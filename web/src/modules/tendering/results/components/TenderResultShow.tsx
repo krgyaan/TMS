@@ -2,11 +2,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { Trophy, XCircle, Clock, Gavel, CheckCircle2 } from 'lucide-react';
+import { Trophy, XCircle, Clock, Gavel, CheckCircle2, FileText, ExternalLink, Download } from 'lucide-react';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import type { ResultDashboardRow } from '../helpers/tenderResult.types';
 import { Button } from '@/components/ui/button';
+import { tenderFilesService } from '@/services/api/tender-files.service';
 
 interface TenderResultShowProps {
     result: ResultDashboardRow & {
@@ -25,6 +26,22 @@ interface TenderResultShowProps {
     onViewRa?: (raId: number) => void;
     className?: string;
 }
+
+// Helper function to get file URL from stored path
+const getFileUrl = (filePath: string): string => {
+    // File paths are stored as "context/filename.ext" (e.g., "bid-submitted-docs/file.pdf")
+    // API expects: /tender-files/serve/:context/:fileName
+    const parts = filePath.split('/');
+    if (parts.length >= 2) {
+        const context = parts[0];
+        const fileName = parts.slice(1).join('/');
+        // Get base URL from axios instance
+        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+        return `${baseUrl}/tender-files/serve/${context}/${encodeURIComponent(fileName)}`;
+    }
+    // Fallback: try to use as-is (shouldn't happen with proper paths)
+    return tenderFilesService.getFileUrl(filePath);
+};
 
 const getStatusVariant = (status: string): string => {
     switch (status) {
@@ -380,52 +397,89 @@ export function TenderResultShow({
                             </>
                         )}
 
-                        {/* Screenshots */}
-                        {(result.qualifiedPartiesScreenshot || result.finalResultScreenshot) && (
-                            <>
-                                <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={4} className="font-semibold text-sm">
-                                        Screenshots
-                                    </TableCell>
-                                </TableRow>
-                                {result.qualifiedPartiesScreenshot && (
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Qualified Parties Screenshot
-                                        </TableCell>
-                                        <TableCell className="text-sm" colSpan={3}>
-                                            <a
-                                                href={result.qualifiedPartiesScreenshot}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-primary hover:underline"
-                                            >
-                                                View Screenshot
-                                            </a>
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                                {result.finalResultScreenshot && (
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Final Result Screenshot
-                                        </TableCell>
-                                        <TableCell className="text-sm" colSpan={3}>
-                                            <a
-                                                href={result.finalResultScreenshot}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-primary hover:underline"
-                                            >
-                                                View Screenshot
-                                            </a>
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </>
-                        )}
                     </TableBody>
                 </Table>
+                {/* Screenshots */}
+                {(result.qualifiedPartiesScreenshot || result.finalResultScreenshot) && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {result.qualifiedPartiesScreenshot && (
+                            <div className="flex flex-col border rounded-md p-3 bg-card shadow-sm gap-2">
+                                <div className="flex items-start gap-2 overflow-hidden">
+                                    <FileText className="h-6 w-6 text-muted-foreground shrink-0" />
+                                    <div className="flex flex-col overflow-hidden">
+                                        <span className="font-medium text-sm truncate" title={result.qualifiedPartiesScreenshot.split('/').pop() || result.qualifiedPartiesScreenshot}>
+                                            {result.qualifiedPartiesScreenshot.split('/').pop() || result.qualifiedPartiesScreenshot}
+                                        </span>
+                                        <span className="text-xs text-muted-foreground truncate" title="Qualified Parties Screenshot">
+                                            Qualified Parties Screenshot
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 mt-auto">
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="flex-1 h-8 text-xs gap-1"
+                                        onClick={() => window.open(getFileUrl(result.qualifiedPartiesScreenshot!), '_blank')}
+                                    >
+                                        <ExternalLink className="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="flex-1 h-8 text-xs gap-1"
+                                        onClick={() => {
+                                            const a = document.createElement('a');
+                                            a.href = getFileUrl(result.qualifiedPartiesScreenshot!);
+                                            a.download = result.qualifiedPartiesScreenshot!.split('/').pop() || result.qualifiedPartiesScreenshot!;
+                                            a.click();
+                                        }}
+                                    >
+                                        <Download className="h-3 w-3" />
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                        {result.finalResultScreenshot && (
+                            <div className="flex flex-col border rounded-md p-3 bg-card shadow-sm gap-2">
+                                <div className="flex items-start gap-2 overflow-hidden">
+                                    <FileText className="h-6 w-6 text-muted-foreground shrink-0" />
+                                    <div className="flex flex-col overflow-hidden">
+                                        <span className="font-medium text-sm truncate" title={result.finalResultScreenshot.split('/').pop() || result.finalResultScreenshot}>
+                                            {result.finalResultScreenshot.split('/').pop() || result.finalResultScreenshot}
+                                        </span>
+                                        <span className="text-xs text-muted-foreground truncate" title="Final Price Screenshot">
+                                            Final Price Screenshot
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 mt-auto">
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="flex-1 h-8 text-xs gap-1"
+                                        onClick={() => window.open(getFileUrl(result.finalResultScreenshot!), '_blank')}
+                                    >
+                                        <ExternalLink className="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="flex-1 h-8 text-xs gap-1"
+                                        onClick={() => {
+                                            const a = document.createElement('a');
+                                            a.href = getFileUrl(result.finalResultScreenshot!);
+                                            a.download = result.finalResultScreenshot!.split('/').pop() || result.finalResultScreenshot!;
+                                            a.click();
+                                        }}
+                                    >
+                                        <Download className="h-3 w-3" />
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
             </CardContent>
         </Card>
     );

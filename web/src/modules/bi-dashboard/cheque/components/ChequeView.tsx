@@ -3,22 +3,40 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Receipt, ExternalLink, Loader2, AlertCircle } from 'lucide-react';
+import { Receipt, ExternalLink, Loader2, AlertCircle, Eye } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { formatINR } from '@/hooks/useINRFormatter';
-import { formatDate } from '@/hooks/useFormatedDate';
+import { formatDate, formatDateTime } from '@/hooks/useFormatedDate';
 import { paths } from '@/app/routes/paths';
 import { useTender } from '@/hooks/api/useTenders';
 import { useInfoSheet } from '@/hooks/api/useInfoSheets';
 import { TenderView } from '@/modules/tendering/tenders/components/TenderView';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { InfoSheetView } from '@/modules/tendering/info-sheet/components/InfoSheetView';
+import { tenderFilesService } from '@/services/api/tender-files.service';
 
 interface ChequeViewProps {
     data: any;
     isLoading?: boolean;
     className?: string;
 }
+
+const FileLink = ({ file }: { file?: string }) => {
+    if (!file) return <span className="text-muted-foreground">Not Uploaded</span>;
+
+    return (
+        <div className="flex gap-3 items-center">
+            <a
+                href={tenderFilesService.getFileUrl(file)}
+                target="_blank"
+                className="flex items-center gap-1 text-blue-600 hover:underline"
+            >
+                <Eye className="h-4 w-4" />
+                {file?.split('_').slice(1).join('_')}
+            </a>
+        </div>
+    );
+};
 
 export function ChequeView({
     data,
@@ -78,17 +96,31 @@ export function ChequeView({
                                 </TableCell>
                             </TableRow>
                             <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
-                                    Cheque No
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Request ID
                                 </TableCell>
-                                <TableCell className="text-sm font-semibold w-1/4">
-                                    {data.chequeNo || '—'}
+                                <TableCell className="text-sm">
+                                    {data.requestId ?? '—'}
                                 </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
-                                    Cheque Date
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Requested By
                                 </TableCell>
-                                <TableCell className="text-sm w-1/4">
-                                    {data.chequeDate ? formatDate(data.chequeDate) : '—'}
+                                <TableCell className="text-sm">
+                                    {data.requestedByName || '—'}
+                                </TableCell>
+                            </TableRow>
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Request Type
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                    {data.requestType ?? '—'}
+                                </TableCell>
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Requeste Date
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                    {formatDateTime(data.createdAt)}
                                 </TableCell>
                             </TableRow>
                             <TableRow className="hover:bg-muted/30 transition-colors">
@@ -120,100 +152,6 @@ export function ChequeView({
                                 </TableCell>
                             </TableRow>
 
-                            {/* Request Information */}
-                            <TableRow className="bg-muted/50">
-                                <TableCell colSpan={4} className="font-semibold text-sm">
-                                    Request Information
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Request ID
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.requestId ?? '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Requested By
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.requestedByName || '—'}
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Docket No
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.docketNo || '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Issue Date
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.issueDate ? formatDate(data.issueDate) : '—'}
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Expiry Date
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.expiryDate ? formatDate(data.expiryDate) : '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Request Status
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.requestStatus || '—'}
-                                </TableCell>
-                            </TableRow>
-                            {data.requestRemarks && (
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Request Remarks
-                                    </TableCell>
-                                    <TableCell className="text-sm break-words" colSpan={3}>
-                                        {data.requestRemarks}
-                                    </TableCell>
-                                </TableRow>
-                            )}
-
-                            {/* Tender/Project Information */}
-                            <TableRow className="bg-muted/50">
-                                <TableCell colSpan={4} className="font-semibold text-sm">
-                                    Tender/Project Information
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Tender No
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.tenderNo || data.projectNo || '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Tender Name
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.tenderName || data.projectName || '—'}
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Bid Validity
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.tenderDueDate ? formatDate(data.tenderDueDate) : data.requestDueDate ? formatDate(data.requestDueDate) : '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Tender Status
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.tenderStatusName || '—'}
-                                </TableCell>
-                            </TableRow>
-
                             {/* Cheque Details */}
                             <TableRow className="bg-muted/50">
                                 <TableCell colSpan={4} className="font-semibold text-sm">
@@ -221,17 +159,31 @@ export function ChequeView({
                                 </TableCell>
                             </TableRow>
                             <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                    Cheque No
+                                </TableCell>
+                                <TableCell className="text-sm font-semibold w-1/4">
+                                    {data.chequeNo || '—'}
+                                </TableCell>
+                                <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                    Cheque Date
+                                </TableCell>
+                                <TableCell className="text-sm w-1/4">
+                                    {data.chequeDate ? formatDate(data.chequeDate) : '—'}
+                                </TableCell>
+                            </TableRow>
+                            <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Bank Name
+                                    Account to be debited from
                                 </TableCell>
                                 <TableCell className="text-sm">
                                     {data.bankName || '—'}
                                 </TableCell>
                                 <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Type
+                                    Cheque Needed In (Hours)
                                 </TableCell>
                                 <TableCell className="text-sm">
-                                    {data.type || data.chequeReason || '—'}
+                                    {data.chequeNeeds || '—'}
                                 </TableCell>
                             </TableRow>
                             <TableRow className="hover:bg-muted/30 transition-colors">
@@ -252,20 +204,6 @@ export function ChequeView({
                                     ) : '—'}
                                 </TableCell>
                             </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Request Type
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.reqType || '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Cheque Needs
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.chequeNeeds || '—'}
-                                </TableCell>
-                            </TableRow>
                             {data.btTransferDate && (
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">
@@ -276,6 +214,64 @@ export function ChequeView({
                                     </TableCell>
                                     <TableCell colSpan={2} />
                                 </TableRow>
+                            )}
+
+                            {/* Handover/Confirmation Details */}
+                            {(data.handover || data.confirmation || data.reference) && (
+                                <>
+                                    <TableRow className="bg-muted/50">
+                                        <TableCell colSpan={4} className="font-semibold text-sm">
+                                            Handover/Confirmation Details
+                                        </TableCell>
+                                    </TableRow>
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Receiving of the cheque handed over
+                                        </TableCell>
+                                        <TableCell className="text-sm">
+                                            <FileLink file={data.handover} />
+                                        </TableCell>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Positive pay confirmation copy
+                                        </TableCell>
+                                        <TableCell className="text-sm">
+                                            <FileLink file={data.confirmation} />
+                                        </TableCell>
+                                    </TableRow>
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Soft copy of Cheque
+                                        </TableCell>
+                                        <TableCell className="text-sm">
+                                            <FileLink file={data.chequeImagePath} />
+                                        </TableCell>
+                                    </TableRow>
+                                </>
+                            )}
+
+                            {/* Linked References (fallback when linkedDd/linkedFdr not populated) */}
+                            {!data.linkedDd && !data.linkedFdr && (data.linkedDdId || data.linkedFdrId) && (
+                                <>
+                                    <TableRow className="bg-muted/50">
+                                        <TableCell colSpan={4} className="font-semibold text-sm">
+                                            Linked References
+                                        </TableCell>
+                                    </TableRow>
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Linked DD ID
+                                        </TableCell>
+                                        <TableCell className="text-sm">
+                                            {data.linkedDdId || '—'}
+                                        </TableCell>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Linked FDR ID
+                                        </TableCell>
+                                        <TableCell className="text-sm">
+                                            {data.linkedFdrId || '—'}
+                                        </TableCell>
+                                    </TableRow>
+                                </>
                             )}
 
                             {/* Linked Demand Draft */}
@@ -399,89 +395,6 @@ export function ChequeView({
                                                     View FDR
                                                 </Link>
                                             </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                </>
-                            )}
-
-                            {/* Linked References (fallback when linkedDd/linkedFdr not populated) */}
-                            {!data.linkedDd && !data.linkedFdr && (data.linkedDdId || data.linkedFdrId) && (
-                                <>
-                                    <TableRow className="bg-muted/50">
-                                        <TableCell colSpan={4} className="font-semibold text-sm">
-                                            Linked References
-                                        </TableCell>
-                                    </TableRow>
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Linked DD ID
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {data.linkedDdId || '—'}
-                                        </TableCell>
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Linked FDR ID
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {data.linkedFdrId || '—'}
-                                        </TableCell>
-                                    </TableRow>
-                                </>
-                            )}
-
-                            {/* Handover/Confirmation Details */}
-                            {(data.handover || data.confirmation || data.reference) && (
-                                <>
-                                    <TableRow className="bg-muted/50">
-                                        <TableCell colSpan={4} className="font-semibold text-sm">
-                                            Handover/Confirmation Details
-                                        </TableCell>
-                                    </TableRow>
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Handover
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {data.handover || '—'}
-                                        </TableCell>
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Confirmation
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {data.confirmation || '—'}
-                                        </TableCell>
-                                    </TableRow>
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Reference
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {data.reference || '—'}
-                                        </TableCell>
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Transfer Date
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {data.transferDate ? formatDate(data.transferDate) : '—'}
-                                        </TableCell>
-                                    </TableRow>
-                                </>
-                            )}
-
-                            {/* Stop Reason */}
-                            {data.stopReasonText && (
-                                <>
-                                    <TableRow className="bg-muted/50">
-                                        <TableCell colSpan={4} className="font-semibold text-sm">
-                                            Additional Information
-                                        </TableCell>
-                                    </TableRow>
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground whitespace-normal [overflow-wrap:anywhere]">
-                                            Stop Reason
-                                        </TableCell>
-                                        <TableCell className="text-sm break-words" colSpan={3}>
-                                            {data.stopReasonText || '—'}
                                         </TableCell>
                                     </TableRow>
                                 </>

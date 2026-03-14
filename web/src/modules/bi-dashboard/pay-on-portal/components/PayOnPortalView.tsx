@@ -68,16 +68,16 @@ export function PayOnPortalView({
                             </TableRow>
                             <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
-                                    Portal Name
+                                    Request Date
                                 </TableCell>
                                 <TableCell className="text-sm font-semibold w-1/4">
-                                    {data.portalName || '—'}
+                                    {formatDateTime(data.createdAt)}
                                 </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
-                                    Transaction Date
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Requested By
                                 </TableCell>
-                                <TableCell className="text-sm w-1/4">
-                                    {data.transactionDate ? formatDateTime(data.transactionDate) : '—'}
+                                <TableCell className="text-sm">
+                                    {data.requestedByName || '—'}
                                 </TableCell>
                             </TableRow>
                             <TableRow className="hover:bg-muted/30 transition-colors">
@@ -88,31 +88,18 @@ export function PayOnPortalView({
                                     {data.amount ? formatINR(Number(data.amount)) : '—'}
                                 </TableCell>
                                 <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Status
+                                    Purpose
                                 </TableCell>
                                 <TableCell className="text-sm">
-                                    <Badge variant="outline">{data.status || '—'}</Badge>
+                                    {data.requestPurpose || '—'}
                                 </TableCell>
                             </TableRow>
                             <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Purpose
+                                    Status
                                 </TableCell>
                                 <TableCell className="text-sm">
-                                    {data.purpose || data.requestPurpose || '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    UTR
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.utrNum || data.utr || '—'}
-                                </TableCell>
-                            </TableRow>
-
-                            {/* Request Information */}
-                            <TableRow className="bg-muted/50">
-                                <TableCell colSpan={4} className="font-semibold text-sm">
-                                    Request Information
+                                    <Badge variant="outline">{data.status || '—'}</Badge>
                                 </TableCell>
                             </TableRow>
                             <TableRow className="hover:bg-muted/30 transition-colors">
@@ -129,55 +116,6 @@ export function PayOnPortalView({
                                     {data.requestType || '—'}
                                 </TableCell>
                             </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Requested By
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.requestedByName || '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Docket No
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.docketNo || '—'}
-                                </TableCell>
-                            </TableRow>
-
-                            {/* Tender/Project Information */}
-                            <TableRow className="bg-muted/50">
-                                <TableCell colSpan={4} className="font-semibold text-sm">
-                                    Tender/Project Information
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Tender No
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.tenderNo || data.projectNo || '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Tender Name
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.tenderName || data.projectName || '—'}
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Bid Validity
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.tenderDueDate ? formatDate(data.tenderDueDate) : data.requestDueDate ? formatDate(data.requestDueDate) : '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Tender Status
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.tenderStatusName || '—'}
-                                </TableCell>
-                            </TableRow>
 
                             {/* Payment Details */}
                             <TableRow className="bg-muted/50">
@@ -186,72 +124,47 @@ export function PayOnPortalView({
                                 </TableCell>
                             </TableRow>
                             <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Payment Method
+                                <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                    Portal Name
                                 </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.paymentMethod || '—'}
+                                <TableCell className="text-sm font-semibold w-1/4">
+                                    {data.portalName || '—'}
                                 </TableCell>
+                                <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                    Transaction Date
+                                </TableCell>
+                                <TableCell className="text-sm w-1/4">
+                                    {data.transactionDate ? formatDateTime(data.transactionDate) : '—'}
+                                </TableCell>
+                            </TableRow>
+                            <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     Netbanking
                                 </TableCell>
                                 <TableCell className="text-sm">
                                     {data.isNetbanking ? 'Yes' : 'No'}
                                 </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     Debit Card
                                 </TableCell>
                                 <TableCell className="text-sm">
                                     {data.isDebit ? 'Yes' : 'No'}
                                 </TableCell>
+                            </TableRow>
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    UTR
+                                </TableCell>
+                                <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
+                                    {data.utrNum || data.utr || '—'}
+                                </TableCell>
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     UTR Message
                                 </TableCell>
-                                <TableCell className="text-sm">
+                                <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
                                     {data.utrMsg || '—'}
                                 </TableCell>
                             </TableRow>
-
-                            {/* Account Information */}
-                            {data.accountName && (
-                                <>
-                                    <TableRow className="bg-muted/50">
-                                        <TableCell colSpan={4} className="font-semibold text-sm">
-                                            Account Information
-                                        </TableCell>
-                                    </TableRow>
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Account Name
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {data.accountName || '—'}
-                                        </TableCell>
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Account Number
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {data.accountNumber || '—'}
-                                        </TableCell>
-                                    </TableRow>
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            IFSC
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {data.ifsc || '—'}
-                                        </TableCell>
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Requested By
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {data.requestedByName || '—'}
-                                        </TableCell>
-                                    </TableRow>
-                                </>
-                            )}
 
                             {/* Return Details */}
                             {(data.returnTransferDate || data.returnUtr) && (
@@ -271,7 +184,7 @@ export function PayOnPortalView({
                                         <TableCell className="text-sm font-medium text-muted-foreground">
                                             Return UTR
                                         </TableCell>
-                                        <TableCell className="text-sm">
+                                        <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
                                             {data.returnUtr || '—'}
                                         </TableCell>
                                     </TableRow>

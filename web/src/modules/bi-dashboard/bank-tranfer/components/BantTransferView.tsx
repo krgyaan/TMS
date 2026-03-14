@@ -68,38 +68,24 @@ export function BankTransferView({
                             </TableRow>
                             <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
-                                    Date
+                                    Request Date
                                 </TableCell>
                                 <TableCell className="text-sm font-semibold w-1/4">
-                                    {data.date ? formatDate(data.date) : data.transactionDate ? formatDateTime(data.transactionDate) : '—'}
+                                    {formatDateTime(data.createdAt)}
                                 </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
-                                    UTR No
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Requested By
                                 </TableCell>
-                                <TableCell className="text-sm w-1/4">
-                                    {data.utrNo || data.utrNum || '—'}
+                                <TableCell className="text-sm">
+                                    {data.requestedByName || '—'}
                                 </TableCell>
                             </TableRow>
                             <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Account Name
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.accountName || '—'}
-                                </TableCell>
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     Amount
                                 </TableCell>
                                 <TableCell className="text-sm font-semibold">
                                     {data.amount ? formatINR(Number(data.amount)) : '—'}
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Status
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    <Badge variant="outline">{data.status || '—'}</Badge>
                                 </TableCell>
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     Purpose
@@ -108,11 +94,12 @@ export function BankTransferView({
                                     {data.purpose || '—'}
                                 </TableCell>
                             </TableRow>
-
-                            {/* Request Information */}
-                            <TableRow className="bg-muted/50">
-                                <TableCell colSpan={4} className="font-semibold text-sm">
-                                    Request Information
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Status
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                    <Badge variant="outline">{data.status || '—'}</Badge>
                                 </TableCell>
                             </TableRow>
                             <TableRow className="hover:bg-muted/30 transition-colors">
@@ -127,41 +114,6 @@ export function BankTransferView({
                                 </TableCell>
                                 <TableCell className="text-sm">
                                     {data.requestType || '—'}
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Requested By
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.requestedByName || '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Docket No
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.docketNo || '—'}
-                                </TableCell>
-                            </TableRow>
-
-                            {/* Tender/Project Information */}
-                            <TableRow className="bg-muted/50">
-                                <TableCell colSpan={4} className="font-semibold text-sm">
-                                    Tender/Project Information
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Tender No
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.tenderNo || data.projectNo || '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Tender Name
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.tenderName || data.projectName || '—'}
                                 </TableCell>
                             </TableRow>
                             <TableRow className="hover:bg-muted/30 transition-colors">
@@ -185,69 +137,46 @@ export function BankTransferView({
                                     Transfer Details
                                 </TableCell>
                             </TableRow>
-                            {(data.portalName || data.paymentMethod) && (
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Portal Name
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {data.portalName || '—'}
-                                    </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Payment Method
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {data.paymentMethod || '—'}
-                                    </TableCell>
-                                </TableRow>
-                            )}
                             <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Account Name
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                    {data.accountName || '—'}
+                                </TableCell>
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     Account Number
                                 </TableCell>
                                 <TableCell className="text-sm">
                                     {data.accountNumber || '—'}
                                 </TableCell>
+                            </TableRow>
+                            <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     IFSC
                                 </TableCell>
                                 <TableCell className="text-sm">
                                     {data.ifsc || '—'}
                                 </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     Transaction Date
                                 </TableCell>
                                 <TableCell className="text-sm">
                                     {data.transactionDate ? formatDateTime(data.transactionDate) : '—'}
                                 </TableCell>
+                            </TableRow>
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                    UTR No
+                                </TableCell>
+                                <TableCell className="text-sm w-1/4">
+                                    {data.utrNo || data.utrNum || '—'}
+                                </TableCell>
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     UTR Message
                                 </TableCell>
-                                <TableCell className="text-sm">
+                                <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
                                     {data.utrMsg || '—'}
-                                </TableCell>
-                            </TableRow>
-
-                            {/* Team Member Information */}
-                            <TableRow className="bg-muted/50">
-                                <TableCell colSpan={4} className="font-semibold text-sm">
-                                    Team Member Information
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Requested By
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.requestedByName || '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Team Member
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.teamMemberName || data.teamMember || '—'}
                                 </TableCell>
                             </TableRow>
 
@@ -269,7 +198,7 @@ export function BankTransferView({
                                         <TableCell className="text-sm font-medium text-muted-foreground">
                                             Return UTR
                                         </TableCell>
-                                        <TableCell className="text-sm">
+                                        <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
                                             {data.returnUtr || '—'}
                                         </TableCell>
                                     </TableRow>

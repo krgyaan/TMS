@@ -712,7 +712,7 @@ export class ChequeService {
                 .from(instrumentDdDetails)
                 .innerJoin(paymentInstruments, eq(paymentInstruments.id, instrumentDdDetails.instrumentId))
                 .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-                .where(eq(instrumentDdDetails.id, result.linkedDdId))
+                .where(eq(instrumentDdDetails.instrumentId, result.linkedDdId))
                 .limit(1);
             if (ddRow) {
                 // Fix: Convert ddDate from string to Date if necessary
@@ -737,7 +737,7 @@ export class ChequeService {
                 .from(instrumentFdrDetails)
                 .innerJoin(paymentInstruments, eq(paymentInstruments.id, instrumentFdrDetails.instrumentId))
                 .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-                .where(eq(instrumentFdrDetails.id, result.linkedFdrId))
+                .where(eq(instrumentFdrDetails.instrumentId, result.linkedFdrId))
                 .limit(1);
             if (fdrRow) {
                 // Fix: Convert fdrDate from string to Date if necessary

@@ -67,31 +67,17 @@ export function DemandDraftView({
                                 </TableCell>
                             </TableRow>
                             <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
-                                    DD No
-                                </TableCell>
-                                <TableCell className="text-sm font-semibold w-1/4">
-                                    {data.ddNo || '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
-                                    DD Date
-                                </TableCell>
-                                <TableCell className="text-sm w-1/4">
-                                    {data.ddDate ? formatDate(data.ddDate) : '—'}
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Request No
+                                    Request ID
                                 </TableCell>
                                 <TableCell className="text-sm">
-                                    {data.reqNo || '—'}
+                                    {data.requestId ?? '—'}
                                 </TableCell>
                                 <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Amount
+                                    Request Type
                                 </TableCell>
-                                <TableCell className="text-sm font-semibold">
-                                    {data.amount ? formatINR(Number(data.amount)) : '—'}
+                                <TableCell className="text-sm">
+                                    {data.requestType || '—'}
                                 </TableCell>
                             </TableRow>
                             <TableRow className="hover:bg-muted/30 transition-colors">
@@ -108,27 +94,6 @@ export function DemandDraftView({
                                     {data.purpose || data.requestPurpose || '—'}
                                 </TableCell>
                             </TableRow>
-
-                            {/* Request Information */}
-                            <TableRow className="bg-muted/50">
-                                <TableCell colSpan={4} className="font-semibold text-sm">
-                                    Request Information
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Request ID
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.requestId ?? '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Request Type
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.requestType || '—'}
-                                </TableCell>
-                            </TableRow>
                             <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     Requested By
@@ -143,6 +108,35 @@ export function DemandDraftView({
                                     {data.courierAddress || '—'}
                                 </TableCell>
                             </TableRow>
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Courier Request Number
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                    {data.reqNo || '—'}
+                                </TableCell>
+                                <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                    DD No
+                                </TableCell>
+                                <TableCell className="text-sm font-semibold w-1/4">
+                                    {data.ddNo || '—'}
+                                </TableCell>
+                                <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                    DD Date
+                                </TableCell>
+                                <TableCell className="text-sm w-1/4">
+                                    {data.ddDate ? formatDate(data.ddDate) : '—'}
+                                </TableCell>
+                            </TableRow>
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Amount
+                                </TableCell>
+                                <TableCell className="text-sm font-semibold">
+                                    {data.amount ? formatINR(Number(data.amount)) : '—'}
+                                </TableCell>
+                            </TableRow>
+
                             <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     Docket No
@@ -182,41 +176,6 @@ export function DemandDraftView({
                                     </TableCell>
                                 </TableRow>
                             )}
-
-                            {/* Tender/Project Information */}
-                            <TableRow className="bg-muted/50">
-                                <TableCell colSpan={4} className="font-semibold text-sm">
-                                    Tender/Project Information
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Tender No
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.tenderNo || data.projectNo || '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Tender Name
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.tenderName || data.projectName || '—'}
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Bid Validity
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.tenderDueDate ? formatDate(data.tenderDueDate) : data.requestDueDate ? formatDate(data.requestDueDate) : '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Tender Status
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.tenderStatusName || '—'}
-                                </TableCell>
-                            </TableRow>
 
                             {/* DD Details */}
                             <TableRow className="bg-muted/50">
