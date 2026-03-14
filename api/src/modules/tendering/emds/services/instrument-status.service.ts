@@ -75,7 +75,6 @@ export class InstrumentStatusService {
             .set({
                 status: newStatus,
                 action: newStage,
-                currentStage: newStage,
                 updatedAt: new Date(),
             })
             .where(eq(paymentInstruments.id, instrumentId))
@@ -128,7 +127,6 @@ export class InstrumentStatusService {
             .update(paymentInstruments)
             .set({
                 status: rejectedStatus,
-                rejectionReason,
                 updatedAt: new Date(),
             })
             .where(eq(paymentInstruments.id, instrumentId))
@@ -195,8 +193,7 @@ export class InstrumentStatusService {
                 favouring: rejectedInstrument.favouring,
                 payableAt: rejectedInstrument.payableAt,
                 status: initialStatus,
-                action: 1,
-                currentStage: 1,
+                action: 0,
                 isActive: true,
                 courierAddress: rejectedInstrument.courierAddress,
                 courierDeadline: rejectedInstrument.courierDeadline,
@@ -333,10 +330,10 @@ export class InstrumentStatusService {
                 if (currentStage === 6) return FDR_STATUSES.ACCOUNTS_FORM_REJECTED; // Cancellation request rejection
                 return FDR_STATUSES.ACCOUNTS_FORM_REJECTED;
             case 'BG':
-                if (currentStage === 1) return BG_STATUSES.BANK_REQUEST_REJECTED;
+                if (currentStage === 1) return BG_STATUSES.ACCOUNTS_FORM_REJECTED;
                 if (currentStage === 5) return BG_STATUSES.EXTENSION_REQUESTED;
                 if (currentStage === 7) return BG_STATUSES.CANCELLATION_REQUESTED;
-                return BG_STATUSES.BANK_REQUEST_REJECTED;
+                return BG_STATUSES.ACCOUNTS_FORM_REJECTED;
             case 'Cheque':
                 return CHEQUE_STATUSES.ACCOUNTS_FORM_REJECTED;
             case 'Bank Transfer':

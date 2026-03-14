@@ -1,21 +1,14 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { and, eq, asc, desc, sql, isNull, isNotNull, inArray, notInArray } from 'drizzle-orm';
+import { and, eq, asc, desc, sql, isNull, isNotNull, inArray, notInArray, SQL } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
 import { users } from '@db/schemas/auth/users.schema';
-import {
-    physicalDocs,
-    physicalDocsPersons,
-    type NewPhysicalDocs,
+import { physicalDocs, physicalDocsPersons, type NewPhysicalDocs,
 } from '@db/schemas/tendering/physical-docs.schema';
 import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
-import { tenderStatusHistory } from '@db/schemas/tendering/tender-status-history.schema';
-import type {
-    CreatePhysicalDocDto,
-    UpdatePhysicalDocDto,
-} from '@/modules/tendering/physical-docs/dto/physical-docs.dto';
+import type { CreatePhysicalDocDto, UpdatePhysicalDocDto } from '@/modules/tendering/physical-docs/dto/physical-docs.dto';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import { items } from '@db/schemas/master/items.schema';
@@ -27,6 +20,8 @@ import { Logger } from '@nestjs/common';
 import { tenderClients } from '@db/schemas/tendering/tender-info-sheet.schema';
 import { StatusCache } from '@/utils/status-cache';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
+import { TimersService } from '@/modules/timers/timers.service';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 export type PhysicalDocFilters = {
     physicalDocsSent?: boolean;
@@ -83,12 +78,69 @@ export class PhysicalDocsService {
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
+        private readonly timersService: TimersService,
     ) { }
+
+    /**
+     * Build role-based filter conditions for tender queries
+     */
+    private buildRoleFilterConditions(user?: ValidatedUser, teamId?: number): any[] {
+        const roleFilterConditions: any[] = [];
+
+        if (user && user.roleId) {
+            if (user.roleId === 1 || user.roleId === 2) {
+                // Super User or Admin: Show all, respect teamId filter if provided
+                if (teamId !== undefined && teamId !== null) {
+                    roleFilterConditions.push(eq(tenderInfos.team, teamId));
+                }
+            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+                // Team Leader, Coordinator, Engineer: Filter by primary_team_id
+                if (user.teamId) {
+                    roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
+                } else {
+                    roleFilterConditions.push(sql`1 = 0`); // Empty results
+                }
+            } else {
+                // All other roles: Show only own tenders
+                if (user.sub) {
+                    roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
+                } else {
+                    roleFilterConditions.push(sql`1 = 0`); // Empty results
+                }
+            }
+        } else {
+            // No user provided - return empty for security
+            roleFilterConditions.push(sql`1 = 0`);
+        }
+
+        return roleFilterConditions;
+    }
+
+    private getDefaultSortByTab(tab: string): SQL<unknown> {
+        switch (tab) {
+            case 'pending':
+                // Soonest due date first, NULLs last
+                return sql`${tenderInfos.dueDate} ASC NULLS LAST`;
+
+            case 'sent':
+                // Latest due date first
+                return sql`${tenderInfos.dueDate} DESC NULLS LAST`;
+
+            case 'tender-dnb':
+                // Latest due date first
+                return sql`${tenderInfos.dueDate} DESC NULLS LAST`;
+
+            default:
+                return sql`${tenderInfos.dueDate} ASC NULLS LAST`;
+        }
+    }
 
     /**
      * Get dashboard data by tab - Refactored to use config
      */
     async getDashboardData(
+        user?: ValidatedUser,
+        teamId?: number,
         tabKey?: 'pending' | 'sent' | 'tender-dnb',
         filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; search?: string }
     ): Promise<PaginatedResult<PhysicalDocDashboardRow>> {
@@ -102,17 +154,14 @@ export class PhysicalDocsService {
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
-            // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
             inArray(tenderInformation.physicalDocsRequired, ['Yes', 'YES']),
         ];
 
-        // TODO: Add role-based team filtering middleware/guard
-        // - Admin: see all tenders
-        // - Team Leader/Coordinator: filter by user.team
-        // - Others: filter by team_member = user.id
+        // Apply role-based filtering
+        const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
 
         // Build tab-specific conditions
-        const conditions = [...baseConditions];
+        const conditions = [...baseConditions, ...roleFilterConditions];
 
         if (activeTab === 'pending') {
             conditions.push(isNull(physicalDocs.id));
@@ -134,36 +183,29 @@ export class PhysicalDocsService {
         // Add search conditions
         if (filters?.search) {
             const searchStr = `%${filters.search}%`;
-            conditions.push(
-                sql`(
-                    ${tenderInfos.tenderName} ILIKE ${searchStr} OR
-                    ${tenderInfos.tenderNo} ILIKE ${searchStr} OR
-                    ${tenderInfos.gstValues}::text ILIKE ${searchStr} OR
-                    ${tenderInfos.dueDate}::text ILIKE ${searchStr} OR
-                    ${users.name} ILIKE ${searchStr}
-                )`
-            );
+            const searchConditions: any[] = [
+                sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
+                sql`${tenderInfos.gstValues}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.dueDate}::text ILIKE ${searchStr}`,
+                sql`${users.name} ILIKE ${searchStr}`,
+                sql`${statuses.name} ILIKE ${searchStr}`,
+                sql`${tenderInformation.courierAddress} ILIKE ${searchStr}`,
+                sql`${tenderInformation.physicalDocsDeadline}::text ILIKE ${searchStr}`,
+                sql`${physicalDocs.courierNo} ILIKE ${searchStr}`,
+            ];
+            conditions.push(sql`(${sql.join(searchConditions, sql` OR `)})`);
         }
 
         const whereClause = and(...conditions);
 
         // Build orderBy clause
-        const sortBy = filters?.sortBy;
-        const sortOrder = filters?.sortOrder || (activeTab === 'pending' ? 'asc' : activeTab === 'sent' ? 'desc' : 'desc');
-        let orderByClause: any = asc(tenderInfos.dueDate);
+        let orderByClause: SQL<unknown>;
 
-        // Set default sort based on tab if no sortBy specified
-        if (!sortBy) {
-            if (activeTab === 'pending') {
-                orderByClause = asc(tenderInfos.dueDate);
-            } else if (activeTab === 'sent') {
-                orderByClause = desc(physicalDocs.createdAt);
-            } else if (activeTab === 'tender-dnb') {
-                orderByClause = desc(tenderInfos.updatedAt);
-            }
-        } else {
-            const sortFn = sortOrder === 'desc' ? desc : asc;
-            switch (sortBy) {
+        if (filters?.sortBy) {
+            // User-specified sorting takes priority
+            const sortFn = filters.sortOrder === 'desc' ? desc : asc;
+            switch (filters.sortBy) {
                 case 'tenderNo':
                     orderByClause = sortFn(tenderInfos.tenderNo);
                     break;
@@ -176,18 +218,21 @@ export class PhysicalDocsService {
                 case 'dueDate':
                     orderByClause = sortFn(tenderInfos.dueDate);
                     break;
-                case 'dispatchDate':
-                    orderByClause = sortFn(physicalDocs.createdAt);
+                case 'physicalDocsDeadline':
+                    orderByClause = sortFn(tenderInformation.physicalDocsDeadline);
                     break;
-                case 'statusChangeDate':
-                    orderByClause = sortFn(tenderInfos.updatedAt);
+                case 'courierDate':
+                    orderByClause = sortFn(physicalDocs.createdAt);
                     break;
                 case 'statusName':
                     orderByClause = sortFn(statuses.name);
                     break;
                 default:
-                    orderByClause = sortFn(tenderInfos.dueDate);
+                    orderByClause = this.getDefaultSortByTab(activeTab);
             }
+        } else {
+            // Default sorting based on tab
+            orderByClause = this.getDefaultSortByTab(activeTab);
         }
 
         // Get total count
@@ -196,7 +241,7 @@ export class PhysicalDocsService {
             .from(tenderInfos)
             .innerJoin(users, eq(users.id, tenderInfos.teamMember))
             .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .innerJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
             .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
             .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
             .where(whereClause);
@@ -225,75 +270,13 @@ export class PhysicalDocsService {
             .from(tenderInfos)
             .innerJoin(users, eq(users.id, tenderInfos.teamMember))
             .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .innerJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
             .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
             .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
             .where(whereClause)
+            .orderBy(orderByClause)
             .limit(limit)
-            .offset(offset)
-            .orderBy(orderByClause);
-
-        // Enrich rows with latest status log data
-        if (rows.length > 0) {
-            const tenderIds = rows.map(r => r.tenderId);
-
-            // Get latest status log for each tender
-            const allStatusLogs = await this.db
-                .select({
-                    tenderId: tenderStatusHistory.tenderId,
-                    newStatus: tenderStatusHistory.newStatus,
-                    comment: tenderStatusHistory.comment,
-                    createdAt: tenderStatusHistory.createdAt,
-                    id: tenderStatusHistory.id,
-                })
-                .from(tenderStatusHistory)
-                .where(inArray(tenderStatusHistory.tenderId, tenderIds))
-                .orderBy(desc(tenderStatusHistory.createdAt), desc(tenderStatusHistory.id));
-
-            // Group by tenderId and take the first (latest) entry for each
-            const latestStatusLogMap = new Map<number, typeof allStatusLogs[0]>();
-            for (const log of allStatusLogs) {
-                if (!latestStatusLogMap.has(log.tenderId)) {
-                    latestStatusLogMap.set(log.tenderId, log);
-                }
-            }
-
-            // Get status names for latest status logs
-            const latestStatusIds = [...new Set(Array.from(latestStatusLogMap.values()).map(log => log.newStatus))];
-            const latestStatuses = latestStatusIds.length > 0
-                ? await this.db
-                    .select({ id: statuses.id, name: statuses.name })
-                    .from(statuses)
-                    .where(inArray(statuses.id, latestStatusIds))
-                : [];
-
-            const statusNameMap = new Map(latestStatuses.map(s => [s.id, s.name]));
-
-            // Enrich rows with latest status log data
-            const enrichedRows = rows.map((row) => {
-                const latestLog = latestStatusLogMap.get(row.tenderId);
-                return {
-                    tenderId: row.tenderId,
-                    tenderNo: row.tenderNo,
-                    tenderName: row.tenderName,
-                    dueDate: row.dueDate,
-                    courierAddress: row.courierAddress || '',
-                    physicalDocsRequired: row.physicalDocsRequired || '',
-                    physicalDocsDeadline: row.physicalDocsDeadline || new Date(),
-                    teamMemberName: row.teamMemberName || '',
-                    status: row.status,
-                    statusName: row.statusName || '',
-                    latestStatus: latestLog?.newStatus || null,
-                    latestStatusName: latestLog ? (statusNameMap.get(latestLog.newStatus) || null) : null,
-                    statusRemark: latestLog?.comment || null,
-                    physicalDocs: row.physicalDocs,
-                    courierNo: row.courierNo || null,
-                    courierDate: row.courierDate || null,
-                };
-            });
-
-            return wrapPaginatedResponse(enrichedRows, total, page, limit);
-        }
+            .offset(offset);
 
         const data: PhysicalDocDashboardRow[] = rows.map((row) => ({
             tenderId: row.tenderId,
@@ -317,12 +300,15 @@ export class PhysicalDocsService {
         return wrapPaginatedResponse(data, total, page, limit);
     }
 
-    async getDashboardCounts(): Promise<{ pending: number; sent: number; 'tender-dnb': number; total: number }> {
+    async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<{ pending: number; sent: number; 'tender-dnb': number; total: number }> {
+        const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
+
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
             // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
             eq(tenderInformation.physicalDocsRequired, 'Yes'),
+            ...roleFilterConditions,
         ];
 
         // Count pending: status = 3, physicalDocsId IS NULL
@@ -353,7 +339,7 @@ export class PhysicalDocsService {
                 .from(tenderInfos)
                 .innerJoin(users, eq(users.id, tenderInfos.teamMember))
                 .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
-                .innerJoin(items, eq(items.id, tenderInfos.item))
+                .leftJoin(items, eq(items.id, tenderInfos.item))
                 .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
                 .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
                 .where(and(...pendingConditions))
@@ -363,7 +349,7 @@ export class PhysicalDocsService {
                 .from(tenderInfos)
                 .innerJoin(users, eq(users.id, tenderInfos.teamMember))
                 .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
-                .innerJoin(items, eq(items.id, tenderInfos.item))
+                .leftJoin(items, eq(items.id, tenderInfos.item))
                 .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
                 .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
                 .where(and(...sentConditions))
@@ -373,7 +359,7 @@ export class PhysicalDocsService {
                 .from(tenderInfos)
                 .innerJoin(users, eq(users.id, tenderInfos.teamMember))
                 .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
-                .innerJoin(items, eq(items.id, tenderInfos.item))
+                .leftJoin(items, eq(items.id, tenderInfos.item))
                 .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
                 .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
                 .where(and(...tenderDnbConditions))
@@ -573,6 +559,23 @@ export class PhysicalDocsService {
         }).then(async (result) => {
             // Send email notification after transaction
             await this.sendPhysicalDocsSentEmail(data.tenderId, result, changedBy);
+
+            // TIMER TRANSITION: Stop physical_docs timer
+            try {
+                this.logger.log(`Stopping timer for tender ${data.tenderId} after physical docs submitted`);
+                await this.timersService.stopTimer({
+                    entityType: 'TENDER',
+                    entityId: data.tenderId,
+                    stage: 'physical_docs',
+                    userId: changedBy,
+                    reason: 'Physical docs submitted'
+                });
+                this.logger.log(`Successfully stopped physical_docs timer for tender ${data.tenderId}`);
+            } catch (error) {
+                this.logger.error(`Failed to stop timer for tender ${data.tenderId} after physical docs submitted:`, error);
+                // Don't fail the entire operation if timer transition fails
+            }
+
             return result;
         });
     }
@@ -782,11 +785,16 @@ export class PhysicalDocsService {
                 'physical-docs.sent',
                 tenderId,
                 sentBy,
-                `Physical Documents Sent: ${tender.tenderNo}`,
+                `Physical Documents Courier - ${tender.tenderNo}`,
                 'physical-docs-sent',
                 emailData,
                 {
                     to: [{ type: 'emails', emails: [client.clientEmail] }],
+                    cc: [
+                        { type: 'role', role: 'Admin', teamId: tender.team },
+                        { type: 'role', role: 'Team Leader', teamId: tender.team },
+                        { type: 'role', role: 'Coordinator', teamId: tender.team },
+                    ],
                 }
             );
         }

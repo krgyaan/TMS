@@ -34,7 +34,7 @@
             <li>Detailed BOQ - {{#if data.hasBoq}}Attached{{else}}NA{{/if}}</li>
             <li>MAF format - {{#if data.hasMaf}}Attached{{else}}NA{{/if}}</li>
             <li>MII Format - {{#if data.hasMii}}Attached{{else}}NA{{/if}}</li>
-            <li>List of Docs needed from manufacturer: {{data.list_of_docs}}</li>
+            <li><b>List of Docs needed from manufacturer:</b><br/>{{#if data.list_of_docs}}<pre style="white-space: pre-wrap; font-weight: bold; margin: 5px 0;">{{data.list_of_docs}}</pre>{{else}}As per tender requirements{{/if}}</li>
         </ul>
         <br />
         <b>Please send the Techno-Commercial Offer before the due date {{data.due_date}}.</b>

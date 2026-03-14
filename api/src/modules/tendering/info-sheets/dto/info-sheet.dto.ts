@@ -60,8 +60,8 @@ export const TenderInfoSheetPayloadSchema = z.object({
 
     // Auction & Terms
     reverseAuctionApplicable: z.enum(['YES', 'NO']).optional().nullable(),
-    paymentTermsSupply: optionalNumber(z.coerce.number().int().min(0).max(100)),
-    paymentTermsInstallation: optionalNumber(z.coerce.number().int().min(0).max(100)),
+    paymentTermsSupply: optionalNumber(z.coerce.number().min(0).max(100)),
+    paymentTermsInstallation: optionalNumber(z.coerce.number().min(0).max(100)),
     bidValidityDays: optionalNumber(z.coerce.number().int().min(0).max(366)),
     commercialEvaluation: z
         .enum(['ITEM_WISE_GST_INCLUSIVE', 'ITEM_WISE_PRE_GST', 'OVERALL_GST_INCLUSIVE', 'OVERALL_PRE_GST'])
@@ -128,8 +128,8 @@ export const TenderInfoSheetPayloadSchema = z.object({
     technicalWorkOrders: optionalStringArray,
     commercialDocuments: optionalStringArray,
 
-    // Client & Address
-    clients: z.array(ClientSchema).min(1, 'At least one client is required'),
+    // Client & Address (zero or more clients allowed)
+    clients: z.array(ClientSchema),
     courierAddress: optionalString,
 
     // Final Remark

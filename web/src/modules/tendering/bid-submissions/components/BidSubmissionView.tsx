@@ -1,9 +1,9 @@
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { Pencil, ArrowLeft, FileText, ExternalLink } from 'lucide-react';
+import { FileText, ExternalLink, Download } from 'lucide-react';
 import type { BidSubmission } from '../helpers/bidSubmission.types';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDateTime } from '@/hooks/useFormatedDate';
@@ -12,32 +12,24 @@ import { tenderFilesService } from '@/services/api/tender-files.service';
 interface BidSubmissionViewProps {
     bidSubmission?: BidSubmission | null;
     isLoading?: boolean;
-    showEditButton?: boolean;
-    showBackButton?: boolean;
-    onEdit?: () => void;
-    onBack?: () => void;
     className?: string;
 }
 
 export function BidSubmissionView({
     bidSubmission,
     isLoading = false,
-    showEditButton = true,
-    showBackButton = true,
-    onEdit,
-    onBack,
     className = '',
 }: BidSubmissionViewProps) {
     if (isLoading) {
         return (
             <Card className={className}>
-                <CardHeader>
-                    <Skeleton className="h-8 w-48" />
+                <CardHeader className="pb-3">
+                    <Skeleton className="h-5 w-40" />
                 </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
-                        {Array.from({ length: 8 }).map((_, i) => (
-                            <Skeleton key={i} className="h-12 w-full" />
+                <CardContent className="pt-0">
+                    <div className="space-y-2">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                            <Skeleton key={i} className="h-10 w-full" />
                         ))}
                     </div>
                 </CardContent>
@@ -48,15 +40,16 @@ export function BidSubmissionView({
     if (!bidSubmission) {
         return (
             <Card className={className}>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <FileText className="h-5 w-5" />
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
                         Bid Submission
                     </CardTitle>
                 </CardHeader>
-                <CardContent>
-                    <div className="text-center py-8 text-muted-foreground">
-                        No bid submission available for this tender yet.
+                <CardContent className="pt-0">
+                    <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                        <FileText className="h-8 w-8 mb-2 opacity-50" />
+                        <p className="text-sm">No bid submission available for this tender yet.</p>
                     </div>
                 </CardContent>
             </Card>
@@ -97,20 +90,6 @@ export function BidSubmissionView({
                     <FileText className="h-5 w-5" />
                     Bid Submission Details
                 </CardTitle>
-                <CardAction className="flex gap-2">
-                    {showEditButton && onEdit && (
-                        <Button variant="default" size="sm" onClick={onEdit}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit
-                        </Button>
-                    )}
-                    {showBackButton && onBack && (
-                        <Button variant="outline" size="sm" onClick={onBack}>
-                            <ArrowLeft className="h-4 w-4 mr-2" />
-                            Back
-                        </Button>
-                    )}
-                </CardAction>
             </CardHeader>
             <CardContent>
                 <Table>
@@ -163,76 +142,126 @@ export function BidSubmissionView({
                                                 Documents
                                             </TableCell>
                                         </TableRow>
-                                        {bidSubmission.documents.submittedDocs && bidSubmission.documents.submittedDocs.length > 0 && (
-                                            <>
-                                                {bidSubmission.documents.submittedDocs.map((doc, idx) => (
-                                                    <TableRow key={idx} className="hover:bg-muted/30 transition-colors">
-                                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                                            Submitted Document {idx + 1}
-                                                        </TableCell>
-                                                        <TableCell className="text-sm" colSpan={2}>
-                                                            <span className="text-xs text-muted-foreground font-mono break-all">
-                                                                {doc}
-                                                            </span>
-                                                        </TableCell>
-                                                        <TableCell className="text-sm text-right">
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                onClick={() => window.open(getFileUrl(doc), '_blank')}
-                                                            >
-                                                                <ExternalLink className="h-4 w-4 mr-1" />
-                                                                View
-                                                            </Button>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))}
-                                            </>
-                                        )}
-                                        {bidSubmission.documents.submissionProof && (
-                                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                                    Submission Proof
-                                                </TableCell>
-                                                <TableCell className="text-sm" colSpan={2}>
-                                                    <span className="text-xs text-muted-foreground font-mono break-all">
-                                                        {bidSubmission.documents.submissionProof}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell className="text-sm text-right">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => window.open(getFileUrl(bidSubmission.documents!.submissionProof!), '_blank')}
-                                                    >
-                                                        <ExternalLink className="h-4 w-4 mr-1" />
-                                                        View
-                                                    </Button>
-                                                </TableCell>
-                                            </TableRow>
-                                        )}
-                                        {bidSubmission.documents.finalPriceSs && (
-                                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                                    Final Price Screenshot
-                                                </TableCell>
-                                                <TableCell className="text-sm" colSpan={2}>
-                                                    <span className="text-xs text-muted-foreground font-mono break-all">
-                                                        {bidSubmission.documents.finalPriceSs}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell className="text-sm text-right">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => window.open(getFileUrl(bidSubmission.documents!.finalPriceSs!), '_blank')}
-                                                    >
-                                                        <ExternalLink className="h-4 w-4 mr-1" />
-                                                        View
-                                                    </Button>
-                                                </TableCell>
-                                            </TableRow>
-                                        )}
+                                        <TableRow>
+                                            <TableCell colSpan={4} className="p-4">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                                    {bidSubmission.documents.submittedDocs?.map((doc, idx) => (
+                                                        <div key={`submitted-${idx}`} className="flex flex-col border rounded-md p-3 bg-card shadow-sm gap-2">
+                                                            <div className="flex items-start gap-2 overflow-hidden">
+                                                                <FileText className="h-6 w-6 text-muted-foreground shrink-0" />
+                                                                <div className="flex flex-col overflow-hidden">
+                                                                    <span className="font-medium text-sm truncate" title={doc.split('/').pop() || doc}>
+                                                                        {doc.split('/').pop() || doc}
+                                                                    </span>
+                                                                    <span className="text-xs text-muted-foreground truncate" title={`Submitted Document ${idx + 1}`}>
+                                                                        Submitted Document {idx + 1}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-2 mt-auto">
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="flex-1 h-8 text-xs gap-1"
+                                                                    onClick={() => window.open(getFileUrl(doc), '_blank')}
+                                                                >
+                                                                    <ExternalLink className="h-3 w-3" />
+                                                                </Button>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="flex-1 h-8 text-xs gap-1"
+                                                                    onClick={() => {
+                                                                        const a = document.createElement('a');
+                                                                        a.href = getFileUrl(doc);
+                                                                        a.download = doc.split('/').pop() || doc;
+                                                                        a.click();
+                                                                    }}
+                                                                >
+                                                                    <Download className="h-3 w-3" />
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                    {bidSubmission.documents.submissionProof && (
+                                                        <div className="flex flex-col border rounded-md p-3 bg-card shadow-sm gap-2">
+                                                            <div className="flex items-start gap-2 overflow-hidden">
+                                                                <FileText className="h-6 w-6 text-muted-foreground shrink-0" />
+                                                                <div className="flex flex-col overflow-hidden">
+                                                                    <span className="font-medium text-sm truncate" title={bidSubmission.documents.submissionProof.split('/').pop() || bidSubmission.documents.submissionProof}>
+                                                                        {bidSubmission.documents.submissionProof.split('/').pop() || bidSubmission.documents.submissionProof}
+                                                                    </span>
+                                                                    <span className="text-xs text-muted-foreground truncate" title="Submission Proof">
+                                                                        Submission Proof
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-2 mt-auto">
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="flex-1 h-8 text-xs gap-1"
+                                                                    onClick={() => window.open(getFileUrl(bidSubmission.documents!.submissionProof!), '_blank')}
+                                                                >
+                                                                    <ExternalLink className="h-3 w-3" />
+                                                                </Button>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="flex-1 h-8 text-xs gap-1"
+                                                                    onClick={() => {
+                                                                        const a = document.createElement('a');
+                                                                        a.href = getFileUrl(bidSubmission.documents!.submissionProof!);
+                                                                        a.download = bidSubmission.documents!.submissionProof!.split('/').pop() || bidSubmission.documents!.submissionProof!;
+                                                                        a.click();
+                                                                    }}
+                                                                >
+                                                                    <Download className="h-3 w-3" />
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {bidSubmission.documents.finalPriceSs && (
+                                                        <div className="flex flex-col border rounded-md p-3 bg-card shadow-sm gap-2">
+                                                            <div className="flex items-start gap-2 overflow-hidden">
+                                                                <FileText className="h-6 w-6 text-muted-foreground shrink-0" />
+                                                                <div className="flex flex-col overflow-hidden">
+                                                                    <span className="font-medium text-sm truncate" title={bidSubmission.documents.finalPriceSs.split('/').pop() || bidSubmission.documents.finalPriceSs}>
+                                                                        {bidSubmission.documents.finalPriceSs.split('/').pop() || bidSubmission.documents.finalPriceSs}
+                                                                    </span>
+                                                                    <span className="text-xs text-muted-foreground truncate" title="Final Price Screenshot">
+                                                                        Final Price Screenshot
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-2 mt-auto">
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="flex-1 h-8 text-xs gap-1"
+                                                                    onClick={() => window.open(getFileUrl(bidSubmission.documents!.finalPriceSs!), '_blank')}
+                                                                >
+                                                                    <ExternalLink className="h-3 w-3" />
+                                                                </Button>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="flex-1 h-8 text-xs gap-1"
+                                                                    onClick={() => {
+                                                                        const a = document.createElement('a');
+                                                                        a.href = getFileUrl(bidSubmission.documents!.finalPriceSs!);
+                                                                        a.download = bidSubmission.documents!.finalPriceSs!.split('/').pop() || bidSubmission.documents!.finalPriceSs!;
+                                                                        a.click();
+                                                                    }}
+                                                                >
+                                                                    <Download className="h-3 w-3" />
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
                                     </>
                                 )}
                             </>
@@ -250,7 +279,7 @@ export function BidSubmissionView({
                                     <TableCell className="text-sm font-medium text-muted-foreground">
                                         Reason for Missing
                                     </TableCell>
-                                    <TableCell className="text-sm" colSpan={3}>
+                                    <TableCell className="text-sm break-words" colSpan={3}>
                                         {bidSubmission.reasonForMissing || '—'}
                                     </TableCell>
                                 </TableRow>
@@ -258,7 +287,7 @@ export function BidSubmissionView({
                                     <TableCell className="text-sm font-medium text-muted-foreground">
                                         Prevention Measures
                                     </TableCell>
-                                    <TableCell className="text-sm" colSpan={3}>
+                                    <TableCell className="text-sm break-words" colSpan={3}>
                                         {bidSubmission.preventionMeasures || '—'}
                                     </TableCell>
                                 </TableRow>
@@ -266,7 +295,7 @@ export function BidSubmissionView({
                                     <TableCell className="text-sm font-medium text-muted-foreground">
                                         TMS Improvements
                                     </TableCell>
-                                    <TableCell className="text-sm" colSpan={3}>
+                                    <TableCell className="text-sm break-words" colSpan={3}>
                                         {bidSubmission.tmsImprovements || '—'}
                                     </TableCell>
                                 </TableRow>

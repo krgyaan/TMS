@@ -1,4 +1,4 @@
-import { Body, BadRequestException, Controller, Get, HttpCode, HttpStatus, Post, Query, Res, UnauthorizedException } from "@nestjs/common";
+import { Body, BadRequestException, Controller, Get, HttpCode, HttpStatus, Post, Query, Res, UnauthorizedException, Param, ParseIntPipe } from "@nestjs/common";
 import type { Response } from "express";
 import { z } from "zod";
 import { AuthService } from "@/modules/auth/auth.service";
@@ -46,6 +46,18 @@ export class AuthController {
         }
         // Return full user details including role
         return { user: await this.authService.getProfile(user.sub) };
+    }
+
+    @Public()
+    @Get("permissions/:id")
+    async permissions(@Param("id", ParseIntPipe) id: number) {
+        console.log("Fetching permissions for user ID:", id);
+        if (!id) {
+            throw new UnauthorizedException("No Id provided");
+        }
+        // Return full user details including role
+
+        return { user: await this.authService.getPermissionsWithId(id) };
     }
 
     @Public()

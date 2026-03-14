@@ -46,6 +46,8 @@ export interface TenderInfoWithNames extends TenderInfo {
     websiteName?: string | null;
     websiteLink?: string | null;
     oemExperience?: string | null;
+    bidSubmissionDate?: Date | null;
+    resultDate?: Date | null;
 }
 
 export interface CreateTenderRequest {
@@ -139,6 +141,8 @@ export interface TenderListParams {
     search?: string;
     page?: number;
     limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
 }
 
 export interface TenderInfoDashboardCounts {

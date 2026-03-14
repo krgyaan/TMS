@@ -56,9 +56,9 @@ export class FollowUpController {
     // ========================
 
     @Post()
-    async create(@Body() dto: CreateFollowUpDto, @Req() req) {
-        console.log("Follow up called");
-        return this.service.create(dto, req.user.id);
+    async create(@Body() dto: CreateFollowUpDto, @CurrentUser() user: any) {
+        console.log("Follow up called. User ID:", user?.id);
+        return this.service.create(dto, user?.id || 13);
     }
 
     // ========================
@@ -117,8 +117,23 @@ export class FollowUpController {
     // DELETE (SOFT DELETE)
     // ========================
     @Delete(":id")
-    async remove(@Param("id", ParseIntPipe) id: number) {
-        return this.service.remove(id);
+    async remove(@Param("id", ParseIntPipe) id: number, @CurrentUser() user) {
+        return this.service.delete(id, user.sub);
+    }
+
+    // ========================
+    // MAILING AND PREVIEWS
+    // ========================
+
+    @Get("preview-mail/:emdId")
+    async previewEmdMail(@Param("emdId", ParseIntPipe) emdId: number) {
+        return this.service.getPreviewHtml(emdId);
+    }
+
+    @Get("test-followup/:id")
+    async test(@Param("id") id: number) {
+        await this.service.processFollowupMail(id);
+        return "Triggered";
     }
 
     // ========================

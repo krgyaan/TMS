@@ -1,24 +1,27 @@
 import React from "react"
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table"
-import { ArrowLeft, FileText, Pencil } from "lucide-react"
+import { FileText } from "lucide-react"
 import type { TenderInfoSheet } from "@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types"
 import { formatDateTime } from "@/hooks/useFormatedDate"
 import { formatINR } from "@/hooks/useINRFormatter"
+import { useDnbStatusOptions } from "@/hooks/useSelectOptions"
+import { tenderFilesService } from "@/services/api/tender-files.service"
 
 interface InfoSheetViewProps {
     infoSheet?: TenderInfoSheet | null
     isLoading?: boolean
-    onEdit?: () => void
-    onBack?: () => void
 }
 
 const formatValue = (value?: string | number | null) => {
     if (value === null || value === undefined || value === "") return "—"
     return value
+}
+
+function toTitleCase(str: string | number) {
+    return str.toString().toLowerCase().split(" ").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
 }
 
 const formatYesNo = (value?: string | null) => {
@@ -31,46 +34,48 @@ const formatPercentage = (value?: number | null) => {
     return `${value}%`
 }
 
-const formatDocuments = (documents: string[] | Array<{ id?: number; documentName: string }> = []) => {
-    if (!documents.length) {
-        return <span className="text-muted-foreground">No documents listed</span>
+const getOptionLabel = (
+    options: Array<{ value: string; label: string }> | undefined,
+    raw: string | number | null | undefined,
+) => {
+    if (raw === null || raw === undefined) return "—"
+    const rawStr = String(raw).trim()
+    if (!rawStr) return "—"
+
+    if (!options || options.length === 0) {
+        return rawStr
     }
 
-    return (
-        <div className="flex flex-wrap gap-2">
-            {documents.map((doc, index) => {
-                // Handle both string arrays and object arrays
-                const docName = typeof doc === 'string' ? doc : doc.documentName;
-                const docKey = typeof doc === 'string' ? doc : (doc.id ?? doc.documentName ?? index);
+    const match = options.find((option) => option.value === rawStr)
+    if (match) {
+        return match.label
+    }
 
-                return (
-                    <Badge key={docKey} variant="outline">
-                        {docName}
-                    </Badge>
-                );
-            })}
-        </div>
-    )
+    // If it's already a descriptive string, keep it as-is
+    if (isNaN(Number(rawStr))) {
+        return rawStr
+    }
+
+    // Fallback to the raw id string when no label is found
+    return rawStr
 }
 
 export const InfoSheetView = ({
     infoSheet,
     isLoading,
-    onEdit,
-    onBack,
 }: InfoSheetViewProps) => {
+    const rejectionReasonOptions = useDnbStatusOptions()
+
     if (isLoading) {
         return (
             <Card>
-                <CardHeader>
-                    <CardTitle>
-                        <Skeleton className="h-6 w-48" />
-                    </CardTitle>
+                <CardHeader className="pb-3">
+                    <Skeleton className="h-5 w-40" />
                 </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
-                        {Array.from({ length: 6 }).map((_, idx) => (
-                            <Skeleton key={idx} className="h-12 w-full" />
+                <CardContent className="pt-0">
+                    <div className="space-y-2">
+                        {Array.from({ length: 4 }).map((_, idx) => (
+                            <Skeleton key={idx} className="h-10 w-full" />
                         ))}
                     </div>
                 </CardContent>
@@ -81,11 +86,17 @@ export const InfoSheetView = ({
     if (!infoSheet) {
         return (
             <Card>
-                <CardHeader>
-                    <CardTitle>Tender Info Sheet</CardTitle>
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Tender Info Sheet
+                    </CardTitle>
                 </CardHeader>
-                <CardContent>
-                    <p className="text-muted-foreground">No info sheet available for this tender.</p>
+                <CardContent className="pt-0">
+                    <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                        <FileText className="h-8 w-8 mb-2 opacity-50" />
+                        <p className="text-sm">No info sheet available for this tender.</p>
+                    </div>
                 </CardContent>
             </Card>
         )
@@ -98,20 +109,6 @@ export const InfoSheetView = ({
                     <FileText className="h-5 w-5" />
                     Tender Info Sheet
                 </CardTitle>
-                <CardAction className="flex gap-2">
-                    {onEdit && (
-                        <Button variant="default" size="sm" onClick={onEdit}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit
-                        </Button>
-                    )}
-                    {onBack && (
-                        <Button variant="outline" size="sm" onClick={onBack}>
-                            <ArrowLeft className="h-4 w-4 mr-2" />
-                            Back
-                        </Button>
-                    )}
-                </CardAction>
             </CardHeader>
             <CardContent>
                 <Table>
@@ -133,22 +130,22 @@ export const InfoSheetView = ({
                                 Rejection Reason
                             </TableCell>
                             <TableCell className="text-sm w-1/4">
-                                {infoSheet.teRejectionReason ? `Status ${infoSheet.teRejectionReason}` : '—'}
+                                {getOptionLabel(rejectionReasonOptions, infoSheet.teRejectionReason)}
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 TE Final Remark
                             </TableCell>
-                            <TableCell className="text-sm" colSpan={3}>
-                                {formatValue(infoSheet.teFinalRemark)}
+                            <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]" colSpan={3}>
+                                {infoSheet.teFinalRemark || '—'}
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Rejection Remarks
                             </TableCell>
-                            <TableCell className="text-sm" colSpan={3}>
+                            <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]" colSpan={3}>
                                 {formatValue(infoSheet.teRejectionRemarks)}
                             </TableCell>
                         </TableRow>
@@ -305,13 +302,13 @@ export const InfoSheetView = ({
                                         Commercial Evaluation Type
                                     </TableCell>
                                     <TableCell className="text-sm">
-                                        {formatValue(infoSheet.commercialEvaluation)}
+                                        {toTitleCase(formatValue(infoSheet.commercialEvaluation?.replaceAll('_', ' ')))}
                                     </TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground">
                                         MAF Required
                                     </TableCell>
                                     <TableCell className="text-sm">
-                                        {formatValue(infoSheet.mafRequired)}
+                                        {toTitleCase(formatValue(infoSheet.mafRequired?.replaceAll('_', ' ')))}
                                     </TableCell>
                                 </TableRow>
                             </>
@@ -369,7 +366,7 @@ export const InfoSheetView = ({
                                 PBG Mode
                             </TableCell>
                             <TableCell className="text-sm">
-                                {formatValue(infoSheet.pbgMode)}
+                                {infoSheet.pbgMode}
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -397,7 +394,7 @@ export const InfoSheetView = ({
                                 Security Deposit Mode
                             </TableCell>
                             <TableCell className="text-sm">
-                                {formatValue(infoSheet.sdMode)}
+                                {infoSheet.sdMode}
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -458,7 +455,7 @@ export const InfoSheetView = ({
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">
-                                Company Age (Years)
+                                Eligibility Criterion (Years)
                             </TableCell>
                             <TableCell className="text-sm">
                                 {formatValue(infoSheet.techEligibilityAge)}
@@ -474,11 +471,6 @@ export const InfoSheetView = ({
                         {/* Work Orders */}
                         {(infoSheet.workValueType) && (
                             <>
-                                <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={4} className="font-semibold text-sm">
-                                        Eligibility Criteria
-                                    </TableCell>
-                                </TableRow>
                                 {infoSheet.workValueType === 'WORKS_VALUES' && (
                                     <>
                                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -513,9 +505,10 @@ export const InfoSheetView = ({
                                             <TableCell className="text-sm font-medium text-muted-foreground">
                                                 Custom Eligibility Criteria
                                             </TableCell>
-                                            <TableCell className="text-sm">
+                                            <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
                                                 {infoSheet.customEligibilityCriteria || '—'}
                                             </TableCell>
+
                                         </TableRow>
                                     </>
                                 )}
@@ -536,7 +529,7 @@ export const InfoSheetView = ({
                                             Avg Annual Turnover Type
                                         </TableCell>
                                         <TableCell className="text-sm">
-                                            {formatValue(infoSheet.avgAnnualTurnoverType)}
+                                            {toTitleCase(formatValue(infoSheet.avgAnnualTurnoverType?.replaceAll('_', ' ')))}
                                         </TableCell>
                                         <TableCell className="text-sm font-medium text-muted-foreground">
                                             Avg Annual Turnover Value
@@ -552,7 +545,7 @@ export const InfoSheetView = ({
                                             Working Capital Type
                                         </TableCell>
                                         <TableCell className="text-sm">
-                                            {formatValue(infoSheet.workingCapitalType)}
+                                            {toTitleCase(formatValue(infoSheet.workingCapitalType?.replaceAll('_', ' ')))}
                                         </TableCell>
                                         <TableCell className="text-sm font-medium text-muted-foreground">
                                             Working Capital Value
@@ -568,7 +561,7 @@ export const InfoSheetView = ({
                                             Solvency Certificate Type
                                         </TableCell>
                                         <TableCell className="text-sm">
-                                            {formatValue(infoSheet.solvencyCertificateType)}
+                                            {toTitleCase(formatValue(infoSheet.solvencyCertificateType?.replaceAll('_', ' ')))}
                                         </TableCell>
                                         <TableCell className="text-sm font-medium text-muted-foreground">
                                             Solvency Certificate Value
@@ -584,7 +577,7 @@ export const InfoSheetView = ({
                                             Net Worth Type
                                         </TableCell>
                                         <TableCell className="text-sm">
-                                            {formatValue(infoSheet.netWorthType)}
+                                            {toTitleCase(formatValue(infoSheet.netWorthType?.replaceAll('_', ' ')))}
                                         </TableCell>
                                         <TableCell className="text-sm font-medium text-muted-foreground">
                                             Net Worth Value
@@ -609,7 +602,7 @@ export const InfoSheetView = ({
                                     <TableCell className="text-sm font-medium text-muted-foreground">
                                         Courier Address
                                     </TableCell>
-                                    <TableCell className="text-sm" colSpan={3}>
+                                    <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]" colSpan={3}>
                                         {infoSheet.courierAddress}
                                     </TableCell>
                                 </TableRow>
@@ -670,7 +663,18 @@ export const InfoSheetView = ({
                                 Technical Documents
                             </TableCell>
                             <TableCell className="text-sm" colSpan={3}>
-                                {formatDocuments(infoSheet.technicalWorkOrders || [])}
+                                <div className="flex flex-wrap gap-1">
+                                    {infoSheet.technicalWorkOrders?.map((order) => {
+                                        const filePath = order.poDocument?.[0];
+                                        return (
+                                            <Badge key={order.id} variant="outline" className="text-xs hover:bg-primary/10">
+                                                <a href={tenderFilesService.getFileUrl(filePath!)} target="_blank" rel="noopener noreferrer">
+                                                    {order.projectName}
+                                                </a>
+                                            </Badge>
+                                        )
+                                    })}
+                                </div>
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -678,7 +682,18 @@ export const InfoSheetView = ({
                                 Financial Documents
                             </TableCell>
                             <TableCell className="text-sm" colSpan={3}>
-                                {formatDocuments(infoSheet.commercialDocuments || [])}
+                                <div className="flex flex-wrap gap-1">
+                                    {infoSheet.commercialDocuments?.map((doc) => {
+                                        const filePath = doc.documentPath?.[0];
+                                        return (
+                                            <Badge key={doc.id} variant="outline" className="text-xs hover:bg-primary/10">
+                                                <a href={tenderFilesService.getFileUrl(filePath!)} target="_blank" rel="noopener noreferrer">
+                                                    {doc.documentName}
+                                                </a>
+                                            </Badge>
+                                        );
+                                    })}
+                                </div>
                             </TableCell>
                         </TableRow>
                     </TableBody>
