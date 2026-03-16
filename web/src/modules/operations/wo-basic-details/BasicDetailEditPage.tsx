@@ -1,17 +1,24 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useParams } from "react-router-dom";
+import { BasicDetailForm } from "./components/BasicDetailForm";
+import { useWoBasicDetailById } from "@/hooks/api/useWoBasicDetails";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const BasicDetailEditPage = () => {
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Work Orders</CardTitle>
-                <CardDescription>All work orders listed</CardDescription>
-            </CardHeader>
-            <CardContent className="h-screen px-0">
+    const { id } = useParams<{ id: string }>();
+    const { data: woBasicDetail, isLoading } = useWoBasicDetailById(Number(id));
 
-            </CardContent>
-        </Card>
+    if (isLoading) {
+        return <Skeleton>
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+        </Skeleton>;
+    }
+
+    return (
+        <div className="flex flex-col gap-4">
+            <BasicDetailForm mode="edit" existingData={woBasicDetail} />
+        </div>
     );
 };
 
-export default BasicDetailEditPage
+export default BasicDetailEditPage;

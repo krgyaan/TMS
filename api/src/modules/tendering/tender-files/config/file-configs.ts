@@ -64,6 +64,7 @@ export type TenderFileContext =
     | "sanctionLetter"
     | "tdsDocument"
     | "bankNoc"
+    | "wo-draft"
     | "mcaClosure";
 
 export interface FileConfig {
@@ -753,6 +754,16 @@ export const FILE_CONFIGS: Record<TenderFileContext, FileConfig> = {
         pdfQuality: 80,
     },
     "mcaClosure": {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: [".pdf", ".doc", ".docx", ".xls", ".xlsx"],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    "wo-draft": {
         maxFiles: 2,
         maxSizeBytes: MB(10),
         allowedMimeTypes: [...DOCS, ...OFFICE],

@@ -125,24 +125,10 @@ const BasicDetailListPage = () => {
     const colDefs = useMemo<ColDef<WoBasicDetail>[]>(
         () => [
             {
-                field: 'projectCode',
-                colId: 'projectCode',
-                headerName: 'Project Code',
-                width: 140,
-                pinned: 'left',
-                sortable: true,
-                filter: true,
-                cellRenderer: (params: any) => (
-                    <span className="font-mono text-sm font-medium text-primary">
-                        {params.value || '—'}
-                    </span>
-                ),
-            },
-            {
                 field: 'projectName',
                 colId: 'projectName',
                 headerName: 'Project Name',
-                width: 250,
+                width: 200,
                 sortable: true,
                 filter: true,
                 cellRenderer: (params: any) => (
@@ -162,19 +148,28 @@ const BasicDetailListPage = () => {
                 colId: 'woDate',
             }),
             {
-                field: 'currentStage',
-                colId: 'currentStage',
-                headerName: 'Stage',
-                width: 130,
+                field: 'woNumber',
+                colId: 'woNumber',
+                headerName: 'WO Number',
+                width: 200,
                 sortable: true,
                 filter: true,
-                cellRenderer: (params: any) => getStageBadge(params.value),
+                cellRenderer: (params: any) => <span className="font-mono text-sm font-medium text-primary">
+                    {params.value || '—'}
+                </span>,
             },
             currencyCol<WoBasicDetail>('woValuePreGst', {
                 field: 'woValuePreGst',
                 colId: 'woValuePreGst',
-                headerName: 'WO Value',
-                width: 130,
+                headerName: 'WO Value (Pre-GST)',
+                width: 150,
+                sortable: true,
+            }),
+            currencyCol<WoBasicDetail>('woValueGstAmt', {
+                field: 'woValueGstAmt',
+                colId: 'woValueGstAmt',
+                headerName: 'WO Value (GST)',
+                width: 150,
                 sortable: true,
             }),
             {
@@ -190,6 +185,15 @@ const BasicDetailListPage = () => {
                     const colorClass = numValue >= 0 ? 'text-green-600' : 'text-red-600';
                     return <span className={`font-medium ${colorClass}`}>{numValue.toFixed(2)}%</span>;
                 },
+            },
+            {
+                field: 'currentStage',
+                colId: 'currentStage',
+                headerName: 'Stage',
+                width: 130,
+                sortable: true,
+                filter: true,
+                cellRenderer: (params: any) => getStageBadge(params.value),
             },
             {
                 field: 'oeFirst',
