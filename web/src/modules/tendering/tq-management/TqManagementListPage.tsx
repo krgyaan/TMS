@@ -122,11 +122,11 @@ const TqManagementListPage = () => {
     };
 
     const tqManagementActions: ActionItem<TqManagementDashboardRowWithTimer>[] = useMemo(() => [
-        {
-            label: 'Change Status',
-            onClick: (row: TqManagementDashboardRowWithTimer) => setChangeStatusModal({ open: true, tenderId: row.tenderId }),
-            icon: <RefreshCw className="h-4 w-4" />,
-        },
+        // {
+        //     label: 'Change Status',
+        //     onClick: (row: TqManagementDashboardRowWithTimer) => setChangeStatusModal({ open: true, tenderId: row.tenderId }),
+        //     icon: <RefreshCw className="h-4 w-4" />,
+        // },
         {
             label: 'TQ Received',
             onClick: (row: TqManagementDashboardRowWithTimer) => {

@@ -120,11 +120,11 @@ const TenderResultListPage = () => {
 
     const resultActions: ActionItem<ResultDashboardRow>[] = useMemo(
         () => [
-            {
-                label: 'Change Status',
-                icon: <RefreshCw className="h-4 w-4" />,
-                onClick: (row: ResultDashboardRow) => setChangeStatusModal({ open: true, tenderId: row.tenderId }),
-            },
+            // {
+            //     label: 'Change Status',
+            //     icon: <RefreshCw className="h-4 w-4" />,
+            //     onClick: (row: ResultDashboardRow) => setChangeStatusModal({ open: true, tenderId: row.tenderId }),
+            // },
             {
                 label: 'View Details',
                 icon: <Eye className="h-4 w-4" />,
