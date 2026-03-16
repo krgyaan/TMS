@@ -1438,13 +1438,15 @@ export class TenderExecutiveService {
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                  AND tr.created_at < '${from}'
+                AND LOWER(tr.status) IN ('won','lost','disqualified')
+                AND tr.created_at < '${from}'
           )
     `);
 
         const resultAwaitedDuringTotal = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
+        AND ti.status NOT IN (18)
           AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
@@ -1502,24 +1504,6 @@ export class TenderExecutiveService {
           )
     `);
 
-        const resultAwaitedDuringPending = await exec(`
-        ${baseSelect}
-        WHERE ${baseWhere()}
-          AND EXISTS (
-                SELECT 1
-                FROM bid_submissions bs
-                WHERE bs.tender_id = ti.id
-                  AND bs.status = 'Bid Submitted'
-                  AND bs.created_at BETWEEN '${from}' AND '${to}'
-          )
-          AND NOT EXISTS (
-                SELECT 1
-                FROM tender_results tr
-                WHERE tr.tender_id = ti.id
-                  AND tr.created_at BETWEEN '${from}' AND '${to}'
-          )
-    `);
-
         const resultAwaitedClosing = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
@@ -1536,7 +1520,26 @@ export class TenderExecutiveService {
                 SELECT 1
                 FROM tender_results tr
                 WHERE tr.tender_id = ti.id
-                  AND tr.created_at <= '${to}'
+                AND LOWER(tr.status) IN ('won','lost','disqualified')
+                AND tr.created_at <= '${to}'
+          )
+    `);
+
+        const resultAwaitedDuringPending = await exec(`
+        ${baseSelect}
+        WHERE ${baseWhere()}
+          AND EXISTS (
+                SELECT 1
+                FROM bid_submissions bs
+                WHERE bs.tender_id = ti.id
+                  AND bs.status = 'Bid Submitted'
+                  AND bs.created_at BETWEEN '${from}' AND '${to}'
+          )
+          AND NOT EXISTS (
+                SELECT 1
+                FROM tender_results tr
+                WHERE tr.tender_id = ti.id
+                AND tr.created_at BETWEEN '${from}' AND '${to}'
           )
     `);
 
