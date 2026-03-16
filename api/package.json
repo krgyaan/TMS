@@ -6,7 +6,7 @@
     "private": true,
     "license": "UNLICENSED",
     "scripts": {
-        "build": "nest build && pnpm run copy:templates",
+        "build": "NODE_OPTIONS=--max-old-space-size=4096 nest build && pnpm run copy:templates",
         "copy:templates": "cpy \"src/**/*.hbs\" dist --parents",
         "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
         "start": "nest start",
