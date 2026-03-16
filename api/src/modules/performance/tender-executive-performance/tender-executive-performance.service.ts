@@ -1202,7 +1202,7 @@ export class TenderExecutiveService {
     `;
 
         const missedStatus = [8, 10, 11];
-        const dnb = [8, 9, 10, 11, 12, 13, 14, 15, 16, 31, 32];
+        const dnb = [8, 9, 10, 11, 12, 13, 14, 15, 16, 31, 32, 34, 35, 36];
 
         /* =====================================================
        ASSIGNED
