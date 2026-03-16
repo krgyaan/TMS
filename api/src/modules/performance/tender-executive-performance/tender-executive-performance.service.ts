@@ -1428,7 +1428,6 @@ export class TenderExecutiveService {
         ${baseSelect}
         WHERE ${baseWhere()}
         AND ti.status NOT IN (${excludedStatuses})
-        AND ti.status NOT IN (18)
           AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
