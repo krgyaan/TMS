@@ -1361,7 +1361,7 @@ export class TenderExecutiveService {
         WHERE ${baseWhere()}
           AND ti.tl_status = 1
           AND tin.created_at < '${from}'
-          -- AND ti.status NOT IN (${missedStatus})
+          AND ti.status NOT IN (${missedStatus})
           AND NOT EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
@@ -1373,7 +1373,7 @@ export class TenderExecutiveService {
         const bidDuringTotal = await exec(`
         ${baseSelect}
         JOIN tender_information tin ON tin.tender_id = ti.id
-        -- AND ti.status NOT IN (${missedStatus})
+        AND ti.status NOT IN (${missedStatus})
         WHERE ${baseWhere()}
           AND ti.tl_status = 1
           AND tin.created_at BETWEEN '${from}' AND '${to}'
@@ -1409,7 +1409,7 @@ export class TenderExecutiveService {
         WHERE ${baseWhere()}
           AND ti.tl_status = 1
           AND tin.created_at <= '${to}'
-          -- AND ti.status NOT IN (${missedStatus})
+          AND ti.status NOT IN (${missedStatus})
           AND NOT EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
@@ -1426,7 +1426,7 @@ export class TenderExecutiveService {
         ${baseSelect}
         WHERE ${baseWhere()}
         AND ti.status NOT IN (${missedStatus})
-        -- AND ti.status NOT IN (18)
+        AND ti.status NOT IN (18)
           AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
@@ -1446,7 +1446,7 @@ export class TenderExecutiveService {
         const resultAwaitedDuringTotal = await exec(`
         ${baseSelect}
         WHERE ${baseWhere()}
-        -- AND ti.status NOT IN (18)
+        AND ti.status NOT IN (18)
           AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
@@ -1508,7 +1508,7 @@ export class TenderExecutiveService {
         ${baseSelect}
         WHERE ${baseWhere()}
         AND ti.status NOT IN (${missedStatus})
-        -- AND ti.status NOT IN (18)
+        AND ti.status NOT IN (18)
           AND EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
