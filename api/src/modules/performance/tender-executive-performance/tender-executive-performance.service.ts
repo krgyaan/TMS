@@ -1202,6 +1202,7 @@ export class TenderExecutiveService {
     `;
 
         const missedStatus = [8, 10, 11];
+        const dnb = [9, 10, 11, 12, 13, 14, 15, 16, 31, 32];
 
         /* =====================================================
        ASSIGNED
@@ -1361,7 +1362,7 @@ export class TenderExecutiveService {
         WHERE ${baseWhere()}
           AND ti.tl_status = 1
           AND tin.created_at < '${from}'
-          AND ti.status NOT IN (${missedStatus})
+          AND ti.status NOT IN (${dnb})
           AND NOT EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
@@ -1373,7 +1374,7 @@ export class TenderExecutiveService {
         const bidDuringTotal = await exec(`
         ${baseSelect}
         JOIN tender_information tin ON tin.tender_id = ti.id
-        AND ti.status NOT IN (${missedStatus})
+         AND ti.status NOT IN (${dnb})
         WHERE ${baseWhere()}
           AND ti.tl_status = 1
           AND tin.created_at BETWEEN '${from}' AND '${to}'
@@ -1409,7 +1410,7 @@ export class TenderExecutiveService {
         WHERE ${baseWhere()}
           AND ti.tl_status = 1
           AND tin.created_at <= '${to}'
-          AND ti.status NOT IN (${missedStatus})
+          AND ti.status NOT IN (${dnb})
           AND NOT EXISTS (
                 SELECT 1
                 FROM bid_submissions bs
