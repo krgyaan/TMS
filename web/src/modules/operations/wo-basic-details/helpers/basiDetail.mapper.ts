@@ -18,15 +18,14 @@ export const buildDefaultValues = (): WoBasicDetailFormValues => ({
 export const mapResponseToForm = (data: WoBasicDetail): WoBasicDetailFormValues => {
   return {
     tenderId: data.tenderId,
-    woNumber: data.woNumber,
-    // Expect WO Date to be correctly parsed and formatted
+    woNumber: Number(data.woNumber) || 0,
     woDate: data.woDate ? new Date(data.woDate) : null,
 
-    woValuePreGst: data.woValuePreGst || "",
-    woValueGstAmt: data.woValueGstAmt || "",
-    budgetPreGst: data.budgetPreGst || "",
-    receiptPreGst: data.receiptPreGst || "",
-    grossMargin: data.grossMargin || "",
+    woValuePreGst: Number(data.woValuePreGst) || 0,
+    woValueGstAmt: Number(data.woValueGstAmt) || 0,
+    budgetPreGst: Number(data.budgetPreGst) || 0,
+    receiptPreGst: Number(data.receiptPreGst) || 0,
+    grossMargin: Number(data.grossMargin) || 0,
     projectCode: data.projectCode || "",
     projectName: data.projectName || "",
     wo_draft: data.wo_draft ? JSON.parse(data.wo_draft) : [],
@@ -35,19 +34,19 @@ export const mapResponseToForm = (data: WoBasicDetail): WoBasicDetailFormValues 
 
 export const mapFormToCreatePayload = (values: WoBasicDetailFormValues): CreateWoBasicDetailDto => {
   const payload: CreateWoBasicDetailDto = {
-    woNumber: values.woNumber,
-    woDate: values.woDate, // Assume backend expects appropriate string format
-    projectCode: values.projectCode,
-    projectName: values.projectName,
+    woNumber: String(values.woNumber),
+    woDate: values.woDate ? values.woDate.toISOString() : undefined,
+    projectCode: values.projectCode || "",
+    projectName: values.projectName || "",
     currentStage: "basic_details",
   };
 
   if (values.tenderId) payload.tenderId = values.tenderId;
-  if (values.woValuePreGst) payload.woValuePreGst = values.woValuePreGst;
-  if (values.woValueGstAmt) payload.woValueGstAmt = values.woValueGstAmt;
-  if (values.budgetPreGst) payload.budgetPreGst = values.budgetPreGst;
-  if (values.receiptPreGst) payload.receiptPreGst = values.receiptPreGst;
-  if (values.grossMargin) payload.grossMargin = values.grossMargin;
+  if (values.woValuePreGst !== undefined) payload.woValuePreGst = String(values.woValuePreGst);
+  if (values.woValueGstAmt !== undefined) payload.woValueGstAmt = String(values.woValueGstAmt);
+  if (values.budgetPreGst !== undefined) payload.budgetPreGst = String(values.budgetPreGst);
+  if (values.receiptPreGst !== undefined) payload.receiptPreGst = String(values.receiptPreGst);
+  if (values.grossMargin !== undefined) payload.grossMargin = String(values.grossMargin);
   if (values.wo_draft && values.wo_draft.length > 0) payload.wo_draft = JSON.stringify(values.wo_draft);
 
   return payload;
@@ -55,17 +54,17 @@ export const mapFormToCreatePayload = (values: WoBasicDetailFormValues): CreateW
 
 export const mapFormToUpdatePayload = (values: WoBasicDetailFormValues): UpdateWoBasicDetailDto => {
   const payload: UpdateWoBasicDetailDto = {
-    woNumber: values.woNumber,
-    woDate: values.woDate,
-    projectCode: values.projectCode,
-    projectName: values.projectName,
+    woNumber: String(values.woNumber),
+    woDate: values.woDate ? values.woDate.toISOString() : undefined,
+    projectCode: values.projectCode || "",
+    projectName: values.projectName || "",
   };
 
-  if (values.woValuePreGst) payload.woValuePreGst = values.woValuePreGst;
-  if (values.woValueGstAmt) payload.woValueGstAmt = values.woValueGstAmt;
-  if (values.budgetPreGst) payload.budgetPreGst = values.budgetPreGst;
-  if (values.receiptPreGst) payload.receiptPreGst = values.receiptPreGst;
-  if (values.grossMargin) payload.grossMargin = values.grossMargin;
+  if (values.woValuePreGst !== undefined) payload.woValuePreGst = String(values.woValuePreGst);
+  if (values.woValueGstAmt !== undefined) payload.woValueGstAmt = String(values.woValueGstAmt);
+  if (values.budgetPreGst !== undefined) payload.budgetPreGst = String(values.budgetPreGst);
+  if (values.receiptPreGst !== undefined) payload.receiptPreGst = String(values.receiptPreGst);
+  if (values.grossMargin !== undefined) payload.grossMargin = String(values.grossMargin);
   if (values.wo_draft && values.wo_draft.length > 0) payload.wo_draft = JSON.stringify(values.wo_draft);
 
   return payload;

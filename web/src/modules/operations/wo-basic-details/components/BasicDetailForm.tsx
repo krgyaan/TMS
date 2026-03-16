@@ -15,6 +15,7 @@ import { WoBasicDetailFormSchema } from "../helpers/basiDetail.schema";
 import type { WoBasicDetailFormValues, WoBasicDetail } from "../helpers/basiDetail.types";
 import { buildDefaultValues, mapResponseToForm, mapFormToCreatePayload, mapFormToUpdatePayload } from "../helpers/basiDetail.mapper";
 import { useCreateWoBasicDetail, useUpdateWoBasicDetail } from "@/hooks/api/useWoBasicDetails";
+import { useTender } from "@/hooks/api/useTenders";
 import { useCostingSheetByTender } from "@/hooks/api/useCostingSheets";
 import { toast } from "sonner";
 
@@ -30,7 +31,6 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
     const createMutation = useCreateWoBasicDetail();
     const updateMutation = useUpdateWoBasicDetail();
 
-    // return <div>Hello 1</div>
     const initialValues = useMemo(() => {
         if (mode === "edit" && existingData) {
             return mapResponseToForm(existingData);
@@ -41,7 +41,6 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
         }
         return defaults;
     }, [mode, existingData, urlTenderId]);
-    // return <div>Hello 2</div>
 
     const form = useForm<WoBasicDetailFormValues>({
         resolver: zodResolver(WoBasicDetailFormSchema) as Resolver<WoBasicDetailFormValues>,
@@ -49,32 +48,57 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
     });
 
     const watchTenderId = form.watch("tenderId");
-    const tenderId = watchTenderId ? Number(watchTenderId) : undefined;
-    const { data: costingRes } = useCostingSheetByTender(tenderId!);
-
-    // Auto-fill from Tender and Costing Sheet if present
-    useEffect(() => {
-        if (mode === "create" && watchTenderId) {
-            if (costingRes) {
-                const c = costingRes as any;
-                // Costing sheet may have budget, receipt
-                if (c.budget && !form.getValues("budgetPreGst")) form.setValue("budgetPreGst", c.budget.toString());
-                if (c.receipt && !form.getValues("receiptPreGst")) form.setValue("receiptPreGst", c.receipt.toString());
-            }
-        }
-    }, [mode, watchTenderId, costingRes, form]);
-
+    const watchWoNumber = form.watch("woNumber");
     const watchBudget = form.watch("budgetPreGst");
     const watchReceipt = form.watch("receiptPreGst");
 
-    // Auto-calculate Margin
+    const tenderId = watchTenderId ? Number(watchTenderId) : null;
+    const { data: tenderData } = useTender(tenderId);
+    const { data: costingData } = useCostingSheetByTender(tenderId || 0);
+
+    // Auto-fill from Costing Sheet
+    useEffect(() => {
+        if (mode === "create" && costingData) {
+            const c = costingData as any;
+            if (c.budget && !form.getValues("budgetPreGst")) {
+                form.setValue("budgetPreGst", Number(c.budget));
+            }
+            if (c.receipt && !form.getValues("receiptPreGst")) {
+                form.setValue("receiptPreGst", Number(c.receipt));
+            }
+            if (c.grossMargin && !form.getValues("grossMargin")) {
+                form.setValue("grossMargin", Number(c.grossMargin));
+            }
+        }
+    }, [mode, costingData, form]);
+
+    // Background Project Code/Name Generation
+    useEffect(() => {
+        if (tenderData) {
+            const t = tenderData as any;
+            const orgName = t.organizationName || "";
+            const itemName = t.itemName || "";
+            const locName = t.locationName || "";
+            const teamName = t.teamName || "";
+
+            const suffix = watchWoNumber ? String(watchWoNumber).slice(-4) : "";
+
+            const code = `${teamName}/${orgName}/${locName}/${itemName}/${suffix}`.replace(/\/+/g, '/');
+            const name = `${orgName} ${locName} ${itemName}`.trim();
+
+            form.setValue("projectCode", code);
+            form.setValue("projectName", name);
+        }
+    }, [tenderData, watchWoNumber, form]);
+
+    // Auto-calculate Margin if manually edited
     useEffect(() => {
         if (watchBudget && watchReceipt) {
-            const b = parseFloat(watchBudget);
-            const r = parseFloat(watchReceipt);
+            const b = Number(watchBudget);
+            const r = Number(watchReceipt);
             if (!isNaN(b) && !isNaN(r) && r !== 0) {
                 const margin = ((r - b) / r) * 100;
-                form.setValue("grossMargin", margin.toFixed(2), { shouldValidate: true });
+                form.setValue("grossMargin", Number(margin.toFixed(2)));
             }
         }
     }, [watchBudget, watchReceipt, form]);
@@ -122,16 +146,57 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                 </div>
             </CardHeader>
             <CardContent>
+
+                {/* Display Section for Auto-generated/Fetched Data */}
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 p-6 bg-muted/30 rounded-lg border border-border mb-6">
+                    <div className="space-y-1">
+                        <p className="text-sm font-medium text-muted-foreground">Project Code</p>
+                        <p className="text-lg font-mono font-semibold text-primary">
+                            {form.watch("projectCode") || "---"}
+                        </p>
+                    </div>
+                    <div className="space-y-1">
+                        <p className="text-sm font-medium text-muted-foreground">Project Name</p>
+                        <p className="text-lg font-semibold text-primary">
+                            {form.watch("projectName") || "---"}
+                        </p>
+                    </div>
+                    <div className="space-y-1">
+                        <p className="text-sm font-medium text-muted-foreground">Gross Margin %age</p>
+                        <p className={`text-lg font-bold ${Number(form.watch("grossMargin")) < 0 ? 'text-destructive' : 'text-emerald-600'}`}>
+                            {form.watch("grossMargin") ? `${form.watch("grossMargin")}%` : "---"}
+                        </p>
+                    </div>
+                    <div className="space-y-1">
+                        <p className="text-sm font-medium text-muted-foreground">Budget (Pre GST)</p>
+                        <p className="text-lg font-semibold">
+                            {form.watch("budgetPreGst") ? `₹${Number(form.watch("budgetPreGst")).toLocaleString()}` : "---"}
+                        </p>
+                    </div>
+                    <div className="space-y-1">
+                        <p className="text-sm font-medium text-muted-foreground">Receipt (Pre GST)</p>
+                        <p className="text-lg font-semibold">
+                            {form.watch("receiptPreGst") ? `₹${Number(form.watch("receiptPreGst")).toLocaleString()}` : "---"}
+                        </p>
+                    </div>
+                </div>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
                         <div className="grid gap-4 md:grid-cols-3 items-start">
                             <FieldWrapper control={form.control} name="woNumber" label="WO Number">
-                                {field => <Input {...field} placeholder="WO Number" />}
+                                {field => <Input {...field} placeholder="WO Number" type="number" value={field.value || ""} onChange={e => field.onChange(e.target.value ? Number(e.target.value) : 0)} />}
                             </FieldWrapper>
 
                             <FieldWrapper control={form.control} name="woDate" label="WO Date">
-                                {field => <DateInput {...field} placeholder="dd-mm-yyyy" />}
+                                {field => (
+                                    <DateInput
+                                        {...field}
+                                        value={field.value instanceof Date ? field.value.toISOString().split('T')[0] : field.value}
+                                        onChange={(val) => field.onChange(val ? new Date(val) : null)}
+                                    />
+                                )}
                             </FieldWrapper>
+
 
                             <FieldWrapper control={form.control} name="woValuePreGst" label="WO Value (Pre-GST)">
                                 {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
@@ -140,30 +205,18 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                             <FieldWrapper control={form.control} name="woValueGstAmt" label="WO Value (GST Amt.)">
                                 {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
                             </FieldWrapper>
-
-                            <FieldWrapper control={form.control} name="budgetPreGst" label="Budget (Pre GST)">
-                                {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
-                            </FieldWrapper>
-
-                            <FieldWrapper control={form.control} name="receiptPreGst" label="Receipt (Pre GST)">
-                                {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
-                            </FieldWrapper>
-
-                            <FieldWrapper control={form.control} name="grossMargin" label="Gross Margin %age">
-                                {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
-                            </FieldWrapper>
-
-                            <FieldWrapper control={form.control} name="wo_draft" label="Upload LOA/GEM PO/LOI/Draft WO">
-                                {field => (
-                                    <TenderFileUploader
-                                        context="wo-draft"
-                                        value={field.value ?? []}
-                                        onChange={paths => field.onChange(paths)}
-                                        disabled={isSubmitting}
-                                    />
-                                )}
-                            </FieldWrapper>
                         </div>
+
+                        <FieldWrapper control={form.control} name="wo_draft" label="Upload LOA/GEM PO/LOI/Draft WO">
+                            {field => (
+                                <TenderFileUploader
+                                    context="wo-draft"
+                                    value={field.value ?? []}
+                                    onChange={paths => field.onChange(paths)}
+                                    disabled={isSubmitting}
+                                />
+                            )}
+                        </FieldWrapper>
 
                         <div className="flex justify-end gap-2 pt-6 border-t">
                             <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={isSubmitting}>
