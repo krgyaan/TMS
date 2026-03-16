@@ -64,11 +64,11 @@ const PhysicalDocsListPage = () => {
     const totalRows = apiResponse?.meta?.total || 0;
 
     const physicalDocsActions: ActionItem<PhysicalDocsDashboardRowWithTimer>[] = [
-        {
-            label: 'Change Status',
-            onClick: (row: PhysicalDocsDashboardRowWithTimer) => setChangeStatusModal({ open: true, tenderId: row.tenderId }),
-            icon: <RefreshCw className="h-4 w-4" />,
-        },
+        // {
+        //     label: 'Change Status',
+        //     onClick: (row: PhysicalDocsDashboardRowWithTimer) => setChangeStatusModal({ open: true, tenderId: row.tenderId }),
+        //     icon: <RefreshCw className="h-4 w-4" />,
+        // },
         {
             label: 'Send',
             onClick: (row: PhysicalDocsDashboardRowWithTimer) => row.physicalDocs ? navigate(paths.tendering.physicalDocsEdit(row.tenderId)) : navigate(paths.tendering.physicalDocsCreate(row.tenderId)),
