@@ -43,7 +43,7 @@ export interface WoBasicDetail {
   receiptPreGst: string | null;
   budgetPreGst: string | null;
   grossMargin: string | null;
-  wo_draft: string | null;
+  woDraft: string | null;
   teChecklistConfirmed: boolean | null;
   tmsDocuments: Record<string, boolean> | null;
   oeFirst: number | null;
@@ -53,8 +53,8 @@ export interface WoBasicDetail {
   oeSiteVisitAssignedAt: string | null;
   oeSiteVisitAssignedBy: number | null;
   oeDocsPrep: number | null;
-  oeDocsPrepVisitAssignedAt: string | null;
-  oeDocsPrepVisitAssignedBy: number | null;
+  oeDocsPrepAssignedAt: string | null;
+  oeDocsPrepAssignedBy: number | null;
   isWorkflowPaused: boolean;
   workflowPausedAt: string | null;
   workflowResumedAt: string | null;
