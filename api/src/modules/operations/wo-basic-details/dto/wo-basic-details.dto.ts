@@ -27,10 +27,14 @@ export const CreateWoBasicDetailSchema = z.object({
   woValueGstAmt: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid decimal format").optional(),
   receiptPreGst: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid decimal format").optional(),
   budgetPreGst: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid decimal format").optional(),
-  grossMargin: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid decimal format").optional(),
+  grossMargin: z.string().regex(/^-?\d+(\.\d{1,2})?$/, "Invalid decimal format").optional(),
 
   // Document upload
   wo_draft: z.string().max(255).optional(),
+
+  // Checklist and TMS Documents
+  teChecklistConfirmed: z.boolean().optional(),
+  tmsDocuments: z.record(z.boolean()).optional(),
 });
 
 export type CreateWoBasicDetailDto = z.infer<typeof CreateWoBasicDetailSchema>;
@@ -165,6 +169,8 @@ export const WoBasicDetailsResponseSchema = z.object({
   budgetPreGst: z.string().nullable(),
   grossMargin: z.string().nullable(),
   wo_draft: z.string().nullable(),
+  teChecklistConfirmed: z.boolean().nullable(),
+  tmsDocuments: z.any().nullable(),
 
   // OE assignments
   oeFirst: z.number().nullable(),

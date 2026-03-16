@@ -13,6 +13,18 @@ export const buildDefaultValues = (): WoBasicDetailFormValues => ({
   projectCode: "",
   projectName: "",
   wo_draft: [],
+  teChecklistConfirmed: false,
+  tmsDocuments: {
+    "Complete Tender Documents": false,
+    "Tender Info": false,
+    "EMD Information": false,
+    "Physical documents submission": false,
+    "RFQ and Quotation": false,
+    "Document Checklist": false,
+    "Costing Sheet": false,
+    "TQ": false,
+    "RA and Result details": false,
+  },
 });
 
 export const mapResponseToForm = (data: WoBasicDetail): WoBasicDetailFormValues => {
@@ -29,6 +41,18 @@ export const mapResponseToForm = (data: WoBasicDetail): WoBasicDetailFormValues 
     projectCode: data.projectCode || "",
     projectName: data.projectName || "",
     wo_draft: data.wo_draft ? JSON.parse(data.wo_draft) : [],
+    teChecklistConfirmed: data.teChecklistConfirmed ?? false,
+    tmsDocuments: data.tmsDocuments || {
+      "Complete Tender Documents": false,
+      "Tender Info": false,
+      "EMD Information": false,
+      "Physical documents submission": false,
+      "RFQ and Quotation": false,
+      "Document Checklist": false,
+      "Costing Sheet": false,
+      "TQ": false,
+      "RA and Result details": false,
+    },
   };
 };
 
@@ -39,6 +63,8 @@ export const mapFormToCreatePayload = (values: WoBasicDetailFormValues): CreateW
     projectCode: values.projectCode || "",
     projectName: values.projectName || "",
     currentStage: "basic_details",
+    teChecklistConfirmed: values.teChecklistConfirmed,
+    tmsDocuments: values.tmsDocuments,
   };
 
   if (values.tenderId) payload.tenderId = values.tenderId;
@@ -58,6 +84,8 @@ export const mapFormToUpdatePayload = (values: WoBasicDetailFormValues): UpdateW
     woDate: values.woDate ? values.woDate.toISOString() : undefined,
     projectCode: values.projectCode || "",
     projectName: values.projectName || "",
+    teChecklistConfirmed: values.teChecklistConfirmed,
+    tmsDocuments: values.tmsDocuments,
   };
 
   if (values.woValuePreGst !== undefined) payload.woValuePreGst = String(values.woValuePreGst);

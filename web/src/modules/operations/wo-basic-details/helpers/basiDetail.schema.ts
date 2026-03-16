@@ -17,4 +17,7 @@ export const WoBasicDetailFormSchema = z.object({
   projectName: z.string().optional(),
 
   wo_draft: z.array(z.string()).optional().nullable(),
+  teChecklistConfirmed: z.boolean().default(false),
+  tmsDocuments: z.record(z.string(), z.boolean()).default({}),
 });
+

@@ -44,6 +44,8 @@ export interface WoBasicDetail {
   budgetPreGst: string | null;
   grossMargin: string | null;
   wo_draft: string | null;
+  teChecklistConfirmed: boolean | null;
+  tmsDocuments: Record<string, boolean> | null;
   oeFirst: number | null;
   oeFirstAssignedAt: string | null;
   oeFirstAssignedBy: number | null;
@@ -79,6 +81,8 @@ export interface CreateWoBasicDetailDto {
   budgetPreGst?: string;
   grossMargin?: string;
   wo_draft?: string;
+  teChecklistConfirmed?: boolean;
+  tmsDocuments?: Record<string, boolean>;
 }
 
 export interface UpdateWoBasicDetailDto extends Partial<Omit<CreateWoBasicDetailDto, 'tenderId' | 'enquiryId'>> {}

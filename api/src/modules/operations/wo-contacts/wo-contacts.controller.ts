@@ -63,11 +63,6 @@ export class WoContactsController {
     return this.woContactsService.findAll(parsed);
   }
 
-  @Get(':id')
-  async getById(@Param('id', ParseIntPipe) id: number) {
-    return this.woContactsService.findById(id);
-  }
-
   @Get('by-basic-detail/:woBasicDetailId')
   async getByWoBasicDetailId(
     @Param('woBasicDetailId', ParseIntPipe) woBasicDetailId: number,
@@ -81,6 +76,29 @@ export class WoContactsController {
     @Param('department') department: string,
   ) {
     return this.woContactsService.findByDepartment(woBasicDetailId, department);
+  }
+
+  @Get('check-email/:email')
+  async checkEmailExists(
+    @Param('email') email: string,
+    @Query('woBasicDetailId') woBasicDetailId?: string,
+  ) {
+    return this.woContactsService.checkEmailExists(
+      email,
+      woBasicDetailId ? parseInt(woBasicDetailId, 10) : undefined,
+    );
+  }
+
+  @Get('summary/:woBasicDetailId')
+  async getContactsSummary(
+    @Param('woBasicDetailId', ParseIntPipe) woBasicDetailId: number,
+  ) {
+    return this.woContactsService.getContactsSummary(woBasicDetailId);
+  }
+
+  @Get(':id')
+  async getById(@Param('id', ParseIntPipe) id: number) {
+    return this.woContactsService.findById(id);
   }
 
   @Post()
@@ -106,12 +124,6 @@ export class WoContactsController {
     return this.woContactsService.update(id, parsed);
   }
 
-  @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async delete(@Param('id', ParseIntPipe) id: number) {
-    await this.woContactsService.delete(id);
-  }
-
   @Delete('by-basic-detail/:woBasicDetailId')
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteAllByBasicDetail(
@@ -120,25 +132,9 @@ export class WoContactsController {
     await this.woContactsService.deleteAllByBasicDetail(woBasicDetailId);
   }
 
-  // ============================================
-  // UTILITY OPERATIONS
-  // ============================================
-
-  @Get('check-email/:email')
-  async checkEmailExists(
-    @Param('email') email: string,
-    @Query('woBasicDetailId') woBasicDetailId?: string,
-  ) {
-    return this.woContactsService.checkEmailExists(
-      email,
-      woBasicDetailId ? parseInt(woBasicDetailId, 10) : undefined,
-    );
-  }
-
-  @Get('summary/:woBasicDetailId')
-  async getContactsSummary(
-    @Param('woBasicDetailId', ParseIntPipe) woBasicDetailId: number,
-  ) {
-    return this.woContactsService.getContactsSummary(woBasicDetailId);
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async delete(@Param('id', ParseIntPipe) id: number) {
+    await this.woContactsService.delete(id);
   }
 }

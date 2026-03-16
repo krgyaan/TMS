@@ -1,5 +1,5 @@
 import { bigserial } from "drizzle-orm/pg-core";
-import { text, integer, index, pgTable, bigint, varchar, timestamp, numeric, date, boolean } from "drizzle-orm/pg-core";
+import { text, integer, index, pgTable, bigint, varchar, timestamp, numeric, date, boolean, jsonb } from "drizzle-orm/pg-core";
 
 /**
  * WO Basic Details Table
@@ -33,6 +33,10 @@ export const woBasicDetails = pgTable("wo_basic_details", {
 
     // Document upload
     wo_draft: varchar("image", { length: 255 }), // Upload LOA/GEM PO/LOI/Draft WO document path
+
+    // Checklist and TMS Documents
+    teChecklistConfirmed: boolean("te_checklist_confirmed").default(false), // Checklist confirmation from TE
+    tmsDocuments: jsonb("tms_documents"), // Stores document completeness status as JSON
 
     // Operations Executive assignments (by TL within 12 hours of Basic Details)
     // Different OEs can be assigned different roles in the project

@@ -37,6 +37,8 @@ export class WoBasicDetailsService {
             budgetPreGst: data.budgetPreGst ?? null,
             grossMargin: data.grossMargin ?? null,
             wo_draft: data.wo_draft ?? null,
+            teChecklistConfirmed: data.teChecklistConfirmed ?? false,
+            tmsDocuments: data.tmsDocuments ?? null,
             isWorkflowPaused: false,
             createdAt: now,
             updatedAt: now,
@@ -57,6 +59,8 @@ export class WoBasicDetailsService {
         if (data.budgetPreGst !== undefined) out.budgetPreGst = data.budgetPreGst;
         if (data.grossMargin !== undefined) out.grossMargin = data.grossMargin;
         if (data.wo_draft !== undefined) out.wo_draft = data.wo_draft;
+        if (data.teChecklistConfirmed !== undefined) out.teChecklistConfirmed = data.teChecklistConfirmed;
+        if (data.tmsDocuments !== undefined) out.tmsDocuments = data.tmsDocuments;
 
         return out as Partial<typeof woBasicDetails.$inferInsert>;
     }
@@ -77,6 +81,8 @@ export class WoBasicDetailsService {
             budgetPreGst: row.budgetPreGst,
             grossMargin: row.grossMargin,
             wo_draft: row.wo_draft,
+            teChecklistConfirmed: row.teChecklistConfirmed,
+            tmsDocuments: row.tmsDocuments,
             oeFirst: row.oeFirst,
             oeFirstAssignedAt: row.oeFirstAssignedAt,
             oeFirstAssignedBy: row.oeFirstAssignedBy,
