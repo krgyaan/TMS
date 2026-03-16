@@ -3,7 +3,7 @@ import { z } from "zod";
 export const WoBasicDetailFormSchema = z.object({
   tenderId: z.number().nullable().optional(),
 
-  woNumber: z.number().min(1, "WO Number is required"),
+  woNumber: z.string().min(1, "WO Number is required"),
   woDate: z.date().nullable(),
 
   woValuePreGst: z.coerce.number().nonnegative().optional(),

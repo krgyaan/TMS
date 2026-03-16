@@ -267,7 +267,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
                         <div className="grid gap-4 md:grid-cols-3 items-start">
                             <FieldWrapper control={form.control} name="woNumber" label="WO Number">
-                                {field => <Input {...field} placeholder="WO Number" type="number" value={field.value || ""} onChange={e => field.onChange(e.target.value ? Number(e.target.value) : 0)} />}
+                                {field => <Input {...field} placeholder="WO Number" value={field.value || ""} onChange={e => field.onChange(e.target.value)} />}
                             </FieldWrapper>
 
                             <FieldWrapper control={form.control} name="woDate" label="WO Date">

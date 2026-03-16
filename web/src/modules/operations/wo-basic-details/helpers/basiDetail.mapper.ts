@@ -3,7 +3,7 @@ import type { WoBasicDetail, CreateWoBasicDetailDto, UpdateWoBasicDetailDto } fr
 
 export const buildDefaultValues = (): WoBasicDetailFormValues => ({
   tenderId: null,
-  woNumber: 0,
+  woNumber: "",
   woDate: null,
   woValuePreGst: 0,
   woValueGstAmt: 0,
@@ -27,10 +27,21 @@ export const buildDefaultValues = (): WoBasicDetailFormValues => ({
   },
 });
 
+const safeParseJsonArray = (val: string | null | undefined): string[] => {
+  if (!val) return [];
+  try {
+    const parsed = JSON.parse(val);
+    return Array.isArray(parsed) ? parsed : [String(val)];
+  } catch (e) {
+    // If it's not valid JSON, it's likely a legacy plain string path
+    return [String(val)];
+  }
+};
+
 export const mapResponseToForm = (data: WoBasicDetail): WoBasicDetailFormValues => {
   return {
     tenderId: data.tenderId,
-    woNumber: Number(data.woNumber) || 0,
+    woNumber: String(data.woNumber || ""),
     woDate: data.woDate ? new Date(data.woDate) : null,
 
     woValuePreGst: Number(data.woValuePreGst) || 0,
@@ -40,7 +51,7 @@ export const mapResponseToForm = (data: WoBasicDetail): WoBasicDetailFormValues 
     grossMargin: Number(data.grossMargin) || 0,
     projectCode: data.projectCode || "",
     projectName: data.projectName || "",
-    wo_draft: data.wo_draft ? JSON.parse(data.wo_draft) : [],
+    wo_draft: safeParseJsonArray(data.woDraft),
     teChecklistConfirmed: data.teChecklistConfirmed ?? false,
     tmsDocuments: data.tmsDocuments || {
       "Complete Tender Documents": false,
