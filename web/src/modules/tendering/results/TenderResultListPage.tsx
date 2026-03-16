@@ -7,7 +7,7 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Clock, Upload, Gavel, Trophy, XCircle, Eye, FileX2, Search, RefreshCw } from 'lucide-react';
+import { AlertCircle, Clock, Upload, Gavel, Trophy, XCircle, Eye, FileX2, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -120,11 +120,11 @@ const TenderResultListPage = () => {
 
     const resultActions: ActionItem<ResultDashboardRow>[] = useMemo(
         () => [
-            {
-                label: 'Change Status',
-                icon: <RefreshCw className="h-4 w-4" />,
-                onClick: (row: ResultDashboardRow) => setChangeStatusModal({ open: true, tenderId: row.tenderId }),
-            },
+            // {
+            //     label: 'Change Status',
+            //     icon: <RefreshCw className="h-4 w-4" />,
+            //     onClick: (row: ResultDashboardRow) => setChangeStatusModal({ open: true, tenderId: row.tenderId }),
+            // },
             {
                 label: 'View Details',
                 icon: <Eye className="h-4 w-4" />,
@@ -138,7 +138,7 @@ const TenderResultListPage = () => {
             {
                 label: 'Basic Details',
                 icon: <FileX2 className="h-4 w-4" />,
-                onClick: (row: ResultDashboardRow) => navigate(`${paths.operations.woBasicDetailCreatePage}?tenderId=${row.tenderId}`),
+                onClick: (row: ResultDashboardRow) => row?.woBasicDetailId ? navigate(paths.operations.woBasicDetailShowPage(row.woBasicDetailId)) : navigate(`${paths.operations.woBasicDetailCreatePage}?tenderId=${row.tenderId}`),
                 visible: (row) => row.resultStatus === 'Won' || row.resultStatus === 'won',
             },
             {

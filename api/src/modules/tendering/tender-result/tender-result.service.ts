@@ -11,6 +11,7 @@ import { tenderCostingSheets } from '@db/schemas/tendering/tender-costing-sheets
 import { users } from '@db/schemas/auth/users.schema';
 import { items } from '@db/schemas/master/items.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
+import { woBasicDetails } from '@db/schemas/operations';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import type { PaginatedResult, ResultDashboardType, ResultDashboardFilters, ResultDashboardRow, ResultDashboardCounts, EmdDetails } from '@/modules/tendering/types/shared.types';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
@@ -239,6 +240,7 @@ export class TenderResultService {
             costingFinalPrice: latestCostingSheetSq.finalPrice,
             resultId: latestTenderResultSq.id,
             resultStatus: latestTenderResultSq.status,
+            woBasicDetailId: woBasicDetails.id,
         })
         .from(tenderInfos)
         .innerJoin(users, eq(users.id, tenderInfos.teamMember))
@@ -256,6 +258,7 @@ export class TenderResultService {
         )
         .leftJoin(items, eq(items.id, tenderInfos.item))
         .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+        .leftJoin(woBasicDetails, eq(woBasicDetails.tenderId, tenderInfos.id))
         .where(whereClause)
         .orderBy(orderByClause)
         .limit(limit)
@@ -285,6 +288,7 @@ export class TenderResultService {
         resultStatus: row.resultStatus || '',
         emdDetails: this.formatEmdDetails(row.emdAmount, emdDetailsMap.get(row.tenderId)),
         hasResultEntry: row.resultId !== null,
+        woBasicDetailId: row.woBasicDetailId ?? null,
     }));
 
     // Count query with same subqueries
