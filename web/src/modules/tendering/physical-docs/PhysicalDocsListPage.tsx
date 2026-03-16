@@ -12,9 +12,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, CheckCircle, Eye, FileX2, Search, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { formatDateTime } from '@/hooks/useFormatedDate';
 import { usePhysicalDocs, usePhysicalDocsDashboardCounts } from '@/hooks/api/usePhysicalDocs';
-import { tenderNameCol } from '@/components/data-grid';
+import { dateCol, tenderNameCol } from '@/components/data-grid';
 import { Input } from '@/components/ui/input';
 import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
@@ -121,15 +120,14 @@ const PhysicalDocsListPage = () => {
             sortable: true,
             filter: true,
         },
-        {
-            field: 'physicalDocsDeadline',
-            colId: 'physicalDocsDeadline',
-            headerName: 'Physical Docs Deadline',
-            width: 160,
-            cellRenderer: (params: any) => params.data?.physicalDocsDeadline ? formatDateTime(params.data.physicalDocsDeadline) : '—',
-            sortable: true,
+        dateCol<PhysicalDocsDashboardRowWithTimer>('physicalDocsDeadline', { includeTime: true }, {
+            field: "physicalDocsDeadline",
+            colId: "physicalDocsDeadline",
+            headerName: "Physical Docs Deadline",
             filter: true,
-        },
+            sortable: true,
+            width: 150,
+        }),
         {
             field: 'courierAddress',
             colId: 'courierAddress',

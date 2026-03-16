@@ -1,7 +1,8 @@
 const inrFormatter = new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: 'INR',
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
 });
 
 export const formatINR = (value: string | number) => {

@@ -630,7 +630,7 @@ export class BidSubmissionsService {
         subject: string,
         template: string,
         data: Record<string, any>,
-        recipients: { to?: RecipientSource[]; cc?: RecipientSource[] }
+        recipients: { to?: RecipientSource[]; cc?: RecipientSource[]; attachments?: { files: string[]; baseDir?: string } }
     ) {
         try {
             await this.emailService.sendTenderEmail({
@@ -642,6 +642,7 @@ export class BidSubmissionsService {
                 subject,
                 template,
                 data,
+                attachments: recipients.attachments,
             });
         } catch (error) {
             this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
@@ -654,7 +655,7 @@ export class BidSubmissionsService {
      */
     private async sendBidSubmittedEmail(
         tenderId: number,
-        bidSubmission: { submissionDatetime: Date | null },
+        bidSubmission: { submissionDatetime: Date | null; documents?: { submittedDocs?: string[]; submissionProof?: string | null; finalPriceSs?: string | null } | null },
         submittedBy: number
     ) {
         const tender = await this.tenderInfosService.findById(tenderId);
@@ -726,6 +727,20 @@ export class BidSubmissionsService {
             ccRecipients.push({ type: 'role', role: 'Admin', teamId: accountsTeamId });
         }
 
+        // Collect attachments
+        const attachmentFiles: string[] = [];
+        if (bidSubmission.documents) {
+            if (bidSubmission.documents.submittedDocs && bidSubmission.documents.submittedDocs.length > 0) {
+                attachmentFiles.push(...bidSubmission.documents.submittedDocs);
+            }
+            if (bidSubmission.documents.submissionProof) {
+                attachmentFiles.push(bidSubmission.documents.submissionProof);
+            }
+            if (bidSubmission.documents.finalPriceSs) {
+                attachmentFiles.push(bidSubmission.documents.finalPriceSs);
+            }
+        }
+
         await this.sendEmail(
             'bid.submitted',
             tenderId,
@@ -736,6 +751,7 @@ export class BidSubmissionsService {
             {
                 to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
                 cc: ccRecipients,
+                attachments: attachmentFiles.length > 0 ? { files: attachmentFiles } : undefined,
             }
         );
     }

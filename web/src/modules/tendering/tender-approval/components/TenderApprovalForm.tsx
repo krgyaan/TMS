@@ -543,26 +543,24 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                     placeholder="Select tender status"
                                 />
                                 {isNotAllowedByOem && (
-                                    <>
-                                        <SelectField
-                                            control={form.control}
-                                            name="oemNotAllowed"
-                                            label="OEM who didn't allow"
-                                            options={vendorOrgOptions}
-                                            placeholder="Select OEM who didn't allow"
-                                        />
-                                        <FieldWrapper control={form.control} name="remarks" label="Remarks">
-                                            {(field) => (
-                                                <textarea
-                                                    {...field}
-                                                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                                                    placeholder="Enter rejection remarks..."
-                                                    maxLength={1000}
-                                                />
-                                            )}
-                                        </FieldWrapper>
-                                    </>
+                                    <SelectField
+                                        control={form.control}
+                                        name="oemNotAllowed"
+                                        label="OEM who didn't allow"
+                                        options={vendorOrgOptions}
+                                        placeholder="Select OEM who didn't allow"
+                                    />
                                 )}
+                                <FieldWrapper control={form.control} name="remarks" label="Remarks">
+                                    {(field) => (
+                                        <textarea
+                                            {...field}
+                                            className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                            placeholder="Enter rejection remarks..."
+                                            maxLength={1000}
+                                        />
+                                    )}
+                                </FieldWrapper>
                             </div>
                         )}
 

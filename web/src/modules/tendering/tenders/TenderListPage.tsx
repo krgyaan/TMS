@@ -13,7 +13,6 @@ import { Eye, FilePlus, Pencil, Plus, Search, RefreshCw, Clock, Archive } from "
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { formatDateTime } from "@/hooks/useFormatedDate";
 import { currencyCol, dateCol, tenderNameCol } from "@/components/data-grid/columns";
 import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
 import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
@@ -213,17 +212,14 @@ const TenderListPage = () => {
             sortable: true,
             width: 100,
         }),
-        {
+        dateCol<TenderInfoWithNames>('dueDate', { includeTime: true }, {
             field: "dueDate",
             colId: "dueDate",
             headerName: "Due Date",
             filter: true,
             sortable: true,
             width: 150,
-            cellRenderer: (params: { value: string | Date }) => {
-                return params.value ? formatDateTime(params.value) : "-";
-            },
-        },
+        }),
         dateCol<TenderInfoWithNames>('resultDate', { includeTime: true }, {
             field: "resultDate",
             colId: "resultDate",

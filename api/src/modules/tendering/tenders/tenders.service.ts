@@ -738,7 +738,7 @@ export class TenderInfosService {
         subject: string,
         template: string,
         data: Record<string, any>,
-        recipients: { to?: RecipientSource[]; cc?: RecipientSource[] }
+        recipients: { to?: RecipientSource[]; cc?: RecipientSource[]; attachments?: { filename: string, path: string }[] }
     ) {
         try {
             await this.emailService.sendTenderEmail({
@@ -750,6 +750,7 @@ export class TenderInfosService {
                 subject,
                 template,
                 data,
+                attachments: recipients.attachments ? { files: recipients.attachments.map(a => a.path) } : undefined,
             });
         } catch (error) {
             this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
@@ -819,6 +820,26 @@ export class TenderInfosService {
             coordinator: coordinatorName,
         };
 
+        // Parse documents array and map into attachments format
+        let attachments: { filename: string, path: string }[] = [];
+        if (data.documents) {
+            try {
+                // Ensure it's an array for attachment resolution
+                const docPaths = Array.isArray(data.documents) 
+                  ? data.documents 
+                  : JSON.parse(data.documents);
+                
+                if (Array.isArray(docPaths)) {
+                    attachments = docPaths.map(path => ({
+                        filename: path.split('/').pop() || 'document.pdf',
+                        path: path
+                    }));
+                }
+            } catch (e) {
+                this.logger.error(`Failed to parse tender documents for attachment: ${e}`);
+            }
+        }
+
         if (tender.teamMember) {
             // Tender assigned - send to team member, from coordinator
             const assignee = await this.recipientResolver.getUserById(tender.teamMember);
@@ -842,6 +863,7 @@ export class TenderInfosService {
                             { type: 'role', role: 'Team Leader', teamId },
                             { type: 'role', role: 'Admin', teamId },
                         ],
+                        attachments: attachments.length > 0 ? attachments : undefined,
                     }
                 );
             }
@@ -862,6 +884,7 @@ export class TenderInfosService {
                         cc: [
                             { type: 'role', role: 'Admin', teamId },
                         ],
+                        attachments: attachments.length > 0 ? attachments : undefined,
                     }
                 );
             }
@@ -935,6 +958,27 @@ export class TenderInfosService {
         const coordinatorUserId = await this.getCoordinatorUserId(teamId)  || 8;
         if (!coordinatorUserId) return;
 
+        // Collect newly updated documents or existing documents if not updated
+        let attachments: { filename: string, path: string }[] = [];
+        const documentsString = changedData.documents !== undefined ? changedData.documents : newTender.documents;
+        
+        if (documentsString) {
+            try {
+                const docPaths = Array.isArray(documentsString) 
+                  ? documentsString 
+                  : JSON.parse(documentsString);
+                
+                if (Array.isArray(docPaths)) {
+                    attachments = docPaths.map(path => ({
+                        filename: path.split('/').pop() || 'document.pdf',
+                        path: path
+                    }));
+                }
+            } catch (e) {
+                this.logger.error(`Failed to parse tender documents for attachment in update: ${e}`);
+            }
+        }
+
         await this.sendEmail(
             'tender.updated',
             newTender.id as number,
@@ -964,6 +1008,7 @@ export class TenderInfosService {
                     { type: 'role', role: 'Team Leader', teamId },
                     { type: 'role', role: 'Admin', teamId },
                 ],
+                attachments: attachments.length > 0 ? attachments : undefined,
             }
         );
     }
