@@ -17,10 +17,6 @@ export type WoBasicDetailRow = typeof woBasicDetails.$inferSelect;
 export class WoBasicDetailsService {
     constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
 
-    // ============================================
-    // MAPPING FUNCTIONS
-    // ============================================
-
     private mapCreateToDb(data: CreateWoBasicDetailDto) {
         const now = new Date();
         return {
@@ -37,6 +33,8 @@ export class WoBasicDetailsService {
             budgetPreGst: data.budgetPreGst ?? null,
             grossMargin: data.grossMargin ?? null,
             wo_draft: data.wo_draft ?? null,
+            teChecklistConfirmed: data.teChecklistConfirmed ?? false,
+            tmsDocuments: data.tmsDocuments ?? null,
             isWorkflowPaused: false,
             createdAt: now,
             updatedAt: now,
@@ -57,6 +55,8 @@ export class WoBasicDetailsService {
         if (data.budgetPreGst !== undefined) out.budgetPreGst = data.budgetPreGst;
         if (data.grossMargin !== undefined) out.grossMargin = data.grossMargin;
         if (data.wo_draft !== undefined) out.wo_draft = data.wo_draft;
+        if (data.teChecklistConfirmed !== undefined) out.teChecklistConfirmed = data.teChecklistConfirmed;
+        if (data.tmsDocuments !== undefined) out.tmsDocuments = data.tmsDocuments;
 
         return out as Partial<typeof woBasicDetails.$inferInsert>;
     }
@@ -77,6 +77,7 @@ export class WoBasicDetailsService {
             budgetPreGst: row.budgetPreGst,
             grossMargin: row.grossMargin,
             wo_draft: row.wo_draft,
+            tmsDocuments: row.tmsDocuments,
             oeFirst: row.oeFirst,
             oeFirstAssignedAt: row.oeFirstAssignedAt,
             oeFirstAssignedBy: row.oeFirstAssignedBy,
@@ -93,10 +94,6 @@ export class WoBasicDetailsService {
             updatedAt: row.updatedAt,
         };
     }
-
-    // ============================================
-    // UTILITY FUNCTIONS
-    // ============================================
 
     private generateProjectCode(): string {
         const timestamp = Date.now().toString(36).toUpperCase();
@@ -115,10 +112,6 @@ export class WoBasicDetailsService {
         const margin = ((receipt - budget) / receipt) * 100;
         return margin.toFixed(2);
     }
-
-    // ============================================
-    // CRUD OPERATIONS
-    // ============================================
 
     async findAll(filters?: WoBasicDetailsQueryDto) {
         const page = filters?.page ?? 1;

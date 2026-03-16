@@ -1,17 +1,11 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { BasicDetailForm } from "./components/BasicDetailForm";
 
 const BasicDetailCreatePage = () => {
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Work Orders</CardTitle>
-                <CardDescription>All work orders listed</CardDescription>
-            </CardHeader>
-            <CardContent className="h-screen px-0">
-
-            </CardContent>
-        </Card>
+        <div className="flex flex-col gap-4">
+            <BasicDetailForm mode="create" />
+        </div>
     );
 };
 
-export default BasicDetailCreatePage
+export default BasicDetailCreatePage;

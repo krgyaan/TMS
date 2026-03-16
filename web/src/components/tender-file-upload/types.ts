@@ -64,6 +64,7 @@ export type TenderFileContext =
     | 'sanctionLetter'
     | 'tdsDocument'
     | 'bankNoc'
+    | 'wo-draft'
     | 'mcaClosure';
 
 export interface FileConfig {
