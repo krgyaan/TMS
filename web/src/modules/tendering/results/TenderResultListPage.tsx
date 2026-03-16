@@ -136,6 +136,12 @@ const TenderResultListPage = () => {
                 onClick: (row: ResultDashboardRow) => row.id ? navigate(paths.tendering.resultsEdit(row.id)) : navigate(paths.tendering.resultsUpload(row.tenderId)),
             },
             {
+                label: 'Basic Details',
+                icon: <FileX2 className="h-4 w-4" />,
+                onClick: (row: ResultDashboardRow) => navigate(`${paths.operations.woBasicDetailCreatePage}?tenderId=${row.tenderId}`),
+                visible: (row) => row.resultStatus === 'Won' || row.resultStatus === 'won',
+            },
+            {
                 label: 'View RA Details',
                 icon: <Gavel className="h-4 w-4" />,
                 onClick: (row: ResultDashboardRow) => navigate(paths.tendering.rasShow(row.reverseAuctionId!)),

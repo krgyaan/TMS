@@ -17,10 +17,6 @@ export type WoBasicDetailRow = typeof woBasicDetails.$inferSelect;
 export class WoBasicDetailsService {
     constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
 
-    // ============================================
-    // MAPPING FUNCTIONS
-    // ============================================
-
     private mapCreateToDb(data: CreateWoBasicDetailDto) {
         const now = new Date();
         return {
@@ -81,7 +77,6 @@ export class WoBasicDetailsService {
             budgetPreGst: row.budgetPreGst,
             grossMargin: row.grossMargin,
             wo_draft: row.wo_draft,
-            teChecklistConfirmed: row.teChecklistConfirmed,
             tmsDocuments: row.tmsDocuments,
             oeFirst: row.oeFirst,
             oeFirstAssignedAt: row.oeFirstAssignedAt,
@@ -100,10 +95,6 @@ export class WoBasicDetailsService {
         };
     }
 
-    // ============================================
-    // UTILITY FUNCTIONS
-    // ============================================
-
     private generateProjectCode(): string {
         const timestamp = Date.now().toString(36).toUpperCase();
         const random = Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -121,10 +112,6 @@ export class WoBasicDetailsService {
         const margin = ((receipt - budget) / receipt) * 100;
         return margin.toFixed(2);
     }
-
-    // ============================================
-    // CRUD OPERATIONS
-    // ============================================
 
     async findAll(filters?: WoBasicDetailsQueryDto) {
         const page = filters?.page ?? 1;

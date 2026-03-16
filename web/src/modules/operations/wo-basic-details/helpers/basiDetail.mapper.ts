@@ -59,7 +59,7 @@ export const mapResponseToForm = (data: WoBasicDetail): WoBasicDetailFormValues 
 export const mapFormToCreatePayload = (values: WoBasicDetailFormValues): CreateWoBasicDetailDto => {
   const payload: CreateWoBasicDetailDto = {
     woNumber: String(values.woNumber),
-    woDate: values.woDate ? values.woDate.toISOString() : undefined,
+    woDate: values.woDate ? values.woDate.toISOString().split('T')[0] : undefined,
     projectCode: values.projectCode || "",
     projectName: values.projectName || "",
     currentStage: "basic_details",
@@ -81,7 +81,7 @@ export const mapFormToCreatePayload = (values: WoBasicDetailFormValues): CreateW
 export const mapFormToUpdatePayload = (values: WoBasicDetailFormValues): UpdateWoBasicDetailDto => {
   const payload: UpdateWoBasicDetailDto = {
     woNumber: String(values.woNumber),
-    woDate: values.woDate ? values.woDate.toISOString() : undefined,
+    woDate: values.woDate ? values.woDate.toISOString().split('T')[0] : undefined,
     projectCode: values.projectCode || "",
     projectName: values.projectName || "",
     teChecklistConfirmed: values.teChecklistConfirmed,

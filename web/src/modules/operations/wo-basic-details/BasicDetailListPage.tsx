@@ -274,7 +274,7 @@ const BasicDetailListPage = () => {
                             Manage work order basic details and OE assignments.
                         </CardDescription>
                     </div>
-                    <Button onClick={() => navigate(paths.operations.woBasicDetailCreatePage)}>
+                    <Button className='hidden' onClick={() => navigate(paths.operations.woBasicDetailCreatePage)}>
                         <Plus className="h-4 w-4 mr-2" />
                         New Work Order
                     </Button>

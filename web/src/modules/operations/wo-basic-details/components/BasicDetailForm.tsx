@@ -65,20 +65,18 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
     const tenderId = watchTenderId ? Number(watchTenderId) : null;
     const { data: tenderData } = useTender(tenderId);
     const { data: costingData } = useCostingSheetByTender(tenderId || 0);
-    console.log(tenderData);
 
     // Auto-fill from Costing Sheet
     useEffect(() => {
         if (mode === "create" && costingData) {
-            const c = costingData as any;
-            if (c.budget && !form.getValues("budgetPreGst")) {
-                form.setValue("budgetPreGst", Number(c.budget));
+            if (costingData.budgetPrice && !form.getValues("budgetPreGst")) {
+                form.setValue("budgetPreGst", Number(costingData.budgetPrice));
             }
-            if (c.receipt && !form.getValues("receiptPreGst")) {
-                form.setValue("receiptPreGst", Number(c.receipt));
+            if (costingData.receiptPrice && !form.getValues("receiptPreGst")) {
+                form.setValue("receiptPreGst", Number(costingData.receiptPrice));
             }
-            if (c.grossMargin && !form.getValues("grossMargin")) {
-                form.setValue("grossMargin", Number(c.grossMargin));
+            if (costingData.grossMargin && !form.getValues("grossMargin")) {
+                form.setValue("grossMargin", Number(costingData.grossMargin));
             }
         }
     }, [mode, costingData, form]);

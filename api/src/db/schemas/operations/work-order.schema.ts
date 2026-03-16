@@ -35,7 +35,6 @@ export const woBasicDetails = pgTable("wo_basic_details", {
     wo_draft: varchar("image", { length: 255 }), // Upload LOA/GEM PO/LOI/Draft WO document path
 
     // Checklist and TMS Documents
-    teChecklistConfirmed: boolean("te_checklist_confirmed").default(false), // Checklist confirmation from TE
     tmsDocuments: jsonb("tms_documents"), // Stores document completeness status as JSON
 
     // Operations Executive assignments (by TL within 12 hours of Basic Details)
