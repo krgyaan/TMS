@@ -197,7 +197,6 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                 )}
                             </FieldWrapper>
 
-
                             <FieldWrapper control={form.control} name="woValuePreGst" label="WO Value (Pre-GST)">
                                 {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
                             </FieldWrapper>
