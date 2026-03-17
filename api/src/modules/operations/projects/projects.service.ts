@@ -6,9 +6,7 @@ import type { DbInstance } from "@/db";
 
 import { projects } from "@/db/schemas/operations/projects.schema";
 import { tenderInfos } from "@/db/schemas/tendering/tenders.schema";
-import { woBasicDetails } from "@/db/schemas/operations/wo-basic-details.schema";
-import { woDetails } from "@/db/schemas/operations/wo-details.schema";
-import { woAcceptanceYes } from "@/db/schemas/operations/wo-acceptance-yes.schema";
+import { woBasicDetails, woDetails } from "@/db/schemas/operations/work-order.schema";
 import { employeeImprests } from "@/db/schemas/shared/employee-imprest.schema";
 import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
 import { purchaseOrderProducts } from "@/db/schemas/operations/purchase-order-products.schema";
@@ -31,11 +29,11 @@ export class ProjectsService {
 
         const tender = project.tenderId ? (await this.db.select().from(tenderInfos).where(eq(tenderInfos.id, project.tenderId)))[0] : undefined;
 
-        const basicDetail = tender ? (await this.db.select().from(woBasicDetails).where(eq(woBasicDetails.tenderNameId, tender.id)))[0] : undefined;
+        const basicDetail = tender ? (await this.db.select().from(woBasicDetails).where(eq(woBasicDetails.tenderId, tender.id)))[0] : undefined;
 
-        const woDetail = basicDetail ? (await this.db.select().from(woDetails).where(eq(woDetails.basicDetailId, basicDetail.id)))[0] : undefined;
+        const woDetail = basicDetail ? (await this.db.select().from(woDetails).where(eq(woDetails.woBasicDetailId, basicDetail.id)))[0] : undefined;
 
-        const woAcceptance = basicDetail ? (await this.db.select().from(woAcceptanceYes).where(eq(woAcceptanceYes.basicDetailId, basicDetail.id)))[0] : undefined;
+        const woAcceptance = basicDetail ? (await this.db.select().from(woDetails).where(eq(woDetails.woBasicDetailId, basicDetail.id)))[0] : undefined;
 
         const imprests = project.projectName ? await this.db.select().from(employeeImprests).where(eq(employeeImprests.projectName, project.projectName)) : [];
 

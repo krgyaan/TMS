@@ -97,16 +97,16 @@ const TenderApprovalListPage = () => {
             },
             icon: <Eye className="h-4 w-4" />,
         },
-        {
-            label: 'Change Status',
-            onClick: (row: any) => {
-                const tenderId = row.tenderId || row.id;
-                if (tenderId) {
-                    setChangeStatusModal({ open: true, tenderId });
-                }
-            },
-            icon: <RefreshCw className="h-4 w-4" />,
-        },
+        // {
+        //     label: 'Change Status',
+        //     onClick: (row: any) => {
+        //         const tenderId = row.tenderId || row.id;
+        //         if (tenderId) {
+        //             setChangeStatusModal({ open: true, tenderId });
+        //         }
+        //     },
+        //     icon: <RefreshCw className="h-4 w-4" />,
+        // },
     ];
 
     const tabsConfig = useMemo(() => {

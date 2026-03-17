@@ -3,9 +3,10 @@ import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service'
 import { NewTenderInfo } from '@db/schemas/tendering/tenders.schema';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { CreateTenderSchema, UpdateTenderSchema, UpdateStatusSchema, GenerateTenderNameSchema } from './dto/tender.dto';
+import { CreateTenderSchema, UpdateTenderSchema, UpdateStatusSchema, GenerateTenderNameSchema, type CreateTenderDto } from './dto/tender.dto';
 import { TimersService } from '@/modules/timers/timers.service';
 import { getFrontendTimer } from '@/modules/timers/timer-helper';
+import { ValidatedBody } from '@/decorators/validated-body.decorator';
 
 @Controller('tenders')
 export class TenderInfoController {
@@ -95,11 +96,10 @@ export class TenderInfoController {
     @Post()
     @HttpCode(HttpStatus.CREATED)
     async create(
-        @Body() body: unknown,
+        @ValidatedBody(CreateTenderSchema) body: CreateTenderDto,
         @CurrentUser() user: ValidatedUser
     ) {
-        const parsed = CreateTenderSchema.parse(body);
-        return this.tenderInfosService.create(parsed, user.sub);
+        return this.tenderInfosService.create(body, user.sub);
     }
 
     @Patch(':id')

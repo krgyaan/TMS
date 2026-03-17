@@ -4,6 +4,7 @@ import { handleQueryError } from '@/lib/react-query';
 import { toast } from 'sonner';
 import { useTeamFilter } from '@/hooks/useTeamFilter';
 import type { CreateTenderRequest, TenderListParams, UpdateTenderRequest, PaginatedResult, TenderInfoWithNames } from '@/types/api.types';
+import { showErrorToast } from '@/utils/errorToast';
 
 export const tendersKey = {
     all: ['tenders'] as const,
@@ -75,9 +76,7 @@ export const useCreateTender = () => {
             queryClient.invalidateQueries({ queryKey: tendersKey.lists() });
             toast.success("Tender created successfully");
         },
-        onError: error => {
-            toast.error(handleQueryError(error));
-        },
+        onError: showErrorToast,
     });
 };
 
@@ -91,9 +90,7 @@ export const useUpdateTender = () => {
             queryClient.invalidateQueries({ queryKey: tendersKey.detail(variables.id) });
             toast.success("Tender updated successfully");
         },
-        onError: error => {
-            toast.error(handleQueryError(error));
-        },
+        onError: showErrorToast,
     });
 };
 
@@ -106,9 +103,7 @@ export const useDeleteTender = () => {
             queryClient.invalidateQueries({ queryKey: tendersKey.lists() });
             toast.success("Tender deleted successfully");
         },
-        onError: error => {
-            toast.error(handleQueryError(error));
-        },
+        onError: showErrorToast,
     });
 };
 
@@ -150,8 +145,6 @@ export const useUpdateTenderStatus = () => {
             queryClient.invalidateQueries({ queryKey: tendersKey.dashboardCounts() });
             toast.success("Tender status updated successfully");
         },
-        onError: error => {
-            toast.error(handleQueryError(error));
-        },
+        onError: showErrorToast,
     });
 };

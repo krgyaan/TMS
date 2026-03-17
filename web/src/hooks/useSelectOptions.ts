@@ -9,6 +9,7 @@ import { useGetTeamMembers } from './api/useUsers';
 import { usePqrsAll } from './api/usePqrs';
 import { useFinanceDocumentsAll } from './api/useFinanceDocuments';
 import { useProjectsMaster } from './api/useProjects';
+import { useLoanParties } from './api/useLoanParties';
 
 export function useTeamOptions(ids: Array<number> = []) {
     const { data: teams = [] } = useTeams();
@@ -124,6 +125,19 @@ export function useProjectOptions() {
             projects.map((p) => ({
                 id: p.projectName,
                 name: p.projectName,
+            })),
+        [projects]
+    );
+}
+
+export function useLoanPartyOptions() {
+    const { data: projects = [] } = useLoanParties();
+
+    return useMemo(
+        () =>
+            projects.map((p) => ({
+                id: p.name,
+                name: p.name,
             })),
         [projects]
     );

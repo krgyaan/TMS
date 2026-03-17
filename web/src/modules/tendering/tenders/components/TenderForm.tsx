@@ -474,7 +474,7 @@ export function TenderForm({ tender, mode }: TenderFormProps) {
                                         label="Team Member"
                                         options={userOptions}
                                         placeholder="Select User"
-                                        disabled={!team || lockUser}
+                                        disabled={!team}
                                     />
 
                                     {/* Due Date & Time */}

@@ -700,11 +700,11 @@ export class TenderApprovalService {
             vendor = `${payload.rfqTo.length} vendor(s)`;
         }
 
-        // Get physical docs requirement
-        const phyDocs = "As per tender requirements"; // TODO: Get from tender data if available
-
         // Fetch info sheet to get original documents
         const infoSheet = await this.tenderInfoSheetsService.findByTenderId(tenderId);
+
+        // Get physical docs requirement
+        const phyDocs = infoSheet?.courierAddress || "As per tender requirements";
 
         // Fetch all PQR and Finance documents for mapping
         const [allPqrDocs, allFinanceDocs] = await Promise.all([
@@ -789,8 +789,30 @@ export class TenderApprovalService {
             }).filter(Boolean);
         };
 
-        const originalTechnicalDocs = infoSheet ? mapTechnicalDocs(infoSheet.technicalWorkOrders) : [];
-        const originalFinancialDocs = infoSheet ? mapFinancialDocs(infoSheet.commercialDocuments) : [];
+        let techDocs = infoSheet?.technicalWorkOrders;
+        let pqrDocs:string[] = [];
+        if (techDocs && Array.isArray(techDocs)) {
+            pqrDocs = techDocs.map(doc => {
+                const docId = typeof doc === 'string' ? parseInt(doc, 10) : doc.id;
+                if (!isNaN(docId) && pqrMap.has(docId)) {
+                    return pqrMap.get(docId)!;
+                }
+                return typeof doc === 'string' ? doc : doc.projectName || '';
+            }).filter(Boolean);
+        }
+        let finDocs = infoSheet?.commercialDocuments;
+        let financeDocs:string[] = [];
+        if (finDocs && Array.isArray(finDocs)) {
+            financeDocs = finDocs.map(doc => {
+                const docId = typeof doc === 'string' ? parseInt(doc, 10) : doc.id;
+                if (!isNaN(docId) && financeMap.has(docId)) {
+                    return financeMap.get(docId)!;
+                }
+                return typeof doc === 'string' ? doc : doc.documentName || '';
+            }).filter(Boolean);
+        }
+        const originalTechnicalDocs = infoSheet ? mapTechnicalDocs(pqrDocs) : [];
+        const originalFinancialDocs = infoSheet ? mapFinancialDocs(financeDocs) : [];
         const alternativeTechnicalDocNames = mapAlternativeTechnicalDocs(payload.alternativeTechnicalDocs);
         const alternativeFinancialDocNames = mapAlternativeFinancialDocs(payload.alternativeFinancialDocs);
 

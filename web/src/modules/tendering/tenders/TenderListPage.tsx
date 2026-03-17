@@ -9,16 +9,16 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { useDeleteTender, useTenders, useTendersDashboardCounts } from "@/hooks/api/useTenders";
 import type { TenderInfoWithNames, TenderWithRelations, TenderWithTimer } from "./helpers/tenderInfo.types";
-import { Eye, FilePlus, Pencil, Plus, Trash, Search, RefreshCw, Clock } from "lucide-react";
+import { Eye, FilePlus, Pencil, Plus, Search, RefreshCw, Clock, Archive } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { formatDateTime } from "@/hooks/useFormatedDate";
 import { currencyCol, dateCol, tenderNameCol } from "@/components/data-grid/columns";
 import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
 import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { QuickFilter } from "@/components/ui/quick-filter";
 import { ChangeStatusModal } from "./components/ChangeStatusModal";
+import { useAuth } from "@/contexts/AuthContext";
 
 type TenderDashboardTab = 'under-preparation' | 'did-not-bid' | 'tenders-bid' | 'tender-won' | 'tender-lost' | 'unallocated';
 
@@ -28,6 +28,8 @@ const TenderListPage = () => {
     const [search, setSearch] = useState<string>('');
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const debouncedSearch = useDebouncedSearch(search, 300);
+
+    const { canDelete } = useAuth();
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
@@ -121,7 +123,7 @@ const TenderListPage = () => {
         ];
     }, [counts]);
 
-    const tenderActions: ActionItem<TenderWithTimer>[] = [
+    const tenderActions: ActionItem<TenderWithTimer & { canDelete: boolean }>[] = [
         {
             label: "Fill Info Sheet",
             onClick: (row: TenderWithRelations) => (row.infoSheet ? navigate(paths.tendering.infoSheetEdit(row.id)) : navigate(paths.tendering.infoSheetCreate(row.id))),
@@ -138,29 +140,6 @@ const TenderListPage = () => {
             icon: <Eye className="h-4 w-4" />,
         },
         {
-            label: "Edit",
-            onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.tenderEdit(row.id)),
-            icon: <Pencil className="h-4 w-4" />,
-        },
-        {
-            label: "Delete",
-            className: "text-red-600",
-            onClick: async row => {
-                if (confirm(`Are you sure you want to delete tender "${row.tenderName}"?`)) {
-                    try {
-                        await deleteTender.mutateAsync(row.id);
-                    } catch (error) {
-                        console.error("Delete failed:", error);
-                    }
-                }
-            },
-            icon: <Trash className="h-4 w-4" />,
-            visible: (row: TenderInfoWithNames) => {
-                // For now, show delete button for all users
-                return row.teamMember == 7 || row.teamMember == 8;
-            },
-        },
-        {
             label: "Request Extension",
             onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.requestExtensionCreate(row.id)),
             icon: <Clock className="h-4 w-4" />,
@@ -169,7 +148,27 @@ const TenderListPage = () => {
             label: "Submit Queries",
             onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.submitQueryCreate(row.id)),
             icon: <Clock className="h-4 w-4" />,
-        }
+        },
+        {
+            label: "Edit",
+            onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.tenderEdit(row.id)),
+            icon: <Pencil className="h-4 w-4" />,
+        },
+        {
+            label: "Archive",
+            className: "text-red-600",
+            onClick: async row => {
+                if (confirm(`Are you sure you want to archive tender "${row.tenderName}"?`)) {
+                    try {
+                        await deleteTender.mutateAsync(row.id);
+                    } catch (error) {
+                        console.error("Delete failed:", error);
+                    }
+                }
+            },
+            icon: <Archive className="h-4 w-4 text-red-600" />,
+            visible: () => canDelete("tender"),
+        },
     ];
 
     const colDefs = useMemo<ColDef<TenderWithTimer>[]>(() => [
@@ -213,17 +212,14 @@ const TenderListPage = () => {
             sortable: true,
             width: 100,
         }),
-        {
+        dateCol<TenderInfoWithNames>('dueDate', { includeTime: true }, {
             field: "dueDate",
             colId: "dueDate",
             headerName: "Due Date",
             filter: true,
             sortable: true,
             width: 150,
-            cellRenderer: (params: { value: string | Date }) => {
-                return params.value ? formatDateTime(params.value) : "-";
-            },
-        },
+        }),
         dateCol<TenderInfoWithNames>('resultDate', { includeTime: true }, {
             field: "resultDate",
             colId: "resultDate",

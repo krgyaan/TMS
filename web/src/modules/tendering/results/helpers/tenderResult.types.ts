@@ -75,6 +75,7 @@ export interface ResultDashboardRow {
     reverseAuctionId: number | null;
     emdDetails: EmdDetails | null;
     technicallyQualified: string | null;
+    woBasicDetailId: number | null;
 }
 
 export interface ResultDashboardCounts {

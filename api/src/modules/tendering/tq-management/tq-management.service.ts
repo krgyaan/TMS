@@ -786,7 +786,7 @@ export class TqManagementService {
         subject: string,
         template: string,
         data: Record<string, any>,
-        recipients: { to?: RecipientSource[]; cc?: RecipientSource[] }
+        recipients: { to?: RecipientSource[]; cc?: RecipientSource[]; attachments?: { files: string[]; baseDir?: string } }
     ) {
         try {
             await this.emailService.sendTenderEmail({
@@ -798,6 +798,7 @@ export class TqManagementService {
                 subject,
                 template,
                 data,
+                attachments: recipients.attachments,
             });
         } catch (error) {
             this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
@@ -810,7 +811,7 @@ export class TqManagementService {
      */
     private async sendTqReceivedEmail(
         tenderId: number,
-        tqRecord: { id: number; tqSubmissionDeadline: Date | null },
+        tqRecord: { id: number; tqSubmissionDeadline: Date | null; tqDocumentReceived?: string | null },
         receivedBy: number,
         tqItems: Array<{ tqTypeId: number; queryDescription: string }>
     ) {
@@ -883,6 +884,7 @@ export class TqManagementService {
             {
                 to: [{ type: 'user', userId: tender.teamMember }],
                 cc: ccRecipients,
+                attachments: tqRecord.tqDocumentReceived ? { files: [tqRecord.tqDocumentReceived] } : undefined,
             }
         );
     }
@@ -892,7 +894,7 @@ export class TqManagementService {
      */
     private async sendTqRepliedEmail(
         tenderId: number,
-        tqRecord: { repliedDatetime: Date | null },
+        tqRecord: { repliedDatetime: Date | null; repliedDocument?: string | null; proofOfSubmission?: string | null },
         repliedBy: number
     ) {
         const tender = await this.tenderInfosService.findById(tenderId);
@@ -957,6 +959,14 @@ export class TqManagementService {
             { type: 'role', role: 'Coordinator', teamId: tender.team },
         ];
 
+        const attachmentFiles: string[] = [];
+        if (tqRecord.repliedDocument) {
+            attachmentFiles.push(tqRecord.repliedDocument);
+        }
+        if (tqRecord.proofOfSubmission) {
+            attachmentFiles.push(tqRecord.proofOfSubmission);
+        }
+
         await this.sendEmail(
             'tq.replied',
             tenderId,
@@ -967,6 +977,7 @@ export class TqManagementService {
             {
                 to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
                 cc: ccRecipients,
+                attachments: attachmentFiles.length > 0 ? { files: attachmentFiles } : undefined,
             }
         );
     }

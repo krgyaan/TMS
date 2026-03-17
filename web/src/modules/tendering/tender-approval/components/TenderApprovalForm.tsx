@@ -26,6 +26,7 @@ import type { TenderApprovalFormValues } from '../helpers/tenderApproval.types';
 import { getInitialValues, mapFormToPayload } from '../helpers/tenderApproval.mappers';
 import { usePqrOptions, useFinanceDocumentOptions } from '@/hooks/useSelectOptions';
 import { TenderFileUploader } from '@/components/tender-file-upload/TenderFileUploader';
+import { tenderFilesService } from '@/services/api/tender-files.service';
 
 interface TenderApprovalFormProps {
     tenderId: number;
@@ -66,74 +67,6 @@ const InfoSheetMissingAlert = ({ tenderId, onBack }: { tenderId: number, onBack:
         </Card>
     );
 };
-
-const getOptionLabel = (
-    options: Array<{ value: string; label: string }> | undefined,
-    raw: string | number | null | undefined,
-) => {
-    if (raw === null || raw === undefined) return "—"
-    const rawStr = String(raw).trim()
-    if (!rawStr) return "—"
-
-    if (!options || options.length === 0) {
-        return rawStr
-    }
-
-    const match = options.find((option) => option.value === rawStr)
-    if (match) {
-        return match.label
-    }
-
-    // If it's already a descriptive string, keep it as-is
-    if (isNaN(Number(rawStr))) {
-        return rawStr
-    }
-
-    // Fallback to the raw id string when no label is found
-    return rawStr
-}
-
-const formatDocuments = (
-    documents: string[] | Array<{ id?: number; documentName: string }> = [],
-    options?: Array<{ value: string; label: string }>,
-) => {
-    if (!documents.length) {
-        return <span className="text-muted-foreground">No documents listed</span>
-    }
-
-    return (
-        <div className="flex flex-wrap gap-2">
-            {documents.map((doc, index) => {
-                // Handle both string arrays and object arrays
-                if (typeof doc === "string") {
-                    const label = options ? getOptionLabel(options, doc) : doc
-                    if (!label || label === "—") {
-                        return null
-                    }
-                    return (
-                        <Badge key={doc} variant="outline">
-                            {label}
-                        </Badge>
-                    )
-                }
-
-                const rawName = doc.documentName
-                const docKey = doc.id ?? rawName ?? index
-                const label = options ? getOptionLabel(options, rawName) : rawName
-
-                if (!label || label === "—") {
-                    return null
-                }
-
-                return (
-                    <Badge key={docKey} variant="outline">
-                        {label}
-                    </Badge>
-                )
-            })}
-        </div>
-    )
-}
 
 export function TenderApprovalForm({ tenderId, relationships, isLoading: isParentLoading }: TenderApprovalFormProps) {
     const navigate = useNavigate();
@@ -528,11 +461,18 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                                 options={documentApprovalOptions}
                                                 placeholder="Select PQR/Technical Docs approval"
                                             />
-                                            {infoSheet.technicalWorkOrders && infoSheet.technicalWorkOrders?.length > 0 && (
-                                                <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded">
-                                                    <strong>Selected:</strong> {formatDocuments(infoSheet.technicalWorkOrders || [], pqrOptions)}
-                                                </div>
-                                            )}
+                                            <div className="flex flex-wrap gap-1">
+                                                {infoSheet.technicalWorkOrders?.map((order) => {
+                                                    const filePath = order.poDocument?.[0];
+                                                    return (
+                                                        <Badge key={order.id} variant="outline" className="text-xs hover:bg-primary/10">
+                                                            <a href={tenderFilesService.getFileUrl(filePath!)} target="_blank" rel="noopener noreferrer">
+                                                                {order.projectName}
+                                                            </a>
+                                                        </Badge>
+                                                    )
+                                                })}
+                                            </div>
                                             {
                                                 techDocs === '2' && (
                                                     <>
@@ -558,11 +498,18 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                                 options={documentApprovalOptions}
                                                 placeholder="Select Finance Docs approval"
                                             />
-                                            {infoSheet.commercialDocuments && infoSheet.commercialDocuments?.length > 0 && (
-                                                <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded">
-                                                    <strong>Selected:</strong> {formatDocuments(infoSheet.commercialDocuments || [], financeDocumentOptions)}
-                                                </div>
-                                            )}
+                                            <div className="flex flex-wrap gap-1">
+                                                {infoSheet.commercialDocuments?.map((doc) => {
+                                                    const filePath = doc.documentPath?.[0];
+                                                    return (
+                                                        <Badge key={doc.id} variant="outline" className="text-xs hover:bg-primary/10">
+                                                            <a href={tenderFilesService.getFileUrl(filePath!)} target="_blank" rel="noopener noreferrer">
+                                                                {doc.documentName}
+                                                            </a>
+                                                        </Badge>
+                                                    );
+                                                })}
+                                            </div>
                                             {
                                                 finDocs === '2' && (
                                                     <>
@@ -596,26 +543,24 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                     placeholder="Select tender status"
                                 />
                                 {isNotAllowedByOem && (
-                                    <>
-                                        <SelectField
-                                            control={form.control}
-                                            name="oemNotAllowed"
-                                            label="OEM who didn't allow"
-                                            options={vendorOrgOptions}
-                                            placeholder="Select OEM who didn't allow"
-                                        />
-                                        <FieldWrapper control={form.control} name="remarks" label="Remarks">
-                                            {(field) => (
-                                                <textarea
-                                                    {...field}
-                                                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                                                    placeholder="Enter rejection remarks..."
-                                                    maxLength={1000}
-                                                />
-                                            )}
-                                        </FieldWrapper>
-                                    </>
+                                    <SelectField
+                                        control={form.control}
+                                        name="oemNotAllowed"
+                                        label="OEM who didn't allow"
+                                        options={vendorOrgOptions}
+                                        placeholder="Select OEM who didn't allow"
+                                    />
                                 )}
+                                <FieldWrapper control={form.control} name="remarks" label="Remarks">
+                                    {(field) => (
+                                        <textarea
+                                            {...field}
+                                            className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                            placeholder="Enter rejection remarks..."
+                                            maxLength={1000}
+                                        />
+                                    )}
+                                </FieldWrapper>
                             </div>
                         )}
 

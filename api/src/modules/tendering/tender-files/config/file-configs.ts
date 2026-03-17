@@ -1,7 +1,5 @@
 export type TenderFileContext =
     | "tender-documents"
-    | "bg-format-files"
-    | "bg-po-files"
     | "emds"
     | "tender-fees"
     | "physical-docs"
@@ -29,6 +27,8 @@ export type TenderFileContext =
     | "result-screenshots"
     | "bg-format-imran"
     | "bg-prefilled-signed"
+    | "bg-format-files"
+    | "bg-po-files"
     | "bg-sfms-conf"
     | "bg-fdr-copy"
     | "bg-ext-letter"
@@ -59,7 +59,13 @@ export type TenderFileContext =
     | "pqr-sap-gem-po"
     | "pqr-completion"
     | "pqr-performance-certificate"
-    | "finance-document";
+    | "finance-document"
+    | "bankLoanSchedule"
+    | "sanctionLetter"
+    | "tdsDocument"
+    | "bankNoc"
+    | "wo-draft"
+    | "mcaClosure";
 
 export interface FileConfig {
     maxFiles: number;
@@ -702,6 +708,66 @@ export const FILE_CONFIGS: Record<TenderFileContext, FileConfig> = {
         maxSizeBytes: MB(10),
         allowedMimeTypes: [...DOCS, ...OFFICE],
         allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx", ".xls", ".xlsx"],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    "bankLoanSchedule": {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: [".pdf", ".doc", ".docx", ".xls", ".xlsx"],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    "sanctionLetter": {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: [".pdf", ".doc", ".docx", ".xls", ".xlsx"],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    "tdsDocument": {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: [".pdf", ".doc", ".docx", ".xls", ".xlsx"],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    "bankNoc": {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: [".pdf", ".doc", ".docx", ".xls", ".xlsx"],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    "mcaClosure": {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: [".pdf", ".doc", ".docx", ".xls", ".xlsx"],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    "wo-draft": {
+        maxFiles: 2,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS, ...OFFICE],
+        allowedExtensions: [".pdf", ".doc", ".docx", ".xls", ".xlsx"],
         compressImages: true,
         imageQuality: 80,
         compressPdf: true,

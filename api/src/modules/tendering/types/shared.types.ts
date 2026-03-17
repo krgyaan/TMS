@@ -137,6 +137,7 @@ export type ResultDashboardRow = {
     resultStatus: string | null;
     emdDetails: EmdDetails | null;
     hasResultEntry: boolean;
+    woBasicDetailId: number | null;
 };
 
 export type EmdDetails = {

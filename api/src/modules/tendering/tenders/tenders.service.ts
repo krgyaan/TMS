@@ -19,7 +19,7 @@ import { Logger } from '@nestjs/common';
 import type { PaginatedResult, TenderInfoWithNames, TenderReference, TenderForPayment, TenderForRfq, TenderForPhysicalDocs, TenderForApproval } from '@/modules/tendering/types/shared.types';
 import { TimersService } from '@/modules/timers/timers.service';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { bidSubmissions, tenderResults } from '@/db/schemas';
+import { bidSubmissions, tenderResults, timerTrackers } from '@/db/schemas';
 
 export type TenderListFilters = {
     statusIds?: number[];
@@ -639,13 +639,37 @@ export class TenderInfosService {
     }
 
     async delete(id: number): Promise<void> {
+        const now = new Date();
+
+        // Soft delete tender
         const result = await this.db
-            .delete(tenderInfos)
+            .update(tenderInfos)
+            .set({
+                deleteStatus: 1,
+            })
             .where(eq(tenderInfos.id, id))
             .returning();
+
         if (!result[0]) {
             throw new NotFoundException(`Tender with ID ${id} not found`);
         }
+
+        // Cancel all running timers for this tender
+        await this.db
+            .update(timerTrackers)
+            .set({
+                status: 'cancelled',
+                endedAt: now,
+                pausedAt: null,
+                updatedAt: now,
+            })
+            .where(
+                and(
+                    eq(timerTrackers.entityType, 'TENDER'),
+                    eq(timerTrackers.entityId, id),
+                    eq(timerTrackers.status, 'running')
+                )
+            );
     }
 
     /**
@@ -714,7 +738,7 @@ export class TenderInfosService {
         subject: string,
         template: string,
         data: Record<string, any>,
-        recipients: { to?: RecipientSource[]; cc?: RecipientSource[] }
+        recipients: { to?: RecipientSource[]; cc?: RecipientSource[]; attachments?: { filename: string, path: string }[] }
     ) {
         try {
             await this.emailService.sendTenderEmail({
@@ -726,6 +750,7 @@ export class TenderInfosService {
                 subject,
                 template,
                 data,
+                attachments: recipients.attachments ? { files: recipients.attachments.map(a => a.path) } : undefined,
             });
         } catch (error) {
             this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
@@ -795,10 +820,30 @@ export class TenderInfosService {
             coordinator: coordinatorName,
         };
 
+        // Parse documents array and map into attachments format
+        let attachments: { filename: string, path: string }[] = [];
+        if (data.documents) {
+            try {
+                // Ensure it's an array for attachment resolution
+                const docPaths = Array.isArray(data.documents) 
+                  ? data.documents 
+                  : JSON.parse(data.documents);
+                
+                if (Array.isArray(docPaths)) {
+                    attachments = docPaths.map(path => ({
+                        filename: path.split('/').pop() || 'document.pdf',
+                        path: path
+                    }));
+                }
+            } catch (e) {
+                this.logger.error(`Failed to parse tender documents for attachment: ${e}`);
+            }
+        }
+
         if (tender.teamMember) {
             // Tender assigned - send to team member, from coordinator
             const assignee = await this.recipientResolver.getUserById(tender.teamMember);
-            const coordinatorUserId = await this.getCoordinatorUserId(teamId);
+            const coordinatorUserId = await this.getCoordinatorUserId(teamId) || 8;
 
             if (assignee && coordinatorUserId) {
                 await this.sendEmail(
@@ -818,12 +863,13 @@ export class TenderInfosService {
                             { type: 'role', role: 'Team Leader', teamId },
                             { type: 'role', role: 'Admin', teamId },
                         ],
+                        attachments: attachments.length > 0 ? attachments : undefined,
                     }
                 );
             }
         } else {
             // Tender unallocated - send to team leader, from coordinator
-            const coordinatorUserId = await this.getCoordinatorUserId(teamId);
+            const coordinatorUserId = await this.getCoordinatorUserId(teamId)  || 8;
 
             if (coordinatorUserId) {
                 await this.sendEmail(
@@ -838,6 +884,7 @@ export class TenderInfosService {
                         cc: [
                             { type: 'role', role: 'Admin', teamId },
                         ],
+                        attachments: attachments.length > 0 ? attachments : undefined,
                     }
                 );
             }
@@ -908,8 +955,29 @@ export class TenderInfosService {
         const assignee = await this.recipientResolver.getUserById(newTender.teamMember);
         if (!assignee) return;
 
-        const coordinatorUserId = await this.getCoordinatorUserId(teamId);
+        const coordinatorUserId = await this.getCoordinatorUserId(teamId)  || 8;
         if (!coordinatorUserId) return;
+
+        // Collect newly updated documents or existing documents if not updated
+        let attachments: { filename: string, path: string }[] = [];
+        const documentsString = changedData.documents !== undefined ? changedData.documents : newTender.documents;
+        
+        if (documentsString) {
+            try {
+                const docPaths = Array.isArray(documentsString) 
+                  ? documentsString 
+                  : JSON.parse(documentsString);
+                
+                if (Array.isArray(docPaths)) {
+                    attachments = docPaths.map(path => ({
+                        filename: path.split('/').pop() || 'document.pdf',
+                        path: path
+                    }));
+                }
+            } catch (e) {
+                this.logger.error(`Failed to parse tender documents for attachment in update: ${e}`);
+            }
+        }
 
         await this.sendEmail(
             'tender.updated',
@@ -940,6 +1008,7 @@ export class TenderInfosService {
                     { type: 'role', role: 'Team Leader', teamId },
                     { type: 'role', role: 'Admin', teamId },
                 ],
+                attachments: attachments.length > 0 ? attachments : undefined,
             }
         );
     }
@@ -962,7 +1031,7 @@ export class TenderInfosService {
 
         // Get coordinator name and user ID
         const coordinatorName = await this.getCoordinatorName(tender.team);
-        const coordinatorUserId = await this.getCoordinatorUserId(tender.team);
+        const coordinatorUserId = await this.getCoordinatorUserId(tender.team)  || 8;
         if (!coordinatorUserId) return;
 
         // Format due date

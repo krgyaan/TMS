@@ -97,10 +97,17 @@ export const paths = {
 
     // ==================== OPERATIONS ====================
     operations: {
-        workOrder: "/operations/work-order",
+        woBasicDetailListPage: "/operations/work-order/basic-details",
+        woBasicDetailCreatePage: "/operations/work-order/basic-details/create",
+        woBasicDetailEditPage: (id: number) => `/operations/work-order/basic-details/${id}/edit`,
+        woBasicDetailShowPage: (id: number) => `/operations/work-order/basic-details/${id}`,
+        woDetailListPage: "/operations/work-order/details",
+        woDetailCreatePage: "/operations/work-order/details/create",
+        woDetailEditPage: (id: number) => `/operations/work-order/details/${id}/edit`,
+        woDetailShowPage: (id: number) => `/operations/work-order/details/${id}`,
+
         kickOff: "/operations/kick-off",
         contractAgreement: "/operations/contract-agreement",
-
         projectDashboard: "/operations/project-dashboard",
         raisePoForm: "/operations/project-dashboard/purchase-order/create",
         viewPoPage: (id: number) => `/operations/project-dashboard/purchase-order/view/${id}`,
@@ -142,6 +149,12 @@ export const paths = {
         imprestsUserView: (id: number) => `/accounts/imprests/user/${id}`,
         financialDocs: "/accounts/financial-docs",
         loanAdvances: "/accounts/loan-advances",
+        loanAdvancesCreate: "/accounts/loan-advances/create",
+        loanAdvancesEdit: (id: number) => `/accounts/loan-advances/${id}/edit`,
+        loanAdvancesView: (id: number) => `/accounts/loan-advances/${id}`,
+        loanEmiPayment: (id: number) => `/accounts/loan-advances/emis/${id}`,
+        loanTdsRecovery: (id: number) =>`/accounts/loan-advances/tds/${id}`,
+        loanClosure: (id: number) =>`/accounts/loan-advances/closure/${id}`,
         accountChecklists: "/accounts/account-checklists",
         gstChecklists: "/accounts/gst-checklists",
         fixedExpenses: "/accounts/fixed-expenses",

@@ -78,7 +78,7 @@ import { BankTransferModule } from "@/modules/bi-dashboard/bank-transfer/bank-tr
 import { ChequeModule } from "@/modules/bi-dashboard/cheque/cheque.module";
 import { TimersModule } from "@/modules/timers/timers.module";
 // import { BusinessPerformanceModule } from "./modules/performance/business/business-performance.module";
-import { WorkOrderModule } from "@/modules/operations/work-order/work-order.module";
+import { WoBasicDetailsModule } from "@/modules/operations/wo-basic-details/wo-basic-details.module";
 import { KickOffMeetingModule } from "./modules/operations/kick-off-meeting/kick-off-meeting.module";
 import { ProjectsModule } from "./modules/operations/projects/projects.module";
 import { FollowupSchedulerModule } from "@/modules/follow-up/follow-up-scheduler.module";
@@ -90,6 +90,12 @@ import { LoggerModule } from "@/logger/logger.module";
 import { ProjectsMasterModule } from "./modules/master/projects-master/projects-master.module";
 import { RequestExtensionsModule } from "./modules/tendering/request_extensions/request-extension.module";
 import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-queries.module";
+import { LoanAdvanceModule } from "./modules/accounts/loan-advance/loan-advance.module";
+import { WoDetailsModule } from "./modules/operations/wo-details/wo-details.module";
+import { WoContactsModule } from "./modules/operations/wo-contacts/wo-contacts.module";
+import { WoAmendmentsModule } from "./modules/operations/wo-amendments/wo-amendments.module";
+import { WoDocumentsModule } from "./modules/operations/wo-documents/wo-documents.module";
+import { WoQueriesModule } from "./modules/operations/wo-queries/wo-queries.module";
 
 @Module({
     imports: [
@@ -179,7 +185,12 @@ import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-q
         BankTransferModule,
         ChequeModule,
         TimersModule,
-        WorkOrderModule,
+        WoBasicDetailsModule,
+        WoDetailsModule,
+        WoContactsModule,
+        WoAmendmentsModule,
+        WoDocumentsModule,
+        WoQueriesModule,
         KickOffMeetingModule,
         ProjectsModule,
         FollowupSchedulerModule,
@@ -190,6 +201,7 @@ import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-q
         // BusinessPerformanceModule,
         RequestExtensionsModule,
         SubmitQueriesModule,
+        LoanAdvanceModule
     ],
     controllers: [AppController],
     providers: [

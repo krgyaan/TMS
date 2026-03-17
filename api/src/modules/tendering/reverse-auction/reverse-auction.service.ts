@@ -978,7 +978,7 @@ export class ReverseAuctionService {
         subject: string,
         template: string,
         data: Record<string, any>,
-        recipients: { to?: RecipientSource[]; cc?: RecipientSource[] }
+        recipients: { to?: RecipientSource[]; cc?: RecipientSource[]; attachments?: { filename: string, path: string }[] }
     ) {
         try {
             await this.emailService.sendTenderEmail({
@@ -990,6 +990,7 @@ export class ReverseAuctionService {
                 subject,
                 template,
                 data,
+                attachments: recipients.attachments ? { files: recipients.attachments.map(a => a.path) } : undefined,
             });
         } catch (error) {
             this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
@@ -1155,6 +1156,28 @@ export class ReverseAuctionService {
             { type: 'role', role: 'Coordinator', teamId: tender.team },
         ];
 
+        // Collect attachments
+        const attachments: any[] = [];
+        
+        if (raRecord.screenshotQualifiedParties) {
+            attachments.push({
+                filename: raRecord.screenshotQualifiedParties.split('/').pop() || 'qualified-parties.png',
+                path: raRecord.screenshotQualifiedParties,
+            });
+        }
+        if (raRecord.screenshotDecrements) {
+            attachments.push({
+                filename: raRecord.screenshotDecrements.split('/').pop() || 'decrements.png',
+                path: raRecord.screenshotDecrements,
+            });
+        }
+        if (raRecord.finalResultScreenshot) {
+            attachments.push({
+                filename: raRecord.finalResultScreenshot.split('/').pop() || 'final-result.png',
+                path: raRecord.finalResultScreenshot,
+            });
+        }
+
         await this.sendEmail(
             'ra.result',
             tenderId,
@@ -1165,6 +1188,7 @@ export class ReverseAuctionService {
             {
                 to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
                 cc: ccRecipients,
+                attachments: attachments.length > 0 ? attachments : undefined,
             }
         );
     }

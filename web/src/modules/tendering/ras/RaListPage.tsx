@@ -155,11 +155,11 @@ const ReverseAuctionListPage = () => {
 
     const raActions: ActionItem<RaDashboardRow>[] = useMemo(
         () => [
-            {
-                label: 'Change Status',
-                onClick: (row: RaDashboardRow) => setChangeStatusModal({ open: true, tenderId: row.tenderId }),
-                icon: <RefreshCw className="h-4 w-4" />,
-            },
+            // {
+            //     label: 'Change Status',
+            //     onClick: (row: RaDashboardRow) => setChangeStatusModal({ open: true, tenderId: row.tenderId }),
+            //     icon: <RefreshCw className="h-4 w-4" />,
+            // },
             {
                 label: 'View Details',
                 onClick: (row: RaDashboardRow) => navigate(paths.tendering.rasShow(row.tenderId)),

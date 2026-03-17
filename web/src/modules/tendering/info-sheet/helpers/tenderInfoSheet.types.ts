@@ -156,8 +156,8 @@ export interface TenderInfoSheetResponse {
     orderValue3: string | number | null;
     customEligibilityCriteria: string | null;
 
-    technicalWorkOrders: Array<{ id?: number; documentName: string }> | string[] | null;
-    commercialDocuments: Array<{ id?: number; documentName: string }> | string[] | null;
+    technicalWorkOrders: TechnicalDocument[] | null;
+    commercialDocuments: FinancialDocument[] | null;
 
     avgAnnualTurnoverType: string | null;
     avgAnnualTurnoverValue: string | number | null;
@@ -183,6 +183,17 @@ export interface TenderInfoSheetResponse {
     createdAt: string;
     updatedAt: string;
 }
+
+export type TechnicalDocument = {
+    id: number;
+    projectName: string | null;
+    poDocument: string[] | null;
+};
+export type FinancialDocument = {
+    id: number;
+    documentName: string | null;
+    documentPath: string[] | null;
+};
 
 // Type alias for backward compatibility (used in InfoSheetView and other places)
 export type TenderInfoSheet = TenderInfoSheetResponse;
