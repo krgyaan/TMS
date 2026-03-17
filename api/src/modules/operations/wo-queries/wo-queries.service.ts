@@ -1,119 +1,65 @@
-import {
-  Inject,
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
-import { eq, desc, asc, sql, and, or, ilike, gte, lte, isNull, isNotNull } from 'drizzle-orm';
+import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { eq, desc, asc, sql, and, gte, lte } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { woQueries, woDetails } from '@db/schemas/operations';
-import type {
-  CreateWoQueryDto,
-  RespondToQueryDto,
-  CloseQueryDto,
-  UpdateQueryStatusDto,
-  WoQueriesQueryDto,
-  CreateBulkWoQueriesDto,
-} from './dto/wo-queries.dto';
+import type { CreateWoQueryDto, CreateBulkWoQueriesDto, RespondToQueryDto, CloseQueryDto, UpdateQueryStatusDto, WoQueriesQueryDto } from './dto/wo-queries.dto';
 
 export type WoQueryRow = typeof woQueries.$inferSelect;
 
-// SLA Constants (in hours)
-const QUERY_RAISE_SLA = 24; // TL has 24hrs to raise queries
-const RESPONSE_SLA = 24; // TE/OE has 24hrs to respond
-const FINAL_DECISION_SLA = 12; // TL has 12hrs for final decision after response
+// SLA threshold in hours
+const RESPONSE_SLA_HOURS = 24;
 
 @Injectable()
 export class WoQueriesService {
   constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
 
-  // ============================================
   // MAPPING FUNCTIONS
-  // ============================================
-
   private mapRowToResponse(row: WoQueryRow) {
+    const queryRaisedAt = new Date(row.queryRaisedAt);
+    const responseDeadline = new Date(queryRaisedAt.getTime() + RESPONSE_SLA_HOURS * 60 * 60 * 1000);
+    const now = new Date();
+    const isOverdue = row.status === 'pending' && now > responseDeadline;
+
     return {
       id: row.id,
-      woDetailId: row.woDetailId,
+      woDetailsId: row.woDetailsId,
       queryBy: row.queryBy,
       queryTo: row.queryTo,
+      queryToUserIds: row.queryToUserIds,
       queryText: row.queryText,
-      queryRaisedAt: row.queryRaisedAt,
+      queryRaisedAt: row.queryRaisedAt.toISOString(),
       responseText: row.responseText,
       respondedBy: row.respondedBy,
-      respondedAt: row.respondedAt,
+      respondedAt: row.respondedAt?.toISOString() ?? null,
       status: row.status,
-      createdAt: row.createdAt,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+      // SLA info
+      responseDeadline: responseDeadline.toISOString(),
+      isOverdue,
+      hoursRemaining: isOverdue ? null : Math.max(0, (responseDeadline.getTime() - now.getTime()) / (60 * 60 * 1000)),
     };
   }
 
-  // ============================================
-  // HELPER FUNCTIONS
-  // ============================================
-
-  private async verifyWoDetailExists(woDetailId: number) {
-    const [detail] = await this.db
-      .select({ id: woDetails.id })
-      .from(woDetails)
-      .where(eq(woDetails.id, woDetailId))
-      .limit(1);
-
-    if (!detail) {
-      throw new NotFoundException(`WO Detail with ID ${woDetailId} not found`);
-    }
-  }
-
-  private isOverdue(queryRaisedAt: Date, respondedAt: Date | null): boolean {
-    if (respondedAt) {
-      return false;
-    }
-
-    const deadline = new Date(queryRaisedAt.getTime() + RESPONSE_SLA * 60 * 60 * 1000);
-    return new Date() > deadline;
-  }
-
-  private calculateResponseTime(queryRaisedAt: Date, respondedAt: Date): number {
-    return (respondedAt.getTime() - queryRaisedAt.getTime()) / (1000 * 60 * 60); // Hours
-  }
-
-  // ============================================
   // CRUD OPERATIONS
-  // ============================================
-
   async findAll(filters?: WoQueriesQueryDto) {
     const page = filters?.page ?? 1;
     const limit = Math.min(Math.max(filters?.limit ?? 50, 1), 100);
     const offset = (page - 1) * limit;
     const sortOrder = filters?.sortOrder ?? 'desc';
     const sortBy = filters?.sortBy ?? 'queryRaisedAt';
-    const search = filters?.search?.trim();
 
-    // Determine order column
     const orderColumnMap: Record<string, any> = {
       queryRaisedAt: woQueries.queryRaisedAt,
       respondedAt: woQueries.respondedAt,
       status: woQueries.status,
-      createdAt: woQueries.createdAt,
     };
     const orderColumn = orderColumnMap[sortBy] ?? woQueries.queryRaisedAt;
     const orderFn = sortOrder === 'desc' ? desc : asc;
 
-    // Build conditions
     const conditions: any[] = [];
 
-    if (search) {
-      conditions.push(
-        or(
-          ilike(woQueries.queryText, `%${search}%`),
-          ilike(woQueries.responseText, `%${search}%`),
-        ),
-      );
-    }
-
-    if (filters?.woDetailId) {
-      conditions.push(eq(woQueries.woDetailId, filters.woDetailId));
-    }
     if (filters?.status) {
       conditions.push(eq(woQueries.status, filters.status));
     }
@@ -126,8 +72,6 @@ export class WoQueriesService {
     if (filters?.respondedBy) {
       conditions.push(eq(woQueries.respondedBy, filters.respondedBy));
     }
-
-    // Date filters
     if (filters?.queryRaisedFrom) {
       conditions.push(gte(woQueries.queryRaisedAt, new Date(filters.queryRaisedFrom)));
     }
@@ -158,16 +102,13 @@ export class WoQueriesService {
         .offset(offset),
     ]);
 
-    const total = countResult;
-    const data = rows.map((r) => this.mapRowToResponse(r));
-
     return {
-      data,
+      data: rows.map((r) => this.mapRowToResponse(r)),
       meta: {
-        total,
+        total: countResult,
         page,
         limit,
-        totalPages: Math.ceil(total / limit) || 1,
+        totalPages: Math.ceil(countResult / limit) || 1,
       },
     };
   }
@@ -180,118 +121,41 @@ export class WoQueriesService {
       .limit(1);
 
     if (!row) {
-      throw new NotFoundException(`WO Query with ID ${id} not found`);
+      throw new NotFoundException(`Query with ID ${id} not found`);
     }
 
-    const response = this.mapRowToResponse(row);
-    const isOverdue = this.isOverdue(
-      new Date(row.queryRaisedAt!),
-      row.respondedAt ? new Date(row.respondedAt) : null,
-    );
-
-    return {
-      ...response,
-      isOverdue,
-      responseDeadline: new Date(
-        new Date(row.queryRaisedAt!).getTime() + RESPONSE_SLA * 60 * 60 * 1000,
-      ).toISOString(),
-    };
+    return this.mapRowToResponse(row);
   }
 
   async findByWoDetailId(woDetailId: number) {
-    await this.verifyWoDetailExists(woDetailId);
-
     const rows = await this.db
       .select()
       .from(woQueries)
-      .where(eq(woQueries.woDetailId, woDetailId))
+      .where(eq(woQueries.woDetailsId, woDetailId))
       .orderBy(desc(woQueries.queryRaisedAt));
 
     return rows.map((r) => this.mapRowToResponse(r));
   }
 
   async findPendingByWoDetail(woDetailId: number) {
-    await this.verifyWoDetailExists(woDetailId);
-
     const rows = await this.db
       .select()
       .from(woQueries)
       .where(
         and(
-          eq(woQueries.woDetailId, woDetailId),
-          eq(woQueries.status, 'pending'),
-        ),
+          eq(woQueries.woDetailsId, woDetailId),
+          eq(woQueries.status, 'pending')
+        )
       )
       .orderBy(asc(woQueries.queryRaisedAt));
 
-    return {
-      count: rows.length,
-      data: rows.map((r) => {
-        const isOverdue = this.isOverdue(
-          new Date(r.queryRaisedAt!),
-          null,
-        );
-        return {
-          ...this.mapRowToResponse(r),
-          isOverdue,
-        };
-      }),
-    };
+    return rows.map((r) => this.mapRowToResponse(r));
   }
 
-  async findAllPending() {
-    const rows = await this.db
-      .select()
-      .from(woQueries)
-      .where(eq(woQueries.status, 'pending'))
-      .orderBy(asc(woQueries.queryRaisedAt));
-
-    return {
-      count: rows.length,
-      data: rows.map((r) => {
-        const isOverdue = this.isOverdue(new Date(r.queryRaisedAt!), null);
-        return {
-          ...this.mapRowToResponse(r),
-          isOverdue,
-        };
-      }),
-    };
-  }
-
-  async findAllOverdue() {
-    const deadline = new Date(Date.now() - RESPONSE_SLA * 60 * 60 * 1000);
-
-    const rows = await this.db
-      .select()
-      .from(woQueries)
-      .where(
-        and(
-          eq(woQueries.status, 'pending'),
-          lte(woQueries.queryRaisedAt, deadline),
-        ),
-      )
-      .orderBy(asc(woQueries.queryRaisedAt));
-
-    return {
-      count: rows.length,
-      overdueThresholdHours: RESPONSE_SLA,
-      data: rows.map((r) => {
-        const hoursOverdue = Math.round(
-          (Date.now() - new Date(r.queryRaisedAt!).getTime()) / (1000 * 60 * 60) - RESPONSE_SLA,
-        );
-        return {
-          ...this.mapRowToResponse(r),
-          hoursOverdue,
-        };
-      }),
-    };
-  }
-
-  async findByUser(userId: number, type: 'raised' | 'received') {
-    const condition =
-      type === 'raised'
-        ? eq(woQueries.queryBy, userId)
-        : eq(woQueries.respondedBy, userId);
+  async findByUser(userId: number, type: 'raised' | 'received' = 'raised') {
+    const condition = type === 'raised'
+      ? eq(woQueries.queryBy, userId)
+      : sql`${userId} = ANY(${woQueries.queryToUserIds})`;
 
     const rows = await this.db
       .select()
@@ -302,61 +166,96 @@ export class WoQueriesService {
     return rows.map((r) => this.mapRowToResponse(r));
   }
 
+  async findAllPending() {
+    const rows = await this.db
+      .select()
+      .from(woQueries)
+      .where(eq(woQueries.status, 'pending'))
+      .orderBy(asc(woQueries.queryRaisedAt));
+
+    return rows.map((r) => this.mapRowToResponse(r));
+  }
+
+  async findAllOverdue() {
+    const deadline = new Date(Date.now() - RESPONSE_SLA_HOURS * 60 * 60 * 1000);
+
+    const rows = await this.db
+      .select()
+      .from(woQueries)
+      .where(
+        and(
+          eq(woQueries.status, 'pending'),
+          lte(woQueries.queryRaisedAt, deadline)
+        )
+      )
+      .orderBy(asc(woQueries.queryRaisedAt));
+
+    return rows.map((r) => this.mapRowToResponse(r));
+  }
+
   async create(data: CreateWoQueryDto) {
-    await this.verifyWoDetailExists(data.woDetailId);
+    // Verify WO Detail exists
+    const [detail] = await this.db
+      .select({ id: woDetails.id })
+      .from(woDetails)
+      .where(eq(woDetails.id, data.woDetailsId))
+      .limit(1);
+
+    if (!detail) {
+      throw new NotFoundException(`WO Detail with ID ${data.woDetailsId} not found`);
+    }
 
     const now = new Date();
 
     const [row] = await this.db
       .insert(woQueries)
       .values({
-        woDetailId: data.woDetailId,
+        woDetailsId: data.woDetailsId,
         queryBy: data.queryBy,
         queryTo: data.queryTo,
+        queryToUserIds: data.queryToUserIds ?? null,
         queryText: data.queryText,
         queryRaisedAt: now,
         status: 'pending',
         createdAt: now,
+        updatedAt: now,
       })
       .returning();
-
-    // Update TL query timestamp on WO Detail
-    await this.db
-      .update(woDetails)
-      .set({ tlQueryRaisedAt: now, updatedAt: now })
-      .where(eq(woDetails.id, data.woDetailId));
 
     return this.mapRowToResponse(row!);
   }
 
   async createBulk(data: CreateBulkWoQueriesDto) {
-    await this.verifyWoDetailExists(data.woDetailId);
+    // Verify WO Detail exists
+    const [detail] = await this.db
+      .select({ id: woDetails.id })
+      .from(woDetails)
+      .where(eq(woDetails.id, data.woDetailsId))
+      .limit(1);
+
+    if (!detail) {
+      throw new NotFoundException(`WO Detail with ID ${data.woDetailsId} not found`);
+    }
 
     const now = new Date();
+
     const insertValues = data.queries.map((q) => ({
-      woDetailId: data.woDetailId,
+      woDetailsId: data.woDetailsId,
       queryBy: data.queryBy,
       queryTo: q.queryTo,
+      queryToUserIds: q.queryToUserIds ?? null,
       queryText: q.queryText,
       queryRaisedAt: now,
-      status: 'pending' as const,
+      status: 'pending',
       createdAt: now,
+      updatedAt: now,
     }));
 
-    const rows = await this.db
-      .insert(woQueries)
-      .values(insertValues)
-      .returning();
-
-    // Update TL query timestamp on WO Detail
-    await this.db
-      .update(woDetails)
-      .set({ tlQueryRaisedAt: now, updatedAt: now })
-      .where(eq(woDetails.id, data.woDetailId));
+    const rows = await this.db.insert(woQueries).values(insertValues).returning();
 
     return {
-      created: rows.length,
-      data: rows.map((r) => this.mapRowToResponse(r)),
+      count: rows.length,
+      queries: rows.map((r) => this.mapRowToResponse(r)),
     };
   }
 
@@ -367,11 +266,11 @@ export class WoQueriesService {
       throw new BadRequestException('Cannot respond to a closed query');
     }
 
-    if (query.status === 'responded') {
-      throw new BadRequestException('Query has already been responded to');
-    }
-
     const now = new Date();
+    const queryRaisedAt = new Date(query.queryRaisedAt);
+    const responseTimeMs = now.getTime() - queryRaisedAt.getTime();
+    const responseTimeHours = responseTimeMs / (60 * 60 * 1000);
+    const withinSla = responseTimeHours <= RESPONSE_SLA_HOURS;
 
     const [row] = await this.db
       .update(woQueries)
@@ -380,67 +279,70 @@ export class WoQueriesService {
         respondedBy: data.respondedBy,
         respondedAt: now,
         status: 'responded',
+        updatedAt: now,
       })
       .where(eq(woQueries.id, id))
       .returning();
 
-    const responseTime = this.calculateResponseTime(
-      new Date(row!.queryRaisedAt!),
-      now,
-    );
-
     return {
       ...this.mapRowToResponse(row!),
-      responseTimeHours: Math.round(responseTime * 100) / 100,
-      withinSla: responseTime <= RESPONSE_SLA,
+      withinSla,
+      responseTimeHours: Math.round(responseTimeHours * 100) / 100,
     };
   }
 
-  async close(id: number, data: CloseQueryDto) {
-    await this.findById(id);
-
+  async close(id: number, data?: CloseQueryDto) {
     const [row] = await this.db
       .update(woQueries)
-      .set({ status: 'closed' })
+      .set({
+        status: 'closed',
+        updatedAt: new Date(),
+      })
       .where(eq(woQueries.id, id))
       .returning();
+
+    if (!row) {
+      throw new NotFoundException(`Query with ID ${id} not found`);
+    }
 
     return {
-      ...this.mapRowToResponse(row!),
-      closedBy: data.closedBy ?? null,
-      closureNotes: data.closureNotes ?? null,
+      ...this.mapRowToResponse(row),
+      remarks: data?.remarks ?? null,
     };
-  }
-
-  async updateStatus(id: number, data: UpdateQueryStatusDto) {
-    await this.findById(id);
-
-    const [row] = await this.db
-      .update(woQueries)
-      .set({ status: data.status })
-      .where(eq(woQueries.id, id))
-      .returning();
-
-    return this.mapRowToResponse(row!);
   }
 
   async reopen(id: number) {
-    const query = await this.findById(id);
-
-    if (query.status !== 'closed') {
-      throw new BadRequestException('Can only reopen closed queries');
-    }
-
     const [row] = await this.db
       .update(woQueries)
-      .set({ status: 'pending' })
+      .set({
+        status: 'pending',
+        updatedAt: new Date(),
+      })
       .where(eq(woQueries.id, id))
       .returning();
 
-    return {
-      ...this.mapRowToResponse(row!),
-      message: 'Query reopened successfully',
-    };
+    if (!row) {
+      throw new NotFoundException(`Query with ID ${id} not found`);
+    }
+
+    return this.mapRowToResponse(row);
+  }
+
+  async updateStatus(id: number, data: UpdateQueryStatusDto) {
+    const [row] = await this.db
+      .update(woQueries)
+      .set({
+        status: data.status,
+        updatedAt: new Date(),
+      })
+      .where(eq(woQueries.id, id))
+      .returning();
+
+    if (!row) {
+      throw new NotFoundException(`Query with ID ${id} not found`);
+    }
+
+    return this.mapRowToResponse(row);
   }
 
   async delete(id: number): Promise<void> {
@@ -450,15 +352,17 @@ export class WoQueriesService {
       .returning();
 
     if (!row) {
-      throw new NotFoundException(`WO Query with ID ${id} not found`);
+      throw new NotFoundException(`Query with ID ${id} not found`);
     }
   }
 
   // ============================================
-  // DASHBOARD/STATISTICS
+  // SUMMARY/STATISTICS
   // ============================================
 
   async getDashboardSummary() {
+    const deadline = new Date(Date.now() - RESPONSE_SLA_HOURS * 60 * 60 * 1000);
+
     const [summary] = await this.db
       .select({
         total: sql<number>`count(*)::int`,
@@ -468,78 +372,72 @@ export class WoQueriesService {
         toTe: sql<number>`count(*) filter (where ${woQueries.queryTo} = 'TE')::int`,
         toOe: sql<number>`count(*) filter (where ${woQueries.queryTo} = 'OE')::int`,
         toBoth: sql<number>`count(*) filter (where ${woQueries.queryTo} = 'BOTH')::int`,
+        overdue: sql<number>`count(*) filter (where ${woQueries.status} = 'pending' and ${woQueries.queryRaisedAt} <= ${deadline})::int`,
       })
       .from(woQueries);
 
-    // Count overdue
-    const deadline = new Date(Date.now() - RESPONSE_SLA * 60 * 60 * 1000);
-    const [overdueCount] = await this.db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(woQueries)
-      .where(
-        and(
-          eq(woQueries.status, 'pending'),
-          lte(woQueries.queryRaisedAt, deadline),
-        ),
-      );
-
     return {
-      summary: {
-        ...summary,
-        overdue: overdueCount?.count ?? 0,
-      },
+      summary,
       slaThresholds: {
-        queryRaiseSlaHours: QUERY_RAISE_SLA,
-        responseSlaHours: RESPONSE_SLA,
-        finalDecisionSlaHours: FINAL_DECISION_SLA,
+        responseSlaHours: RESPONSE_SLA_HOURS,
       },
       generatedAt: new Date().toISOString(),
     };
   }
 
   async getResponseTimeStatistics() {
-    const respondedQueries = await this.db
+    const [stats] = await this.db
       .select({
-        queryRaisedAt: woQueries.queryRaisedAt,
-        respondedAt: woQueries.respondedAt,
+        totalResponded: sql<number>`count(*) filter (where ${woQueries.respondedAt} is not null)::int`,
+        avgResponseTimeHours: sql<number>`
+          round(
+            avg(
+              extract(epoch from (${woQueries.respondedAt} - ${woQueries.queryRaisedAt})) / 3600
+            )::numeric,
+            2
+          )
+        `,
+        minResponseTimeHours: sql<number>`
+          round(
+            min(
+              extract(epoch from (${woQueries.respondedAt} - ${woQueries.queryRaisedAt})) / 3600
+            )::numeric,
+            2
+          )
+        `,
+        maxResponseTimeHours: sql<number>`
+          round(
+            max(
+              extract(epoch from (${woQueries.respondedAt} - ${woQueries.queryRaisedAt})) / 3600
+            )::numeric,
+            2
+          )
+        `,
       })
       .from(woQueries)
-      .where(
-        and(
-          eq(woQueries.status, 'responded'),
-          isNotNull(woQueries.respondedAt),
-        ),
-      );
+      .where(sql`${woQueries.respondedAt} is not null`);
 
-    if (respondedQueries.length === 0) {
-      return {
-        totalResponded: 0,
-        avgResponseTimeHours: null,
-        minResponseTimeHours: null,
-        maxResponseTimeHours: null,
-        withinSlaPct: null,
-      };
-    }
+    // Calculate within SLA percentage
+    const [slaStats] = await this.db
+      .select({
+        withinSla: sql<number>`
+          count(*) filter (
+            where extract(epoch from (${woQueries.respondedAt} - ${woQueries.queryRaisedAt})) / 3600 <= ${RESPONSE_SLA_HOURS}
+          )::int
+        `,
+        total: sql<number>`count(*)::int`,
+      })
+      .from(woQueries)
+      .where(sql`${woQueries.respondedAt} is not null`);
 
-    const responseTimes = respondedQueries.map((q) =>
-      this.calculateResponseTime(
-        new Date(q.queryRaisedAt!),
-        new Date(q.respondedAt!),
-      ),
-    );
-
-    const avgTime = responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length;
-    const minTime = Math.min(...responseTimes);
-    const maxTime = Math.max(...responseTimes);
-    const withinSla = responseTimes.filter((t) => t <= RESPONSE_SLA).length;
+    const withinSlaPct = slaStats?.total > 0
+      ? Math.round((slaStats.withinSla / slaStats.total) * 100)
+      : null;
 
     return {
-      totalResponded: respondedQueries.length,
-      avgResponseTimeHours: Math.round(avgTime * 100) / 100,
-      minResponseTimeHours: Math.round(minTime * 100) / 100,
-      maxResponseTimeHours: Math.round(maxTime * 100) / 100,
-      withinSlaPct: Math.round((withinSla / respondedQueries.length) * 100),
-      slaTresholdHours: RESPONSE_SLA,
+      ...stats,
+      withinSlaPct,
+      slaTresholdHours: RESPONSE_SLA_HOURS,
       generatedAt: new Date().toISOString(),
     };
   }
@@ -557,7 +455,7 @@ export class WoQueriesService {
 
     const [answered] = await this.db
       .select({
-        total: sql<number>`count(*)::int`,
+        count: sql<number>`count(*)::int`,
       })
       .from(woQueries)
       .where(eq(woQueries.respondedBy, userId));
@@ -565,62 +463,59 @@ export class WoQueriesService {
     return {
       userId,
       queriesRaised: raised,
-      queriesAnswered: answered?.total ?? 0,
+      queriesAnswered: answered?.count ?? 0,
       generatedAt: new Date().toISOString(),
     };
   }
 
   async getSlaStatus(woDetailId: number) {
-    await this.verifyWoDetailExists(woDetailId);
+    const deadline = new Date(Date.now() - RESPONSE_SLA_HOURS * 60 * 60 * 1000);
 
-    const queries = await this.db
+    const rows = await this.db
       .select()
       .from(woQueries)
-      .where(eq(woQueries.woDetailId, woDetailId))
-      .orderBy(asc(woQueries.queryRaisedAt));
+      .where(eq(woQueries.woDetailsId, woDetailId));
 
-    const slaDetails = queries.map((q) => {
-      const raisedAt = new Date(q.queryRaisedAt!);
-      const responseDeadline = new Date(raisedAt.getTime() + RESPONSE_SLA * 60 * 60 * 1000);
-
-      let responseTime: number | null = null;
+    const details = rows.map((row) => {
+      const queryRaisedAt = new Date(row.queryRaisedAt);
+      const responseDeadline = new Date(queryRaisedAt.getTime() + RESPONSE_SLA_HOURS * 60 * 60 * 1000);
+      let responseTimeHours: number | null = null;
       let withinSla: boolean | null = null;
 
-      if (q.respondedAt) {
-        responseTime = this.calculateResponseTime(raisedAt, new Date(q.respondedAt));
-        withinSla = responseTime <= RESPONSE_SLA;
+      if (row.respondedAt) {
+        responseTimeHours = (new Date(row.respondedAt).getTime() - queryRaisedAt.getTime()) / (60 * 60 * 1000);
+        withinSla = responseTimeHours <= RESPONSE_SLA_HOURS;
       }
 
-      const isOverdue = q.status === 'pending' && new Date() > responseDeadline;
-
       return {
-        queryId: q.id,
-        status: q.status,
-        queryRaisedAt: q.queryRaisedAt,
+        queryId: row.id,
+        status: row.status,
+        queryRaisedAt: row.queryRaisedAt.toISOString(),
         responseDeadline: responseDeadline.toISOString(),
-        respondedAt: q.respondedAt,
-        responseTimeHours: responseTime ? Math.round(responseTime * 100) / 100 : null,
+        respondedAt: row.respondedAt?.toISOString() ?? null,
+        responseTimeHours: responseTimeHours ? Math.round(responseTimeHours * 100) / 100 : null,
         withinSla,
-        isOverdue,
+        isOverdue: row.status === 'pending' && new Date() > responseDeadline,
       };
     });
 
-    const totalQueries = slaDetails.length;
-    const respondedQueries = slaDetails.filter((q) => q.respondedAt);
-    const withinSlaCount = respondedQueries.filter((q) => q.withinSla).length;
-    const overdueCount = slaDetails.filter((q) => q.isOverdue).length;
+    const totalQueries = rows.length;
+    const pendingQueries = rows.filter((r) => r.status === 'pending').length;
+    const overdueQueries = details.filter((d) => d.isOverdue).length;
+    const respondedWithinSla = details.filter((d) => d.withinSla === true).length;
+    const totalResponded = details.filter((d) => d.respondedAt !== null).length;
+    const slaComplianceRate = totalResponded > 0
+      ? Math.round((respondedWithinSla / totalResponded) * 100)
+      : 100;
 
     return {
-      woDetailId,
+      woDetailsId: woDetailId,
       totalQueries,
-      pendingQueries: slaDetails.filter((q) => q.status === 'pending').length,
-      overdueQueries: overdueCount,
-      slaComplianceRate:
-        respondedQueries.length > 0
-          ? Math.round((withinSlaCount / respondedQueries.length) * 100) + '%'
-          : 'N/A',
-      slaThresholdHours: RESPONSE_SLA,
-      details: slaDetails,
+      pendingQueries,
+      overdueQueries,
+      slaComplianceRate,
+      slaThresholdHours: RESPONSE_SLA_HOURS,
+      details,
     };
   }
 }

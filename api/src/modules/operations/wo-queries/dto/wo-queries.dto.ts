@@ -1,106 +1,79 @@
-import { z } from "zod";
+import { z } from 'zod';
 
-// ============================================
-// WO QUERIES SCHEMAS
-// ============================================
+// ENUMS
+export const QueryToEnum = z.enum(['TE', 'OE', 'BOTH']);
+export const QueryStatusEnum = z.enum(['pending', 'responded', 'closed', 'escalated']);
 
-export const QueryToEnum = z.enum(["TE", "OE", "BOTH"]);
-export const QueryStatusEnum = z.enum(["pending", "responded", "closed"]);
+export type QueryTo = z.infer<typeof QueryToEnum>;
+export type QueryStatus = z.infer<typeof QueryStatusEnum>;
 
-/**
- * Schema for creating a new WO Query
- */
+// CREATE
 export const CreateWoQuerySchema = z.object({
-  woDetailId: z.number().int().positive({
-    message: "Valid WO Detail ID is required",
-  }),
-
-  queryBy: z.number().int().positive({
-    message: "Valid user ID required for queryBy",
-  }),
+  woDetailsId: z.number().int().positive(),
+  queryBy: z.number().int().positive(),
   queryTo: QueryToEnum,
-  queryText: z.string().min(1, "Query text is required").max(2000),
+  queryToUserIds: z.array(z.number().int().positive()).optional(),
+  queryText: z.string().min(1, 'Query text is required'),
 });
 
 export type CreateWoQueryDto = z.infer<typeof CreateWoQuerySchema>;
 
-/**
- * Schema for responding to a query
- */
+// BULK CREATE
+export const CreateBulkWoQueriesSchema = z.object({
+  woDetailsId: z.number().int().positive(),
+  queryBy: z.number().int().positive(),
+  queries: z.array(
+    z.object({
+      queryTo: QueryToEnum,
+      queryToUserIds: z.array(z.number().int().positive()).optional(),
+      queryText: z.string().min(1),
+    })
+  ),
+});
+
+export type CreateBulkWoQueriesDto = z.infer<typeof CreateBulkWoQueriesSchema>;
+
+// RESPOND
 export const RespondToQuerySchema = z.object({
-  responseText: z.string().min(1, "Response text is required").max(2000),
-  respondedBy: z.number().int().positive({
-    message: "Valid user ID required for respondedBy",
-  }),
+  responseText: z.string().min(1, 'Response text is required'),
+  respondedBy: z.number().int().positive(),
 });
 
 export type RespondToQueryDto = z.infer<typeof RespondToQuerySchema>;
 
-/**
- * Schema for closing a query
- */
+// CLOSE
 export const CloseQuerySchema = z.object({
-  closedBy: z.number().int().positive().optional(),
-  closureNotes: z.string().max(500).optional(),
+  remarks: z.string().optional(),
 });
 
 export type CloseQueryDto = z.infer<typeof CloseQuerySchema>;
 
-/**
- * Schema for updating query status
- */
+// UPDATE STATUS
 export const UpdateQueryStatusSchema = z.object({
   status: QueryStatusEnum,
 });
 
 export type UpdateQueryStatusDto = z.infer<typeof UpdateQueryStatusSchema>;
 
-/**
- * Schema for filtering/querying WO Queries
- */
+// QUERY/FILTERS
 export const WoQueriesQuerySchema = z.object({
-  // Pagination
   page: z.coerce.number().int().positive().default(1).optional(),
-  limit: z.coerce.number().int().positive().max(100).default(10).optional(),
+  limit: z.coerce.number().int().positive().max(100).default(50).optional(),
+  sortBy: z
+    .enum(['queryRaisedAt', 'respondedAt', 'status'])
+    .default('queryRaisedAt')
+    .optional(),
+  sortOrder: z.enum(['asc', 'desc']).default('desc').optional(),
 
-  // Filters
-  woDetailId: z.coerce.number().int().positive().optional(),
+  woDetailsId: z.coerce.number().int().positive().optional(),
   status: QueryStatusEnum.optional(),
   queryTo: QueryToEnum.optional(),
   queryBy: z.coerce.number().int().positive().optional(),
   respondedBy: z.coerce.number().int().positive().optional(),
-
-  // Date filters
   queryRaisedFrom: z.string().datetime().optional(),
   queryRaisedTo: z.string().datetime().optional(),
   respondedFrom: z.string().datetime().optional(),
   respondedTo: z.string().datetime().optional(),
-
-  // Search
-  search: z.string().max(255).optional(),
-
-  // Sorting
-  sortBy: z
-    .enum(["queryRaisedAt", "respondedAt", "status", "createdAt"])
-    .default("queryRaisedAt")
-    .optional(),
-  sortOrder: z.enum(["asc", "desc"]).default("desc").optional(),
 });
 
 export type WoQueriesQueryDto = z.infer<typeof WoQueriesQuerySchema>;
-
-/**
- * Schema for bulk query creation
- */
-export const CreateBulkWoQueriesSchema = z.object({
-  woDetailId: z.number().int().positive(),
-  queryBy: z.number().int().positive(),
-  queries: z.array(
-    z.object({
-      queryTo: QueryToEnum,
-      queryText: z.string().min(1).max(2000),
-    })
-  ).min(1, "At least one query is required"),
-});
-
-export type CreateBulkWoQueriesDto = z.infer<typeof CreateBulkWoQueriesSchema>;
