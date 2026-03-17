@@ -1,17 +1,10 @@
 import { BaseApiService } from './base.service';
 import type {
   WoQuery,
-  WoQueryWithOverdue,
   CreateWoQueryDto,
   CreateBulkWoQueriesDto,
   RespondToQueryDto,
-  CloseQueryDto,
-  UpdateQueryStatusDto,
   WoQueriesFilters,
-  QueriesDashboardSummary,
-  ResponseTimeStatistics,
-  UserQueryStatistics,
-  SlaStatus,
   PaginatedResult,
 } from '@/modules/operations/types/wo.types';
 
@@ -29,16 +22,10 @@ class WoQueriesService extends BaseApiService {
     if (filters.limit) params.set('limit', String(filters.limit));
     if (filters.sortBy) params.set('sortBy', filters.sortBy);
     if (filters.sortOrder) params.set('sortOrder', filters.sortOrder);
-    if (filters.search) params.set('search', filters.search);
-    if (filters.woDetailId) params.set('woDetailId', String(filters.woDetailId));
+    if (filters.woDetailsId) params.set('woDetailsId', String(filters.woDetailsId));
     if (filters.status) params.set('status', filters.status);
-    if (filters.queryTo) params.set('queryTo', filters.queryTo);
     if (filters.queryBy) params.set('queryBy', String(filters.queryBy));
-    if (filters.respondedBy) params.set('respondedBy', String(filters.respondedBy));
-    if (filters.queryRaisedFrom) params.set('queryRaisedFrom', filters.queryRaisedFrom);
-    if (filters.queryRaisedTo) params.set('queryRaisedTo', filters.queryRaisedTo);
-    if (filters.respondedFrom) params.set('respondedFrom', filters.respondedFrom);
-    if (filters.respondedTo) params.set('respondedTo', filters.respondedTo);
+    if (filters.queryTo) params.set('queryTo', filters.queryTo);
 
     const queryString = params.toString();
     return queryString ? `?${queryString}` : '';
@@ -49,73 +36,93 @@ class WoQueriesService extends BaseApiService {
     return this.get<PaginatedResult<WoQuery>>(this.buildQueryString(filters));
   }
 
-  async getAllPending(): Promise<{ count: number; data: WoQueryWithOverdue[] }> {
-    return this.get<{ count: number; data: WoQueryWithOverdue[] }>('/pending');
-  }
-
-  async getAllOverdue(): Promise<{ count: number; overdueThresholdHours: number; data: WoQueryWithOverdue[] }> {
-    return this.get<{ count: number; overdueThresholdHours: number; data: WoQueryWithOverdue[] }>('/overdue');
-  }
-
-  async getById(id: number): Promise<WoQueryWithOverdue> {
-    return this.get<WoQueryWithOverdue>(`/${id}`);
+  async getById(id: number): Promise<WoQuery> {
+    return this.get<WoQuery>(`/${id}`);
   }
 
   async getByWoDetailId(woDetailId: number): Promise<WoQuery[]> {
     return this.get<WoQuery[]>(`/by-wo-detail/${woDetailId}`);
   }
 
-  async getPendingByWoDetail(woDetailId: number): Promise<{ count: number; data: WoQueryWithOverdue[] }> {
-    return this.get<{ count: number; data: WoQueryWithOverdue[] }>(`/by-wo-detail/${woDetailId}/pending`);
+  async getPendingByWoDetail(woDetailId: number): Promise<WoQuery[]> {
+    return this.get<WoQuery[]>(`/by-wo-detail/${woDetailId}/pending`);
   }
 
   async getByUser(userId: number, type: 'raised' | 'received' = 'raised'): Promise<WoQuery[]> {
     return this.get<WoQuery[]>(`/by-user/${userId}?type=${type}`);
   }
 
+  async getAllPending(): Promise<WoQuery[]> {
+    return this.get<WoQuery[]>('/pending');
+  }
+
+  async getAllOverdue(): Promise<WoQuery[]> {
+    return this.get<WoQuery[]>('/overdue');
+  }
+
   async create(data: CreateWoQueryDto): Promise<WoQuery> {
     return this.post<WoQuery>('', data);
   }
 
-  async createBulk(data: CreateBulkWoQueriesDto): Promise<{ created: number; data: WoQuery[] }> {
-    return this.post<{ created: number; data: WoQuery[] }>('/bulk', data);
+  async createBulk(data: CreateBulkWoQueriesDto): Promise<{ count: number; queries: WoQuery[] }> {
+    return this.post<{ count: number; queries: WoQuery[] }>('/bulk', data);
   }
 
-  async respond(id: number, data: RespondToQueryDto): Promise<WoQuery & { responseTimeHours: number; withinSla: boolean }> {
-    return this.post<WoQuery & { responseTimeHours: number; withinSla: boolean }>(`/${id}/respond`, data);
+  async respond(id: number, data: RespondToQueryDto): Promise<WoQuery & { withinSla: boolean; responseTimeHours: number }> {
+    return this.post<WoQuery & { withinSla: boolean; responseTimeHours: number }>(`/${id}/respond`, data);
   }
 
-  async close(id: number, data?: CloseQueryDto): Promise<WoQuery> {
-    return this.post<WoQuery>(`/${id}/close`, data || {});
+  async close(id: number, remarks?: string): Promise<WoQuery> {
+    return this.post<WoQuery>(`/${id}/close`, { remarks });
   }
 
-  async updateStatus(id: number, data: UpdateQueryStatusDto): Promise<WoQuery> {
-    return this.patch<WoQuery>(`/${id}/status`, data);
+  async reopen(id: number): Promise<WoQuery> {
+    return this.post<WoQuery>(`/${id}/reopen`);
   }
 
-  async reopen(id: number): Promise<WoQuery & { message: string }> {
-    return this.post<WoQuery & { message: string }>(`/${id}/reopen`, {});
+  async updateStatus(id: number, status: string): Promise<WoQuery> {
+    return this.patch<WoQuery>(`/${id}/status`, { status });
   }
 
   async remove(id: number): Promise<void> {
     return this.delete(`/${id}`);
   }
 
-  // Dashboard/Statistics
-  async getDashboardSummary(): Promise<QueriesDashboardSummary> {
-    return this.get<QueriesDashboardSummary>('/dashboard/summary');
+  // Statistics
+  async getDashboardSummary(): Promise<{
+    total: number;
+    pending: number;
+    responded: number;
+    closed: number;
+    overdue: number;
+  }> {
+    return this.get('/statistics/summary');
   }
 
-  async getResponseTimeStatistics(): Promise<ResponseTimeStatistics> {
-    return this.get<ResponseTimeStatistics>('/dashboard/response-times');
+  async getResponseTimeStatistics(): Promise<{
+    averageResponseTimeHours: number;
+    withinSlaPercentage: number;
+    byMonth: Array<{ month: string; avgHours: number; count: number }>;
+  }> {
+    return this.get('/statistics/response-time');
   }
 
-  async getUserQueryStatistics(userId: number): Promise<UserQueryStatistics> {
-    return this.get<UserQueryStatistics>(`/dashboard/by-user/${userId}`);
+  async getUserQueryStatistics(userId: number): Promise<{
+    raised: number;
+    received: number;
+    pending: number;
+    avgResponseTime: number;
+  }> {
+    return this.get(`/statistics/user/${userId}`);
   }
 
-  async getSlaStatus(woDetailId: number): Promise<SlaStatus> {
-    return this.get<SlaStatus>(`/sla/${woDetailId}`);
+  async getSlaStatus(woDetailId: number): Promise<{
+    totalQueries: number;
+    respondedWithinSla: number;
+    overdueQueries: number;
+    slaCompliancePercentage: number;
+  }> {
+    return this.get(`/by-wo-detail/${woDetailId}/sla-status`);
   }
 }
 

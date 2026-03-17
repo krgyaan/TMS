@@ -7,7 +7,6 @@ import type {
   WoDetailsFilters,
   CreateWoDetailDto,
   UpdateWoDetailDto,
-  AcceptWoDto,
   RequestAmendmentDto,
   WoAcceptanceDecisionDto,
 } from '@/modules/operations/types/wo.types';
@@ -26,6 +25,12 @@ export const woDetailsKeys = {
   byBasicDetail: (woBasicDetailId: number) => [...woDetailsKeys.all, 'by-basic-detail', woBasicDetailId] as const,
   acceptanceStatus: (id: number) => [...woDetailsKeys.all, 'acceptance-status', id] as const,
   timeline: (id: number) => [...woDetailsKeys.all, 'timeline', id] as const,
+
+  // Wizard-specific keys
+  wizardProgress: (id: number) => [...woDetailsKeys.all, 'wizard-progress', id] as const,
+  pageData: (id: number, pageNum: number) => [...woDetailsKeys.all, 'page-data', id, pageNum] as const,
+
+  // Dashboard
   dashboardSummary: () => [...woDetailsKeys.all, 'dashboard-summary'] as const,
   pendingAcceptance: () => [...woDetailsKeys.all, 'pending-acceptance'] as const,
   pendingQueries: () => [...woDetailsKeys.all, 'pending-queries'] as const,
@@ -48,7 +53,7 @@ export const useWoDetailById = (id: number) => {
   return useQuery({
     queryKey: woDetailsKeys.detail(id),
     queryFn: () => woDetailsService.getById(id),
-    enabled: !!id,
+    enabled: !!id && id > 0,
   });
 };
 
@@ -64,7 +69,7 @@ export const useWoDetailByBasicDetail = (woBasicDetailId: number) => {
   return useQuery({
     queryKey: woDetailsKeys.byBasicDetail(woBasicDetailId),
     queryFn: () => woDetailsService.getByWoBasicDetailId(woBasicDetailId),
-    enabled: !!woBasicDetailId,
+    enabled: !!woBasicDetailId && woBasicDetailId > 0,
   });
 };
 
@@ -83,6 +88,30 @@ export const useWoTimeline = (id: number) => {
     enabled: !!id,
   });
 };
+
+// ============================================
+// WIZARD QUERY HOOKS (NEW)
+// ============================================
+
+export const useWizardProgress = (id: number) => {
+  return useQuery({
+    queryKey: woDetailsKeys.wizardProgress(id),
+    queryFn: () => woDetailsService.getWizardProgress(id),
+    enabled: !!id && id > 0,
+  });
+};
+
+export const usePageData = (woDetailId: number, pageNum: number) => {
+  return useQuery({
+    queryKey: woDetailsKeys.pageData(woDetailId, pageNum),
+    queryFn: () => woDetailsService.getPageData(woDetailId, pageNum),
+    enabled: !!woDetailId && woDetailId > 0 && pageNum >= 1 && pageNum <= 7,
+  });
+};
+
+// ============================================
+// DASHBOARD QUERY HOOKS
+// ============================================
 
 export const useWoDetailsDashboardSummary = () => {
   return useQuery({
@@ -128,10 +157,11 @@ export const useCreateWoDetail = () => {
 
   return useMutation({
     mutationFn: (data: CreateWoDetailDto) => woDetailsService.create(data),
-    onSuccess: (_, data) => {
+    onSuccess: (result, data) => {
       queryClient.invalidateQueries({ queryKey: woDetailsKeys.all });
       queryClient.invalidateQueries({ queryKey: woBasicDetailsKeys.detail(data.woBasicDetailId) });
       toast.success('WO Detail created successfully');
+      return result;
     },
     onError: (error: any) => {
       toast.error(handleQueryError(error));
@@ -171,12 +201,89 @@ export const useDeleteWoDetail = () => {
   });
 };
 
-// Acceptance Workflow Mutations
+// ============================================
+// WIZARD MUTATION HOOKS (NEW)
+// ============================================
+
+export const useSavePageData = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ woDetailId, pageNum, data }: { woDetailId: number; pageNum: number; data: any }) =>
+      woDetailsService.savePage(woDetailId, pageNum, data),
+    onSuccess: (_, { woDetailId, pageNum }) => {
+      queryClient.invalidateQueries({ queryKey: woDetailsKeys.detail(woDetailId) });
+      queryClient.invalidateQueries({ queryKey: woDetailsKeys.wizardProgress(woDetailId) });
+      queryClient.invalidateQueries({ queryKey: woDetailsKeys.pageData(woDetailId, pageNum) });
+      toast.success('Page saved as draft');
+    },
+    onError: (error: any) => {
+      toast.error(handleQueryError(error));
+    },
+  });
+};
+
+export const useSubmitPage = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ woDetailId, pageNum, data }: { woDetailId: number; pageNum: number; data: any }) =>
+      woDetailsService.submitPage(woDetailId, pageNum, data),
+    onSuccess: (_, { woDetailId, pageNum }) => {
+      queryClient.invalidateQueries({ queryKey: woDetailsKeys.detail(woDetailId) });
+      queryClient.invalidateQueries({ queryKey: woDetailsKeys.wizardProgress(woDetailId) });
+      queryClient.invalidateQueries({ queryKey: woDetailsKeys.pageData(woDetailId, pageNum) });
+      toast.success(`Page ${pageNum} submitted successfully`);
+    },
+    onError: (error: any) => {
+      toast.error(handleQueryError(error));
+    },
+  });
+};
+
+export const useSkipPage = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ woDetailId, pageNum, reason }: { woDetailId: number; pageNum: number; reason?: string }) =>
+      woDetailsService.skipPage(woDetailId, pageNum, reason),
+    onSuccess: (_, { woDetailId, pageNum }) => {
+      queryClient.invalidateQueries({ queryKey: woDetailsKeys.detail(woDetailId) });
+      queryClient.invalidateQueries({ queryKey: woDetailsKeys.wizardProgress(woDetailId) });
+      toast.info(`Page ${pageNum} skipped`);
+    },
+    onError: (error: any) => {
+      toast.error(handleQueryError(error));
+    },
+  });
+};
+
+export const useSubmitForReview = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (woDetailId: number) => woDetailsService.submitForReview(woDetailId),
+    onSuccess: (_, woDetailId) => {
+      queryClient.invalidateQueries({ queryKey: woDetailsKeys.all });
+      queryClient.invalidateQueries({ queryKey: woDetailsKeys.detail(woDetailId) });
+      queryClient.invalidateQueries({ queryKey: woDetailsKeys.wizardProgress(woDetailId) });
+      toast.success('WO Details submitted for TL review');
+    },
+    onError: (error: any) => {
+      toast.error(handleQueryError(error));
+    },
+  });
+};
+
+// ============================================
+// ACCEPTANCE WORKFLOW MUTATIONS
+// ============================================
+
 export const useAcceptWo = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: AcceptWoDto }) =>
+    mutationFn: ({ id, data }: { id: number; data: {tlId?: number; notes?: string;} }) =>
       woDetailsService.acceptWo(id, data),
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: woDetailsKeys.all });

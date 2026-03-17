@@ -8,8 +8,6 @@ import type {
   CreateWoQueryDto,
   CreateBulkWoQueriesDto,
   RespondToQueryDto,
-  CloseQueryDto,
-  UpdateQueryStatusDto,
 } from '@/modules/operations/types/wo.types';
 
 // ============================================
@@ -28,8 +26,6 @@ export const woQueriesKeys = {
   allPending: () => [...woQueriesKeys.all, 'all-pending'] as const,
   allOverdue: () => [...woQueriesKeys.all, 'all-overdue'] as const,
   dashboardSummary: () => [...woQueriesKeys.all, 'dashboard-summary'] as const,
-  responseTimeStats: () => [...woQueriesKeys.all, 'response-time-stats'] as const,
-  userStats: (userId: number) => [...woQueriesKeys.all, 'user-stats', userId] as const,
   slaStatus: (woDetailId: number) => [...woQueriesKeys.all, 'sla-status', woDetailId] as const,
 };
 
@@ -48,7 +44,7 @@ export const useWoQueryById = (id: number) => {
   return useQuery({
     queryKey: woQueriesKeys.detail(id),
     queryFn: () => woQueriesService.getById(id),
-    enabled: !!id,
+    enabled: !!id && id > 0,
   });
 };
 
@@ -56,7 +52,7 @@ export const useWoQueriesByWoDetail = (woDetailId: number) => {
   return useQuery({
     queryKey: woQueriesKeys.byWoDetail(woDetailId),
     queryFn: () => woQueriesService.getByWoDetailId(woDetailId),
-    enabled: !!woDetailId,
+    enabled: !!woDetailId && woDetailId > 0,
   });
 };
 
@@ -64,7 +60,7 @@ export const usePendingQueriesByWoDetail = (woDetailId: number) => {
   return useQuery({
     queryKey: woQueriesKeys.pendingByWoDetail(woDetailId),
     queryFn: () => woQueriesService.getPendingByWoDetail(woDetailId),
-    enabled: !!woDetailId,
+    enabled: !!woDetailId && woDetailId > 0,
   });
 };
 
@@ -72,7 +68,7 @@ export const useQueriesByUser = (userId: number, type: 'raised' | 'received' = '
   return useQuery({
     queryKey: woQueriesKeys.byUser(userId, type),
     queryFn: () => woQueriesService.getByUser(userId, type),
-    enabled: !!userId,
+    enabled: !!userId && userId > 0,
   });
 };
 
@@ -97,26 +93,11 @@ export const useQueriesDashboardSummary = () => {
   });
 };
 
-export const useResponseTimeStatistics = () => {
-  return useQuery({
-    queryKey: woQueriesKeys.responseTimeStats(),
-    queryFn: () => woQueriesService.getResponseTimeStatistics(),
-  });
-};
-
-export const useUserQueryStatistics = (userId: number) => {
-  return useQuery({
-    queryKey: woQueriesKeys.userStats(userId),
-    queryFn: () => woQueriesService.getUserQueryStatistics(userId),
-    enabled: !!userId,
-  });
-};
-
 export const useQuerySlaStatus = (woDetailId: number) => {
   return useQuery({
     queryKey: woQueriesKeys.slaStatus(woDetailId),
     queryFn: () => woQueriesService.getSlaStatus(woDetailId),
-    enabled: !!woDetailId,
+    enabled: !!woDetailId && woDetailId > 0,
   });
 };
 
@@ -131,10 +112,10 @@ export const useCreateWoQuery = () => {
     mutationFn: (data: CreateWoQueryDto) => woQueriesService.create(data),
     onSuccess: (_, data) => {
       queryClient.invalidateQueries({ queryKey: woQueriesKeys.all });
-      queryClient.invalidateQueries({ queryKey: woQueriesKeys.byWoDetail(data.woDetailId) });
-      queryClient.invalidateQueries({ queryKey: woDetailsKeys.detail(data.woDetailId) });
-      queryClient.invalidateQueries({ queryKey: woDetailsKeys.timeline(data.woDetailId) });
-      toast.success('Query created successfully');
+      queryClient.invalidateQueries({ queryKey: woQueriesKeys.byWoDetail(data.woDetailsId) });
+      queryClient.invalidateQueries({ queryKey: woDetailsKeys.detail(data.woDetailsId) });
+      queryClient.invalidateQueries({ queryKey: woDetailsKeys.timeline(data.woDetailsId) });
+      toast.success('Query raised successfully');
     },
     onError: (error: any) => {
       toast.error(handleQueryError(error));
@@ -149,10 +130,9 @@ export const useCreateBulkWoQueries = () => {
     mutationFn: (data: CreateBulkWoQueriesDto) => woQueriesService.createBulk(data),
     onSuccess: (_, data) => {
       queryClient.invalidateQueries({ queryKey: woQueriesKeys.all });
-      queryClient.invalidateQueries({ queryKey: woQueriesKeys.byWoDetail(data.woDetailId) });
-      queryClient.invalidateQueries({ queryKey: woDetailsKeys.detail(data.woDetailId) });
-      queryClient.invalidateQueries({ queryKey: woDetailsKeys.timeline(data.woDetailId) });
-      toast.success('Queries created successfully');
+      queryClient.invalidateQueries({ queryKey: woQueriesKeys.byWoDetail(data.woDetailsId) });
+      queryClient.invalidateQueries({ queryKey: woDetailsKeys.detail(data.woDetailsId) });
+      toast.success('Queries raised successfully');
     },
     onError: (error: any) => {
       toast.error(handleQueryError(error));
@@ -169,7 +149,7 @@ export const useRespondToQuery = () => {
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: woQueriesKeys.all });
       if (result.withinSla) {
-        toast.success(`Query responded successfully (${result.responseTimeHours.toFixed(1)} hours)`);
+        toast.success(`Query responded (${result.responseTimeHours.toFixed(1)} hours)`);
       } else {
         toast.warning(`Query responded (${result.responseTimeHours.toFixed(1)} hours - exceeded SLA)`);
       }
@@ -184,27 +164,11 @@ export const useCloseQuery = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data?: CloseQueryDto }) =>
-      woQueriesService.close(id, data),
+    mutationFn: ({ id, remarks }: { id: number; remarks?: string }) =>
+      woQueriesService.close(id, remarks),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: woQueriesKeys.all });
       toast.success('Query closed successfully');
-    },
-    onError: (error: any) => {
-      toast.error(handleQueryError(error));
-    },
-  });
-};
-
-export const useUpdateQueryStatus = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: UpdateQueryStatusDto }) =>
-      woQueriesService.updateStatus(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: woQueriesKeys.all });
-      toast.success('Query status updated successfully');
     },
     onError: (error: any) => {
       toast.error(handleQueryError(error));
