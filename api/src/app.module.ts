@@ -69,7 +69,7 @@ import { FinancialYearModule } from "@/modules/master/financial-year/financial-y
 import { FinanceDocTypeModule } from "@/modules/master/finance-doc-type/finance-doc-type.module";
 import { TenderExecutivePerformanceModule } from "./modules/performance/tender-executive-performance/tender-executive-performance.module";
 import { TeamLeaderPerformanceModule } from "./modules/performance/team-leader-performance/team-leader-performance.module";
-import { OemDashboardModule } from "./modules/performance/oem-performance/oem-performance.module";
+import { OemPerformanceModule } from "./modules/performance/oem-performance/oem-performance.module";
 import { PayOnPortalModule } from "@/modules/bi-dashboard/pay-on-portal/pay-on-portal.module";
 import { BankGuaranteeModule } from "@/modules/bi-dashboard/bank-guarantee/bank-guarantee.module";
 import { DemandDraftModule } from "@/modules/bi-dashboard/demand-draft/demand-draft.module";
@@ -177,7 +177,7 @@ import { WoQueriesModule } from "./modules/operations/wo-queries/wo-queries.modu
         FinanceDocTypeModule,
         TenderExecutivePerformanceModule,
         TeamLeaderPerformanceModule,
-        OemDashboardModule,
+        OemPerformanceModule,
         PayOnPortalModule,
         BankGuaranteeModule,
         DemandDraftModule,
