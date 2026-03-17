@@ -1292,7 +1292,7 @@ export class TenderExecutiveService {
         JOIN tender_information tin ON tin.tender_id = ti.id
         WHERE ${baseWhere()}
           AND tin.created_at < '${from}'
-          AND ti.tl_status = 0
+          AND ti.tl_status IN (0,3)
     `);
 
         const approvedDuringCompleted = await exec(`
@@ -1350,7 +1350,7 @@ export class TenderExecutiveService {
         JOIN tender_information tin ON tin.tender_id = ti.id
         WHERE ${baseWhere()}
           AND tin.created_at < '${to}'
-          AND ti.tl_status = 0
+          AND ti.tl_status IN (0,3)
     `);
 
         /* =====================================================
