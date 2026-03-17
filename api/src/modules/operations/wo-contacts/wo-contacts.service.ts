@@ -16,10 +16,7 @@ export type WoContactRow = typeof woContacts.$inferSelect;
 export class WoContactsService {
   constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
 
-  // ============================================
   // MAPPING FUNCTIONS
-  // ============================================
-
   private mapCreateToDb(data: CreateWoContactDto) {
     const now = new Date();
     return {
@@ -63,10 +60,7 @@ export class WoContactsService {
     };
   }
 
-  // ============================================
   // CRUD OPERATIONS
-  // ============================================
-
   async findAll(filters?: WoContactsQueryDto) {
     const page = filters?.page ?? 1;
     const limit = Math.min(Math.max(filters?.limit ?? 50, 1), 100);
@@ -261,10 +255,7 @@ export class WoContactsService {
     return { count: deleted.length };
   }
 
-  // ============================================
   // UTILITY
-  // ============================================
-
   async getContactsSummary(woBasicDetailId: number) {
     const [summary] = await this.db
       .select({
