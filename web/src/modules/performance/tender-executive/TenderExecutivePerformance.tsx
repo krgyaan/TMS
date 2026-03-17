@@ -565,30 +565,46 @@ export default function TenderExecutivePerformance() {
                                                                                             <p className="text-xs text-muted-foreground">No tenders</p>
                                                                                         ) : (
                                                                                             drilldown.map((t: any) => (
-                                                                                                <div key={t.tenderId} className="border-b pb-2 text-xs space-y-1">
-                                                                                                    <div className="font-medium">{t.tenderNo ?? `Tender #${t.tenderId}`}</div>
+                                                                                                <div className="flex justify-between">
+                                                                                                    <div key={t.tenderId} className="border-b pb-2 text-xs space-y-1">
+                                                                                                        <div className="font-medium">{t.tenderNo ?? `Tender #${t.tenderId}`}</div>
 
-                                                                                                    {t.tenderName && (
-                                                                                                        <div className="text-muted-foreground truncate">{t.tenderName}</div>
-                                                                                                    )}
+                                                                                                        {t.tenderName && (
+                                                                                                            <div className="text-muted-foreground truncate">{t.tenderName}</div>
+                                                                                                        )}
 
-                                                                                                    {t.deadline && (
-                                                                                                        <div className="text-muted-foreground">
-                                                                                                            Due: {new Date(t.deadline).toLocaleDateString()}
-                                                                                                        </div>
-                                                                                                    )}
+                                                                                                        {t.deadline && (
+                                                                                                            <div className="text-muted-foreground">
+                                                                                                                Due: {new Date(t.deadline).toLocaleDateString()}
+                                                                                                            </div>
+                                                                                                        )}
 
-                                                                                                    {t.daysOverdue !== null && (
-                                                                                                        <div className="text-red-600 font-medium">{t.daysOverdue} days overdue</div>
-                                                                                                    )}
+                                                                                                        {t.daysOverdue !== null && (
+                                                                                                            <div className="text-red-600 font-medium">
+                                                                                                                {t.daysOverdue} days overdue
+                                                                                                            </div>
+                                                                                                        )}
 
-                                                                                                    {t.meta && Object.keys(t.meta).length > 0 && (
-                                                                                                        <div className="italic text-muted-foreground">
-                                                                                                            {Object.entries(t.meta)
-                                                                                                                .map(([k, v]) => `${k}: ${v}`)
-                                                                                                                .join(", ")}
-                                                                                                        </div>
-                                                                                                    )}
+                                                                                                        {t.meta && Object.keys(t.meta).length > 0 && (
+                                                                                                            <div className="italic text-muted-foreground">
+                                                                                                                {Object.entries(t.meta)
+                                                                                                                    .map(([k, v]) => `${k}: ${v}`)
+                                                                                                                    .join(", ")}
+                                                                                                            </div>
+                                                                                                        )}
+                                                                                                    </div>
+                                                                                                    <div>
+                                                                                                        <button
+                                                                                                            onClick={ev => {
+                                                                                                                ev.stopPropagation();
+                                                                                                                window.open(paths.tendering.tenderView(t.tenderId), "_blank");
+                                                                                                            }}
+                                                                                                            className="h-7 w-7 flex items-center justify-center rounded-md
+                                                                                                                                        text-muted-foreground hover:text-primary hover:bg-muted"
+                                                                                                        >
+                                                                                                            <Eye className="h-4 w-4" />
+                                                                                                        </button>
+                                                                                                    </div>
                                                                                                 </div>
                                                                                             ))
                                                                                         )}
