@@ -10,10 +10,7 @@ export const WoDetailsStatusEnum = z.enum([
 
 export type WoDetailsStatus = z.infer<typeof WoDetailsStatusEnum>;
 
-// ============================================
 // COMMON SCHEMAS
-// ============================================
-
 export const TenderDocumentsChecklistSchema = z.object({
   completeTenderDocuments: z.boolean().default(false),
   tenderInfo: z.boolean().default(false),
@@ -45,20 +42,14 @@ export const PercentageSchema = z
   .regex(/^(100(\.00?)?|\d{1,2}(\.\d{1,2})?)$/, 'Invalid percentage (0-100)')
   .or(z.number().min(0).max(100).transform(String));
 
-// ============================================
 // CREATE
-// ============================================
-
 export const CreateWoDetailSchema = z.object({
   woBasicDetailId: z.number().int().positive(),
 });
 
 export type CreateWoDetailDto = z.infer<typeof CreateWoDetailSchema>;
 
-// ============================================
 // UPDATE (Full)
-// ============================================
-
 export const UpdateWoDetailSchema = z.object({
   // Page 1: Project Handover
   tenderDocumentsChecklist: TenderDocumentsChecklistSchema.optional(),
@@ -112,10 +103,7 @@ export const UpdateWoDetailSchema = z.object({
 
 export type UpdateWoDetailDto = z.infer<typeof UpdateWoDetailSchema>;
 
-// ============================================
 // QUERY/FILTERS
-// ============================================
-
 export const WoDetailsQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1).optional(),
   limit: z.coerce.number().int().positive().max(100).default(50).optional(),
@@ -154,9 +142,7 @@ export const WoDetailsQuerySchema = z.object({
 
 export type WoDetailsQueryDto = z.infer<typeof WoDetailsQuerySchema>;
 
-// ============================================
 // PAGE-SPECIFIC SCHEMAS (Save/Submit)
-// ============================================
 
 // Page 1
 export const SavePage1Schema = z.object({

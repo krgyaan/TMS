@@ -7,10 +7,7 @@ import type { CreateWoDetailDto, UpdateWoDetailDto, WoDetailsQueryDto, SkipPageD
 export class WoDetailsController {
   constructor(private readonly woDetailsService: WoDetailsService) {}
 
-  // ============================================
   // CRUD OPERATIONS
-  // ============================================
-
   @Get()
   async list(
     @Query('page') page?: string,
@@ -62,10 +59,7 @@ export class WoDetailsController {
     await this.woDetailsService.delete(id);
   }
 
-  // ============================================
   // WIZARD OPERATIONS
-  // ============================================
-
   @Get(':id/wizard/progress')
   async getWizardProgress(@Param('id', ParseIntPipe) id: number) {
     return this.woDetailsService.getWizardProgress(id);

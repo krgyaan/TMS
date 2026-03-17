@@ -3,7 +3,7 @@ import { eq, desc, asc, sql, and, gte, lte } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { woDetails, woBasicDetails, woContacts, woBillingBoq, woBuybackBoq, woBillingAddresses, woShippingAddresses, woAmendments, woQueries, woDocuments, woAcceptance } from '@db/schemas/operations';
-import type { CreateWoDetailDto, UpdateWoDetailDto, WoDetailsQueryDto, SavePage1Dto, SubmitPage1Dto, SavePage2Dto, SubmitPage2Dto, SavePage3Dto, SubmitPage3Dto, SavePage4Dto, SubmitPage4Dto, SavePage5Dto, SubmitPage5Dto, SavePage6Dto, SubmitPage6Dto, SavePage7Dto, SubmitPage7Dto, SkipPageDto, TenderDocumentsChecklist, SiteVisitPerson } from './dto/wo-details.dto';
+import type { CreateWoDetailDto, UpdateWoDetailDto, WoDetailsQueryDto, SavePage4Dto, SkipPageDto, TenderDocumentsChecklist } from './dto/wo-details.dto';
 
 export type WoDetailRow = typeof woDetails.$inferSelect;
 
@@ -22,10 +22,7 @@ const TENDER_CHECKLIST_ITEMS = [
 export class WoDetailsService {
   constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
 
-  // ============================================
   // MAPPING FUNCTIONS
-  // ============================================
-
   private mapRowToResponse(row: WoDetailRow) {
     return {
       id: row.id,
