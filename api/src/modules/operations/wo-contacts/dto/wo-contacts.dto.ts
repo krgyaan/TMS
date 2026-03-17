@@ -1,84 +1,46 @@
-import { z } from "zod";
+import { z } from 'zod';
 
-// ============================================
-// WO CONTACTS SCHEMAS
-// ============================================
-
-
-export const DepartmentEnum = z.enum(["EIC", "User", "C&P", "Finance"]);
-
-export type Department = z.infer<typeof DepartmentEnum>;
+export const DepartmentEnum = z.enum(['EIC', 'User', 'C&P', 'Finance']);
 
 export const CreateWoContactSchema = z.object({
-  woBasicDetailId: z.number().int().positive({
-    message: "Valid WO Basic Detail ID is required",
-  }),
-  organization: z.string().max(255).optional(),
+  woBasicDetailId: z.number().int().positive(),
+  organization: z.string().max(100).optional(),
   departments: DepartmentEnum.optional(),
-  name: z.string().min(1, "Name is required").max(255),
-  designation: z.string().max(100).optional(),
+  name: z.string().max(255).optional(),
+  designation: z.string().max(50).optional(),
   phone: z.string().max(20).optional(),
-  email: z.string().email().max(255).optional().or(z.literal("")),
-  isFromTender: z.boolean().default(false).optional(),
+  email: z.string().email().max(255).optional().or(z.literal('')),
 });
 
 export type CreateWoContactDto = z.infer<typeof CreateWoContactSchema>;
 
-// ============================================
-// BULK CREATE WO CONTACTS
-// ============================================
-
-export const CreateBulkWoContactsSchema = z.object({
-  woBasicDetailId: z.number().int().positive({
-    message: "Valid WO Basic Detail ID is required",
-  }),
-  contacts: z.array(
-    z.object({
-      organization: z.string().max(255).optional(),
-      departments: DepartmentEnum.optional(),
-      name: z.string().min(1, "Name is required").max(255),
-      designation: z.string().max(100).optional(),
-      phone: z.string().max(20).optional(),
-      email: z.string().email().max(255).optional().or(z.literal("")),
-      isFromTender: z.boolean().default(false).optional(),
-    })
-  ).min(1, "At least one contact is required"),
+export const UpdateWoContactSchema = z.object({
+  organization: z.string().max(100).optional(),
+  departments: DepartmentEnum.optional(),
+  name: z.string().max(255).optional(),
+  designation: z.string().max(50).optional(),
+  phone: z.string().max(20).optional(),
+  email: z.string().email().max(255).optional().or(z.literal('')),
 });
 
-/**
- * Schema for filtering/querying WO Contacts
- */
+export type UpdateWoContactDto = z.infer<typeof UpdateWoContactSchema>;
+
+export const CreateBulkWoContactsSchema = z.object({
+  woBasicDetailId: z.number().int().positive(),
+  contacts: z.array(CreateWoContactSchema.omit({ woBasicDetailId: true })),
+});
+
+export type CreateBulkWoContactsDto = z.infer<typeof CreateBulkWoContactsSchema>;
+
 export const WoContactsQuerySchema = z.object({
-  // Pagination
   page: z.coerce.number().int().positive().default(1).optional(),
-  limit: z.coerce.number().int().positive().max(100).default(10).optional(),
+  limit: z.coerce.number().int().positive().max(100).default(50).optional(),
+  sortBy: z.enum(['createdAt', 'updatedAt', 'name']).default('createdAt').optional(),
+  sortOrder: z.enum(['asc', 'desc']).default('desc').optional(),
 
-  // Filters
   woBasicDetailId: z.coerce.number().int().positive().optional(),
-  organization: z.string().max(100).optional(),
-  departments: z.enum(["EIC", "User", "C&P", "Finance"]).optional(),
-  name: z.string().max(255).optional(),
-  email: z.string().max(255).optional(),
-
-  // Search
-  search: z.string().max(255).optional(),
-
-  // Sorting
-  sortBy: z
-    .enum(["name", "organization", "departments", "email"])
-    .default("name")
-    .optional(),
-  sortOrder: z.enum(["asc", "desc"]).default("asc").optional(),
+  departments: DepartmentEnum.optional(),
+  search: z.string().optional(),
 });
 
 export type WoContactsQueryDto = z.infer<typeof WoContactsQuerySchema>;
-
-/**
- * Schema for importing contacts from TMS tender
- */
-export const ImportContactsFromTenderSchema = z.object({
-  woBasicDetailId: z.number().int().positive(),
-  tenderId: z.number().int().positive(),
-});
-
-export type ImportContactsFromTenderDto = z.infer<typeof ImportContactsFromTenderSchema>;
