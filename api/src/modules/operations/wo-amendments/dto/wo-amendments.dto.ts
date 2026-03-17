@@ -1,78 +1,99 @@
-import { z } from "zod";
+import { z } from 'zod';
 
-// ============================================
-// WO AMENDMENTS SCHEMAS
-// ============================================
+// ENUMS
+export const AmendmentCreatorRoleEnum = z.enum(['OE', 'TE', 'TL']);
 
-/**
- * Schema for creating a new WO Amendment
- */
+export const AmendmentStatusEnum = z.enum([
+  'draft',
+  'submitted',
+  'tl_approved',
+  'tl_rejected',
+  'communicated',
+  'client_acknowledged',
+  'resolved',
+  'rejected_by_client',
+]);
+
+export type AmendmentCreatorRole = z.infer<typeof AmendmentCreatorRoleEnum>;
+export type AmendmentStatus = z.infer<typeof AmendmentStatusEnum>;
+
+// CREATE
 export const CreateWoAmendmentSchema = z.object({
-  woDetailId: z.number().int().positive({
-    message: "Valid WO Detail ID is required",
-  }),
-
-  // Amendment details
-  pageNo: z.string().max(100),
-  clauseNo: z.string().max(100),
-  currentStatement: z.string().min(1, "Current statement is required"),
-  correctedStatement: z.string().min(1, "Corrected statement is required"),
+  woDetailId: z.number().int().positive(),
+  createdByRole: AmendmentCreatorRoleEnum,
+  pageNo: z.string().max(100).optional(),
+  clauseNo: z.string().max(100).optional(),
+  currentStatement: z.string().optional(),
+  correctedStatement: z.string().optional(),
 });
 
 export type CreateWoAmendmentDto = z.infer<typeof CreateWoAmendmentSchema>;
 
-/**
- * Schema for updating WO Amendment
- */
-export const UpdateWoAmendmentSchema = CreateWoAmendmentSchema.partial().omit({
-  woDetailId: true,
+// UPDATE
+
+export const UpdateWoAmendmentSchema = z.object({
+  pageNo: z.string().max(100).optional(),
+  clauseNo: z.string().max(100).optional(),
+  currentStatement: z.string().optional(),
+  correctedStatement: z.string().optional(),
+  status: AmendmentStatusEnum.optional(),
 });
 
 export type UpdateWoAmendmentDto = z.infer<typeof UpdateWoAmendmentSchema>;
 
-/**
- * Schema for bulk amendment creation
- */
+// BULK CREATE
 export const CreateBulkWoAmendmentsSchema = z.object({
   woDetailId: z.number().int().positive(),
+  createdByRole: AmendmentCreatorRoleEnum,
   amendments: z.array(
     z.object({
-      pageNo: z.string().max(100),
-      clauseNo: z.string().max(100),
-      currentStatement: z.string().min(1),
-      correctedStatement: z.string().min(1),
+      pageNo: z.string().max(100).optional(),
+      clauseNo: z.string().max(100).optional(),
+      currentStatement: z.string().optional(),
+      correctedStatement: z.string().optional(),
     })
-  ).min(1, "At least one amendment is required"),
+  ),
 });
 
 export type CreateBulkWoAmendmentsDto = z.infer<typeof CreateBulkWoAmendmentsSchema>;
 
-/**
- * Schema for filtering/querying WO Amendments
- */
+// TL REVIEW
+export const TlReviewAmendmentSchema = z.object({
+  approved: z.boolean(),
+  remarks: z.string().optional(),
+});
+
+export type TlReviewAmendmentDto = z.infer<typeof TlReviewAmendmentSchema>;
+
+// CLIENT RESPONSE
+export const RecordClientResponseSchema = z.object({
+  response: z.string().min(1, 'Response is required'),
+  proof: z.string().optional(),
+});
+
+export type RecordClientResponseDto = z.infer<typeof RecordClientResponseSchema>;
+
+// QUERY/FILTERS
 export const WoAmendmentsQuerySchema = z.object({
-  // Pagination
   page: z.coerce.number().int().positive().default(1).optional(),
-  limit: z.coerce.number().int().positive().max(100).default(10).optional(),
+  limit: z.coerce.number().int().positive().max(100).default(50).optional(),
+  sortBy: z
+    .enum(['createdAt', 'updatedAt', 'pageNo', 'clauseNo', 'status'])
+    .default('createdAt')
+    .optional(),
+  sortOrder: z.enum(['asc', 'desc']).default('desc').optional(),
 
-  // Filters
   woDetailId: z.coerce.number().int().positive().optional(),
-  pageNo: z.string().max(100).optional(),
-  clauseNo: z.string().max(100).optional(),
-
-  // Search
-  search: z.string().max(255).optional(),
-
-  // Date filters
+  status: AmendmentStatusEnum.optional(),
+  createdByRole: AmendmentCreatorRoleEnum.optional(),
+  tlApproved: z
+    .enum(['true', 'false'])
+    .transform((val) => val === 'true')
+    .optional(),
+  pageNo: z.string().optional(),
+  clauseNo: z.string().optional(),
   createdAtFrom: z.string().datetime().optional(),
   createdAtTo: z.string().datetime().optional(),
-
-  // Sorting
-  sortBy: z
-    .enum(["createdAt", "updatedAt", "pageNo", "clauseNo"])
-    .default("createdAt")
-    .optional(),
-  sortOrder: z.enum(["asc", "desc"]).default("asc").optional(),
 });
 
 export type WoAmendmentsQueryDto = z.infer<typeof WoAmendmentsQuerySchema>;
