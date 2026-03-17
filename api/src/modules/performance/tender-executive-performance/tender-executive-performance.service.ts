@@ -249,7 +249,7 @@ export class TenderExecutiveService {
         const timers = await this.db
             .select()
             .from(timerTrackers)
-            .where(and(eq(timerTrackers.assignedUserId, userId), inArray(timerTrackers.entityId, tenderIds), inArray(timerTrackers.stage, timerNames)));
+            .where(and(eq(timerTrackers.createdByUserId, userId), inArray(timerTrackers.entityId, tenderIds), inArray(timerTrackers.stage, timerNames)));
 
         const timerMap = new Map<string, (typeof timers)[number]>();
         for (const t of timers) {
@@ -1036,7 +1036,7 @@ export class TenderExecutiveService {
 
         // User view → only that user's timers
         if (mode === "user" && userId) {
-            timerConditions.push(eq(timerTrackers.assignedUserId, userId));
+            timerConditions.push(eq(timerTrackers.createdByUserId, userId));
         }
 
         // Team view → ALL timers (no user filter)
