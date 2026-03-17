@@ -4,64 +4,46 @@ import { z } from "zod";
 // WO CONTACTS SCHEMAS
 // ============================================
 
-/**
- * Schema for creating a new WO Contact
- */
+
+export const DepartmentEnum = z.enum(["EIC", "User", "C&P", "Finance"]);
+
+export type Department = z.infer<typeof DepartmentEnum>;
+
 export const CreateWoContactSchema = z.object({
   woBasicDetailId: z.number().int().positive({
     message: "Valid WO Basic Detail ID is required",
   }),
-
-  // Client organization details
-  organization: z.string().max(100).optional(),
-  departments: z.enum(["EIC", "User", "C&P", "Finance"], {
-    invalid_type_error: "Invalid department type",
-  }).optional(),
-
-  // Contact person details
-  name: z.string().max(255).optional(),
-  designation: z.string().max(50).optional(),
-  phone: z
-    .string()
-    .max(20)
-    .regex(/^[\d\s\-\+\(\)]+$/, "Invalid phone number format")
-    .optional(),
-  email: z.string().email("Invalid email format").max(255).optional(),
+  organization: z.string().max(255).optional(),
+  departments: DepartmentEnum.optional(),
+  name: z.string().min(1, "Name is required").max(255),
+  designation: z.string().max(100).optional(),
+  phone: z.string().max(20).optional(),
+  email: z.string().email().max(255).optional().or(z.literal("")),
+  isFromTender: z.boolean().default(false).optional(),
 });
 
 export type CreateWoContactDto = z.infer<typeof CreateWoContactSchema>;
 
-/**
- * Schema for updating WO Contact
- */
-export const UpdateWoContactSchema = CreateWoContactSchema.partial().omit({
-  woBasicDetailId: true,
-});
+// ============================================
+// BULK CREATE WO CONTACTS
+// ============================================
 
-export type UpdateWoContactDto = z.infer<typeof UpdateWoContactSchema>;
-
-/**
- * Schema for bulk contact creation
- */
 export const CreateBulkWoContactsSchema = z.object({
-  woBasicDetailId: z.number().int().positive(),
+  woBasicDetailId: z.number().int().positive({
+    message: "Valid WO Basic Detail ID is required",
+  }),
   contacts: z.array(
     z.object({
-      organization: z.string().max(100).optional(),
-      departments: z.enum(["EIC", "User", "C&P", "Finance"]).optional(),
-      name: z.string().max(255).optional(),
-      designation: z.string().max(50).optional(),
-      phone: z
-        .string()
-        .max(20)
-        .regex(/^[\d\s\-\+\(\)]+$/, "Invalid phone number format")
-        .optional(),
-      email: z.string().email().max(255).optional(),
+      organization: z.string().max(255).optional(),
+      departments: DepartmentEnum.optional(),
+      name: z.string().min(1, "Name is required").max(255),
+      designation: z.string().max(100).optional(),
+      phone: z.string().max(20).optional(),
+      email: z.string().email().max(255).optional().or(z.literal("")),
+      isFromTender: z.boolean().default(false).optional(),
     })
   ).min(1, "At least one contact is required"),
 });
-
-export type CreateBulkWoContactsDto = z.infer<typeof CreateBulkWoContactsSchema>;
 
 /**
  * Schema for filtering/querying WO Contacts

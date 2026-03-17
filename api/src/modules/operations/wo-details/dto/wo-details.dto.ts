@@ -1,257 +1,138 @@
 import { z } from "zod";
 
 // ============================================
-// WO DETAILS SCHEMAS
+// COMMON VALIDATORS
 // ============================================
 
-/**
- * Schema for creating WO Details
- * Filled after Basic Details are completed
- */
+export const DecimalSchema = z
+  .string()
+  .regex(/^\d+(\.\d{1,2})?$/, "Invalid decimal format")
+  .or(z.number().transform(String));
+
+export const PercentageSchema = z
+  .string()
+  .regex(/^(100(\.00?)?|\d{1,2}(\.\d{1,2})?)$/, "Invalid percentage (0-100)")
+  .or(z.number().min(0).max(100).transform(String));
+
+export const PositiveIntSchema = z.number().int().positive();
+
+// ============================================
+// ENUMS
+// ============================================
+
+export const WoDetailsStatusEnum = z.enum([
+  "draft",
+  "in_progress",
+  "completed",
+  "submitted_for_review",
+]);
+
+export type WoDetailsStatus = z.infer<typeof WoDetailsStatusEnum>;
+
+// ============================================
+// TENDER DOCUMENTS CHECKLIST (Page 1)
+// ============================================
+
+export const TenderDocumentsChecklistSchema = z.object({
+  completeTenderDocuments: z.boolean().default(false),
+  tenderInfo: z.boolean().default(false),
+  emdInformation: z.boolean().default(false),
+  physicalDocumentsSubmission: z.boolean().default(false),
+  rfqAndQuotation: z.boolean().default(false),
+  documentChecklist: z.boolean().default(false),
+  costingSheet: z.boolean().default(false),
+  result: z.boolean().default(false),
+});
+
+export type TenderDocumentsChecklist = z.infer<typeof TenderDocumentsChecklistSchema>;
+
+// ============================================
+// SITE VISIT PERSON (Page 5)
+// ============================================
+
+export const SiteVisitPersonSchema = z.object({
+  name: z.string().max(255),
+  phone: z.string().max(20),
+  email: z.string().max(255),
+});
+
+export type SiteVisitPerson = z.infer<typeof SiteVisitPersonSchema>;
+
+// ============================================
+// CREATE WO DETAILS
+// ============================================
+
 export const CreateWoDetailSchema = z.object({
-  woBasicDetailId: z.number().int().positive({
-    message: "Valid WO Basic Detail ID is required",
-  }),
-
-  // Liquidated Damages (LD) configuration
-  ldApplicable: z.boolean().default(true),
-  maxLd: z
-    .string()
-    .regex(/^\d+(\.\d{1,2})?$/, "Invalid decimal format")
-    .optional(),
-  ldStartDate: z.string().date().optional(),
-  maxLdDate: z.string().date().optional(),
-
-  // Performance Bank Guarantee (PBG) configuration
-  isPbgApplicable: z.boolean().default(false),
-  filledBgFormat: z.string().max(255).optional(),
-
-  // Contract Agreement configuration
-  isContractAgreement: z.boolean().default(false),
-  contractAgreementFormat: z.string().max(255).optional(),
-
-  // Budget validation
-  budgetPreGst: z
-    .string()
-    .regex(/^\d+(\.\d{1,2})?$/, "Invalid decimal format")
-    .optional(),
-
-  // Record status
-  status: z.boolean().default(true).optional(),
+  woBasicDetailId: PositiveIntSchema,
 });
 
 export type CreateWoDetailDto = z.infer<typeof CreateWoDetailSchema>;
 
-/**
- * Schema for updating WO Details
- * All fields are optional for partial updates
- */
-export const UpdateWoDetailSchema = CreateWoDetailSchema.partial();
+// ============================================
+// UPDATE WO DETAILS (Full Update)
+// ============================================
+
+export const UpdateWoDetailSchema = z.object({
+  // Page 1: Project Handover
+  tenderDocumentsChecklist: TenderDocumentsChecklistSchema.optional(),
+
+  // Page 2: Compliance Obligations
+  ldApplicable: z.boolean().optional(),
+  maxLd: PercentageSchema.nullable().optional(),
+  ldStartDate: z.string().date().nullable().optional(),
+  maxLdDate: z.string().date().nullable().optional(),
+
+  isPbgApplicable: z.boolean().optional(),
+  filledBgFormat: z.string().max(255).nullable().optional(),
+  pbgBgId: PositiveIntSchema.nullable().optional(),
+
+  isContractAgreement: z.boolean().optional(),
+  contractAgreementFormat: z.string().max(255).nullable().optional(),
+
+  detailedPoApplicable: z.boolean().optional(),
+  detailedPoFollowupId: PositiveIntSchema.nullable().optional(),
+
+  // Page 3: SWOT Analysis
+  swotStrengths: z.string().nullable().optional(),
+  swotWeaknesses: z.string().nullable().optional(),
+  swotOpportunities: z.string().nullable().optional(),
+  swotThreats: z.string().nullable().optional(),
+
+  // Page 5: Project Execution
+  siteVisitNeeded: z.boolean().optional(),
+  siteVisitPerson: SiteVisitPersonSchema.nullable().optional(),
+  documentsFromTendering: z.array(z.string()).nullable().optional(),
+  documentsNeeded: z.array(z.string()).nullable().optional(),
+  documentsInHouse: z.array(z.string()).nullable().optional(),
+
+  // Page 6: Profitability
+  costingSheetLink: z.string().url().max(500).nullable().optional(),
+  hasDiscrepancies: z.boolean().optional(),
+  discrepancyComments: z.string().nullable().optional(),
+
+  budgetPreGst: DecimalSchema.nullable().optional(),
+  budgetSupply: DecimalSchema.nullable().optional(),
+  budgetService: DecimalSchema.nullable().optional(),
+  budgetFreight: DecimalSchema.nullable().optional(),
+  budgetAdmin: DecimalSchema.nullable().optional(),
+  budgetBuybackSale: DecimalSchema.nullable().optional(),
+
+  // Page 7: WO Acceptance (OE Step)
+  oeWoAmendmentNeeded: z.boolean().optional(),
+  oeSignaturePrepared: z.boolean().optional(),
+  courierRequestPrepared: z.boolean().optional(),
+
+  // Wizard Progress
+  currentPage: z.number().int().min(1).max(7).optional(),
+  status: WoDetailsStatusEnum.optional(),
+});
 
 export type UpdateWoDetailDto = z.infer<typeof UpdateWoDetailSchema>;
 
 // ============================================
-// WO ACCEPTANCE SCHEMAS
+// QUERY/FILTER SCHEMA
 // ============================================
 
-/**
- * Schema for TL to accept WO
- */
-export const AcceptWoSchema = z.object({
-  tlId: z.number().int().positive().optional(), // Auto-filled from auth context
-  notes: z.string().max(1000).optional(),
-});
-
-export type AcceptWoDto = z.infer<typeof AcceptWoSchema>;
-
-/**
- * Schema for TL to request amendments
- */
-export const RequestAmendmentSchema = z.object({
-  tlId: z.number().int().positive().optional(), // Auto-filled from auth context
-  reason: z.string().min(1).max(1000),
-  amendments: z.array(
-    z.object({
-      pageNo: z.string().max(100),
-      clauseNo: z.string().max(100),
-      currentStatement: z.string().min(1),
-      correctedStatement: z.string().min(1),
-    })
-  ).min(1, "At least one amendment is required"),
-  followupRequired: z.boolean().default(true),
-});
-
-export type RequestAmendmentDto = z.infer<typeof RequestAmendmentSchema>;
-
-/**
- * Complete WO Acceptance Decision Schema
- * TL makes final decision after reviewing all details
- */
-export const WoAcceptanceDecisionSchema = z.object({
-  accepted: z.boolean(),
-  tlId: z.number().int().positive().optional(),
-
-  // If accepted
-  notes: z.string().max(1000).optional(),
-
-  // If not accepted (amendment needed)
-  amendmentReason: z.string().max(1000).optional(),
-  amendments: z.array(
-    z.object({
-      pageNo: z.string().max(100),
-      clauseNo: z.string().max(100),
-      currentStatement: z.string().min(1),
-      correctedStatement: z.string().min(1),
-    })
-  ).optional(),
-}).refine(
-  (data) => {
-    // If not accepted, amendments must be provided
-    if (!data.accepted) {
-      return data.amendments && data.amendments.length > 0 && data.amendmentReason;
-    }
-    return true;
-  },
-  {
-    message: "Amendments and reason are required when WO is not accepted",
-    path: ["amendments"],
-  }
-);
-
-export type WoAcceptanceDecisionDto = z.infer<typeof WoAcceptanceDecisionSchema>;
-
-// ============================================
-// WO AMENDMENT SCHEMAS
-// ============================================
-
-/**
- * Schema for creating a single amendment
- */
-export const CreateWoAmendmentSchema = z.object({
-  pageNo: z.string().max(100),
-  clauseNo: z.string().max(100),
-  currentStatement: z.string().min(1, "Current statement is required"),
-  correctedStatement: z.string().min(1, "Corrected statement is required"),
-});
-
-export type CreateWoAmendmentDto = z.infer<typeof CreateWoAmendmentSchema>;
-
-/**
- * Schema for creating multiple amendments at once
- */
-export const CreateBulkWoAmendmentsSchema = z.object({
-  amendments: z.array(CreateWoAmendmentSchema).min(1, "At least one amendment is required"),
-});
-
-export type CreateBulkWoAmendmentsDto = z.infer<typeof CreateBulkWoAmendmentsSchema>;
-
-/**
- * Schema for updating an amendment
- */
-export const UpdateWoAmendmentSchema = CreateWoAmendmentSchema.partial();
-
-export type UpdateWoAmendmentDto = z.infer<typeof UpdateWoAmendmentSchema>;
-
-// ============================================
-// WO DOCUMENT SCHEMAS
-// ============================================
-
-/**
- * Schema for uploading WO documents
- */
-export const CreateWoDocumentSchema = z.object({
-  type: z.enum([
-    "draftWo",
-    "acceptedWoSigned",
-    "finalWo",
-    "detailedWo",
-    "sapPo",
-    "foa",
-  ], {
-    required_error: "Document type is required",
-    invalid_type_error: "Invalid document type",
-  }),
-  version: z.number().int().positive().default(1).optional(),
-  filePath: z.string().max(500).min(1, "File path is required"),
-  uploadedAt: z.string().datetime().optional(), // Auto-filled
-});
-
-export type CreateWoDocumentDto = z.infer<typeof CreateWoDocumentSchema>;
-
-/**
- * Schema for updating document metadata
- */
-export const UpdateWoDocumentSchema = z.object({
-  version: z.number().int().positive().optional(),
-  filePath: z.string().max(500).optional(),
-});
-
-export type UpdateWoDocumentDto = z.infer<typeof UpdateWoDocumentSchema>;
-
-/**
- * Schema for bulk document upload
- */
-export const CreateBulkWoDocumentsSchema = z.object({
-  documents: z.array(CreateWoDocumentSchema).min(1, "At least one document is required"),
-});
-
-export type CreateBulkWoDocumentsDto = z.infer<typeof CreateBulkWoDocumentsSchema>;
-
-// ============================================
-// WO QUERY SCHEMAS
-// ============================================
-
-/**
- * Schema for TL to raise a query to TE/OE
- */
-export const CreateWoQuerySchema = z.object({
-  queryBy: z.number().int().positive().optional(), // Auto-filled from auth context
-  queryTo: z.enum(["TE", "OE", "BOTH"], {
-    required_error: "Query recipient is required",
-  }),
-  queryText: z.string().min(1, "Query text is required").max(2000),
-  queryRaisedAt: z.string().datetime().optional(), // Auto-filled
-});
-
-export type CreateWoQueryDto = z.infer<typeof CreateWoQuerySchema>;
-
-/**
- * Schema for TE/OE to respond to a query
- */
-export const RespondToQuerySchema = z.object({
-  responseText: z.string().min(1, "Response text is required").max(2000),
-  respondedBy: z.number().int().positive().optional(), // Auto-filled from auth context
-  respondedAt: z.string().datetime().optional(), // Auto-filled
-});
-
-export type RespondToQueryDto = z.infer<typeof RespondToQuerySchema>;
-
-/**
- * Schema for closing a query
- */
-export const CloseQuerySchema = z.object({
-  closedBy: z.number().int().positive().optional(), // Auto-filled from auth context
-  closureNotes: z.string().max(500).optional(),
-});
-
-export type CloseQueryDto = z.infer<typeof CloseQuerySchema>;
-
-/**
- * Schema for updating query status
- */
-export const UpdateQueryStatusSchema = z.object({
-  status: z.enum(["pending", "responded", "closed"]),
-});
-
-export type UpdateQueryStatusDto = z.infer<typeof UpdateQueryStatusSchema>;
-
-// ============================================
-// QUERY/FILTER SCHEMAS
-// ============================================
-
-/**
- * Schema for filtering/querying WO Details list
- */
 export const WoDetailsQuerySchema = z.object({
   // Pagination
   page: z.coerce.number().int().positive().default(1).optional(),
@@ -259,6 +140,7 @@ export const WoDetailsQuerySchema = z.object({
 
   // Filters
   woBasicDetailId: z.coerce.number().int().positive().optional(),
+  status: WoDetailsStatusEnum.optional(),
   ldApplicable: z
     .enum(["true", "false"])
     .transform((val) => val === "true")
@@ -271,37 +153,23 @@ export const WoDetailsQuerySchema = z.object({
     .enum(["true", "false"])
     .transform((val) => val === "true")
     .optional(),
-  woAcceptance: z
+  siteVisitNeeded: z
     .enum(["true", "false"])
     .transform((val) => val === "true")
     .optional(),
-  woAmendmentNeeded: z
+  hasDiscrepancies: z
     .enum(["true", "false"])
     .transform((val) => val === "true")
     .optional(),
-  status: z
-    .enum(["true", "false"])
-    .transform((val) => val === "true")
-    .optional(),
-  tlId: z.coerce.number().int().positive().optional(),
+  createdBy: z.coerce.number().int().positive().optional(),
 
   // Date range filters
-  ldStartDateFrom: z.string().date().optional(),
-  ldStartDateTo: z.string().date().optional(),
   createdAtFrom: z.string().datetime().optional(),
   createdAtTo: z.string().datetime().optional(),
-  woAcceptanceAtFrom: z.string().datetime().optional(),
-  woAcceptanceAtTo: z.string().datetime().optional(),
 
   // Sorting
   sortBy: z
-    .enum([
-      "createdAt",
-      "updatedAt",
-      "ldStartDate",
-      "woAcceptanceAt",
-      "budgetPreGst",
-    ])
+    .enum(["createdAt", "updatedAt", "currentPage", "status"])
     .default("createdAt")
     .optional(),
   sortOrder: z.enum(["asc", "desc"]).default("desc").optional(),
@@ -309,136 +177,93 @@ export const WoDetailsQuerySchema = z.object({
 
 export type WoDetailsQueryDto = z.infer<typeof WoDetailsQuerySchema>;
 
-/**
- * Schema for filtering queries
- */
-export const QueryFilterSchema = z.object({
-  status: z.enum(["pending", "responded", "closed"]).optional(),
-  queryTo: z.enum(["TE", "OE", "BOTH"]).optional(),
-  queryBy: z.coerce.number().int().positive().optional(),
-  respondedBy: z.coerce.number().int().positive().optional(),
-
-  // Date filters
-  queryRaisedFrom: z.string().datetime().optional(),
-  queryRaisedTo: z.string().datetime().optional(),
-
-  // Pagination
-  page: z.coerce.number().int().positive().default(1).optional(),
-  limit: z.coerce.number().int().positive().max(100).default(10).optional(),
-
-  // Sorting
-  sortBy: z.enum(["queryRaisedAt", "respondedAt"]).default("queryRaisedAt").optional(),
-  sortOrder: z.enum(["asc", "desc"]).default("desc").optional(),
-});
-
-export type QueryFilterDto = z.infer<typeof QueryFilterSchema>;
-
-/**
- * Schema for filtering amendments
- */
-export const AmendmentFilterSchema = z.object({
-  pageNo: z.string().max(100).optional(),
-  clauseNo: z.string().max(100).optional(),
-
-  // Pagination
-  page: z.coerce.number().int().positive().default(1).optional(),
-  limit: z.coerce.number().int().positive().max(100).default(10).optional(),
-
-  // Sorting
-  sortBy: z.enum(["createdAt", "updatedAt", "pageNo"]).default("createdAt").optional(),
-  sortOrder: z.enum(["asc", "desc"]).default("asc").optional(),
-});
-
-export type AmendmentFilterDto = z.infer<typeof AmendmentFilterSchema>;
-
-/**
- * Schema for filtering documents
- */
-export const DocumentFilterSchema = z.object({
-  type: z.enum([
-    "draftWo",
-    "acceptedWoSigned",
-    "finalWo",
-    "detailedWo",
-    "sapPo",
-    "foa",
-  ]).optional(),
-  version: z.coerce.number().int().positive().optional(),
-
-  // Date filters
-  uploadedFrom: z.string().datetime().optional(),
-  uploadedTo: z.string().datetime().optional(),
-
-  // Pagination
-  page: z.coerce.number().int().positive().default(1).optional(),
-  limit: z.coerce.number().int().positive().max(100).default(10).optional(),
-
-  // Sorting
-  sortBy: z.enum(["uploadedAt", "version", "type"]).default("uploadedAt").optional(),
-  sortOrder: z.enum(["asc", "desc"]).default("desc").optional(),
-});
-
-export type DocumentFilterDto = z.infer<typeof DocumentFilterSchema>;
-
 // ============================================
 // RESPONSE SCHEMAS
 // ============================================
 
-/**
- * Schema for WO Details response with related data
- */
-export const WoDetailsResponseSchema = z.object({
+export const WoDetailResponseSchema = z.object({
   id: z.number(),
   woBasicDetailId: z.number(),
 
-  // LD configuration
+  // Page 1
+  tenderDocumentsChecklist: TenderDocumentsChecklistSchema.nullable(),
+  checklistCompletedAt: z.string().nullable(),
+  checklistIncompleteNotifiedAt: z.string().nullable(),
+
+  // Page 2
   ldApplicable: z.boolean(),
   maxLd: z.string().nullable(),
   ldStartDate: z.string().nullable(),
   maxLdDate: z.string().nullable(),
-
-  // PBG configuration
   isPbgApplicable: z.boolean(),
   filledBgFormat: z.string().nullable(),
-
-  // Contract Agreement
+  pbgBgId: z.number().nullable(),
   isContractAgreement: z.boolean(),
   contractAgreementFormat: z.string().nullable(),
+  detailedPoApplicable: z.boolean(),
+  detailedPoFollowupId: z.number().nullable(),
 
-  // Budget
+  // Page 3
+  swotStrengths: z.string().nullable(),
+  swotWeaknesses: z.string().nullable(),
+  swotOpportunities: z.string().nullable(),
+  swotThreats: z.string().nullable(),
+  swotCompletedAt: z.string().nullable(),
+
+  // Page 5
+  siteVisitNeeded: z.boolean(),
+  siteVisitPerson: SiteVisitPersonSchema.nullable(),
+  documentsFromTendering: z.array(z.string()).nullable(),
+  documentsNeeded: z.array(z.string()).nullable(),
+  documentsInHouse: z.array(z.string()).nullable(),
+
+  // Page 6
+  costingSheetLink: z.string().nullable(),
+  hasDiscrepancies: z.boolean(),
+  discrepancyComments: z.string().nullable(),
+  discrepancyNotifiedAt: z.string().nullable(),
   budgetPreGst: z.string().nullable(),
+  budgetSupply: z.string().nullable(),
+  budgetService: z.string().nullable(),
+  budgetFreight: z.string().nullable(),
+  budgetAdmin: z.string().nullable(),
+  budgetBuybackSale: z.string().nullable(),
 
-  // Acceptance workflow
-  woAcceptance: z.boolean(),
-  woAcceptanceAt: z.string().nullable(),
-  woAmendmentNeeded: z.boolean(),
-  followupId: z.number().nullable(),
-  courierId: z.number().nullable(),
+  // Page 7
+  oeWoAmendmentNeeded: z.boolean().nullable(),
+  oeAmendmentSubmittedAt: z.string().nullable(),
+  oeSignaturePrepared: z.boolean(),
+  courierRequestPrepared: z.boolean(),
+  courierRequestPreparedAt: z.string().nullable(),
 
-  // TL timeline
-  tlId: z.number().nullable(),
-  tlQueryRaisedAt: z.string().nullable(),
-  tlFinalDecisionAt: z.string().nullable(),
+  // Wizard Progress
+  currentPage: z.number(),
+  completedPages: z.array(z.number()),
+  skippedPages: z.array(z.number()),
+  startedAt: z.string().nullable(),
+  completedAt: z.string().nullable(),
 
   // Status
-  status: z.boolean(),
+  status: z.string(),
   createdAt: z.string(),
   updatedAt: z.string(),
+  createdBy: z.number().nullable(),
+  updatedBy: z.number().nullable(),
 
-  // Related data (optional, populated on demand)
-  amendments: z.array(z.any()).optional(),
-  documents: z.array(z.any()).optional(),
-  queries: z.array(z.any()).optional(),
+  // Relations (optional, populated on demand)
   woBasicDetail: z.any().optional(),
+  contacts: z.array(z.any()).optional(),
+  billingBoq: z.array(z.any()).optional(),
+  buybackBoq: z.array(z.any()).optional(),
+  billingAddresses: z.array(z.any()).optional(),
+  shippingAddresses: z.array(z.any()).optional(),
+  acceptance: z.any().optional(),
 });
 
-export type WoDetailsResponseDto = z.infer<typeof WoDetailsResponseSchema>;
+export type WoDetailResponseDto = z.infer<typeof WoDetailResponseSchema>;
 
-/**
- * Paginated list response schema
- */
 export const WoDetailsListResponseSchema = z.object({
-  data: z.array(WoDetailsResponseSchema),
+  data: z.array(WoDetailResponseSchema),
   meta: z.object({
     page: z.number(),
     limit: z.number(),
@@ -448,3 +273,31 @@ export const WoDetailsListResponseSchema = z.object({
 });
 
 export type WoDetailsListResponseDto = z.infer<typeof WoDetailsListResponseSchema>;
+
+// ============================================
+// WIZARD/PROGRESS SCHEMAS
+// ============================================
+
+export const PageNumberSchema = z.number().int().min(1).max(7);
+export type PageNumber = z.infer<typeof PageNumberSchema>;
+
+export const SkipPageSchema = z.object({
+  pageNum: PageNumberSchema,
+  reason: z.string().max(500).optional(),
+});
+
+export type SkipPageDto = z.infer<typeof SkipPageSchema>;
+
+export const WizardProgressResponseSchema = z.object({
+  currentPage: z.number(),
+  completedPages: z.array(z.number()),
+  skippedPages: z.array(z.number()),
+  startedAt: z.string().nullable(),
+  completedAt: z.string().nullable(),
+  status: z.string(),
+  percentComplete: z.number(),
+  canSubmitForReview: z.boolean(),
+  blockers: z.array(z.string()),
+});
+
+export type WizardProgressResponseDto = z.infer<typeof WizardProgressResponseSchema>;
