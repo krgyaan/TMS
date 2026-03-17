@@ -32,7 +32,7 @@ export class WoBasicDetailsService {
             receiptPreGst: data.receiptPreGst ?? null,
             budgetPreGst: data.budgetPreGst ?? null,
             grossMargin: data.grossMargin ?? null,
-            wo_draft: data.wo_draft ?? null,
+            woDraft: data.woDraft ?? null,
             teChecklistConfirmed: data.teChecklistConfirmed ?? false,
             tmsDocuments: data.tmsDocuments ?? null,
             isWorkflowPaused: false,
@@ -54,7 +54,7 @@ export class WoBasicDetailsService {
         if (data.receiptPreGst !== undefined) out.receiptPreGst = data.receiptPreGst;
         if (data.budgetPreGst !== undefined) out.budgetPreGst = data.budgetPreGst;
         if (data.grossMargin !== undefined) out.grossMargin = data.grossMargin;
-        if (data.wo_draft !== undefined) out.wo_draft = data.wo_draft;
+        if (data.woDraft !== undefined) out.woDraft = data.woDraft;
         if (data.teChecklistConfirmed !== undefined) out.teChecklistConfirmed = data.teChecklistConfirmed;
         if (data.tmsDocuments !== undefined) out.tmsDocuments = data.tmsDocuments;
 
@@ -76,7 +76,7 @@ export class WoBasicDetailsService {
             receiptPreGst: row.receiptPreGst,
             budgetPreGst: row.budgetPreGst,
             grossMargin: row.grossMargin,
-            wo_draft: row.wo_draft,
+            woDraft: row.woDraft,
             tmsDocuments: row.tmsDocuments,
             oeFirst: row.oeFirst,
             oeFirstAssignedAt: row.oeFirstAssignedAt,
@@ -174,20 +174,6 @@ export class WoBasicDetailsService {
         }
         if (filters?.isWorkflowPaused !== undefined) {
             conditions.push(eq(woBasicDetails.isWorkflowPaused, filters.isWorkflowPaused));
-        }
-
-        // Date range filters
-        if (filters?.woDateFrom) {
-            conditions.push(gte(woBasicDetails.woDate, filters.woDateFrom));
-        }
-        if (filters?.woDateTo) {
-            conditions.push(lte(woBasicDetails.woDate, filters.woDateTo));
-        }
-        if (filters?.createdAtFrom) {
-            conditions.push(gte(woBasicDetails.createdAt, new Date(filters.createdAtFrom)));
-        }
-        if (filters?.createdAtTo) {
-            conditions.push(lte(woBasicDetails.createdAt, new Date(filters.createdAtTo)));
         }
 
         const whereClause = conditions.length > 0 ? and(...conditions) : undefined;

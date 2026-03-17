@@ -32,7 +32,7 @@ export const woBasicDetails = pgTable("wo_basic_details", {
     grossMargin: numeric("gross_margin", { precision: 5, scale: 2 }), // Calculated: ((Receipt-Budget)/Receipt) * 100
 
     // Document upload
-    wo_draft: varchar("image", { length: 255 }), // Upload LOA/GEM PO/LOI/Draft WO document path
+    woDraft: varchar("wo_draft", { length: 255 }), // Upload LOA/GEM PO/LOI/Draft WO document path
 
     // Checklist and TMS Documents
     tmsDocuments: jsonb("tms_documents"), // Stores document completeness status as JSON
@@ -57,8 +57,10 @@ export const woBasicDetails = pgTable("wo_basic_details", {
     workflowResumedAt: timestamp("workflow_resumed_at", { withTimezone: true }), // When edited PO uploaded and workflow resumed
 
     // Audit timestamps
-    createdAt: timestamp("created_at", { withTimezone: true }), // When TE created the basic details
-    updatedAt: timestamp("updated_at", { withTimezone: true }), // Last update timestamp
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(), // When TE created the basic details
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(), // Last update timestamp
+    createdBy: bigint("created_by", { mode: "number" }), // TE who created
+    updatedBy: bigint("updated_by", { mode: "number" }),
 });
 
 /**
@@ -68,72 +70,269 @@ export const woBasicDetails = pgTable("wo_basic_details", {
  * Includes contractual terms (LD, PBG, agreements) and triggers WO Acceptance workflow.
  * Email sent to TL and CEO with PSS and WO Dashboard Link once filled.
  */
-export const woDetails = pgTable("wo_details",{
-        id: bigserial("id", { mode: "number" }).primaryKey(),
-        woBasicDetailId: bigint("wo_basic_detail_id", { mode: "number" }), // FK to woBasicDetails
+export const woDetails = pgTable("wo_details", {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    woBasicDetailId: bigint("wo_basic_detail_id", { mode: "number" }).notNull()
+        .references(() => woBasicDetails.id, { onDelete: "cascade" }),
 
-        // Liquidated Damages (LD) configuration
-        ldApplicable: boolean("ld_applicable").default(true), // Whether LD clause applies
-        maxLd: numeric("max_ld", { precision: 5, scale: 2 }), // Maximum LD percentage (if LD applicable)
-        ldStartDate: date("ld_start_date"), // Date from which LD calculation starts
-        maxLdDate: date("max_ld_date"), // Maximum date until which LD can be charged
+    // PAGE 1: Project Handover
+    tenderDocumentsChecklist: jsonb("tender_documents_checklist").$type<{
+        completeTenderDocuments: boolean;
+        tenderInfo: boolean;
+        emdInformation: boolean;
+        physicalDocumentsSubmission: boolean;
+        rfqAndQuotation: boolean;
+        documentChecklist: boolean;
+        costingSheet: boolean;
+        result: boolean;
+    }>(),
+    checklistCompletedAt: timestamp("checklist_completed_at", { withTimezone: true }),
+    checklistIncompleteNotifiedAt: timestamp("checklist_incomplete_notified_at", { withTimezone: true }),
 
-        // Performance Bank Guarantee (PBG) configuration
-        isPbgApplicable: boolean("is_pbg_applicable").notNull().default(false), // Whether PBG required
-        filledBgFormat: varchar("filled_bg_format", { length: 255 }), // Upload filled BG format (if PBG = Yes)
+    // PAGE 2: Compliance Obligations
+    ldApplicable: boolean("ld_applicable").default(false),
+    maxLd: numeric("max_ld", { precision: 5, scale: 2 }),
+    ldStartDate: date("ld_start_date"),
+    maxLdDate: date("max_ld_date"),
 
-        // Contract Agreement configuration
-        isContractAgreement: boolean("is_contract_agreement").notNull().default(false), // Whether contract agreement needed
-        contractAgreementFormat: varchar("contract_agreement_format", { length: 255 }), // Upload contract agreement format
+    isPbgApplicable: boolean("is_pbg_applicable").default(false),
+    filledBgFormat: varchar("filled_bg_format", { length: 255 }),
+    pbgBgId: bigint("pbg_bg_id", { mode: "number" }),
 
-        // Budget validation
-        budgetPreGst: numeric("budget_pre_gst", { precision: 20, scale: 2 }), // Auto-filled from Pricing Module (TMS) or manual
+    isContractAgreement: boolean("is_contract_agreement").default(false),
+    contractAgreementFormat: varchar("contract_agreement_format", { length: 255 }),
 
-        // ============================================
-        // WO ACCEPTANCE FORM FIELDS (TL Step)
-        // ============================================
-        // TL reviews complete project summary and either accepts or requests amendments
-        woAcceptance: boolean("wo_acceptance").default(false), // Whether TL has accepted the WO
-        woAcceptanceAt: timestamp("wo_acceptance_at", { withTimezone: true }), // When TL accepted
-        woAmendmentNeeded: boolean("wo_amendment_needed").default(false), // Whether PO edits required from client
+    detailedPoApplicable: boolean("detailed_po_applicable").default(false),
+    detailedPoFollowupId: bigint("detailed_po_followup_id", { mode: "number" }),
 
-        // If amendment needed, followup is initiated using client contacts from woContacts
-        followupId: bigint("followup_id", { mode: "number" }), // Reference to followup entry in Followup Dashboard
-        courierId: bigint("couried_id", { mode: "number" }), // Reference to courier entry for sending signed WO
+    // PAGE 3: SWOT Analysis
+    swotStrengths: text("swot_strengths"),
+    swotWeaknesses: text("swot_weaknesses"),
+    swotOpportunities: text("swot_opportunities"),
+    swotThreats: text("swot_threats"),
+    swotCompletedAt: timestamp("swot_completed_at", { withTimezone: true }),
 
-        // TL Timeline Management (SLA: 24hrs for queries, 24hrs for TE/OE response, 12hrs for final decision)
-        tlId: bigint("tl_id", { mode: "number" }), // Team Leader who reviews and accepts/rejects
-        tlQueryRaisedAt: timestamp("tl_query_raised_at", { withTimezone: true }), // When TL raised queries to TE/OE (24hr deadline)
-        tlFinalDecisionAt: timestamp("tl_final_decision_at", { withTimezone: true }), // When TL made final accept/edit decision (12hr after response)
+    // PAGE 4: Billing (BOQ in separate tables)
+    // References: woBillingBoq, woBuybackBoq, woBillingAddresses, woShippingAddresses
 
-        // Record status
-        status: boolean("status").notNull().default(true), // Active/Inactive flag
-        createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-        updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
-    },
-    table => ([{basicIdx: index("idx_wo_basic_detail_id").on(table.woBasicDetailId)}])
-);
+    // PAGE 5: Project Execution
+    siteVisitNeeded: boolean("site_visit_needed").default(false),
+    siteVisitPersonName: varchar("site_visit_person_name", { length: 255 }),
+    siteVisitPersonPhone: varchar("site_visit_person_phone", { length: 20 }),
+    siteVisitPersonEmail: varchar("site_visit_person_email", { length: 255 }),
+    siteVisitApproved: boolean("site_visit_approved"),
+    siteVisitApprovedBy: bigint("site_visit_approved_by", { mode: "number" }),
+    siteVisitApprovedAt: timestamp("site_visit_approved_at", { withTimezone: true }),
 
+    // PAGE 6: Profitability
+    costingSheetLink: varchar("costing_sheet_link", { length: 500 }),
+    hasDiscrepancies: boolean("has_discrepancies").default(false),
+    discrepancyComments: text("discrepancy_comments"),
+    discrepancyNotifiedAt: timestamp("discrepancy_notified_at", { withTimezone: true }),
+
+    budgetPreGst: numeric("budget_pre_gst", { precision: 20, scale: 2 }),
+    budgetSupply: numeric("budget_supply", { precision: 20, scale: 2 }),
+    budgetService: numeric("budget_service", { precision: 20, scale: 2 }),
+    budgetFreight: numeric("budget_freight", { precision: 20, scale: 2 }),
+    budgetAdmin: numeric("budget_admin", { precision: 20, scale: 2 }),
+    budgetBuybackSale: numeric("budget_buyback_sale", { precision: 20, scale: 2 }),
+
+    // ===========================================
+    // Wizard Progress (OE's 6 pages)
+    // ===========================================
+    currentPage: integer("current_page").default(1),
+    completedPages: jsonb("completed_pages").$type<number[]>().default([]),
+    skippedPages: jsonb("skipped_pages").$type<number[]>().default([]),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    deadlineAt: timestamp("deadline_at", { withTimezone: true }), // 96 hours
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    isOverdue: boolean("is_overdue").default(false),
+
+    // ===========================================
+    // OE Workflow Status
+    // ===========================================
+    status: varchar("status", { length: 50 }).default('draft'),
+    // Enum: 'draft' | 'in_progress' | 'completed' | 'submitted_for_review'
+
+    // ===========================================
+    // Audit
+    // ===========================================
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    createdBy: bigint("created_by", { mode: "number" }), // OE
+    updatedBy: bigint("updated_by", { mode: "number" }),
+}, (table) => ({
+    basicIdx: index("idx_wo_details_basic_detail").on(table.woBasicDetailId),
+    statusIdx: index("idx_wo_details_status").on(table.status),
+}));
+
+// ============================================
+// WO Acceptance Table (TL Workflow)
+// ============================================
 /**
- * WO Amendments Table
- * ===================
- * Stores amendment requests when TL identifies issues in WO that need client correction.
- * Multiple amendments can be requested per WO. Each amendment tracks specific clause changes.
- * Initiates followup workflow when woAmendmentNeeded = true in woDetails.
+ * WO Acceptance Table
+ * ====================
+ * Separate workflow for Team Leader (TL) to review and accept/reject WO.
+ * Created automatically when OE completes all pages (or manually by TL).
+ *
+ * TL Workflow:
+ * 1. TL reviews PSS (Project Summary Sheet) and WO Dashboard
+ * 2. TL has 24hrs to raise queries to TE/OE
+ * 3. TE/OE has 24hrs to respond
+ * 4. TL has 12hrs for final decision (Accept or Request Amendment)
+ *
+ * If Accepted:
+ * - OE puts digital signature on WO
+ * - TL puts digital signature on WO
+ * - Authority letter generated
+ * - Courier request initiated (dormant until TL accepts)
+ *
+ * If Amendment Needed:
+ * - Amendments recorded in woAmendments table
+ * - Followup initiated with client
+ * - Workflow paused until amended WO received
  */
+export const woAcceptance = pgTable("wo_acceptance", {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    woDetailId: bigint("wo_detail_id", { mode: "number" }).notNull().unique()
+        .references(() => woDetails.id, { onDelete: "cascade" }),
+
+    tlId: bigint("tl_id", { mode: "number" }).notNull(), // Team Leader assigned for review
+    tlAssignedAt: timestamp("tl_assigned_at", { withTimezone: true }).notNull().defaultNow(),
+    tlAssignedBy: bigint("tl_assigned_by", { mode: "number" }), // Who assigned (could be auto or manual)
+
+    queryRaisedAt: timestamp("query_raised_at", { withTimezone: true }), // When TL raised queries
+    queryRespondedAt: timestamp("query_responded_at", { withTimezone: true }), // When TE/OE responded
+    finalDecisionAt: timestamp("final_decision_at", { withTimezone: true }), // When TL made decision
+    decision: varchar("decision", { length: 50 }),
+    // Enum: 'pending' | 'queries_raised' | 'accepted' | 'amendment_needed' | 'rejected'
+    decisionRemarks: text("decision_remarks"), // TL's remarks on decision
+
+    // Amendment Flow (if decision = 'amendment_needed')
+    followupId: bigint("followup_id", { mode: "number" }), // FK to Followup Dashboard
+    followupInitiatedAt: timestamp("followup_initiated_at", { withTimezone: true }),
+
+    // Amended WO received
+    amendedWoReceivedAt: timestamp("amended_wo_received_at", { withTimezone: true }),
+    amendedWoFilePath: varchar("amended_wo_file_path", { length: 500 }),
+
+    // Re-review after amendment
+    reReviewCount: integer("re_review_count").default(0), // How many times re-reviewed
+
+    // Acceptance Flow (if decision = 'accepted')
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+
+    // Digital Signatures
+    oeSignatureRequired: boolean("oe_signature_required").default(true),
+    oeSignedAt: timestamp("oe_signed_at", { withTimezone: true }),
+    oeSignedBy: bigint("oe_signed_by", { mode: "number" }),
+    oeSignatureFilePath: varchar("oe_signature_file_path", { length: 500 }),
+
+    tlSignatureRequired: boolean("tl_signature_required").default(true),
+    tlSignedAt: timestamp("tl_signed_at", { withTimezone: true }),
+    tlSignedBy: bigint("tl_signed_by", { mode: "number" }),
+    tlSignatureFilePath: varchar("tl_signature_file_path", { length: 500 }),
+
+    // Authority Letter (auto-generated)
+    authorityLetterGenerated: boolean("authority_letter_generated").default(false),
+    authorityLetterPath: varchar("authority_letter_path", { length: 500 }),
+    authorityLetterGeneratedAt: timestamp("authority_letter_generated_at", { withTimezone: true }),
+
+    // Final Signed WO
+    signedWoFilePath: varchar("signed_wo_file_path", { length: 500 }),
+    signedWoUploadedAt: timestamp("signed_wo_uploaded_at", { withTimezone: true }),
+    signedWoUploadedBy: bigint("signed_wo_uploaded_by", { mode: "number" }),
+
+    // Courier Flow
+    courierRequired: boolean("courier_required").default(true),
+    courierId: bigint("courier_id", { mode: "number" }), // FK to Courier table
+    courierRequestCreatedAt: timestamp("courier_request_created_at", { withTimezone: true }),
+    courierRequestCreatedBy: bigint("courier_request_created_by", { mode: "number" }),
+
+    // Workflow Status
+    status: varchar("status", { length: 50 }).default('pending_review'),
+    // Enum: 'pending_review' | 'in_review' | 'queries_pending' | 'awaiting_amendment' |
+    //       'pending_signatures' | 'pending_courier' | 'completed'
+
+    isCompleted: boolean("is_completed").default(false),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+
+    // Audit
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    createdBy: bigint("created_by", { mode: "number" }),
+    updatedBy: bigint("updated_by", { mode: "number" }),
+}, (table) => ({
+    woDetailIdx: index("idx_wo_acceptance_wo_detail").on(table.woDetailId),
+    tlIdx: index("idx_wo_acceptance_tl").on(table.tlId),
+    statusIdx: index("idx_wo_acceptance_status").on(table.status),
+    decisionIdx: index("idx_wo_acceptance_decision").on(table.decision),
+}));
+
+// ============================================
+// WO Amendments Table (Updated - references woAcceptance)
+// ============================================
 export const woAmendments = pgTable("wo_amendments", {
     id: bigserial("id", { mode: "number" }).primaryKey(),
-    woDetailId: bigint("wo_detail_id", { mode: "number" }), // FK to woDetails
+    woAcceptanceId: bigint("wo_acceptance_id", { mode: "number" }).notNull()
+        .references(() => woAcceptance.id, { onDelete: "cascade" }), // Changed from woDetailId
 
-    // Amendment details - identifies exact location and changes needed
-    pageNo: varchar("page_no", { length: 100 }), // Page number in WO document
-    clauseNo: varchar("clause_no", { length: 100 }), // Clause/section number
-    currentStatement: text("current_statement"), // Current text in WO (what client wrote)
-    correctedStatement: text("corrected_statement"), // Proposed correction (what should be)
+    // Amendment details
+    pageNo: varchar("page_no", { length: 100 }),
+    clauseNo: varchar("clause_no", { length: 100 }),
+    currentStatement: text("current_statement"),
+    correctedStatement: text("corrected_statement"),
 
-    createdAt: timestamp("created_at", { withTimezone: true }), // When amendment was requested
-    updatedAt: timestamp("updated_at", { withTimezone: true }),
-});
+    // Amendment status tracking
+    status: varchar("status", { length: 50 }).default('pending'),
+    // Enum: 'pending' | 'communicated' | 'client_acknowledged' | 'resolved' | 'rejected_by_client'
+
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    clientResponse: text("client_response"),
+
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    createdBy: bigint("created_by", { mode: "number" }), // TL who created
+}, (table) => ({
+    woAcceptanceIdx: index("idx_wo_amendments_acceptance").on(table.woAcceptanceId),
+    statusIdx: index("idx_wo_amendments_status").on(table.status),
+}));
+
+// ============================================
+// WO Queries Table (Updated - references woAcceptance)
+// ============================================
+export const woQueries = pgTable("wo_queries", {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    woAcceptanceId: bigint("wo_acceptance_id", { mode: "number" }).notNull()
+        .references(() => woAcceptance.id, { onDelete: "cascade" }), // Changed from woDetailId
+
+    // Query metadata
+    queryBy: bigint("query_by", { mode: "number" }).notNull(), // TL user ID
+    queryTo: varchar("query_to", { length: 50 }).notNull(), // 'TE' | 'OE' | 'BOTH'
+    queryToUserIds: jsonb("query_to_user_ids").$type<number[]>(), // Actual user IDs
+    queryText: text("query_text").notNull(),
+    queryRaisedAt: timestamp("query_raised_at", { withTimezone: true }).notNull().defaultNow(),
+
+    // Response tracking
+    responseText: text("response_text"),
+    respondedBy: bigint("responded_by", { mode: "number" }),
+    respondedAt: timestamp("responded_at", { withTimezone: true }),
+
+    // Deadline tracking
+    responseDeadlineAt: timestamp("response_deadline_at", { withTimezone: true }), // 24 hrs from query
+    isOverdue: boolean("is_overdue").default(false),
+
+    // Query lifecycle
+    status: varchar("status", { length: 50 }).default('pending'),
+    // Enum: 'pending' | 'responded' | 'closed' | 'escalated'
+
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+    woAcceptanceIdx: index("idx_wo_queries_acceptance").on(table.woAcceptanceId),
+    statusIdx: index("idx_wo_queries_status").on(table.status),
+    queryByIdx: index("idx_wo_queries_by").on(table.queryBy),
+}));
 
 /**
  * WO Documents Table
@@ -150,7 +349,9 @@ export const woDocuments = pgTable("wo_documents", {
   type: varchar("type", { length: 50 }), // Enum: 'draftWo' | 'acceptedWoSigned' | 'finalWo' | 'detailedWo' | 'sapPo' | 'foa'
   version: integer("version"), // Version number (for tracking amendments)
   filePath: varchar("file_path", { length: 500 }), // Storage path of uploaded document
-  uploadedAt: timestamp("uploaded_at", { withTimezone: true }).defaultNow() // Upload timestamp
+
+  uploadedAt: timestamp("uploaded_at", { withTimezone: true }).notNull().defaultNow(),
+  uploadedBy: bigint("uploaded_by", { mode: "number" }), // Who uploaded
 });
 
 /**
@@ -176,36 +377,130 @@ export const woContacts = pgTable("wo_contacts", {
     email: varchar("email", { length: 255 }), // Contact email (used for followups)
 });
 
-/**
- * WO Queries Table
- * ================
- * Tracks TL queries to TE/OE during WO Acceptance phase.
- * Timeline: TL has 24hrs to raise queries, TE/OE has 24hrs to respond, TL has 12hrs for final decision.
- * TL can query TE, OE, or both simultaneously.
- */
-export const woQueries = pgTable("wo_queries", {
+// ============================================
+// WO Billing BOQ Table
+// ============================================
+export const woBillingBoq = pgTable("wo_billing_boq", {
     id: bigserial("id", { mode: "number" }).primaryKey(),
-    woDetailId: bigint("wo_detail_id", { mode: "number" }).notNull(), // FK to woDetails
+    woDetailId: bigint("wo_detail_id", { mode: "number" }).notNull()
+        .references(() => woDetails.id, { onDelete: "cascade" }),
 
-    // Query metadata
-    queryBy: bigint("query_by", { mode: "number" }).notNull(), // TL user ID who raised the query
-    queryTo: varchar("query_to", { length: 50 }).notNull(), // Target: 'TE' | 'OE' | 'BOTH' (comma-separated user IDs)
-    queryText: text("query_text").notNull(), // Query content/question
-    queryRaisedAt: timestamp("query_raised_at", { withTimezone: true }).notNull().defaultNow(), // When query was raised
+    srNos: jsonb("sr_nos").$type<number[] | 'all'>().notNull(),
 
-    // Response tracking
-    responseText: text("response_text"), // TE/OE response to the query
-    respondedBy: bigint("responded_by", { mode: "number" }), // User ID who responded
-    respondedAt: timestamp("responded_at", { withTimezone: true }), // Response timestamp
+    itemDescription: text("item_description").notNull(),
+    quantity: numeric("quantity", { precision: 20, scale: 2 }).notNull(),
+    rate: numeric("rate", { precision: 20, scale: 2 }).notNull(),
+    amount: numeric("amount", { precision: 20, scale: 2 }), // Calculated: quantity * rate
 
-    // Query lifecycle
-    status: varchar("status", { length: 50 }).default('pending'), // Enum: 'pending' | 'responded' | 'closed'
+    sortOrder: integer("sort_order"), // For drag-drop reordering
+
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+    index("idx_billing_boq_wo_detail").on(table.woDetailId),
+    index("idx_billing_boq_sort_order").on(table.sortOrder),
+]);
 
 // ============================================
-// TypeScript Type Exports
+// WO Buyback BOQ Table
 // ============================================
+export const woBuybackBoq = pgTable("wo_buyback_boq", {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    woDetailId: bigint("wo_detail_id", { mode: "number" }).notNull()
+        .references(() => woDetails.id, { onDelete: "cascade" }),
+
+    srNos: jsonb("sr_nos").$type<number[] | 'all'>().notNull(),
+    itemDescription: text("item_description").notNull(),
+    quantity: numeric("quantity", { precision: 20, scale: 2 }).notNull(),
+    rate: numeric("rate", { precision: 20, scale: 2 }).notNull(),
+    amount: numeric("amount", { precision: 20, scale: 2 }),
+
+    sortOrder: integer("sort_order"),
+
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+    index("idx_buyback_boq_wo_detail").on(table.woDetailId),
+]);
+
+// ============================================
+// WO Billing Addresses Table
+// ============================================
+export const woBillingAddresses = pgTable("wo_billing_addresses", {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    woDetailId: bigint("wo_detail_id", { mode: "number" }).notNull()
+        .references(() => woDetails.id, { onDelete: "cascade" }),
+
+    srNos: jsonb("sr_nos").$type<number[] | 'all'>().notNull(), // Array of SR nos or 'all'
+    customerName: varchar("customer_name", { length: 255 }).notNull(),
+    address: text("address").notNull(),
+    gst: varchar("gst", { length: 15 }), // GST number format: 15 chars
+
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+    woDetailIdx: index("idx_billing_addr_wo_detail").on(table.woDetailId),
+}));
+
+// ============================================
+// WO Shipping Addresses Table
+// ============================================
+export const woShippingAddresses = pgTable("wo_shipping_addresses", {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    woDetailId: bigint("wo_detail_id", { mode: "number" }).notNull()
+        .references(() => woDetails.id, { onDelete: "cascade" }),
+
+    srNos: jsonb("sr_nos").$type<number[] | 'all'>().notNull(),
+    customerName: varchar("customer_name", { length: 255 }).notNull(),
+    address: text("address").notNull(),
+    gst: varchar("gst", { length: 15 }),
+
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+    woDetailIdx: index("idx_shipping_addr_wo_detail").on(table.woDetailId),
+}));
+
+// ============================================
+// WO Document Approvals Table (Page 5)
+// ============================================
+export const woDocumentApprovals = pgTable("wo_document_approvals", {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    woDetailId: bigint("wo_detail_id", { mode: "number" }).notNull()
+        .references(() => woDetails.id, { onDelete: "cascade" }),
+
+    documentName: varchar("document_name", { length: 255 }).notNull(),
+    documentType: varchar("document_type", { length: 50 }).notNull(),
+    // Enum: 'available' | 'needed' | 'in_house'
+
+    filePath: varchar("file_path", { length: 500 }),
+    status: varchar("status", { length: 50 }).default('pending'),
+    // Enum: 'pending' | 'uploaded' | 'approved' | 'rejected'
+
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+    woDetailIdx: index("idx_doc_approvals_wo_detail").on(table.woDetailId),
+    typeIdx: index("idx_doc_approvals_type").on(table.documentType),
+}));
+
+// ============================================
+// Type Exports
+// ============================================
+export type WoBillingBoq = typeof woBillingBoq.$inferSelect;
+export type NewWoBillingBoq = typeof woBillingBoq.$inferInsert;
+
+export type WoBuybackBoq = typeof woBuybackBoq.$inferSelect;
+export type NewWoBuybackBoq = typeof woBuybackBoq.$inferInsert;
+
+export type WoBillingAddress = typeof woBillingAddresses.$inferSelect;
+export type NewWoBillingAddress = typeof woBillingAddresses.$inferInsert;
+
+export type WoShippingAddress = typeof woShippingAddresses.$inferSelect;
+export type NewWoShippingAddress = typeof woShippingAddresses.$inferInsert;
+
+export type WoDocumentApproval = typeof woDocumentApprovals.$inferSelect;
+export type NewWoDocumentApproval = typeof woDocumentApprovals.$inferInsert;
 
 export type WoBasicDetails = typeof woBasicDetails.$inferSelect;
 export type NewWoBasicDetails = typeof woBasicDetails.$inferInsert;
@@ -216,11 +511,14 @@ export type NewWoDetail = typeof woDetails.$inferInsert;
 export type WoContact = typeof woContacts.$inferSelect;
 export type NewWoContact = typeof woContacts.$inferInsert;
 
-export type WoAmendment = typeof woAmendments.$inferSelect;
-export type NewWoAmendment = typeof woAmendments.$inferInsert;
-
 export type WoDocument = typeof woDocuments.$inferSelect;
 export type NewWoDocument = typeof woDocuments.$inferInsert;
+
+export type WoAcceptance = typeof woAcceptance.$inferSelect;
+export type NewWoAcceptance = typeof woAcceptance.$inferInsert;
+
+export type WoAmendment = typeof woAmendments.$inferSelect;
+export type NewWoAmendment = typeof woAmendments.$inferInsert;
 
 export type WoQuery = typeof woQueries.$inferSelect;
 export type NewWoQuery = typeof woQueries.$inferInsert;
