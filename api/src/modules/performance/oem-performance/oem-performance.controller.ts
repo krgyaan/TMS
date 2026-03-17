@@ -1,61 +1,56 @@
-// oem-performance.controller.ts
+import { Controller, Get, Query, UseGuards, BadRequestException, Inject } from "@nestjs/common";
 
-import { Controller, Get, Query } from "@nestjs/common";
-import { Public } from "@/modules/auth/decorators";
+import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
+import { PermissionGuard } from "@/modules/auth/guards/permission.guard";
+import { CanRead } from "@/modules/auth/decorators";
+import { WINSTON_MODULE_PROVIDER } from "nest-winston";
+import { Logger } from "winston";
+
 import { OemPerformanceService } from "./oem-performance.service";
-import type { OemPerformanceQueryDto } from "./zod/oem-performance.dto";
-import { OemPerformanceQuerySchema } from "./zod/oem-performance.dto";
-import { z } from "zod";
-import { ZodValidationPipe } from "nestjs-zod";
+import { oemPerformanceQuerySchema } from "./zod/oem-performance.dto";
 
 @Controller("performance/oem")
+// @UseGuards(JwtAuthGuard, PermissionGuard)
 export class OemPerformanceController {
-    constructor(private readonly service: OemPerformanceService) {}
+    constructor(
+        private readonly service: OemPerformanceService,
+        @Inject(WINSTON_MODULE_PROVIDER)
+        private readonly logger: Logger
+    ) {}
 
-    @Get()
-    healthCheck() {
-        return "OEM Performance API is running.";
+    /**
+     * GET /performance/oem?oem=1&fromDate=2024-01-01&toDate=2024-12-31
+     *
+     * Permission: read on "performance.oem" — adjust the module string
+     * to whatever key you register in your permissions table.
+     */
+
+    @Get("health")
+    async getHealth() {
+        this.logger.debug("This is the debug statement");
+        return {
+            status: "ok",
+            message: "The api is working",
+        };
     }
 
-    // @Public()
-    // @Get("summary")
-    // getSummary(@Query() q: unknown) {
-    //     console.log(q);
-    //     return this.service.getSummary(OemPerformanceQuerySchema.parse(q));
-    // }
+    @Get()
+    @CanRead("performance.oem")
+    async getOemPerformance(@Query() query: Record<string, string>) {
+        this.logger.debug({ message: "oem performance request made", query });
 
-    // @Public()
-    // @Get("tenders")
-    // getTenders(@Query() q: unknown) {
-    //     return this.service.getTenderList(OemPerformanceQuerySchema.parse(q));
-    // }
+        const parsed = oemPerformanceQuerySchema.safeParse({
+            oem: query.oem,
+            fromDate: query.fromDate,
+            toDate: query.toDate,
+        });
 
-    // @Public()
-    // @Get("not-allowed")
-    // getNotAllowed(@Query() q: unknown) {
-    //     return this.service.getNotAllowedTenders(OemPerformanceQuerySchema.parse(q));
-    // }
+        this.logger.debug({ message: "New Request Made.", parsed });
 
-    // @Public()
-    // @Get("rfqs")
-    // getRfqs(@Query() q: unknown) {
-    //     return this.service.getRfqsSent(OemPerformanceQuerySchema.parse(q));
-    // }
+        if (!parsed.success) {
+            throw new BadRequestException(parsed.error.flatten());
+        }
 
-    // @Public()
-    // @Get("trends")
-    // getTrends(@Query() q: unknown) {
-    //     return this.service.getTrends(OemPerformanceQuerySchema.parse(q));
-    // }
-
-    // @Public()
-    // @Get("scoring")
-    // getScoring(@Query() q: unknown) {
-    //     return this.service.getScoring(OemPerformanceQuerySchema.parse(q));
-    // }
-
-    @Get("outcomes")
-    getOemOutcomes(@Query(new ZodValidationPipe(OemPerformanceQuerySchema)) q: OemPerformanceQueryDto) {
-        return this.service.getOemOutcomes(q);
+        return this.service.getOemPerformance(parsed.data);
     }
 }
