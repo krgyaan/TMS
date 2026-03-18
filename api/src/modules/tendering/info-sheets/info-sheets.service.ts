@@ -9,8 +9,6 @@ import {
     tenderFinancialDocuments,
     type TenderInformation,
     type TenderClient,
-    type TenderTechnicalDocument,
-    type TenderFinancialDocument,
 } from '@db/schemas/tendering/tender-info-sheet.schema';
 import type { TenderInfoSheetPayload } from '@/modules/tendering/info-sheets/dto/info-sheet.dto';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
@@ -722,6 +720,29 @@ export class TenderInfoSheetsService {
 
             // Send email notification
             await this.sendInfoSheetFilledEmail(tenderId, result, changedBy);
+
+            const prevStatus = tender?.status ?? null;
+            let newStatus = prevStatus ?? 2;
+
+            if (prevStatus === 29) {
+                newStatus = 2;
+
+                await this.db
+                    .update(tenderInfos)
+                    .set({ status: newStatus, updatedAt: new Date() })
+                    .where(eq(tenderInfos.id, tenderId));
+            }
+
+            // Always track history
+            await this.tenderStatusHistoryService.trackStatusChange(
+                tenderId,
+                newStatus,
+                changedBy,
+                prevStatus,
+                prevStatus === 29
+                    ? 'Tender info sheet re-filled (was incomplete)'
+                    : 'Tender info sheet updated',
+            );
 
             return result;
         } catch (error: any) {
