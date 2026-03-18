@@ -110,12 +110,15 @@ export interface WoBasicDetail {
   woDraft: string | null;
   tmsDocuments: TmsDocuments | null;
   oeFirst: number | null;
+  oeFirstName: string | null;
   oeFirstAssignedAt: string | null;
   oeFirstAssignedBy: number | null;
   oeSiteVisit: number | null;
+  oeSiteVisitName: string | null;
   oeSiteVisitAssignedAt: string | null;
   oeSiteVisitAssignedBy: number | null;
   oeDocsPrep: number | null;
+  oeDocsPrepName: string | null;
   oeDocsPrepAssignedAt: string | null;
   oeDocsPrepAssignedBy: number | null;
   isWorkflowPaused: boolean;
@@ -176,6 +179,7 @@ export interface WoBasicDetailsFilters {
   projectCode?: string;
   projectName?: string;
   currentStage?: WorkflowStage;
+  status?: number[];
   oeFirst?: number;
   oeSiteVisit?: number;
   oeDocsPrep?: number;
