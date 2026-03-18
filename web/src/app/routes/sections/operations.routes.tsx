@@ -25,11 +25,10 @@ export default function OperationsRoutes() {
             <Route path="work-order/details/basic/create" element={<RouteWrapper><Basic_Details_Create /></RouteWrapper>} />
             <Route path="work-order/details/basic/:id/edit" element={<RouteWrapper><Basic_Details_Edit /></RouteWrapper>} />
             <Route path="work-order/details/basic/:id" element={<RouteWrapper><Basic_Details_Show /></RouteWrapper>} />
-
-            <Route path="work-order/details" element={<RouteWrapper><Wo_Details /></RouteWrapper>} />
-            <Route path="work-order/details/create/:woBasicDetailId" element={<RouteWrapper><Wo_Details_Create /></RouteWrapper>} />
-            <Route path="work-order/details/:id/edit" element={<RouteWrapper><Wo_Details_Edit /></RouteWrapper>} />
-            <Route path="work-order/details/:id" element={<RouteWrapper><Wo_Details_Show /></RouteWrapper>} />
+            <Route path="work-order/details/full" element={<RouteWrapper><Wo_Details /></RouteWrapper>} />
+            <Route path="work-order/details/full/create/:woBasicDetailId" element={<RouteWrapper><Wo_Details_Create /></RouteWrapper>} />
+            <Route path="work-order/details/full/:id/edit" element={<RouteWrapper><Wo_Details_Edit /></RouteWrapper>} />
+            <Route path="work-order/details/full/:id" element={<RouteWrapper><Wo_Details_Show /></RouteWrapper>} />
 
             <Route path="kick-off" element={<RouteWrapper><Operations_KickOff /></RouteWrapper>} />
             <Route path="contract-agreement" element={<RouteWrapper><Operations_ContractAgreement /></RouteWrapper>} />
