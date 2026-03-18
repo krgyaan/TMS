@@ -10,6 +10,14 @@ const formatCurrency = (amount: number) =>
         maximumFractionDigits: 0,
     }).format(amount);
 
+const formatDate = (date: string | Date) => {
+    return new Intl.DateTimeFormat("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+    }).format(new Date(date));
+};
+
 export function MetricCell({ data, strong = false }: { data: any; strong?: boolean }) {
     if (!data || data.count === 0) {
         return <TableCell className="text-center text-muted-foreground">·</TableCell>;
@@ -43,6 +51,7 @@ export function MetricCell({ data, strong = false }: { data: any; strong?: boole
                                     <div>
                                         {e.instrumentType} · {formatCurrency(e.value)}
                                     </div>
+                                    <div className="text-xs text-muted-foreground">{e.transferDate ? formatDate(e.transferDate) : "-"}</div>
                                 </div>
 
                                 <button
