@@ -1,19 +1,9 @@
-import {
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { eq, desc, asc, sql, and, gte, lte } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { woDocuments, woDetails } from '@db/schemas/operations';
-import type {
-  CreateWoDocumentDto,
-  UpdateWoDocumentDto,
-  CreateBulkWoDocumentsDto,
-  WoDocumentsQueryDto,
-  ReplaceDocumentDto,
-} from './dto/wo-documents.dto';
+import type { CreateWoDocumentDto, UpdateWoDocumentDto, CreateBulkWoDocumentsDto, ReplaceDocumentDto, WoDocumentsQueryDto, DocumentType } from './dto/wo-documents.dto';
 
 export type WoDocumentRow = typeof woDocuments.$inferSelect;
 
@@ -21,10 +11,7 @@ export type WoDocumentRow = typeof woDocuments.$inferSelect;
 export class WoDocumentsService {
   constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
 
-  // ============================================
   // MAPPING FUNCTIONS
-  // ============================================
-
   private mapRowToResponse(row: WoDocumentRow) {
     return {
       id: row.id,
@@ -32,44 +19,12 @@ export class WoDocumentsService {
       type: row.type,
       version: row.version,
       filePath: row.filePath,
-      uploadedAt: row.uploadedAt,
+      uploadedAt: row.uploadedAt.toISOString(),
+      uploadedBy: row.uploadedBy,
     };
   }
 
-  // ============================================
-  // HELPER FUNCTIONS
-  // ============================================
-
-  private async verifyWoDetailExists(woDetailId: number) {
-    const [detail] = await this.db
-      .select({ id: woDetails.id })
-      .from(woDetails)
-      .where(eq(woDetails.id, woDetailId))
-      .limit(1);
-
-    if (!detail) {
-      throw new NotFoundException(`WO Detail with ID ${woDetailId} not found`);
-    }
-  }
-
-  private async getNextVersion(woDetailId: number, type: string): Promise<number> {
-    const [latest] = await this.db
-      .select({ version: sql<number>`max(${woDocuments.version})` })
-      .from(woDocuments)
-      .where(
-        and(
-          eq(woDocuments.woDetailId, woDetailId),
-          eq(woDocuments.type, type),
-        ),
-      );
-
-    return (latest?.version ?? 0) + 1;
-  }
-
-  // ============================================
   // CRUD OPERATIONS
-  // ============================================
-
   async findAll(filters?: WoDocumentsQueryDto) {
     const page = filters?.page ?? 1;
     const limit = Math.min(Math.max(filters?.limit ?? 50, 1), 100);
@@ -77,7 +32,6 @@ export class WoDocumentsService {
     const sortOrder = filters?.sortOrder ?? 'desc';
     const sortBy = filters?.sortBy ?? 'uploadedAt';
 
-    // Determine order column
     const orderColumnMap: Record<string, any> = {
       uploadedAt: woDocuments.uploadedAt,
       version: woDocuments.version,
@@ -86,7 +40,6 @@ export class WoDocumentsService {
     const orderColumn = orderColumnMap[sortBy] ?? woDocuments.uploadedAt;
     const orderFn = sortOrder === 'desc' ? desc : asc;
 
-    // Build conditions
     const conditions: any[] = [];
 
     if (filters?.woDetailId) {
@@ -122,16 +75,13 @@ export class WoDocumentsService {
         .offset(offset),
     ]);
 
-    const total = countResult;
-    const data = rows.map((r) => this.mapRowToResponse(r));
-
     return {
-      data,
+      data: rows.map((r) => this.mapRowToResponse(r)),
       meta: {
-        total,
+        total: countResult,
         page,
         limit,
-        totalPages: Math.ceil(total / limit) || 1,
+        totalPages: Math.ceil(countResult / limit) || 1,
       },
     };
   }
@@ -144,124 +94,158 @@ export class WoDocumentsService {
       .limit(1);
 
     if (!row) {
-      throw new NotFoundException(`WO Document with ID ${id} not found`);
+      throw new NotFoundException(`Document with ID ${id} not found`);
     }
 
     return this.mapRowToResponse(row);
   }
 
   async findByWoDetailId(woDetailId: number) {
-    await this.verifyWoDetailExists(woDetailId);
-
     const rows = await this.db
       .select()
       .from(woDocuments)
       .where(eq(woDocuments.woDetailId, woDetailId))
-      .orderBy(asc(woDocuments.type), desc(woDocuments.version));
+      .orderBy(desc(woDocuments.uploadedAt));
 
     return rows.map((r) => this.mapRowToResponse(r));
   }
 
-  async findByType(woDetailId: number, type: string) {
-    await this.verifyWoDetailExists(woDetailId);
-
+  async findByType(woDetailId: number, type: DocumentType) {
     const rows = await this.db
       .select()
       .from(woDocuments)
       .where(
         and(
           eq(woDocuments.woDetailId, woDetailId),
-          eq(woDocuments.type, type),
-        ),
+          eq(woDocuments.type, type)
+        )
       )
       .orderBy(desc(woDocuments.version));
 
     return rows.map((r) => this.mapRowToResponse(r));
   }
 
-  async findLatestByType(woDetailId: number, type: string) {
-    await this.verifyWoDetailExists(woDetailId);
-
+  async findLatestByType(woDetailId: number, type: DocumentType) {
     const [row] = await this.db
       .select()
       .from(woDocuments)
       .where(
         and(
           eq(woDocuments.woDetailId, woDetailId),
-          eq(woDocuments.type, type),
-        ),
+          eq(woDocuments.type, type)
+        )
       )
       .orderBy(desc(woDocuments.version))
       .limit(1);
 
     if (!row) {
-      throw new NotFoundException(
-        `No document of type ${type} found for WO Detail ${woDetailId}`,
-      );
+      return null;
     }
 
     return this.mapRowToResponse(row);
   }
 
-  async getVersionHistory(woDetailId: number, type: string) {
-    await this.verifyWoDetailExists(woDetailId);
-
+  async getVersionHistory(woDetailId: number, type: DocumentType) {
     const rows = await this.db
       .select()
       .from(woDocuments)
       .where(
         and(
           eq(woDocuments.woDetailId, woDetailId),
-          eq(woDocuments.type, type),
-        ),
+          eq(woDocuments.type, type)
+        )
       )
       .orderBy(desc(woDocuments.version));
+
+    const latestVersion = rows.length > 0 ? rows[0].version : null;
 
     return {
       woDetailId,
       type,
       totalVersions: rows.length,
-      latestVersion: rows[0]?.version ?? null,
+      latestVersion,
       versions: rows.map((r) => this.mapRowToResponse(r)),
     };
   }
 
-  async upload(data: CreateWoDocumentDto) {
-    await this.verifyWoDetailExists(data.woDetailId);
+  async upload(data: CreateWoDocumentDto, userId?: number) {
+    // Verify WO Detail exists
+    const [detail] = await this.db
+      .select({ id: woDetails.id })
+      .from(woDetails)
+      .where(eq(woDetails.id, data.woDetailId))
+      .limit(1);
 
-    const version = data.version ?? await this.getNextVersion(data.woDetailId, data.type);
+    if (!detail) {
+      throw new NotFoundException(`WO Detail with ID ${data.woDetailId} not found`);
+    }
+
+    // Get latest version for this document type
+    const [latestVersion] = await this.db
+      .select({ version: sql<number>`max(${woDocuments.version})` })
+      .from(woDocuments)
+      .where(
+        and(
+          eq(woDocuments.woDetailId, data.woDetailId),
+          eq(woDocuments.type, data.type)
+        )
+      );
+
+    const newVersion = data.version ?? (latestVersion?.version ?? 0) + 1;
 
     const [row] = await this.db
       .insert(woDocuments)
       .values({
         woDetailId: data.woDetailId,
         type: data.type,
-        version,
+        version: newVersion,
         filePath: data.filePath,
         uploadedAt: new Date(),
+        uploadedBy: userId ?? null,
       })
       .returning();
 
     return this.mapRowToResponse(row!);
   }
 
-  async uploadBulk(data: CreateBulkWoDocumentsDto) {
-    await this.verifyWoDetailExists(data.woDetailId);
+  async uploadBulk(data: CreateBulkWoDocumentsDto, userId?: number) {
+    // Verify WO Detail exists
+    const [detail] = await this.db
+      .select({ id: woDetails.id })
+      .from(woDetails)
+      .where(eq(woDetails.id, data.woDetailId))
+      .limit(1);
+
+    if (!detail) {
+      throw new NotFoundException(`WO Detail with ID ${data.woDetailId} not found`);
+    }
 
     const now = new Date();
     const results: WoDocumentRow[] = [];
 
     for (const doc of data.documents) {
-      const version = doc.version ?? await this.getNextVersion(data.woDetailId, doc.type);
+      // Get latest version for this document type
+      const [latestVersion] = await this.db
+        .select({ version: sql<number>`max(${woDocuments.version})` })
+        .from(woDocuments)
+        .where(
+          and(
+            eq(woDocuments.woDetailId, data.woDetailId),
+            eq(woDocuments.type, doc.type)
+          )
+        );
+
+      const newVersion = doc.version ?? (latestVersion?.version ?? 0) + 1;
 
       const [row] = await this.db
         .insert(woDocuments)
         .values({
           woDetailId: data.woDetailId,
           type: doc.type,
-          version,
+          version: newVersion,
           filePath: doc.filePath,
           uploadedAt: now,
+          uploadedBy: userId ?? null,
         })
         .returning();
 
@@ -269,8 +253,8 @@ export class WoDocumentsService {
     }
 
     return {
-      uploaded: results.length,
-      data: results.map((r) => this.mapRowToResponse(r)),
+      count: results.length,
+      documents: results.map((r) => this.mapRowToResponse(r)),
     };
   }
 
@@ -279,6 +263,7 @@ export class WoDocumentsService {
 
     const updateValues: Record<string, unknown> = {};
 
+    if (data.type !== undefined) updateValues.type = data.type;
     if (data.version !== undefined) updateValues.version = data.version;
     if (data.filePath !== undefined) updateValues.filePath = data.filePath;
 
@@ -295,41 +280,28 @@ export class WoDocumentsService {
     return this.mapRowToResponse(row!);
   }
 
-  async replace(id: number, data: ReplaceDocumentDto) {
+  async replace(id: number, data: ReplaceDocumentDto, userId?: number) {
     const existing = await this.findById(id);
 
+    let newVersion = existing.version ?? 1;
     if (data.incrementVersion) {
-      // Create new version
-      const nextVersion = await this.getNextVersion(existing.woDetailId!, existing.type!);
-
-      const [row] = await this.db
-        .insert(woDocuments)
-        .values({
-          woDetailId: existing.woDetailId,
-          type: existing.type,
-          version: nextVersion,
-          filePath: data.filePath,
-          uploadedAt: new Date(),
-        })
-        .returning();
-
-      return {
-        previousVersion: existing,
-        newVersion: this.mapRowToResponse(row!),
-      };
-    } else {
-      // Replace existing
-      const [row] = await this.db
-        .update(woDocuments)
-        .set({
-          filePath: data.filePath,
-          uploadedAt: new Date(),
-        })
-        .where(eq(woDocuments.id, id))
-        .returning();
-
-      return this.mapRowToResponse(row!);
+      newVersion += 1;
     }
+
+    // Create new version
+    const [row] = await this.db
+      .insert(woDocuments)
+      .values({
+        woDetailId: existing.woDetailId!,
+        type: existing.type,
+        version: newVersion,
+        filePath: data.filePath,
+        uploadedAt: new Date(),
+        uploadedBy: userId ?? null,
+      })
+      .returning();
+
+    return this.mapRowToResponse(row!);
   }
 
   async delete(id: number): Promise<void> {
@@ -339,95 +311,91 @@ export class WoDocumentsService {
       .returning();
 
     if (!row) {
-      throw new NotFoundException(`WO Document with ID ${id} not found`);
+      throw new NotFoundException(`Document with ID ${id} not found`);
     }
   }
 
-  async deleteAllByWoDetail(woDetailId: number): Promise<void> {
-    await this.verifyWoDetailExists(woDetailId);
-
-    await this.db
+  async deleteAllByWoDetail(woDetailId: number): Promise<{ count: number }> {
+    const deleted = await this.db
       .delete(woDocuments)
-      .where(eq(woDocuments.woDetailId, woDetailId));
+      .where(eq(woDocuments.woDetailId, woDetailId))
+      .returning();
+
+    return { count: deleted.length };
   }
 
-  async deleteByType(woDetailId: number, type: string): Promise<void> {
-    await this.verifyWoDetailExists(woDetailId);
-
-    await this.db
+  async deleteByType(woDetailId: number, type: DocumentType): Promise<{ count: number }> {
+    const deleted = await this.db
       .delete(woDocuments)
       .where(
         and(
           eq(woDocuments.woDetailId, woDetailId),
-          eq(woDocuments.type, type),
-        ),
-      );
+          eq(woDocuments.type, type)
+        )
+      )
+      .returning();
+
+    return { count: deleted.length };
   }
 
-  // ============================================
-  // UTILITY OPERATIONS
-  // ============================================
-
-  async getDocumentsSummary(woDetailId: number) {
-    await this.verifyWoDetailExists(woDetailId);
-
-    const [summary] = await this.db
-      .select({
-        total: sql<number>`count(*)::int`,
-        draftWo: sql<number>`count(*) filter (where ${woDocuments.type} = 'draftWo')::int`,
-        acceptedWoSigned: sql<number>`count(*) filter (where ${woDocuments.type} = 'acceptedWoSigned')::int`,
-        finalWo: sql<number>`count(*) filter (where ${woDocuments.type} = 'finalWo')::int`,
-        detailedWo: sql<number>`count(*) filter (where ${woDocuments.type} = 'detailedWo')::int`,
-        sapPo: sql<number>`count(*) filter (where ${woDocuments.type} = 'sapPo')::int`,
-        foa: sql<number>`count(*) filter (where ${woDocuments.type} = 'foa')::int`,
-      })
-      .from(woDocuments)
-      .where(eq(woDocuments.woDetailId, woDetailId));
-
-    // Get latest versions per type
-    const latestVersions = await this.db
+  // SUMMARY/STATISTICS
+  async getSummary(woDetailId: number) {
+    const rows = await this.db
       .select({
         type: woDocuments.type,
+        count: sql<number>`count(*)::int`,
         latestVersion: sql<number>`max(${woDocuments.version})::int`,
       })
       .from(woDocuments)
       .where(eq(woDocuments.woDetailId, woDetailId))
       .groupBy(woDocuments.type);
 
+    const total = rows.reduce((sum, r) => sum + r.count, 0);
+    const byType: Record<string, number> = {};
+    const latestVersions: Array<{ type: string; version: number }> = [];
+
+    rows.forEach((r) => {
+      byType[r.type!] = r.count;
+      latestVersions.push({
+        type: r.type!,
+        version: r.latestVersion,
+      });
+    });
+
     return {
       woDetailId,
-      summary,
+      total,
+      byType,
       latestVersions,
     };
   }
 
-  async checkDocumentExists(woDetailId: number, type: string) {
-    const [existing] = await this.db
-      .select({ id: woDocuments.id, version: woDocuments.version })
+  async checkDocumentExists(woDetailId: number, type: DocumentType) {
+    const [result] = await this.db
+      .select({
+        count: sql<number>`count(*)::int`,
+        latestVersion: sql<number>`max(${woDocuments.version})::int`,
+      })
       .from(woDocuments)
       .where(
         and(
           eq(woDocuments.woDetailId, woDetailId),
-          eq(woDocuments.type, type),
-        ),
-      )
-      .orderBy(desc(woDocuments.version))
-      .limit(1);
+          eq(woDocuments.type, type)
+        )
+      );
 
     return {
-      exists: !!existing,
-      woDetailId,
-      type,
-      latestVersion: existing?.version ?? null,
+      exists: (result?.count ?? 0) > 0,
+      latestVersion: result?.latestVersion ?? null,
     };
   }
 
   async getOverviewStatistics() {
-    const [stats] = await this.db
+    const [overview] = await this.db
       .select({
         totalDocuments: sql<number>`count(*)::int`,
         totalWoDetails: sql<number>`count(distinct ${woDocuments.woDetailId})::int`,
-        avgVersionsPerType: sql<string>`round(avg(version)::numeric, 2)::text`,
+        avgVersionsPerType: sql<string>`round(avg(${woDocuments.version})::numeric, 2)::text`,
       })
       .from(woDocuments);
 
@@ -438,11 +406,10 @@ export class WoDocumentsService {
         avgVersion: sql<string>`round(avg(${woDocuments.version})::numeric, 2)::text`,
       })
       .from(woDocuments)
-      .groupBy(woDocuments.type)
-      .orderBy(desc(sql`count(*)`));
+      .groupBy(woDocuments.type);
 
     return {
-      overview: stats,
+      overview,
       byType,
       generatedAt: new Date().toISOString(),
     };
