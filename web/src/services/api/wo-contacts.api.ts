@@ -1,3 +1,5 @@
+// web/src/services/api/wo-contacts.api.ts
+
 import { BaseApiService } from './base.service';
 import type {
   WoContact,
@@ -5,7 +7,6 @@ import type {
   UpdateWoContactDto,
   CreateBulkWoContactsDto,
   WoContactsFilters,
-  ContactsSummary,
   PaginatedResult,
 } from '@/modules/operations/types/wo.types';
 
@@ -23,12 +24,9 @@ class WoContactsService extends BaseApiService {
     if (filters.limit) params.set('limit', String(filters.limit));
     if (filters.sortBy) params.set('sortBy', filters.sortBy);
     if (filters.sortOrder) params.set('sortOrder', filters.sortOrder);
-    if (filters.search) params.set('search', filters.search);
     if (filters.woBasicDetailId) params.set('woBasicDetailId', String(filters.woBasicDetailId));
-    if (filters.organization) params.set('organization', filters.organization);
     if (filters.departments) params.set('departments', filters.departments);
-    if (filters.name) params.set('name', filters.name);
-    if (filters.email) params.set('email', filters.email);
+    if (filters.search) params.set('search', filters.search);
 
     const queryString = params.toString();
     return queryString ? `?${queryString}` : '';
@@ -48,15 +46,15 @@ class WoContactsService extends BaseApiService {
   }
 
   async getByDepartment(woBasicDetailId: number, department: string): Promise<WoContact[]> {
-    return this.get<WoContact[]>(`/by-department/${woBasicDetailId}/${department}`);
+    return this.get<WoContact[]>(`/by-basic-detail/${woBasicDetailId}/department/${department}`);
   }
 
   async create(data: CreateWoContactDto): Promise<WoContact> {
     return this.post<WoContact>('', data);
   }
 
-  async createBulk(data: CreateBulkWoContactsDto): Promise<{ created: number; data: WoContact[] }> {
-    return this.post<{ created: number; data: WoContact[] }>('/bulk', data);
+  async createBulk(data: CreateBulkWoContactsDto): Promise<{ count: number; contacts: WoContact[] }> {
+    return this.post<{ count: number; contacts: WoContact[] }>('/bulk', data);
   }
 
   async update(id: number, data: UpdateWoContactDto): Promise<WoContact> {
@@ -67,18 +65,22 @@ class WoContactsService extends BaseApiService {
     return this.delete(`/${id}`);
   }
 
-  async removeAllByBasicDetail(woBasicDetailId: number): Promise<void> {
-    return this.delete(`/by-basic-detail/${woBasicDetailId}`);
+  async removeAllByBasicDetail(woBasicDetailId: number): Promise<{ count: number }> {
+    return this.delete<{ count: number }>(`/by-basic-detail/${woBasicDetailId}`);
   }
 
-  // Utility Operations
-  async checkEmailExists(email: string, woBasicDetailId?: number): Promise<{ exists: boolean; email: string }> {
-    const params = woBasicDetailId ? `?woBasicDetailId=${woBasicDetailId}` : '';
-    return this.get<{ exists: boolean; email: string }>(`/check-email/${email}${params}`);
+  // Utility
+  async getContactsSummary(woBasicDetailId: number): Promise<{
+    total: number;
+    byDepartment: Record<string, number>;
+  }> {
+    return this.get(`/by-basic-detail/${woBasicDetailId}/summary`);
   }
 
-  async getContactsSummary(woBasicDetailId: number): Promise<ContactsSummary> {
-    return this.get<ContactsSummary>(`/summary/${woBasicDetailId}`);
+  async checkEmailExists(email: string, woBasicDetailId?: number): Promise<{ exists: boolean }> {
+    const params = new URLSearchParams({ email });
+    if (woBasicDetailId) params.set('woBasicDetailId', String(woBasicDetailId));
+    return this.get(`/check-email?${params.toString()}`);
   }
 }
 

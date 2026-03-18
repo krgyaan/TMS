@@ -1,66 +1,29 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Param,
-  ParseIntPipe,
-  Patch,
-  Post,
-  Query,
-} from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import { WoDocumentsService } from './wo-documents.service';
-import {
-  CreateWoDocumentSchema,
-  UpdateWoDocumentSchema,
-  CreateBulkWoDocumentsSchema,
-  WoDocumentsQuerySchema,
-  ReplaceDocumentSchema,
-} from './dto/wo-documents.dto';
-import type {
-  CreateWoDocumentDto,
-  UpdateWoDocumentDto,
-  CreateBulkWoDocumentsDto,
-  WoDocumentsQueryDto,
-  ReplaceDocumentDto,
-} from './dto/wo-documents.dto';
+import { CreateWoDocumentSchema, UpdateWoDocumentSchema, CreateBulkWoDocumentsSchema, ReplaceDocumentSchema, WoDocumentsQuerySchema, DocumentTypeEnum } from './dto/wo-documents.dto';
+import type { CreateWoDocumentDto, UpdateWoDocumentDto, CreateBulkWoDocumentsDto, ReplaceDocumentDto, WoDocumentsQueryDto, DocumentType } from './dto/wo-documents.dto';
 
 @Controller('wo-documents')
 export class WoDocumentsController {
   constructor(private readonly woDocumentsService: WoDocumentsService) {}
 
-  // ============================================
-  // CRUD OPERATIONS
-  // ============================================
-
+  // CRUD
   @Get()
   async list(
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('sortBy') sortBy?: string,
     @Query('sortOrder') sortOrder?: 'asc' | 'desc',
-    @Query('woDetailId') woDetailId?: string,
-    @Query('type') type?: string,
-    @Query('version') version?: string,
-    @Query('uploadedFrom') uploadedFrom?: string,
-    @Query('uploadedTo') uploadedTo?: string,
   ) {
-    const rawFilters = {
-      page,
-      limit,
-      sortBy,
-      sortOrder,
-      woDetailId,
-      type,
-      version,
-      uploadedFrom,
-      uploadedTo,
-    };
+    const rawFilters = { page, limit, sortBy, sortOrder };
 
     const parsed = WoDocumentsQuerySchema.parse(rawFilters) as WoDocumentsQueryDto;
     return this.woDocumentsService.findAll(parsed);
+  }
+
+  @Get('statistics/overview')
+  async getOverviewStatistics() {
+    return this.woDocumentsService.getOverviewStatistics();
   }
 
   @Get(':id')
@@ -69,34 +32,49 @@ export class WoDocumentsController {
   }
 
   @Get('by-wo-detail/:woDetailId')
-  async getByWoDetailId(
-    @Param('woDetailId', ParseIntPipe) woDetailId: number,
-  ) {
+  async getByWoDetailId(@Param('woDetailId', ParseIntPipe) woDetailId: number) {
     return this.woDocumentsService.findByWoDetailId(woDetailId);
   }
 
-  @Get('by-type/:woDetailId/:type')
+  @Get('by-wo-detail/:woDetailId/type/:type')
   async getByType(
     @Param('woDetailId', ParseIntPipe) woDetailId: number,
     @Param('type') type: string,
   ) {
-    return this.woDocumentsService.findByType(woDetailId, type);
+    const parsedType = DocumentTypeEnum.parse(type) as DocumentType;
+    return this.woDocumentsService.findByType(woDetailId, parsedType);
   }
 
-  @Get('latest/:woDetailId/:type')
+  @Get('by-wo-detail/:woDetailId/type/:type/latest')
   async getLatestByType(
     @Param('woDetailId', ParseIntPipe) woDetailId: number,
     @Param('type') type: string,
   ) {
-    return this.woDocumentsService.findLatestByType(woDetailId, type);
+    const parsedType = DocumentTypeEnum.parse(type) as DocumentType;
+    return this.woDocumentsService.findLatestByType(woDetailId, parsedType);
   }
 
-  @Get('versions/:woDetailId/:type')
+  @Get('by-wo-detail/:woDetailId/type/:type/versions')
   async getVersionHistory(
     @Param('woDetailId', ParseIntPipe) woDetailId: number,
     @Param('type') type: string,
   ) {
-    return this.woDocumentsService.getVersionHistory(woDetailId, type);
+    const parsedType = DocumentTypeEnum.parse(type) as DocumentType;
+    return this.woDocumentsService.getVersionHistory(woDetailId, parsedType);
+  }
+
+  @Get('by-wo-detail/:woDetailId/type/:type/exists')
+  async checkDocumentExists(
+    @Param('woDetailId', ParseIntPipe) woDetailId: number,
+    @Param('type') type: string,
+  ) {
+    const parsedType = DocumentTypeEnum.parse(type) as DocumentType;
+    return this.woDocumentsService.checkDocumentExists(woDetailId, parsedType);
+  }
+
+  @Get('by-wo-detail/:woDetailId/summary')
+  async getSummary(@Param('woDetailId', ParseIntPipe) woDetailId: number) {
+    return this.woDocumentsService.getSummary(woDetailId);
   }
 
   @Post()
@@ -114,20 +92,14 @@ export class WoDocumentsController {
   }
 
   @Patch(':id')
-  async update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() body: unknown,
-  ) {
+  async update(@Param('id', ParseIntPipe) id: number, @Body() body: unknown) {
     const parsed = UpdateWoDocumentSchema.parse(body) as UpdateWoDocumentDto;
     return this.woDocumentsService.update(id, parsed);
   }
 
   @Post(':id/replace')
-  @HttpCode(HttpStatus.CREATED)
-  async replace(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() body: unknown,
-  ) {
+  @HttpCode(HttpStatus.OK)
+  async replace(@Param('id', ParseIntPipe) id: number, @Body() body: unknown) {
     const parsed = ReplaceDocumentSchema.parse(body) as ReplaceDocumentDto;
     return this.woDocumentsService.replace(id, parsed);
   }
@@ -139,43 +111,18 @@ export class WoDocumentsController {
   }
 
   @Delete('by-wo-detail/:woDetailId')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteAllByWoDetail(
-    @Param('woDetailId', ParseIntPipe) woDetailId: number,
-  ) {
-    await this.woDocumentsService.deleteAllByWoDetail(woDetailId);
+  @HttpCode(HttpStatus.OK)
+  async deleteAllByWoDetail(@Param('woDetailId', ParseIntPipe) woDetailId: number) {
+    return this.woDocumentsService.deleteAllByWoDetail(woDetailId);
   }
 
-  @Delete('by-type/:woDetailId/:type')
-  @HttpCode(HttpStatus.NO_CONTENT)
+  @Delete('by-wo-detail/:woDetailId/type/:type')
+  @HttpCode(HttpStatus.OK)
   async deleteByType(
     @Param('woDetailId', ParseIntPipe) woDetailId: number,
     @Param('type') type: string,
   ) {
-    await this.woDocumentsService.deleteByType(woDetailId, type);
-  }
-
-  // ============================================
-  // UTILITY OPERATIONS
-  // ============================================
-
-  @Get('summary/:woDetailId')
-  async getDocumentsSummary(
-    @Param('woDetailId', ParseIntPipe) woDetailId: number,
-  ) {
-    return this.woDocumentsService.getDocumentsSummary(woDetailId);
-  }
-
-  @Get('check-exists/:woDetailId/:type')
-  async checkDocumentExists(
-    @Param('woDetailId', ParseIntPipe) woDetailId: number,
-    @Param('type') type: string,
-  ) {
-    return this.woDocumentsService.checkDocumentExists(woDetailId, type);
-  }
-
-  @Get('statistics/overview')
-  async getOverviewStatistics() {
-    return this.woDocumentsService.getOverviewStatistics();
+    const parsedType = DocumentTypeEnum.parse(type) as DocumentType;
+    return this.woDocumentsService.deleteByType(woDetailId, parsedType);
   }
 }

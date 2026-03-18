@@ -7,8 +7,6 @@ import type {
   WoDocumentsFilters,
   CreateWoDocumentDto,
   UpdateWoDocumentDto,
-  CreateBulkWoDocumentsDto,
-  ReplaceDocumentDto,
   DocumentType,
 } from '@/modules/operations/types/wo.types';
 
@@ -30,9 +28,6 @@ export const woDocumentsKeys = {
   versions: (woDetailId: number, type: string) =>
     [...woDocumentsKeys.all, 'versions', woDetailId, type] as const,
   summary: (woDetailId: number) => [...woDocumentsKeys.all, 'summary', woDetailId] as const,
-  checkExists: (woDetailId: number, type: string) =>
-    [...woDocumentsKeys.all, 'check-exists', woDetailId, type] as const,
-  overviewStats: () => [...woDocumentsKeys.all, 'overview-stats'] as const,
 };
 
 // ============================================
@@ -50,7 +45,7 @@ export const useWoDocumentById = (id: number) => {
   return useQuery({
     queryKey: woDocumentsKeys.detail(id),
     queryFn: () => woDocumentsService.getById(id),
-    enabled: !!id,
+    enabled: !!id && id > 0,
   });
 };
 
@@ -58,7 +53,7 @@ export const useWoDocumentsByWoDetail = (woDetailId: number) => {
   return useQuery({
     queryKey: woDocumentsKeys.byWoDetail(woDetailId),
     queryFn: () => woDocumentsService.getByWoDetailId(woDetailId),
-    enabled: !!woDetailId,
+    enabled: !!woDetailId && woDetailId > 0,
   });
 };
 
@@ -90,22 +85,7 @@ export const useDocumentsSummary = (woDetailId: number) => {
   return useQuery({
     queryKey: woDocumentsKeys.summary(woDetailId),
     queryFn: () => woDocumentsService.getDocumentsSummary(woDetailId),
-    enabled: !!woDetailId,
-  });
-};
-
-export const useCheckDocumentExists = (woDetailId: number, type: DocumentType) => {
-  return useQuery({
-    queryKey: woDocumentsKeys.checkExists(woDetailId, type),
-    queryFn: () => woDocumentsService.checkDocumentExists(woDetailId, type),
-    enabled: !!woDetailId && !!type,
-  });
-};
-
-export const useDocumentsOverviewStatistics = () => {
-  return useQuery({
-    queryKey: woDocumentsKeys.overviewStats(),
-    queryFn: () => woDocumentsService.getOverviewStatistics(),
+    enabled: !!woDetailId && woDetailId > 0,
   });
 };
 
@@ -134,7 +114,8 @@ export const useUploadBulkWoDocuments = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: CreateBulkWoDocumentsDto) => woDocumentsService.uploadBulk(data),
+    mutationFn: (data: { woDetailId: number; documents: Omit<CreateWoDocumentDto, 'woDetailId'>[] }) =>
+      woDocumentsService.uploadBulk(data),
     onSuccess: (_, data) => {
       queryClient.invalidateQueries({ queryKey: woDocumentsKeys.all });
       queryClient.invalidateQueries({ queryKey: woDocumentsKeys.byWoDetail(data.woDetailId) });
@@ -167,8 +148,8 @@ export const useReplaceWoDocument = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: ReplaceDocumentDto }) =>
-      woDocumentsService.replace(id, data),
+    mutationFn: ({ id, filePath }: { id: number; filePath: string }) =>
+      woDocumentsService.replace(id, { filePath }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: woDocumentsKeys.all });
       toast.success('Document replaced successfully');

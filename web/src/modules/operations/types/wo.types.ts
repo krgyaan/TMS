@@ -17,7 +17,7 @@ export interface PaginatedResult<T> {
 export type SortOrder = 'asc' | 'desc';
 
 // ============================================
-// WO BASIC DETAILS TYPES
+// ENUMS
 // ============================================
 
 export type WorkflowStage =
@@ -27,7 +27,71 @@ export type WorkflowStage =
   | 'wo_upload'
   | 'completed';
 
+export type WoDetailsStatus =
+  | 'draft'
+  | 'in_progress'
+  | 'completed'
+  | 'submitted_for_review';
+
+export type WoAcceptanceStatus =
+  | 'pending_review'
+  | 'in_review'
+  | 'queries_pending'
+  | 'awaiting_amendment'
+  | 'pending_signatures'
+  | 'pending_courier'
+  | 'completed';
+
+export type WoAcceptanceDecision =
+  | 'pending'
+  | 'queries_raised'
+  | 'accepted'
+  | 'amendment_needed'
+  | 'rejected';
+
+export type AmendmentStatus =
+  | 'draft'
+  | 'submitted'
+  | 'tl_approved'
+  | 'tl_rejected'
+  | 'communicated'
+  | 'client_acknowledged'
+  | 'resolved'
+  | 'rejected_by_client';
+
+export type AmendmentCreatorRole = 'OE' | 'TE' | 'TL';
+
+export type QueryStatus = 'pending' | 'responded' | 'closed' | 'escalated';
+
+export type QueryTo = 'TE' | 'OE' | 'BOTH';
+
+export type DocumentType =
+  | 'draftWo'
+  | 'acceptedWoSigned'
+  | 'finalWo'
+  | 'detailedWo'
+  | 'sapPo'
+  | 'foa';
+
+export type Department = 'EIC' | 'User' | 'C&P' | 'Finance';
+
 export type OeAssignmentType = 'first' | 'siteVisit' | 'docsPrep';
+
+// ============================================
+// WO BASIC DETAILS
+// ============================================
+
+export interface TmsDocuments {
+  completeTenderDocuments?: boolean;
+  tenderInfo?: boolean;
+  emdInformation?: boolean;
+  physicalDocumentsSubmission?: boolean;
+  rfqAndQuotation?: boolean;
+  documentChecklist?: boolean;
+  costingSheet?: boolean;
+  result?: boolean;
+  [key: string]: boolean | undefined;
+}
 
 export interface WoBasicDetail {
   id: number;
@@ -35,17 +99,16 @@ export interface WoBasicDetail {
   enquiryId: number | null;
   woNumber: string | null;
   woDate: string | null;
-  projectCode: string;
+  projectCode: string | null;
   projectName: string | null;
-  currentStage: WorkflowStage;
+  currentStage: WorkflowStage | null;
   woValuePreGst: string | null;
   woValueGstAmt: string | null;
   receiptPreGst: string | null;
   budgetPreGst: string | null;
   grossMargin: string | null;
   woDraft: string | null;
-  teChecklistConfirmed: boolean | null;
-  tmsDocuments: Record<string, boolean> | null;
+  tmsDocuments: TmsDocuments | null;
   oeFirst: number | null;
   oeFirstAssignedAt: string | null;
   oeFirstAssignedBy: number | null;
@@ -60,6 +123,8 @@ export interface WoBasicDetail {
   workflowResumedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  createdBy: number | null;
+  updatedBy: number | null;
 }
 
 export interface WoBasicDetailWithRelations extends WoBasicDetail {
@@ -80,9 +145,8 @@ export interface CreateWoBasicDetailDto {
   receiptPreGst?: string;
   budgetPreGst?: string;
   grossMargin?: string;
-  wo_draft?: string;
-  teChecklistConfirmed?: boolean;
-  tmsDocuments?: Record<string, boolean>;
+  woDraft?: string;
+  tmsDocuments?: TmsDocuments;
 }
 
 export interface UpdateWoBasicDetailDto extends Partial<Omit<CreateWoBasicDetailDto, 'tenderId' | 'enquiryId'>> {}
@@ -99,23 +163,6 @@ export interface BulkAssignOeDto {
     oeUserId: number;
   }>;
   assignedBy?: number;
-}
-
-export interface RemoveOeAssignmentDto {
-  assignmentType: OeAssignmentType;
-}
-
-export interface PauseWorkflowDto {
-  reason?: string;
-}
-
-export interface ResumeWorkflowDto {
-  editedPoDocument?: string;
-  notes?: string;
-}
-
-export interface UpdateWorkflowStageDto {
-  currentStage: WorkflowStage;
 }
 
 export interface WoBasicDetailsFilters {
@@ -154,7 +201,7 @@ export interface OeAssignments {
   };
 }
 
-export interface DashboardSummary {
+export interface WoBasicDetailsDashboardSummary {
   summary: {
     total: number;
     basicDetails: number;
@@ -167,178 +214,9 @@ export interface DashboardSummary {
   generatedAt: string;
 }
 
-export interface WorkflowStatusSummary {
-  totalActive: number;
-  totalPaused: number;
-  avgGrossMargin: string | null;
-  totalWoValue: string | null;
-  generatedAt: string;
-}
-
 // ============================================
-// WO DETAILS TYPES
+// WO CONTACTS
 // ============================================
-
-export interface WoDetail {
-  id: number;
-  woBasicDetailId: number;
-  ldApplicable: boolean;
-  maxLd: string | null;
-  ldStartDate: string | null;
-  maxLdDate: string | null;
-  isPbgApplicable: boolean;
-  filledBgFormat: string | null;
-  isContractAgreement: boolean;
-  contractAgreementFormat: string | null;
-  budgetPreGst: string | null;
-  woAcceptance: boolean;
-  woAcceptanceAt: string | null;
-  woAmendmentNeeded: boolean;
-  followupId: number | null;
-  courierId: number | null;
-  tlId: number | null;
-  tlQueryRaisedAt: string | null;
-  tlFinalDecisionAt: string | null;
-  status: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface WoDetailWithRelations extends WoDetail {
-  amendments: WoAmendment[];
-  documents: WoDocument[];
-  queries: WoQuery[];
-  woBasicDetail: WoBasicDetail | null;
-}
-
-export interface CreateWoDetailDto {
-  woBasicDetailId: number;
-  ldApplicable?: boolean;
-  maxLd?: string;
-  ldStartDate?: string;
-  maxLdDate?: string;
-  isPbgApplicable?: boolean;
-  filledBgFormat?: string;
-  isContractAgreement?: boolean;
-  contractAgreementFormat?: string;
-  budgetPreGst?: string;
-  status?: boolean;
-}
-
-export interface UpdateWoDetailDto extends Partial<Omit<CreateWoDetailDto, 'woBasicDetailId'>> {}
-
-export interface AcceptWoDto {
-  tlId?: number;
-  notes?: string;
-}
-
-export interface RequestAmendmentDto {
-  tlId?: number;
-  reason: string;
-  amendments: Array<{
-    pageNo: string;
-    clauseNo: string;
-    currentStatement: string;
-    correctedStatement: string;
-  }>;
-  followupRequired?: boolean;
-}
-
-export interface WoAcceptanceDecisionDto {
-  accepted: boolean;
-  tlId?: number;
-  notes?: string;
-  amendmentReason?: string;
-  amendments?: Array<{
-    pageNo: string;
-    clauseNo: string;
-    currentStatement: string;
-    correctedStatement: string;
-  }>;
-}
-
-export interface WoDetailsFilters {
-  page?: number;
-  limit?: number;
-  sortBy?: string;
-  sortOrder?: SortOrder;
-  woBasicDetailId?: number;
-  ldApplicable?: boolean;
-  isPbgApplicable?: boolean;
-  isContractAgreement?: boolean;
-  woAcceptance?: boolean;
-  woAmendmentNeeded?: boolean;
-  status?: boolean;
-  tlId?: number;
-  ldStartDateFrom?: string;
-  ldStartDateTo?: string;
-  createdAtFrom?: string;
-  createdAtTo?: string;
-  woAcceptanceAtFrom?: string;
-  woAcceptanceAtTo?: string;
-}
-
-export interface AcceptanceStatus {
-  woDetailId: number;
-  isAccepted: boolean;
-  acceptedAt: string | null;
-  amendmentNeeded: boolean;
-  tlId: number | null;
-  tlFinalDecisionAt: string | null;
-  followupId: number | null;
-  courierId: number | null;
-}
-
-export interface TimelineEvent {
-  event: string;
-  timestamp: string | null;
-  type: string;
-}
-
-export interface WoTimeline {
-  woDetailId: number;
-  timeline: TimelineEvent[];
-  sla: {
-    queryDeadline: string;
-    isQueryOverdue: boolean;
-  };
-}
-
-export interface WoDetailsDashboardSummary {
-  summary: {
-    total: number;
-    accepted: number;
-    pending: number;
-    amendmentNeeded: number;
-    active: number;
-    ldApplicable: number;
-    pbgApplicable: number;
-  };
-  generatedAt: string;
-}
-
-export interface SlaComplianceReport {
-  totalRecords: number;
-  compliantRecords: number;
-  complianceRate: string;
-  details: Array<{
-    woDetailId: number;
-    woBasicDetailId: number;
-    createdAt: string;
-    queryOnTime: boolean;
-    responseOnTime: boolean;
-    decisionOnTime: boolean;
-    isAccepted: boolean;
-    isCompliant: boolean;
-  }>;
-  generatedAt: string;
-}
-
-// ============================================
-// WO CONTACTS TYPES
-// ============================================
-
-export type Department = 'EIC' | 'User' | 'C&P' | 'Finance';
 
 export interface WoContact {
   id: number;
@@ -349,6 +227,8 @@ export interface WoContact {
   designation: string | null;
   phone: string | null;
   email: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface CreateWoContactDto {
@@ -361,11 +241,18 @@ export interface CreateWoContactDto {
   email?: string;
 }
 
-export interface UpdateWoContactDto extends Partial<Omit<CreateWoContactDto, 'woBasicDetailId'>> {}
+export interface UpdateWoContactDto {
+  organization?: string;
+  departments?: Department;
+  name?: string;
+  designation?: string;
+  phone?: string;
+  email?: string;
+}
 
 export interface CreateBulkWoContactsDto {
   woBasicDetailId: number;
-  contacts: Array<Omit<CreateWoContactDto, 'woBasicDetailId'>>;
+  contacts: Omit<CreateWoContactDto, 'woBasicDetailId'>[];
 }
 
 export interface WoContactsFilters {
@@ -377,51 +264,529 @@ export interface WoContactsFilters {
   woBasicDetailId?: number;
   organization?: string;
   departments?: Department;
-  name?: string;
-  email?: string;
 }
 
 export interface ContactsSummary {
   woBasicDetailId: number;
-  summary: {
-    total: number;
-    eicCount: number;
-    userCount: number;
-    cpCount: number;
-    financeCount: number;
-    withEmail: number;
-    withPhone: number;
-  };
+  total: number;
+  byDepartment: Record<Department, number>;
 }
 
 // ============================================
-// WO AMENDMENTS TYPES
+// WO DETAILS (Wizard Pages 1-7)
+// ============================================
+
+export interface TenderDocumentsChecklist {
+  completeTenderDocuments: boolean;
+  tenderInfo: boolean;
+  emdInformation: boolean;
+  physicalDocumentsSubmission: boolean;
+  rfqAndQuotation: boolean;
+  documentChecklist: boolean;
+  costingSheet: boolean;
+  result: boolean;
+}
+
+export interface SiteVisitPerson {
+  name: string;
+  phone: string;
+  email: string;
+}
+
+export interface WoDetail {
+  id: number;
+  woBasicDetailId: number;
+
+  // Page 1: Project Handover
+  tenderDocumentsChecklist: TenderDocumentsChecklist | null;
+  checklistCompletedAt: string | null;
+  checklistIncompleteNotifiedAt: string | null;
+
+  // Page 2: Compliance Obligations
+  ldApplicable: boolean;
+  maxLd: string | null;
+  ldStartDate: string | null;
+  maxLdDate: string | null;
+  isPbgApplicable: boolean;
+  filledBgFormat: string | null;
+  pbgBgId: number | null;
+  isContractAgreement: boolean;
+  contractAgreementFormat: string | null;
+  detailedPoApplicable: boolean;
+  detailedPoFollowupId: number | null;
+
+  // Page 3: SWOT Analysis
+  swotStrengths: string | null;
+  swotWeaknesses: string | null;
+  swotOpportunities: string | null;
+  swotThreats: string | null;
+  swotCompletedAt: string | null;
+
+  // Page 4: Billing (BOQ & Addresses in separate tables)
+
+  // Page 5: Project Execution
+  siteVisitNeeded: boolean;
+  siteVisitPerson: SiteVisitPerson | null;
+  documentsFromTendering: string[] | null;
+  documentsNeeded: string[] | null;
+  documentsInHouse: string[] | null;
+
+  // Page 6: Profitability
+  costingSheetLink: string | null;
+  hasDiscrepancies: boolean;
+  discrepancyComments: string | null;
+  discrepancyNotifiedAt: string | null;
+  budgetPreGst: string | null;
+  budgetSupply: string | null;
+  budgetService: string | null;
+  budgetFreight: string | null;
+  budgetAdmin: string | null;
+  budgetBuybackSale: string | null;
+
+  // Page 7: WO Acceptance (OE Step)
+  oeWoAmendmentNeeded: boolean | null;
+  oeAmendmentSubmittedAt: string | null;
+  oeSignaturePrepared: boolean;
+  courierRequestPrepared: boolean;
+  courierRequestPreparedAt: string | null;
+
+  // Wizard Progress
+  currentPage: number;
+  completedPages: number[];
+  skippedPages: number[];
+  startedAt: string | null;
+  completedAt: string | null;
+
+  // Status
+  status: WoDetailsStatus;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: number | null;
+  updatedBy: number | null;
+}
+
+export interface WoDetailWithRelations extends WoDetail {
+  woBasicDetail?: WoBasicDetail;
+  contacts?: WoContact[];
+  billingBoq?: WoBillingBoq[];
+  buybackBoq?: WoBuybackBoq[];
+  billingAddresses?: WoBillingAddress[];
+  shippingAddresses?: WoShippingAddress[];
+  amendments?: WoAmendment[];
+  queries?: WoQuery[];
+  documents?: WoDocument[];
+  acceptance?: WoAcceptance | null;
+}
+
+export interface CreateWoDetailDto {
+  woBasicDetailId: number;
+}
+
+export interface UpdateWoDetailDto {
+  // Page 1
+  tenderDocumentsChecklist?: TenderDocumentsChecklist;
+
+  // Page 2
+  ldApplicable?: boolean;
+  maxLd?: string;
+  ldStartDate?: string;
+  maxLdDate?: string;
+  isPbgApplicable?: boolean;
+  filledBgFormat?: string;
+  pbgBgId?: number;
+  isContractAgreement?: boolean;
+  contractAgreementFormat?: string;
+  detailedPoApplicable?: boolean;
+  detailedPoFollowupId?: number;
+
+  // Page 3
+  swotStrengths?: string;
+  swotWeaknesses?: string;
+  swotOpportunities?: string;
+  swotThreats?: string;
+
+  // Page 5
+  siteVisitNeeded?: boolean;
+  siteVisitPerson?: SiteVisitPerson;
+  documentsFromTendering?: string[];
+  documentsNeeded?: string[];
+  documentsInHouse?: string[];
+
+  // Page 6
+  costingSheetLink?: string;
+  hasDiscrepancies?: boolean;
+  discrepancyComments?: string;
+  budgetPreGst?: string;
+  budgetSupply?: string;
+  budgetService?: string;
+  budgetFreight?: string;
+  budgetAdmin?: string;
+  budgetBuybackSale?: string;
+
+  // Page 7
+  oeWoAmendmentNeeded?: boolean;
+  oeSignaturePrepared?: boolean;
+  courierRequestPrepared?: boolean;
+
+  // Wizard
+  currentPage?: number;
+  status?: WoDetailsStatus;
+}
+
+export interface WoDetailsFilters {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: SortOrder;
+  woBasicDetailId?: number;
+  status?: WoDetailsStatus;
+  ldApplicable?: boolean;
+  isPbgApplicable?: boolean;
+  isContractAgreement?: boolean;
+  siteVisitNeeded?: boolean;
+  hasDiscrepancies?: boolean;
+  createdBy?: number;
+  createdAtFrom?: string;
+  createdAtTo?: string;
+}
+
+// Wizard-specific types
+export interface WizardProgress {
+  currentPage: number;
+  completedPages: number[];
+  skippedPages: number[];
+  startedAt: string | null;
+  completedAt: string | null;
+  status: WoDetailsStatus;
+  percentComplete: number;
+  canSubmitForReview: boolean;
+  blockers: string[];
+}
+
+export interface PageMetadata {
+  pageNum: number;
+  title: string;
+  description: string;
+  canSkip: boolean;
+  isCompleted: boolean;
+  isSkipped: boolean;
+  isCurrent: boolean;
+}
+
+export interface WizardStatus {
+  progress: WizardProgress;
+  pages: PageMetadata[];
+  woDetailId: number;
+  woBasicDetailId: number;
+}
+
+// ============================================
+// WO BILLING BOQ
+// ============================================
+
+export interface WoBillingBoq {
+  id: number;
+  woDetailId: number;
+  srNo: number;
+  itemDescription: string;
+  quantity: string;
+  rate: string;
+  amount: string | null;
+  sortOrder: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateWoBillingBoqDto {
+  woDetailId: number;
+  srNo: number;
+  itemDescription: string;
+  quantity: string;
+  rate: string;
+  sortOrder?: number;
+}
+
+export interface UpdateWoBillingBoqDto {
+  srNo?: number;
+  itemDescription?: string;
+  quantity?: string;
+  rate?: string;
+  sortOrder?: number;
+}
+
+export interface CreateBulkWoBillingBoqDto {
+  woDetailId: number;
+  items: Omit<CreateWoBillingBoqDto, 'woDetailId'>[];
+}
+
+// ============================================
+// WO BUYBACK BOQ
+// ============================================
+
+export interface WoBuybackBoq {
+  id: number;
+  woDetailId: number;
+  srNo: number;
+  itemDescription: string;
+  quantity: string;
+  rate: string;
+  amount: string | null;
+  sortOrder: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateWoBuybackBoqDto {
+  woDetailId: number;
+  srNo: number;
+  itemDescription: string;
+  quantity: string;
+  rate: string;
+  sortOrder?: number;
+}
+
+export interface UpdateWoBuybackBoqDto {
+  srNo?: number;
+  itemDescription?: string;
+  quantity?: string;
+  rate?: string;
+  sortOrder?: number;
+}
+
+export interface CreateBulkWoBuybackBoqDto {
+  woDetailId: number;
+  items: Omit<CreateWoBuybackBoqDto, 'woDetailId'>[];
+}
+
+// ============================================
+// WO BILLING ADDRESSES
+// ============================================
+
+export type SrNos = number[] | 'all';
+
+export interface WoBillingAddress {
+  id: number;
+  woDetailId: number;
+  srNos: SrNos;
+  customerName: string;
+  address: string;
+  gst: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateWoBillingAddressDto {
+  woDetailId: number;
+  srNos: SrNos;
+  customerName: string;
+  address: string;
+  gst?: string;
+}
+
+export interface UpdateWoBillingAddressDto {
+  srNos?: SrNos;
+  customerName?: string;
+  address?: string;
+  gst?: string;
+}
+
+export interface CreateBulkWoBillingAddressDto {
+  woDetailId: number;
+  addresses: Omit<CreateWoBillingAddressDto, 'woDetailId'>[];
+}
+
+// ============================================
+// WO SHIPPING ADDRESSES
+// ============================================
+
+export interface WoShippingAddress {
+  id: number;
+  woDetailId: number;
+  srNos: SrNos;
+  customerName: string;
+  address: string;
+  gst: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateWoShippingAddressDto {
+  woDetailId: number;
+  srNos: SrNos;
+  customerName: string;
+  address: string;
+  gst?: string;
+}
+
+export interface UpdateWoShippingAddressDto {
+  srNos?: SrNos;
+  customerName?: string;
+  address?: string;
+  gst?: string;
+}
+
+export interface CreateBulkWoShippingAddressDto {
+  woDetailId: number;
+  addresses: Omit<CreateWoShippingAddressDto, 'woDetailId'>[];
+}
+
+// ============================================
+// WO ACCEPTANCE (TL Review)
+// ============================================
+
+export interface WoAcceptance {
+  id: number;
+  woDetailId: number;
+
+  // Query tracking
+  queryRaisedAt: string | null;
+  queryRespondedAt: string | null;
+
+  // Decision
+  finalDecisionAt: string | null;
+  decision: WoAcceptanceDecision | null;
+  decisionRemarks: string | null;
+
+  // Amendment tracking
+  hasAmendmentsToReview: boolean;
+  amendmentsReviewedAt: string | null;
+  followupId: number | null;
+  followupInitiatedAt: string | null;
+
+  // Amended WO
+  amendedWoReceivedAt: string | null;
+  amendedWoFilePath: string | null;
+  reReviewCount: number;
+
+  // Acceptance
+  acceptedAt: string | null;
+
+  // OE Digital Signature
+  oeSignatureRequired: boolean;
+  oeSignedAt: string | null;
+  oeSignedBy: number | null;
+  oeSignatureFilePath: string | null;
+
+  // TL Digital Signature
+  tlSignatureRequired: boolean;
+  tlSignedAt: string | null;
+  tlSignedBy: number | null;
+  tlSignatureFilePath: string | null;
+
+  // Authority Letter
+  authorityLetterGenerated: boolean;
+  authorityLetterPath: string | null;
+  authorityLetterGeneratedAt: string | null;
+
+  // Final Signed WO
+  signedWoFilePath: string | null;
+  signedWoUploadedAt: string | null;
+  signedWoUploadedBy: number | null;
+
+  // Courier
+  courierId: number | null;
+
+  // Status
+  status: WoAcceptanceStatus;
+  isCompleted: boolean;
+  completedAt: string | null;
+
+  // Audit
+  createdAt: string;
+  updatedAt: string;
+  createdBy: number | null;
+  updatedBy: number | null;
+}
+
+export interface CreateWoAcceptanceDto {
+  woDetailId: number;
+}
+
+export interface WoAcceptanceDecisionDto {
+  decision: WoAcceptanceDecision;
+  decisionRemarks?: string;
+}
+
+export interface SignWoDto {
+  signatureFilePath: string;
+}
+
+export interface UploadSignedWoDto {
+  signedWoFilePath: string;
+}
+
+export interface AcceptanceStatusResponse {
+  woDetailId: number;
+  status: WoAcceptanceStatus;
+  decision: WoAcceptanceDecision | null;
+  isAccepted: boolean;
+  acceptedAt: string | null;
+  hasAmendments: boolean;
+  pendingSignatures: {
+    oe: boolean;
+    tl: boolean;
+  };
+  courierStatus: 'not_required' | 'pending' | 'sent';
+}
+
+// ============================================
+// WO AMENDMENTS
 // ============================================
 
 export interface WoAmendment {
   id: number;
   woDetailId: number;
-  pageNo: string;
-  clauseNo: string;
-  currentStatement: string;
-  correctedStatement: string;
+  createdByRole: AmendmentCreatorRole;
+  pageNo: string | null;
+  clauseNo: string | null;
+  currentStatement: string | null;
+  correctedStatement: string | null;
+  tlApproved: boolean | null;
+  tlRemarks: string | null;
+  tlReviewedAt: string | null;
+  status: AmendmentStatus;
+  communicatedAt: string | null;
+  communicatedBy: number | null;
+  clientResponse: string | null;
+  clientProof: string | null;
+  resolvedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  createdBy: number;
+  updatedBy: number | null;
 }
 
 export interface CreateWoAmendmentDto {
   woDetailId: number;
-  pageNo: string;
-  clauseNo: string;
-  currentStatement: string;
-  correctedStatement: string;
+  createdByRole: AmendmentCreatorRole;
+  pageNo?: string;
+  clauseNo?: string;
+  currentStatement?: string;
+  correctedStatement?: string;
 }
 
-export interface UpdateWoAmendmentDto extends Partial<Omit<CreateWoAmendmentDto, 'woDetailId'>> {}
+export interface UpdateWoAmendmentDto {
+  pageNo?: string;
+  clauseNo?: string;
+  currentStatement?: string;
+  correctedStatement?: string;
+  status?: AmendmentStatus;
+}
 
 export interface CreateBulkWoAmendmentsDto {
   woDetailId: number;
-  amendments: Array<Omit<CreateWoAmendmentDto, 'woDetailId'>>;
+  createdByRole: AmendmentCreatorRole;
+  amendments: Omit<CreateWoAmendmentDto, 'woDetailId' | 'createdByRole'>[];
+}
+
+export interface TlReviewAmendmentDto {
+  approved: boolean;
+  remarks?: string;
+}
+
+export interface RecordClientResponseDto {
+  response: string;
+  proof?: string;
 }
 
 export interface WoAmendmentsFilters {
@@ -429,75 +794,135 @@ export interface WoAmendmentsFilters {
   limit?: number;
   sortBy?: string;
   sortOrder?: SortOrder;
-  search?: string;
   woDetailId?: number;
-  pageNo?: string;
-  clauseNo?: string;
+  status?: AmendmentStatus;
+  createdByRole?: AmendmentCreatorRole;
+  tlApproved?: boolean;
   createdAtFrom?: string;
   createdAtTo?: string;
 }
 
 export interface AmendmentsSummary {
   woDetailId: number;
-  summary: {
-    total: number;
-    uniquePages: number;
-    uniqueClauses: number;
-  };
-  byPage: Array<{
-    pageNo: string;
-    count: number;
-  }>;
-}
-
-export interface TopClausesStatistics {
-  topClauses: Array<{
-    clauseNo: string;
-    count: number;
-  }>;
-  topPages: Array<{
-    pageNo: string;
-    count: number;
-  }>;
-  generatedAt: string;
+  total: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+  communicated: number;
+  resolved: number;
 }
 
 // ============================================
-// WO DOCUMENTS TYPES
+// WO QUERIES
 // ============================================
 
-export type DocumentType =
-  | 'draftWo'
-  | 'acceptedWoSigned'
-  | 'finalWo'
-  | 'detailedWo'
-  | 'sapPo'
-  | 'foa';
+export interface WoQuery {
+  id: number;
+  woDetailsId: number;
+  queryBy: number;
+  queryTo: QueryTo;
+  queryToUserIds: number[] | null;
+  queryText: string;
+  queryRaisedAt: string;
+  responseText: string | null;
+  respondedBy: number | null;
+  respondedAt: string | null;
+  status: QueryStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WoQueryWithSla extends WoQuery {
+  isOverdue: boolean;
+  responseDeadline: string;
+  hoursRemaining: number | null;
+}
+
+export interface CreateWoQueryDto {
+  woDetailsId: number;
+  queryBy: number;
+  queryTo: QueryTo;
+  queryToUserIds?: number[];
+  queryText: string;
+}
+
+export interface CreateBulkWoQueriesDto {
+  woDetailsId: number;
+  queryBy: number;
+  queries: Omit<CreateWoQueryDto, 'woDetailsId' | 'queryBy'>[];
+}
+
+export interface RespondToQueryDto {
+  responseText: string;
+  respondedBy: number;
+}
+
+export interface CloseQueryDto {
+  remarks?: string;
+}
+
+export interface WoQueriesFilters {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: SortOrder;
+  woDetailsId?: number;
+  status?: QueryStatus;
+  queryTo?: QueryTo;
+  queryBy?: number;
+  respondedBy?: number;
+  queryRaisedFrom?: string;
+  queryRaisedTo?: string;
+}
+
+export interface QueriesSummary {
+  woDetailsId: number;
+  total: number;
+  pending: number;
+  responded: number;
+  closed: number;
+  overdue: number;
+}
+
+export interface QuerySlaStatus {
+  woDetailsId: number;
+  totalQueries: number;
+  pendingQueries: number;
+  overdueQueries: number;
+  slaComplianceRate: number;
+  slaThresholdHours: number;
+}
+
+// ============================================
+// WO DOCUMENTS
+// ============================================
 
 export interface WoDocument {
   id: number;
-  woDetailId: number;
-  type: DocumentType;
-  version: number;
-  filePath: string;
+  woDetailId: number | null;
+  type: DocumentType | null;
+  version: number | null;
+  filePath: string | null;
   uploadedAt: string;
+  uploadedBy: number | null;
 }
 
 export interface CreateWoDocumentDto {
   woDetailId: number;
   type: DocumentType;
-  version?: number;
   filePath: string;
+  version?: number;
 }
 
 export interface UpdateWoDocumentDto {
-  version?: number;
+  type?: DocumentType;
   filePath?: string;
+  version?: number;
 }
 
 export interface CreateBulkWoDocumentsDto {
   woDetailId: number;
-  documents: Array<Omit<CreateWoDocumentDto, 'woDetailId'>>;
+  documents: Omit<CreateWoDocumentDto, 'woDetailId'>[];
 }
 
 export interface ReplaceDocumentDto {
@@ -517,7 +942,7 @@ export interface WoDocumentsFilters {
   uploadedTo?: string;
 }
 
-export interface VersionHistory {
+export interface DocumentVersionHistory {
   woDetailId: number;
   type: DocumentType;
   totalVersions: number;
@@ -527,165 +952,177 @@ export interface VersionHistory {
 
 export interface DocumentsSummary {
   woDetailId: number;
-  summary: {
-    total: number;
-    draftWo: number;
-    acceptedWoSigned: number;
-    finalWo: number;
-    detailedWo: number;
-    sapPo: number;
-    foa: number;
-  };
+  total: number;
+  byType: Record<DocumentType, number>;
   latestVersions: Array<{
     type: DocumentType;
-    latestVersion: number;
+    version: number;
+    filePath: string;
   }>;
-}
-
-export interface DocumentsOverviewStatistics {
-  overview: {
-    totalDocuments: number;
-    totalWoDetails: number;
-    avgVersionsPerType: string;
-  };
-  byType: Array<{
-    type: DocumentType;
-    count: number;
-    avgVersion: string;
-  }>;
-  generatedAt: string;
 }
 
 // ============================================
-// WO QUERIES TYPES
+// DASHBOARD & REPORTS
 // ============================================
 
-export type QueryTo = 'TE' | 'OE' | 'BOTH';
-export type QueryStatus = 'pending' | 'responded' | 'closed';
-
-export interface WoQuery {
-  id: number;
-  woDetailId: number;
-  queryBy: number;
-  queryTo: QueryTo;
-  queryText: string;
-  queryRaisedAt: string;
-  responseText: string | null;
-  respondedBy: number | null;
-  respondedAt: string | null;
-  status: QueryStatus;
-  createdAt: string;
-}
-
-export interface WoQueryWithOverdue extends WoQuery {
-  isOverdue: boolean;
-  responseDeadline: string;
-  hoursOverdue?: number;
-}
-
-export interface CreateWoQueryDto {
-  woDetailId: number;
-  queryBy: number;
-  queryTo: QueryTo;
-  queryText: string;
-}
-
-export interface CreateBulkWoQueriesDto {
-  woDetailId: number;
-  queryBy: number;
-  queries: Array<{
-    queryTo: QueryTo;
-    queryText: string;
-  }>;
-}
-
-export interface RespondToQueryDto {
-  responseText: string;
-  respondedBy: number;
-}
-
-export interface CloseQueryDto {
-  closedBy?: number;
-  closureNotes?: string;
-}
-
-export interface UpdateQueryStatusDto {
-  status: QueryStatus;
-}
-
-export interface WoQueriesFilters {
-  page?: number;
-  limit?: number;
-  sortBy?: string;
-  sortOrder?: SortOrder;
-  search?: string;
-  woDetailId?: number;
-  status?: QueryStatus;
-  queryTo?: QueryTo;
-  queryBy?: number;
-  respondedBy?: number;
-  queryRaisedFrom?: string;
-  queryRaisedTo?: string;
-  respondedFrom?: string;
-  respondedTo?: string;
-}
-
-export interface QueriesDashboardSummary {
-  summary: {
-    total: number;
-    pending: number;
-    responded: number;
-    closed: number;
-    toTe: number;
-    toOe: number;
-    toBoth: number;
-    overdue: number;
-  };
-  slaThresholds: {
-    queryRaiseSlaHours: number;
-    responseSlaHours: number;
-    finalDecisionSlaHours: number;
-  };
+export interface WoDetailsDashboardSummary {
+  total: number;
+  draft: number;
+  inProgress: number;
+  completed: number;
+  submittedForReview: number;
+  ldApplicable: number;
+  pbgApplicable: number;
+  contractAgreement: number;
   generatedAt: string;
 }
 
-export interface ResponseTimeStatistics {
-  totalResponded: number;
-  avgResponseTimeHours: number | null;
-  minResponseTimeHours: number | null;
-  maxResponseTimeHours: number | null;
-  withinSlaPct: number | null;
-  slaTresholdHours: number;
+export interface AcceptanceDashboardSummary {
+  total: number;
+  pendingReview: number;
+  inReview: number;
+  queriesPending: number;
+  awaitingAmendment: number;
+  pendingSignatures: number;
+  pendingCourier: number;
+  completed: number;
   generatedAt: string;
 }
 
-export interface UserQueryStatistics {
-  userId: number;
-  queriesRaised: {
-    total: number;
-    pending: number;
-    responded: number;
-    closed: number;
-  };
-  queriesAnswered: number;
-  generatedAt: string;
-}
-
-export interface SlaStatus {
-  woDetailId: number;
-  totalQueries: number;
-  pendingQueries: number;
-  overdueQueries: number;
-  slaComplianceRate: string;
-  slaThresholdHours: number;
+export interface SlaComplianceReport {
+  totalRecords: number;
+  compliantRecords: number;
+  complianceRate: number;
+  avgResponseTimeHours: number;
   details: Array<{
-    queryId: number;
-    status: QueryStatus;
-    queryRaisedAt: string;
-    responseDeadline: string;
-    respondedAt: string | null;
-    responseTimeHours: number | null;
-    withinSla: boolean | null;
-    isOverdue: boolean;
+    woDetailId: number;
+    woBasicDetailId: number;
+    createdAt: string;
+    queryOnTime: boolean;
+    responseOnTime: boolean;
+    decisionOnTime: boolean;
+    isCompliant: boolean;
   }>;
+  generatedAt: string;
+}
+
+export interface TimelineEvent {
+  event: string;
+  timestamp: string | null;
+  type: 'info' | 'success' | 'warning' | 'error';
+  actor?: string;
+  details?: string;
+}
+
+export interface WoTimeline {
+  woDetailId: number;
+  timeline: TimelineEvent[];
+  sla: {
+    queryDeadline: string | null;
+    responseDeadline: string | null;
+    isQueryOverdue: boolean;
+    isResponseOverdue: boolean;
+  };
+}
+
+// ============================================
+// PAGE-SPECIFIC DATA TYPES (for Wizard)
+// ============================================
+
+export interface Page1Data {
+  contacts: WoContact[];
+  tenderDocumentsChecklist: TenderDocumentsChecklist | null;
+  checklistCompletedAt: string | null;
+  checklistIncompleteNotifiedAt: string | null;
+  isChecklistComplete: boolean;
+  incompleteItems: string[];
+}
+
+export interface Page2Data {
+  ldApplicable: boolean;
+  maxLd: string | null;
+  ldStartDate: string | null;
+  maxLdDate: string | null;
+  isPbgApplicable: boolean;
+  filledBgFormat: string | null;
+  pbgBgId: number | null;
+  isContractAgreement: boolean;
+  contractAgreementFormat: string | null;
+  detailedPoApplicable: boolean;
+  detailedPoFollowupId: number | null;
+}
+
+export interface Page3Data {
+  swotStrengths: string | null;
+  swotWeaknesses: string | null;
+  swotOpportunities: string | null;
+  swotThreats: string | null;
+  swotCompletedAt: string | null;
+  hasContent: boolean;
+}
+
+export interface Page4Data {
+  billingBoq: WoBillingBoq[];
+  buybackBoq: WoBuybackBoq[];
+  billingAddresses: WoBillingAddress[];
+  shippingAddresses: WoShippingAddress[];
+  billingTotal: string;
+  buybackTotal: string;
+}
+
+export interface Page5Data {
+  siteVisitNeeded: boolean;
+  siteVisitPerson: SiteVisitPerson | null;
+  documentsFromTendering: string[] | null;
+  documentsNeeded: string[] | null;
+  documentsInHouse: string[] | null;
+  totalDocuments: number;
+}
+
+export interface Page6Data {
+  costingSheetLink: string | null;
+  hasDiscrepancies: boolean;
+  discrepancyComments: string | null;
+  discrepancyNotifiedAt: string | null;
+  budgetPreGst: string | null;
+  budgetSupply: string | null;
+  budgetService: string | null;
+  budgetFreight: string | null;
+  budgetAdmin: string | null;
+  budgetBuybackSale: string | null;
+  totalBudget: string;
+}
+
+export interface Page7Data {
+  oeWoAmendmentNeeded: boolean | null;
+  oeAmendmentSubmittedAt: string | null;
+  oeSignaturePrepared: boolean;
+  courierRequestPrepared: boolean;
+  courierRequestPreparedAt: string | null;
+  amendments: WoAmendment[];
+  canSubmitForReview: boolean;
+  blockers: string[];
+}
+
+export interface RequestAmendmentDto {
+    tlId?: number;
+    reason: string;
+    amendments: Array<{
+        pageNo: string;
+        clauseNo: string;
+        currentStatement: string;
+        correctedStatement: string;
+    }>;
+    followupRequired?: boolean;
+}
+
+export interface AcceptanceStatus {
+    woDetailId: number;
+    isAccepted: boolean;
+    acceptedAt: string | null;
+    amendmentNeeded: boolean;
+    tlId: number | null;
+    tlFinalDecisionAt: string | null;
+    followupId: number | null;
+    courierId: number | null;
 }

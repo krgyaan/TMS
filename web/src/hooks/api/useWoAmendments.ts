@@ -21,8 +21,6 @@ export const woAmendmentsKeys = {
   details: () => [...woAmendmentsKeys.all, 'detail'] as const,
   detail: (id: number) => [...woAmendmentsKeys.details(), id] as const,
   byWoDetail: (woDetailId: number) => [...woAmendmentsKeys.all, 'by-wo-detail', woDetailId] as const,
-  byClause: (woDetailId: number, clauseNo: string) =>
-    [...woAmendmentsKeys.all, 'by-clause', woDetailId, clauseNo] as const,
   summary: (woDetailId: number) => [...woAmendmentsKeys.all, 'summary', woDetailId] as const,
   topClauses: () => [...woAmendmentsKeys.all, 'top-clauses'] as const,
 };
@@ -42,7 +40,7 @@ export const useWoAmendmentById = (id: number) => {
   return useQuery({
     queryKey: woAmendmentsKeys.detail(id),
     queryFn: () => woAmendmentsService.getById(id),
-    enabled: !!id,
+    enabled: !!id && id > 0,
   });
 };
 
@@ -50,15 +48,7 @@ export const useWoAmendmentsByWoDetail = (woDetailId: number) => {
   return useQuery({
     queryKey: woAmendmentsKeys.byWoDetail(woDetailId),
     queryFn: () => woAmendmentsService.getByWoDetailId(woDetailId),
-    enabled: !!woDetailId,
-  });
-};
-
-export const useWoAmendmentsByClause = (woDetailId: number, clauseNo: string) => {
-  return useQuery({
-    queryKey: woAmendmentsKeys.byClause(woDetailId, clauseNo),
-    queryFn: () => woAmendmentsService.getByClause(woDetailId, clauseNo),
-    enabled: !!woDetailId && !!clauseNo,
+    enabled: !!woDetailId && woDetailId > 0,
   });
 };
 
@@ -66,7 +56,7 @@ export const useAmendmentsSummary = (woDetailId: number) => {
   return useQuery({
     queryKey: woAmendmentsKeys.summary(woDetailId),
     queryFn: () => woAmendmentsService.getAmendmentsSummary(woDetailId),
-    enabled: !!woDetailId,
+    enabled: !!woDetailId && woDetailId > 0,
   });
 };
 
@@ -90,7 +80,6 @@ export const useCreateWoAmendment = () => {
       queryClient.invalidateQueries({ queryKey: woAmendmentsKeys.all });
       queryClient.invalidateQueries({ queryKey: woAmendmentsKeys.byWoDetail(data.woDetailId) });
       queryClient.invalidateQueries({ queryKey: woDetailsKeys.detail(data.woDetailId) });
-      queryClient.invalidateQueries({ queryKey: woDetailsKeys.detailWithRelations(data.woDetailId) });
       toast.success('Amendment created successfully');
     },
     onError: (error: any) => {
@@ -108,7 +97,6 @@ export const useCreateBulkWoAmendments = () => {
       queryClient.invalidateQueries({ queryKey: woAmendmentsKeys.all });
       queryClient.invalidateQueries({ queryKey: woAmendmentsKeys.byWoDetail(data.woDetailId) });
       queryClient.invalidateQueries({ queryKey: woDetailsKeys.detail(data.woDetailId) });
-      queryClient.invalidateQueries({ queryKey: woDetailsKeys.detailWithRelations(data.woDetailId) });
       toast.success('Amendments created successfully');
     },
     onError: (error: any) => {
@@ -158,6 +146,86 @@ export const useDeleteAllAmendmentsByWoDetail = () => {
       queryClient.invalidateQueries({ queryKey: woAmendmentsKeys.byWoDetail(woDetailId) });
       queryClient.invalidateQueries({ queryKey: woDetailsKeys.detail(woDetailId) });
       toast.success('All amendments deleted successfully');
+    },
+    onError: (error: any) => {
+      toast.error(handleQueryError(error));
+    },
+  });
+};
+
+// TL Review Actions
+export const useApproveAmendment = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, remarks }: { id: number; remarks?: string }) =>
+      woAmendmentsService.approveAmendment(id, remarks),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: woAmendmentsKeys.all });
+      toast.success('Amendment approved');
+    },
+    onError: (error: any) => {
+      toast.error(handleQueryError(error));
+    },
+  });
+};
+
+export const useRejectAmendment = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, remarks }: { id: number; remarks: string }) =>
+      woAmendmentsService.rejectAmendment(id, remarks),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: woAmendmentsKeys.all });
+      toast.success('Amendment rejected');
+    },
+    onError: (error: any) => {
+      toast.error(handleQueryError(error));
+    },
+  });
+};
+
+// Client Communication
+export const useMarkAmendmentCommunicated = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => woAmendmentsService.markCommunicated(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: woAmendmentsKeys.all });
+      toast.success('Marked as communicated');
+    },
+    onError: (error: any) => {
+      toast.error(handleQueryError(error));
+    },
+  });
+};
+
+export const useRecordClientResponse = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, response, proof }: { id: number; response: string; proof?: string }) =>
+      woAmendmentsService.recordClientResponse(id, response, proof),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: woAmendmentsKeys.all });
+      toast.success('Client response recorded');
+    },
+    onError: (error: any) => {
+      toast.error(handleQueryError(error));
+    },
+  });
+};
+
+export const useResolveAmendment = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => woAmendmentsService.markResolved(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: woAmendmentsKeys.all });
+      toast.success('Amendment resolved');
     },
     onError: (error: any) => {
       toast.error(handleQueryError(error));

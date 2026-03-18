@@ -1,9 +1,5 @@
-import {
-  Inject,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import { eq, desc, asc, sql, and, or, ilike } from 'drizzle-orm';
+import { Inject, Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { eq, desc, asc, sql, and, ilike } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { woContacts, woBasicDetails } from '@db/schemas/operations';
@@ -20,11 +16,9 @@ export type WoContactRow = typeof woContacts.$inferSelect;
 export class WoContactsService {
   constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
 
-  // ============================================
   // MAPPING FUNCTIONS
-  // ============================================
-
   private mapCreateToDb(data: CreateWoContactDto) {
+    const now = new Date();
     return {
       woBasicDetailId: data.woBasicDetailId,
       organization: data.organization ?? null,
@@ -33,11 +27,13 @@ export class WoContactsService {
       designation: data.designation ?? null,
       phone: data.phone ?? null,
       email: data.email ?? null,
+      createdAt: now,
+      updatedAt: now,
     };
   }
 
   private mapUpdateToDb(data: UpdateWoContactDto) {
-    const out: Record<string, unknown> = {};
+    const out: Record<string, unknown> = { updatedAt: new Date() };
 
     if (data.organization !== undefined) out.organization = data.organization;
     if (data.departments !== undefined) out.departments = data.departments;
@@ -59,61 +55,43 @@ export class WoContactsService {
       designation: row.designation,
       phone: row.phone,
       email: row.email,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
     };
   }
 
-  // ============================================
   // CRUD OPERATIONS
-  // ============================================
-
   async findAll(filters?: WoContactsQueryDto) {
     const page = filters?.page ?? 1;
     const limit = Math.min(Math.max(filters?.limit ?? 50, 1), 100);
     const offset = (page - 1) * limit;
-    const sortOrder = filters?.sortOrder ?? 'asc';
-    const sortBy = filters?.sortBy ?? 'name';
-    const search = filters?.search?.trim();
+    const sortOrder = filters?.sortOrder ?? 'desc';
+    const sortBy = filters?.sortBy ?? 'createdAt';
 
-    // Determine order column
     const orderColumnMap: Record<string, any> = {
+      createdAt: woContacts.createdAt,
+      updatedAt: woContacts.updatedAt,
       name: woContacts.name,
-      organization: woContacts.organization,
-      departments: woContacts.departments,
-      email: woContacts.email,
     };
-    const orderColumn = orderColumnMap[sortBy] ?? woContacts.name;
+    const orderColumn = orderColumnMap[sortBy] ?? woContacts.createdAt;
     const orderFn = sortOrder === 'desc' ? desc : asc;
 
-    // Build conditions
     const conditions: any[] = [];
 
-    // Search condition
-    if (search) {
-      conditions.push(
-        or(
-          ilike(woContacts.name, `%${search}%`),
-          ilike(woContacts.organization, `%${search}%`),
-          ilike(woContacts.email, `%${search}%`),
-          ilike(woContacts.designation, `%${search}%`),
-        ),
-      );
-    }
-
-    // Filter conditions
     if (filters?.woBasicDetailId) {
       conditions.push(eq(woContacts.woBasicDetailId, filters.woBasicDetailId));
-    }
-    if (filters?.organization) {
-      conditions.push(ilike(woContacts.organization, `%${filters.organization}%`));
     }
     if (filters?.departments) {
       conditions.push(eq(woContacts.departments, filters.departments));
     }
-    if (filters?.name) {
-      conditions.push(ilike(woContacts.name, `%${filters.name}%`));
-    }
-    if (filters?.email) {
-      conditions.push(ilike(woContacts.email, `%${filters.email}%`));
+    if (filters?.search) {
+      conditions.push(
+        sql`(
+          ${woContacts.name} ILIKE ${`%${filters.search}%`} OR
+          ${woContacts.email} ILIKE ${`%${filters.search}%`} OR
+          ${woContacts.organization} ILIKE ${`%${filters.search}%`}
+        )`
+      );
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -133,16 +111,13 @@ export class WoContactsService {
         .offset(offset),
     ]);
 
-    const total = countResult;
-    const data = rows.map((r) => this.mapRowToResponse(r));
-
     return {
-      data,
+      data: rows.map((r) => this.mapRowToResponse(r)),
       meta: {
-        total,
+        total: countResult,
         page,
         limit,
-        totalPages: Math.ceil(total / limit) || 1,
+        totalPages: Math.ceil(countResult / limit) || 1,
       },
     };
   }
@@ -155,31 +130,18 @@ export class WoContactsService {
       .limit(1);
 
     if (!row) {
-      throw new NotFoundException(`WO Contact with ID ${id} not found`);
+      throw new NotFoundException(`Contact with ID ${id} not found`);
     }
 
     return this.mapRowToResponse(row);
   }
 
   async findByWoBasicDetailId(woBasicDetailId: number) {
-    // Verify WO Basic Detail exists
-    const [basicDetail] = await this.db
-      .select({ id: woBasicDetails.id })
-      .from(woBasicDetails)
-      .where(eq(woBasicDetails.id, woBasicDetailId))
-      .limit(1);
-
-    if (!basicDetail) {
-      throw new NotFoundException(
-        `WO Basic Detail with ID ${woBasicDetailId} not found`,
-      );
-    }
-
     const rows = await this.db
       .select()
       .from(woContacts)
       .where(eq(woContacts.woBasicDetailId, woBasicDetailId))
-      .orderBy(asc(woContacts.name));
+      .orderBy(asc(woContacts.createdAt));
 
     return rows.map((r) => this.mapRowToResponse(r));
   }
@@ -191,8 +153,8 @@ export class WoContactsService {
       .where(
         and(
           eq(woContacts.woBasicDetailId, woBasicDetailId),
-          eq(woContacts.departments, department),
-        ),
+          eq(woContacts.departments, department)
+        )
       )
       .orderBy(asc(woContacts.name));
 
@@ -209,16 +171,13 @@ export class WoContactsService {
 
     if (!basicDetail) {
       throw new NotFoundException(
-        `WO Basic Detail with ID ${data.woBasicDetailId} not found`,
+        `WO Basic Detail with ID ${data.woBasicDetailId} not found`
       );
     }
 
     const insertValues = this.mapCreateToDb(data);
 
-    const [row] = await this.db
-      .insert(woContacts)
-      .values(insertValues)
-      .returning();
+    const [row] = await this.db.insert(woContacts).values(insertValues).returning();
 
     return this.mapRowToResponse(row!);
   }
@@ -233,10 +192,11 @@ export class WoContactsService {
 
     if (!basicDetail) {
       throw new NotFoundException(
-        `WO Basic Detail with ID ${data.woBasicDetailId} not found`,
+        `WO Basic Detail with ID ${data.woBasicDetailId} not found`
       );
     }
 
+    const now = new Date();
     const insertValues = data.contacts.map((contact) => ({
       woBasicDetailId: data.woBasicDetailId,
       organization: contact.organization ?? null,
@@ -245,16 +205,15 @@ export class WoContactsService {
       designation: contact.designation ?? null,
       phone: contact.phone ?? null,
       email: contact.email ?? null,
+      createdAt: now,
+      updatedAt: now,
     }));
 
-    const rows = await this.db
-      .insert(woContacts)
-      .values(insertValues)
-      .returning();
+    const rows = await this.db.insert(woContacts).values(insertValues).returning();
 
     return {
-      created: rows.length,
-      data: rows.map((r) => this.mapRowToResponse(r)),
+      count: rows.length,
+      contacts: rows.map((r) => this.mapRowToResponse(r)),
     };
   }
 
@@ -263,10 +222,6 @@ export class WoContactsService {
 
     const updateValues = this.mapUpdateToDb(data);
 
-    if (Object.keys(updateValues).length === 0) {
-      return this.findById(id);
-    }
-
     const [row] = await this.db
       .update(woContacts)
       .set(updateValues)
@@ -274,7 +229,7 @@ export class WoContactsService {
       .returning();
 
     if (!row) {
-      throw new NotFoundException(`WO Contact with ID ${id} not found`);
+      throw new NotFoundException(`Contact with ID ${id} not found`);
     }
 
     return this.mapRowToResponse(row);
@@ -287,19 +242,39 @@ export class WoContactsService {
       .returning();
 
     if (!row) {
-      throw new NotFoundException(`WO Contact with ID ${id} not found`);
+      throw new NotFoundException(`Contact with ID ${id} not found`);
     }
   }
 
-  async deleteAllByBasicDetail(woBasicDetailId: number): Promise<void> {
-    await this.db
+  async deleteAllByBasicDetail(woBasicDetailId: number): Promise<{ count: number }> {
+    const deleted = await this.db
       .delete(woContacts)
-      .where(eq(woContacts.woBasicDetailId, woBasicDetailId));
+      .where(eq(woContacts.woBasicDetailId, woBasicDetailId))
+      .returning();
+
+    return { count: deleted.length };
   }
 
-  // ============================================
-  // UTILITY OPERATIONS
-  // ============================================
+  // UTILITY
+  async getContactsSummary(woBasicDetailId: number) {
+    const [summary] = await this.db
+      .select({
+        total: sql<number>`count(*)::int`,
+        byDepartment: sql<any>`
+          json_object_agg(
+            COALESCE(${woContacts.departments}, 'none'),
+            count(*)
+          )
+        `,
+      })
+      .from(woContacts)
+      .where(eq(woContacts.woBasicDetailId, woBasicDetailId));
+
+    return {
+      total: summary?.total ?? 0,
+      byDepartment: summary?.byDepartment ?? {},
+    };
+  }
 
   async checkEmailExists(email: string, woBasicDetailId?: number) {
     const conditions: any[] = [eq(woContacts.email, email)];
@@ -308,36 +283,12 @@ export class WoContactsService {
       conditions.push(eq(woContacts.woBasicDetailId, woBasicDetailId));
     }
 
-    const [existing] = await this.db
+    const [result] = await this.db
       .select({ id: woContacts.id })
       .from(woContacts)
       .where(and(...conditions))
       .limit(1);
 
-    return {
-      exists: !!existing,
-      email,
-      woBasicDetailId: woBasicDetailId ?? null,
-    };
-  }
-
-  async getContactsSummary(woBasicDetailId: number) {
-    const [summary] = await this.db
-      .select({
-        total: sql<number>`count(*)::int`,
-        eicCount: sql<number>`count(*) filter (where ${woContacts.departments} = 'EIC')::int`,
-        userCount: sql<number>`count(*) filter (where ${woContacts.departments} = 'User')::int`,
-        cpCount: sql<number>`count(*) filter (where ${woContacts.departments} = 'C&P')::int`,
-        financeCount: sql<number>`count(*) filter (where ${woContacts.departments} = 'Finance')::int`,
-        withEmail: sql<number>`count(*) filter (where ${woContacts.email} is not null)::int`,
-        withPhone: sql<number>`count(*) filter (where ${woContacts.phone} is not null)::int`,
-      })
-      .from(woContacts)
-      .where(eq(woContacts.woBasicDetailId, woBasicDetailId));
-
-    return {
-      woBasicDetailId,
-      summary,
-    };
+    return { exists: !!result };
   }
 }

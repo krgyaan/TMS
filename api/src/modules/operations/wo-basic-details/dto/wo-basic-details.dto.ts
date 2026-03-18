@@ -30,7 +30,7 @@ export const CreateWoBasicDetailSchema = z.object({
   grossMargin: z.string().regex(/^-?\d+(\.\d{1,2})?$/, "Invalid decimal format").optional(),
 
   // Document upload
-  wo_draft: z.string().max(255).optional(),
+  woDraft: z.string().max(255).optional(),
 
   // Checklist and TMS Documents
   teChecklistConfirmed: z.boolean().optional(),
@@ -168,7 +168,7 @@ export const WoBasicDetailsResponseSchema = z.object({
   receiptPreGst: z.string().nullable(),
   budgetPreGst: z.string().nullable(),
   grossMargin: z.string().nullable(),
-  wo_draft: z.string().nullable(),
+  woDraft: z.string().nullable(),
   teChecklistConfirmed: z.boolean().nullable(),
   tmsDocuments: z.any().nullable(),
 
