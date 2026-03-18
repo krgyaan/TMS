@@ -1,5 +1,18 @@
 import { z } from 'zod';
 
+export const DecimalSchema = z
+  .string()
+  .regex(/^\d+(\.\d{1,2})?$/, "Invalid decimal format")
+  .or(z.number().transform(String));
+
+export const PercentageSchema = z
+  .string()
+  .regex(/^(100(\.00?)?|\d{1,2}(\.\d{1,2})?)$/, "Invalid percentage (0-100)")
+  .or(z.number().min(0).max(100).transform(String));
+
+export const PositiveIntSchema = z.number().int().positive();
+
+
 // ENUMS
 export const WoDetailsStatusEnum = z.enum([
   'draft',
@@ -31,16 +44,6 @@ export const SiteVisitPersonSchema = z.object({
 });
 
 export type SiteVisitPerson = z.infer<typeof SiteVisitPersonSchema>;
-
-export const DecimalSchema = z
-  .string()
-  .regex(/^\d+(\.\d{1,2})?$/, 'Invalid decimal format')
-  .or(z.number().transform(String));
-
-export const PercentageSchema = z
-  .string()
-  .regex(/^(100(\.00?)?|\d{1,2}(\.\d{1,2})?)$/, 'Invalid percentage (0-100)')
-  .or(z.number().min(0).max(100).transform(String));
 
 // CREATE
 export const CreateWoDetailSchema = z.object({

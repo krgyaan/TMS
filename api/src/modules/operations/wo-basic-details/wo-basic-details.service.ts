@@ -85,8 +85,8 @@ export class WoBasicDetailsService {
             oeSiteVisitAssignedAt: row.oeSiteVisitAssignedAt,
             oeSiteVisitAssignedBy: row.oeSiteVisitAssignedBy,
             oeDocsPrep: row.oeDocsPrep,
-            oeDocsPrepVisitAssignedAt: row.oeDocsPrepVisitAssignedAt,
-            oeDocsPrepVisitAssignedBy: row.oeDocsPrepVisitAssignedBy,
+            oeDocsPrepAssignedAt: row.oeDocsPrepAssignedAt,
+            oeDocsPrepAssignedBy: row.oeDocsPrepAssignedBy,
             isWorkflowPaused: row.isWorkflowPaused,
             workflowPausedAt: row.workflowPausedAt,
             workflowResumedAt: row.workflowResumedAt,
@@ -468,8 +468,8 @@ export class WoBasicDetailsService {
                 docsPrep: row.oeDocsPrep
                     ? {
                           oeUserId: row.oeDocsPrep,
-                          assignedAt: row.oeDocsPrepVisitAssignedAt,
-                          assignedBy: row.oeDocsPrepVisitAssignedBy,
+                          assignedAt: row.oeDocsPrepAssignedAt,
+                          assignedBy: row.oeDocsPrepAssignedBy,
                       }
                     : null,
             },
