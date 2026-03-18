@@ -671,10 +671,10 @@ export class WoBasicDetailsService {
         return conditions;
     }
 
-    async getDashboardSummary(user?: ValidatedUser) {
+    async getDashboardSummary(user?: ValidatedUser, teamId?: number) {
         const conditions: any[] = [];
         if (user) {
-            conditions.push(...this.getVisibilityConditions(user));
+            conditions.push(...this.getVisibilityConditions(user, teamId));
         }
         const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -697,13 +697,13 @@ export class WoBasicDetailsService {
         };
     }
 
-    async getPendingOeAssignments(user?: ValidatedUser) {
+    async getPendingOeAssignments(user?: ValidatedUser, teamId?: number) {
         const conditions: any[] = [
             isNull(woBasicDetails.oeFirst),
             eq(woBasicDetails.currentStage, 'basic_details'),
         ];
         if (user) {
-            conditions.push(...this.getVisibilityConditions(user));
+            conditions.push(...this.getVisibilityConditions(user, teamId));
         }
 
         const rows = await this.db
@@ -718,10 +718,10 @@ export class WoBasicDetailsService {
         };
     }
 
-    async getWorkflowStatusSummary(user?: ValidatedUser) {
+    async getWorkflowStatusSummary(user?: ValidatedUser, teamId?: number) {
         const conditions: any[] = [];
         if (user) {
-            conditions.push(...this.getVisibilityConditions(user));
+            conditions.push(...this.getVisibilityConditions(user, teamId));
         }
         const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 

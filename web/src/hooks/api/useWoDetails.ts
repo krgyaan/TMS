@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { woDetailsService } from '@/services/api/wo-details.api';
 import { toast } from 'sonner';
 import { handleQueryError } from '@/lib/react-query';
+import { useTeamFilter } from '../useTeamFilter';
 import { woBasicDetailsKeys } from './useWoBasicDetails';
 import type {
   WoDetailsFilters,
@@ -31,7 +32,7 @@ export const woDetailsKeys = {
   pageData: (id: number, pageNum: number) => [...woDetailsKeys.all, 'page-data', id, pageNum] as const,
 
   // Dashboard
-  dashboardSummary: () => [...woDetailsKeys.all, 'dashboard-summary'] as const,
+  dashboardSummary: (teamId?: number) => [...woDetailsKeys.all, 'dashboard-summary', teamId] as const,
   pendingAcceptance: () => [...woDetailsKeys.all, 'pending-acceptance'] as const,
   pendingQueries: () => [...woDetailsKeys.all, 'pending-queries'] as const,
   amendmentsSummary: () => [...woDetailsKeys.all, 'amendments-summary'] as const,
@@ -43,9 +44,18 @@ export const woDetailsKeys = {
 // ============================================
 
 export const useWoDetails = (filters?: WoDetailsFilters) => {
+  const { teamId, userId, dataScope } = useTeamFilter();
+
+  const combinedFilters = {
+    ...filters,
+    teamId: (filters?.teamId || teamId) ?? undefined,
+    userId: (filters?.userId || userId) ?? undefined,
+    dataScope: filters?.dataScope || dataScope,
+  };
+
   return useQuery({
-    queryKey: woDetailsKeys.list(filters),
-    queryFn: () => woDetailsService.getAll(filters),
+    queryKey: woDetailsKeys.list(combinedFilters),
+    queryFn: () => woDetailsService.getAll(combinedFilters),
   });
 };
 
@@ -114,9 +124,11 @@ export const usePageData = (woDetailId: number, pageNum: number) => {
 // ============================================
 
 export const useWoDetailsDashboardSummary = () => {
+  const { teamId } = useTeamFilter();
+
   return useQuery({
-    queryKey: woDetailsKeys.dashboardSummary(),
-    queryFn: () => woDetailsService.getDashboardSummary(),
+    queryKey: woDetailsKeys.dashboardSummary(teamId ?? undefined),
+    queryFn: () => woDetailsService.getDashboardSummary(teamId ?? undefined),
   });
 };
 

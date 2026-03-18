@@ -151,17 +151,26 @@ export class WoBasicDetailsController {
     // ============================================
 
     @Get('dashboard/summary')
-    async getDashboardSummary(@CurrentUser() user: ValidatedUser) {
-        return this.woBasicDetailsService.getDashboardSummary(user);
+    async getDashboardSummary(
+        @CurrentUser() user: ValidatedUser,
+        @Query('teamId') teamId?: string,
+    ) {
+        return this.woBasicDetailsService.getDashboardSummary(user, teamId ? Number(teamId) : undefined);
     }
 
     @Get('dashboard/pending-assignments')
-    async getPendingOeAssignments(@CurrentUser() user: ValidatedUser) {
-        return this.woBasicDetailsService.getPendingOeAssignments(user);
+    async getPendingOeAssignments(
+        @CurrentUser() user: ValidatedUser,
+        @Query('teamId') teamId?: string,
+    ) {
+        return this.woBasicDetailsService.getPendingOeAssignments(user, teamId ? Number(teamId) : undefined);
     }
 
     @Get('dashboard/workflow-status')
-    async getWorkflowStatusSummary(@CurrentUser() user: ValidatedUser) {
-        return this.woBasicDetailsService.getWorkflowStatusSummary(user);
+    async getWorkflowStatusSummary(
+        @CurrentUser() user: ValidatedUser,
+        @Query('teamId') teamId?: string,
+    ) {
+        return this.woBasicDetailsService.getWorkflowStatusSummary(user, teamId ? Number(teamId) : undefined);
     }
 }

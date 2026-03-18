@@ -14,10 +14,11 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useWoDetails, useWoDetailsDashboardSummary } from '@/hooks/api/useWoDetails';
-import type { WoDetail, WoDetailsFilters } from '@/modules/operations/types/wo.types';
+import type { WoDetailWithRelations, WoDetailsFilters } from '@/modules/operations/types/wo.types';
 import { currencyCol, dateCol } from '@/components/data-grid';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { QuickFilter } from '@/components/ui/quick-filter';
+import { useTeamFilter } from '@/hooks/useTeamFilter';
 
 type TabKey = 'pending' | 'accepted' | 'amendment-needed';
 
@@ -28,11 +29,12 @@ const WoDetailListPage = () => {
     const [search, setSearch] = useState<string>('');
     const debouncedSearch = useDebouncedSearch(search, 300);
     const navigate = useNavigate();
+    const { teamId } = useTeamFilter();
 
-    // Reset pagination on tab/search change
+    // Reset pagination on tab/search/team change
     useEffect(() => {
         setPagination((p) => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, debouncedSearch]);
+    }, [activeTab, debouncedSearch, teamId]);
 
     const handleSortChanged = useCallback((event: any) => {
         const sortModel = event.api
@@ -97,7 +99,7 @@ const WoDetailListPage = () => {
     }, [dashboardSummary]);
 
     // Action items for each row
-    const rowActions: ActionItem<WoDetail>[] = [
+    const rowActions: ActionItem<WoDetailWithRelations>[] = [
         {
             label: 'Accept/Reject',
             onClick: (row) => navigate(paths.operations.woDetailShowPage(row.id)),
@@ -116,8 +118,8 @@ const WoDetailListPage = () => {
     ];
 
     // Acceptance status badge
-    const getAcceptanceBadge = (row: WoDetail) => {
-        if (row.woAcceptance) {
+    const getAcceptanceBadge = (row: WoDetailWithRelations) => {
+        if (row.acceptance?.status === 'completed' && row.acceptance?.decision === 'accepted') {
             return (
                 <Badge variant="default" className="bg-green-600 gap-1">
                     <CheckCircle className="h-3 w-3" />
@@ -125,7 +127,7 @@ const WoDetailListPage = () => {
                 </Badge>
             );
         }
-        if (row.woAmendmentNeeded) {
+        if (row.oeWoAmendmentNeeded) {
             return (
                 <Badge variant="destructive" className="gap-1">
                     <XCircle className="h-3 w-3" />
@@ -142,7 +144,7 @@ const WoDetailListPage = () => {
     };
 
     // Column definitions
-    const colDefs = useMemo<ColDef<WoDetail>[]>(
+    const colDefs = useMemo<ColDef<WoDetailWithRelations>[]>(
         () => [
             {
                 field: 'id',
@@ -200,7 +202,7 @@ const WoDetailListPage = () => {
                     return <span>{parseFloat(params.value).toFixed(2)}%</span>;
                 },
             },
-            dateCol<WoDetail>('ldStartDate', { includeTime: false }, {
+            dateCol<WoDetailWithRelations>('ldStartDate', { includeTime: false }, {
                 headerName: 'LD Start',
                 width: 120,
                 colId: 'ldStartDate',
@@ -229,14 +231,14 @@ const WoDetailListPage = () => {
                     </div>
                 ),
             },
-            currencyCol<WoDetail>('budgetPreGst', {
+            currencyCol<WoDetailWithRelations>('budgetPreGst', {
                 field: 'budgetPreGst',
                 colId: 'budgetPreGst',
                 headerName: 'Budget',
                 width: 130,
                 sortable: true,
             }),
-            dateCol<WoDetail>('woAcceptanceAt', { includeTime: true }, {
+            dateCol<WoDetailWithRelations>('woAcceptanceAt', { includeTime: true }, {
                 headerName: 'Accepted At',
                 width: 150,
                 colId: 'woAcceptanceAt',

@@ -171,15 +171,18 @@ export interface BulkAssignOeDto {
 export interface WoBasicDetailsFilters {
   page?: number;
   limit?: number;
-  sortBy?: string;
-  sortOrder?: SortOrder;
   search?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
   tenderId?: number;
   enquiryId?: number;
+  teamId?: number;
+  userId?: number;
+  dataScope?: string;
+  unallocated?: boolean;
   projectCode?: string;
   projectName?: string;
   currentStage?: WorkflowStage;
-  status?: number[];
   oeFirst?: number;
   oeSiteVisit?: number;
   oeDocsPrep?: number;
@@ -188,6 +191,7 @@ export interface WoBasicDetailsFilters {
   woDateTo?: string;
   createdAtFrom?: string;
   createdAtTo?: string;
+  status?: number[];
 }
 
 export interface OeAssignment {
@@ -449,9 +453,12 @@ export interface WoDetailsFilters {
   isContractAgreement?: boolean;
   siteVisitNeeded?: boolean;
   hasDiscrepancies?: boolean;
-  createdBy?: number;
-  createdAtFrom?: string;
   createdAtTo?: string;
+  teamId?: number;
+  userId?: number;
+  dataScope?: string;
+  woAcceptance?: boolean;
+  woAmendmentNeeded?: boolean;
 }
 
 // Wizard-specific types
@@ -970,14 +977,11 @@ export interface DocumentsSummary {
 // ============================================
 
 export interface WoDetailsDashboardSummary {
-  total: number;
-  draft: number;
-  inProgress: number;
-  completed: number;
-  submittedForReview: number;
-  ldApplicable: number;
-  pbgApplicable: number;
-  contractAgreement: number;
+  summary: {
+    pending: number;
+    accepted: number;
+    amendmentNeeded: number;
+  };
   generatedAt: string;
 }
 
