@@ -351,7 +351,7 @@ export default function BusinessPerformanceDashboard() {
                                                         <TableCell>
                                                             <div className="flex flex-wrap gap-1">
                                                                 {value.tender.map((tender, idx) => (
-                                                                    <Badge key={idx} variant="secondary" className="font-normal bg-green-100 text-green-800">
+                                                                    <Badge key={idx} variant="secondary" className="font-normal border border-gray-200">
                                                                         {tender}
                                                                     </Badge>
                                                                 ))}
