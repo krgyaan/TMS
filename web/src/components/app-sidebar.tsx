@@ -132,12 +132,12 @@ const navMain: NavGroup[] = [
         items: [
             { title: "Tender Executive", url: paths.performance.tenderExecutive, permission: "performance.tender-executive" },
             { title: "Team Leader", url: paths.performance.teamLeader, permission: "performance.team-leader" },
-            { title: "Operation Team", url: paths.performance.operationTeam, permission: "performance.operation-team" },
-            { title: "Account Team", url: paths.performance.accountTeam, permission: "performance.account-team" },
             { title: "OEM Dashboard", url: paths.performance.oemDashboard, permission: "performance.oem-dashboard" },
             { title: "Business Dashboard", url: paths.performance.businessDashboard, permission: "performance.business-dashboard" },
             { title: "Customer Dashboard", url: paths.performance.customerDashboard, permission: "performance.customer-dashboard" },
             { title: "Location Dashboard", url: paths.performance.locationDashboard, permission: "performance.location-dashboard" },
+            { title: "Operation Team", url: paths.performance.operationTeam, permission: "performance.operation-team" },
+            { title: "Account Team", url: paths.performance.accountTeam, permission: "performance.account-team" },
         ],
     },
     {
@@ -201,12 +201,12 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
 
     const displayUser = currentUser ??
         storedUser ?? {
-        id: 0,
-        name: "Gyan",
-        email: "gyan@volkenergie.in",
-        username: null,
-        mobile: null,
-    };
+            id: 0,
+            name: "Gyan",
+            email: "gyan@volkenergie.in",
+            username: null,
+            mobile: null,
+        };
 
     const filteredMenuItems = React.useMemo(() => filterMenu(currentUser, navMain), [currentUser]);
 
