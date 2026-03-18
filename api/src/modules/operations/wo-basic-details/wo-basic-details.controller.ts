@@ -2,6 +2,8 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPip
 import { WoBasicDetailsService } from './wo-basic-details.service';
 import { CreateWoBasicDetailSchema, UpdateWoBasicDetailSchema, AssignOeSchema, BulkAssignOeSchema, RemoveOeAssignmentSchema,  WoBasicDetailsQuerySchema } from './dto/wo-basic-details.dto';
 import type { CreateWoBasicDetailDto, UpdateWoBasicDetailDto, AssignOeDto, BulkAssignOeDto, RemoveOeAssignmentDto, WoBasicDetailsQueryDto } from './dto/wo-basic-details.dto';
+import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 @Controller('wo-basic-details')
 export class WoBasicDetailsController {
@@ -15,6 +17,7 @@ export class WoBasicDetailsController {
 
     @Get()
     async list(
+        @CurrentUser() user: ValidatedUser,
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('sortBy') sortBy?: string,
@@ -22,6 +25,8 @@ export class WoBasicDetailsController {
         @Query('search') search?: string,
         @Query('tenderId') tenderId?: string,
         @Query('enquiryId') enquiryId?: string,
+        @Query('teamId') teamId?: string,
+        @Query('unallocated') unallocated?: string,
         @Query('projectCode') projectCode?: string,
         @Query('projectName') projectName?: string,
         @Query('currentStage') currentStage?: string,
@@ -34,9 +39,10 @@ export class WoBasicDetailsController {
         @Query('createdAtFrom') createdAtFrom?: string,
         @Query('createdAtTo') createdAtTo?: string,
     ) {
-        const rawFilters = { page, limit, sortBy, sortOrder, search, tenderId, enquiryId, projectCode, projectName, currentStage, oeFirst, oeSiteVisit, oeDocsPrep, isWorkflowPaused, woDateFrom, woDateTo, createdAtFrom, createdAtTo };
+        const rawFilters = { page, limit, sortBy, sortOrder, search, tenderId, enquiryId, teamId, unallocated: unallocated === 'true' || unallocated === '1', projectCode, projectName, currentStage, oeFirst, oeSiteVisit, oeDocsPrep, isWorkflowPaused, woDateFrom, woDateTo, createdAtFrom, createdAtTo };
 
         const parsed = WoBasicDetailsQuerySchema.parse(rawFilters) as WoBasicDetailsQueryDto;
+        parsed.user = user;
         return this.woBasicDetailsService.findAll(parsed);
     }
 
@@ -52,18 +58,22 @@ export class WoBasicDetailsController {
 
     @Post()
     @HttpCode(HttpStatus.CREATED)
-    async create(@Body() body: unknown) {
+    async create(
+        @Body() body: unknown,
+        @CurrentUser() user: ValidatedUser,
+    ) {
         const parsed = CreateWoBasicDetailSchema.parse(body) as CreateWoBasicDetailDto;
-        return this.woBasicDetailsService.create(parsed);
+        return this.woBasicDetailsService.create(parsed, user.sub);
     }
 
     @Patch(':id')
     async update(
         @Param('id', ParseIntPipe) id: number,
         @Body() body: unknown,
+        @CurrentUser() user: ValidatedUser,
     ) {
         const parsed = UpdateWoBasicDetailSchema.parse(body) as UpdateWoBasicDetailDto;
-        return this.woBasicDetailsService.update(id, parsed);
+        return this.woBasicDetailsService.update(id, parsed, user.sub);
     }
 
     @Delete(':id')
@@ -141,17 +151,26 @@ export class WoBasicDetailsController {
     // ============================================
 
     @Get('dashboard/summary')
-    async getDashboardSummary() {
-        return this.woBasicDetailsService.getDashboardSummary();
+    async getDashboardSummary(
+        @CurrentUser() user: ValidatedUser,
+        @Query('teamId') teamId?: string,
+    ) {
+        return this.woBasicDetailsService.getDashboardSummary(user, teamId ? Number(teamId) : undefined);
     }
 
     @Get('dashboard/pending-assignments')
-    async getPendingOeAssignments() {
-        return this.woBasicDetailsService.getPendingOeAssignments();
+    async getPendingOeAssignments(
+        @CurrentUser() user: ValidatedUser,
+        @Query('teamId') teamId?: string,
+    ) {
+        return this.woBasicDetailsService.getPendingOeAssignments(user, teamId ? Number(teamId) : undefined);
     }
 
     @Get('dashboard/workflow-status')
-    async getWorkflowStatusSummary() {
-        return this.woBasicDetailsService.getWorkflowStatusSummary();
+    async getWorkflowStatusSummary(
+        @CurrentUser() user: ValidatedUser,
+        @Query('teamId') teamId?: string,
+    ) {
+        return this.woBasicDetailsService.getWorkflowStatusSummary(user, teamId ? Number(teamId) : undefined);
     }
 }
