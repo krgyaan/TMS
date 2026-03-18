@@ -96,6 +96,7 @@ import { WoContactsModule } from "./modules/operations/wo-contacts/wo-contacts.m
 import { WoAmendmentsModule } from "./modules/operations/wo-amendments/wo-amendments.module";
 import { WoDocumentsModule } from "./modules/operations/wo-documents/wo-documents.module";
 import { WoQueriesModule } from "./modules/operations/wo-queries/wo-queries.module";
+import { CustomerPerformanceModule } from "./modules/performance/customer-performance/customer-performance.module";
 
 @Module({
     imports: [
@@ -202,6 +203,7 @@ import { WoQueriesModule } from "./modules/operations/wo-queries/wo-queries.modu
         RequestExtensionsModule,
         SubmitQueriesModule,
         LoanAdvanceModule,
+        CustomerPerformanceModule,
     ],
     controllers: [AppController],
     providers: [
