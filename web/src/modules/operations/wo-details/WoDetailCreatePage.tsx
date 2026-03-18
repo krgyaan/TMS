@@ -1,11 +1,10 @@
-import { useSearchParams } from "react-router-dom";
 import { WoDetailsWizard } from "./components/WoDetailsWizard";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import { useParams } from "react-router-dom";
 
 const WoDetailCreatePage = () => {
-    const [searchParams] = useSearchParams();
-    const woBasicDetailId = searchParams.get("woBasicDetailId");
+    const { woBasicDetailId } = useParams<{ woBasicDetailId: string }>();
 
     if (!woBasicDetailId) {
         return (

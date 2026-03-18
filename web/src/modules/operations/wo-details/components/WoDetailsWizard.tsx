@@ -249,8 +249,8 @@ export function WoDetailsWizard({
             </div>
 
             {/* Stepper */}
-            <Card>
-                <CardContent className="pt-6">
+            <Card className="px-0 bg-transparent border-none">
+                <CardContent>
                     <WizardStepper
                         currentPage={wizardState.currentPage}
                         completedPages={wizardState.completedPages}

@@ -64,8 +64,8 @@ export function WizardStepper({
             </div>
 
             {/* Current Page Info */}
-            <div className="mt-4 text-center">
-                <h2 className="text-lg font-semibold">
+            <div className="mt-4 text-center hidden">
+                <h2 className="font-semibold">
                     Step {currentPage}: {WIZARD_PAGES[currentPage - 1]?.title}
                 </h2>
                 <p className="text-sm text-muted-foreground">

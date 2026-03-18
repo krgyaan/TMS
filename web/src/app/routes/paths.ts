@@ -97,14 +97,14 @@ export const paths = {
 
     // ==================== OPERATIONS ====================
     operations: {
-        woBasicDetailListPage: "/operations/work-order/basic-details",
-        woBasicDetailCreatePage: "/operations/work-order/basic-details/create",
-        woBasicDetailEditPage: (id: number) => `/operations/work-order/basic-details/${id}/edit`,
-        woBasicDetailShowPage: (id: number) => `/operations/work-order/basic-details/${id}`,
-        woDetailListPage: "/operations/work-order/details",
-        woDetailCreatePage: "/operations/work-order/details/create",
-        woDetailEditPage: (id: number) => `/operations/work-order/details/${id}/edit`,
-        woDetailShowPage: (id: number) => `/operations/work-order/details/${id}`,
+        woBasicDetailListPage: "/operations/work-order/details/basic",
+        woBasicDetailCreatePage: "/operations/work-order/details/basic/create",
+        woBasicDetailEditPage: (id: number) => `/operations/work-order/details/basic/${id}/edit`,
+        woBasicDetailShowPage: (id: number) => `/operations/work-order/details/basic/${id}`,
+        woDetailListPage: "/operations/work-order/details/full",
+        woDetailCreatePage: (woBasicDetailId: number) => `/operations/work-order/details/full/create/${woBasicDetailId}`,
+        woDetailEditPage: (id: number) => `/operations/work-order/details/full/${id}/edit`,
+        woDetailShowPage: (id: number) => `/operations/work-order/details/full/${id}`,
 
         kickOff: "/operations/kick-off",
         contractAgreement: "/operations/contract-agreement",

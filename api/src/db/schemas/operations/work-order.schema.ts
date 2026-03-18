@@ -8,6 +8,7 @@ export const woBasicDetails = pgTable("wo_basic_details", {
     // Source reference
     tenderId: bigint("tender_id", { mode: "number" }),
     enquiryId: bigint("enquiry_id", { mode: "number" }),
+    team: bigint("team", { mode: "number" }),
 
     // Core WO information
     woNumber: varchar("wo_number", { length: 255 }),
