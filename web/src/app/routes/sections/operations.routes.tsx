@@ -21,13 +21,13 @@ const Operations_ViewPoPage = lazy(() => import("@/modules/operations/project-da
 export default function OperationsRoutes() {
     return (
         <Routes>
-            <Route path="work-order/basic-details" element={<RouteWrapper><Basic_Details /></RouteWrapper>} />
-            <Route path="work-order/basic-details/create" element={<RouteWrapper><Basic_Details_Create /></RouteWrapper>} />
-            <Route path="work-order/basic-details/:id/edit" element={<RouteWrapper><Basic_Details_Edit /></RouteWrapper>} />
-            <Route path="work-order/basic-details/:id" element={<RouteWrapper><Basic_Details_Show /></RouteWrapper>} />
+            <Route path="work-order/details/basic" element={<RouteWrapper><Basic_Details /></RouteWrapper>} />
+            <Route path="work-order/details/basic/create" element={<RouteWrapper><Basic_Details_Create /></RouteWrapper>} />
+            <Route path="work-order/details/basic/:id/edit" element={<RouteWrapper><Basic_Details_Edit /></RouteWrapper>} />
+            <Route path="work-order/details/basic/:id" element={<RouteWrapper><Basic_Details_Show /></RouteWrapper>} />
 
             <Route path="work-order/details" element={<RouteWrapper><Wo_Details /></RouteWrapper>} />
-            <Route path="work-order/details/create" element={<RouteWrapper><Wo_Details_Create /></RouteWrapper>} />
+            <Route path="work-order/details/create/:woBasicDetailId" element={<RouteWrapper><Wo_Details_Create /></RouteWrapper>} />
             <Route path="work-order/details/:id/edit" element={<RouteWrapper><Wo_Details_Edit /></RouteWrapper>} />
             <Route path="work-order/details/:id" element={<RouteWrapper><Wo_Details_Show /></RouteWrapper>} />
 

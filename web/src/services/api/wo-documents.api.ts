@@ -3,12 +3,8 @@ import type {
   WoDocument,
   CreateWoDocumentDto,
   UpdateWoDocumentDto,
-  CreateBulkWoDocumentsDto,
-  ReplaceDocumentDto,
   WoDocumentsFilters,
-  VersionHistory,
-  DocumentsSummary,
-  DocumentsOverviewStatistics,
+  DocumentType,
   PaginatedResult,
 } from '@/modules/operations/types/wo.types';
 
@@ -28,9 +24,6 @@ class WoDocumentsService extends BaseApiService {
     if (filters.sortOrder) params.set('sortOrder', filters.sortOrder);
     if (filters.woDetailId) params.set('woDetailId', String(filters.woDetailId));
     if (filters.type) params.set('type', filters.type);
-    if (filters.version) params.set('version', String(filters.version));
-    if (filters.uploadedFrom) params.set('uploadedFrom', filters.uploadedFrom);
-    if (filters.uploadedTo) params.set('uploadedTo', filters.uploadedTo);
 
     const queryString = params.toString();
     return queryString ? `?${queryString}` : '';
@@ -49,57 +42,64 @@ class WoDocumentsService extends BaseApiService {
     return this.get<WoDocument[]>(`/by-wo-detail/${woDetailId}`);
   }
 
-  async getByType(woDetailId: number, type: string): Promise<WoDocument[]> {
-    return this.get<WoDocument[]>(`/by-type/${woDetailId}/${type}`);
+  async getByType(woDetailId: number, type: DocumentType): Promise<WoDocument[]> {
+    return this.get<WoDocument[]>(`/by-wo-detail/${woDetailId}/type/${type}`);
   }
 
-  async getLatestByType(woDetailId: number, type: string): Promise<WoDocument> {
-    return this.get<WoDocument>(`/latest/${woDetailId}/${type}`);
+  async getLatestByType(woDetailId: number, type: DocumentType): Promise<WoDocument | null> {
+    return this.get<WoDocument | null>(`/by-wo-detail/${woDetailId}/type/${type}/latest`);
   }
 
-  async getVersionHistory(woDetailId: number, type: string): Promise<VersionHistory> {
-    return this.get<VersionHistory>(`/versions/${woDetailId}/${type}`);
+  async getVersionHistory(woDetailId: number, type: DocumentType): Promise<WoDocument[]> {
+    return this.get<WoDocument[]>(`/by-wo-detail/${woDetailId}/type/${type}/versions`);
   }
 
   async upload(data: CreateWoDocumentDto): Promise<WoDocument> {
     return this.post<WoDocument>('', data);
   }
 
-  async uploadBulk(data: CreateBulkWoDocumentsDto): Promise<{ uploaded: number; data: WoDocument[] }> {
-    return this.post<{ uploaded: number; data: WoDocument[] }>('/bulk', data);
+  async uploadBulk(data: { woDetailId: number; documents: Omit<CreateWoDocumentDto, 'woDetailId'>[] }): Promise<{ count: number; documents: WoDocument[] }> {
+    return this.post<{ count: number; documents: WoDocument[] }>('/bulk', data);
   }
 
   async update(id: number, data: UpdateWoDocumentDto): Promise<WoDocument> {
     return this.patch<WoDocument>(`/${id}`, data);
   }
 
-  async replace(id: number, data: ReplaceDocumentDto): Promise<WoDocument | { previousVersion: WoDocument; newVersion: WoDocument }> {
-    return this.post<WoDocument | { previousVersion: WoDocument; newVersion: WoDocument }>(`/${id}/replace`, data);
+  async replace(id: number, data: { filePath: string }): Promise<WoDocument> {
+    return this.post<WoDocument>(`/${id}/replace`, data);
   }
 
   async remove(id: number): Promise<void> {
     return this.delete(`/${id}`);
   }
 
-  async removeAllByWoDetail(woDetailId: number): Promise<void> {
-    return this.delete(`/by-wo-detail/${woDetailId}`);
+  async removeAllByWoDetail(woDetailId: number): Promise<{ count: number }> {
+    return this.delete<{ count: number }>(`/by-wo-detail/${woDetailId}`);
   }
 
-  async removeByType(woDetailId: number, type: string): Promise<void> {
-    return this.delete(`/by-type/${woDetailId}/${type}`);
+  async removeByType(woDetailId: number, type: DocumentType): Promise<{ count: number }> {
+    return this.delete<{ count: number }>(`/by-wo-detail/${woDetailId}/type/${type}`);
   }
 
-  // Utility Operations
-  async getDocumentsSummary(woDetailId: number): Promise<DocumentsSummary> {
-    return this.get<DocumentsSummary>(`/summary/${woDetailId}`);
+  // Utility
+  async getDocumentsSummary(woDetailId: number): Promise<{
+    total: number;
+    byType: Record<string, number>;
+  }> {
+    return this.get(`/by-wo-detail/${woDetailId}/summary`);
   }
 
-  async checkDocumentExists(woDetailId: number, type: string): Promise<{ exists: boolean; latestVersion: number | null }> {
-    return this.get<{ exists: boolean; latestVersion: number | null }>(`/check-exists/${woDetailId}/${type}`);
+  async checkDocumentExists(woDetailId: number, type: DocumentType): Promise<{ exists: boolean; latestVersion?: number }> {
+    return this.get(`/by-wo-detail/${woDetailId}/type/${type}/exists`);
   }
 
-  async getOverviewStatistics(): Promise<DocumentsOverviewStatistics> {
-    return this.get<DocumentsOverviewStatistics>('/statistics/overview');
+  async getOverviewStatistics(): Promise<{
+    totalDocuments: number;
+    byType: Record<string, number>;
+    recentUploads: WoDocument[];
+  }> {
+    return this.get('/statistics/overview');
   }
 }
 

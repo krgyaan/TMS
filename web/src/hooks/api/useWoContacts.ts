@@ -24,7 +24,6 @@ export const woContactsKeys = {
   byDepartment: (woBasicDetailId: number, department: string) =>
     [...woContactsKeys.all, 'by-department', woBasicDetailId, department] as const,
   summary: (woBasicDetailId: number) => [...woContactsKeys.all, 'summary', woBasicDetailId] as const,
-  emailCheck: (email: string) => [...woContactsKeys.all, 'email-check', email] as const,
 };
 
 // ============================================
@@ -42,7 +41,7 @@ export const useWoContactById = (id: number) => {
   return useQuery({
     queryKey: woContactsKeys.detail(id),
     queryFn: () => woContactsService.getById(id),
-    enabled: !!id,
+    enabled: !!id && id > 0,
   });
 };
 
@@ -50,7 +49,7 @@ export const useWoContactsByBasicDetail = (woBasicDetailId: number) => {
   return useQuery({
     queryKey: woContactsKeys.byBasicDetail(woBasicDetailId),
     queryFn: () => woContactsService.getByWoBasicDetailId(woBasicDetailId),
-    enabled: !!woBasicDetailId,
+    enabled: !!woBasicDetailId && woBasicDetailId > 0,
   });
 };
 
@@ -66,15 +65,7 @@ export const useContactsSummary = (woBasicDetailId: number) => {
   return useQuery({
     queryKey: woContactsKeys.summary(woBasicDetailId),
     queryFn: () => woContactsService.getContactsSummary(woBasicDetailId),
-    enabled: !!woBasicDetailId,
-  });
-};
-
-export const useCheckEmailExists = (email: string, woBasicDetailId?: number) => {
-  return useQuery({
-    queryKey: woContactsKeys.emailCheck(email),
-    queryFn: () => woContactsService.checkEmailExists(email, woBasicDetailId),
-    enabled: !!email && email.length > 0,
+    enabled: !!woBasicDetailId && woBasicDetailId > 0,
   });
 };
 

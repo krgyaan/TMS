@@ -5,8 +5,6 @@ import type {
   UpdateWoAmendmentDto,
   CreateBulkWoAmendmentsDto,
   WoAmendmentsFilters,
-  AmendmentsSummary,
-  TopClausesStatistics,
   PaginatedResult,
 } from '@/modules/operations/types/wo.types';
 
@@ -24,12 +22,10 @@ class WoAmendmentsService extends BaseApiService {
     if (filters.limit) params.set('limit', String(filters.limit));
     if (filters.sortBy) params.set('sortBy', filters.sortBy);
     if (filters.sortOrder) params.set('sortOrder', filters.sortOrder);
-    if (filters.search) params.set('search', filters.search);
     if (filters.woDetailId) params.set('woDetailId', String(filters.woDetailId));
-    if (filters.pageNo) params.set('pageNo', filters.pageNo);
-    if (filters.clauseNo) params.set('clauseNo', filters.clauseNo);
-    if (filters.createdAtFrom) params.set('createdAtFrom', filters.createdAtFrom);
-    if (filters.createdAtTo) params.set('createdAtTo', filters.createdAtTo);
+    if (filters.status) params.set('status', filters.status);
+    if (filters.createdByRole) params.set('createdByRole', filters.createdByRole);
+    if (filters.tlApproved !== undefined) params.set('tlApproved', String(filters.tlApproved));
 
     const queryString = params.toString();
     return queryString ? `?${queryString}` : '';
@@ -49,15 +45,15 @@ class WoAmendmentsService extends BaseApiService {
   }
 
   async getByClause(woDetailId: number, clauseNo: string): Promise<WoAmendment[]> {
-    return this.get<WoAmendment[]>(`/by-clause/${woDetailId}/${clauseNo}`);
+    return this.get<WoAmendment[]>(`/by-wo-detail/${woDetailId}/clause/${encodeURIComponent(clauseNo)}`);
   }
 
   async create(data: CreateWoAmendmentDto): Promise<WoAmendment> {
     return this.post<WoAmendment>('', data);
   }
 
-  async createBulk(data: CreateBulkWoAmendmentsDto): Promise<{ created: number; data: WoAmendment[] }> {
-    return this.post<{ created: number; data: WoAmendment[] }>('/bulk', data);
+  async createBulk(data: CreateBulkWoAmendmentsDto): Promise<{ count: number; amendments: WoAmendment[] }> {
+    return this.post<{ count: number; amendments: WoAmendment[] }>('/bulk', data);
   }
 
   async update(id: number, data: UpdateWoAmendmentDto): Promise<WoAmendment> {
@@ -68,17 +64,46 @@ class WoAmendmentsService extends BaseApiService {
     return this.delete(`/${id}`);
   }
 
-  async removeAllByWoDetail(woDetailId: number): Promise<void> {
-    return this.delete(`/by-wo-detail/${woDetailId}`);
+  async removeAllByWoDetail(woDetailId: number): Promise<{ count: number }> {
+    return this.delete<{ count: number }>(`/by-wo-detail/${woDetailId}`);
   }
 
-  // Utility Operations
-  async getAmendmentsSummary(woDetailId: number): Promise<AmendmentsSummary> {
-    return this.get<AmendmentsSummary>(`/summary/${woDetailId}`);
+  // TL Review Actions
+  async approveAmendment(id: number, remarks?: string): Promise<WoAmendment> {
+    return this.post<WoAmendment>(`/${id}/approve`, { remarks });
   }
 
-  async getTopClausesStatistics(): Promise<TopClausesStatistics> {
-    return this.get<TopClausesStatistics>('/statistics/top-clauses');
+  async rejectAmendment(id: number, remarks: string): Promise<WoAmendment> {
+    return this.post<WoAmendment>(`/${id}/reject`, { remarks });
+  }
+
+  // Client Communication
+  async markCommunicated(id: number): Promise<WoAmendment> {
+    return this.post<WoAmendment>(`/${id}/communicated`);
+  }
+
+  async recordClientResponse(id: number, response: string, proof?: string): Promise<WoAmendment> {
+    return this.post<WoAmendment>(`/${id}/client-response`, { response, proof });
+  }
+
+  async markResolved(id: number): Promise<WoAmendment> {
+    return this.post<WoAmendment>(`/${id}/resolve`);
+  }
+
+  // Summary/Statistics
+  async getAmendmentsSummary(woDetailId: number): Promise<{
+    total: number;
+    pending: number;
+    approved: number;
+    rejected: number;
+    communicated: number;
+    resolved: number;
+  }> {
+    return this.get(`/by-wo-detail/${woDetailId}/summary`);
+  }
+
+  async getTopClausesStatistics(): Promise<Array<{ clauseNo: string; count: number }>> {
+    return this.get('/statistics/top-clauses');
   }
 }
 

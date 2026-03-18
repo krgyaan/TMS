@@ -95,7 +95,7 @@ const BasicDetailListPage = () => {
         },
         {
             label: 'WO Details',
-            onClick: () => navigate(paths.operations.woDetailCreatePage),
+            onClick: (row) => navigate(paths.operations.woDetailCreatePage(row.id)),
             icon: <FileText className="h-4 w-4" />,
         },
         {

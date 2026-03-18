@@ -4,15 +4,14 @@ import type {
   WoDetailWithRelations,
   CreateWoDetailDto,
   UpdateWoDetailDto,
-  AcceptWoDto,
-  RequestAmendmentDto,
   WoAcceptanceDecisionDto,
   WoDetailsFilters,
-  AcceptanceStatus,
   WoTimeline,
   WoDetailsDashboardSummary,
   SlaComplianceReport,
   PaginatedResult,
+  RequestAmendmentDto,
+  AcceptanceStatus,
 } from '@/modules/operations/types/wo.types';
 
 class WoDetailsService extends BaseApiService {
@@ -29,26 +28,14 @@ class WoDetailsService extends BaseApiService {
     if (filters.limit) params.set('limit', String(filters.limit));
     if (filters.sortBy) params.set('sortBy', filters.sortBy);
     if (filters.sortOrder) params.set('sortOrder', filters.sortOrder);
-    if (filters.woBasicDetailId) params.set('woBasicDetailId', String(filters.woBasicDetailId));
-    if (filters.ldApplicable !== undefined) params.set('ldApplicable', String(filters.ldApplicable));
-    if (filters.isPbgApplicable !== undefined) params.set('isPbgApplicable', String(filters.isPbgApplicable));
-    if (filters.isContractAgreement !== undefined) params.set('isContractAgreement', String(filters.isContractAgreement));
-    if (filters.woAcceptance !== undefined) params.set('woAcceptance', String(filters.woAcceptance));
-    if (filters.woAmendmentNeeded !== undefined) params.set('woAmendmentNeeded', String(filters.woAmendmentNeeded));
-    if (filters.status !== undefined) params.set('status', String(filters.status));
-    if (filters.tlId) params.set('tlId', String(filters.tlId));
-    if (filters.ldStartDateFrom) params.set('ldStartDateFrom', filters.ldStartDateFrom);
-    if (filters.ldStartDateTo) params.set('ldStartDateTo', filters.ldStartDateTo);
-    if (filters.createdAtFrom) params.set('createdAtFrom', filters.createdAtFrom);
-    if (filters.createdAtTo) params.set('createdAtTo', filters.createdAtTo);
-    if (filters.woAcceptanceAtFrom) params.set('woAcceptanceAtFrom', filters.woAcceptanceAtFrom);
-    if (filters.woAcceptanceAtTo) params.set('woAcceptanceAtTo', filters.woAcceptanceAtTo);
-
     const queryString = params.toString();
     return queryString ? `?${queryString}` : '';
   }
 
+  // ============================================
   // CRUD Operations
+  // ============================================
+
   async getAll(filters?: WoDetailsFilters): Promise<PaginatedResult<WoDetail>> {
     return this.get<PaginatedResult<WoDetail>>(this.buildQueryString(filters));
   }
@@ -77,8 +64,65 @@ class WoDetailsService extends BaseApiService {
     return this.delete(`/${id}`);
   }
 
+  // ============================================
+  // WIZARD OPERATIONS (NEW)
+  // ============================================
+
+  /**
+   * Get wizard progress for a WO Detail
+   */
+  async getWizardProgress(id: number): Promise<{
+    currentPage: number;
+    completedPages: number[];
+    skippedPages: number[];
+    status: string;
+    percentComplete: number;
+    canSubmitForReview: boolean;
+    blockers: string[];
+  }> {
+    return this.get(`/${id}/wizard/progress`);
+  }
+
+  /**
+   * Save page data (draft save)
+   */
+  async savePage(woDetailId: number, pageNum: number, data: any): Promise<WoDetail> {
+    return this.post<WoDetail>(`/${woDetailId}/wizard/pages/${pageNum}/save`, data);
+  }
+
+  /**
+   * Submit page and proceed to next
+   */
+  async submitPage(woDetailId: number, pageNum: number, data: any): Promise<WoDetail> {
+    return this.post<WoDetail>(`/${woDetailId}/wizard/pages/${pageNum}/submit`, data);
+  }
+
+  /**
+   * Skip a page
+   */
+  async skipPage(woDetailId: number, pageNum: number, reason?: string): Promise<WoDetail> {
+    return this.post<WoDetail>(`/${woDetailId}/wizard/pages/${pageNum}/skip`, { reason });
+  }
+
+  /**
+   * Submit entire WO Details for TL review
+   */
+  async submitForReview(woDetailId: number): Promise<WoDetail & { message: string }> {
+    return this.post<WoDetail & { message: string }>(`/${woDetailId}/wizard/submit-for-review`);
+  }
+
+  /**
+   * Get page data (for editing)
+   */
+  async getPageData(woDetailId: number, pageNum: number): Promise<any> {
+    return this.get(`/${woDetailId}/wizard/pages/${pageNum}`);
+  }
+
+  // ============================================
   // WO Acceptance Workflow
-  async acceptWo(id: number, data: AcceptWoDto): Promise<WoDetail & { message: string }> {
+  // ============================================
+
+  async acceptWo(id: number, data: {tlId?: number; notes?: string;}): Promise<WoDetail & { message: string }> {
     return this.post<WoDetail & { message: string }>(`/${id}/accept`, data);
   }
 
@@ -98,7 +142,10 @@ class WoDetailsService extends BaseApiService {
     return this.get<WoTimeline>(`/${id}/timeline`);
   }
 
+  // ============================================
   // Dashboard/Reporting
+  // ============================================
+
   async getDashboardSummary(): Promise<WoDetailsDashboardSummary> {
     return this.get<WoDetailsDashboardSummary>('/dashboard/summary');
   }
