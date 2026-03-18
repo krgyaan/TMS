@@ -1,16 +1,9 @@
-import {
-    Inject,
-    Injectable,
-    NotFoundException,
-    ConflictException,
-    BadRequestException,
-} from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { eq, desc, asc, sql, and, or, ilike, gte, lte, isNull, inArray, SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { woBasicDetails, woContacts, woDetails } from '@db/schemas/operations';
-import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import type { CreateWoBasicDetailDto, UpdateWoBasicDetailDto, AssignOeDto, BulkAssignOeDto, RemoveOeAssignmentDto, WoBasicDetailsQueryDto } from './dto/wo-basic-details.dto';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
