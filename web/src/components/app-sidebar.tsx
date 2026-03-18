@@ -16,10 +16,6 @@ import type { AuthUser } from "@/types/auth.types";
 import { canRead } from "@/types/auth.types";
 import type { LucideIcon } from "lucide-react";
 
-/* -------------------------------------------------------------------------- */
-/*                                   TYPES                                    */
-/* -------------------------------------------------------------------------- */
-
 type NavItem = {
     title: string;
     url: string;
@@ -32,10 +28,6 @@ type NavGroup = {
     icon?: LucideIcon;
     items?: NavItem[];
 };
-
-/* -------------------------------------------------------------------------- */
-/*                             MENU CONFIGURATION                              */
-/* -------------------------------------------------------------------------- */
 
 const navMain: NavGroup[] = [
     {
@@ -66,7 +58,7 @@ const navMain: NavGroup[] = [
         icon: Wrench,
         items: [
             { title: "Work Order", url: paths.operations.woBasicDetailListPage, permission: "ops.work-order" },
-            { title: "WO Approval", url: paths.operations.woDetailListPage, permission: "ops.wo-approval" },
+            { title: "WO Approval", url: paths.operations.woDetailAcceptanceListPage, permission: "ops.wo-approval" },
             { title: "Kick Off", url: paths.operations.kickOff, permission: "ops.kick-off" },
             { title: "Contract Agreement", url: paths.operations.contractAgreement, permission: "ops.contract-agreement" },
             { title: "Project Dashboard", url: paths.operations.projectDashboard, permission: "project-dashboard" },
@@ -190,10 +182,6 @@ function filterMenu(user: AuthUser | null, menu: NavGroup[]): NavGroup[] {
         })
         .filter(Boolean) as NavGroup[];
 }
-
-/* -------------------------------------------------------------------------- */
-/*                               SIDEBAR COMPONENT                             */
-/* -------------------------------------------------------------------------- */
 
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
     const { data: currentUser } = useCurrentUser();

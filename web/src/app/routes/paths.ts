@@ -106,6 +106,11 @@ export const paths = {
         woDetailEditPage: (id: number) => `/operations/work-order/details/full/${id}/edit`,
         woDetailShowPage: (id: number) => `/operations/work-order/details/full/${id}`,
 
+        woDetailAcceptanceListPage: "/operations/work-order/acceptance",
+        woDetailAcceptanceCreatePage: (woBasicDetailId: number) => `/operations/work-order/acceptance/create/${woBasicDetailId}`,
+        woDetailAcceptanceEditPage: (id: number) => `/operations/work-order/acceptance/${id}/edit`,
+        woDetailAcceptanceShowPage: (id: number) => `/operations/work-order/acceptance/${id}`,
+
         kickOff: "/operations/kick-off",
         contractAgreement: "/operations/contract-agreement",
         projectDashboard: "/operations/project-dashboard",
