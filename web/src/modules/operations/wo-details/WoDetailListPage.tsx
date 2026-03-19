@@ -58,6 +58,8 @@ const WoDetailListPage = () => {
             limit: pagination.pageSize,
             sortBy: sortModel[0]?.colId,
             sortOrder: sortModel[0]?.sort,
+            search: debouncedSearch,
+            teamId,
         };
 
         switch (activeTab) {
@@ -74,7 +76,7 @@ const WoDetailListPage = () => {
         }
 
         return baseFilters;
-    }, [activeTab, pagination, sortModel]);
+    }, [activeTab, pagination, sortModel, debouncedSearch, teamId]);
 
     // Fetch data
     const { data: dashboardSummary } = useWoDetailsDashboardSummary();
@@ -100,7 +102,7 @@ const WoDetailListPage = () => {
     // Action items for each row
     const rowActions: ActionItem<WoDetailsListResponseDto>[] = [
         {
-            label: 'Accept/Reject',
+            label: 'WO Acceptance',
             onClick: (row) => navigate(paths.operations.woDetailAcceptanceShowPage(row.id)),
             icon: <CheckCircle className="h-4 w-4" />,
         },
@@ -187,14 +189,22 @@ const WoDetailListPage = () => {
                 colId: 'status',
                 headerName: 'WO Status',
                 width: 120,
-                cellRenderer: (params: any) => <span className="capitalize">{params.value}</span>,
+                cellRenderer: (params: any) => {
+                    return <Badge variant='outline' className="capitalize">
+                        {params.value?.replaceAll('_', ' ')}
+                    </Badge>
+                },
             },
             {
                 field: 'woAcceptanceStatus',
                 colId: 'woAcceptanceStatus',
                 headerName: 'Acceptance',
                 width: 120,
-                cellRenderer: (params: any) => <span className="capitalize">{params.value}</span>,
+                cellRenderer: (params: any) => {
+                    return <Badge variant='outline' className="capitalize">
+                        {params.value ? params.value?.replaceAll('_', ' ') : 'Pending'}
+                    </Badge>
+                },
             },
             {
                 headerName: '',

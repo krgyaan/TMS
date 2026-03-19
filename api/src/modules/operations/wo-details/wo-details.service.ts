@@ -174,15 +174,38 @@ export class WoDetailsService {
       conditions.push(eq(woDetails.isContractAgreement, filters.isContractAgreement));
     }
 
-    if (filters?.woAmendmentNeeded !== undefined) {
-      conditions.push(eq(woDetails.oeWoAmendmentNeeded, filters.woAmendmentNeeded));
-    }
-    if (filters?.woAcceptance !== undefined) {
-      if (filters.woAcceptance) {
-        conditions.push(eq(woAcceptance.status, 'completed'), eq(woAcceptance.decision, 'accepted'));
-      } else {
-        conditions.push(or(isNull(woAcceptance.id), ne(woAcceptance.status, 'completed'), ne(woAcceptance.decision, 'accepted')));
-      }
+    if (filters?.woAmendmentNeeded !== undefined && filters?.woAmendmentNeeded === true) {
+      conditions.push(eq(woDetails.oeWoAmendmentNeeded, true));
+    } else if (filters?.woAcceptance !== undefined && filters?.woAcceptance === true) {
+      conditions.push(
+        and(
+          eq(woAcceptance.status, 'completed'),
+          eq(woAcceptance.decision, 'accepted')
+        )
+      );
+    } else if (filters?.woAcceptance === false && filters?.woAmendmentNeeded === false) {
+      // Pending tab: Not accepted and not amendment needed
+      conditions.push(
+        and(
+          // Not accepted
+          or(
+            isNull(woAcceptance.id),
+            ne(woAcceptance.status, 'completed'),
+            ne(woAcceptance.decision, 'accepted')
+          ),
+          // Not amendment needed
+          and(
+            eq(woDetails.oeWoAmendmentNeeded, false),
+            or(
+              isNull(woAcceptance.id),
+              and(
+                ne(woAcceptance.status, 'awaiting_amendment'),
+                ne(woAcceptance.decision, 'amendment_needed')
+              )
+            )
+          )
+        )
+      );
     }
 
     // Search condition
@@ -1049,26 +1072,35 @@ export class WoDetailsService {
   }
 
   // DASHBOARD
-  async getDashboardSummary(teamId?: number) {
+  async getDashboardSummary(user: ValidatedUser, teamId?: number) {
     const conditions: any[] = [];
-    if (teamId) {
-      conditions.push(eq(woBasicDetails.team, teamId));
+    if (user) {
+      conditions.push(...this.getVisibilityConditions(user, teamId));
     }
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
     const [summary] = await this.db
       .select({
-        pending: sql<number>`count(*) filter (where ${woAcceptance.status} = 'pending_review')::int`,
         accepted: sql<number>`count(*) filter (where ${woAcceptance.status} = 'completed' and ${woAcceptance.decision} = 'accepted')::int`,
-        amendmentNeeded: sql<number>`count(*) filter (where ${woAcceptance.status} = 'awaiting_amendment' or ${woAcceptance.decision} = 'amendment_needed')::int`,
+        amendmentNeeded: sql<number>`count(*) filter (where ${woDetails.oeWoAmendmentNeeded} = true or ${woAcceptance.status} = 'awaiting_amendment' or ${woAcceptance.decision} = 'amendment_needed')::int`,
+        total: sql<number>`count(*)::int`,
       })
       .from(woDetails)
       .leftJoin(woAcceptance, eq(woDetails.id, woAcceptance.woDetailId))
       .leftJoin(woBasicDetails, eq(woDetails.woBasicDetailId, woBasicDetails.id))
       .where(whereClause);
 
+    const acceptedCount = summary?.accepted ?? 0;
+    const amendmentNeededCount = summary?.amendmentNeeded ?? 0;
+    const totalCount = summary?.total ?? 0;
+    const pendingCount = Math.max(0, totalCount - acceptedCount - amendmentNeededCount);
+
     return {
-      summary: summary || { pending: 0, accepted: 0, amendmentNeeded: 0 },
+      summary: {
+        pending: pendingCount,
+        accepted: acceptedCount,
+        amendmentNeeded: amendmentNeededCount,
+      },
       generatedAt: new Date().toISOString(),
     };
   }

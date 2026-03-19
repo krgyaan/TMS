@@ -462,6 +462,7 @@ export interface WoDetailsFilters {
   limit?: number;
   sortBy?: string;
   sortOrder?: SortOrder;
+  search?: string;
   woBasicDetailId?: number;
   status?: WoDetailsStatus;
   ldApplicable?: boolean;

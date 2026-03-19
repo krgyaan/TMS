@@ -20,8 +20,8 @@ export class WoDetailsController {
   }
 
   @Get('dashboard/summary')
-  async getDashboardSummary(@Query('teamId') teamId?: string) {
-    return this.woDetailsService.getDashboardSummary(teamId ? Number(teamId) : undefined);
+  async getDashboardSummary(@CurrentUser() user: ValidatedUser, @Query('teamId') teamId?: string) {
+    return this.woDetailsService.getDashboardSummary(user, teamId ? Number(teamId) : undefined);
   }
 
   @Get(':id')
