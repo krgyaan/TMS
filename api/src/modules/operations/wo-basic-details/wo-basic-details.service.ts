@@ -1,5 +1,5 @@
-import { Inject, Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
-import { eq, desc, asc, sql, and, or, ilike, gte, lte, isNull, inArray, SQL } from 'drizzle-orm';
+import { Inject, Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { eq, desc, asc, sql, and, or, ilike, isNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
@@ -25,7 +25,7 @@ export class WoBasicDetailsService {
             enquiryId: data.enquiryId ?? null,
             woNumber: data.woNumber ?? null,
             woDate: data.woDate ?? null,
-            projectCode: data.projectCode ?? this.generateProjectCode(),
+            projectCode: data.projectCode ?? '',
             projectName: data.projectName ?? null,
             currentStage: data.currentStage ?? 'basic_details',
             woValuePreGst: data.woValuePreGst ?? null,
@@ -97,43 +97,36 @@ export class WoBasicDetailsService {
         };
     }
 
-    private mapJoinedRowToResponse(row: {
-        woBasicDetails: typeof woBasicDetails.$inferSelect;
-        oeFirstUser: { name: string | null } | null;
-        oeSiteVisitUser: { name: string | null } | null;
-        oeDocsPrepUser: { name: string | null } | null;
-    }) {
-        const r = row.woBasicDetails;
+    private mapJoinedRowToResponseList(row: any) {
         return {
-            ...this.mapRowToResponse(r),
-            // Joined fields
+            id: row.woBasicDetails.id,
+            woNumber: row.woBasicDetails.woNumber,
+            woDate: row.woBasicDetails.woDate,
+            projectName: row.woBasicDetails.projectName,
+            currentStage: row.woBasicDetails.currentStage,
+            woValuePreGst: row.woBasicDetails.woValuePreGst,
+            woValueGstAmt: row.woBasicDetails.woValueGstAmt,
+            grossMargin: row.woBasicDetails.grossMargin,
+            stage: row.woBasicDetails.currentStage,
             oeFirstName: row.oeFirstUser?.name ?? null,
             oeSiteVisitName: row.oeSiteVisitUser?.name ?? null,
             oeDocsPrepName: row.oeDocsPrepUser?.name ?? null,
         };
     }
 
-    private generateProjectCode(): string {
-        const timestamp = Date.now().toString(36).toUpperCase();
-        const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-        return `PRJ-${timestamp}-${random}`;
-    }
-
-    private calculateGrossMargin(receiptPreGst: string, budgetPreGst: string): string | null {
-        const receipt = parseFloat(receiptPreGst);
-        const budget = parseFloat(budgetPreGst);
-
-        if (isNaN(receipt) || isNaN(budget) || receipt === 0) {
-            return null;
-        }
-
-        const margin = ((receipt - budget) / receipt) * 100;
-        return margin.toFixed(2);
-    }
-
     private getWoBaseSelect() {
         return {
-            woBasicDetails,
+            woBasicDetails: {
+                id: woBasicDetails.id,
+                woNumber: woBasicDetails.woNumber,
+                woDate: woBasicDetails.woDate,
+                projectName: woBasicDetails.projectName,
+                currentStage: woBasicDetails.currentStage,
+                woValuePreGst: woBasicDetails.woValuePreGst,
+                woValueGstAmt: woBasicDetails.woValueGstAmt,
+                grossMargin: woBasicDetails.grossMargin,
+                stage: woBasicDetails.currentStage,
+            },
             oeFirstUser: {
                 name: oeFirstUser.name,
             },
@@ -170,21 +163,7 @@ export class WoBasicDetailsService {
         if (filters?.user) {
             conditions.push(...this.getVisibilityConditions(filters.user, filters.teamId));
         }
-
-        if (filters?.unallocated) {
-            conditions.push(isNull(woBasicDetails.team));
-        }
-
         // Additional filters
-        if (filters?.tenderId) {
-            conditions.push(eq(woBasicDetails.tenderId, filters.tenderId));
-        }
-        if (filters?.enquiryId) {
-            conditions.push(eq(woBasicDetails.enquiryId, filters.enquiryId));
-        }
-        if (filters?.projectCode) {
-            conditions.push(ilike(woBasicDetails.projectCode, `%${filters.projectCode}%`));
-        }
         if (filters?.projectName) {
             conditions.push(ilike(woBasicDetails.projectName, `%${filters.projectName}%`));
         }
@@ -199,12 +178,6 @@ export class WoBasicDetailsService {
         }
         if (filters?.oeDocsPrep) {
             conditions.push(eq(woBasicDetails.oeDocsPrep, filters.oeDocsPrep));
-        }
-        if (filters?.isWorkflowPaused !== undefined) {
-            conditions.push(eq(woBasicDetails.isWorkflowPaused, filters.isWorkflowPaused));
-        }
-        if (filters?.status && filters.status.length > 0) {
-            conditions.push(inArray(woBasicDetails.status, filters.status));
         }
 
         // Search condition (Expanded to joined fields)
@@ -248,9 +221,6 @@ export class WoBasicDetailsService {
             case 'woDate':
                 orderByClause = orderFn(woBasicDetails.woDate);
                 break;
-            case 'projectCode':
-                orderByClause = orderFn(woBasicDetails.projectCode);
-                break;
             case 'woNumber':
                 orderByClause = orderFn(woBasicDetails.woNumber);
                 break;
@@ -289,7 +259,7 @@ export class WoBasicDetailsService {
             .limit(limit)
             .offset(offset);
 
-        const data = rows.map((r) => this.mapJoinedRowToResponse(r as any));
+        const data = rows.map((r) => this.mapJoinedRowToResponseList(r));
 
         return {
             data,
@@ -362,14 +332,6 @@ export class WoBasicDetailsService {
             insertValues.updatedBy = userId;
         }
 
-        // Auto-calculate gross margin if both values are provided
-        if (data.receiptPreGst && data.budgetPreGst) {
-            insertValues.grossMargin = this.calculateGrossMargin(
-                data.receiptPreGst,
-                data.budgetPreGst,
-            );
-        }
-
         const [row] = await this.db
             .insert(woBasicDetails)
             .values(insertValues)
@@ -405,17 +367,6 @@ export class WoBasicDetailsService {
             updateValues.updatedBy = userId;
         }
 
-        // Auto-calculate gross margin if both values are provided
-        if (data.receiptPreGst !== undefined || data.budgetPreGst !== undefined) {
-            const currentRow = await this.findById(id);
-            const receipt = data.receiptPreGst ?? currentRow.receiptPreGst;
-            const budget = data.budgetPreGst ?? currentRow.budgetPreGst;
-
-            if (receipt && budget) {
-                updateValues.grossMargin = this.calculateGrossMargin(receipt, budget);
-            }
-        }
-
         const [row] = await this.db
             .update(woBasicDetails)
             .set(updateValues)
@@ -440,10 +391,7 @@ export class WoBasicDetailsService {
         }
     }
 
-    // ============================================
     // OE ASSIGNMENT OPERATIONS
-    // ============================================
-
     async assignOe(id: number, data: AssignOeDto) {
         // Check if record exists
         await this.findById(id);
@@ -578,10 +526,7 @@ export class WoBasicDetailsService {
         };
     }
 
-    // ============================================
     // UTILITY OPERATIONS
-    // ============================================
-
     async checkProjectCodeExists(projectCode: string) {
         const [existing] = await this.db
             .select({ id: woBasicDetails.id })
@@ -592,32 +537,6 @@ export class WoBasicDetailsService {
         return {
             exists: !!existing,
             projectCode,
-        };
-    }
-
-    async calculateAndUpdateGrossMargin(id: number) {
-        const row = await this.findById(id);
-
-        if (!row.receiptPreGst || !row.budgetPreGst) {
-            throw new BadRequestException(
-                'Both receiptPreGst and budgetPreGst are required to calculate gross margin',
-            );
-        }
-
-        const grossMargin = this.calculateGrossMargin(row.receiptPreGst, row.budgetPreGst);
-
-        const [updated] = await this.db
-            .update(woBasicDetails)
-            .set({
-                grossMargin,
-                updatedAt: new Date(),
-            })
-            .where(eq(woBasicDetails.id, id))
-            .returning();
-
-        return {
-            ...this.mapRowToResponse(updated!),
-            calculatedGrossMargin: grossMargin,
         };
     }
 
@@ -639,10 +558,7 @@ export class WoBasicDetailsService {
         return rows.map((r) => this.mapRowToResponse(r));
     }
 
-    // ============================================
     // DASHBOARD/REPORTING
-    // ============================================
-
     private getVisibilityConditions(user: ValidatedUser, teamId?: number) {
         const conditions: any[] = [];
 

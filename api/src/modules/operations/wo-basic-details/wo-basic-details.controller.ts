@@ -11,10 +11,7 @@ export class WoBasicDetailsController {
         private readonly woBasicDetailsService: WoBasicDetailsService,
     ) {}
 
-    // ============================================
     // CRUD OPERATIONS
-    // ============================================
-
     @Get()
     async list(
         @CurrentUser() user: ValidatedUser,
@@ -23,23 +20,14 @@ export class WoBasicDetailsController {
         @Query('sortBy') sortBy?: string,
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
         @Query('search') search?: string,
-        @Query('tenderId') tenderId?: string,
-        @Query('enquiryId') enquiryId?: string,
         @Query('teamId') teamId?: string,
-        @Query('unallocated') unallocated?: string,
-        @Query('projectCode') projectCode?: string,
         @Query('projectName') projectName?: string,
         @Query('currentStage') currentStage?: string,
         @Query('oeFirst') oeFirst?: string,
         @Query('oeSiteVisit') oeSiteVisit?: string,
         @Query('oeDocsPrep') oeDocsPrep?: string,
-        @Query('isWorkflowPaused') isWorkflowPaused?: string,
-        @Query('woDateFrom') woDateFrom?: string,
-        @Query('woDateTo') woDateTo?: string,
-        @Query('createdAtFrom') createdAtFrom?: string,
-        @Query('createdAtTo') createdAtTo?: string,
     ) {
-        const rawFilters = { page, limit, sortBy, sortOrder, search, tenderId, enquiryId, teamId, unallocated: unallocated === 'true' || unallocated === '1', projectCode, projectName, currentStage, oeFirst, oeSiteVisit, oeDocsPrep, isWorkflowPaused, woDateFrom, woDateTo, createdAtFrom, createdAtTo };
+        const rawFilters = { page, limit, sortBy, sortOrder, search, teamId, projectName, currentStage, oeFirst, oeSiteVisit, oeDocsPrep };
 
         const parsed = WoBasicDetailsQuerySchema.parse(rawFilters) as WoBasicDetailsQueryDto;
         parsed.user = user;
@@ -82,10 +70,7 @@ export class WoBasicDetailsController {
         await this.woBasicDetailsService.delete(id);
     }
 
-    // ============================================
     // OE ASSIGNMENT OPERATIONS
-    // ============================================
-
     @Post(':id/assign-oe')
     @HttpCode(HttpStatus.OK)
     async assignOe(
@@ -121,19 +106,10 @@ export class WoBasicDetailsController {
         return this.woBasicDetailsService.getOeAssignments(id);
     }
 
-    // ============================================
     // UTILITY OPERATIONS
-    // ============================================
-
     @Get('check-project-code/:projectCode')
     async checkProjectCodeExists(@Param('projectCode') projectCode: string) {
         return this.woBasicDetailsService.checkProjectCodeExists(projectCode);
-    }
-
-    @Post(':id/calculate-gross-margin')
-    @HttpCode(HttpStatus.OK)
-    async calculateGrossMargin(@Param('id', ParseIntPipe) id: number) {
-        return this.woBasicDetailsService.calculateAndUpdateGrossMargin(id);
     }
 
     @Get('by-tender/:tenderId')
@@ -146,10 +122,7 @@ export class WoBasicDetailsController {
         return this.woBasicDetailsService.findByEnquiryId(enquiryId);
     }
 
-    // ============================================
     // DASHBOARD/REPORTING
-    // ============================================
-
     @Get('dashboard/summary')
     async getDashboardSummary(
         @CurrentUser() user: ValidatedUser,
