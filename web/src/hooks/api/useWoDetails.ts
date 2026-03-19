@@ -12,10 +12,7 @@ import type {
   WoAcceptanceDecisionDto,
 } from '@/modules/operations/types/wo.types';
 
-// ============================================
 // QUERY KEYS
-// ============================================
-
 export const woDetailsKeys = {
   all: ['wo-details'] as const,
   lists: () => [...woDetailsKeys.all, 'list'] as const,
@@ -39,10 +36,7 @@ export const woDetailsKeys = {
   slaCompliance: () => [...woDetailsKeys.all, 'sla-compliance'] as const,
 };
 
-// ============================================
 // QUERY HOOKS
-// ============================================
-
 export const useWoDetails = (filters?: WoDetailsFilters) => {
   const { teamId, userId, dataScope } = useTeamFilter();
 
@@ -99,10 +93,7 @@ export const useWoTimeline = (id: number) => {
   });
 };
 
-// ============================================
 // WIZARD QUERY HOOKS (NEW)
-// ============================================
-
 export const useWizardProgress = (id: number) => {
   return useQuery({
     queryKey: woDetailsKeys.wizardProgress(id),
@@ -119,10 +110,7 @@ export const usePageData = (woDetailId: number, pageNum: number) => {
   });
 };
 
-// ============================================
 // DASHBOARD QUERY HOOKS
-// ============================================
-
 export const useWoDetailsDashboardSummary = () => {
   const { teamId } = useTeamFilter();
 
@@ -160,10 +148,7 @@ export const useSlaComplianceReport = () => {
   });
 };
 
-// ============================================
 // MUTATION HOOKS
-// ============================================
-
 export const useCreateWoDetail = () => {
   const queryClient = useQueryClient();
 
@@ -213,10 +198,7 @@ export const useDeleteWoDetail = () => {
   });
 };
 
-// ============================================
 // WIZARD MUTATION HOOKS (NEW)
-// ============================================
-
 export const useSavePageData = () => {
   const queryClient = useQueryClient();
 
@@ -287,10 +269,7 @@ export const useSubmitForReview = () => {
   });
 };
 
-// ============================================
 // ACCEPTANCE WORKFLOW MUTATIONS
-// ============================================
-
 export const useAcceptWo = () => {
   const queryClient = useQueryClient();
 

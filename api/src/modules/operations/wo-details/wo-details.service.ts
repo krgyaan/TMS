@@ -1,9 +1,10 @@
 import { Inject, Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
-import { eq, desc, asc, sql, and, gte, lte, or, isNull, ne } from 'drizzle-orm';
+import { eq, desc, asc, sql, and, gte, lte, or, isNull, ne, ilike } from 'drizzle-orm';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { woDetails, woBasicDetails, woContacts, woBillingBoq, woBuybackBoq, woBillingAddresses, woShippingAddresses, woAmendments, woQueries, woDocuments, woAcceptance } from '@db/schemas/operations';
-import type { CreateWoDetailDto, UpdateWoDetailDto, WoDetailsQueryDto, SavePage4Dto, SkipPageDto, TenderDocumentsChecklist } from './dto/wo-details.dto';
+import type { CreateWoDetailDto, UpdateWoDetailDto, WoDetailsListResponseDto, WoDetailsQueryDto, SavePage4Dto, SkipPageDto, TenderDocumentsChecklist, WoDetailsStatus } from './dto/wo-details.dto';
 
 export type WoDetailRow = typeof woDetails.$inferSelect;
 
@@ -95,27 +96,70 @@ export class WoDetailsService {
     };
   }
 
-  // ============================================
-  // CRUD OPERATIONS
-  // ============================================
+  mapRowToResponseList(row: any): WoDetailsListResponseDto {
+    return {
+      id: row.id,
+      woBasicDetailId: row.woBasicDetailId,
+      projectName: row.projectName ?? '',
+      woNumber: row.woNumber ?? '',
+      woDate: row.woDate ?? '',
+      woValuePreGst: row.woValuePreGst ?? '0',
+      woValueGstAmt: row.woValueGstAmt ?? '0',
+      ldApplicable: !!row.ldApplicable,
+      isContractAgreement: !!row.isContractAgreement,
+      oeWoAmendmentNeeded: !!row.oeWoAmendmentNeeded,
+      status: (row.status as WoDetailsStatus) || 'draft',
+      woAcceptanceId: row.woAcceptanceId ?? null,
+      woAcceptanceStatus: (row.woAcceptanceStatus as any) ?? null,
+    };
+  }
 
-  async findAll(filters?: WoDetailsQueryDto) {
+  private getVisibilityConditions(user: ValidatedUser, teamId?: number) {
+    const conditions: any[] = [];
+
+    // Role ID 1 = Super User, 2 = Admin: Show all, respect teamId filter if provided
+    if (user.roleId === 1 || user.roleId === 2) {
+      if (teamId !== undefined && teamId !== null) {
+        conditions.push(eq(woBasicDetails.team, teamId));
+      }
+    } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+      // Team Leader, Coordinator, Engineer: Filter by teamId
+      if (user.teamId) {
+        conditions.push(eq(woBasicDetails.team, user.teamId));
+      }
+    } else {
+      // Other roles: Show where they created or are assigned as OE
+      conditions.push(
+        or(
+          eq(woBasicDetails.createdBy, user.sub),
+          eq(woBasicDetails.oeFirst, user.sub),
+          eq(woBasicDetails.oeSiteVisit, user.sub),
+          eq(woBasicDetails.oeDocsPrep, user.sub),
+          eq(woDetails.createdBy, user.sub)
+        ),
+      );
+    }
+
+    return conditions;
+  }
+
+  // CRUD OPERATIONS
+  async findAll(filters?: WoDetailsQueryDto & { user?: ValidatedUser }) {
     const page = filters?.page ?? 1;
     const limit = Math.min(Math.max(filters?.limit ?? 50, 1), 100);
     const offset = (page - 1) * limit;
     const sortOrder = filters?.sortOrder ?? 'desc';
     const sortBy = filters?.sortBy ?? 'createdAt';
+    const search = filters?.search?.trim();
 
-    const orderColumnMap: Record<string, any> = {
-      createdAt: woDetails.createdAt,
-      updatedAt: woDetails.updatedAt,
-      currentPage: woDetails.currentPage,
-      status: woDetails.status,
-    };
-    const orderColumn = orderColumnMap[sortBy] ?? woDetails.createdAt;
     const orderFn = sortOrder === 'desc' ? desc : asc;
 
     const conditions: any[] = [];
+
+    // Apply role-based filtering
+    if (filters?.user) {
+      conditions.push(...this.getVisibilityConditions(filters.user, filters.teamId));
+    }
 
     if (filters?.woBasicDetailId) {
       conditions.push(eq(woDetails.woBasicDetailId, filters.woBasicDetailId));
@@ -126,62 +170,124 @@ export class WoDetailsService {
     if (filters?.ldApplicable !== undefined) {
       conditions.push(eq(woDetails.ldApplicable, filters.ldApplicable));
     }
-    if (filters?.isPbgApplicable !== undefined) {
-      conditions.push(eq(woDetails.isPbgApplicable, filters.isPbgApplicable));
-    }
     if (filters?.isContractAgreement !== undefined) {
       conditions.push(eq(woDetails.isContractAgreement, filters.isContractAgreement));
     }
-    if (filters?.siteVisitNeeded !== undefined) {
-      conditions.push(eq(woDetails.siteVisitNeeded, filters.siteVisitNeeded));
+
+    if (filters?.woAmendmentNeeded !== undefined && filters?.woAmendmentNeeded === true) {
+      conditions.push(eq(woDetails.oeWoAmendmentNeeded, true));
+    } else if (filters?.woAcceptance !== undefined && filters?.woAcceptance === true) {
+      conditions.push(
+        and(
+          eq(woAcceptance.status, 'completed'),
+          eq(woAcceptance.decision, 'accepted')
+        )
+      );
+    } else if (filters?.woAcceptance === false && filters?.woAmendmentNeeded === false) {
+      // Pending tab: Not accepted and not amendment needed
+      conditions.push(
+        and(
+          // Not accepted
+          or(
+            isNull(woAcceptance.id),
+            ne(woAcceptance.status, 'completed'),
+            ne(woAcceptance.decision, 'accepted')
+          ),
+          // Not amendment needed
+          and(
+            eq(woDetails.oeWoAmendmentNeeded, false),
+            or(
+              isNull(woAcceptance.id),
+              and(
+                ne(woAcceptance.status, 'awaiting_amendment'),
+                ne(woAcceptance.decision, 'amendment_needed')
+              )
+            )
+          )
+        )
+      );
     }
-    if (filters?.hasDiscrepancies !== undefined) {
-      conditions.push(eq(woDetails.hasDiscrepancies, filters.hasDiscrepancies));
-    }
-    if (filters?.createdBy) {
-      conditions.push(eq(woDetails.createdBy, filters.createdBy));
-    }
-    if (filters?.teamId) {
-      conditions.push(eq(woBasicDetails.team, filters.teamId));
-    }
-    if (filters?.createdAtFrom) {
-      conditions.push(gte(woDetails.createdAt, new Date(filters.createdAtFrom)));
-    }
-    if (filters?.createdAtTo) {
-      conditions.push(lte(woDetails.createdAt, new Date(filters.createdAtTo)));
-    }
-    if (filters?.woAmendmentNeeded !== undefined) {
-      conditions.push(eq(woDetails.oeWoAmendmentNeeded, filters.woAmendmentNeeded));
-    }
-    if (filters?.woAcceptance !== undefined) {
-      if (filters.woAcceptance) {
-        conditions.push(eq(woAcceptance.status, 'completed'), eq(woAcceptance.decision, 'accepted'));
-      } else {
-        conditions.push(or(isNull(woAcceptance.id), ne(woAcceptance.status, 'completed'), ne(woAcceptance.decision, 'accepted')));
-      }
+
+    // Search condition
+    if (search) {
+      const searchStr = `%${search}%`;
+      conditions.push(
+        or(
+          ilike(woBasicDetails.projectName, searchStr),
+          ilike(woBasicDetails.woNumber, searchStr),
+          ilike(woBasicDetails.projectCode, searchStr),
+        ),
+      );
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
+    // Determine sorting
+    let orderByClause: any;
+    switch (sortBy) {
+      case 'woNumber':
+        orderByClause = orderFn(woBasicDetails.woNumber);
+        break;
+      case 'woDate':
+        orderByClause = orderFn(woBasicDetails.woDate);
+        break;
+      case 'projectName':
+        orderByClause = orderFn(woBasicDetails.projectName);
+        break;
+      case 'woValuePreGst':
+        orderByClause = orderFn(woBasicDetails.woValuePreGst);
+        break;
+      case 'woValueGstAmt':
+        orderByClause = orderFn(woBasicDetails.woValueGstAmt);
+        break;
+      case 'status':
+        orderByClause = orderFn(woDetails.status);
+        break;
+      case 'updatedAt':
+        orderByClause = orderFn(woDetails.updatedAt);
+        break;
+      case 'currentPage':
+        orderByClause = orderFn(woDetails.currentPage);
+        break;
+      default:
+        orderByClause = orderFn(woDetails.createdAt);
+    }
+
     const [countResult, rows] = await Promise.all([
       this.db
-        .select({ count: sql<number>`count(*)::int` })
+        .select({ count: sql<number>`count(distinct ${woDetails.id})::int` })
         .from(woDetails)
         .leftJoin(woBasicDetails, eq(woDetails.woBasicDetailId, woBasicDetails.id))
+        .leftJoin(woAcceptance, eq(woDetails.id, woAcceptance.woDetailId))
         .where(whereClause)
         .then(([r]) => Number(r?.count ?? 0)),
       this.db
-        .select({ woDetails })
+        .select({
+            id: woDetails.id,
+            woBasicDetailId: woDetails.woBasicDetailId,
+            projectName: woBasicDetails.projectName,
+            woNumber: woBasicDetails.woNumber,
+            woDate: woBasicDetails.woDate,
+            woValuePreGst: woBasicDetails.woValuePreGst,
+            woValueGstAmt: woBasicDetails.woValueGstAmt,
+            ldApplicable: woDetails.ldApplicable,
+            isContractAgreement: woDetails.isContractAgreement,
+            oeWoAmendmentNeeded: woDetails.oeWoAmendmentNeeded,
+            status: woDetails.status,
+            woAcceptanceId: woAcceptance?.id,
+            woAcceptanceStatus: woAcceptance?.status,
+         })
         .from(woDetails)
         .leftJoin(woBasicDetails, eq(woDetails.woBasicDetailId, woBasicDetails.id))
+        .leftJoin(woAcceptance, eq(woDetails.id, woAcceptance.woDetailId))
         .where(whereClause)
-        .orderBy(orderFn(orderColumn))
+        .orderBy(orderByClause)
         .limit(limit)
         .offset(offset),
     ]);
 
     return {
-      data: rows.map((r) => this.mapRowToResponse(r.woDetails)),
+      data: rows.map((r) => this.mapRowToResponseList(r)),
       meta: {
         total: countResult,
         page,
@@ -433,10 +539,7 @@ export class WoDetailsService {
     await this.db.delete(woDetails).where(eq(woDetails.id, id));
   }
 
-  // ============================================
   // WIZARD OPERATIONS
-  // ============================================
-
   async getWizardProgress(id: number) {
     const detail = await this.findById(id);
 
@@ -794,10 +897,7 @@ export class WoDetailsService {
     }
   }
 
-  // ============================================
   // HELPER METHODS
-  // ============================================
-
   private mapPageDataToUpdate(pageNum: number, data: any, updateValues: Record<string, unknown>) {
     switch (pageNum) {
       case 1:
@@ -971,30 +1071,36 @@ export class WoDetailsService {
     return total.toFixed(2);
   }
 
-  // ============================================
   // DASHBOARD
-  // ============================================
-
-  async getDashboardSummary(teamId?: number) {
+  async getDashboardSummary(user: ValidatedUser, teamId?: number) {
     const conditions: any[] = [];
-    if (teamId) {
-      conditions.push(eq(woBasicDetails.team, teamId));
+    if (user) {
+      conditions.push(...this.getVisibilityConditions(user, teamId));
     }
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
     const [summary] = await this.db
       .select({
-        pending: sql<number>`count(*) filter (where ${woAcceptance.status} = 'pending_review')::int`,
         accepted: sql<number>`count(*) filter (where ${woAcceptance.status} = 'completed' and ${woAcceptance.decision} = 'accepted')::int`,
-        amendmentNeeded: sql<number>`count(*) filter (where ${woAcceptance.status} = 'awaiting_amendment' or ${woAcceptance.decision} = 'amendment_needed')::int`,
+        amendmentNeeded: sql<number>`count(*) filter (where ${woDetails.oeWoAmendmentNeeded} = true or ${woAcceptance.status} = 'awaiting_amendment' or ${woAcceptance.decision} = 'amendment_needed')::int`,
+        total: sql<number>`count(*)::int`,
       })
       .from(woDetails)
       .leftJoin(woAcceptance, eq(woDetails.id, woAcceptance.woDetailId))
       .leftJoin(woBasicDetails, eq(woDetails.woBasicDetailId, woBasicDetails.id))
       .where(whereClause);
 
+    const acceptedCount = summary?.accepted ?? 0;
+    const amendmentNeededCount = summary?.amendmentNeeded ?? 0;
+    const totalCount = summary?.total ?? 0;
+    const pendingCount = Math.max(0, totalCount - acceptedCount - amendmentNeededCount);
+
     return {
-      summary: summary || { pending: 0, accepted: 0, amendmentNeeded: 0 },
+      summary: {
+        pending: pendingCount,
+        accepted: acceptedCount,
+        amendmentNeeded: amendmentNeededCount,
+      },
       generatedAt: new Date().toISOString(),
     };
   }

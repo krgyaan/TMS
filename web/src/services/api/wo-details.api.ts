@@ -31,6 +31,13 @@ class WoDetailsService extends BaseApiService {
     if (filters.teamId) params.set('teamId', String(filters.teamId));
     if (filters.userId) params.set('userId', String(filters.userId));
     if (filters.dataScope) params.set('dataScope', filters.dataScope);
+    
+    // Add new filters
+    if (filters.search) params.set('search', filters.search);
+    if (filters.woAcceptance !== undefined) params.set('woAcceptance', String(filters.woAcceptance));
+    if (filters.woAmendmentNeeded !== undefined) params.set('woAmendmentNeeded', String(filters.woAmendmentNeeded));
+    if (filters.ldApplicable !== undefined) params.set('ldApplicable', String(filters.ldApplicable));
+    if (filters.status) params.set('status', filters.status);
 
     const queryString = params.toString();
     return queryString ? `?${queryString}` : '';

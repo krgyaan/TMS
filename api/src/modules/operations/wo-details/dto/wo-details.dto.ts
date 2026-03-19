@@ -15,11 +15,30 @@ export const PositiveIntSchema = z.number().int().positive();
 
 // ENUMS
 export const WoDetailsStatusEnum = z.enum([
-  'draft',
-  'in_progress',
-  'completed',
-  'submitted_for_review',
+  'draft', 'in_progress', 'completed', 'submitted_for_review'
 ]);
+
+export const WoAcceptanceStatusEnum = z.enum([
+  'pending_review', 'in_review', 'queries_pending', 'awaiting_amendment', 'pending_signatures', 'pending_courier', 'completed'
+]);
+
+export const WoDetailsListResponseSchema = z.object({
+  id: z.number().int().positive(),
+  woBasicDetailId: z.number().int().positive(),
+  projectName: z.string().max(255),
+  woNumber: z.string().max(255),
+  woDate: z.string().date(),
+  woValuePreGst: DecimalSchema,
+  woValueGstAmt: DecimalSchema,
+  ldApplicable: z.boolean(),
+  isContractAgreement: z.boolean(),
+  oeWoAmendmentNeeded: z.boolean(),
+  status: WoDetailsStatusEnum,
+  woAcceptanceId: z.number().int().positive().nullable(),
+  woAcceptanceStatus: WoAcceptanceStatusEnum.nullable(),
+});
+
+export type WoDetailsListResponseDto = z.infer<typeof WoDetailsListResponseSchema>;
 
 export type WoDetailsStatus = z.infer<typeof WoDetailsStatusEnum>;
 
@@ -111,11 +130,12 @@ export const WoDetailsQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1).optional(),
   limit: z.coerce.number().int().positive().max(100).default(50).optional(),
   sortBy: z
-    .enum(['createdAt', 'updatedAt', 'currentPage', 'status'])
+    .enum(['createdAt', 'updatedAt', 'currentPage', 'status', 'woNumber', 'woDate', 'projectName', 'woValuePreGst', 'woValueGstAmt'])
     .default('createdAt')
     .optional(),
   sortOrder: z.enum(['asc', 'desc']).default('desc').optional(),
 
+  search: z.string().optional(),
   woBasicDetailId: z.coerce.number().int().positive().optional(),
   status: WoDetailsStatusEnum.optional(),
   ldApplicable: z
