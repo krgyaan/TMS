@@ -33,9 +33,9 @@ export default function OperationsRoutes() {
             <Route path="work-order/details/full/:id/edit" element={<RouteWrapper><Wo_Details_Edit /></RouteWrapper>} />
 
             <Route path="work-order/acceptance" element={<RouteWrapper><Wo_Details_Acceptance /></RouteWrapper>} />
-            <Route path="work-order/acceptance/:woDetailId" element={<RouteWrapper><Wo_Details_Acceptance_Create /></RouteWrapper>} />
-            <Route path="work-order/acceptance/raise-query/:woDetailId" element={<RouteWrapper><Wo_Acceptance_RaiseQuery_Create /></RouteWrapper>} />
-            <Route path="work-order/acceptance/raise-query/:woDetailId/edit" element={<RouteWrapper><Wo_Acceptance_RaiseQuery_Edit /></RouteWrapper>} />
+            <Route path="work-order/acceptance/:id" element={<RouteWrapper><Wo_Details_Acceptance_Create /></RouteWrapper>} />
+            <Route path="work-order/acceptance/raise-query/:id" element={<RouteWrapper><Wo_Acceptance_RaiseQuery_Create /></RouteWrapper>} />
+            <Route path="work-order/acceptance/raise-query/:id/edit" element={<RouteWrapper><Wo_Acceptance_RaiseQuery_Edit /></RouteWrapper>} />
             <Route path="work-order/acceptance/:id/edit" element={<RouteWrapper><Wo_Details_Acceptance_Edit /></RouteWrapper>} />
             <Route path="work-order/acceptance/:id" element={<RouteWrapper><Wo_Details_Acceptance_Show /></RouteWrapper>} />
 
