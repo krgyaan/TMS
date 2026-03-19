@@ -130,11 +130,12 @@ export const WoDetailsQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1).optional(),
   limit: z.coerce.number().int().positive().max(100).default(50).optional(),
   sortBy: z
-    .enum(['createdAt', 'updatedAt', 'currentPage', 'status'])
+    .enum(['createdAt', 'updatedAt', 'currentPage', 'status', 'woNumber', 'woDate', 'projectName', 'woValuePreGst', 'woValueGstAmt'])
     .default('createdAt')
     .optional(),
   sortOrder: z.enum(['asc', 'desc']).default('desc').optional(),
 
+  search: z.string().optional(),
   woBasicDetailId: z.coerce.number().int().positive().optional(),
   status: WoDetailsStatusEnum.optional(),
   ldApplicable: z

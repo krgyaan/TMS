@@ -1,5 +1,6 @@
 import { Inject, Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
-import { eq, desc, asc, sql, and, gte, lte, or, isNull, ne } from 'drizzle-orm';
+import { eq, desc, asc, sql, and, gte, lte, or, isNull, ne, ilike } from 'drizzle-orm';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { woDetails, woBasicDetails, woContacts, woBillingBoq, woBuybackBoq, woBillingAddresses, woShippingAddresses, woAmendments, woQueries, woDocuments, woAcceptance } from '@db/schemas/operations';
@@ -113,24 +114,52 @@ export class WoDetailsService {
     };
   }
 
+  private getVisibilityConditions(user: ValidatedUser, teamId?: number) {
+    const conditions: any[] = [];
+
+    // Role ID 1 = Super User, 2 = Admin: Show all, respect teamId filter if provided
+    if (user.roleId === 1 || user.roleId === 2) {
+      if (teamId !== undefined && teamId !== null) {
+        conditions.push(eq(woBasicDetails.team, teamId));
+      }
+    } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+      // Team Leader, Coordinator, Engineer: Filter by teamId
+      if (user.teamId) {
+        conditions.push(eq(woBasicDetails.team, user.teamId));
+      }
+    } else {
+      // Other roles: Show where they created or are assigned as OE
+      conditions.push(
+        or(
+          eq(woBasicDetails.createdBy, user.sub),
+          eq(woBasicDetails.oeFirst, user.sub),
+          eq(woBasicDetails.oeSiteVisit, user.sub),
+          eq(woBasicDetails.oeDocsPrep, user.sub),
+          eq(woDetails.createdBy, user.sub)
+        ),
+      );
+    }
+
+    return conditions;
+  }
+
   // CRUD OPERATIONS
-  async findAll(filters?: WoDetailsQueryDto) {
+  async findAll(filters?: WoDetailsQueryDto & { user?: ValidatedUser }) {
     const page = filters?.page ?? 1;
     const limit = Math.min(Math.max(filters?.limit ?? 50, 1), 100);
     const offset = (page - 1) * limit;
     const sortOrder = filters?.sortOrder ?? 'desc';
     const sortBy = filters?.sortBy ?? 'createdAt';
+    const search = filters?.search?.trim();
 
-    const orderColumnMap: Record<string, any> = {
-      createdAt: woDetails.createdAt,
-      updatedAt: woDetails.updatedAt,
-      currentPage: woDetails.currentPage,
-      status: woDetails.status,
-    };
-    const orderColumn = orderColumnMap[sortBy] ?? woDetails.createdAt;
     const orderFn = sortOrder === 'desc' ? desc : asc;
 
     const conditions: any[] = [];
+
+    // Apply role-based filtering
+    if (filters?.user) {
+      conditions.push(...this.getVisibilityConditions(filters.user, filters.teamId));
+    }
 
     if (filters?.woBasicDetailId) {
       conditions.push(eq(woDetails.woBasicDetailId, filters.woBasicDetailId));
@@ -156,13 +185,57 @@ export class WoDetailsService {
       }
     }
 
+    // Search condition
+    if (search) {
+      const searchStr = `%${search}%`;
+      conditions.push(
+        or(
+          ilike(woBasicDetails.projectName, searchStr),
+          ilike(woBasicDetails.woNumber, searchStr),
+          ilike(woBasicDetails.projectCode, searchStr),
+        ),
+      );
+    }
+
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    // Determine sorting
+    let orderByClause: any;
+    switch (sortBy) {
+      case 'woNumber':
+        orderByClause = orderFn(woBasicDetails.woNumber);
+        break;
+      case 'woDate':
+        orderByClause = orderFn(woBasicDetails.woDate);
+        break;
+      case 'projectName':
+        orderByClause = orderFn(woBasicDetails.projectName);
+        break;
+      case 'woValuePreGst':
+        orderByClause = orderFn(woBasicDetails.woValuePreGst);
+        break;
+      case 'woValueGstAmt':
+        orderByClause = orderFn(woBasicDetails.woValueGstAmt);
+        break;
+      case 'status':
+        orderByClause = orderFn(woDetails.status);
+        break;
+      case 'updatedAt':
+        orderByClause = orderFn(woDetails.updatedAt);
+        break;
+      case 'currentPage':
+        orderByClause = orderFn(woDetails.currentPage);
+        break;
+      default:
+        orderByClause = orderFn(woDetails.createdAt);
+    }
 
     const [countResult, rows] = await Promise.all([
       this.db
-        .select({ count: sql<number>`count(*)::int` })
+        .select({ count: sql<number>`count(distinct ${woDetails.id})::int` })
         .from(woDetails)
         .leftJoin(woBasicDetails, eq(woDetails.woBasicDetailId, woBasicDetails.id))
+        .leftJoin(woAcceptance, eq(woDetails.id, woAcceptance.woDetailId))
         .where(whereClause)
         .then(([r]) => Number(r?.count ?? 0)),
       this.db
@@ -185,7 +258,7 @@ export class WoDetailsService {
         .leftJoin(woBasicDetails, eq(woDetails.woBasicDetailId, woBasicDetails.id))
         .leftJoin(woAcceptance, eq(woDetails.id, woAcceptance.woDetailId))
         .where(whereClause)
-        .orderBy(orderFn(orderColumn))
+        .orderBy(orderByClause)
         .limit(limit)
         .offset(offset),
     ]);
