@@ -102,6 +102,8 @@ export const WoBasicDetailsQuerySchema = z.object({
   // Filters
   tenderId: z.coerce.number().int().positive().optional(),
   enquiryId: z.coerce.number().int().positive().optional(),
+  teamId: z.coerce.number().int().positive().optional(),
+  unallocated: z.coerce.boolean().optional(),
   projectCode: z.string().max(100).optional(),
   projectName: z.string().max(255).optional(),
   currentStage: z
@@ -126,26 +128,33 @@ export const WoBasicDetailsQuerySchema = z.object({
   woDateTo: z.string().date().optional(),
   createdAtFrom: z.string().datetime().optional(),
   createdAtTo: z.string().datetime().optional(),
-
   // Sorting
   sortBy: z
     .enum([
       "woDate",
-      "createdAt",
-      "updatedAt",
       "projectCode",
+      "woNumber",
+      "projectName",
       "woValuePreGst",
+      "woValueGstAmt",
       "grossMargin",
+      "oeFirstName",
+      "oeSiteVisitName",
+      "oeDocsPrepName",
+      "currentStage",
     ])
-    .default("createdAt")
+    .default("woDate")
     .optional(),
   sortOrder: z.enum(["asc", "desc"]).default("desc").optional(),
-
+  status: z.array(z.coerce.number()).optional(),
   // Search
   search: z.string().max(255).optional(), // Search across projectName, woNumber, projectCode
 });
 
-export type WoBasicDetailsQueryDto = z.infer<typeof WoBasicDetailsQuerySchema>;
+import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
+export type WoBasicDetailsQueryDto = z.infer<typeof WoBasicDetailsQuerySchema> & {
+  user?: ValidatedUser;
+};
 
 // ============================================
 // RESPONSE SCHEMAS
@@ -171,6 +180,11 @@ export const WoBasicDetailsResponseSchema = z.object({
   woDraft: z.string().nullable(),
   teChecklistConfirmed: z.boolean().nullable(),
   tmsDocuments: z.any().nullable(),
+
+  // Joined Data
+  oeFirstName: z.string().nullable().optional(),
+  oeSiteVisitName: z.string().nullable().optional(),
+  oeDocsPrepName: z.string().nullable().optional(),
 
   // OE assignments
   oeFirst: z.number().nullable(),

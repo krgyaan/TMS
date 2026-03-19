@@ -141,6 +141,9 @@ export const WoDetailsQuerySchema = z.object({
   createdBy: z.coerce.number().int().positive().optional(),
   createdAtFrom: z.string().datetime().optional(),
   createdAtTo: z.string().datetime().optional(),
+  teamId: z.coerce.number().int().positive().optional(),
+  woAcceptance: z.enum(['true', 'false']).transform((val) => val === 'true').optional(),
+  woAmendmentNeeded: z.enum(['true', 'false']).transform((val) => val === 'true').optional(),
 });
 
 export type WoDetailsQueryDto = z.infer<typeof WoDetailsQuerySchema>;

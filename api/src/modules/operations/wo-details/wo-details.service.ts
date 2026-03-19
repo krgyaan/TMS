@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
-import { eq, desc, asc, sql, and, gte, lte } from 'drizzle-orm';
+import { eq, desc, asc, sql, and, gte, lte, or, isNull, ne } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { woDetails, woBasicDetails, woContacts, woBillingBoq, woBuybackBoq, woBillingAddresses, woShippingAddresses, woAmendments, woQueries, woDocuments, woAcceptance } from '@db/schemas/operations';
@@ -141,11 +141,24 @@ export class WoDetailsService {
     if (filters?.createdBy) {
       conditions.push(eq(woDetails.createdBy, filters.createdBy));
     }
+    if (filters?.teamId) {
+      conditions.push(eq(woBasicDetails.team, filters.teamId));
+    }
     if (filters?.createdAtFrom) {
       conditions.push(gte(woDetails.createdAt, new Date(filters.createdAtFrom)));
     }
     if (filters?.createdAtTo) {
       conditions.push(lte(woDetails.createdAt, new Date(filters.createdAtTo)));
+    }
+    if (filters?.woAmendmentNeeded !== undefined) {
+      conditions.push(eq(woDetails.oeWoAmendmentNeeded, filters.woAmendmentNeeded));
+    }
+    if (filters?.woAcceptance !== undefined) {
+      if (filters.woAcceptance) {
+        conditions.push(eq(woAcceptance.status, 'completed'), eq(woAcceptance.decision, 'accepted'));
+      } else {
+        conditions.push(or(isNull(woAcceptance.id), ne(woAcceptance.status, 'completed'), ne(woAcceptance.decision, 'accepted')));
+      }
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -154,11 +167,13 @@ export class WoDetailsService {
       this.db
         .select({ count: sql<number>`count(*)::int` })
         .from(woDetails)
+        .leftJoin(woBasicDetails, eq(woDetails.woBasicDetailId, woBasicDetails.id))
         .where(whereClause)
         .then(([r]) => Number(r?.count ?? 0)),
       this.db
-        .select()
+        .select({ woDetails })
         .from(woDetails)
+        .leftJoin(woBasicDetails, eq(woDetails.woBasicDetailId, woBasicDetails.id))
         .where(whereClause)
         .orderBy(orderFn(orderColumn))
         .limit(limit)
@@ -166,7 +181,7 @@ export class WoDetailsService {
     ]);
 
     return {
-      data: rows.map((r) => this.mapRowToResponse(r)),
+      data: rows.map((r) => this.mapRowToResponse(r.woDetails)),
       meta: {
         total: countResult,
         page,
@@ -960,22 +975,26 @@ export class WoDetailsService {
   // DASHBOARD
   // ============================================
 
-  async getDashboardSummary() {
+  async getDashboardSummary(teamId?: number) {
+    const conditions: any[] = [];
+    if (teamId) {
+      conditions.push(eq(woBasicDetails.team, teamId));
+    }
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
     const [summary] = await this.db
       .select({
-        total: sql<number>`count(*)::int`,
-        draft: sql<number>`count(*) filter (where ${woDetails.status} = 'draft')::int`,
-        inProgress: sql<number>`count(*) filter (where ${woDetails.status} = 'in_progress')::int`,
-        completed: sql<number>`count(*) filter (where ${woDetails.status} = 'completed')::int`,
-        submittedForReview: sql<number>`count(*) filter (where ${woDetails.status} = 'submitted_for_review')::int`,
-        ldApplicable: sql<number>`count(*) filter (where ${woDetails.ldApplicable} = true)::int`,
-        pbgApplicable: sql<number>`count(*) filter (where ${woDetails.isPbgApplicable} = true)::int`,
-        contractAgreement: sql<number>`count(*) filter (where ${woDetails.isContractAgreement} = true)::int`,
+        pending: sql<number>`count(*) filter (where ${woAcceptance.status} = 'pending_review')::int`,
+        accepted: sql<number>`count(*) filter (where ${woAcceptance.status} = 'completed' and ${woAcceptance.decision} = 'accepted')::int`,
+        amendmentNeeded: sql<number>`count(*) filter (where ${woAcceptance.status} = 'awaiting_amendment' or ${woAcceptance.decision} = 'amendment_needed')::int`,
       })
-      .from(woDetails);
+      .from(woDetails)
+      .leftJoin(woAcceptance, eq(woDetails.id, woAcceptance.woDetailId))
+      .leftJoin(woBasicDetails, eq(woDetails.woBasicDetailId, woBasicDetails.id))
+      .where(whereClause);
 
     return {
-      ...summary,
+      summary: summary || { pending: 0, accepted: 0, amendmentNeeded: 0 },
       generatedAt: new Date().toISOString(),
     };
   }

@@ -48,6 +48,9 @@ export const woBasicDetails = pgTable("wo_basic_details", {
     workflowPausedAt: timestamp("workflow_paused_at", { withTimezone: true }),
     workflowResumedAt: timestamp("workflow_resumed_at", { withTimezone: true }),
 
+    // Status
+    status: integer("status").default(0),
+
     // Audit
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

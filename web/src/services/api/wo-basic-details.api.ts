@@ -37,6 +37,9 @@ class WoBasicDetailsService extends BaseApiService {
     if (filters.projectCode) params.set('projectCode', filters.projectCode);
     if (filters.projectName) params.set('projectName', filters.projectName);
     if (filters.currentStage) params.set('currentStage', filters.currentStage);
+    if (filters.teamId) params.set('teamId', String(filters.teamId));
+    if (filters.userId) params.set('userId', String(filters.userId));
+    if (filters.dataScope) params.set('dataScope', filters.dataScope);
     if (filters.oeFirst) params.set('oeFirst', String(filters.oeFirst));
     if (filters.oeSiteVisit) params.set('oeSiteVisit', String(filters.oeSiteVisit));
     if (filters.oeDocsPrep) params.set('oeDocsPrep', String(filters.oeDocsPrep));
@@ -125,16 +128,19 @@ class WoBasicDetailsService extends BaseApiService {
   }
 
   // Dashboard/Reporting
-  async getDashboardSummary(): Promise<DashboardSummary> {
-    return this.get<DashboardSummary>('/dashboard/summary');
+  async getDashboardSummary(teamId?: number): Promise<DashboardSummary> {
+    const query = teamId ? `?teamId=${teamId}` : '';
+    return this.get<DashboardSummary>(`/dashboard/summary${query}`);
   }
 
-  async getPendingOeAssignments(): Promise<{ count: number; data: WoBasicDetail[] }> {
-    return this.get<{ count: number; data: WoBasicDetail[] }>('/dashboard/pending-assignments');
+  async getPendingOeAssignments(teamId?: number): Promise<{ count: number; data: WoBasicDetail[] }> {
+    const query = teamId ? `?teamId=${teamId}` : '';
+    return this.get<{ count: number; data: WoBasicDetail[] }>(`/dashboard/pending-assignments${query}`);
   }
 
-  async getWorkflowStatusSummary(): Promise<WorkflowStatusSummary> {
-    return this.get<WorkflowStatusSummary>('/dashboard/workflow-status');
+  async getWorkflowStatusSummary(teamId?: number): Promise<WorkflowStatusSummary> {
+    const query = teamId ? `?teamId=${teamId}` : '';
+    return this.get<WorkflowStatusSummary>(`/dashboard/workflow-status${query}`);
   }
 }
 

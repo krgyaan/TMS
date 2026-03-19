@@ -56,9 +56,29 @@ const BasicDetailListPage = () => {
             page: pagination.pageIndex + 1,
             limit: pagination.pageSize,
             search: debouncedSearch || undefined,
-            sortBy: sortModel[0]?.colId,
-            sortOrder: sortModel[0]?.sort,
+            sortBy: sortModel[0]?.colId || 'woDate',
+            sortOrder: sortModel[0]?.sort || 'desc',
         };
+
+        // Add tab-specific filters
+        switch (activeTab) {
+            case 'basic_details':
+                baseFilters.currentStage = 'basic_details';
+                baseFilters.status = [26];
+                break;
+            case 'wo_details':
+                baseFilters.currentStage = 'wo_details';
+                baseFilters.status = [27];
+                break;
+            case 'wo_acceptance':
+                baseFilters.currentStage = 'wo_acceptance';
+                baseFilters.status = [42];
+                break;
+            case 'completed':
+                baseFilters.currentStage = 'completed';
+                baseFilters.status = [44];
+                break;
+        }
 
         return baseFilters;
     }, [activeTab, pagination, debouncedSearch, sortModel]);
@@ -131,16 +151,7 @@ const BasicDetailListPage = () => {
                 width: 200,
                 sortable: true,
                 filter: true,
-                cellRenderer: (params: any) => (
-                    <div className="flex flex-col">
-                        <span className="font-medium truncate">{params.value || '—'}</span>
-                        {params.data?.woNumber && (
-                            <span className="text-xs text-muted-foreground">
-                                WO: {params.data.woNumber}
-                            </span>
-                        )}
-                    </div>
-                ),
+                cellRenderer: (params: any) => <span className="font-medium truncate">{params.value || '—'}</span>,
             },
             dateCol<WoBasicDetail>('woDate', { includeTime: false }, {
                 headerName: 'WO Date',
@@ -196,8 +207,8 @@ const BasicDetailListPage = () => {
                 cellRenderer: (params: any) => getStageBadge(params.value),
             },
             {
-                field: 'oeFirst',
-                colId: 'oeFirst',
+                field: 'oeFirstName',
+                colId: 'oeFirstName',
                 headerName: 'Primary OE',
                 width: 120,
                 cellRenderer: (params: any) => {
@@ -208,7 +219,7 @@ const BasicDetailListPage = () => {
                             </Badge>
                         );
                     }
-                    return <span>OE #{params.value}</span>;
+                    return <span>{params.value}</span>;
                 },
             },
             {

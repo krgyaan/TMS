@@ -1,15 +1,16 @@
-import {
-    Inject,
-    Injectable,
-    NotFoundException,
-    ConflictException,
-    BadRequestException,
-} from '@nestjs/common';
-import { eq, desc, asc, sql, and, or, ilike, gte, lte, isNull } from 'drizzle-orm';
+import { Inject, Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
+import { eq, desc, asc, sql, and, or, ilike, gte, lte, isNull, inArray, SQL } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { woBasicDetails, woContacts, woDetails } from '@db/schemas/operations';
+import { users } from '@db/schemas/auth/users.schema';
 import type { CreateWoBasicDetailDto, UpdateWoBasicDetailDto, AssignOeDto, BulkAssignOeDto, RemoveOeAssignmentDto, WoBasicDetailsQueryDto } from './dto/wo-basic-details.dto';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+
+const oeFirstUser = alias(users, 'oeFirstUser');
+const oeSiteVisitUser = alias(users, 'oeSiteVisitUser');
+const oeDocsPrepUser = alias(users, 'oeDocsPrepUser');
 
 export type WoBasicDetailRow = typeof woBasicDetails.$inferSelect;
 
@@ -19,7 +20,7 @@ export class WoBasicDetailsService {
 
     private mapCreateToDb(data: CreateWoBasicDetailDto) {
         const now = new Date();
-        return {
+        const out: Record<string, any> = {
             tenderId: data.tenderId ?? null,
             enquiryId: data.enquiryId ?? null,
             woNumber: data.woNumber ?? null,
@@ -39,6 +40,7 @@ export class WoBasicDetailsService {
             createdAt: now,
             updatedAt: now,
         };
+        return out as Partial<typeof woBasicDetails.$inferInsert>;
     }
 
     private mapUpdateToDb(data: UpdateWoBasicDetailDto) {
@@ -58,7 +60,7 @@ export class WoBasicDetailsService {
         if (data.teChecklistConfirmed !== undefined) out.teChecklistConfirmed = data.teChecklistConfirmed;
         if (data.tmsDocuments !== undefined) out.tmsDocuments = data.tmsDocuments;
 
-        return out as Partial<typeof woBasicDetails.$inferInsert>;
+        return out as any;
     }
 
     private mapRowToResponse(row: WoBasicDetailRow) {
@@ -95,6 +97,22 @@ export class WoBasicDetailsService {
         };
     }
 
+    private mapJoinedRowToResponse(row: {
+        woBasicDetails: typeof woBasicDetails.$inferSelect;
+        oeFirstUser: { name: string | null } | null;
+        oeSiteVisitUser: { name: string | null } | null;
+        oeDocsPrepUser: { name: string | null } | null;
+    }) {
+        const r = row.woBasicDetails;
+        return {
+            ...this.mapRowToResponse(r),
+            // Joined fields
+            oeFirstName: row.oeFirstUser?.name ?? null,
+            oeSiteVisitName: row.oeSiteVisitUser?.name ?? null,
+            oeDocsPrepName: row.oeDocsPrepUser?.name ?? null,
+        };
+    }
+
     private generateProjectCode(): string {
         const timestamp = Date.now().toString(36).toUpperCase();
         const random = Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -113,6 +131,30 @@ export class WoBasicDetailsService {
         return margin.toFixed(2);
     }
 
+    private getWoBaseSelect() {
+        return {
+            woBasicDetails,
+            oeFirstUser: {
+                name: oeFirstUser.name,
+            },
+            oeSiteVisitUser: {
+                name: oeSiteVisitUser.name,
+            },
+            oeDocsPrepUser: {
+                name: oeDocsPrepUser.name,
+            },
+        };
+    }
+
+    private getBaseQueryBuilder() {
+        return this.db
+            .select(this.getWoBaseSelect())
+            .from(woBasicDetails)
+            .leftJoin(oeFirstUser, eq(oeFirstUser.id, woBasicDetails.oeFirst))
+            .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
+            .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep));
+    }
+
     async findAll(filters?: WoBasicDetailsQueryDto) {
         const page = filters?.page ?? 1;
         const limit = Math.min(Math.max(filters?.limit ?? 50, 1), 100);
@@ -121,33 +163,19 @@ export class WoBasicDetailsService {
         const sortBy = filters?.sortBy ?? 'createdAt';
         const search = filters?.search?.trim();
 
-        // Determine order column
-        const orderColumnMap: Record<string, any> = {
-            woDate: woBasicDetails.woDate,
-            createdAt: woBasicDetails.createdAt,
-            updatedAt: woBasicDetails.updatedAt,
-            projectCode: woBasicDetails.projectCode,
-            woValuePreGst: woBasicDetails.woValuePreGst,
-            grossMargin: woBasicDetails.grossMargin,
-        };
-        const orderColumn = orderColumnMap[sortBy] ?? woBasicDetails.createdAt;
-        const orderFn = sortOrder === 'desc' ? desc : asc;
-
-        // Build conditions
+        // 1. Build Conditions
         const conditions: any[] = [];
 
-        // Search condition
-        if (search) {
-            conditions.push(
-                or(
-                    ilike(woBasicDetails.projectName, `%${search}%`),
-                    ilike(woBasicDetails.woNumber, `%${search}%`),
-                    ilike(woBasicDetails.projectCode, `%${search}%`),
-                ),
-            );
+        // Apply role-based filtering
+        if (filters?.user) {
+            conditions.push(...this.getVisibilityConditions(filters.user, filters.teamId));
         }
 
-        // Filter conditions
+        if (filters?.unallocated) {
+            conditions.push(isNull(woBasicDetails.team));
+        }
+
+        // Additional filters
         if (filters?.tenderId) {
             conditions.push(eq(woBasicDetails.tenderId, filters.tenderId));
         }
@@ -175,26 +203,93 @@ export class WoBasicDetailsService {
         if (filters?.isWorkflowPaused !== undefined) {
             conditions.push(eq(woBasicDetails.isWorkflowPaused, filters.isWorkflowPaused));
         }
+        if (filters?.status && filters.status.length > 0) {
+            conditions.push(inArray(woBasicDetails.status, filters.status));
+        }
+
+        // Search condition (Expanded to joined fields)
+        if (search) {
+            const searchStr = `%${search}%`;
+            conditions.push(
+                or(
+                    ilike(woBasicDetails.projectName, searchStr),
+                    ilike(woBasicDetails.woNumber, searchStr),
+                    ilike(woBasicDetails.projectCode, searchStr),
+                    ilike(oeFirstUser.name, searchStr),
+                    ilike(oeSiteVisitUser.name, searchStr),
+                    ilike(oeDocsPrepUser.name, searchStr),
+                ),
+            );
+        }
 
         const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-        const [countResult, rows] = await Promise.all([
-            this.db
-                .select({ count: sql<number>`count(*)::int` })
-                .from(woBasicDetails)
-                .where(whereClause)
-                .then(([r]) => Number(r?.count ?? 0)),
-            this.db
-                .select()
-                .from(woBasicDetails)
-                .where(whereClause)
-                .orderBy(orderFn(orderColumn))
-                .limit(limit)
-                .offset(offset),
-        ]);
+        // 2. Get Total Count
+        let countQuery: any = this.db
+            .select({ count: sql<number>`count(distinct ${woBasicDetails.id})::int` })
+            .from(woBasicDetails);
 
-        const total = countResult;
-        const data = rows.map((r) => this.mapRowToResponse(r));
+        // Add joins if search is being used (searches in joined tables)
+        if (search) {
+            countQuery = countQuery
+                .leftJoin(oeFirstUser, eq(oeFirstUser.id, woBasicDetails.oeFirst))
+                .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
+                .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep));
+        }
+
+        const [countResult] = await countQuery.where(whereClause);
+        const total = Number(countResult?.count || 0);
+
+        // 3. Determine sorting
+        const orderFn = sortOrder === 'desc' ? desc : asc;
+        let orderByClause: any;
+
+        switch (sortBy) {
+            case 'woDate':
+                orderByClause = orderFn(woBasicDetails.woDate);
+                break;
+            case 'projectCode':
+                orderByClause = orderFn(woBasicDetails.projectCode);
+                break;
+            case 'woNumber':
+                orderByClause = orderFn(woBasicDetails.woNumber);
+                break;
+            case 'projectName':
+                orderByClause = orderFn(woBasicDetails.projectName);
+                break;
+            case 'woValuePreGst':
+                orderByClause = orderFn(woBasicDetails.woValuePreGst);
+                break;
+            case 'woValueGstAmt':
+                orderByClause = orderFn(woBasicDetails.woValueGstAmt);
+                break;
+            case 'grossMargin':
+                orderByClause = orderFn(woBasicDetails.grossMargin);
+                break;
+            case 'oeFirstName':
+                orderByClause = orderFn(oeFirstUser.name);
+                break;
+            case 'oeSiteVisitName':
+                orderByClause = orderFn(oeSiteVisitUser.name);
+                break;
+            case 'oeDocsPrepName':
+                orderByClause = orderFn(oeDocsPrepUser.name);
+                break;
+            case 'currentStage':
+                orderByClause = orderFn(woBasicDetails.currentStage);
+                break;
+            default:
+                orderByClause = orderFn(woBasicDetails.createdAt);
+        }
+
+        // 4. Get Data
+        const rows = await this.getBaseQueryBuilder()
+            .where(whereClause)
+            .orderBy(orderByClause)
+            .limit(limit)
+            .offset(offset);
+
+        const data = rows.map((r) => this.mapJoinedRowToResponse(r as any));
 
         return {
             data,
@@ -252,7 +347,7 @@ export class WoBasicDetailsService {
         };
     }
 
-    async create(data: CreateWoBasicDetailDto) {
+    async create(data: CreateWoBasicDetailDto, userId?: number) {
         // Check if project code already exists (if provided)
         if (data.projectCode) {
             const existing = await this.checkProjectCodeExists(data.projectCode);
@@ -262,6 +357,10 @@ export class WoBasicDetailsService {
         }
 
         const insertValues = this.mapCreateToDb(data);
+        if (userId) {
+            insertValues.createdBy = userId;
+            insertValues.updatedBy = userId;
+        }
 
         // Auto-calculate gross margin if both values are provided
         if (data.receiptPreGst && data.budgetPreGst) {
@@ -279,7 +378,7 @@ export class WoBasicDetailsService {
         return this.mapRowToResponse(row!);
     }
 
-    async update(id: number, data: UpdateWoBasicDetailDto) {
+    async update(id: number, data: UpdateWoBasicDetailDto, userId?: number) {
         // Check if record exists
         await this.findById(id);
 
@@ -302,6 +401,9 @@ export class WoBasicDetailsService {
         }
 
         const updateValues = this.mapUpdateToDb(data);
+        if (userId) {
+            updateValues.updatedBy = userId;
+        }
 
         // Auto-calculate gross margin if both values are provided
         if (data.receiptPreGst !== undefined || data.budgetPreGst !== undefined) {
@@ -541,7 +643,41 @@ export class WoBasicDetailsService {
     // DASHBOARD/REPORTING
     // ============================================
 
-    async getDashboardSummary() {
+    private getVisibilityConditions(user: ValidatedUser, teamId?: number) {
+        const conditions: any[] = [];
+
+        // Role ID 1 = Super User, 2 = Admin: Show all, respect teamId filter if provided
+        if (user.roleId === 1 || user.roleId === 2) {
+            if (teamId !== undefined && teamId !== null) {
+                conditions.push(eq(woBasicDetails.team, teamId));
+            }
+        } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+            // Team Leader, Coordinator, Engineer: Filter by teamId
+            if (user.teamId) {
+                conditions.push(eq(woBasicDetails.team, user.teamId));
+            }
+        } else {
+            // Other roles: Show where they created or are assigned as OE
+            conditions.push(
+                or(
+                    eq(woBasicDetails.createdBy, user.sub),
+                    eq(woBasicDetails.oeFirst, user.sub),
+                    eq(woBasicDetails.oeSiteVisit, user.sub),
+                    eq(woBasicDetails.oeDocsPrep, user.sub),
+                ),
+            );
+        }
+
+        return conditions;
+    }
+
+    async getDashboardSummary(user?: ValidatedUser, teamId?: number) {
+        const conditions: any[] = [];
+        if (user) {
+            conditions.push(...this.getVisibilityConditions(user, teamId));
+        }
+        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
         const [stageCounts] = await this.db
             .select({
                 total: sql<number>`count(*)::int`,
@@ -552,7 +688,8 @@ export class WoBasicDetailsService {
                 completed: sql<number>`count(*) filter (where ${woBasicDetails.currentStage} = 'completed')::int`,
                 paused: sql<number>`count(*) filter (where ${woBasicDetails.isWorkflowPaused} = true)::int`,
             })
-            .from(woBasicDetails);
+            .from(woBasicDetails)
+            .where(whereClause);
 
         return {
             summary: stageCounts,
@@ -560,16 +697,19 @@ export class WoBasicDetailsService {
         };
     }
 
-    async getPendingOeAssignments() {
+    async getPendingOeAssignments(user?: ValidatedUser, teamId?: number) {
+        const conditions: any[] = [
+            isNull(woBasicDetails.oeFirst),
+            eq(woBasicDetails.currentStage, 'basic_details'),
+        ];
+        if (user) {
+            conditions.push(...this.getVisibilityConditions(user, teamId));
+        }
+
         const rows = await this.db
             .select()
             .from(woBasicDetails)
-            .where(
-                and(
-                    isNull(woBasicDetails.oeFirst),
-                    eq(woBasicDetails.currentStage, 'basic_details'),
-                ),
-            )
+            .where(and(...conditions))
             .orderBy(asc(woBasicDetails.createdAt));
 
         return {
@@ -578,7 +718,13 @@ export class WoBasicDetailsService {
         };
     }
 
-    async getWorkflowStatusSummary() {
+    async getWorkflowStatusSummary(user?: ValidatedUser, teamId?: number) {
+        const conditions: any[] = [];
+        if (user) {
+            conditions.push(...this.getVisibilityConditions(user, teamId));
+        }
+        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
         const [summary] = await this.db
             .select({
                 totalActive: sql<number>`count(*) filter (where ${woBasicDetails.isWorkflowPaused} = false)::int`,
@@ -586,7 +732,8 @@ export class WoBasicDetailsService {
                 avgGrossMargin: sql<string>`round(avg(${woBasicDetails.grossMargin}::numeric), 2)::text`,
                 totalWoValue: sql<string>`sum(${woBasicDetails.woValuePreGst}::numeric)::text`,
             })
-            .from(woBasicDetails);
+            .from(woBasicDetails)
+            .where(whereClause);
 
         return {
             ...summary,

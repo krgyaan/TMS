@@ -28,6 +28,10 @@ class WoDetailsService extends BaseApiService {
     if (filters.limit) params.set('limit', String(filters.limit));
     if (filters.sortBy) params.set('sortBy', filters.sortBy);
     if (filters.sortOrder) params.set('sortOrder', filters.sortOrder);
+    if (filters.teamId) params.set('teamId', String(filters.teamId));
+    if (filters.userId) params.set('userId', String(filters.userId));
+    if (filters.dataScope) params.set('dataScope', filters.dataScope);
+
     const queryString = params.toString();
     return queryString ? `?${queryString}` : '';
   }
@@ -146,8 +150,9 @@ class WoDetailsService extends BaseApiService {
   // Dashboard/Reporting
   // ============================================
 
-  async getDashboardSummary(): Promise<WoDetailsDashboardSummary> {
-    return this.get<WoDetailsDashboardSummary>('/dashboard/summary');
+  async getDashboardSummary(teamId?: number): Promise<WoDetailsDashboardSummary> {
+    const query = teamId ? `?teamId=${teamId}` : '';
+    return this.get<WoDetailsDashboardSummary>(`/dashboard/summary${query}`);
   }
 
   async getPendingAcceptance(): Promise<{ count: number; data: WoDetail[] }> {

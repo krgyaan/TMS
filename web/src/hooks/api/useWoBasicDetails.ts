@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { woBasicDetailsService } from '@/services/api/wo-basic-details.api';
 import { toast } from 'sonner';
 import { handleQueryError } from '@/lib/react-query';
+import { useTeamFilter } from '@/hooks/useTeamFilter';
 import type {
   WoBasicDetailsFilters,
   CreateWoBasicDetailDto,
@@ -21,16 +22,19 @@ import type {
 export const woBasicDetailsKeys = {
   all: ['wo-basic-details'] as const,
   lists: () => [...woBasicDetailsKeys.all, 'list'] as const,
-  list: (filters?: WoBasicDetailsFilters) => [...woBasicDetailsKeys.lists(), filters] as const,
+  list: (filters?: WoBasicDetailsFilters) => {
+    const { teamId, userId, dataScope, ...rest } = filters || {};
+    return [...woBasicDetailsKeys.lists(), { teamId, userId, dataScope, ...rest }] as const;
+  },
   details: () => [...woBasicDetailsKeys.all, 'detail'] as const,
   detail: (id: number) => [...woBasicDetailsKeys.details(), id] as const,
   detailWithRelations: (id: number) => [...woBasicDetailsKeys.details(), id, 'with-relations'] as const,
   oeAssignments: (id: number) => [...woBasicDetailsKeys.all, 'oe-assignments', id] as const,
   byTender: (tenderId: number) => [...woBasicDetailsKeys.all, 'by-tender', tenderId] as const,
   byEnquiry: (enquiryId: number) => [...woBasicDetailsKeys.all, 'by-enquiry', enquiryId] as const,
-  dashboardSummary: () => [...woBasicDetailsKeys.all, 'dashboard-summary'] as const,
-  pendingAssignments: () => [...woBasicDetailsKeys.all, 'pending-assignments'] as const,
-  workflowStatus: () => [...woBasicDetailsKeys.all, 'workflow-status'] as const,
+  dashboardSummary: (teamId?: number | null) => [...woBasicDetailsKeys.all, 'dashboard-summary', teamId] as const,
+  pendingAssignments: (teamId?: number | null) => [...woBasicDetailsKeys.all, 'pending-assignments', teamId] as const,
+  workflowStatus: (teamId?: number | null) => [...woBasicDetailsKeys.all, 'workflow-status', teamId] as const,
   projectCodeCheck: (code: string) => [...woBasicDetailsKeys.all, 'project-code-check', code] as const,
 };
 
@@ -39,9 +43,16 @@ export const woBasicDetailsKeys = {
 // ============================================
 
 export const useWoBasicDetails = (filters?: WoBasicDetailsFilters) => {
+  const { queryParams: teamParams } = useTeamFilter();
+  
+  const mergedFilters = {
+    ...teamParams,
+    ...(filters || {}),
+  };
+
   return useQuery({
-    queryKey: woBasicDetailsKeys.list(filters),
-    queryFn: () => woBasicDetailsService.getAll(filters),
+    queryKey: woBasicDetailsKeys.list(mergedFilters),
+    queryFn: () => woBasicDetailsService.getAll(mergedFilters),
   });
 };
 
@@ -86,23 +97,36 @@ export const useOeAssignments = (id: number) => {
 };
 
 export const useWoBasicDetailsDashboardSummary = () => {
+  const { teamId, dataScope } = useTeamFilter();
+  // Only pass teamId for Super User/Admin (dataScope === 'all') when a team is selected
+  const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+
   return useQuery({
-    queryKey: woBasicDetailsKeys.dashboardSummary(),
-    queryFn: () => woBasicDetailsService.getDashboardSummary(),
+    queryKey: woBasicDetailsKeys.dashboardSummary(teamIdParam ?? null),
+    queryFn: () => woBasicDetailsService.getDashboardSummary(teamIdParam),
+    staleTime: 0,
   });
 };
 
 export const usePendingOeAssignments = () => {
+  const { teamId, dataScope } = useTeamFilter();
+  const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+
   return useQuery({
-    queryKey: woBasicDetailsKeys.pendingAssignments(),
-    queryFn: () => woBasicDetailsService.getPendingOeAssignments(),
+    queryKey: woBasicDetailsKeys.pendingAssignments(teamIdParam ?? null),
+    queryFn: () => woBasicDetailsService.getPendingOeAssignments(teamIdParam),
+    staleTime: 0,
   });
 };
 
 export const useWorkflowStatusSummary = () => {
+  const { teamId, dataScope } = useTeamFilter();
+  const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+
   return useQuery({
-    queryKey: woBasicDetailsKeys.workflowStatus(),
-    queryFn: () => woBasicDetailsService.getWorkflowStatusSummary(),
+    queryKey: woBasicDetailsKeys.workflowStatus(teamIdParam ?? null),
+    queryFn: () => woBasicDetailsService.getWorkflowStatusSummary(teamIdParam),
+    staleTime: 0,
   });
 };
 
