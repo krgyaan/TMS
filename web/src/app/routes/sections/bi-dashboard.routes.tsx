@@ -23,6 +23,8 @@ const BI_BankGuaranteeDetails = lazy(() => import('@/modules/bi-dashboard/bank-g
 const BI_BankTransferDetails = lazy(() => import('@/modules/bi-dashboard/bank-tranfer/BankTransferDetailsPage'));
 const BI_PayOnPortalDetails = lazy(() => import('@/modules/bi-dashboard/pay-on-portal/PayOnPortalDetailsPage'));
 
+const BI_BankGuaranteeEdit = lazy(() => import('@/modules/bi-dashboard/bank-guarantee/BankGuaranteeEditPage'));
+
 export default function BIDashboardRoutes() {
     return (
         <Routes>
@@ -42,6 +44,7 @@ export default function BIDashboardRoutes() {
             <Route path="fdr/details/:id" element={<RouteWrapper><BI_FDRDetails /></RouteWrapper>} />
             <Route path="cheque/details/:id" element={<RouteWrapper><BI_ChequeDetails /></RouteWrapper>} />
             <Route path="bank-guarantee/details/:id" element={<RouteWrapper><BI_BankGuaranteeDetails /></RouteWrapper>} />
+            <Route path="bank-guarantee/edit/:id" element={<RouteWrapper><BI_BankGuaranteeEdit /></RouteWrapper>} />
             <Route path="bank-transfer/details/:id" element={<RouteWrapper><BI_BankTransferDetails /></RouteWrapper>} />
             <Route path="pay-on-portal/details/:id" element={<RouteWrapper><BI_PayOnPortalDetails /></RouteWrapper>} />
         </Routes>

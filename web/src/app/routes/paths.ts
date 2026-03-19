@@ -135,6 +135,7 @@ export const paths = {
         bankGuarantee: "/bi-dashboard/bank-guarantee",
         bankGuaranteeView: (requestId: number) => `/bi-dashboard/bank-guarantee/details/${requestId}`,
         bankGuaranteeAction: (id: number) => `/bi-dashboard/bank-guarantee/action/${id}`,
+        bankGuaranteeEdit: (id: number) => `/bi-dashboard/bank-guarantee/edit/${id}`,
         bankTransfer: "/bi-dashboard/bank-transfer",
         bankTransferView: (requestId: number) => `/bi-dashboard/bank-transfer/details/${requestId}`,
         bankTransferAction: (id: number) => `/bi-dashboard/bank-transfer/action/${id}`,

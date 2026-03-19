@@ -88,6 +88,19 @@ export const useBankGuaranteeDetails = (id: number) => {
     return query;
 };
 
+export const useUpdateBankGuarantee = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, formData }: { id: number; formData: FormData }) =>
+            bankGuaranteesService.update(id, formData),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.all });
+            queryClient.invalidateQueries({ queryKey: bankGuaranteesKey.counts() });
+        },
+    });
+};
+
 export const useUpdateBankGuaranteeAction = () => {
     const queryClient = useQueryClient();
 

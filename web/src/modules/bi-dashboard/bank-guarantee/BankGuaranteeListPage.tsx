@@ -123,8 +123,13 @@ const BankGuaranteeListPage = () => {
             },
             {
                 label: 'Action Form',
-                icon: <Edit className="h-4 w-4" />,
+                icon: <FileText className="h-4 w-4" />,
                 onClick: (row: BankGuaranteeDashboardRow) => navigate(paths.bi.bankGuaranteeAction(row.id)),
+            },
+            {
+                label: 'Edit',
+                icon: <Edit className="h-4 w-4" />,
+                onClick: (row: BankGuaranteeDashboardRow) => navigate(paths.bi.bankGuaranteeEdit(row.requestId)),
             },
         ],
         [navigate]

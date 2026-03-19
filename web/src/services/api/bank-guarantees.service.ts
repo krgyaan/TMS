@@ -75,6 +75,10 @@ class BankGuaranteesService extends BaseApiService {
         }
     }
 
+    async update(id: number, formData: FormData): Promise<any> {
+        return this.put<any, FormData>(`/${id}`, formData);
+    }
+
     async updateAction(id: number, formData: FormData): Promise<any> {
         return this.put<any, FormData>(`/instruments/${id}/action`, formData);
     }
