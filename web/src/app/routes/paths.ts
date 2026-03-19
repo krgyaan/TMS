@@ -101,10 +101,8 @@ export const paths = {
         woBasicDetailCreatePage: "/operations/work-order/details/basic/create",
         woBasicDetailEditPage: (id: number) => `/operations/work-order/details/basic/${id}/edit`,
         woBasicDetailShowPage: (id: number) => `/operations/work-order/details/basic/${id}`,
-        woDetailListPage: "/operations/work-order/details/full",
         woDetailCreatePage: (woBasicDetailId: number) => `/operations/work-order/details/full/create/${woBasicDetailId}`,
         woDetailEditPage: (id: number) => `/operations/work-order/details/full/${id}/edit`,
-        woDetailShowPage: (id: number) => `/operations/work-order/details/full/${id}`,
 
         woDetailAcceptanceListPage: "/operations/work-order/acceptance",
         woDetailAcceptanceCreatePage: (woBasicDetailId: number) => `/operations/work-order/acceptance/create/${woBasicDetailId}`,
