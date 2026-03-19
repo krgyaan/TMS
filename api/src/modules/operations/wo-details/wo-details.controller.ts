@@ -2,6 +2,8 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPip
 import { WoDetailsService } from './wo-details.service';
 import { CreateWoDetailSchema, UpdateWoDetailSchema, WoDetailsQuerySchema, PageSaveSchemas, PageSubmitSchemas, SkipPageSchema } from './dto/wo-details.dto';
 import type { CreateWoDetailDto, UpdateWoDetailDto, WoDetailsQueryDto, SkipPageDto } from './dto/wo-details.dto';
+import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 @Controller('wo-details')
 export class WoDetailsController {
@@ -10,19 +12,16 @@ export class WoDetailsController {
   // CRUD OPERATIONS
   @Get()
   async list(
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('sortBy') sortBy?: string,
-    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+    @CurrentUser() user: ValidatedUser,
+    @Query() query: any,
   ) {
-    const rawFilters = { page, limit, sortBy, sortOrder };
-    const parsed = WoDetailsQuerySchema.parse(rawFilters) as WoDetailsQueryDto;
-    return this.woDetailsService.findAll(parsed);
+    const parsed = WoDetailsQuerySchema.parse(query) as WoDetailsQueryDto;
+    return this.woDetailsService.findAll({ ...parsed, user });
   }
 
   @Get('dashboard/summary')
-  async getDashboardSummary(@Query('teamId') teamId?: string) {
-    return this.woDetailsService.getDashboardSummary(teamId ? Number(teamId) : undefined);
+  async getDashboardSummary(@CurrentUser() user: ValidatedUser, @Query('teamId') teamId?: string) {
+    return this.woDetailsService.getDashboardSummary(user, teamId ? Number(teamId) : undefined);
   }
 
   @Get(':id')
@@ -42,15 +41,15 @@ export class WoDetailsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  async create(@Body() body: unknown) {
+  async create(@Body() body: unknown, @CurrentUser() user: ValidatedUser) {
     const parsed = CreateWoDetailSchema.parse(body) as CreateWoDetailDto;
-    return this.woDetailsService.create(parsed);
+    return this.woDetailsService.create(parsed, user.sub);
   }
 
   @Patch(':id')
-  async update(@Param('id', ParseIntPipe) id: number, @Body() body: unknown) {
+  async update(@Param('id', ParseIntPipe) id: number, @Body() body: unknown, @CurrentUser() user: ValidatedUser) {
     const parsed = UpdateWoDetailSchema.parse(body) as UpdateWoDetailDto;
-    return this.woDetailsService.update(id, parsed);
+    return this.woDetailsService.update(id, parsed, user.sub);
   }
 
   @Delete(':id')

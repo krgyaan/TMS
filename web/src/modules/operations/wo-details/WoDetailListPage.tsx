@@ -9,12 +9,11 @@ import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Eye, FileX2, Search, Edit, CheckCircle, XCircle, Clock, FileText, Shield } from 'lucide-react';
+import { AlertCircle, Eye, FileX2, Search, Edit, CheckCircle, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { useWoDetails, useWoDetailsDashboardSummary } from '@/hooks/api/useWoDetails';
-import type { WoDetailWithRelations, WoDetailsFilters } from '@/modules/operations/types/wo.types';
+import type { WoDetailsListResponseDto, WoDetailsFilters } from '@/modules/operations/types/wo.types';
 import { currencyCol, dateCol } from '@/components/data-grid';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { QuickFilter } from '@/components/ui/quick-filter';
@@ -59,6 +58,8 @@ const WoDetailListPage = () => {
             limit: pagination.pageSize,
             sortBy: sortModel[0]?.colId,
             sortOrder: sortModel[0]?.sort,
+            search: debouncedSearch,
+            teamId,
         };
 
         switch (activeTab) {
@@ -75,7 +76,7 @@ const WoDetailListPage = () => {
         }
 
         return baseFilters;
-    }, [activeTab, pagination, sortModel]);
+    }, [activeTab, pagination, sortModel, debouncedSearch, teamId]);
 
     // Fetch data
     const { data: dashboardSummary } = useWoDetailsDashboardSummary();
@@ -99,87 +100,71 @@ const WoDetailListPage = () => {
     }, [dashboardSummary]);
 
     // Action items for each row
-    const rowActions: ActionItem<WoDetailWithRelations>[] = [
+    const rowActions: ActionItem<WoDetailsListResponseDto>[] = [
         {
-            label: 'Accept/Reject',
-            onClick: (row) => navigate(paths.operations.woDetailShowPage(row.id)),
+            label: 'WO Acceptance',
+            onClick: (row) => navigate(paths.operations.woAcceptancePage(row.id)),
             icon: <CheckCircle className="h-4 w-4" />,
         },
         {
+            label: 'Request for Clarification',
+            onClick: (row) => navigate(paths.operations.woRaiseQueryPage(row.id)),
+            icon: <FileX2 className="h-4 w-4" />,
+        },
+        {
             label: 'View Details',
-            onClick: (row) => navigate(paths.operations.woDetailShowPage(row.id)),
+            onClick: (row) => navigate(paths.operations.woBasicDetailShowPage(row.id)),
             icon: <Eye className="h-4 w-4" />,
         },
         {
             label: 'Edit',
-            onClick: (row) => navigate(paths.operations.woDetailEditPage(row.id)),
+            onClick: (row) => navigate(paths.operations.woAcceptanceEditPage(row.id)),
             icon: <Edit className="h-4 w-4" />,
         },
     ];
 
-    // Acceptance status badge
-    const getAcceptanceBadge = (row: WoDetailWithRelations) => {
-        if (row.acceptance?.status === 'completed' && row.acceptance?.decision === 'accepted') {
-            return (
-                <Badge variant="default" className="bg-green-600 gap-1">
-                    <CheckCircle className="h-3 w-3" />
-                    Accepted
-                </Badge>
-            );
-        }
-        if (row.oeWoAmendmentNeeded) {
-            return (
-                <Badge variant="destructive" className="gap-1">
-                    <XCircle className="h-3 w-3" />
-                    Amendment Needed
-                </Badge>
-            );
-        }
-        return (
-            <Badge variant="outline" className="text-orange-600 border-orange-300 gap-1">
-                <Clock className="h-3 w-3" />
-                Pending
-            </Badge>
-        );
-    };
-
     // Column definitions
-    const colDefs = useMemo<ColDef<WoDetailWithRelations>[]>(
+    const colDefs = useMemo<ColDef<WoDetailsListResponseDto>[]>(
         () => [
             {
-                field: 'id',
-                colId: 'id',
-                headerName: 'ID',
-                width: 80,
-                pinned: 'left',
+                field: 'projectName',
+                colId: 'projectName',
+                headerName: 'Project Name',
+                width: 150,
                 sortable: true,
-                cellRenderer: (params: any) => (
-                    <span className="font-mono text-sm">#{params.value}</span>
-                ),
             },
             {
-                field: 'woBasicDetailId',
-                colId: 'woBasicDetailId',
-                headerName: 'Basic Detail',
+                field: 'woNumber',
+                colId: 'woNumber',
+                headerName: 'WO Number',
                 width: 120,
                 sortable: true,
-                cellRenderer: (params: any) => (
-                    <Button
-                        variant="link"
-                        size="sm"
-                        className="p-0 h-auto"
-                        onClick={() => navigate(paths.operations.woBasicDetailShowPage(params.value))}
-                    >
-                        View #{params.value}
-                    </Button>
-                ),
             },
+            dateCol<WoDetailsListResponseDto>('woDate', { includeTime: false }, {
+                headerName: 'WO Date',
+                width: 120,
+                colId: 'woDate',
+            }),
+            currencyCol<WoDetailsListResponseDto>('woValuePreGst', {
+                headerName: 'WO Value',
+                width: 120,
+                colId: 'woValuePreGst',
+            }),
+            currencyCol<WoDetailsListResponseDto>('woValueGstAmt', {
+                headerName: 'GST Amount',
+                width: 120,
+                colId: 'woValueGstAmt',
+            }),
             {
-                field: 'status',
-                colId: 'acceptanceStatus',
-                headerName: 'Status',
-                width: 160,
-                cellRenderer: (params: any) => getAcceptanceBadge(params.data),
+                field: 'oeWoAmendmentNeeded',
+                colId: 'oeWoAmendmentNeeded',
+                headerName: 'Amendment',
+                width: 120,
+                cellRenderer: (params: any) => (
+                    <Badge variant={params.value ? 'default' : 'secondary'}>
+                        {params.value ? 'Yes' : 'No'}
+                    </Badge>
+                ),
             },
             {
                 field: 'ldApplicable',
@@ -190,33 +175,6 @@ const WoDetailListPage = () => {
                     <Badge variant={params.value ? 'default' : 'secondary'}>
                         {params.value ? 'Yes' : 'No'}
                     </Badge>
-                ),
-            },
-            {
-                field: 'maxLd',
-                colId: 'maxLd',
-                headerName: 'Max LD %',
-                width: 100,
-                cellRenderer: (params: any) => {
-                    if (!params.value) return '—';
-                    return <span>{parseFloat(params.value).toFixed(2)}%</span>;
-                },
-            },
-            dateCol<WoDetailWithRelations>('ldStartDate', { includeTime: false }, {
-                headerName: 'LD Start',
-                width: 120,
-                colId: 'ldStartDate',
-            }),
-            {
-                field: 'isPbgApplicable',
-                colId: 'isPbgApplicable',
-                headerName: 'PBG',
-                width: 90,
-                cellRenderer: (params: any) => (
-                    <div className="flex items-center gap-1">
-                        <Shield className={`h-4 w-4 ${params.value ? 'text-green-600' : 'text-gray-400'}`} />
-                        <span>{params.value ? 'Yes' : 'No'}</span>
-                    </div>
                 ),
             },
             {
@@ -231,18 +189,28 @@ const WoDetailListPage = () => {
                     </div>
                 ),
             },
-            currencyCol<WoDetailWithRelations>('budgetPreGst', {
-                field: 'budgetPreGst',
-                colId: 'budgetPreGst',
-                headerName: 'Budget',
-                width: 130,
-                sortable: true,
-            }),
-            dateCol<WoDetailWithRelations>('woAcceptanceAt', { includeTime: true }, {
-                headerName: 'Accepted At',
-                width: 150,
-                colId: 'woAcceptanceAt',
-            }),
+            {
+                field: 'status',
+                colId: 'status',
+                headerName: 'WO Status',
+                width: 120,
+                cellRenderer: (params: any) => {
+                    return <Badge variant='outline' className="capitalize">
+                        {params.value?.replaceAll('_', ' ')}
+                    </Badge>
+                },
+            },
+            {
+                field: 'woAcceptanceStatus',
+                colId: 'woAcceptanceStatus',
+                headerName: 'Acceptance',
+                width: 120,
+                cellRenderer: (params: any) => {
+                    return <Badge variant='outline' className="capitalize">
+                        {params.value ? params.value?.replaceAll('_', ' ') : 'Pending'}
+                    </Badge>
+                },
+            },
             {
                 headerName: '',
                 filter: false,
@@ -322,13 +290,7 @@ const WoDetailListPage = () => {
                             >
                                 <span className="font-semibold text-sm">{tab.name}</span>
                                 <Badge
-                                    variant={
-                                        tab.key === 'amendment-needed'
-                                            ? 'destructive'
-                                            : tab.key === 'accepted'
-                                                ? 'default'
-                                                : 'secondary'
-                                    }
+                                    variant="secondary"
                                     className="text-xs"
                                 >
                                     {tab.count}
@@ -347,7 +309,7 @@ const WoDetailListPage = () => {
                             ]}
                             value=""
                             onChange={(value) => {
-                                // Handle quick filter
+                                console.log(value);
                             }}
                         />
 

@@ -77,7 +77,7 @@ import { FdrModule } from "@/modules/bi-dashboard/fdr/fdr.module";
 import { BankTransferModule } from "@/modules/bi-dashboard/bank-transfer/bank-transfer.module";
 import { ChequeModule } from "@/modules/bi-dashboard/cheque/cheque.module";
 import { TimersModule } from "@/modules/timers/timers.module";
-import { BusinessPerformanceModule } from "./modules/performance/business/business-performance.module";
+import { BusinessPerformanceModule } from "./modules/performance/business-performance/business-performance.module";
 import { WoBasicDetailsModule } from "@/modules/operations/wo-basic-details/wo-basic-details.module";
 import { KickOffMeetingModule } from "./modules/operations/kick-off-meeting/kick-off-meeting.module";
 import { ProjectsModule } from "./modules/operations/projects/projects.module";
@@ -97,7 +97,7 @@ import { WoAmendmentsModule } from "./modules/operations/wo-amendments/wo-amendm
 import { WoDocumentsModule } from "./modules/operations/wo-documents/wo-documents.module";
 import { WoQueriesModule } from "./modules/operations/wo-queries/wo-queries.module";
 import { CustomerPerformanceModule } from "./modules/performance/customer-performance/customer-performance.module";
-
+import { LocationPerformanceModule } from "./modules/performance/location-performance/location-performance.module";
 @Module({
     imports: [
         ServeStaticModule.forRoot({
@@ -204,6 +204,7 @@ import { CustomerPerformanceModule } from "./modules/performance/customer-perfor
         SubmitQueriesModule,
         LoanAdvanceModule,
         CustomerPerformanceModule,
+        LocationPerformanceModule,
     ],
     controllers: [AppController],
     providers: [

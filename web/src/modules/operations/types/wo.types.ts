@@ -386,6 +386,22 @@ export interface WoDetailWithRelations extends WoDetail {
   acceptance?: WoAcceptance | null;
 }
 
+export interface WoDetailsListResponseDto {
+  id: number;
+  woBasicDetailId: number;
+  projectName: string;
+  woNumber: string;
+  woDate: string;
+  woValuePreGst: string;
+  woValueGstAmt: string;
+  ldApplicable: boolean;
+  isContractAgreement: boolean;
+  oeWoAmendmentNeeded: boolean;
+  status: WoDetailsStatus;
+  woAcceptanceId: number | null;
+  woAcceptanceStatus: WoAcceptanceStatus | null;
+}
+
 export interface CreateWoDetailDto {
   woBasicDetailId: number;
 }
@@ -446,6 +462,7 @@ export interface WoDetailsFilters {
   limit?: number;
   sortBy?: string;
   sortOrder?: SortOrder;
+  search?: string;
   woBasicDetailId?: number;
   status?: WoDetailsStatus;
   ldApplicable?: boolean;
