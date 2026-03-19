@@ -55,6 +55,17 @@ export class BankGuaranteeController {
         return this.bankGuaranteeService.getById(id);
     }
 
+    @Put(':id')
+    @UseInterceptors(FilesInterceptor('files', 20, biDashboardMulterConfig))
+    async update(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() body: any,
+        @UploadedFiles() files: Express.Multer.File[],
+        @Req() req: any,
+    ) {
+        return this.bankGuaranteeService.update(id, body, files || [], req.user);
+    }
+
     @Put('instruments/:id/action')
     @UseInterceptors(FilesInterceptor('files', 20, biDashboardMulterConfig))
     async updateAction(

@@ -599,6 +599,169 @@ export class BankGuaranteeService {
     }
 
     /**
+     * Update instrument with form data (general edit)
+     */
+    async update(
+        instrumentId: number,
+        body: any,
+        files: Express.Multer.File[],
+        user: any,
+    ) {
+        // Get instrument
+        const [instrument] = await this.db
+            .select()
+            .from(paymentInstruments)
+            .where(eq(paymentInstruments.id, instrumentId))
+            .limit(1);
+
+        if (!instrument) {
+            throw new NotFoundException(`Instrument ${instrumentId} not found`);
+        }
+
+        if (instrument.instrumentType !== 'BG') {
+            throw new BadRequestException('Instrument is not a Bank Guarantee');
+        }
+
+        // Parse contacts if provided
+        let contacts: any[] = [];
+        if (body.contacts) {
+            try {
+                contacts = typeof body.contacts === 'string' ? JSON.parse(body.contacts) : body.contacts;
+            } catch (e) {
+                this.logger.warn('Failed to parse contacts', e);
+            }
+        }
+
+        // Track file index for processing files in order
+        const fileIndexTracker = { current: 0 };
+
+        // Update payment_instruments
+        const updateData: any = {
+            updatedAt: new Date(),
+        };
+
+        // Common instrument fields (partial list based on what might be edited)
+        if (body.amount !== undefined) updateData.amount = body.amount;
+        if (body.favouring !== undefined) updateData.favouring = body.favouring;
+        if (body.payableAt !== undefined) updateData.payableAt = body.payableAt;
+        if (body.issueDate !== undefined) updateData.issueDate = body.issueDate;
+        if (body.expiryDate !== undefined) updateData.expiryDate = body.expiryDate;
+        if (body.validityDate !== undefined) updateData.validityDate = body.validityDate;
+        if (body.claimExpiryDate !== undefined) updateData.claimExpiryDate = body.claimExpiryDate;
+        if (body.status !== undefined) updateData.status = body.status;
+        if (body.action !== undefined) updateData.action = body.action;
+        if (body.utr !== undefined) updateData.utr = body.utr;
+        if (body.docketNo !== undefined) updateData.docketNo = body.docketNo;
+        if (body.courierAddress !== undefined) updateData.courierAddress = body.courierAddress;
+        if (body.courierDeadline !== undefined) updateData.courierDeadline = body.courierDeadline;
+
+        // Handle files for payment_instruments (if any were uploaded)
+        const docketSlipFile = this.getFileForField('docket_slip', files, body, fileIndexTracker);
+        if (docketSlipFile) updateData.docketSlip = `bi-dashboard/${docketSlipFile.filename}`;
+
+        const coveringLetterFile = this.getFileForField('covering_letter', files, body, fileIndexTracker);
+        if (coveringLetterFile) updateData.coveringLetter = `bi-dashboard/${coveringLetterFile.filename}`;
+
+        const cancelPdfFile = this.getFileForField('cancel_pdf', files, body, fileIndexTracker);
+        if (cancelPdfFile) updateData.cancelPdf = `bi-dashboard/${cancelPdfFile.filename}`;
+
+        await this.db
+            .update(paymentInstruments)
+            .set(updateData)
+            .where(eq(paymentInstruments.id, instrumentId));
+
+        // Update instrument_bg_details
+        const bgDetailsUpdate: any = {};
+
+        // All possible BG details fields
+        const directFields = [
+            'bgNo', 'bgDate', 'validityDate', 'claimExpiryDate',
+            'beneficiaryName', 'beneficiaryAddress', 'bankName',
+            'cashMarginPercent', 'fdrMarginPercent',
+            'stampCharges', 'sfmsCharges',
+            'stampChargesDeducted', 'sfmsChargesDeducted', 'otherChargesDeducted',
+            'extendedAmount', 'extendedValidityDate', 'extendedClaimExpiryDate',
+            'extendedBankName', 'bgNeeds', 'bgPurpose', 'bgSoftCopy',
+            'bgPo', 'bgClientUser', 'bgClientCp', 'bgClientFin',
+            'bgBankAcc', 'bgBankIfsc', 'courierNo', 'stampCharge',
+            'extensionLetter', 'newBgClaim', 'approveBg',
+            'fdrAmt', 'fdrPer', 'fdrNo', 'fdrValidity', 'fdrRoi',
+            'bgChargeDeducted', 'newStampChargeDeducted', 'cancelRemark',
+            'bgFdrCancelDate', 'bgFdrCancelAmount', 'bgFdrCancelRefNo',
+            'bg2Remark', 'reasonReq'
+        ];
+
+        directFields.forEach(field => {
+            if (body[field] !== undefined) {
+                bgDetailsUpdate[field] = body[field] === '' ? null : body[field];
+            }
+        });
+
+        // Handle file fields for BG details
+        const fileFields = [
+            { body: 'extension_letter_path', db: 'extensionLetterPath' },
+            { body: 'cancellation_letter_path', db: 'cancellationLetterPath' },
+            { body: 'bg_format_te', db: 'bgFormatTe' },
+            { body: 'bg_format_tl', db: 'bgFormatTl' },
+            { body: 'sfms_conf', db: 'sfmsConf' },
+            { body: 'fdr_copy', db: 'fdrCopy' },
+            { body: 'stamp_covering_letter', db: 'stampCoveringLetter' },
+            { body: 'cancell_confirm', db: 'cancellConfirm' },
+        ];
+
+        fileFields.forEach(f => {
+            const uploadedFile = this.getFileForField(f.body, files, body, fileIndexTracker);
+            if (uploadedFile) {
+                bgDetailsUpdate[f.db] = `bi-dashboard/${uploadedFile.filename}`;
+            } else if (body[f.body] && typeof body[f.body] === 'string') {
+                // If it's a string path, keep it if it's not a dummy marker
+                if (!body[f.body].includes('[object File]')) {
+                    bgDetailsUpdate[f.db] = body[f.body];
+                }
+            }
+        });
+
+        // Handle prefilledSignedBg separately (it's often JSON or multiple files)
+        const prefilledFiles = this.getMultipleFilesForField('prefilled_signed_bg', files, body, fileIndexTracker);
+        if (prefilledFiles.length > 0) {
+            const filePaths = prefilledFiles.map(f => `bi-dashboard/${f.filename}`);
+            bgDetailsUpdate.prefilledSignedBg = JSON.stringify(filePaths);
+        } else if (body.prefilled_signed_bg && typeof body.prefilled_signed_bg === 'string') {
+            if (!body.prefilled_signed_bg.includes('[object File]')) {
+                bgDetailsUpdate.prefilledSignedBg = body.prefilled_signed_bg;
+            }
+        }
+
+        if (Object.keys(bgDetailsUpdate).length > 0) {
+            bgDetailsUpdate.updatedAt = new Date();
+
+            const [existingBgDetails] = await this.db
+                .select()
+                .from(instrumentBgDetails)
+                .where(eq(instrumentBgDetails.instrumentId, instrumentId))
+                .limit(1);
+
+            if (existingBgDetails) {
+                await this.db
+                    .update(instrumentBgDetails)
+                    .set(bgDetailsUpdate)
+                    .where(eq(instrumentBgDetails.instrumentId, instrumentId));
+            } else {
+                await this.db.insert(instrumentBgDetails).values({
+                    instrumentId,
+                    ...bgDetailsUpdate,
+                    createdAt: new Date(),
+                });
+            }
+        }
+
+        return {
+            success: true,
+            instrumentId,
+        };
+    }
+
+    /**
      * Update instrument action with form data
      */
     async updateAction(
