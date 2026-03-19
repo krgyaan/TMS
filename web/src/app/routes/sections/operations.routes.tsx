@@ -10,9 +10,11 @@ const Wo_Details_Create = lazy(() => import("@/modules/operations/wo-details/WoD
 const Wo_Details_Edit = lazy(() => import("@/modules/operations/wo-details/WoDetailEditPage"));
 
 const Wo_Details_Acceptance = lazy(() => import("@/modules/operations/wo-details/WoDetailListPage"));
-const Wo_Details_Acceptance_Create = lazy(() => import("@/modules/operations/wo-details/WoDetailCreatePage"));
-const Wo_Details_Acceptance_Edit = lazy(() => import("@/modules/operations/wo-details/WoDetailEditPage"));
 const Wo_Details_Acceptance_Show = lazy(() => import("@/modules/operations/wo-details/WoDetailShowPage"));
+const Wo_Details_Acceptance_Create = lazy(() => import("@/modules/operations/wo-details/WoAcceptancePage"));
+const Wo_Details_Acceptance_Edit = lazy(() => import("@/modules/operations/wo-details/WoAcceptancePage"));
+const Wo_Acceptance_RaiseQuery_Create = lazy(() => import("@/modules/operations/wo-details/WoRaiseQueryPage"));
+const Wo_Acceptance_RaiseQuery_Edit = lazy(() => import("@/modules/operations/wo-details/WoRaiseQueryPage"));
 
 const Operations_KickOff = lazy(() => import("@/modules/operations/kick-off"));
 const Operations_ContractAgreement = lazy(() => import("@/modules/operations/contract-agreement"));
@@ -31,7 +33,9 @@ export default function OperationsRoutes() {
             <Route path="work-order/details/full/:id/edit" element={<RouteWrapper><Wo_Details_Edit /></RouteWrapper>} />
 
             <Route path="work-order/acceptance" element={<RouteWrapper><Wo_Details_Acceptance /></RouteWrapper>} />
-            <Route path="work-order/acceptance/create/:woBasicDetailId" element={<RouteWrapper><Wo_Details_Acceptance_Create /></RouteWrapper>} />
+            <Route path="work-order/acceptance/:woDetailId" element={<RouteWrapper><Wo_Details_Acceptance_Create /></RouteWrapper>} />
+            <Route path="work-order/acceptance/raise-query/:woDetailId" element={<RouteWrapper><Wo_Acceptance_RaiseQuery_Create /></RouteWrapper>} />
+            <Route path="work-order/acceptance/raise-query/:woDetailId/edit" element={<RouteWrapper><Wo_Acceptance_RaiseQuery_Edit /></RouteWrapper>} />
             <Route path="work-order/acceptance/:id/edit" element={<RouteWrapper><Wo_Details_Acceptance_Edit /></RouteWrapper>} />
             <Route path="work-order/acceptance/:id" element={<RouteWrapper><Wo_Details_Acceptance_Show /></RouteWrapper>} />
 

@@ -103,17 +103,22 @@ const WoDetailListPage = () => {
     const rowActions: ActionItem<WoDetailsListResponseDto>[] = [
         {
             label: 'WO Acceptance',
-            onClick: (row) => navigate(paths.operations.woDetailAcceptanceShowPage(row.id)),
+            onClick: (row) => navigate(paths.operations.woAcceptancePage(row.id)),
             icon: <CheckCircle className="h-4 w-4" />,
         },
         {
+            label: 'Request for Clarification',
+            onClick: (row) => navigate(paths.operations.woRaiseQueryPage(row.id)),
+            icon: <FileX2 className="h-4 w-4" />,
+        },
+        {
             label: 'View Details',
-            onClick: (row) => navigate(paths.operations.woDetailAcceptanceShowPage(row.id)),
+            onClick: (row) => navigate(paths.operations.woBasicDetailShowPage(row.id)),
             icon: <Eye className="h-4 w-4" />,
         },
         {
             label: 'Edit',
-            onClick: (row) => navigate(paths.operations.woDetailAcceptanceEditPage(row.id)),
+            onClick: (row) => navigate(paths.operations.woAcceptanceEditPage(row.id)),
             icon: <Edit className="h-4 w-4" />,
         },
     ];
