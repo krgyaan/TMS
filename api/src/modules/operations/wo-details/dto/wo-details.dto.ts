@@ -15,11 +15,30 @@ export const PositiveIntSchema = z.number().int().positive();
 
 // ENUMS
 export const WoDetailsStatusEnum = z.enum([
-  'draft',
-  'in_progress',
-  'completed',
-  'submitted_for_review',
+  'draft', 'in_progress', 'completed', 'submitted_for_review'
 ]);
+
+export const WoAcceptanceStatusEnum = z.enum([
+  'pending_review', 'in_review', 'queries_pending', 'awaiting_amendment', 'pending_signatures', 'pending_courier', 'completed'
+]);
+
+export const WoDetailsListResponseSchema = z.object({
+  id: z.number().int().positive(),
+  woBasicDetailId: z.number().int().positive(),
+  projectName: z.string().max(255),
+  woNumber: z.string().max(255),
+  woDate: z.string().date(),
+  woValuePreGst: DecimalSchema,
+  woValueGstAmt: DecimalSchema,
+  ldApplicable: z.boolean(),
+  isContractAgreement: z.boolean(),
+  oeWoAmendmentNeeded: z.boolean(),
+  status: WoDetailsStatusEnum,
+  woAcceptanceId: z.number().int().positive().nullable(),
+  woAcceptanceStatus: WoAcceptanceStatusEnum.nullable(),
+});
+
+export type WoDetailsListResponseDto = z.infer<typeof WoDetailsListResponseSchema>;
 
 export type WoDetailsStatus = z.infer<typeof WoDetailsStatusEnum>;
 

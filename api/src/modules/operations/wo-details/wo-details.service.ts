@@ -3,7 +3,7 @@ import { eq, desc, asc, sql, and, gte, lte, or, isNull, ne } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { woDetails, woBasicDetails, woContacts, woBillingBoq, woBuybackBoq, woBillingAddresses, woShippingAddresses, woAmendments, woQueries, woDocuments, woAcceptance } from '@db/schemas/operations';
-import type { CreateWoDetailDto, UpdateWoDetailDto, WoDetailsQueryDto, SavePage4Dto, SkipPageDto, TenderDocumentsChecklist } from './dto/wo-details.dto';
+import type { CreateWoDetailDto, UpdateWoDetailDto, WoDetailsListResponseDto, WoDetailsQueryDto, SavePage4Dto, SkipPageDto, TenderDocumentsChecklist, WoDetailsStatus } from './dto/wo-details.dto';
 
 export type WoDetailRow = typeof woDetails.$inferSelect;
 
@@ -95,10 +95,25 @@ export class WoDetailsService {
     };
   }
 
-  // ============================================
-  // CRUD OPERATIONS
-  // ============================================
+  mapRowToResponseList(row: any): WoDetailsListResponseDto {
+    return {
+      id: row.id,
+      woBasicDetailId: row.woBasicDetailId,
+      projectName: row.projectName ?? '',
+      woNumber: row.woNumber ?? '',
+      woDate: row.woDate ?? '',
+      woValuePreGst: row.woValuePreGst ?? '0',
+      woValueGstAmt: row.woValueGstAmt ?? '0',
+      ldApplicable: !!row.ldApplicable,
+      isContractAgreement: !!row.isContractAgreement,
+      oeWoAmendmentNeeded: !!row.oeWoAmendmentNeeded,
+      status: (row.status as WoDetailsStatus) || 'draft',
+      woAcceptanceId: row.woAcceptanceId ?? null,
+      woAcceptanceStatus: (row.woAcceptanceStatus as any) ?? null,
+    };
+  }
 
+  // CRUD OPERATIONS
   async findAll(filters?: WoDetailsQueryDto) {
     const page = filters?.page ?? 1;
     const limit = Math.min(Math.max(filters?.limit ?? 50, 1), 100);
@@ -126,30 +141,10 @@ export class WoDetailsService {
     if (filters?.ldApplicable !== undefined) {
       conditions.push(eq(woDetails.ldApplicable, filters.ldApplicable));
     }
-    if (filters?.isPbgApplicable !== undefined) {
-      conditions.push(eq(woDetails.isPbgApplicable, filters.isPbgApplicable));
-    }
     if (filters?.isContractAgreement !== undefined) {
       conditions.push(eq(woDetails.isContractAgreement, filters.isContractAgreement));
     }
-    if (filters?.siteVisitNeeded !== undefined) {
-      conditions.push(eq(woDetails.siteVisitNeeded, filters.siteVisitNeeded));
-    }
-    if (filters?.hasDiscrepancies !== undefined) {
-      conditions.push(eq(woDetails.hasDiscrepancies, filters.hasDiscrepancies));
-    }
-    if (filters?.createdBy) {
-      conditions.push(eq(woDetails.createdBy, filters.createdBy));
-    }
-    if (filters?.teamId) {
-      conditions.push(eq(woBasicDetails.team, filters.teamId));
-    }
-    if (filters?.createdAtFrom) {
-      conditions.push(gte(woDetails.createdAt, new Date(filters.createdAtFrom)));
-    }
-    if (filters?.createdAtTo) {
-      conditions.push(lte(woDetails.createdAt, new Date(filters.createdAtTo)));
-    }
+
     if (filters?.woAmendmentNeeded !== undefined) {
       conditions.push(eq(woDetails.oeWoAmendmentNeeded, filters.woAmendmentNeeded));
     }
@@ -171,9 +166,24 @@ export class WoDetailsService {
         .where(whereClause)
         .then(([r]) => Number(r?.count ?? 0)),
       this.db
-        .select({ woDetails })
+        .select({
+            id: woDetails.id,
+            woBasicDetailId: woDetails.woBasicDetailId,
+            projectName: woBasicDetails.projectName,
+            woNumber: woBasicDetails.woNumber,
+            woDate: woBasicDetails.woDate,
+            woValuePreGst: woBasicDetails.woValuePreGst,
+            woValueGstAmt: woBasicDetails.woValueGstAmt,
+            ldApplicable: woDetails.ldApplicable,
+            isContractAgreement: woDetails.isContractAgreement,
+            oeWoAmendmentNeeded: woDetails.oeWoAmendmentNeeded,
+            status: woDetails.status,
+            woAcceptanceId: woAcceptance?.id,
+            woAcceptanceStatus: woAcceptance?.status,
+         })
         .from(woDetails)
         .leftJoin(woBasicDetails, eq(woDetails.woBasicDetailId, woBasicDetails.id))
+        .leftJoin(woAcceptance, eq(woDetails.id, woAcceptance.woDetailId))
         .where(whereClause)
         .orderBy(orderFn(orderColumn))
         .limit(limit)
@@ -181,7 +191,7 @@ export class WoDetailsService {
     ]);
 
     return {
-      data: rows.map((r) => this.mapRowToResponse(r.woDetails)),
+      data: rows.map((r) => this.mapRowToResponseList(r)),
       meta: {
         total: countResult,
         page,
@@ -433,10 +443,7 @@ export class WoDetailsService {
     await this.db.delete(woDetails).where(eq(woDetails.id, id));
   }
 
-  // ============================================
   // WIZARD OPERATIONS
-  // ============================================
-
   async getWizardProgress(id: number) {
     const detail = await this.findById(id);
 
@@ -794,10 +801,7 @@ export class WoDetailsService {
     }
   }
 
-  // ============================================
   // HELPER METHODS
-  // ============================================
-
   private mapPageDataToUpdate(pageNum: number, data: any, updateValues: Record<string, unknown>) {
     switch (pageNum) {
       case 1:
@@ -971,10 +975,7 @@ export class WoDetailsService {
     return total.toFixed(2);
   }
 
-  // ============================================
   // DASHBOARD
-  // ============================================
-
   async getDashboardSummary(teamId?: number) {
     const conditions: any[] = [];
     if (teamId) {
