@@ -1,276 +1,372 @@
-import React, { useState, useMemo } from "react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from "recharts";
-
+import React, { useState, useMemo, useCallback } from "react";
 /* UI Components */
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useOemNotAllowed, useOemRfqs, useOemScoring, useOemSummary, useOemTenders, useOemTrends } from "./oem-performance.hooks";
+import { useOemOutcomes } from "./oem-performance.hooks";
 
 /* Icons */
-import {
-    Filter,
-    Download,
-    Calendar as CalendarIcon,
-    Search,
-    Trophy,
-    XCircle,
-    FileText,
-    Clock,
-    Target,
-    TrendingUp,
-    Briefcase,
-    Eye,
-    Hammer,
-    Mail,
-    Megaphone,
-    Percent,
-    Handshake,
-    BadgePercent,
-} from "lucide-react";
-import { useVendors } from "@/hooks/api/useVendors";
-import { useVendorOrganization, useVendorOrganizations } from "@/hooks/api/useVendorOrganizations";
+import { Filter, Download, Calendar as CalendarIcon, Eye, Hammer, Mail, Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { useVendorOrganizations } from "@/hooks/api/useVendorOrganizations";
+import { paths } from "@/app/routes/paths";
 
 /* ================================
    HELPERS
 ================================ */
-const formatCurrency = (amount: number) => {
-    if (typeof amount !== "number" || isNaN(amount)) {
+const formatCurrency = (amount: string) => {
+    const numericAmount = parseFloat(amount);
+
+    if (isNaN(numericAmount)) {
         return "₹0";
     }
+
     return new Intl.NumberFormat("en-IN", {
         style: "currency",
         currency: "INR",
         maximumFractionDigits: 0,
-    }).format(amount);
-};
-
-const formatPercentage = (value: number) => {
-    return `${value.toFixed(0)}%`;
-};
-
-const STATUS_COLOR_MAP: Record<string, string> = {
-    Won: "default",
-    Lost: "destructive",
-    Submitted: "secondary",
-    "Not Allowed": "destructive",
-    "RFQ Sent": "blue",
-    "RFQ Responded": "success",
-    Pending: "warning",
-    Missed: "destructive",
-    "Not Bid": "warning",
+    }).format(numericAmount);
 };
 
 /* ================================
-   DUMMY DATA INTERFACES
+   PAGINATION HOOK
 ================================ */
-interface Oem {
-    id: number;
-    name: string;
-}
+function usePagination<T>(data: T[], itemsPerPage: number = 10) {
+    const [currentPage, setCurrentPage] = useState(1);
 
-interface OemSummary {
-    totalTendersWithOem: number;
-    tendersWon: number;
-    tendersLost: number;
-    tendersSubmitted: number;
-    tendersNotAllowed: number;
-    rfqsSent: number;
-    rfqsResponded: number;
-    totalValueWon: number;
-    totalValueLost: number;
-    totalValueSubmitted: number;
-    winRate: number; // percentage
-    rfqResponseRate: number; // percentage
-}
+    const totalPages = Math.ceil(data.length / itemsPerPage);
 
-interface OemTender {
-    id: string;
-    tenderNo: string;
-    tenderName: string;
-    organizationName: string;
-    value: number;
-    status: "Won" | "Lost" | "Submitted" | "Not Allowed" | "RFQ Sent" | "RFQ Responded";
-    teamMember: string;
-    team: string;
-    gstValue: number;
-    dueDate: string; // "YYYY-MM-DD"
-    rfqSentOn?: string; // "YYYY-MM-DD"
-    rfqResponseOn?: string; // "YYYY-MM-DD"
-}
+    const paginatedData = useMemo(() => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        return data.slice(startIndex, startIndex + itemsPerPage);
+    }, [data, currentPage, itemsPerPage]);
 
-interface OemNotAllowedTender extends OemTender {
-    reason: string; // dummy reason
-}
-
-interface OemRfqSentTender extends OemTender {
-    rfqSentOn: string;
-    rfqResponseOn?: string;
-}
-
-interface OemKPICard {
-    key: string;
-    label: string;
-    count: number;
-    value?: number;
-    icon: any;
-    color: string;
-    bg: string;
-    percentage?: number; // For win rate, RFQ response rate
-}
-
-interface OemTrendData {
-    label: string; // e.g., 'Jan', 'Feb'
-    winRate: number; // percentage
-    rfqResponseRate: number; // percentage
-}
-
-interface OemScoring {
-    winRateScore: number;
-    responseEfficiencyScore: number;
-    complianceScore: number; // Based on tenders not allowed
-    total: number;
-}
-
-type OemScoringKey = "Win Rate" | "Response Efficiency" | "Compliance";
-
-export default function OemPerformanceDashboard() {
-    const [selectedOemId, setSelectedOemId] = useState<number | null>(6);
-    const [fromDate, setFromDate] = useState<string | null>("2025-01-01");
-    const [toDate, setToDate] = useState<string | null>("2025-12-01");
-    const [selectedMetric, setSelectedMetric] = useState("total");
-
-    const enabled = !!selectedOemId && !!fromDate && !!toDate;
-
-    const params = useMemo(
-        () => (enabled ? { oemId: selectedOemId!, fromDate: fromDate!, toDate: toDate!, metric: selectedMetric } : null),
-        [selectedOemId, fromDate, toDate, selectedMetric]
+    const goToPage = useCallback(
+        (page: number) => {
+            setCurrentPage(Math.max(1, Math.min(page, totalPages || 1)));
+        },
+        [totalPages]
     );
 
-    const { data: oems = [] } = useVendorOrganizations();
-    console.log(oems);
+    const nextPage = useCallback(() => {
+        goToPage(currentPage + 1);
+    }, [currentPage, goToPage]);
 
-    // Generate dummy data based on filters
-    const { data: tendersNotAllowed = [] } = useOemNotAllowed(params!, enabled);
-    const { data: rfqsSent = [] } = useOemRfqs(params!, enabled);
-    const { data: oemTenderList = [] } = useOemTenders(params!, enabled);
-    const { data: oemTrends = [] } = useOemTrends(params!, enabled);
-    const { data: summary } = useOemSummary(params!, enabled);
-    const { data: oemScoring } = useOemScoring(params!, enabled);
-    // KPI Card Data for OEM
-    const OEM_KPI_DATA = useMemo((): OemKPICard[] => {
-        return [
-            {
-                key: "total",
-                label: "Total Tenders with OEM",
-                count: summary?.totalTendersWithOem,
-                icon: Briefcase,
-                color: "text-blue-600",
-                bg: "bg-blue-50",
-            },
-            {
-                key: "tendersWon",
-                label: "Tenders Won",
-                count: summary?.tendersWon,
-                value: summary?.totalValueWon,
-                icon: Trophy,
-                color: "text-emerald-600",
-                bg: "bg-emerald-50",
-            },
-            {
-                key: "tendersLost",
-                label: "Tenders Lost",
-                count: summary?.tendersLost,
-                value: summary?.totalValueLost,
-                icon: XCircle,
-                color: "text-red-600",
-                bg: "bg-red-50",
-            },
-            {
-                key: "tendersSubmitted",
-                label: "Tenders Submitted",
-                count: summary?.tendersSubmitted,
-                value: summary?.totalValueSubmitted,
-                icon: FileText,
-                color: "text-indigo-600",
-                bg: "bg-indigo-50",
-            },
-            {
-                key: "tendersNotAllowed",
-                label: "Tenders Not Allowed",
-                count: summary?.tendersNotAllowed,
-                icon: Hammer,
-                color: "text-orange-600",
-                bg: "bg-orange-50",
-            },
-            {
-                key: "rfqsSent",
-                label: "RFQs Sent",
-                count: summary?.rfqsSent,
-                icon: Mail,
-                color: "text-purple-600",
-                bg: "bg-purple-50",
-            },
-            {
-                key: "rfqsResponded",
-                label: "RFQs Responded",
-                count: summary?.rfqsResponded,
-                icon: Megaphone,
-                color: "text-cyan-600",
-                bg: "bg-cyan-50",
-            },
-            {
-                key: "winRate",
-                label: "Win Rate",
-                count: summary?.winRate,
-                percentage: summary?.winRate,
-                icon: BadgePercent,
-                color: "text-green-600",
-                bg: "bg-green-50",
-            },
-            {
-                key: "rfqResponseRate",
-                label: "RFQ Response Rate",
-                count: summary?.rfqResponseRate,
-                percentage: summary?.rfqResponseRate,
-                icon: Percent,
-                color: "text-teal-600",
-                bg: "bg-teal-50",
-            },
-        ];
-    }, [summary]);
+    const prevPage = useCallback(() => {
+        goToPage(currentPage - 1);
+    }, [currentPage, goToPage]);
 
-    const SCORING_COLORS: Record<OemScoringKey, string> = {
-        "Win Rate": "#34D399", // Green
-        "Response Efficiency": "#60A5FA", // Blue
-        Compliance: "#FBBF24", // Yellow
+    const firstPage = useCallback(() => {
+        goToPage(1);
+    }, [goToPage]);
+
+    const lastPage = useCallback(() => {
+        goToPage(totalPages);
+    }, [goToPage, totalPages]);
+
+    // Reset to page 1 when data changes
+    React.useEffect(() => {
+        setCurrentPage(1);
+    }, [data.length]);
+
+    return {
+        currentPage,
+        totalPages,
+        paginatedData,
+        goToPage,
+        nextPage,
+        prevPage,
+        firstPage,
+        lastPage,
+        totalItems: data.length,
+        startIndex: (currentPage - 1) * itemsPerPage + 1,
+        endIndex: Math.min(currentPage * itemsPerPage, data.length),
+    };
+}
+
+/* ================================
+   PAGINATION COMPONENT
+================================ */
+interface PaginationControlsProps {
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+    startIndex: number;
+    endIndex: number;
+    onFirstPage: () => void;
+    onPrevPage: () => void;
+    onNextPage: () => void;
+    onLastPage: () => void;
+    onPageChange: (page: number) => void;
+}
+
+function PaginationControls({ currentPage, totalPages, totalItems, startIndex, endIndex, onFirstPage, onPrevPage, onNextPage, onLastPage }: PaginationControlsProps) {
+    if (totalItems === 0) return null;
+
+    return (
+        <div className="flex items-center justify-between px-4 py-3 border-t">
+            <div className="text-sm text-muted-foreground">
+                Showing <span className="font-medium">{startIndex}</span> to <span className="font-medium">{endIndex}</span> of <span className="font-medium">{totalItems}</span>{" "}
+                results
+            </div>
+            <div className="flex items-center gap-1">
+                <Button variant="outline" size="icon" className="h-8 w-8" onClick={onFirstPage} disabled={currentPage === 1}>
+                    <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="icon" className="h-8 w-8" onClick={onPrevPage} disabled={currentPage === 1}>
+                    <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <div className="flex items-center gap-1 px-2">
+                    <span className="text-sm font-medium">{currentPage}</span>
+                    <span className="text-sm text-muted-foreground">/</span>
+                    <span className="text-sm text-muted-foreground">{totalPages || 1}</span>
+                </div>
+                <Button variant="outline" size="icon" className="h-8 w-8" onClick={onNextPage} disabled={currentPage === totalPages || totalPages === 0}>
+                    <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="icon" className="h-8 w-8" onClick={onLastPage} disabled={currentPage === totalPages || totalPages === 0}>
+                    <ChevronsRight className="h-4 w-4" />
+                </Button>
+            </div>
+        </div>
+    );
+}
+
+/* ================================
+   SEARCH INPUT COMPONENT
+================================ */
+interface TableSearchProps {
+    value: string;
+    onChange: (value: string) => void;
+    placeholder?: string;
+}
+
+function TableSearch({ value, onChange, placeholder = "Search..." }: TableSearchProps) {
+    return (
+        <div className="relative w-full max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input type="text" placeholder={placeholder} value={value} onChange={e => onChange(e.target.value)} className="pl-9 h-9" />
+        </div>
+    );
+}
+
+/* ================================
+   EXPORT UTILITIES
+================================ */
+const exportToCSV = (data: any[], filename: string, headers: { key: string; label: string }[]) => {
+    if (data.length === 0) {
+        alert("No data to export");
+        return;
+    }
+
+    const csvHeaders = headers.map(h => h.label).join(",");
+    const csvRows = data
+        .map(row =>
+            headers
+                .map(h => {
+                    const value = row[h.key];
+                    // Escape quotes and wrap in quotes if contains comma
+                    const stringValue = String(value ?? "");
+                    if (stringValue.includes(",") || stringValue.includes('"') || stringValue.includes("\n")) {
+                        return `"${stringValue.replace(/"/g, '""')}"`;
+                    }
+                    return stringValue;
+                })
+                .join(",")
+        )
+        .join("\n");
+
+    const csvContent = `${csvHeaders}\n${csvRows}`;
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `${filename}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+};
+
+interface OemPerformanceParams {
+    oemId: number;
+    fromDate: string;
+    toDate: string;
+}
+
+export default function OemPerformanceDashboard() {
+    const [selectedOemId, setSelectedOemId] = useState<number | null>();
+    const [fromDate, setFromDate] = useState<string | null>();
+    const [toDate, setToDate] = useState<string | null>();
+    const [appliedParams, setAppliedParams] = useState<OemPerformanceParams | null>(null);
+    const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+
+    // Search states for each table
+    const [notAllowedSearch, setNotAllowedSearch] = useState("");
+    const [rfqSearch, setRfqSearch] = useState("");
+    const [workedWithSearch, setWorkedWithSearch] = useState("");
+
+    const toggleExpand = (category: string) => {
+        setExpandedCategories(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(category)) {
+                newSet.delete(category);
+            } else {
+                newSet.add(category);
+            }
+            return newSet;
+        });
     };
 
-    const SCORING_DATA = oemScoring
-        ? [
-              { name: "Win Rate", score: oemScoring.winRateScore },
-              { name: "Response Efficiency", score: oemScoring.responseEfficiencyScore },
-              { name: "Compliance", score: oemScoring.complianceScore },
-          ].map(item => ({
-              ...item,
-              fill: SCORING_COLORS[item.name as OemScoringKey],
-          }))
-        : [];
+    const params = useMemo(() => {
+        if (!selectedOemId || !fromDate || !toDate) return null;
 
-    const totalScore = oemScoring?.total ?? (SCORING_DATA.length ? Math.round(SCORING_DATA.reduce((sum, item) => sum + item.score, 0) / SCORING_DATA.length) : 0);
+        return {
+            oemId: selectedOemId,
+            fromDate,
+            toDate,
+        };
+    }, [selectedOemId, fromDate, toDate]);
 
-    const TENDER_OUTCOME_DATA = [
-        { name: "Won", count: summary?.tendersWon, fill: "#10B981" }, // emerald-500
-        { name: "Lost", count: summary?.tendersLost, fill: "#EF4444" }, // red-500
-        { name: "Submitted", count: summary?.tendersSubmitted, fill: "#6366F1" }, // indigo-500
-        { name: "Not Allowed", count: summary?.tendersNotAllowed, fill: "#F97316" }, // orange-500
-    ];
+    const { data: oems = [] } = useVendorOrganizations();
+
+    const { data } = useOemOutcomes(appliedParams);
+    console.log("oem data", data);
+
+    const summary = data?.summary;
+    const tendersByKpi = data?.tendersByKpi ?? {};
+
+    const tendersNotAllowed = tendersByKpi.tendersNotAllowed ?? [];
+    const rfqsSent = tendersByKpi.rfqsSent ?? [];
+
+    // Filtered data for Tenders Not Allowed
+    const filteredNotAllowed = useMemo(() => {
+        if (!notAllowedSearch.trim()) return tendersNotAllowed;
+        const search = notAllowedSearch.toLowerCase();
+        return tendersNotAllowed.filter(
+            tender =>
+                tender.member?.toLowerCase().includes(search) ||
+                tender.tenderName?.toLowerCase().includes(search) ||
+                tender.tenderNo?.toLowerCase().includes(search) ||
+                tender.reason?.toLowerCase().includes(search) ||
+                tender.team?.toLowerCase().includes(search)
+        );
+    }, [tendersNotAllowed, notAllowedSearch]);
+
+    // Filtered data for RFQs Sent
+    const filteredRfqs = useMemo(() => {
+        if (!rfqSearch.trim()) return rfqsSent;
+        const search = rfqSearch.toLowerCase();
+        return rfqsSent.filter(
+            tender =>
+                tender.member?.toLowerCase().includes(search) ||
+                tender.tenderName?.toLowerCase().includes(search) ||
+                tender.tenderNo?.toLowerCase().includes(search) ||
+                tender.team?.toLowerCase().includes(search)
+        );
+    }, [rfqsSent, rfqSearch]);
+
+    // Worked with OEM data
+    const workedWithData = useMemo(() => {
+        if (!summary) return [];
+        return [
+            {
+                category: "Total",
+                count: summary.totalTendersWithOem,
+                value: 0,
+                tenders: tendersByKpi.total || [],
+            },
+            {
+                category: "Won",
+                count: summary.tendersWon,
+                value: summary.totalValueWon,
+                tenders: tendersByKpi.tendersWon || [],
+            },
+            {
+                category: "Lost",
+                count: summary.tendersLost,
+                value: summary.totalValueLost,
+                tenders: tendersByKpi.tendersLost || [],
+            },
+            {
+                category: "Submitted",
+                count: summary.tendersSubmitted,
+                value: summary.totalValueSubmitted,
+                tenders: tendersByKpi.tendersSubmitted || [],
+            },
+        ];
+    }, [summary, tendersByKpi]);
+
+    // Filtered worked with data
+    const filteredWorkedWith = useMemo(() => {
+        if (!workedWithSearch.trim()) return workedWithData;
+        const search = workedWithSearch.toLowerCase();
+        return workedWithData.filter(item => item.category.toLowerCase().includes(search) || item.tenders.some(t => t.tenderName?.toLowerCase().includes(search)));
+    }, [workedWithData, workedWithSearch]);
+
+    // Pagination hooks
+    const notAllowedPagination = usePagination(filteredNotAllowed, 10);
+    const rfqPagination = usePagination(filteredRfqs, 10);
+    const workedWithPagination = usePagination(filteredWorkedWith, 10);
+
+    // Export handler
+    const handleExportReport = useCallback(() => {
+        const selectedOem = oems.find(o => o.id === selectedOemId);
+        const oemName = selectedOem?.name || "Unknown OEM";
+
+        // Export all tables data
+        const allData: any[] = [];
+
+        // Add Tenders Not Allowed
+        tendersNotAllowed.forEach(t => {
+            allData.push({
+                section: "Tenders Not Allowed",
+                member: t.member,
+                team: t.team,
+                tenderName: t.tenderName,
+                tenderNo: t.tenderNo,
+                gstValue: t.gstValues,
+                dueDate: t.dueDate,
+                reason: t.reason,
+                rfqSentOn: "",
+                rfqResponseOn: "",
+            });
+        });
+
+        // Add RFQs Sent
+        rfqsSent.forEach(t => {
+            allData.push({
+                section: "RFQs Sent",
+                member: t.member,
+                team: t.team,
+                tenderName: t.tenderName,
+                tenderNo: t.tenderNo,
+                gstValue: t.gstValues,
+                dueDate: t.dueDate,
+                reason: "",
+                rfqSentOn: t.rfqSentOn,
+                rfqResponseOn: t.rfqResponseOn || "Pending",
+            });
+        });
+
+        const headers = [
+            { key: "section", label: "Section" },
+            { key: "member", label: "Team Member" },
+            { key: "team", label: "Team" },
+            { key: "tenderName", label: "Tender Name" },
+            { key: "tenderNo", label: "Tender No" },
+            { key: "gstValue", label: "GST Value" },
+            { key: "dueDate", label: "Due Date" },
+            { key: "reason", label: "Reason" },
+            { key: "rfqSentOn", label: "RFQ Sent On" },
+            { key: "rfqResponseOn", label: "RFQ Response On" },
+        ];
+
+        const filename = `OEM_Performance_Report_${oemName}_${fromDate}_to_${toDate}`;
+        exportToCSV(allData, filename, headers);
+    }, [tendersNotAllowed, rfqsSent, oems, selectedOemId, fromDate, toDate]);
 
     return (
         <div className="min-h-screen bg-muted/10 pb-12">
@@ -282,7 +378,7 @@ export default function OemPerformanceDashboard() {
                         <p className="text-muted-foreground mt-1">Analyze performance metrics and interactions with selected Original Equipment Manufacturers.</p>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Button variant="outline">
+                        <Button variant="outline" onClick={handleExportReport} disabled={!appliedParams}>
                             <Download className="mr-2 h-4 w-4" /> Export Report
                         </Button>
                     </div>
@@ -320,348 +416,283 @@ export default function OemPerformanceDashboard() {
                                     <Input type="date" className="pl-9" value={toDate ?? ""} onChange={e => setToDate(e.target.value || null)} />
                                 </div>
                             </div>
-                            <Button className="w-full md:w-auto" disabled={!selectedOemId}>
-                                <Filter className="mr-2 h-4 w-4" /> Apply Filters
+                            <Button
+                                onClick={() => {
+                                    if (params) setAppliedParams(params);
+                                }}
+                            >
+                                <Filter className="mr-2 h-4 w-4" /> Submit
                             </Button>
                         </div>
                     </CardContent>
                 </Card>
-
-                {/* ===== KPI CARDS ===== */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                    {OEM_KPI_DATA.map(kpi => {
-                        const isSelected = selectedMetric === kpi.key;
-                        return (
-                            <button
-                                key={kpi.key}
-                                onClick={() => setSelectedMetric(kpi.key)}
-                                className={`
-                                    relative flex flex-col items-start p-4 rounded-xl border transition-all duration-200 text-left
-                                    hover:shadow-md hover:-translate-y-1 group
-                                    ${isSelected ? "bg-card ring-2 ring-primary border-transparent shadow-md" : "bg-card border-border"}
-                                `}
-                            >
-                                <div className={`p-2 rounded-lg mb-3 ${kpi.bg}`}>
-                                    <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
-                                </div>
-                                <div className="space-y-1">
-                                    <span className="text-xs font-medium text-muted-foreground uppercase">{kpi.label}</span>
-                                    <div className="flex items-baseline gap-1">
-                                        <span className="text-xl font-bold">{kpi.percentage !== undefined ? `${kpi.percentage}%` : kpi.count}</span>
+                {!appliedParams ? (
+                    <>
+                        <div className="bg-muted rounded-full p-3 text-center mx-50">
+                            <span className="justify-center">Please Select an OEM and Date</span>
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        {/* ===== TENDERS NOT ALLOWED TABLE ===== */}
+                        <Card className="shadow-sm border-0 ring-1 ring-border/50">
+                            <CardHeader className="pb-4">
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                                    <div>
+                                        <CardTitle className="text-lg flex items-center gap-2">
+                                            <Hammer className="h-5 w-5 text-destructive" />
+                                            Tenders Not Allowed by This OEM
+                                            <Badge variant="secondary">{tendersNotAllowed.length}</Badge>
+                                        </CardTitle>
+                                        <CardDescription className="mt-1">List of tenders that could not proceed due to OEM specific restrictions or policies.</CardDescription>
                                     </div>
-                                    {kpi.value !== undefined && (
-                                        <span className={`text-[10px] font-medium ${kpi.key === "tendersWon" ? "text-emerald-600" : "text-muted-foreground"}`}>
-                                            {formatCurrency(kpi.value)}
-                                        </span>
-                                    )}
+                                    <TableSearch value={notAllowedSearch} onChange={setNotAllowedSearch} placeholder="Search tenders..." />
                                 </div>
-                            </button>
-                        );
-                    })}
-                </div>
-
-                {/* ===== CHARTS: TENDER OUTCOMES, TRENDS, SCORING ===== */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Tender Outcome Distribution */}
-                    <Card className="shadow-sm border-0 ring-1 ring-border/50 h-full">
-                        <CardHeader>
-                            <CardTitle className="text-lg flex items-center gap-2">
-                                <Briefcase className="h-5 w-5 text-primary" />
-                                Tender Outcome Distribution
-                            </CardTitle>
-                            <CardDescription>Breakdown of tenders associated with this OEM by outcome.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="h-[280px] w-full">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                        <Pie data={TENDER_OUTCOME_DATA} cx="50%" cy="50%" labelLine={false} outerRadius={100} fill="#8884d8" dataKey="count">
-                                            {TENDER_OUTCOME_DATA.map((entry, index) => (
-                                                <Cell key={`cell-${index}`} fill={entry.fill} />
-                                            ))}
-                                        </Pie>
-                                        <RechartsTooltip />
-                                        <Legend />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* OEM Performance Trends */}
-                    <Card className="shadow-sm border-0 ring-1 ring-border/50 h-full">
-                        <CardHeader>
-                            <div className="space-y-1">
-                                <CardTitle className="text-lg flex items-center gap-2">
-                                    <TrendingUp className="h-5 w-5 text-primary" />
-                                    OEM Performance Trends
-                                </CardTitle>
-                                <CardDescription>Win Rate and RFQ Response Rate over the last 5 periods</CardDescription>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="h-[280px] w-full">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart data={oemTrends}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                                        <XAxis dataKey="label" axisLine={false} tickLine={false} dy={10} fontSize={12} />
-                                        <YAxis axisLine={false} tickLine={false} fontSize={12} tickFormatter={value => `${value}%`} />
-                                        <RechartsTooltip
-                                            formatter={(value: number) => `${value}%`}
-                                            contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}
-                                        />
-                                        <Legend />
-                                        <Line type="monotone" dataKey="winRate" name="Win Rate (%)" stroke="#10B981" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                                        <Line
-                                            type="monotone"
-                                            dataKey="rfqResponseRate"
-                                            name="RFQ Response Rate (%)"
-                                            stroke="#60A5FA"
-                                            strokeWidth={3}
-                                            dot={{ r: 4 }}
-                                            activeDot={{ r: 6 }}
-                                        />
-                                    </LineChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* OEM Scoring */}
-                <Card className="shadow-sm border-0 ring-1 ring-border/50 h-full">
-                    <CardHeader>
-                        <div className="space-y-1">
-                            <CardTitle className="text-lg flex items-center gap-2">
-                                <Target className="h-5 w-5 text-primary" />
-                                OEM Relationship Scoring
-                            </CardTitle>
-                            <CardDescription>Weighted scores based on Win Rate, Response Efficiency, and Compliance.</CardDescription>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex flex-col md:flex-row items-center gap-8">
-                            <div className="h-[250px] w-full md:w-1/2">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                        <Pie data={SCORING_DATA} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="score">
-                                            {SCORING_DATA.map((entry, index) => (
-                                                <Cell key={`cell-${index}`} fill={entry.fill} />
-                                            ))}
-                                        </Pie>
-                                        <RechartsTooltip />
-                                        <Legend verticalAlign="bottom" height={36} />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                            </div>
-                            <div className="w-full md:w-1/2 space-y-4">
-                                {SCORING_DATA.map((item, idx) => (
-                                    <div key={idx} className="space-y-1">
-                                        <div className="flex justify-between text-sm">
-                                            <span className="font-medium text-muted-foreground">{item.name}</span>
-                                            <span className="font-bold">{item.score}/100</span>
-                                        </div>
-                                        <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                                            <div className="h-full rounded-full" style={{ width: `${item.score}%`, backgroundColor: item.fill }} />
-                                        </div>
-                                    </div>
-                                ))}
-                                <div className="pt-4 border-t">
-                                    <div className="flex justify-between items-center">
-                                        <span className="font-semibold text-lg">Total Score</span>
-                                        <Badge variant="default" className="text-lg px-3 py-1">
-                                            {totalScore}
-                                        </Badge>
-                                    </div>
+                            </CardHeader>
+                            <CardContent className="p-0">
+                                <div className="overflow-x-auto">
+                                    <Table>
+                                        <TableHeader className="bg-muted/50">
+                                            <TableRow>
+                                                <TableHead className="font-semibold">Team</TableHead>
+                                                <TableHead className="font-semibold">Team Member</TableHead>
+                                                <TableHead className="font-semibold">Tender</TableHead>
+                                                <TableHead className="text-right font-semibold">Value</TableHead>
+                                                <TableHead className="font-semibold">Due Date</TableHead>
+                                                <TableHead className="text-right font-semibold">Action</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {notAllowedPagination.paginatedData.length === 0 ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                                                        {notAllowedSearch ? "No matching tenders found." : "No tenders found for this category."}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : (
+                                                notAllowedPagination.paginatedData.map(tender => (
+                                                    <TableRow key={tender.id} className="hover:bg-muted/30 transition-colors">
+                                                        <TableCell>
+                                                            <div className="font-medium">{tender.team}</div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="font-medium">{tender.member}</div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="font-medium max-w-[200px] truncate" title={tender.tenderName}>
+                                                                {tender.tenderName}
+                                                            </div>
+                                                            <div className="text-sm text-muted-foreground">{tender.tenderNo}</div>
+                                                        </TableCell>
+                                                        <TableCell className="text-right font-medium tabular-nums">{formatCurrency(tender.gstValues)}</TableCell>
+                                                        <TableCell className="tabular-nums">{tender.dueDate}</TableCell>
+                                                        <TableCell className="text-right">
+                                                            <button
+                                                                onClick={ev => {
+                                                                    ev.stopPropagation();
+                                                                    window.open(paths.tendering.tenderView(tender.id), "_blank");
+                                                                }}
+                                                                className="h-7 w-7 flex items-center justify-center rounded-md
+                                                                                                text-muted-foreground hover:text-primary hover:bg-muted"
+                                                            >
+                                                                <Eye className="h-4 w-4" />
+                                                            </button>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))
+                                            )}
+                                        </TableBody>
+                                    </Table>
                                 </div>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
+                                <PaginationControls
+                                    currentPage={notAllowedPagination.currentPage}
+                                    totalPages={notAllowedPagination.totalPages}
+                                    totalItems={notAllowedPagination.totalItems}
+                                    startIndex={notAllowedPagination.startIndex}
+                                    endIndex={notAllowedPagination.endIndex}
+                                    onFirstPage={notAllowedPagination.firstPage}
+                                    onPrevPage={notAllowedPagination.prevPage}
+                                    onNextPage={notAllowedPagination.nextPage}
+                                    onLastPage={notAllowedPagination.lastPage}
+                                    onPageChange={notAllowedPagination.goToPage}
+                                />
+                            </CardContent>
+                        </Card>
 
-                {/* ===== TENDERS NOT ALLOWED TABLE ===== */}
-                <Card className="shadow-sm border-0 ring-1 ring-border/50">
-                    <CardHeader>
-                        <CardTitle className="text-lg flex items-center gap-2">
-                            <Hammer className="h-5 w-5 text-destructive" />
-                            Tenders Not Allowed by This OEM
-                            <Badge variant="secondary">{tendersNotAllowed.length}</Badge>
-                        </CardTitle>
-                        <CardDescription>List of tenders that could not proceed due to OEM specific restrictions or policies.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        <Table>
-                            <TableHeader className="bg-muted/50">
-                                <TableRow>
-                                    <TableHead>Team Member</TableHead>
-                                    <TableHead>Tender</TableHead>
-                                    <TableHead className="text-right">GST Value</TableHead>
-                                    <TableHead>Due Date</TableHead>
-                                    <TableHead>Reason</TableHead>
-                                    <TableHead className="text-right">Action</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {tendersNotAllowed.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                                            No tenders found for this category.
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    tendersNotAllowed.map(tender => (
-                                        <TableRow key={tender.id}>
-                                            <TableCell>
-                                                <div className="font-medium">{tender.teamMember}</div>
-                                                <div className="text-sm text-muted-foreground">{tender.team} Team</div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="font-medium max-w-[200px] truncate" title={tender.tenderName}>
-                                                    {tender.tenderName}
-                                                </div>
-                                                <div className="text-sm text-muted-foreground">{tender.tenderNo}</div>
-                                            </TableCell>
-                                            <TableCell className="text-right font-medium">{formatCurrency(tender.gstValue)}</TableCell>
-                                            <TableCell>{tender.dueDate}</TableCell>
-                                            <TableCell className="text-muted-foreground text-sm">{tender.reason}</TableCell>
-                                            <TableCell className="text-right">
-                                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                                    <Eye className="h-4 w-4 text-muted-foreground" />
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
+                        {/* ===== RFQs SENT TO THIS OEM TABLE ===== */}
+                        <Card className="shadow-sm border-0 ring-1 ring-border/50">
+                            <CardHeader className="pb-4">
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                                    <div>
+                                        <CardTitle className="text-lg flex items-center gap-2">
+                                            <Mail className="h-5 w-5 text-purple-600" />
+                                            RFQs Sent to This OEM
+                                            <Badge variant="secondary">{rfqsSent.length}</Badge>
+                                        </CardTitle>
+                                        <CardDescription className="mt-1">Detailed list of RFQs sent to this OEM and their response status.</CardDescription>
+                                    </div>
+                                    <TableSearch value={rfqSearch} onChange={setRfqSearch} placeholder="Search RFQs..." />
+                                </div>
+                            </CardHeader>
+                            <CardContent className="p-0">
+                                <div className="overflow-x-auto">
+                                    <Table>
+                                        <TableHeader className="bg-muted/50">
+                                            <TableRow>
+                                                <TableHead className="font-semibold">Team</TableHead>
+                                                <TableHead className="font-semibold">Team Member</TableHead>
+                                                <TableHead className="font-semibold">Tender</TableHead>
+                                                <TableHead className="text-right font-semibold">GST Value</TableHead>
+                                                <TableHead className="font-semibold">Due Date</TableHead>
+                                                <TableHead className="font-semibold">RFQ Sent On</TableHead>
+                                                <TableHead className="font-semibold">Response On</TableHead>
+                                                <TableHead className="text-right font-semibold">Action</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {rfqPagination.paginatedData.length === 0 ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                                                        {rfqSearch ? "No matching RFQs found." : "No RFQs found for this category."}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : (
+                                                rfqPagination.paginatedData.map(tender => (
+                                                    <TableRow key={tender.id} className="hover:bg-muted/30 transition-colors">
+                                                        <TableCell>
+                                                            <div className="font-medium">{tender.team}</div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="font-medium">{tender.member}</div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="font-medium max-w-[200px] truncate" title={tender.tenderName}>
+                                                                {tender.tenderName}
+                                                            </div>
+                                                            <div className="text-sm text-muted-foreground">{tender.tenderNo}</div>
+                                                        </TableCell>
+                                                        <TableCell className="text-right font-medium tabular-nums">{formatCurrency(tender.gstValues)}</TableCell>
+                                                        <TableCell className="tabular-nums">{tender.dueDate}</TableCell>
+                                                        <TableCell className="tabular-nums">{tender.rfqSentOn}</TableCell>
+                                                        <TableCell>
+                                                            {tender.rfqResponseOn ? (
+                                                                <Badge variant="default" className="font-normal">
+                                                                    {tender.rfqResponseOn}
+                                                                </Badge>
+                                                            ) : (
+                                                                <Badge variant="secondary" className="font-normal">
+                                                                    Pending
+                                                                </Badge>
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell className="text-right">
+                                                            <button
+                                                                onClick={ev => {
+                                                                    ev.stopPropagation();
+                                                                    window.open(paths.tendering.tenderView(tender.id), "_blank");
+                                                                }}
+                                                                className="h-7 w-7 flex items-center justify-center rounded-md
+                                                                                                text-muted-foreground hover:text-primary hover:bg-muted"
+                                                            >
+                                                                <Eye className="h-4 w-4" />
+                                                            </button>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                                <PaginationControls
+                                    currentPage={rfqPagination.currentPage}
+                                    totalPages={rfqPagination.totalPages}
+                                    totalItems={rfqPagination.totalItems}
+                                    startIndex={rfqPagination.startIndex}
+                                    endIndex={rfqPagination.endIndex}
+                                    onFirstPage={rfqPagination.firstPage}
+                                    onPrevPage={rfqPagination.prevPage}
+                                    onNextPage={rfqPagination.nextPage}
+                                    onLastPage={rfqPagination.lastPage}
+                                    onPageChange={rfqPagination.goToPage}
+                                />
+                            </CardContent>
+                        </Card>
 
-                {/* ===== RFQs SENT TO THIS OEM TABLE ===== */}
-                <Card className="shadow-sm border-0 ring-1 ring-border/50">
-                    <CardHeader>
-                        <CardTitle className="text-lg flex items-center gap-2">
-                            <Mail className="h-5 w-5 text-purple-600" />
-                            RFQs Sent to This OEM
-                            <Badge variant="secondary">{rfqsSent.length}</Badge>
-                        </CardTitle>
-                        <CardDescription>Detailed list of RFQs sent to this OEM and their response status.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        <Table>
-                            <TableHeader className="bg-muted/50">
-                                <TableRow>
-                                    <TableHead>Team Member</TableHead>
-                                    <TableHead>Tender</TableHead>
-                                    <TableHead className="text-right">GST Value</TableHead>
-                                    <TableHead>Due Date</TableHead>
-                                    <TableHead>RFQ Sent On</TableHead>
-                                    <TableHead>Response On</TableHead>
-                                    <TableHead className="text-right">Action</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {rfqsSent.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                                            No RFQs found for this category.
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    rfqsSent.map(tender => (
-                                        <TableRow key={tender.id}>
-                                            <TableCell>
-                                                <div className="font-medium">{tender.teamMember}</div>
-                                                <div className="text-sm text-muted-foreground">{tender.team} Team</div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="font-medium max-w-[200px] truncate" title={tender.tenderName}>
-                                                    {tender.tenderName}
-                                                </div>
-                                                <div className="text-sm text-muted-foreground">{tender.tenderNo}</div>
-                                            </TableCell>
-                                            <TableCell className="text-right font-medium">{formatCurrency(tender.gstValue)}</TableCell>
-                                            <TableCell>{tender.dueDate}</TableCell>
-                                            <TableCell>{tender.rfqSentOn}</TableCell>
-                                            <TableCell>
-                                                {tender.rfqResponseOn ? <Badge variant="default">{tender.rfqResponseOn}</Badge> : <Badge variant="secondary">Pending</Badge>}
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                                    <Eye className="h-4 w-4 text-muted-foreground" />
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
+                        {/* ===== ALL TENDERS WORKED WITH THIS OEM TABLE ===== */}
+                        <Card className="shadow-sm border-0 ring-1 ring-border/50">
+                            <CardHeader className="pb-4">
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                                    <CardTitle className="text-lg">Worked With This OEM</CardTitle>
+                                    <TableSearch value={workedWithSearch} onChange={setWorkedWithSearch} placeholder="Search by category or tender..." />
+                                </div>
+                            </CardHeader>
 
-                {/* ===== ALL TENDERS WORKED WITH THIS OEM TABLE (FILTERED BY SELECTED METRIC) ===== */}
-                <Card className="shadow-sm border-0 ring-1 ring-border/50">
-                    <CardHeader className="flex flex-row items-center justify-between pb-4">
-                        <div>
-                            <CardTitle className="text-lg flex items-center gap-2">
-                                {OEM_KPI_DATA.find(k => k.key === selectedMetric)?.label} Tenders
-                                <Badge variant="secondary">{oemTenderList.length}</Badge>
-                            </CardTitle>
-                            <CardDescription>Comprehensive list of tenders associated with this OEM.</CardDescription>
-                        </div>
-                        <div className="relative w-64 hidden sm:block">
-                            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input placeholder="Search tenders..." className="pl-8 h-9" />
-                        </div>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        <Table>
-                            <TableHeader className="bg-muted/50">
-                                <TableRow>
-                                    <TableHead>Tender No</TableHead>
-                                    <TableHead>Organization</TableHead>
-                                    <TableHead>Tender Name</TableHead>
-                                    <TableHead>Team Member</TableHead>
-                                    <TableHead className="text-right">Value</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead className="text-right">Action</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {oemTenderList.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                                            No tenders found for this category.
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    oemTenderList.map(tender => (
-                                        <TableRow key={tender.id}>
-                                            <TableCell className="font-medium text-muted-foreground">{tender.tenderNo}</TableCell>
-                                            <TableCell>{tender.organizationName}</TableCell>
-                                            <TableCell className="max-w-[300px] truncate" title={tender.tenderName}>
-                                                {tender.tenderName}
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="font-medium">{tender.teamMember}</div>
-                                                <div className="text-sm text-muted-foreground">{tender.team}</div>
-                                            </TableCell>
-                                            <TableCell className="text-right font-medium">{formatCurrency(tender.value)}</TableCell>
-                                            <TableCell>
-                                                <Badge variant={STATUS_COLOR_MAP[tender.status] as "default" | "destructive" | "secondary" | "warning"}>{tender.status}</Badge>
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                                                    <Eye className="h-4 w-4 text-muted-foreground" />
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
-                    </CardContent>
-                </Card>
+                            <CardContent className="p-0">
+                                <div className="overflow-x-auto">
+                                    <Table>
+                                        <TableHeader className="bg-muted/50">
+                                            <TableRow>
+                                                <TableHead className="font-semibold">Category</TableHead>
+                                                <TableHead className="font-semibold">Count</TableHead>
+                                                <TableHead className="font-semibold">Value</TableHead>
+                                                <TableHead className="font-semibold">Tenders</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+
+                                        <TableBody>
+                                            {workedWithPagination.paginatedData.length === 0 ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                                                        {workedWithSearch ? "No matching data found." : "No data available."}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : (
+                                                workedWithPagination.paginatedData.map(val => {
+                                                    const isExpanded = expandedCategories.has(val.category);
+                                                    const visibleTenders = isExpanded ? val.tenders : val.tenders.slice(0, 3);
+                                                    return (
+                                                        <TableRow key={val.category} className="hover:bg-muted/30 transition-colors">
+                                                            <TableCell className="font-medium">{val.category}</TableCell>
+                                                            <TableCell className="tabular-nums">{val.count}</TableCell>
+                                                            <TableCell className="tabular-nums">{formatCurrency(val.value)}</TableCell>
+                                                            <TableCell>
+                                                                <div className="flex flex-wrap gap-1 max-w-md">
+                                                                    {visibleTenders.map(t => (
+                                                                        <Badge key={t.id} variant="secondary" className="font-normal truncate max-w-[150px]" title={t.tenderName}>
+                                                                            {t.tenderName}
+                                                                        </Badge>
+                                                                    ))}
+
+                                                                    {val.tenders.length > 3 && (
+                                                                        <Badge variant="outline" className="font-normal cursor-pointer" onClick={() => toggleExpand(val.category)}>
+                                                                            {isExpanded ? "Show less" : `+${val.tenders.length - 3} more`}
+                                                                        </Badge>
+                                                                    )}
+                                                                </div>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    );
+                                                })
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                                <PaginationControls
+                                    currentPage={workedWithPagination.currentPage}
+                                    totalPages={workedWithPagination.totalPages}
+                                    totalItems={workedWithPagination.totalItems}
+                                    startIndex={workedWithPagination.startIndex}
+                                    endIndex={workedWithPagination.endIndex}
+                                    onFirstPage={workedWithPagination.firstPage}
+                                    onPrevPage={workedWithPagination.prevPage}
+                                    onNextPage={workedWithPagination.nextPage}
+                                    onLastPage={workedWithPagination.lastPage}
+                                    onPageChange={workedWithPagination.goToPage}
+                                />
+                            </CardContent>
+                        </Card>
+                    </>
+                )}
             </div>
         </div>
     );

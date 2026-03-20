@@ -1,7 +1,7 @@
 import { Inject, Injectable, NotFoundException, ConflictException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
-import { eq } from 'drizzle-orm';
+import { eq, inArray, or } from 'drizzle-orm';
 import {
     tenderInformation,
     tenderClients,
@@ -9,8 +9,6 @@ import {
     tenderFinancialDocuments,
     type TenderInformation,
     type TenderClient,
-    type TenderTechnicalDocument,
-    type TenderFinancialDocument,
 } from '@db/schemas/tendering/tender-info-sheet.schema';
 import type { TenderInfoSheetPayload } from '@/modules/tendering/info-sheets/dto/info-sheet.dto';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
@@ -20,13 +18,27 @@ import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
+import { organizations } from '@db/schemas/master/organizations.schema';
 import { websites } from '@db/schemas/master/websites.schema';
-import { WorkflowService } from '@/modules/timers/services/workflow.service';
+import { TimersService } from '@/modules/timers/timers.service';
+import { pqrDocuments } from '@db/schemas/shared/pqr.schema';
+import { financeDocuments } from '@db/schemas/shared/finance_docs.schema';
+
+export type TechnicalDocument = {
+    id: number;
+    projectName: string | null;
+    poDocument: string[] | null;
+};
+export type FinancialDocument = {
+    id: number;
+    documentName: string | null;
+    documentPath: string[] | null;
+};
 
 export type TenderInfoSheetWithRelations = TenderInformation & {
     clients: TenderClient[];
-    technicalWorkOrders: TenderTechnicalDocument[];
-    commercialDocuments: TenderFinancialDocument[];
+    technicalWorkOrders: TechnicalDocument[];
+    commercialDocuments: FinancialDocument[];
 };
 
 @Injectable()
@@ -39,12 +51,10 @@ export class TenderInfoSheetsService {
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
-        private readonly workflowService: WorkflowService,
+        private readonly timersService: TimersService,
     ) { }
 
-    async findByTenderId(
-        tenderId: number
-    ): Promise<TenderInfoSheetWithRelations | null> {
+    async findByTenderId(tenderId: number): Promise<TenderInfoSheetWithRelations | null> {
         const info = await this.db
             .select()
             .from(tenderInformation)
@@ -73,18 +83,85 @@ export class TenderInfoSheetsService {
                 .where(eq(tenderFinancialDocuments.tenderId, tenderId)),
         ]);
 
+        // Separate numeric IDs from text names for technical documents
+        const technicalDocIds: number[] = [];
+        const technicalDocNames: string[] = [];
+
+        technicalDocs.forEach(doc => {
+            const parsed = Number(doc.documentName);
+            if (!isNaN(parsed) && doc.documentName?.trim() !== '') {
+                technicalDocIds.push(parsed);
+            } else if (doc.documentName) {
+                technicalDocNames.push(doc.documentName);
+            }
+        });
+
+        // Separate numeric IDs from text names for financial documents
+        const financialDocIds: number[] = [];
+        const financialDocNames: string[] = [];
+
+        financialDocs.forEach(doc => {
+            const parsed = Number(doc.documentName);
+            if (!isNaN(parsed) && doc.documentName?.trim() !== '') {
+                financialDocIds.push(parsed);
+            } else if (doc.documentName) {
+                financialDocNames.push(doc.documentName);
+            }
+        });
+
+        // Fetch actual documents from pqr_documents and finance_documents
+        const [pqrDocumentsAll, financeDocumentsAll] = await Promise.all([
+            // Fetch PQR documents by ID or by project_name
+            technicalDocIds.length > 0 || technicalDocNames.length > 0
+                ? this.db
+                    .select({
+                        id: pqrDocuments.id,
+                        projectName: pqrDocuments.projectName,
+                        poDocument: pqrDocuments.uploadPo,
+                    })
+                    .from(pqrDocuments)
+                    .where(
+                        or(
+                            technicalDocIds.length > 0
+                                ? inArray(pqrDocuments.id, technicalDocIds)
+                                : undefined,
+                            technicalDocNames.length > 0
+                                ? inArray(pqrDocuments.projectName, technicalDocNames)
+                                : undefined
+                        )
+                    )
+                : Promise.resolve([]),
+
+            // Fetch Finance documents by ID or by document_name
+            financialDocIds.length > 0 || financialDocNames.length > 0
+                ? this.db
+                    .select({
+                        id: financeDocuments.id,
+                        documentName: financeDocuments.documentName,
+                        documentPath: financeDocuments.documentPath,
+                    })
+                    .from(financeDocuments)
+                    .where(
+                        or(
+                            financialDocIds.length > 0
+                                ? inArray(financeDocuments.id, financialDocIds)
+                                : undefined,
+                            financialDocNames.length > 0
+                                ? inArray(financeDocuments.documentName, financialDocNames)
+                                : undefined
+                        )
+                    )
+                : Promise.resolve([]),
+        ]);
+
         return {
             ...infoSheet,
             clients,
-            technicalWorkOrders: technicalDocs,
-            commercialDocuments: financialDocs,
+            technicalWorkOrders: pqrDocumentsAll,
+            commercialDocuments: financeDocumentsAll,
         };
     }
 
-    /**
-     * Get info sheet with tender details
-     * Uses shared tender service method
-     */
     async findByTenderIdWithTender(tenderId: number) {
         const [infoSheet, tender] = await Promise.all([
             this.findByTenderId(tenderId),
@@ -97,9 +174,6 @@ export class TenderInfoSheetsService {
         };
     }
 
-    /**
-     * Validate YES/NO fields before database insertion
-     */
     private validateYesNoFields(payload: TenderInfoSheetPayload): void {
         const yesNoFields = [
             { name: 'processingFeeRequired', value: payload.processingFeeRequired },
@@ -355,75 +429,39 @@ export class TenderInfoSheetsService {
             // Send email notification
             await this.sendInfoSheetFilledEmail(tenderId, result, changedBy);
 
-            // TIMER TRANSITION: Stop tender_info timer and start tender_approval timer
+            // TIMER TRANSITION: Stop tender_info_sheet timer and start tender_approval timer
             try {
                 this.logger.log(`Transitioning timers for tender ${tenderId}`);
 
-                // Get workflow status
-                const workflowStatus = await this.workflowService.getWorkflowStatus('TENDER', tenderId.toString());
-
-                // Debug: Log all steps
-                this.logger.debug(`Current workflow steps for tender ${tenderId}:`, {
-                    steps: workflowStatus.steps.map(step => ({
-                        stepKey: step.stepKey,
-                        status: step.status,
-                        timerStatus: step.timerStatus,
-                        id: step.id
-                    }))
-                });
-
-                // 1. Complete the tender_info step
-                const tenderInfoStep = workflowStatus.steps.find(step =>
-                    step.stepKey === 'tender_info' && step.status === 'IN_PROGRESS'
-                );
-
-                if (tenderInfoStep) {
-                    this.logger.log(`Completing tender_info step ${tenderInfoStep.id} for tender ${tenderId}`);
-                    await this.workflowService.completeStep(tenderInfoStep.id.toString(), {
-                        userId: changedBy.toString(),
-                        notes: 'Tender info sheet completed'
+                // 1. Stop the tender_info_sheet timer
+                try {
+                    await this.timersService.stopTimer({
+                        entityType: 'TENDER',
+                        entityId: tenderId,
+                        stage: 'tender_info_sheet',
+                        userId: changedBy,
+                        reason: 'Tender info sheet completed'
                     });
-                } else {
-                    this.logger.warn(`No active tender_info step found for tender ${tenderId}`);
-                    // Try to find any tender_info step
-                    const anyTenderInfoStep = workflowStatus.steps.find(step => step.stepKey === 'tender_info');
-                    if (anyTenderInfoStep) {
-                        this.logger.warn(`Found tender_info step ${anyTenderInfoStep.id} with status ${anyTenderInfoStep.status}`);
-                    }
+                    this.logger.log(`Successfully stopped tender_info_sheet timer for tender ${tenderId}`);
+                } catch (error) {
+                    this.logger.warn(`Failed to stop tender_info_sheet timer for tender ${tenderId}:`, error);
                 }
 
-                // 2. Verify tender_approval step was started
-                const updatedWorkflowStatus = await this.workflowService.getWorkflowStatus('TENDER', tenderId.toString());
-                const tenderApprovalStep = updatedWorkflowStatus.steps.find(step =>
-                    step.stepKey === 'tender_approval' && step.status === 'IN_PROGRESS'
-                );
-
-                if (!tenderApprovalStep) {
-                    this.logger.warn(`tender_approval step not automatically started for tender ${tenderId}`);
-
-                    // Fallback: Manually start the step if automatic transition failed
-                    const pendingApprovalStep = updatedWorkflowStatus.steps.find(step =>
-                        step.stepKey === 'tender_approval' && step.status === 'PENDING'
-                    );
-
-                    if (pendingApprovalStep) {
-                        this.logger.log(`Manually starting tender_approval step ${pendingApprovalStep.id} for tender ${tenderId}`);
-                        await this.workflowService.startStep(pendingApprovalStep.id.toString(), {
-                            stepKey: 'tender_approval',
-                            assignedToUserId: pendingApprovalStep.assignedToUserId?.toString()
-                        });
-                    } else {
-                        this.logger.error(`No pending tender_approval step found for tender ${tenderId}`);
-                        // Try to find any tender_approval step
-                        const anyApprovalStep = updatedWorkflowStatus.steps.find(step => step.stepKey === 'tender_approval');
-                        if (anyApprovalStep) {
-                            this.logger.error(`Found tender_approval step ${anyApprovalStep.id} with status ${anyApprovalStep.status}`);
-                        } else {
-                            this.logger.error(`No tender_approval step found at all for tender ${tenderId}`);
+                // 2. Start the tender_approval timer
+                try {
+                    await this.timersService.startTimer({
+                        entityType: 'TENDER',
+                        entityId: tenderId,
+                        stage: 'tender_approval',
+                        userId: changedBy,
+                        timerConfig: {
+                            type: 'FIXED_DURATION',
+                            durationHours: 24
                         }
-                    }
-                } else {
-                    this.logger.log(`tender_approval step ${tenderApprovalStep.id} successfully started for tender ${tenderId}`);
+                    });
+                    this.logger.log(`Successfully started tender_approval timer for tender ${tenderId}`);
+                } catch (error) {
+                    this.logger.warn(`Failed to start tender_approval timer for tender ${tenderId}:`, error);
                 }
 
                 this.logger.log(`Successfully transitioned timers for tender ${tenderId}`);
@@ -684,6 +722,29 @@ export class TenderInfoSheetsService {
             // Send email notification
             await this.sendInfoSheetFilledEmail(tenderId, result, changedBy);
 
+            const prevStatus = tender?.status ?? null;
+            let newStatus = prevStatus ?? 2;
+
+            if (prevStatus === 29) {
+                newStatus = 2;
+
+                await this.db
+                    .update(tenderInfos)
+                    .set({ status: newStatus, updatedAt: new Date() })
+                    .where(eq(tenderInfos.id, tenderId));
+            }
+
+            // Always track history
+            await this.tenderStatusHistoryService.trackStatusChange(
+                tenderId,
+                newStatus,
+                changedBy,
+                prevStatus,
+                prevStatus === 29
+                    ? 'Tender info sheet re-filled (was incomplete)'
+                    : 'Tender info sheet updated',
+            );
+
             return result;
         } catch (error: any) {
             // Same error handling as create method
@@ -751,9 +812,6 @@ export class TenderInfoSheetsService {
         }
     }
 
-    /**
-     * Helper method to send email notifications
-     */
     private async sendEmail(
         eventType: string,
         tenderId: number,
@@ -780,9 +838,6 @@ export class TenderInfoSheetsService {
         }
     }
 
-    /**
-     * Send info sheet filled email
-     */
     private async sendInfoSheetFilledEmail(
         tenderId: number,
         infoSheet: TenderInfoSheetWithRelations,
@@ -794,10 +849,12 @@ export class TenderInfoSheetsService {
         const assignee = await this.recipientResolver.getUserById(tender.teamMember);
         if (!assignee) return;
 
-        const [websiteData] = await Promise.all([
+        const [websiteData, orgData] = await Promise.all([
             tender.website ? this.db.select({ name: websites.name, url: websites.url }).from(websites).where(eq(websites.id, tender.website)).limit(1) : Promise.resolve([]),
+            tender.organization ? this.db.select({ name: organizations.name }).from(organizations).where(eq(organizations.id, tender.organization)).limit(1) : Promise.resolve([]),
         ]);
         const websiteName = websiteData[0]?.name || websiteData[0]?.url || 'Not specified';
+        const organizationName = orgData[0]?.name || 'Not specified';
 
         // Format due date
         const dueDate = tender.dueDate ? new Date(tender.dueDate).toLocaleString('en-IN', {
@@ -821,47 +878,138 @@ export class TenderInfoSheetsService {
             return `${value}%`;
         };
 
-        // Build document lists
-        const teDocs = infoSheet.technicalWorkOrders.map(doc => `<li>${doc.documentName}</li>`).join('');
-        const tenderDocs = infoSheet.commercialDocuments.map(doc => `<li>${doc.documentName}</li>`).join('');
-        const ceDocs = infoSheet.commercialDocuments.map(doc => `<li>${doc.documentName}</li>`).join('');
+        // Fetch all PQR and Finance documents for mapping
+        const [allPqrDocs, allFinanceDocs] = await Promise.all([
+            this.db.select().from(pqrDocuments).limit(1000),
+            this.db.select().from(financeDocuments).limit(1000),
+        ]);
+
+        // Create maps for document lookup
+        const pqrMap = new Map<number, string>();
+        allPqrDocs.forEach(pqr => {
+            const label = pqr.projectName
+                ? (pqr.item ? `${pqr.projectName} - ${pqr.item}` : pqr.projectName)
+                : `PQR ${pqr.id}`;
+            pqrMap.set(pqr.id, label);
+        });
+
+        const financeMap = new Map<number, string>();
+        allFinanceDocs.forEach(doc => {
+            if (doc.documentName) {
+                financeMap.set(doc.id, doc.documentName);
+            }
+        });
+
+        // Build document lists with mapped names
+        const teDocs = infoSheet.technicalWorkOrders.length > 0
+            ? infoSheet.technicalWorkOrders.map(doc =>
+                `<li>${doc.projectName || `Document ${doc.id}`}</li>`
+            ).join('') : '<li>None</li>';
+
+        const ceDocs = infoSheet.commercialDocuments.length > 0
+            ? infoSheet.commercialDocuments.map(doc =>
+                `<li>${doc.documentName || `Document ${doc.id}`}</li>`
+            ).join('') : '<li>None</li>';
+
+        let docs = [];
+        if (tender.documents) {
+            try {
+                docs = JSON.parse(tender.documents);
+            } catch (e) {
+                docs = [];
+            }
+        }
+
+        const tenderDocs = docs.length > 0
+            ? docs.map((doc, index) => `<li>${doc || `Document ${index + 1}`}</li>`).join('')
+            : '<li>None</li>';
+
+
+        // Format array fields (modes) as comma-separated strings
+        const formatArray = (arr: string[] | null | undefined): string => {
+            if (!arr || arr.length === 0) return 'Not specified';
+            return arr.join(', ');
+        };
+
+        // Format physical docs deadline
+        const formatPhysicalDocsDeadline = (deadline: Date | string | null): string => {
+            if (!deadline) return 'N/A';
+            const date = deadline instanceof Date ? deadline : new Date(deadline);
+            return date.toLocaleString('en-IN', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+            });
+        };
 
         // Build email data matching template
         const emailData: Record<string, any> = {
+            organization: organizationName,
             tender_name: tender.tenderName,
             tender_no: tender.tenderNo,
             website: websiteName,
             dueDate,
             recommendation_by_te: infoSheet.teRecommendation || 'Not specified',
             reason: infoSheet.teRejectionReason || infoSheet.teRejectionRemarks || 'N/A',
+            // Processing Fee fields
+            processing_fee_required: infoSheet.processingFeeRequired || 'No',
+            processing_fee_amount: formatCurrency(infoSheet.processingFeeAmount),
+            processing_fee_modes: formatArray(infoSheet.processingFeeMode),
+            // Tender Fee fields
+            tender_fee_required: infoSheet.tenderFeeRequired || 'No',
             tender_fees: formatCurrency(infoSheet.tenderFeeAmount),
-            tender_fees_in_form_of: infoSheet.tenderFeeMode || 'Not specified',
+            tender_fees_in_form_of: formatArray(infoSheet.tenderFeeMode),
+            // EMD fields
             emd: formatCurrency(infoSheet.emdAmount),
             emd_required: infoSheet.emdRequired || 'No',
-            emd_in_form_of: infoSheet.emdMode || 'Not specified',
+            emd_in_form_of: formatArray(infoSheet.emdMode),
+            // Tender Value
             tender_value: formatCurrency(tender.gstValues),
+            // OEM Experience
+            oem_experience: infoSheet.oemExperience || 'Not specified',
+            // Bid & Commercial
             bid_validity: infoSheet.bidValidityDays?.toString() || 'Not specified',
             commercial_evaluation: infoSheet.commercialEvaluation || 'Not specified',
             ra_applicable: infoSheet.reverseAuctionApplicable || 'No',
             maf_required: infoSheet.mafRequired || 'No',
+            // Delivery Time
             delivery_time: infoSheet.deliveryTimeSupply?.toString() || 'Not specified',
+            delivery_time_ic_inclusive: infoSheet.deliveryTimeInstallationInclusive ? 'Yes' : 'No',
             delivery_time_ic: infoSheet.deliveryTimeInstallationDays?.toString() || 'Not specified',
+            // PBG fields
+            pbg_required: infoSheet.pbgRequired || 'No',
+            pbg_form: formatArray(infoSheet.pbgMode ? JSON.parse(infoSheet.pbgMode) : null),
             pbg_percentage: formatPercent(infoSheet.pbgPercentage),
             pbg_duration: infoSheet.pbgDurationMonths?.toString() || 'Not specified',
+            // SD fields
+            sd_required: infoSheet.sdRequired || 'No',
+            sd_form: formatArray(infoSheet.sdMode ? JSON.parse(infoSheet.sdMode) : null),
+            sd_percentage: formatPercent(infoSheet.sdPercentage),
+            sd_duration: infoSheet.sdDurationMonths?.toString() || 'Not specified',
+            // Payment Terms
             payment_terms: formatPercent(infoSheet.paymentTermsSupply?.toString() || null),
             payment_terms_ic: formatPercent(infoSheet.paymentTermsInstallation?.toString() || null),
+            // LD fields
+            ld_required: infoSheet.ldRequired || 'No',
             ld_percentage: formatPercent(infoSheet.ldPercentagePerWeek),
             max_ld: formatPercent(infoSheet.maxLdPercentage),
+            // Physical Docs
             phydocs_submission_required: infoSheet.physicalDocsRequired || 'No',
             phydocsRequired: infoSheet.physicalDocsRequired === 'Yes',
-            phydocs_submission_deadline: infoSheet.physicalDocsDeadline || 'N/A',
+            phydocs_submission_deadline: formatPhysicalDocsDeadline(infoSheet.physicalDocsDeadline),
+            // Technical Eligibility
             eligibility_criterion: infoSheet.techEligibilityAge?.toString() || 'Not specified',
+            work_value_type: infoSheet.workValueType || 'Not specified',
+            custom_eligibility_criteria: infoSheet.customEligibilityCriteria || '',
             work_value1: formatCurrency(infoSheet.orderValue1),
             name1: infoSheet.workValueType === 'orderValue1' ? 'Selected' : '',
             work_value2: formatCurrency(infoSheet.orderValue2),
             name2: infoSheet.workValueType === 'orderValue2' ? 'Selected' : '',
             work_value3: formatCurrency(infoSheet.orderValue3),
             name3: infoSheet.workValueType === 'orderValue3' ? 'Selected' : '',
+            // Financial Criterion
             aat_display: infoSheet.avgAnnualTurnoverType || 'Not specified',
             aat_amt: formatCurrency(infoSheet.avgAnnualTurnoverValue),
             wc_display: infoSheet.workingCapitalType || 'Not specified',
@@ -870,16 +1018,22 @@ export class TenderInfoSheetsService {
             nw_amt: formatCurrency(infoSheet.netWorthValue),
             sc_display: infoSheet.solvencyCertificateType || 'Not specified',
             sc_amt: formatCurrency(infoSheet.solvencyCertificateValue),
-            te_docs: teDocs || '<li>None</li>',
-            tender_docs: tenderDocs || '<li>None</li>',
-            ce_docs: ceDocs || '<li>None</li>',
+            // Documents
+            te_docs: teDocs,
+            tender_docs: tenderDocs,
+            ce_docs: ceDocs,
+            // Clients
             clients: infoSheet.clients.map(client => ({
                 client_name: client.clientName,
                 client_designation: client.clientDesignation || '',
                 client_email: client.clientEmail || '',
                 client_mobile: client.clientMobile || '',
             })),
-            link: `#/tendering/tender-approvals/${tenderId}/approval`, // TODO: Update with actual frontend URL
+            // Courier & Remarks
+            courier_address: infoSheet.courierAddress || 'Not specified',
+            te_final_remark: infoSheet.teFinalRemark || '',
+            // Link & Assignee
+            link: `#/tendering/tender-approvals/${tenderId}/approval`,
             assignee: assignee.name,
         };
 
@@ -887,11 +1041,15 @@ export class TenderInfoSheetsService {
             'info-sheet.filled',
             tenderId,
             changedBy,
-            `Tender Info Sheet Filled: ${tender.tenderNo}`,
+            `Tender Info - ${tender.tenderName}`,
             'tender-info-sheet-filled',
             emailData,
             {
                 to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
+                cc: [
+                    { type: 'role', role: 'Admin', teamId: tender.team },
+                    { type: 'role', role: 'Coordinator', teamId: tender.team },
+                ],
             }
         );
     }

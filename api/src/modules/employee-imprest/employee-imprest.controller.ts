@@ -1,12 +1,14 @@
-import { Controller, Get, Post, Put, Delete, Param, Body, ParseIntPipe, UseInterceptors, UploadedFiles, UploadedFile, BadRequestException, Req } from "@nestjs/common";
+import { Controller, Get, Post, Put, Delete, Param, Body, ParseIntPipe, UseInterceptors, UploadedFiles, UploadedFile, BadRequestException, Req, Patch } from "@nestjs/common";
 import { FilesInterceptor, FileInterceptor } from "@nestjs/platform-express";
 import { diskStorage } from "multer";
 import { extname } from "path";
 
 import { EmployeeImprestService } from "@/modules/employee-imprest/employee-imprest.service";
-import type { CreateEmployeeImprestDto } from "@/modules/employee-imprest/zod/create-employee-imprest.schema";
-import type { UpdateEmployeeImprestDto } from "@/modules/employee-imprest/zod/update-employee-imprest.schema";
+import { CreateEmployeeImprestSchema, type CreateEmployeeImprestDto } from "@/modules/employee-imprest/zod/create-employee-imprest.schema";
+import { UpdateEmployeeImprestSchema, type UpdateEmployeeImprestDto } from "@/modules/employee-imprest/zod/update-employee-imprest.schema";
 import { CurrentUser } from "@/decorators/current-user.decorator";
+import { ZodValidationPipe } from "nestjs-zod";
+import { CreateEmployeeImprestCreditSchema } from "../imprest-admin/zod/create-employee-imprest-credit.schema";
 
 // Multer config
 const multerConfig = {
@@ -28,21 +30,25 @@ export class EmployeeImprestController {
 
     @Post()
     @UseInterceptors(FilesInterceptor("files", 10, multerConfig))
-    create(@Body() body: CreateEmployeeImprestDto, @UploadedFiles() files: Express.Multer.File[], @CurrentUser("id") userId: number) {
-        let data = this.service.create(body, files, userId);
-        console.log("Created Employee Imprest:", data);
-        return data;
+    create(@Req() req: Request, @UploadedFiles() files: Express.Multer.File[]) {
+        const parsed = CreateEmployeeImprestSchema.safeParse(req.body);
+
+        if (!parsed.success) {
+            throw new BadRequestException(parsed.error.flatten());
+        }
+
+        return this.service.create(parsed.data, files);
     }
 
     @Get()
     getMyImprests(@Req() req) {
-        return this.service.findAllByUser(req.user.sub);
+        return this.service.getEmployeeDashboard(req.user.sub);
     }
 
     @Get("user/:userId")
     getByUser(@Param("userId", ParseIntPipe) userId: number) {
         console.log("Fetching imprests for userId (controller):", userId);
-        return this.service.findAllByUser(userId);
+        return this.service.getEmployeeDashboard(userId);
     }
 
     @Get(":id")
@@ -50,9 +56,15 @@ export class EmployeeImprestController {
         return this.service.findOne(id);
     }
 
-    @Put(":id")
-    update(@Param("id", ParseIntPipe) id: number, @Body() body: UpdateEmployeeImprestDto, @CurrentUser("id") userId: number) {
-        return this.service.update(id, body, userId);
+    @Patch(":id")
+    update(
+        @Param("id", ParseIntPipe) id: number,
+        @Body(new ZodValidationPipe(UpdateEmployeeImprestSchema))
+        body: UpdateEmployeeImprestDto
+    ) {
+        console.log("TEST");
+        console.log(id, body);
+        return this.service.update(id, body);
     }
 
     @Delete(":id")

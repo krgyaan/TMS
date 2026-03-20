@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
 import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -12,8 +13,11 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useBankTransferDashboard, useBankTransferDashboardCounts } from '@/hooks/api/useBankTransfers';
 import type { BankTransferDashboardRow, BankTransferDashboardTab } from './helpers/bankTransfer.types';
-import { tenderNameCol, dateCol, currencyCol } from '@/components/data-grid/columns';
-import { BankTransferActionForm } from './components/BankTransferActionForm';
+import { tenderNameCol } from '@/components/data-grid/columns';
+import { formatDate } from '@/hooks/useFormatedDate';
+import { formatINR } from '@/hooks/useINRFormatter';
+import { paths } from '@/app/routes/paths';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 
 const TABS_CONFIG: Array<{ key: BankTransferDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -65,15 +69,19 @@ const getStatusVariant = (status: string | null): string => {
 
 const BankTransferListPage = () => {
     const [activeTab, setActiveTab] = useState<BankTransferDashboardTab>('pending');
+    const navigate = useNavigate();
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
-    const [actionFormOpen, setActionFormOpen] = useState(false);
-    const [selectedInstrument, setSelectedInstrument] = useState<BankTransferDashboardRow | null>(null);
+    const debouncedSearch = useDebouncedSearch(search, 300);
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, search]);
+    }, [activeTab, debouncedSearch]);
+
+    const handlePageSizeChange = useCallback((newPageSize: number) => {
+        setPagination({ pageIndex: 0, pageSize: newPageSize });
+    }, []);
 
     const handleSortChanged = useCallback((event: any) => {
         const sortModel = event.api.getColumnState()
@@ -92,7 +100,7 @@ const BankTransferListPage = () => {
         limit: pagination.pageSize,
         sortBy: sortModel[0]?.colId,
         sortOrder: sortModel[0]?.sort,
-        search: search || undefined,
+        search: debouncedSearch || undefined,
     });
 
     const { data: counts } = useBankTransferDashboardCounts();
@@ -100,38 +108,44 @@ const BankTransferListPage = () => {
     const btData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
 
-    const handleViewDetails = useCallback((row: BankTransferDashboardRow) => {
-        // TODO: Implement navigation to detail page
-        console.log('View details:', row);
-    }, []);
-
-    const handleOpenActionForm = useCallback((row: BankTransferDashboardRow) => {
-        setSelectedInstrument(row);
-        setActionFormOpen(true);
-    }, []);
-
     const btActions: ActionItem<BankTransferDashboardRow>[] = useMemo(
         () => [
             {
                 label: 'View Details',
                 icon: <Eye className="h-4 w-4" />,
-                onClick: handleViewDetails,
+                onClick: (row: BankTransferDashboardRow) => navigate(paths.bi.bankTransferView(row.requestId)),
             },
             {
                 label: 'Action Form',
                 icon: <Edit className="h-4 w-4" />,
-                onClick: handleOpenActionForm,
+                onClick: (row: BankTransferDashboardRow) => navigate(paths.bi.bankTransferAction(row.id)),
             },
         ],
-        [handleViewDetails, handleOpenActionForm]
+        [navigate]
     );
 
     const colDefs = useMemo<ColDef<BankTransferDashboardRow>[]>(
         () => [
-            dateCol<BankTransferDashboardRow>('date', {
+            {
+                field: 'date',
                 headerName: 'Date',
-                width: 120,
+                width: 100,
                 colId: 'date',
+                sortable: true,
+                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
+                comparator: (dateA, dateB) => {
+                    if (!dateA && !dateB) return 0;
+                    if (!dateA) return 1;
+                    if (!dateB) return -1;
+                    return new Date(dateA).getTime() - new Date(dateB).getTime();
+                },
+                hide: activeTab === 'pending' || activeTab === 'rejected',
+            },
+            tenderNameCol<BankTransferDashboardRow>('tenderNo', {
+                headerName: 'Tender Name',
+                width: 200,
+                maxWidth: 200,
+                colId: 'tenderNo',
                 sortable: true,
             }),
             {
@@ -146,52 +160,69 @@ const BankTransferListPage = () => {
             {
                 field: 'utrNo',
                 headerName: 'UTR No',
-                width: 150,
+                width: 130,
+                maxWidth: 130,
                 colId: 'utrNo',
                 valueGetter: (params) => params.data?.utrNo || '—',
                 sortable: true,
                 filter: true,
+                hide: activeTab === 'pending' || activeTab === 'rejected',
             },
             {
                 field: 'accountName',
                 headerName: 'Account Name',
-                width: 150,
+                width: 240,
+                maxWidth: 240,
                 colId: 'accountName',
                 valueGetter: (params) => params.data?.accountName || '—',
                 sortable: true,
                 filter: true,
             },
-            tenderNameCol<BankTransferDashboardRow>('tenderNo', {
-                headerName: 'Tender Name',
-                width: 200,
-                colId: 'tenderNo',
-                sortable: true,
-            }),
-            dateCol<BankTransferDashboardRow>('bidValidity', {
+            {
+                field: 'bidValidity',
                 headerName: 'Bid Validity',
-                width: 130,
+                width: 120,
                 colId: 'bidValidity',
                 sortable: true,
-            }),
+                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
+                comparator: (dateA, dateB) => {
+                    if (!dateA && !dateB) return 0;
+                    if (!dateA) return 1;
+                    if (!dateB) return -1;
+                    return new Date(dateA).getTime() - new Date(dateB).getTime();
+                },
+            },
+            {
+                field: 'purpose',
+                headerName: 'Purpose',
+                width: 100,
+                colId: 'purpose',
+                valueGetter: (params) => params.data?.purpose || '—',
+                sortable: true,
+                filter: true,
+            },
             {
                 field: 'tenderStatus',
                 headerName: 'Tender Status',
-                width: 140,
+                width: 130,
+                maxWidth: 130,
                 colId: 'tenderStatus',
                 valueGetter: (params) => params.data?.tenderStatus || '—',
                 sortable: true,
                 filter: true,
             },
-            currencyCol<BankTransferDashboardRow>('amount', {
+            {
+                field: 'amount',
                 headerName: 'Amount',
-                width: 130,
+                width: 100,
                 colId: 'amount',
                 sortable: true,
-            }),
+                valueFormatter: (params) => params.value ? formatINR(params.value) : '—',
+            },
             {
                 field: 'btStatus',
                 headerName: 'BT Status',
-                width: 130,
+                width: 100,
                 colId: 'btStatus',
                 sortable: true,
                 filter: true,
@@ -210,7 +241,7 @@ const BankTransferListPage = () => {
                 width: 57,
             },
         ],
-        [btActions]
+        [btActions, activeTab]
     );
 
     const tabsWithData = useMemo(() => {
@@ -276,18 +307,6 @@ const BankTransferListPage = () => {
                                 Track and manage bank transfers for tenders.
                             </CardDescription>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <div className="relative">
-                                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    type="text"
-                                    placeholder="Search..."
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    className="pl-8 w-64"
-                                />
-                            </div>
-                        </div>
                     </div>
                 </CardHeader>
                 <CardContent className="px-0">
@@ -295,7 +314,7 @@ const BankTransferListPage = () => {
                         value={activeTab}
                         onValueChange={(value) => setActiveTab(value as BankTransferDashboardTab)}
                     >
-                        <TabsList className="m-auto">
+                        <TabsList className="m-auto mb-4">
                             {tabsWithData.map((tab) => (
                                 <TabsTrigger
                                     key={tab.key}
@@ -312,6 +331,25 @@ const BankTransferListPage = () => {
                                 </TabsTrigger>
                             ))}
                         </TabsList>
+
+                        {/* Search Row: Quick Filters, Search Bar */}
+                        <div className="flex items-center gap-4 px-6 pb-4">
+                            {/* Quick Filters (Left) - Optional, can be added per page */}
+
+                            {/* Search Bar (Center) - Flex grow */}
+                            <div className="flex-1 flex justify-end">
+                                <div className="relative">
+                                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        type="text"
+                                        placeholder="Search..."
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                        className="pl-8 w-64"
+                                    />
+                                </div>
+                            </div>
+                        </div>
 
                         {tabsWithData.map((tab) => (
                             <TabsContent key={tab.key} value={tab.key} className="px-0 m-0 data-[state=inactive]:hidden">
@@ -335,6 +373,9 @@ const BankTransferListPage = () => {
                                                 rowCount={totalRows}
                                                 paginationState={pagination}
                                                 onPaginationChange={setPagination}
+                                                onPageSizeChange={handlePageSizeChange}
+                                                showTotalCount={true}
+                                                showLengthChange={true}
                                                 gridOptions={{
                                                     defaultColDef: {
                                                         editable: false,
@@ -354,22 +395,6 @@ const BankTransferListPage = () => {
                     </Tabs>
                 </CardContent>
             </Card>
-
-            {/* Action Form Dialog */}
-            {selectedInstrument && (
-                <BankTransferActionForm
-                    open={actionFormOpen}
-                    onOpenChange={setActionFormOpen}
-                    instrumentId={selectedInstrument.id}
-                    instrumentData={{
-                        utrNo: selectedInstrument.utrNo || undefined,
-                        accountName: selectedInstrument.accountName || undefined,
-                        amount: selectedInstrument.amount || undefined,
-                        tenderName: selectedInstrument.tenderName || undefined,
-                        tenderNo: selectedInstrument.tenderNo || undefined,
-                    }}
-                />
-            )}
         </>
     );
 };

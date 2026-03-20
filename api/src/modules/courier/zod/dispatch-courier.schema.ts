@@ -13,10 +13,15 @@ export const dispatchCourierSchema = z.object({
         .max(255)
         .transform(v => v.trim()),
 
-    pickupDate: z
-        .string()
-        .min(1, "Pickup date is required")
-        .refine(v => !isNaN(Date.parse(v)), "Invalid pickup date format"),
+    pickupDate: z.coerce.date(),
 });
+
+export const CreateDispatchSchema = z.object({
+    courierProvider: z.string().min(1),
+    docketNo: z.string().min(1),
+    pickupDate: z.coerce.date(), // expects YYYY-MM-DD
+});
+
+export type CreateDispatchInput = z.infer<typeof CreateDispatchSchema>;
 
 export type DispatchCourierDto = z.infer<typeof dispatchCourierSchema>;

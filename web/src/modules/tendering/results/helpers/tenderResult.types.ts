@@ -7,6 +7,7 @@ export type ResultDashboardFilters = {
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
     search?: string;
+    teamId?: number;
 };
 
 export interface UploadResultFormPageProps {
@@ -73,6 +74,8 @@ export interface ResultDashboardRow {
     raApplicable: boolean;
     reverseAuctionId: number | null;
     emdDetails: EmdDetails | null;
+    technicallyQualified: string | null;
+    woBasicDetailId: number | null;
 }
 
 export interface ResultDashboardCounts {
@@ -81,6 +84,12 @@ export interface ResultDashboardCounts {
     lost: number;
     disqualified: number;
     total: number;
+    totalAmounts: {
+        pending: number;
+        won: number;
+        lost: number;
+        disqualified: number;
+    };
 }
 
 export interface ResultDashboardResponse {

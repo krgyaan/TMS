@@ -1,5 +1,7 @@
 export interface DemandDraftDashboardRow {
     id: number;
+    requestId: number;
+    purpose: string | null;
     ddCreationDate: Date | null;
     ddNo: string | null;
     beneficiaryName: string | null;
@@ -8,8 +10,8 @@ export interface DemandDraftDashboardRow {
     tenderNo: string | null;
     bidValidity: Date | null;
     tenderStatus: string | null;
-    member: string | null;
-    expiry: Date | null;
+    teamMember: string | null;
+    expiry: string | null;
     ddStatus: string | null;
 }
 

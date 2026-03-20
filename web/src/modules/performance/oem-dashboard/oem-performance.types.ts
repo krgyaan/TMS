@@ -1,62 +1,104 @@
 /* ===================== TYPES ===================== */
 
-import { access } from "fs";
+// ─── Query ────────────────────────────────────────────────────────────────────
 
-export interface PerformanceQuery {
-    userId: number | null;
+export interface OemPerformanceQuery {
+    oemId: number | null;
     fromDate: string | null; // yyyy-mm-dd
     toDate: string | null; // yyyy-mm-dd
 }
 
-export interface PerformanceSummary {
-    tendersHandled: number;
-    stagesApplicable: number;
-    stagesCompleted: number;
-    stagesPending: number;
-    stagesOnTime: number;
-    stagesLate: number;
-    completionRate: number;
-    onTimeRate: number;
+// ─── API response (mirrors backend shape exactly) ─────────────────────────────
+
+export interface SummaryItem {
+    count: number;
+    value: number;
+    tenders: string[];
 }
 
-export interface PerformanceOutcomes {
-    resultAwaited: number;
-    missed: number;
-    won: number;
-    lost: number;
-    notBid: number;
+export interface OemSummary {
+    tendersAssigned: SummaryItem;
+    tendersApproved: SummaryItem;
+    tendersBid: SummaryItem;
+    tendersMissed: SummaryItem;
+    tendersDisqualified: SummaryItem;
+    tenderResultsAwaited: SummaryItem;
+    tendersWon: SummaryItem;
+    tendersLost: SummaryItem;
 }
 
-export interface StageMatrixRow {
-    key: string;
-    label: string;
-    data: number[];
+export interface NotAllowedTenderRow {
+    id: number;
+    tenderNo: string;
+    tenderName: string;
+    dueDate: string;
+    gstValues: string;
+    member: string;
+    team: string;
+    reason: string;
 }
 
-export interface StageMatrixResponse {
-    stages: string[];
-    rows: StageMatrixRow[];
+export interface RfqSentToOemRow {
+    id: number;
+    tenderNo: string;
+    tenderName: string;
+    dueDate: string;
+    gstValues: string;
+    member: string;
+    team: string;
+    rfqSentOn: string;
+    rfqResponseOn: string | null; // null = not yet responded
+}
+
+export interface OemPerformanceResponse {
+    summary: OemSummary;
+    notAllowedTenders: NotAllowedTenderRow[];
+    rfqsSentToOem: RfqSentToOemRow[];
+}
+
+// ─── Component-level types (derived in hooks, consumed by dashboard) ──────────
+
+export interface OemKpiSummary {
+    totalTendersWithOem: number;
+    tendersWon: number;
+    totalValueWon: number;
+    tendersLost: number;
+    totalValueLost: number;
+    tendersSubmitted: number;
+    totalValueSubmitted: number;
+    tendersNotAllowed: number;
+    rfqsSent: number;
+    rfqsResponded: number;
+    winRate: number;
+    rfqResponseRate: number;
+}
+
+export interface OemScoring {
+    winRateScore: number;
+    responseEfficiencyScore: number;
+    complianceScore: number;
+    total: number;
 }
 
 export interface TenderListRow {
-    id: number | null;
+    id: number;
     tenderNo: string;
     tenderName: string;
-    organizationName: string | null;
+    organizationName: string;
+    teamMember: string;
+    team: string;
     value: number;
-    status: "Result Awaited" | "Won" | "Lost" | "Missed" | "Not Bid";
-    dueDate: string;
+    status: string;
 }
 
-export interface PerformanceTrends {
-    label: string;
-    completion: number;
-    onTime: number;
-}
-
-export interface ExecutiveScoring {
-    velocity: number;
-    accuracy: number;
-    outcome: number;
-    total: number;
+export interface TendersByKpi {
+    total: TenderListRow[];
+    tendersWon: TenderListRow[];
+    tendersLost: TenderListRow[];
+    tendersSubmitted: TenderListRow[];
+    tendersNotAllowed: NotAllowedTenderRow[];
+    rfqsSent: RfqSentToOemRow[];
+    rfqsResponded: TenderListRow[];
+    winRate: TenderListRow[];
+    rfqResponseRate: TenderListRow[];
 }

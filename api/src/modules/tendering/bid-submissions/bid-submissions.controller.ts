@@ -1,18 +1,10 @@
-import {
-    Controller,
-    Get,
-    Post,
-    Patch,
-    Body,
-    Param,
-    ParseIntPipe,
-    Query
-} from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, Query } from '@nestjs/common';
 import { BidSubmissionsService } from '@/modules/tendering/bid-submissions/bid-submissions.service';
 import type { SubmitBidDto, MarkAsMissedDto, UpdateBidSubmissionDto } from './dto/bid-submission.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { type TimerData, WorkflowService } from '@/modules/timers/services/workflow.service';
+import { TimersService } from '@/modules/timers/timers.service';
+import { getFrontendTimer } from '@/modules/timers/timer-helper';
 import { Logger } from '@nestjs/common';
 
 @Controller('bid-submissions')
@@ -20,19 +12,26 @@ export class BidSubmissionsController {
     private readonly logger = new Logger(BidSubmissionsController.name);
     constructor(
         private readonly bidSubmissionsService: BidSubmissionsService,
-        private readonly workflowService: WorkflowService
+        private readonly timersService: TimersService
     ) { }
 
     @Get('dashboard')
     async getDashboard(
+        @CurrentUser() user: ValidatedUser,
         @Query('tab') tab?: 'pending' | 'submitted' | 'disqualified' | 'tender-dnb',
+        @Query('teamId') teamId?: string,
         @Query('page') page?: string,
         @Query('limit') limit?: string,
         @Query('sortBy') sortBy?: string,
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
         @Query('search') search?: string,
     ) {
-        const result = await this.bidSubmissionsService.getDashboardData(tab, {
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
+        const result = await this.bidSubmissionsService.getDashboardData(user, parseNumber(teamId), tab, {
             page: page ? parseInt(page, 10) : undefined,
             limit: limit ? parseInt(limit, 10) : undefined,
             sortBy,
@@ -42,18 +41,9 @@ export class BidSubmissionsController {
         // Add timer data to each tender
         const dataWithTimers = await Promise.all(
             result.data.map(async (tender) => {
-                let timer: TimerData | null = null;
-                try {
-                    timer = await this.workflowService.getTimerForStep('TENDER', tender.tenderId, 'bid_submission');
-                    if (!timer.hasTimer) {
-                        timer = null;
-                    }
-                } catch (error) {
-                    this.logger.error(
-                        `Failed to get timer for tender ${tender.tenderId}:`,
-                        error
-                    );
-                }
+                // this.logger.debug(`Fetching timer for tender ${tender.tenderId}, stage bid_submission`);
+                const timer = await getFrontendTimer(this.timersService, 'TENDER', tender.tenderId, 'bid_submission');
+                // this.logger.debug(`Timer for tender ${tender.tenderId}: ${JSON.stringify(timer)}`);
 
                 return {
                     ...tender,
@@ -69,8 +59,16 @@ export class BidSubmissionsController {
     }
 
     @Get('dashboard/counts')
-    getDashboardCounts() {
-        return this.bidSubmissionsService.getDashboardCounts();
+    getDashboardCounts(
+        @CurrentUser() user: ValidatedUser,
+        @Query('teamId') teamId?: string,
+    ) {
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
+        return this.bidSubmissionsService.getDashboardCounts(user, parseNumber(teamId));
     }
 
     @Get('tender/:tenderId')
