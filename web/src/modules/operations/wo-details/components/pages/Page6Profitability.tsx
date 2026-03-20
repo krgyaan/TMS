@@ -7,10 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { SelectField } from "@/components/form/SelectField";
 import { Link2, AlertCircle, Calculator } from "lucide-react";
-import { Page6FormSchema } from "../../helpers/woDetail.schema";
-import { WizardNavigation } from "../WizardNavigation";
-import { YES_NO_OPTIONS } from "../../helpers/constants";
-import type { Page6FormValues, PageFormProps } from "../../helpers/woDetail.types";
+import { Page6FormSchema } from "@/modules/operations/wo-details/helpers/woDetail.schema";
+import { WizardNavigation } from "@/modules/operations/wo-details/components/WizardNavigation";
+import { YES_NO_OPTIONS } from "@/modules/operations/wo-details/helpers/constants";
+import type { Page6FormValues, PageFormProps } from "@/modules/operations/wo-details/helpers/woDetail.types";
 
 interface Page6ProfitabilityProps extends PageFormProps {
     initialData?: Partial<Page6FormValues>;
@@ -124,13 +124,7 @@ export function Page6Profitability({
                         </div>
 
                         {watchHasDiscrepancies === 'true' && (
-                            <div className="bg-red-50 border-l-4 border-red-500 p-6 rounded-r-xl space-y-4">
-                                <div className="flex items-center gap-2 text-red-800">
-                                    <AlertCircle className="h-5 w-5 text-red-500" />
-                                    <p className="text-sm font-semibold">
-                                        Please describe the discrepancies. TL and TE will be notified.
-                                    </p>
-                                </div>
+                            <div className="space-y-4">
                                 <FieldWrapper
                                     control={form.control}
                                     name="discrepancyComments"
@@ -145,6 +139,12 @@ export function Page6Profitability({
                                         />
                                     )}
                                 </FieldWrapper>
+                                <div className="flex items-center gap-2 text-red-800">
+                                    <AlertCircle className="h-5 w-5 text-red-500" />
+                                    <p className="text-sm font-semibold">
+                                        Please describe the discrepancies. TL and TE will be notified.
+                                    </p>
+                                </div>
                             </div>
                         )}
                     </CardContent>

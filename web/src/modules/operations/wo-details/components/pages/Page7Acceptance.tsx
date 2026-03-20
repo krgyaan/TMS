@@ -8,10 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { SelectField } from "@/components/form/SelectField";
 import { Plus, Trash2, FileEdit, CheckCircle2, Pen, Truck, AlertTriangle, ShieldCheck } from "lucide-react";
-import { Page7FormSchema } from "../../helpers/woDetail.schema";
-import { WizardNavigation } from "../WizardNavigation";
-import { YES_NO_OPTIONS } from "../../helpers/constants";
-import type { Page7FormValues, PageFormProps } from "../../helpers/woDetail.types";
+import { Page7FormSchema } from "@/modules/operations/wo-details/helpers/woDetail.schema";
+import { WizardNavigation } from "@/modules/operations/wo-details/components/WizardNavigation";
+import { YES_NO_OPTIONS } from "@/modules/operations/wo-details/helpers/constants";
+import type { Page7FormValues, PageFormProps } from "@/modules/operations/wo-details/helpers/woDetail.types";
 
 interface Page7AcceptanceProps extends PageFormProps {
     initialData?: Partial<Page7FormValues>;
@@ -96,7 +96,7 @@ export function Page7Acceptance({
                             {amendmentFields.map((field, index) => (
                                 <div
                                     key={field.id}
-                                    className="p-6 border rounded-2xl bg-orange-50/50 space-y-6 relative"
+                                    className="p-6 border rounded-2xl space-y-6 relative"
                                 >
                                     <div className="flex justify-between items-center">
                                         <h4 className="font-bold text-sm uppercase tracking-wider text-orange-800">Amendment #{index + 1}</h4>
@@ -111,7 +111,7 @@ export function Page7Acceptance({
                                         </Button>
                                     </div>
 
-                                    <div className="grid gap-6 md:grid-cols-2">
+                                    <div className="grid gap-6 md:grid-cols-6 items-start">
                                         <FieldWrapper
                                             control={form.control}
                                             name={`amendments.${index}.pageNo`}
@@ -128,7 +128,7 @@ export function Page7Acceptance({
                                             {(field) => <Input {...field} placeholder="e.g., 5.1.a" />}
                                         </FieldWrapper>
 
-                                        <div className="md:col-span-2 space-y-4">
+                                        <div className="md:col-span-4 grid grid-cols-2 gap-6">
                                             <FieldWrapper
                                                 control={form.control}
                                                 name={`amendments.${index}.currentStatement`}

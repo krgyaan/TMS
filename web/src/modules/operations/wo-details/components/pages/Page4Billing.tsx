@@ -9,9 +9,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Plus, Trash2, Package, MapPin, Truck } from "lucide-react";
-import { Page4FormSchema } from "../../helpers/woDetail.schema";
-import { WizardNavigation } from "../WizardNavigation";
-import type { Page4FormValues, PageFormProps } from "../../helpers/woDetail.types";
+import { Page4FormSchema } from "@/modules/operations/wo-details/helpers/woDetail.schema";
+import { WizardNavigation } from "@/modules/operations/wo-details/components/WizardNavigation";
+import type { Page4FormValues, PageFormProps } from "@/modules/operations/wo-details/helpers/woDetail.types";
 
 interface Page4BillingProps extends PageFormProps {
     initialData?: Partial<Page4FormValues>;
@@ -340,9 +340,8 @@ export function Page4Billing({
                                     </Button>
                                 </div>
 
-                                <div className="grid gap-4 md:grid-cols-2">
+                                <div className="grid gap-4 md:grid-cols-4 items-start">
                                     <div className="space-y-2">
-                                        <Label>Sr. Nos.</Label>
                                         <div className="flex items-center gap-2">
                                             <Checkbox
                                                 id={`billing-all-${index}`}
@@ -354,7 +353,7 @@ export function Page4Billing({
                                                     );
                                                 }}
                                             />
-                                            <Label htmlFor={`billing-all-${index}`}>Select All</Label>
+                                            <Label htmlFor={`billing-all-${index}`}>Billing Address for All Items</Label>
                                         </div>
                                         {form.watch(`billingAddresses.${index}.srNos`) !== "all" && (
                                             <Input
@@ -378,24 +377,22 @@ export function Page4Billing({
                                         {(field) => <Input {...field} placeholder="Customer name" />}
                                     </FieldWrapper>
 
-                                    <div className="md:col-span-2">
-                                        <FieldWrapper
-                                            control={form.control}
-                                            name={`billingAddresses.${index}.address`}
-                                            label="Address"
-                                        >
-                                            {(field) => (
-                                                <Textarea {...field} placeholder="Full address" rows={2} />
-                                            )}
-                                        </FieldWrapper>
-                                    </div>
-
                                     <FieldWrapper
                                         control={form.control}
                                         name={`billingAddresses.${index}.gst`}
                                         label="GST Number"
                                     >
                                         {(field) => <Input {...field} placeholder="27AABCU9603R1ZX" />}
+                                    </FieldWrapper>
+
+                                    <FieldWrapper
+                                        control={form.control}
+                                        name={`billingAddresses.${index}.address`}
+                                        label="Address"
+                                    >
+                                        {(field) => (
+                                            <Textarea {...field} placeholder="Full address" rows={2} />
+                                        )}
                                     </FieldWrapper>
                                 </div>
                             </div>
@@ -445,9 +442,8 @@ export function Page4Billing({
                                     </Button>
                                 </div>
 
-                                <div className="grid gap-4 md:grid-cols-2">
+                                <div className="grid gap-4 md:grid-cols-4 items-start">
                                     <div className="space-y-2">
-                                        <Label>Sr. Nos.</Label>
                                         <div className="flex items-center gap-2">
                                             <Checkbox
                                                 id={`shipping-all-${index}`}
@@ -459,7 +455,7 @@ export function Page4Billing({
                                                     );
                                                 }}
                                             />
-                                            <Label htmlFor={`shipping-all-${index}`}>Select All</Label>
+                                            <Label htmlFor={`shipping-all-${index}`}>Shipping Address for All Items</Label>
                                         </div>
                                         {form.watch(`shippingAddresses.${index}.srNos`) !== "all" && (
                                             <Input
@@ -483,24 +479,22 @@ export function Page4Billing({
                                         {(field) => <Input {...field} placeholder="Customer name" />}
                                     </FieldWrapper>
 
-                                    <div className="md:col-span-2">
-                                        <FieldWrapper
-                                            control={form.control}
-                                            name={`shippingAddresses.${index}.address`}
-                                            label="Address"
-                                        >
-                                            {(field) => (
-                                                <Textarea {...field} placeholder="Full address" rows={2} />
-                                            )}
-                                        </FieldWrapper>
-                                    </div>
-
                                     <FieldWrapper
                                         control={form.control}
                                         name={`shippingAddresses.${index}.gst`}
                                         label="GST Number"
                                     >
                                         {(field) => <Input {...field} placeholder="27AABCU9603R1ZX" />}
+                                    </FieldWrapper>
+
+                                    <FieldWrapper
+                                        control={form.control}
+                                        name={`shippingAddresses.${index}.address`}
+                                        label="Address"
+                                    >
+                                        {(field) => (
+                                            <Textarea {...field} placeholder="Full address" rows={2} />
+                                        )}
                                     </FieldWrapper>
                                 </div>
                             </div>

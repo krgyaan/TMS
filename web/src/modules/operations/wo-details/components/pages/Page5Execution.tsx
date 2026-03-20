@@ -8,10 +8,10 @@ import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { Input } from "@/components/ui/input";
 import { SelectField } from "@/components/form/SelectField";
 import { Plus, Trash2, MapPinned, FileText, User } from "lucide-react";
-import { Page5FormSchema } from "../../helpers/woDetail.schema";
-import { WizardNavigation } from "../WizardNavigation";
-import { YES_NO_OPTIONS } from "../../helpers/constants";
-import type { Page5FormValues, PageFormProps } from "../../helpers/woDetail.types";
+import { Page5FormSchema } from "@/modules/operations/wo-details/helpers/woDetail.schema";
+import { WizardNavigation } from "@/modules/operations/wo-details/components/WizardNavigation";
+import { YES_NO_OPTIONS } from "@/modules/operations/wo-details/helpers/constants";
+import type { Page5FormValues, PageFormProps } from "@/modules/operations/wo-details/helpers/woDetail.types";
 
 interface Page5ExecutionProps extends PageFormProps {
     initialData?: Partial<Page5FormValues>;
@@ -66,27 +66,15 @@ export function Page5Execution({
         console.log("Save draft:", values);
     };
 
-    const DocumentList = ({
-        title,
-        icon: Icon,
-        documents,
-        setDocuments,
-        color,
-    }: {
-        title: string;
-        icon: any;
-        documents: string[];
-        setDocuments: (docs: string[]) => void;
-        color: string;
-    }) => (
-        <Card className="h-full">
-            <CardHeader className="bg-muted/10 border-b p-4">
+    const DocumentList = ({ title, icon: Icon, documents, setDocuments, color }: { title: string; icon: any; documents: string[]; setDocuments: (docs: string[]) => void; color: string; }) => (
+        <Card>
+            <CardHeader className="border-b">
                 <CardTitle className={`flex items-center gap-2 text-sm font-semibold text-${color}-600`}>
                     <Icon className="h-4 w-4" />
                     {title}
                 </CardTitle>
             </CardHeader>
-            <CardContent className="p-4 space-y-3">
+            <CardContent className="space-y-3">
                 {documents.map((doc, index) => (
                     <div key={index} className="group flex items-center gap-2">
                         <Input
