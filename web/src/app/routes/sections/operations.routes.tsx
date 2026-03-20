@@ -15,8 +15,16 @@ const Wo_Details_Acceptance_Edit = lazy(() => import("@/modules/operations/wo-de
 const Wo_Acceptance_RaiseQuery_Create = lazy(() => import("@/modules/operations/wo-details/WoRaiseQueryPage"));
 const Wo_Acceptance_RaiseQuery_Edit = lazy(() => import("@/modules/operations/wo-details/WoRaiseQueryEditPage"));
 
-const Operations_KickOff = lazy(() => import("@/modules/operations/kick-off"));
-const Operations_ContractAgreement = lazy(() => import("@/modules/operations/contract-agreement"));
+const Operations_KickOff = lazy(() => import("@/modules/operations/kick-off/KickOffListPage"));
+const Operations_KickOffCreate = lazy(() => import("@/modules/operations/kick-off/KickOffCreatePage"));
+const Operations_KickOffEdit = lazy(() => import("@/modules/operations/kick-off/KickOffEditPage"));
+const Operations_KickOffShow = lazy(() => import("@/modules/operations/kick-off/KickOffShowPage"));
+
+const Operations_ContractAgreement = lazy(() => import("@/modules/operations/contract-agreement/ContractAgreementListPage"));
+const Operations_ContractAgreementCreate = lazy(() => import("@/modules/operations/contract-agreement/ContractAgreementCreatePage"));
+const Operations_ContractAgreementEdit = lazy(() => import("@/modules/operations/contract-agreement/ContractAgreementEditPage"));
+const Operations_ContractAgreementShow = lazy(() => import("@/modules/operations/contract-agreement/ContractAgreementShowPage"));
+
 const Operations_ProjectDashboard = lazy(() => import("@/modules/operations/project-dashboard/ProjectDashboardPage"));
 const Operations_RaisePoFormPage = lazy(() => import("@/modules/operations/project-dashboard/RaisePoFormPage"));
 const Operations_ViewPoPage = lazy(() => import("@/modules/operations/project-dashboard/ViewPoPage"));
@@ -38,7 +46,15 @@ export default function OperationsRoutes() {
             <Route path="work-order/acceptance/:id/edit" element={<RouteWrapper><Wo_Details_Acceptance_Edit /></RouteWrapper>} />
 
             <Route path="kick-off" element={<RouteWrapper><Operations_KickOff /></RouteWrapper>} />
+            <Route path="kick-off/create" element={<RouteWrapper><Operations_KickOffCreate /></RouteWrapper>} />
+            <Route path="kick-off/:id/edit" element={<RouteWrapper><Operations_KickOffEdit /></RouteWrapper>} />
+            <Route path="kick-off/:id" element={<RouteWrapper><Operations_KickOffShow /></RouteWrapper>} />
+
             <Route path="contract-agreement" element={<RouteWrapper><Operations_ContractAgreement /></RouteWrapper>} />
+            <Route path="contract-agreement/create" element={<RouteWrapper><Operations_ContractAgreementCreate /></RouteWrapper>} />
+            <Route path="contract-agreement/:id/edit" element={<RouteWrapper><Operations_ContractAgreementEdit /></RouteWrapper>} />
+            <Route path="contract-agreement/:id" element={<RouteWrapper><Operations_ContractAgreementShow /></RouteWrapper>} />
+
             <Route path="project-dashboard" element={<RouteWrapper><Operations_ProjectDashboard /></RouteWrapper>} />
             <Route path="project-dashboard/purchase-order/create" element={<RouteWrapper><Operations_RaisePoFormPage /></RouteWrapper>} />
             <Route path="project-dashboard/purchase-order/:id/view" element={<RouteWrapper><Operations_ViewPoPage /></RouteWrapper>} />
