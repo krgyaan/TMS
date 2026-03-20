@@ -1,15 +1,15 @@
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Form } from "@/components/ui/form";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/form/DateInput";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
+import { SelectField } from "@/components/form/SelectField";
 import { ShieldCheck, FileText, Truck, Receipt } from "lucide-react";
 import { Page2FormSchema } from "../../helpers/woDetail.schema";
 import { WizardNavigation } from "../WizardNavigation";
+import { YES_NO_OPTIONS } from "../../helpers/constants";
 import type { Page2FormValues, PageFormProps } from "../../helpers/woDetail.types";
 
 interface Page2ComplianceProps extends PageFormProps {
@@ -26,15 +26,15 @@ export function Page2Compliance({
     const form = useForm<Page2FormValues>({
         resolver: zodResolver(Page2FormSchema) as Resolver<Page2FormValues>,
         defaultValues: {
-            ldApplicable: false,
+            ldApplicable: 'false',
             maxLd: "",
             ldStartDate: "",
             maxLdDate: "",
-            isPbgApplicable: false,
+            isPbgApplicable: 'false',
             filledBgFormat: "",
-            isContractAgreement: false,
+            isContractAgreement: 'false',
             contractAgreementFormat: "",
-            detailedPoApplicable: false,
+            detailedPoApplicable: 'false',
             ...initialData,
         },
     });
@@ -59,182 +59,160 @@ export function Page2Compliance({
     return (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
-                {/* LD Section */}
+                {/* 1. LD Section */}
                 <Card>
-                    <CardHeader>
+                    <CardHeader className="border-b bg-muted/10">
                         <CardTitle className="flex items-center gap-2">
                             <ShieldCheck className="h-5 w-5 text-orange-500" />
-                            Liquidated Damages (LD)
+                            Liquidated Damages (LD) Settings
                         </CardTitle>
+                        <CardDescription>Configure penalties for completion delays.</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex items-center space-x-2">
-                            <FieldWrapper control={form.control} name="ldApplicable" label="">
-                                {(field) => (
-                                    <div className="flex items-center space-x-2">
-                                        <Switch
-                                            id="ldApplicable"
-                                            checked={field.value}
-                                            onCheckedChange={field.onChange}
-                                        />
-                                        <Label htmlFor="ldApplicable">LD Applicable</Label>
-                                    </div>
-                                )}
-                            </FieldWrapper>
+                    <CardContent className="p-6 space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
+                            <SelectField
+                                control={form.control}
+                                name="ldApplicable"
+                                label="LD Applicable?"
+                                options={YES_NO_OPTIONS as any}
+                                placeholder="Select"
+                            />
+
+                            {watchLdApplicable === 'true' && (
+                                <>
+                                    <FieldWrapper control={form.control} name="maxLd" label="Max LD %">
+                                        {(field) => (
+                                            <Input
+                                                {...field}
+                                                placeholder="e.g., 10.00"
+                                                type="number"
+                                                step="0.01"
+                                                min="0"
+                                                max="100"
+                                            />
+                                        )}
+                                    </FieldWrapper>
+
+                                    <FieldWrapper control={form.control} name="ldStartDate" label="LD Start Date">
+                                        {(field) => <DateInput {...field} />}
+                                    </FieldWrapper>
+
+                                    <FieldWrapper control={form.control} name="maxLdDate" label="Max LD Date">
+                                        {(field) => <DateInput {...field} />}
+                                    </FieldWrapper>
+                                </>
+                            )}
                         </div>
-
-                        {watchLdApplicable && (
-                            <div className="grid gap-4 md:grid-cols-3 mt-4 p-4 bg-muted/50 rounded-lg border">
-                                <FieldWrapper control={form.control} name="maxLd" label="Max LD %">
-                                    {(field) => (
-                                        <Input
-                                            {...field}
-                                            placeholder="e.g., 10.00"
-                                            type="number"
-                                            step="0.01"
-                                            min="0"
-                                            max="100"
-                                        />
-                                    )}
-                                </FieldWrapper>
-
-                                <FieldWrapper control={form.control} name="ldStartDate" label="LD Start Date">
-                                    {(field) => (
-                                        <DateInput
-                                            value={field.value}
-                                            onChange={field.onChange}
-                                        />
-                                    )}
-                                </FieldWrapper>
-
-                                <FieldWrapper control={form.control} name="maxLdDate" label="Max LD Date">
-                                    {(field) => (
-                                        <DateInput
-                                            value={field.value}
-                                            onChange={field.onChange}
-                                        />
-                                    )}
-                                </FieldWrapper>
-                            </div>
-                        )}
                     </CardContent>
                 </Card>
 
-                {/* PBG Section */}
+                {/* 2. PBG Section */}
                 <Card>
-                    <CardHeader>
+                    <CardHeader className="border-b bg-muted/10">
                         <CardTitle className="flex items-center gap-2">
                             <FileText className="h-5 w-5 text-orange-500" />
                             Performance Bank Guarantee (PBG)
                         </CardTitle>
+                        <CardDescription>Security deposit requirements for project performance.</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex items-center space-x-2">
-                            <FieldWrapper control={form.control} name="isPbgApplicable" label="">
-                                {(field) => (
-                                    <div className="flex items-center space-x-2">
-                                        <Switch
-                                            id="isPbgApplicable"
-                                            checked={field.value}
-                                            onCheckedChange={field.onChange}
-                                        />
-                                        <Label htmlFor="isPbgApplicable">PBG Applicable</Label>
-                                    </div>
-                                )}
-                            </FieldWrapper>
-                        </div>
+                    <CardContent className="p-6 space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                            <SelectField
+                                control={form.control}
+                                name="isPbgApplicable"
+                                label="PBG Applicable?"
+                                options={YES_NO_OPTIONS as any}
+                                placeholder="Select"
+                            />
 
-                        {watchPbgApplicable && (
-                            <div className="mt-4 p-4 bg-muted/50 rounded-lg border">
-                                <FieldWrapper control={form.control} name="filledBgFormat" label="BG Format">
+                            {watchPbgApplicable === 'true' && (
+                                <FieldWrapper control={form.control} name="filledBgFormat" label="BG Format Required">
                                     {(field) => (
-                                        <Input {...field} placeholder="Enter BG format or upload file" />
+                                        <Input {...field} placeholder="Enter BG format name or code" />
                                     )}
                                 </FieldWrapper>
-                                <p className="text-sm text-muted-foreground mt-2">
-                                    Please fill the BG form (other than tender). This is compulsory.
+                            )}
+                        </div>
+                        {watchPbgApplicable === 'true' && (
+                            <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-r-lg">
+                                <p className="text-sm text-orange-800">
+                                    <strong>Note:</strong> Please fill the BG form (other than tender). This is compulsory for project compliance.
                                 </p>
                             </div>
                         )}
                     </CardContent>
                 </Card>
 
-                {/* Contract Agreement Section */}
+                {/* 3. Contract Agreement Section */}
                 <Card>
-                    <CardHeader>
+                    <CardHeader className="border-b bg-muted/10">
                         <CardTitle className="flex items-center gap-2">
                             <Receipt className="h-5 w-5 text-orange-500" />
-                            Contract Agreement
+                            Formal Contract Agreement
                         </CardTitle>
+                        <CardDescription>Legal contract requirement between client and company.</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex items-center space-x-2">
-                            <FieldWrapper control={form.control} name="isContractAgreement" label="">
-                                {(field) => (
-                                    <div className="flex items-center space-x-2">
-                                        <Switch
-                                            id="isContractAgreement"
-                                            checked={field.value}
-                                            onCheckedChange={field.onChange}
-                                        />
-                                        <Label htmlFor="isContractAgreement">Contract Agreement Required</Label>
-                                    </div>
-                                )}
-                            </FieldWrapper>
-                        </div>
+                    <CardContent className="p-6 space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                            <SelectField
+                                control={form.control}
+                                name="isContractAgreement"
+                                label="Contract Agreement Required?"
+                                options={YES_NO_OPTIONS as any}
+                                placeholder="Select"
+                            />
 
-                        {watchContractAgreement && (
-                            <div className="mt-4 p-4 bg-muted/50 rounded-lg border">
+                            {watchContractAgreement === 'true' && (
                                 <FieldWrapper
                                     control={form.control}
                                     name="contractAgreementFormat"
                                     label="Contract Agreement Format"
                                 >
                                     {(field) => (
-                                        <Input {...field} placeholder="Enter format or upload contract agreement" />
+                                        <Input {...field} placeholder="Specify contract format" />
                                     )}
                                 </FieldWrapper>
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </CardContent>
                 </Card>
 
-                {/* Detailed PO Section */}
+                {/* 4. Detailed PO Section */}
                 <Card>
-                    <CardHeader>
+                    <CardHeader className="border-b bg-muted/10">
                         <CardTitle className="flex items-center gap-2">
                             <Truck className="h-5 w-5 text-orange-500" />
-                            Detailed PO / FOA / SAP PO / Detailed WO
+                            Detailed PO / FOA Requirements
                         </CardTitle>
+                        <CardDescription>SAP PO and detailed work order configurations.</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex items-center space-x-2">
-                            <FieldWrapper control={form.control} name="detailedPoApplicable" label="">
-                                {(field) => (
-                                    <div className="flex items-center space-x-2">
-                                        <Switch
-                                            id="detailedPoApplicable"
-                                            checked={field.value}
-                                            onCheckedChange={field.onChange}
-                                        />
-                                        <Label htmlFor="detailedPoApplicable">Detailed PO Applicable</Label>
-                                    </div>
-                                )}
-                            </FieldWrapper>
+                    <CardContent className="p-6 space-y-4">
+                        <div className="max-w-xs">
+                            <SelectField
+                                control={form.control}
+                                name="detailedPoApplicable"
+                                label="Detailed PO Applicable?"
+                                options={YES_NO_OPTIONS as any}
+                                placeholder="Select"
+                            />
                         </div>
 
-                        {watchDetailedPo && (
-                            <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
-                                <p className="text-sm text-blue-800 dark:text-blue-200">
-                                    A follow-up for SAP PO will be initiated after the TL accepts the PO.
+                        {watchDetailedPo === 'true' ? (
+                            <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl flex gap-3 items-center">
+                                <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
+                                    <FileText className="h-5 w-5" />
+                                </div>
+                                <p className="text-sm text-blue-800">
+                                    A followup for SAP PO will be automatically initiated once the TL accepts the PO.
                                 </p>
                             </div>
-                        )}
-
-                        {!watchDetailedPo && (
-                            <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-950 rounded-lg border border-yellow-200 dark:border-yellow-800">
-                                <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                                    The WO Upload step will be skipped since Detailed PO is not applicable.
+                        ) : (
+                            <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex gap-3 items-center">
+                                <div className="p-2 bg-amber-100 rounded-lg text-amber-600">
+                                    <ShieldCheck className="h-5 w-5" />
+                                </div>
+                                <p className="text-sm text-amber-800">
+                                    The WO Upload step will be skipped as Detailed PO is not applicable for this project.
                                 </p>
                             </div>
                         )}

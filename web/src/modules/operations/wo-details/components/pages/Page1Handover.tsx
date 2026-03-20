@@ -4,22 +4,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
-import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
 import { Plus, Trash2, Users, FileCheck } from "lucide-react";
-import { Page1FormSchema } from "../../helpers/woDetail.schema";
-import { DEPARTMENTS, TENDER_CHECKLIST_ITEMS } from "../../helpers/constants";
-import { WizardNavigation } from "../WizardNavigation";
-import type { Page1FormValues, Contact, PageFormProps } from "../../helpers/woDetail.types";
+import { Page1FormSchema } from "@/modules/operations/wo-details/helpers/woDetail.schema";
+import { DEPARTMENTS, TENDER_CHECKLIST_ITEMS, YES_NO_OPTIONS } from "@/modules/operations/wo-details/helpers/constants";
+import { WizardNavigation } from "@/modules/operations/wo-details/components/WizardNavigation";
+import { SelectField } from "@/components/form/SelectField";
+import type { Page1FormValues, Contact, PageFormProps } from "@/modules/operations/wo-details/helpers/woDetail.types";
 
 interface Page1HandoverProps extends PageFormProps {
     initialData?: {
@@ -44,14 +35,14 @@ export function Page1Handover({
         defaultValues: {
             contacts: [],
             tenderDocumentsChecklist: {
-                completeTenderDocuments: false,
-                tenderInfo: false,
-                emdInformation: false,
-                physicalDocumentsSubmission: false,
-                rfqAndQuotation: false,
-                documentChecklist: false,
-                costingSheet: false,
-                result: false,
+                completeTenderDocuments: 'false',
+                tenderInfo: 'false',
+                emdInformation: 'false',
+                physicalDocumentsSubmission: 'false',
+                rfqAndQuotation: 'false',
+                documentChecklist: 'false',
+                costingSheet: 'false',
+                result: 'false',
             },
         },
     });
@@ -77,7 +68,7 @@ export function Page1Handover({
     const handleAddContact = () => {
         setContacts([
             ...contacts,
-            { name: "", designation: "", phone: "", email: "", organization: "", departments: "" },
+            { name: "", designation: "", phone: "", email: "", organization: "", departments: undefined },
         ]);
     };
 
@@ -150,21 +141,13 @@ export function Page1Handover({
                                                 />
                                             </td>
                                             <td className="p-2">
-                                                <Select
-                                                    value={contact.departments || ""}
-                                                    onValueChange={(val) => handleUpdateContact(idx, "departments", val)}
-                                                >
-                                                    <SelectTrigger className="h-8 text-xs">
-                                                        <SelectValue placeholder="Select" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {DEPARTMENTS.map((dept) => (
-                                                            <SelectItem key={dept} value={dept}>
-                                                                {dept}
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
+                                                <SelectField
+                                                    name={`contacts.${idx}.departments`}
+                                                    control={form.control}
+                                                    options={DEPARTMENTS.map((dept) => ({ label: dept, value: dept }))}
+                                                    placeholder="Select"
+                                                    className="h-8 text-xs"
+                                                />
                                             </td>
                                             <td className="p-2">
                                                 <Input
@@ -247,27 +230,16 @@ export function Page1Handover({
                         <p className="text-sm text-muted-foreground mb-4">
                             If any item is not selected, a notification will be sent to the Tendering TL and the respective TE.
                         </p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 bg-muted/50 rounded-lg border">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4 p-6 bg-muted/5 rounded-xl border border-dashed">
                             {TENDER_CHECKLIST_ITEMS.map((item) => (
-                                <FieldWrapper
+                                <SelectField
                                     key={item.key}
                                     control={form.control}
                                     name={`tenderDocumentsChecklist.${item.key}` as any}
-                                    label=""
-                                >
-                                    {(field) => (
-                                        <div className="flex items-center space-x-2">
-                                            <Checkbox
-                                                id={item.key}
-                                                checked={field.value || false}
-                                                onCheckedChange={field.onChange}
-                                            />
-                                            <Label htmlFor={item.key} className="text-sm cursor-pointer">
-                                                {item.label}
-                                            </Label>
-                                        </div>
-                                    )}
-                                </FieldWrapper>
+                                    label={item.label}
+                                    options={YES_NO_OPTIONS as any}
+                                    placeholder="Select"
+                                />
                             ))}
                         </div>
                     </CardContent>

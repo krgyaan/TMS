@@ -57,3 +57,7 @@ export const TENDER_CHECKLIST_ITEMS = [
   { key: "costingSheet", label: "Costing Sheet" },
   { key: "result", label: "Result" },
 ] as const;
+export const YES_NO_OPTIONS = [
+  { value: "true", label: "Yes" },
+  { value: "false", label: "No" },
+] as const;

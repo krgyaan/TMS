@@ -1,9 +1,6 @@
 import { z } from "zod";
 
-// ============================================
 // PAGE 1: PROJECT HANDOVER
-// ============================================
-
 export const ContactSchema = z.object({
   id: z.number().optional(),
   organization: z.string().max(100).optional(),
@@ -15,14 +12,14 @@ export const ContactSchema = z.object({
 });
 
 export const TenderChecklistSchema = z.object({
-  completeTenderDocuments: z.boolean().default(false),
-  tenderInfo: z.boolean().default(false),
-  emdInformation: z.boolean().default(false),
-  physicalDocumentsSubmission: z.boolean().default(false),
-  rfqAndQuotation: z.boolean().default(false),
-  documentChecklist: z.boolean().default(false),
-  costingSheet: z.boolean().default(false),
-  result: z.boolean().default(false),
+  completeTenderDocuments: z.string().optional(),
+  tenderInfo: z.string().optional(),
+  emdInformation: z.string().optional(),
+  physicalDocumentsSubmission: z.string().optional(),
+  rfqAndQuotation: z.string().optional(),
+  documentChecklist: z.string().optional(),
+  costingSheet: z.string().optional(),
+  result: z.string().optional(),
 });
 
 export const Page1FormSchema = z.object({
@@ -30,29 +27,23 @@ export const Page1FormSchema = z.object({
   tenderDocumentsChecklist: TenderChecklistSchema,
 });
 
-// ============================================
 // PAGE 2: COMPLIANCE OBLIGATIONS
-// ============================================
-
 export const Page2FormSchema = z
   .object({
-    ldApplicable: z.boolean().default(false),
+    ldApplicable: z.string().optional(),
     maxLd: z.string().optional(),
     ldStartDate: z.string().optional(),
     maxLdDate: z.string().optional(),
-
-    isPbgApplicable: z.boolean().default(false),
+    isPbgApplicable: z.string().optional(),
     filledBgFormat: z.string().max(255).optional(),
     pbgBgId: z.number().optional(),
-
-    isContractAgreement: z.boolean().default(false),
+    isContractAgreement: z.string().optional(),
     contractAgreementFormat: z.string().max(255).optional(),
-
-    detailedPoApplicable: z.boolean().default(false),
+    detailedPoApplicable: z.string().optional(),
     detailedPoFollowupId: z.number().optional(),
   })
   .superRefine((data, ctx) => {
-    if (data.ldApplicable) {
+    if (data.ldApplicable === 'true') {
       if (!data.maxLd) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -76,7 +67,7 @@ export const Page2FormSchema = z
       }
     }
 
-    if (data.isPbgApplicable && !data.filledBgFormat && !data.pbgBgId) {
+    if (data.isPbgApplicable === 'true' && !data.filledBgFormat && !data.pbgBgId) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "BG format or BG ID is required when PBG is applicable",
@@ -84,7 +75,7 @@ export const Page2FormSchema = z
       });
     }
 
-    if (data.isContractAgreement && !data.contractAgreementFormat) {
+    if (data.isContractAgreement === 'true' && !data.contractAgreementFormat) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Contract agreement format is required",
@@ -93,10 +84,7 @@ export const Page2FormSchema = z
     }
   });
 
-// ============================================
 // PAGE 3: SWOT ANALYSIS
-// ============================================
-
 export const Page3FormSchema = z.object({
   swotStrengths: z.string().optional(),
   swotWeaknesses: z.string().optional(),
@@ -104,10 +92,7 @@ export const Page3FormSchema = z.object({
   swotThreats: z.string().optional(),
 });
 
-// ============================================
 // PAGE 4: BILLING
-// ============================================
-
 export const BOQItemSchema = z.object({
   id: z.number().optional(),
   srNo: z.number().int().positive(),
@@ -140,10 +125,7 @@ export const Page4FormSchema = z.object({
   shippingAddresses: z.array(AddressSchema).min(1, "At least one shipping address is required"),
 });
 
-// ============================================
 // PAGE 5: PROJECT EXECUTION
-// ============================================
-
 export const SiteVisitPersonSchema = z.object({
   name: z.string().min(1, "Name is required").max(255),
   phone: z.string().max(20).optional(),
@@ -152,14 +134,14 @@ export const SiteVisitPersonSchema = z.object({
 
 export const Page5FormSchema = z
   .object({
-    siteVisitNeeded: z.boolean().default(false),
+    siteVisitNeeded: z.string().optional(),
     siteVisitPerson: SiteVisitPersonSchema.optional(),
     documentsFromTendering: z.array(z.string()).optional().default([]),
     documentsNeeded: z.array(z.string()).optional().default([]),
     documentsInHouse: z.array(z.string()).optional().default([]),
   })
   .superRefine((data, ctx) => {
-    if (data.siteVisitNeeded && !data.siteVisitPerson?.name) {
+    if (data.siteVisitNeeded === 'true' && !data.siteVisitPerson?.name) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Site visit person details are required",
@@ -168,14 +150,11 @@ export const Page5FormSchema = z
     }
   });
 
-// ============================================
 // PAGE 6: PROFITABILITY
-// ============================================
-
 export const Page6FormSchema = z
   .object({
     costingSheetLink: z.string().url().optional().or(z.literal("")),
-    hasDiscrepancies: z.boolean().default(false),
+    hasDiscrepancies: z.string().optional(),
     discrepancyComments: z.string().optional(),
     budgetPreGst: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid amount"),
     budgetSupply: z.string().optional(),
@@ -185,7 +164,7 @@ export const Page6FormSchema = z
     budgetBuybackSale: z.string().optional(),
   })
   .superRefine((data, ctx) => {
-    if (data.hasDiscrepancies && !data.discrepancyComments?.trim()) {
+    if (data.hasDiscrepancies === 'true' && !data.discrepancyComments?.trim()) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Discrepancy comments are required",
@@ -194,10 +173,7 @@ export const Page6FormSchema = z
     }
   });
 
-// ============================================
 // PAGE 7: WO ACCEPTANCE
-// ============================================
-
 export const AmendmentSchema = z.object({
   id: z.number().optional(),
   pageNo: z.string().max(100),
@@ -208,13 +184,13 @@ export const AmendmentSchema = z.object({
 
 export const Page7FormSchema = z
   .object({
-    oeWoAmendmentNeeded: z.boolean(),
+    oeWoAmendmentNeeded: z.string().optional(),
     amendments: z.array(AmendmentSchema).optional().default([]),
-    oeSignaturePrepared: z.boolean().default(false),
-    courierRequestPrepared: z.boolean().default(false),
+    oeSignaturePrepared: z.string().optional(),
+    courierRequestPrepared: z.string().optional(),
   })
   .superRefine((data, ctx) => {
-    if (data.oeWoAmendmentNeeded && data.amendments.length === 0) {
+    if (data.oeWoAmendmentNeeded === 'true' && data.amendments.length === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "At least one amendment is required",
@@ -222,15 +198,15 @@ export const Page7FormSchema = z
       });
     }
 
-    if (!data.oeWoAmendmentNeeded) {
-      if (!data.oeSignaturePrepared) {
+    if (data.oeWoAmendmentNeeded !== 'true') {
+      if (data.oeSignaturePrepared !== 'true') {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "OE signature must be prepared",
           path: ["oeSignaturePrepared"],
         });
       }
-      if (!data.courierRequestPrepared) {
+      if (data.courierRequestPrepared !== 'true') {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "Courier request must be prepared",

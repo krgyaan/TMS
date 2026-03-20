@@ -6,12 +6,11 @@ import { Form } from "@/components/ui/form";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Trash2, FileEdit, CheckCircle2, Pen, Truck, AlertTriangle } from "lucide-react";
+import { SelectField } from "@/components/form/SelectField";
+import { Plus, Trash2, FileEdit, CheckCircle2, Pen, Truck, AlertTriangle, ShieldCheck } from "lucide-react";
 import { Page7FormSchema } from "../../helpers/woDetail.schema";
 import { WizardNavigation } from "../WizardNavigation";
+import { YES_NO_OPTIONS } from "../../helpers/constants";
 import type { Page7FormValues, PageFormProps } from "../../helpers/woDetail.types";
 
 interface Page7AcceptanceProps extends PageFormProps {
@@ -28,10 +27,10 @@ export function Page7Acceptance({
     const form = useForm<Page7FormValues>({
         resolver: zodResolver(Page7FormSchema) as Resolver<Page7FormValues>,
         defaultValues: {
-            oeWoAmendmentNeeded: false,
+            oeWoAmendmentNeeded: 'false',
             amendments: [],
-            oeSignaturePrepared: false,
-            courierRequestPrepared: false,
+            oeSignaturePrepared: 'false',
+            courierRequestPrepared: 'false',
             ...initialData,
         },
     });
@@ -57,117 +56,105 @@ export function Page7Acceptance({
     return (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
-                {/* Amendment Decision */}
+                {/* 1. Amendment Decision */}
                 <Card>
-                    <CardHeader>
+                    <CardHeader className="border-b bg-muted/10">
                         <CardTitle className="flex items-center gap-2">
                             <FileEdit className="h-5 w-5 text-orange-500" />
-                            WO Amendment
+                            WO Amendment Decision
                         </CardTitle>
                         <CardDescription>
                             Does this WO require any amendments before acceptance?
                         </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex items-center space-x-2">
-                            <FieldWrapper control={form.control} name="oeWoAmendmentNeeded" label="">
-                                {(field) => (
-                                    <div className="flex items-center space-x-2">
-                                        <Switch
-                                            id="oeWoAmendmentNeeded"
-                                            checked={field.value}
-                                            onCheckedChange={(checked) => {
-                                                field.onChange(checked);
-                                                // Reset signature/courier if amendment needed
-                                                if (checked) {
-                                                    form.setValue("oeSignaturePrepared", false);
-                                                    form.setValue("courierRequestPrepared", false);
-                                                }
-                                            }}
-                                        />
-                                        <Label htmlFor="oeWoAmendmentNeeded">WO Amendment Needed</Label>
-                                    </div>
-                                )}
-                            </FieldWrapper>
+                    <CardContent className="p-6">
+                        <div className="max-w-xs">
+                            <SelectField
+                                control={form.control}
+                                name="oeWoAmendmentNeeded"
+                                label="Amendment Needed?"
+                                options={YES_NO_OPTIONS as any}
+                                placeholder="Select"
+                            />
                         </div>
                     </CardContent>
                 </Card>
 
-                {/* Amendments List (if needed) */}
-                {watchAmendmentNeeded && (
+                {/* 2. Amendments List (if needed) */}
+                {watchAmendmentNeeded === 'true' && (
                     <Card>
-                        <CardHeader>
+                        <CardHeader className="border-b bg-muted/10">
                             <CardTitle className="flex items-center gap-2">
-                                <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                                <AlertTriangle className="h-5 w-5 text-orange-500" />
                                 Amendment Details
                             </CardTitle>
                             <CardDescription>
-                                List all amendments required in the WO
+                                Specify all required corrections for the Work Order.
                             </CardDescription>
                         </CardHeader>
-                        <CardContent className="space-y-4">
+                        <CardContent className="p-6 space-y-6">
                             {amendmentFields.map((field, index) => (
                                 <div
                                     key={field.id}
-                                    className="p-4 border rounded-lg space-y-4 bg-yellow-50 dark:bg-yellow-950"
+                                    className="p-6 border rounded-2xl bg-orange-50/50 space-y-6 relative"
                                 >
                                     <div className="flex justify-between items-center">
-                                        <h4 className="font-medium">Amendment {index + 1}</h4>
+                                        <h4 className="font-bold text-sm uppercase tracking-wider text-orange-800">Amendment #{index + 1}</h4>
                                         <Button
                                             variant="ghost"
-                                            size="sm"
+                                            size="icon"
                                             type="button"
                                             onClick={() => removeAmendment(index)}
-                                            className="text-destructive"
+                                            className="text-destructive h-8 w-8 hover:bg-red-100"
                                         >
                                             <Trash2 className="h-4 w-4" />
                                         </Button>
                                     </div>
 
-                                    <div className="grid gap-4 md:grid-cols-2">
+                                    <div className="grid gap-6 md:grid-cols-2">
                                         <FieldWrapper
                                             control={form.control}
                                             name={`amendments.${index}.pageNo`}
-                                            label="Page No."
+                                            label="Page Number"
                                         >
-                                            {(field) => <Input {...field} placeholder="e.g., 5" />}
+                                            {(field) => <Input {...field} placeholder="e.g., 12" />}
                                         </FieldWrapper>
 
                                         <FieldWrapper
                                             control={form.control}
                                             name={`amendments.${index}.clauseNo`}
-                                            label="Clause No."
+                                            label="Clause Number"
                                         >
-                                            {(field) => <Input {...field} placeholder="e.g., 3.2.1" />}
+                                            {(field) => <Input {...field} placeholder="e.g., 5.1.a" />}
                                         </FieldWrapper>
 
-                                        <div className="md:col-span-2">
+                                        <div className="md:col-span-2 space-y-4">
                                             <FieldWrapper
                                                 control={form.control}
                                                 name={`amendments.${index}.currentStatement`}
-                                                label="Current Statement"
+                                                label="Current Statement in WO"
                                             >
                                                 {(field) => (
                                                     <Textarea
                                                         {...field}
-                                                        placeholder="Current statement in the WO..."
+                                                        placeholder="Copy the exact text from the PO/WO..."
                                                         rows={2}
+                                                        className="bg-white"
                                                     />
                                                 )}
                                             </FieldWrapper>
-                                        </div>
 
-                                        <div className="md:col-span-2">
                                             <FieldWrapper
                                                 control={form.control}
                                                 name={`amendments.${index}.correctedStatement`}
-                                                label="Corrected Statement"
+                                                label="Proposed Corrected Statement"
                                             >
                                                 {(field) => (
                                                     <Textarea
                                                         {...field}
-                                                        placeholder="Proposed corrected statement..."
+                                                        placeholder="How it should read after amendment..."
                                                         rows={2}
+                                                        className="bg-white border-green-200 focus:border-green-500"
                                                     />
                                                 )}
                                             </FieldWrapper>
@@ -187,95 +174,82 @@ export function Page7Acceptance({
                                         correctedStatement: "",
                                     })
                                 }
+                                className="w-full border-dashed border-2 py-6 hover:bg-orange-50 hover:border-orange-200"
                             >
                                 <Plus className="h-4 w-4 mr-2" />
-                                Add Amendment
+                                Add Another Amendment
                             </Button>
 
                             {form.formState.errors.amendments && (
-                                <p className="text-sm text-destructive">
-                                    {form.formState.errors.amendments.message}
+                                <p className="text-sm text-destructive font-medium">
+                                    {form.formState.errors.amendments.message as string}
                                 </p>
                             )}
                         </CardContent>
                     </Card>
                 )}
 
-                {/* Acceptance Actions (if no amendments) */}
-                {!watchAmendmentNeeded && (
+                {/* 3. Acceptance Actions (if no amendments) */}
+                {watchAmendmentNeeded === 'false' && (
                     <Card>
-                        <CardHeader>
+                        <CardHeader className="border-b bg-muted/10">
                             <CardTitle className="flex items-center gap-2">
-                                <CheckCircle2 className="h-5 w-5 text-green-500" />
-                                WO Acceptance Actions
+                                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                                Final Acceptance Checklist
                             </CardTitle>
                             <CardDescription>
-                                Complete the following steps to accept the WO
+                                Complete these steps to finalize Work Order acceptance.
                             </CardDescription>
                         </CardHeader>
-                        <CardContent className="space-y-6">
-                            {/* Digital Signature */}
-                            <div className="p-4 border rounded-lg space-y-4">
-                                <div className="flex items-center gap-3">
-                                    <Pen className="h-5 w-5 text-blue-500" />
-                                    <div className="flex-1">
-                                        <h4 className="font-medium">Digital Signature</h4>
-                                        <p className="text-sm text-muted-foreground">
-                                            Put digital signature of OE on all pages of the PO/WO
-                                        </p>
+                        <CardContent className="p-6 space-y-6">
+                            <div className="grid gap-6 md:grid-cols-2">
+                                <div className="p-6 border rounded-2xl space-y-4 bg-muted/5">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-blue-100 rounded-lg">
+                                            <Pen className="h-5 w-5 text-blue-600" />
+                                        </div>
+                                        <h4 className="font-semibold text-sm">Digital Signature</h4>
                                     </div>
-                                    <FieldWrapper control={form.control} name="oeSignaturePrepared" label="">
-                                        {(field) => (
-                                            <Checkbox
-                                                id="oeSignaturePrepared"
-                                                checked={field.value}
-                                                onCheckedChange={field.onChange}
-                                            />
-                                        )}
-                                    </FieldWrapper>
-                                </div>
-                                {form.formState.errors.oeSignaturePrepared && (
-                                    <p className="text-sm text-destructive">
-                                        {form.formState.errors.oeSignaturePrepared.message}
+                                    <p className="text-xs text-muted-foreground leading-relaxed">
+                                        Apply digital signature of authorized signatory on all pages of the PO/WO PDF.
                                     </p>
-                                )}
+                                    <SelectField
+                                        control={form.control}
+                                        name="oeSignaturePrepared"
+                                        label="Signature Applied?"
+                                        options={YES_NO_OPTIONS as any}
+                                        placeholder="Select"
+                                    />
+                                </div>
+
+                                <div className="p-6 border rounded-2xl space-y-4 bg-muted/5">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-purple-100 rounded-lg">
+                                            <Truck className="h-5 w-5 text-purple-600" />
+                                        </div>
+                                        <h4 className="font-semibold text-sm">Courier Preparation</h4>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground leading-relaxed">
+                                        Initiate courier request for physical signed copies. Processed after TL approval.
+                                    </p>
+                                    <SelectField
+                                        control={form.control}
+                                        name="courierRequestPrepared"
+                                        label="Courier Initiated?"
+                                        options={YES_NO_OPTIONS as any}
+                                        placeholder="Select"
+                                    />
+                                </div>
                             </div>
 
-                            {/* Courier Request */}
-                            <div className="p-4 border rounded-lg space-y-4">
-                                <div className="flex items-center gap-3">
-                                    <Truck className="h-5 w-5 text-purple-500" />
-                                    <div className="flex-1">
-                                        <h4 className="font-medium">Courier Request</h4>
-                                        <p className="text-sm text-muted-foreground">
-                                            Initiate courier request for signed WO copy. The request will be
-                                            processed after TL acceptance.
-                                        </p>
-                                    </div>
-                                    <FieldWrapper control={form.control} name="courierRequestPrepared" label="">
-                                        {(field) => (
-                                            <Checkbox
-                                                id="courierRequestPrepared"
-                                                checked={field.value}
-                                                onCheckedChange={field.onChange}
-                                            />
-                                        )}
-                                    </FieldWrapper>
-                                </div>
-                                {form.formState.errors.courierRequestPrepared && (
-                                    <p className="text-sm text-destructive">
-                                        {form.formState.errors.courierRequestPrepared.message}
+                            <div className="bg-blue-50 border border-blue-200 p-6 rounded-2xl flex gap-4 items-start">
+                                <ShieldCheck className="h-6 w-6 text-blue-600 shrink-0 mt-1" />
+                                <div className="space-y-1">
+                                    <p className="text-sm font-semibold text-blue-900">Signatory Authorization</p>
+                                    <p className="text-sm text-blue-800 leading-relaxed">
+                                        Upon submission, an authority letter will be automatically generated authorizing the TL to sign on behalf of the company for this specific project.
                                     </p>
-                                )}
-                            </div>
-
-                            {/* Info Box */}
-                            <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
-                                <p className="text-sm text-blue-800 dark:text-blue-200">
-                                    <strong>Note:</strong> After submission, the TL will review and sign the
-                                    WO. An authority letter will be automatically generated authorizing the
-                                    TL to sign on behalf of the company.
-                                </p>
+                                </div>
                             </div>
                         </CardContent>
                     </Card>

@@ -22,7 +22,7 @@ export type Page7FormValues = z.infer<typeof Page7FormSchema>;
 export interface Contact {
   id?: number;
   organization?: string;
-  departments?: string;
+  departments?: "EIC" | "User" | "C&P" | "Finance";
   name: string;
   designation?: string;
   phone?: string;

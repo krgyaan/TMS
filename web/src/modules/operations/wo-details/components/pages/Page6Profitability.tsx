@@ -5,11 +5,11 @@ import { Form } from "@/components/ui/form";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
+import { SelectField } from "@/components/form/SelectField";
 import { Link2, AlertCircle, Calculator } from "lucide-react";
 import { Page6FormSchema } from "../../helpers/woDetail.schema";
 import { WizardNavigation } from "../WizardNavigation";
+import { YES_NO_OPTIONS } from "../../helpers/constants";
 import type { Page6FormValues, PageFormProps } from "../../helpers/woDetail.types";
 
 interface Page6ProfitabilityProps extends PageFormProps {
@@ -29,7 +29,7 @@ export function Page6Profitability({
         resolver: zodResolver(Page6FormSchema) as Resolver<Page6FormValues>,
         defaultValues: {
             costingSheetLink: "",
-            hasDiscrepancies: false,
+            hasDiscrepancies: 'false',
             discrepancyComments: "",
             budgetPreGst: costingSheetBudget || "",
             budgetSupply: "",
@@ -58,7 +58,7 @@ export function Page6Profitability({
 
     const handleFormSubmit = async (values: Page6FormValues) => {
         // If discrepancies exist, notify TL and TE
-        if (values.hasDiscrepancies) {
+        if (values.hasDiscrepancies === 'true') {
             // TODO: Trigger email notification
             console.log("Discrepancy notification to TL and TE:", values.discrepancyComments);
         }
@@ -77,17 +77,18 @@ export function Page6Profitability({
             <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
                 {/* Costing Sheet Link */}
                 <Card>
-                    <CardHeader>
+                    <CardHeader className="border-b bg-muted/10">
                         <CardTitle className="flex items-center gap-2">
                             <Link2 className="h-5 w-5 text-orange-500" />
                             Tendering Costing Sheet
                         </CardTitle>
+                        <CardDescription>Reference the original costing sheet for this project.</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="p-6">
                         <FieldWrapper
                             control={form.control}
                             name="costingSheetLink"
-                            label="Costing Sheet Link"
+                            label="Costing Sheet URL"
                         >
                             {(field) => (
                                 <Input
@@ -102,37 +103,34 @@ export function Page6Profitability({
 
                 {/* Discrepancy Check */}
                 <Card>
-                    <CardHeader>
+                    <CardHeader className="border-b bg-muted/10">
                         <CardTitle className="flex items-center gap-2">
                             <AlertCircle className="h-5 w-5 text-orange-500" />
-                            PO/WO Comparison
+                            PO/WO Comparison & Discrepancies
                         </CardTitle>
                         <CardDescription>
-                            Compare the costing sheet with the PO/WO. Are there any discrepancies?
+                            Compare the costing sheet with the received PO/WO.
                         </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex items-center space-x-2">
-                            <FieldWrapper control={form.control} name="hasDiscrepancies" label="">
-                                {(field) => (
-                                    <div className="flex items-center space-x-2">
-                                        <Switch
-                                            id="hasDiscrepancies"
-                                            checked={field.value}
-                                            onCheckedChange={field.onChange}
-                                        />
-                                        <Label htmlFor="hasDiscrepancies">Discrepancies Found</Label>
-                                    </div>
-                                )}
-                            </FieldWrapper>
+                    <CardContent className="p-6 space-y-6">
+                        <div className="max-w-xs">
+                            <SelectField
+                                control={form.control}
+                                name="hasDiscrepancies"
+                                label="Discrepancies Found?"
+                                options={YES_NO_OPTIONS as any}
+                                placeholder="Select"
+                            />
                         </div>
 
-                        {watchHasDiscrepancies && (
-                            <div className="mt-4 p-4 bg-red-50 dark:bg-red-950 rounded-lg border border-red-200 dark:border-red-800 space-y-4">
-                                <p className="text-sm text-red-800 dark:text-red-200">
-                                    Please describe the discrepancies. This will be sent to the TL and the
-                                    respective TE.
-                                </p>
+                        {watchHasDiscrepancies === 'true' && (
+                            <div className="bg-red-50 border-l-4 border-red-500 p-6 rounded-r-xl space-y-4">
+                                <div className="flex items-center gap-2 text-red-800">
+                                    <AlertCircle className="h-5 w-5 text-red-500" />
+                                    <p className="text-sm font-semibold">
+                                        Please describe the discrepancies. TL and TE will be notified.
+                                    </p>
+                                </div>
                                 <FieldWrapper
                                     control={form.control}
                                     name="discrepancyComments"
@@ -141,9 +139,9 @@ export function Page6Profitability({
                                     {(field) => (
                                         <Textarea
                                             {...field}
-                                            placeholder="Describe the discrepancies found..."
+                                            placeholder="Describe the discrepancies found between costing and PO..."
                                             rows={4}
-                                            className="border-red-300 focus:border-red-500"
+                                            className="bg-white"
                                         />
                                     )}
                                 </FieldWrapper>
@@ -154,78 +152,81 @@ export function Page6Profitability({
 
                 {/* Budget Breakdown */}
                 <Card>
-                    <CardHeader>
+                    <CardHeader className="border-b bg-muted/10">
                         <CardTitle className="flex items-center gap-2">
                             <Calculator className="h-5 w-5 text-orange-500" />
                             Budget Breakdown (Pre-GST)
                         </CardTitle>
                         <CardDescription>
                             {costingSheetBudget
-                                ? `Auto-filled from Pricing Module: ₹${parseFloat(
+                                ? `Validated with Pricing Module: ₹${parseFloat(
                                     costingSheetBudget
                                 ).toLocaleString()}`
-                                : "Enter the budget manually if not available from TMS."}
+                                : "Enter the budget breakdown manually."}
                         </CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-6">
-                        <FieldWrapper control={form.control} name="budgetPreGst" label="Total Budget (Pre-GST)">
-                            {(field) => (
-                                <Input
-                                    {...field}
-                                    placeholder="0.00"
-                                    type="number"
-                                    step="0.01"
-                                    className="text-lg font-semibold"
-                                />
-                            )}
-                        </FieldWrapper>
+                    <CardContent className="p-6 space-y-8">
+                        <div className="max-w-md">
+                            <FieldWrapper control={form.control} name="budgetPreGst" label="Total Value (Pre-GST)">
+                                {(field) => (
+                                    <Input
+                                        {...field}
+                                        placeholder="0.00"
+                                        type="number"
+                                        step="0.01"
+                                        className="text-xl font-bold h-12"
+                                    />
+                                )}
+                            </FieldWrapper>
+                        </div>
 
-                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                            <FieldWrapper control={form.control} name="budgetSupply" label="Supply">
+                        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                            <FieldWrapper control={form.control} name="budgetSupply" label="Supply Component">
                                 {(field) => (
                                     <Input {...field} placeholder="0.00" type="number" step="0.01" />
                                 )}
                             </FieldWrapper>
 
-                            <FieldWrapper control={form.control} name="budgetService" label="Service">
+                            <FieldWrapper control={form.control} name="budgetService" label="Service Component">
                                 {(field) => (
                                     <Input {...field} placeholder="0.00" type="number" step="0.01" />
                                 )}
                             </FieldWrapper>
 
-                            <FieldWrapper control={form.control} name="budgetFreight" label="Freight">
+                            <FieldWrapper control={form.control} name="budgetFreight" label="Freight/Logistics">
                                 {(field) => (
                                     <Input {...field} placeholder="0.00" type="number" step="0.01" />
                                 )}
                             </FieldWrapper>
 
-                            <FieldWrapper control={form.control} name="budgetAdmin" label="Admin">
+                            <FieldWrapper control={form.control} name="budgetAdmin" label="Admin/Misc.">
                                 {(field) => (
                                     <Input {...field} placeholder="0.00" type="number" step="0.01" />
                                 )}
                             </FieldWrapper>
 
-                            <FieldWrapper control={form.control} name="budgetBuybackSale" label="Buyback Sale">
+                            <FieldWrapper control={form.control} name="budgetBuybackSale" label="Buyback Adjustment">
                                 {(field) => (
                                     <Input {...field} placeholder="0.00" type="number" step="0.01" />
                                 )}
                             </FieldWrapper>
                         </div>
 
-                        {/* Total Display */}
-                        <div className="p-4 bg-muted rounded-lg border">
-                            <div className="flex justify-between items-center">
-                                <span className="font-medium">Calculated Total:</span>
+                        <div className="p-6 bg-muted/50 rounded-2xl border border-dashed flex flex-col md:flex-row justify-between items-center gap-4">
+                            <div className="space-y-1">
+                                <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Calculated Reconciliation</span>
+                                <p className="text-xs text-muted-foreground">
+                                    (Supply + Service + Freight + Admin - Buyback Sale)
+                                </p>
+                            </div>
+                            <div className="text-right">
                                 <span
-                                    className={`text-xl font-bold ${totalBudget < 0 ? "text-destructive" : "text-green-600"
+                                    className={`text-3xl font-black ${totalBudget < 0 ? "text-destructive" : "text-primary"
                                         }`}
                                 >
                                     ₹{totalBudget.toLocaleString()}
                                 </span>
                             </div>
-                            <p className="text-xs text-muted-foreground mt-1">
-                                (Supply + Service + Freight + Admin - Buyback Sale)
-                            </p>
                         </div>
                     </CardContent>
                 </Card>

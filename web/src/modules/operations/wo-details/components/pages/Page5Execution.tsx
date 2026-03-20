@@ -1,15 +1,16 @@
+import { useState, useEffect } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
+import { SelectField } from "@/components/form/SelectField";
 import { Plus, Trash2, MapPinned, FileText, User } from "lucide-react";
 import { Page5FormSchema } from "../../helpers/woDetail.schema";
 import { WizardNavigation } from "../WizardNavigation";
+import { YES_NO_OPTIONS } from "../../helpers/constants";
 import type { Page5FormValues, PageFormProps } from "../../helpers/woDetail.types";
 
 interface Page5ExecutionProps extends PageFormProps {
@@ -26,7 +27,7 @@ export function Page5Execution({
     const form = useForm<Page5FormValues>({
         resolver: zodResolver(Page5FormSchema) as Resolver<Page5FormValues>,
         defaultValues: {
-            siteVisitNeeded: false,
+            siteVisitNeeded: 'false',
             siteVisitPerson: { name: "", phone: "", email: "" },
             documentsFromTendering: [],
             documentsNeeded: [],
@@ -78,16 +79,16 @@ export function Page5Execution({
         setDocuments: (docs: string[]) => void;
         color: string;
     }) => (
-        <Card>
-            <CardHeader>
-                <CardTitle className={`flex items-center gap-2 text-${color}-600`}>
-                    <Icon className="h-5 w-5" />
+        <Card className="h-full">
+            <CardHeader className="bg-muted/10 border-b p-4">
+                <CardTitle className={`flex items-center gap-2 text-sm font-semibold text-${color}-600`}>
+                    <Icon className="h-4 w-4" />
                     {title}
                 </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="p-4 space-y-3">
                 {documents.map((doc, index) => (
-                    <div key={index} className="flex items-center gap-2">
+                    <div key={index} className="group flex items-center gap-2">
                         <Input
                             value={doc}
                             onChange={(e) => {
@@ -96,14 +97,14 @@ export function Page5Execution({
                                 setDocuments(updated);
                             }}
                             placeholder="Document name"
-                            className="flex-1"
+                            className="flex-1 h-9"
                         />
                         <Button
                             variant="ghost"
-                            size="sm"
+                            size="icon"
                             type="button"
                             onClick={() => setDocuments(documents.filter((_, i) => i !== index))}
-                            className="text-destructive"
+                            className="text-destructive h-9 w-9 opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                             <Trash2 className="h-4 w-4" />
                         </Button>
@@ -111,11 +112,12 @@ export function Page5Execution({
                 ))}
                 <Button
                     type="button"
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
+                    className="w-full justify-start text-xs text-muted-foreground hover:text-primary"
                     onClick={() => setDocuments([...documents, ""])}
                 >
-                    <Plus className="h-4 w-4 mr-2" />
+                    <Plus className="h-3 w-3 mr-2" />
                     Add Document
                 </Button>
             </CardContent>
@@ -127,47 +129,43 @@ export function Page5Execution({
             <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
                 {/* Site Visit Section */}
                 <Card>
-                    <CardHeader>
+                    <CardHeader className="border-b bg-muted/10">
                         <CardTitle className="flex items-center gap-2">
                             <MapPinned className="h-5 w-5 text-orange-500" />
-                            Site Visit
+                            Site Visit Assessment
                         </CardTitle>
+                        <CardDescription>Determine if a site visit is necessary for project execution.</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex items-center space-x-2">
-                            <FieldWrapper control={form.control} name="siteVisitNeeded" label="">
-                                {(field) => (
-                                    <div className="flex items-center space-x-2">
-                                        <Switch
-                                            id="siteVisitNeeded"
-                                            checked={field.value}
-                                            onCheckedChange={field.onChange}
-                                        />
-                                        <Label htmlFor="siteVisitNeeded">Site Visit Needed</Label>
-                                    </div>
-                                )}
-                            </FieldWrapper>
+                    <CardContent className="p-6 space-y-6">
+                        <div className="max-w-xs">
+                            <SelectField
+                                control={form.control}
+                                name="siteVisitNeeded"
+                                label="Site Visit Required?"
+                                options={YES_NO_OPTIONS as any}
+                                placeholder="Select"
+                            />
                         </div>
 
-                        {watchSiteVisitNeeded && (
-                            <div className="mt-4 p-4 bg-muted/50 rounded-lg border space-y-4">
-                                <h4 className="font-medium flex items-center gap-2">
-                                    <User className="h-4 w-4" />
-                                    Proposed Person for Site Visit
+                        {watchSiteVisitNeeded === 'true' && (
+                            <div className="bg-muted/5 p-6 rounded-xl border border-dashed space-y-4">
+                                <h4 className="font-semibold text-sm flex items-center gap-2">
+                                    <User className="h-4 w-4 text-primary" />
+                                    Proposed Contact Person
                                 </h4>
-                                <div className="grid gap-4 md:grid-cols-3">
+                                <div className="grid gap-6 md:grid-cols-3">
                                     <FieldWrapper
                                         control={form.control}
                                         name="siteVisitPerson.name"
-                                        label="Name"
+                                        label="Full Name"
                                     >
-                                        {(field) => <Input {...field} placeholder="Full name" />}
+                                        {(field) => <Input {...field} placeholder="John Doe" />}
                                     </FieldWrapper>
 
                                     <FieldWrapper
                                         control={form.control}
                                         name="siteVisitPerson.phone"
-                                        label="Phone No."
+                                        label="Phone Number"
                                     >
                                         {(field) => <Input {...field} placeholder="+91 XXXXX XXXXX" />}
                                     </FieldWrapper>
@@ -175,10 +173,10 @@ export function Page5Execution({
                                     <FieldWrapper
                                         control={form.control}
                                         name="siteVisitPerson.email"
-                                        label="Email ID"
+                                        label="Email Address"
                                     >
                                         {(field) => (
-                                            <Input {...field} type="email" placeholder="email@example.com" />
+                                            <Input {...field} type="email" placeholder="john@example.com" />
                                         )}
                                     </FieldWrapper>
                                 </div>
@@ -189,30 +187,31 @@ export function Page5Execution({
 
                 {/* Product/Document Approval Section */}
                 <Card>
-                    <CardHeader>
+                    <CardHeader className="border-b bg-muted/10">
                         <CardTitle className="flex items-center gap-2">
                             <FileText className="h-5 w-5 text-orange-500" />
-                            Product/Document Approval (Documents needed from OEM)
+                            Documentation & OEM Approvals
                         </CardTitle>
+                        <CardDescription>Identify documents that need to be collected or prepared for project approval.</CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="p-6">
                         <div className="grid gap-6 md:grid-cols-3">
                             <DocumentList
-                                title="Documents Available (from Tendering)"
+                                title="Available from Tendering"
                                 icon={FileText}
                                 documents={docsFromTendering}
                                 setDocuments={setDocsFromTendering}
                                 color="green"
                             />
                             <DocumentList
-                                title="Documents Needed"
+                                title="Additional Documents Needed"
                                 icon={FileText}
                                 documents={docsNeeded}
                                 setDocuments={setDocsNeeded}
                                 color="yellow"
                             />
                             <DocumentList
-                                title="Documents to Create In-House"
+                                title="To be Created In-House"
                                 icon={FileText}
                                 documents={docsInHouse}
                                 setDocuments={setDocsInHouse}
@@ -237,6 +236,3 @@ export function Page5Execution({
         </Form>
     );
 }
-
-// Add missing imports at top
-import { useState, useEffect } from "react";
