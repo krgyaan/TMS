@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import { WoQueriesService } from './wo-queries.service';
-import { CreateWoQuerySchema, CreateBulkWoQueriesSchema, RespondToQuerySchema, CloseQuerySchema, UpdateQueryStatusSchema, WoQueriesQuerySchema } from './dto/wo-queries.dto';
-import type { CreateWoQueryDto, CreateBulkWoQueriesDto, RespondToQueryDto, CloseQueryDto, UpdateQueryStatusDto, WoQueriesQueryDto } from './dto/wo-queries.dto';
+import { CreateWoQuerySchema, CreateBulkWoQueriesSchema, RespondToQuerySchema, CloseQuerySchema, UpdateQueryStatusSchema, WoQueriesQuerySchema, UpdateWoQuerySchema } from './dto/wo-queries.dto';
+import type { CreateWoQueryDto, CreateBulkWoQueriesDto, RespondToQueryDto, CloseQueryDto, UpdateQueryStatusDto, WoQueriesQueryDto, UpdateWoQueryDto } from './dto/wo-queries.dto';
 
 @Controller('wo-queries')
 export class WoQueriesController {
@@ -111,10 +111,21 @@ export class WoQueriesController {
     return this.woQueriesService.reopen(id);
   }
 
+  @Patch(':id')
+  async update(@Param('id', ParseIntPipe) id: number, @Body() body: unknown) {
+    const parsed = UpdateWoQuerySchema.parse(body) as UpdateWoQueryDto;
+    return this.woQueriesService.update(id, parsed);
+  }
+
   @Patch(':id/status')
   async updateStatus(@Param('id', ParseIntPipe) id: number, @Body() body: unknown) {
     const parsed = UpdateQueryStatusSchema.parse(body) as UpdateQueryStatusDto;
     return this.woQueriesService.updateStatus(id, parsed);
+  }
+
+  @Get('recipients/:woDetailsId')
+  async getPotentialRecipients(@Param('woDetailsId', ParseIntPipe) woDetailsId: number) {
+    return this.woQueriesService.getPotentialRecipients(woDetailsId);
   }
 
   @Delete(':id')
