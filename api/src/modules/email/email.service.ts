@@ -95,7 +95,16 @@ export class EmailService {
         for (const file of requestedFiles) {
             // Normalize and strip any attempted ../ segments
             const safeRelative = normalize(file).replace(/^(\.\.(\/|\\|$))+/, '');
-            const finalRelative = input.baseDir ? `${input.baseDir}/${safeRelative}` : safeRelative;
+            let finalRelative = safeRelative;
+            if (input.baseDir) {
+                // Ensure baseDir and safeRelative use consistent separators for comparison
+                const baseDirNorm = input.baseDir.replace(/\\/g, '/');
+                const safeRelativeNorm = safeRelative.replace(/\\/g, '/');
+                
+                if (!safeRelativeNorm.startsWith(`${baseDirNorm}/`)) {
+                    finalRelative = `${input.baseDir}/${safeRelative}`;
+                }
+            }
 
             // Delegate to TenderFilesService for absolute path resolution
             const absolutePath = this.tenderFilesService.getAbsolutePath(finalRelative);

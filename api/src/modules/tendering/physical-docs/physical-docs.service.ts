@@ -21,6 +21,7 @@ import { tenderClients } from '@db/schemas/tendering/tender-info-sheet.schema';
 import { StatusCache } from '@/utils/status-cache';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import { TimersService } from '@/modules/timers/timers.service';
+import { couriers } from '@db/schemas/shared/couriers.schema';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 export type PhysicalDocFilters = {
@@ -763,9 +764,18 @@ export class PhysicalDocsService {
             day: 'numeric',
         }) : 'Not specified';
 
-        // Get courier provider from persons if available, otherwise use placeholder
-        const courierProvider = physicalDoc.persons.length > 0 ? physicalDoc.persons[0].name : 'Courier Service';
-        const deliveryTime = 'As per courier service'; // TODO: Get from courier service if available
+        // Fetch courier details if courierNo is available
+        const [courier] = physicalDoc.courierNo 
+            ? await this.db.select().from(couriers).where(eq(couriers.id, physicalDoc.courierNo)).limit(1)
+            : [null];
+
+        const courierProviderName = courier?.courierProvider || (physicalDoc.persons.length > 0 ? physicalDoc.persons[0].name : 'Courier Service');
+        const docketNumber = courier?.docketNo || (physicalDoc.courierNo ? physicalDoc.courierNo.toString() : 'N/A');
+        const expectedDelivery = courier?.deliveryDate ? new Date(courier.deliveryDate).toLocaleDateString('en-IN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+        }) : 'As per courier service';
 
         // Send email to each client
         for (const client of clients) {
@@ -775,9 +785,9 @@ export class PhysicalDocsService {
                 clientName: client.clientName || 'Sir/Madam',
                 tenderNo: tender.tenderNo,
                 dueDate,
-                courierProvider,
-                docketNo: physicalDoc.courierNo.toString(),
-                deliveryTime,
+                courierProvider: courierProviderName,
+                docketNo: docketNumber,
+                deliveryTime: expectedDelivery,
                 tenderExecutive: teUser.name,
             };
 

@@ -826,14 +826,16 @@ export class TenderResultService {
             isWon: dto.result === 'Won',
         };
 
-    // attachments?: { files: string[]; baseDir?: string }
-    const attachments = {
-        files: [
-            resultRecord.qualifiedPartiesScreenshot ? resultRecord.qualifiedPartiesScreenshot : '',
-            resultRecord.finalResultScreenshot ? resultRecord.finalResultScreenshot : '',
-        ],
-        baseDir: 'public',
-    };
+        // Collect valid attachments
+        const attachmentFiles = [
+            resultRecord.qualifiedPartiesScreenshot,
+            resultRecord.finalResultScreenshot,
+        ].filter(Boolean) as string[];
+
+        const attachments = attachmentFiles.length > 0 ? {
+            files: attachmentFiles,
+            baseDir: 'result-screenshots',
+        } : undefined;
 
         await this.sendEmail(
             'tender.result',
