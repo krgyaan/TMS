@@ -18,6 +18,7 @@ import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
+import { organizations } from '@db/schemas/master/organizations.schema';
 import { websites } from '@db/schemas/master/websites.schema';
 import { TimersService } from '@/modules/timers/timers.service';
 import { pqrDocuments } from '@db/schemas/shared/pqr.schema';
@@ -848,10 +849,12 @@ export class TenderInfoSheetsService {
         const assignee = await this.recipientResolver.getUserById(tender.teamMember);
         if (!assignee) return;
 
-        const [websiteData] = await Promise.all([
+        const [websiteData, orgData] = await Promise.all([
             tender.website ? this.db.select({ name: websites.name, url: websites.url }).from(websites).where(eq(websites.id, tender.website)).limit(1) : Promise.resolve([]),
+            tender.organization ? this.db.select({ name: organizations.name }).from(organizations).where(eq(organizations.id, tender.organization)).limit(1) : Promise.resolve([]),
         ]);
         const websiteName = websiteData[0]?.name || websiteData[0]?.url || 'Not specified';
+        const organizationName = orgData[0]?.name || 'Not specified';
 
         // Format due date
         const dueDate = tender.dueDate ? new Date(tender.dueDate).toLocaleString('en-IN', {
@@ -943,7 +946,7 @@ export class TenderInfoSheetsService {
 
         // Build email data matching template
         const emailData: Record<string, any> = {
-            organization: tender.organizationName || 'Not specified',
+            organization: organizationName,
             tender_name: tender.tenderName,
             tender_no: tender.tenderNo,
             website: websiteName,

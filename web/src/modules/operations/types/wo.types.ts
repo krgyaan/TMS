@@ -856,6 +856,8 @@ export interface WoQuery {
   respondedBy: number | null;
   respondedAt: string | null;
   status: QueryStatus;
+  queryByName?: string | null;
+  respondedByName?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -883,6 +885,11 @@ export interface CreateBulkWoQueriesDto {
 export interface RespondToQueryDto {
   responseText: string;
   respondedBy: number;
+  respondedAt?: string;
+}
+
+export interface UpdateWoQueryDto {
+  queryText: string;
 }
 
 export interface CloseQueryDto {

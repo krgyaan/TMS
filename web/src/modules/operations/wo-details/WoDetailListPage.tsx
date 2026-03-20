@@ -108,8 +108,13 @@ const WoDetailListPage = () => {
         },
         {
             label: 'Request for Clarification',
-            onClick: (row) => navigate(paths.operations.woRaiseQueryPage(row.id)),
+            onClick: (row) => row.woAcceptanceStatus == 'queries_pending' ? navigate(paths.operations.woRaiseQueryEditPage(row.id)) : navigate(paths.operations.woRaiseQueryPage(row.id)),
             icon: <FileX2 className="h-4 w-4" />,
+        },
+        {
+            label: 'Wo Uploads',
+            onClick: (row) => navigate(paths.operations.woBasicDetailShowPage(row.id)),
+            icon: <FileText className="h-4 w-4" />,
         },
         {
             label: 'View Details',

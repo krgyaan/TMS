@@ -37,9 +37,17 @@ export type CreateBulkWoQueriesDto = z.infer<typeof CreateBulkWoQueriesSchema>;
 export const RespondToQuerySchema = z.object({
   responseText: z.string().min(1, 'Response text is required'),
   respondedBy: z.number().int().positive(),
+  respondedAt: z.string().datetime().optional(),
 });
 
 export type RespondToQueryDto = z.infer<typeof RespondToQuerySchema>;
+
+// UPDATE
+export const UpdateWoQuerySchema = z.object({
+  queryText: z.string().min(1, 'Query text is required'),
+});
+
+export type UpdateWoQueryDto = z.infer<typeof UpdateWoQuerySchema>;
 
 // CLOSE
 export const CloseQuerySchema = z.object({

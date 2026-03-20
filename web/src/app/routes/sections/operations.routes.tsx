@@ -14,7 +14,7 @@ const Wo_Details_Acceptance_Show = lazy(() => import("@/modules/operations/wo-de
 const Wo_Details_Acceptance_Create = lazy(() => import("@/modules/operations/wo-details/WoAcceptancePage"));
 const Wo_Details_Acceptance_Edit = lazy(() => import("@/modules/operations/wo-details/WoAcceptancePage"));
 const Wo_Acceptance_RaiseQuery_Create = lazy(() => import("@/modules/operations/wo-details/WoRaiseQueryPage"));
-const Wo_Acceptance_RaiseQuery_Edit = lazy(() => import("@/modules/operations/wo-details/WoRaiseQueryPage"));
+const Wo_Acceptance_RaiseQuery_Edit = lazy(() => import("@/modules/operations/wo-details/WoRaiseQueryEditPage"));
 
 const Operations_KickOff = lazy(() => import("@/modules/operations/kick-off"));
 const Operations_ContractAgreement = lazy(() => import("@/modules/operations/contract-agreement"));

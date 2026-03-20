@@ -1,11 +1,20 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { eq, desc, asc, sql, and, gte, lte } from 'drizzle-orm';
+import { eq, desc, asc, sql, and, gte, lte, isNull } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
-import { woQueries, woDetails } from '@db/schemas/operations';
-import type { CreateWoQueryDto, CreateBulkWoQueriesDto, RespondToQueryDto, CloseQueryDto, UpdateQueryStatusDto, WoQueriesQueryDto } from './dto/wo-queries.dto';
+import { woQueries, woDetails, woBasicDetails, woAcceptance } from '@db/schemas/operations';
+import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
+import { users } from '@db/schemas/auth/users.schema';
+import { userRoles } from '@db/schemas/auth/user-roles.schema';
+import { roles } from '@db/schemas/auth/roles.schema';
+import { inArray } from 'drizzle-orm';
+import type { CreateWoQueryDto, CreateBulkWoQueriesDto, RespondToQueryDto, CloseQueryDto, UpdateQueryStatusDto, WoQueriesQueryDto, UpdateWoQueryDto } from './dto/wo-queries.dto';
 
 export type WoQueryRow = typeof woQueries.$inferSelect;
+
+const queryByUser = alias(users, 'queryByUser');
+const respondedByUser = alias(users, 'respondedByUser');
 
 // SLA threshold in hours
 const RESPONSE_SLA_HOURS = 24;
@@ -94,8 +103,14 @@ export class WoQueriesService {
         .where(whereClause)
         .then(([r]) => Number(r?.count ?? 0)),
       this.db
-        .select()
+        .select({
+          query: woQueries,
+          queryByName: queryByUser.name,
+          respondedByName: respondedByUser.name,
+        })
         .from(woQueries)
+        .leftJoin(queryByUser, eq(woQueries.queryBy, queryByUser.id))
+        .leftJoin(respondedByUser, eq(woQueries.respondedBy, respondedByUser.id))
         .where(whereClause)
         .orderBy(orderFn(orderColumn))
         .limit(limit)
@@ -103,7 +118,11 @@ export class WoQueriesService {
     ]);
 
     return {
-      data: rows.map((r) => this.mapRowToResponse(r)),
+      data: rows.map((r) => ({
+        ...this.mapRowToResponse(r.query as any),
+        queryByName: r.queryByName,
+        respondedByName: r.respondedByName,
+      })),
       meta: {
         total: countResult,
         page,
@@ -115,8 +134,14 @@ export class WoQueriesService {
 
   async findById(id: number) {
     const [row] = await this.db
-      .select()
+      .select({
+        query: woQueries,
+        queryByName: queryByUser.name,
+        respondedByName: respondedByUser.name,
+      })
       .from(woQueries)
+      .leftJoin(queryByUser, eq(woQueries.queryBy, queryByUser.id))
+      .leftJoin(respondedByUser, eq(woQueries.respondedBy, respondedByUser.id))
       .where(eq(woQueries.id, id))
       .limit(1);
 
@@ -124,17 +149,31 @@ export class WoQueriesService {
       throw new NotFoundException(`Query with ID ${id} not found`);
     }
 
-    return this.mapRowToResponse(row);
+    return {
+      ...this.mapRowToResponse(row.query as any),
+      queryByName: row.queryByName,
+      respondedByName: row.respondedByName,
+    };
   }
 
   async findByWoDetailId(woDetailId: number) {
     const rows = await this.db
-      .select()
+      .select({
+        query: woQueries,
+        queryByName: queryByUser.name,
+        respondedByName: respondedByUser.name,
+      })
       .from(woQueries)
+      .leftJoin(queryByUser, eq(woQueries.queryBy, queryByUser.id))
+      .leftJoin(respondedByUser, eq(woQueries.respondedBy, respondedByUser.id))
       .where(eq(woQueries.woDetailsId, woDetailId))
       .orderBy(desc(woQueries.queryRaisedAt));
 
-    return rows.map((r) => this.mapRowToResponse(r));
+    return rows.map((r) => ({
+      ...this.mapRowToResponse(r.query as any),
+      queryByName: r.queryByName,
+      respondedByName: r.respondedByName,
+    }));
   }
 
   async findPendingByWoDetail(woDetailId: number) {
@@ -222,6 +261,15 @@ export class WoQueriesService {
       })
       .returning();
 
+    // Update woAcceptance status if it exists
+    await this.db
+      .update(woAcceptance)
+      .set({
+        queryRaisedAt: now,
+        status: 'queries_pending',
+      })
+      .where(eq(woAcceptance.woDetailId, data.woDetailsId));
+
     return this.mapRowToResponse(row!);
   }
 
@@ -253,6 +301,15 @@ export class WoQueriesService {
 
     const rows = await this.db.insert(woQueries).values(insertValues).returning();
 
+    // Update woAcceptance status if it exists
+    await this.db
+      .update(woAcceptance)
+      .set({
+        queryRaisedAt: now,
+        status: 'queries_pending',
+      })
+      .where(eq(woAcceptance.woDetailId, data.woDetailsId));
+
     return {
       count: rows.length,
       queries: rows.map((r) => this.mapRowToResponse(r)),
@@ -268,7 +325,8 @@ export class WoQueriesService {
 
     const now = new Date();
     const queryRaisedAt = new Date(query.queryRaisedAt);
-    const responseTimeMs = now.getTime() - queryRaisedAt.getTime();
+    const respondedAt = data.respondedAt ? new Date(data.respondedAt) : now;
+    const responseTimeMs = respondedAt.getTime() - queryRaisedAt.getTime();
     const responseTimeHours = responseTimeMs / (60 * 60 * 1000);
     const withinSla = responseTimeHours <= RESPONSE_SLA_HOURS;
 
@@ -277,7 +335,7 @@ export class WoQueriesService {
       .set({
         responseText: data.responseText,
         respondedBy: data.respondedBy,
-        respondedAt: now,
+        respondedAt: respondedAt,
         status: 'responded',
         updatedAt: now,
       })
@@ -343,6 +401,26 @@ export class WoQueriesService {
     }
 
     return this.mapRowToResponse(row);
+  }
+
+  async update(id: number, data: UpdateWoQueryDto) {
+    const query = await this.findById(id);
+
+    if (query.status !== 'pending') {
+      throw new BadRequestException('Can only update pending queries');
+    }
+
+    const now = new Date();
+    const [row] = await this.db
+      .update(woQueries)
+      .set({
+        queryText: data.queryText,
+        updatedAt: now,
+      })
+      .where(eq(woQueries.id, id))
+      .returning();
+
+    return this.mapRowToResponse(row!);
   }
 
   async delete(id: number): Promise<void> {
@@ -516,6 +594,92 @@ export class WoQueriesService {
       slaComplianceRate,
       slaThresholdHours: RESPONSE_SLA_HOURS,
       details,
+    };
+  }
+
+  async getPotentialRecipients(woDetailsId: number) {
+    // 1. Get WO Detail and Basic Detail
+    const [detail] = await this.db
+      .select({
+        id: woDetails.id,
+        woBasicDetailId: woDetails.woBasicDetailId,
+        teamId: woBasicDetails.team,
+        tenderId: woBasicDetails.tenderId,
+      })
+      .from(woDetails)
+      .innerJoin(woBasicDetails, eq(woDetails.woBasicDetailId, woBasicDetails.id))
+      .where(eq(woDetails.id, woDetailsId))
+      .limit(1);
+
+    if (!detail) {
+      throw new NotFoundException(`WO Detail with ID ${woDetailsId} not found`);
+    }
+
+    // 2. Get OE Team Members (Users in the same team)
+    const oeTeamMembers = detail.teamId
+      ? await this.db
+          .select({
+            id: users.id,
+            name: users.name,
+            email: users.email,
+          })
+          .from(users)
+          .where(and(eq(users.team, detail.teamId), eq(users.isActive, true), isNull(users.deletedAt)))
+      : [];
+
+    // 3. Get TE and TL from Tender
+    let teUser: any = null;
+    let tlUsers: any[] = [];
+
+    if (detail.tenderId) {
+      const [tender] = await this.db
+        .select({
+          teamMember: tenderInfos.teamMember,
+          teamId: tenderInfos.team,
+        })
+        .from(tenderInfos)
+        .where(eq(tenderInfos.id, detail.tenderId))
+        .limit(1);
+
+      if (tender) {
+        // Fetch TE
+        if (tender.teamMember) {
+          const [te] = await this.db
+            .select({
+              id: users.id,
+              name: users.name,
+              email: users.email,
+            })
+            .from(users)
+            .where(eq(users.id, tender.teamMember))
+            .limit(1);
+          teUser = te;
+        }
+
+        // Fetch TLs (Users with Role ID 3 in the tender team)
+        tlUsers = await this.db
+          .select({
+            id: users.id,
+            name: users.name,
+            email: users.email,
+          })
+          .from(users)
+          .innerJoin(userRoles, eq(users.id, userRoles.userId))
+          .where(
+            and(
+              eq(users.team, tender.teamId),
+              eq(userRoles.roleId, 3), // Role ID 3 = Team Leader
+              eq(users.isActive, true),
+              isNull(users.deletedAt)
+            )
+          );
+      }
+    }
+
+    return {
+      oeRecipients: oeTeamMembers.map(u => ({ ...u, role: 'OE' })),
+      teRecipients: teUser ? [{ ...teUser, role: 'TE' }] : [],
+      tlRecipients: tlUsers.map(u => ({ ...u, role: 'TL' })),
     };
   }
 }
