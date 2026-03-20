@@ -6,7 +6,6 @@ import { FileText, Download, ExternalLink, AlertCircle } from 'lucide-react';
 import type { TenderQuery, TenderQueryItem, TenderQueryStatus } from '../helpers/tqManagement.types';
 import type { TqType } from '@/types/api.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
-import { tenderFilesService } from '@/services/api/tender-files.service';
 
 interface TqViewProps {
     tqData?: TenderQuery | null;
@@ -84,6 +83,28 @@ export function TqView({
         return tqTypes?.find(t => t.id === tqTypeId)?.name || 'Unknown';
     };
 
+    // Helper function to get file URL from stored path
+    const getFileUrl = (filePath: string): string => {
+        // File paths may be stored as:
+        // 1. "context/filename.ext" (e.g., "tq-management/file.pdf")
+        // 2. Just "filename.ext" (need to prepend context)
+        const parts = filePath.split('/');
+        let context = 'tq-management';
+        let fileName = filePath;
+
+        if (parts.length >= 2 && parts[0] === 'tq-management') {
+            // Path already includes context
+            fileName = parts.slice(1).join('/');
+        } else {
+            // Path is just filename, prepend context
+            fileName = filePath;
+        }
+
+        // Get base URL from axios instance
+        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+        return `${baseUrl}/tender-files/serve/${context}/${encodeURIComponent(fileName)}`;
+    };
+
     return (
         <Card className={className}>
             <CardHeader>
@@ -130,7 +151,7 @@ export function TqView({
                                         <Download className="h-4 w-4 text-muted-foreground" />
                                         <span className="text-sm flex-1">{tqData.tqDocumentReceived}</span>
                                         <a
-                                            href={tenderFilesService.getFileUrl(tqData.tqDocumentReceived)}
+                                            href={getFileUrl(tqData.tqDocumentReceived)}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="text-primary hover:underline text-sm"
@@ -207,7 +228,7 @@ export function TqView({
                                         <Download className="h-4 w-4 text-muted-foreground" />
                                         <span className="text-sm flex-1">{tqData.repliedDocument}</span>
                                         <a
-                                            href={tenderFilesService.getFileUrl(tqData.repliedDocument)}
+                                            href={getFileUrl(tqData.repliedDocument)}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="text-primary hover:underline text-sm"
@@ -224,7 +245,7 @@ export function TqView({
                                         <Download className="h-4 w-4 text-muted-foreground" />
                                         <span className="text-sm flex-1">{tqData.proofOfSubmission}</span>
                                         <a
-                                            href={tenderFilesService.getFileUrl(tqData.proofOfSubmission)}
+                                            href={getFileUrl(tqData.proofOfSubmission)}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="text-primary hover:underline text-sm"
