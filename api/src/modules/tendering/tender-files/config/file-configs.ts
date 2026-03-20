@@ -65,6 +65,7 @@ export type TenderFileContext =
     | "tdsDocument"
     | "bankNoc"
     | "wo-draft"
+    | "wo-signed-copy"
     | "mcaClosure";
 
 export interface FileConfig {
@@ -768,6 +769,16 @@ export const FILE_CONFIGS: Record<TenderFileContext, FileConfig> = {
         maxSizeBytes: MB(10),
         allowedMimeTypes: [...DOCS, ...OFFICE],
         allowedExtensions: [".pdf", ".doc", ".docx", ".xls", ".xlsx"],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    "wo-signed-copy": {
+        maxFiles: 1,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
         compressImages: true,
         imageQuality: 80,
         compressPdf: true,
