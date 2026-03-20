@@ -65,6 +65,7 @@ export type TenderFileContext =
     | 'tdsDocument'
     | 'bankNoc'
     | 'wo-draft'
+    | 'wo-signed-copy'
     | 'mcaClosure';
 
 export interface FileConfig {
