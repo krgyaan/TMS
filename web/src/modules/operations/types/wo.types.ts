@@ -732,7 +732,17 @@ export interface CreateWoAcceptanceDto {
 
 export interface WoAcceptanceDecisionDto {
   decision: WoAcceptanceDecision;
-  decisionRemarks?: string;
+  remarks?: string;
+  amendments?: Array<{
+    pageNo?: string;
+    clauseNo?: string;
+    currentStatement?: string;
+    correctedStatement?: string;
+  }>;
+  initiateFollowUp?: boolean;
+  oeSiteVisitId?: number | null;
+  oeDocsPrepId?: number | null;
+  signedWoFilePath?: string | null;
 }
 
 export interface SignWoDto {
