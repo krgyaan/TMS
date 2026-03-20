@@ -4,6 +4,7 @@ import type {
   CreateWoQueryDto,
   CreateBulkWoQueriesDto,
   RespondToQueryDto,
+  UpdateWoQueryDto,
   WoQueriesFilters,
   PaginatedResult,
 } from '@/modules/operations/types/wo.types';
@@ -84,6 +85,10 @@ class WoQueriesService extends BaseApiService {
     return this.patch<WoQuery>(`/${id}/status`, { status });
   }
 
+  async update(id: number, data: UpdateWoQueryDto): Promise<WoQuery> {
+    return this.patch<WoQuery>(`/${id}`, data);
+  }
+
   async remove(id: number): Promise<void> {
     return this.delete(`/${id}`);
   }
@@ -123,6 +128,14 @@ class WoQueriesService extends BaseApiService {
     slaCompliancePercentage: number;
   }> {
     return this.get(`/by-wo-detail/${woDetailId}/sla-status`);
+  }
+
+  async getPotentialRecipients(woDetailsId: number): Promise<{
+    oeRecipients: { id: number; name: string; email: string; role: 'OE' }[];
+    teRecipients: { id: number; name: string; email: string; role: 'TE' }[];
+    tlRecipients: { id: number; name: string; email: string; role: 'TL' }[];
+  }> {
+    return this.get(`/recipients/${woDetailsId}`);
   }
 }
 

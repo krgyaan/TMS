@@ -8,6 +8,7 @@ import type {
   CreateWoQueryDto,
   CreateBulkWoQueriesDto,
   RespondToQueryDto,
+  UpdateWoQueryDto,
 } from '@/modules/operations/types/wo.types';
 
 // ============================================
@@ -98,6 +99,14 @@ export const useQuerySlaStatus = (woDetailId: number) => {
     queryKey: woQueriesKeys.slaStatus(woDetailId),
     queryFn: () => woQueriesService.getSlaStatus(woDetailId),
     enabled: !!woDetailId && woDetailId > 0,
+  });
+};
+
+export const usePotentialRecipients = (woDetailsId: number) => {
+  return useQuery({
+    queryKey: [...woQueriesKeys.all, 'recipients', woDetailsId],
+    queryFn: () => woQueriesService.getPotentialRecipients(woDetailsId),
+    enabled: !!woDetailsId && woDetailsId > 0,
   });
 };
 
@@ -199,6 +208,22 @@ export const useDeleteWoQuery = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: woQueriesKeys.all });
       toast.success('Query deleted successfully');
+    },
+    onError: (error: any) => {
+      toast.error(handleQueryError(error));
+    },
+  });
+};
+
+export const useUpdateWoQuery = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: UpdateWoQueryDto }) =>
+      woQueriesService.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: woQueriesKeys.all });
+      toast.success('Query updated successfully');
     },
     onError: (error: any) => {
       toast.error(handleQueryError(error));
