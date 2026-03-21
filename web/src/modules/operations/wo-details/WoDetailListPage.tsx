@@ -113,7 +113,7 @@ const WoDetailListPage = () => {
         },
         {
             label: 'Wo Uploads',
-            onClick: (row) => navigate(paths.operations.woBasicDetailShowPage(row.id)),
+            onClick: (row) => navigate(paths.operations.woUploadPage(row.id)),
             icon: <FileText className="h-4 w-4" />,
         },
         {

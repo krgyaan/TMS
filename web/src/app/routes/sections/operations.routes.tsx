@@ -14,6 +14,7 @@ const Wo_Details_Acceptance_Create = lazy(() => import("@/modules/operations/wo-
 const Wo_Details_Acceptance_Edit = lazy(() => import("@/modules/operations/wo-details/WoAcceptancePage"));
 const Wo_Acceptance_RaiseQuery_Create = lazy(() => import("@/modules/operations/wo-details/WoRaiseQueryPage"));
 const Wo_Acceptance_RaiseQuery_Edit = lazy(() => import("@/modules/operations/wo-details/WoRaiseQueryEditPage"));
+const Wo_Upload = lazy(() => import("@/modules/operations/wo-details/WoUploadPage"));
 
 const Operations_KickOff = lazy(() => import("@/modules/operations/kick-off/KickOffListPage"));
 const Operations_KickOffCreate = lazy(() => import("@/modules/operations/kick-off/KickOffCreatePage"));
@@ -44,6 +45,7 @@ export default function OperationsRoutes() {
             <Route path="work-order/acceptance/raise-query/:id" element={<RouteWrapper><Wo_Acceptance_RaiseQuery_Create /></RouteWrapper>} />
             <Route path="work-order/acceptance/raise-query/:id/edit" element={<RouteWrapper><Wo_Acceptance_RaiseQuery_Edit /></RouteWrapper>} />
             <Route path="work-order/acceptance/:id/edit" element={<RouteWrapper><Wo_Details_Acceptance_Edit /></RouteWrapper>} />
+            <Route path="work-order/acceptance/upload/:id" element={<RouteWrapper><Wo_Upload /></RouteWrapper>} />
 
             <Route path="kick-off" element={<RouteWrapper><Operations_KickOff /></RouteWrapper>} />
             <Route path="kick-off/create" element={<RouteWrapper><Operations_KickOffCreate /></RouteWrapper>} />

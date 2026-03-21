@@ -66,7 +66,9 @@ export type TenderFileContext =
     | "bankNoc"
     | "wo-draft"
     | "wo-signed-copy"
-    | "mcaClosure";
+    | "mcaClosure"
+    | "final-wo"
+    | "detailed-wo";
 
 export interface FileConfig {
     maxFiles: number;
@@ -775,6 +777,26 @@ export const FILE_CONFIGS: Record<TenderFileContext, FileConfig> = {
         pdfQuality: 80,
     },
     "wo-signed-copy": {
+        maxFiles: 1,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    "final-wo": {
+        maxFiles: 1,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    "detailed-wo": {
         maxFiles: 1,
         maxSizeBytes: MB(10),
         allowedMimeTypes: [...DOCS],

@@ -108,6 +108,7 @@ export const paths = {
         woAcceptanceEditPage: (id: number) => `/operations/work-order/acceptance/${id}/edit`,
         woRaiseQueryPage: (id: number) => `/operations/work-order/acceptance/raise-query/${id}`,
         woRaiseQueryEditPage: (id: number) => `/operations/work-order/acceptance/raise-query/${id}/edit`,
+        woUploadPage: (id: number) => `/operations/work-order/acceptance/upload/${id}`,
         kickOffListPage: "/operations/kick-off",
         kickOffCreatePage: "/operations/kick-off/create",
         kickOffEditPage: (id: number) => `/operations/kick-off/${id}/edit`,
