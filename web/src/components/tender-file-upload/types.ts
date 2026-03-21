@@ -70,7 +70,8 @@ export type TenderFileContext =
     | 'foa'
     | 'sap-po'
     | 'detailed-wo'
-    | 'final-wo';
+    | 'final-wo'
+    | 'kickoff-mom';
 
 export interface FileConfig {
     context: string;

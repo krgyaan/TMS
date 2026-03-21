@@ -3,12 +3,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
 import { useMemo, useState, useEffect, useCallback } from 'react';
-import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ActionMenu } from '@/components/ui/ActionMenu';
 import { AlertCircle, Eye, FileX2, Search, Edit, CheckCircle, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -59,7 +59,7 @@ const WoDetailListPage = () => {
             sortBy: sortModel[0]?.colId,
             sortOrder: sortModel[0]?.sort,
             search: debouncedSearch,
-            teamId,
+            teamId: teamId === null ? undefined : teamId,
         };
 
         switch (activeTab) {
@@ -219,7 +219,7 @@ const WoDetailListPage = () => {
             {
                 headerName: '',
                 filter: false,
-                cellRenderer: createActionColumnRenderer(rowActions),
+                cellRenderer: (params: any) => <ActionMenu rowData={params.data} actions={rowActions} />,
                 sortable: false,
                 pinned: 'right',
                 width: 57,

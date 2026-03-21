@@ -400,6 +400,7 @@ export interface WoDetailsListResponseDto {
   status: WoDetailsStatus;
   woAcceptanceId: number | null;
   woAcceptanceStatus: WoAcceptanceStatus | null;
+  kickoffMeetingId?: number | null;
 }
 
 export interface CreateWoDetailDto {
@@ -1167,4 +1168,31 @@ export interface AcceptanceStatus {
     tlFinalDecisionAt: string | null;
     followupId: number | null;
     courierId: number | null;
+}
+
+// ============================================
+// KICK-OFF MEETING
+// ============================================
+
+export interface KickoffMeeting {
+  id: number;
+  woDetailId: number;
+  meetingDate: string | null;
+  meetingLink: string | null;
+  momFilePath: string | null;
+  momUploadedAt: string | null;
+  momUploadedBy: number | null;
+  status: 'scheduled' | 'mom_uploaded';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SaveKickoffMeetingDto {
+  woDetailId: number;
+  meetingDate?: string | null;
+  meetingLink?: string | null;
+}
+
+export interface UpdateKickoffMeetingMomDto {
+  momFilePath: string;
 }
