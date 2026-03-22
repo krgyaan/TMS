@@ -27,10 +27,12 @@ const departmentOptions = [
 interface WoKickoffMeetingProps {
     kickoffData: any;
     woContactsData: any;
+    woDetailId: number;
+    woBasicDetailId: number;
     organizationName?: string;
 }
 
-export function WoKickoffMeeting({ kickoffData, woContactsData, organizationName }: WoKickoffMeetingProps) {
+export function WoKickoffMeeting({ kickoffData, woContactsData, woDetailId, woBasicDetailId, organizationName }: WoKickoffMeetingProps) {
     const navigate = useNavigate();
     const saveKickoffMutation = useSaveKickoffMeeting();
     const bulkCreateContacts = useCreateBulkWoContacts();

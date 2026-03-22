@@ -458,6 +458,18 @@ export interface UpdateWoDetailDto {
   status?: WoDetailsStatus;
 }
 
+export interface KickOffFilters {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: SortOrder;
+  search?: string;
+  teamId?: number;
+  userId?: number;
+  dataScope?: string;
+  kickoffScheduled?: boolean;
+}
+
 export interface WoDetailsFilters {
   page?: number;
   limit?: number;

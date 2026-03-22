@@ -1,5 +1,7 @@
+import type { PaginatedResponse } from '@/types/api.types';
 import { BaseApiService } from './base.service';
 import type {
+    KickOffFilters,
     KickoffMeeting,
     SaveKickoffMeetingDto,
     UpdateKickoffMeetingMomDto
@@ -8,6 +10,14 @@ import type {
 class KickOffMeetingApiService extends BaseApiService {
     constructor() {
         super('/kick-off-meeting');
+    }
+
+    async getOne(id: number): Promise<KickoffMeeting> {
+        return this.get(`/${id}`);
+    }
+
+    async getAll(filters: KickOffFilters): Promise<PaginatedResponse<KickoffMeeting>> {
+        return this.getAll(filters);
     }
 
     async getByWoDetailId(woDetailId: number): Promise<KickoffMeeting | null> {

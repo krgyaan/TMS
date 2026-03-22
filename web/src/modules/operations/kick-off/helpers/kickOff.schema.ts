@@ -11,7 +11,7 @@ export const ContactSchema = z.object({
 });
 
 export const KickoffFormSchema = z.object({
-    meetingDate: z.string().optional(),
+    meetingDate: z.string().min(1, 'Meeting date is required'),
     meetingLink: z.string().url('Invalid URL').optional().or(z.literal('')),
 });
 

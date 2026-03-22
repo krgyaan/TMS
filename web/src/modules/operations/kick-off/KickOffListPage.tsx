@@ -1,40 +1,44 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
 import { useMemo, useState, useEffect, useCallback } from 'react';
+import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
+import { useNavigate } from 'react-router-dom';
+import { paths } from '@/app/routes/paths';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, FileX2, Search, CheckCircle, Eye } from 'lucide-react';
+import { AlertCircle, Eye, FileX2, Search, CheckCircle, Upload } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { useWoDetails } from '@/hooks/api/useWoDetails';
-import type { WoDetailsListResponseDto, WoDetailsFilters } from '@/modules/operations/types/wo.types';
+import type { WoDetailsListResponseDto, KickOffFilters } from '@/modules/operations/types/wo.types';
 import { currencyCol, dateCol } from '@/components/data-grid';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { useTeamFilter } from '@/hooks/useTeamFilter';
-import { WoUploadMomDialog } from '../wo-details/components/WoUploadMomDialog';
-import { useNavigate } from 'react-router-dom';
-import { paths } from '@/app/routes/paths';
-import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
+import { WoUploadMomDialog } from './components/WoUploadMomDialog';
+import { useKickoffMeeting } from '@/hooks/api/useKickoffMeeting';
+
+type TabKey = 'not_scheduled' | 'scheduled';
 
 const KickOffListPage = () => {
+    const [activeTab, setActiveTab] = useState<TabKey>('not_scheduled');
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
     const debouncedSearch = useDebouncedSearch(search, 300);
-    const { teamId } = useTeamFilter();
     const navigate = useNavigate();
+    const { teamId } = useTeamFilter();
 
-    // Kickoff Modals State
+    // Upload MOM modal state
     const [selectedWoId, setSelectedWoId] = useState<number | null>(null);
     const [selectedKickoffId, setSelectedKickoffId] = useState<number | null>(null);
     const [isUploadMomOpen, setIsUploadMomOpen] = useState(false);
 
-    // Reset pagination on search/team change
+    // Reset pagination on tab/search change
     useEffect(() => {
         setPagination((p) => ({ ...p, pageIndex: 0 }));
-    }, [debouncedSearch, teamId]);
+    }, [activeTab, debouncedSearch]);
 
     const handleSortChanged = useCallback((event: any) => {
         const sortModel = event.api
@@ -52,26 +56,64 @@ const KickOffListPage = () => {
         setPagination({ pageIndex: 0, pageSize: newPageSize });
     }, []);
 
-    // Build filters - strictly accepted WOs
-    const filters: WoDetailsFilters = useMemo(() => {
-        return {
+    // Build filters based on active tab
+    const filters: KickOffFilters = useMemo(() => {
+        const baseFilters: KickOffFilters = {
             page: pagination.pageIndex + 1,
             limit: pagination.pageSize,
-            sortBy: sortModel[0]?.colId,
-            sortOrder: sortModel[0]?.sort,
-            search: debouncedSearch,
+            search: debouncedSearch || undefined,
+            sortBy: sortModel[0]?.colId || 'woDate',
+            sortOrder: sortModel[0]?.sort || 'desc',
             teamId: teamId === null ? undefined : teamId,
-            woAcceptance: true,
+            kickoffScheduled: true,
         };
-    }, [pagination, sortModel, debouncedSearch, teamId]);
 
-    // Fetch data using woDetails hook but filtered
-    const { data: apiResponse, isLoading: loading, error } = useWoDetails(filters);
+        // Add tab-specific filters
+        switch (activeTab) {
+            case 'not_scheduled':
+                baseFilters.kickoffScheduled = false;
+                break;
+            case 'scheduled':
+                baseFilters.kickoffScheduled = true;
+                break;
+        }
 
-    const tableData = apiResponse?.data || [];
-    const totalRows = apiResponse?.meta?.total || 0;
+        return baseFilters;
+    }, [activeTab, pagination, debouncedSearch, sortModel, teamId]);
 
-    const rowActions: ActionItem<WoDetailsListResponseDto>[] = [
+    // Fetch data
+    const { data: apiResponse, isLoading: loading, error } = useKickoffMeeting(filters);
+
+    // Client-side filtering fallback (if backend doesn't support kickoffScheduled filter)
+    const allRows = apiResponse?.data || [];
+    const tableData = useMemo(() => {
+        return allRows.filter((row) => {
+            if (activeTab === 'not_scheduled') {
+                return !row.kickoffScheduled;
+            }
+            return !!row.kickoffMeetingId;
+        });
+    }, [allRows, activeTab]);
+
+    const totalRows = apiResponse?.meta?.total || tableData.length;
+
+    // Calculate counts for tabs
+    const tabCounts = useMemo(() => {
+        const notScheduled = allRows.filter((row) => !row.kickoffMeetingId).length;
+        const scheduled = allRows.filter((row) => !!row.kickoffMeetingId).length;
+        return { notScheduled, scheduled };
+    }, [allRows]);
+
+    // Tab configuration with counts
+    const tabsConfig = useMemo(() => {
+        return [
+            { key: 'not_scheduled' as const, name: 'Not Scheduled', count: tabCounts.notScheduled },
+            { key: 'scheduled' as const, name: 'Scheduled', count: tabCounts.scheduled },
+        ];
+    }, [tabCounts]);
+
+    // Action items for "Not Scheduled" tab
+    const notScheduledActions: ActionItem<WoDetailsListResponseDto>[] = useMemo(() => [
         {
             label: 'Initiate Kickoff',
             onClick: (row) => navigate(paths.operations.woKickOffCreatePage(row.id)),
@@ -82,7 +124,28 @@ const KickOffListPage = () => {
             onClick: (row) => navigate(paths.operations.woBasicDetailShowPage(row.id)),
             icon: <Eye className="h-4 w-4" />,
         },
-    ];
+    ], [navigate]);
+
+    // Action items for "Scheduled" tab
+    const scheduledActions: ActionItem<WoDetailsListResponseDto>[] = useMemo(() => [
+        {
+            label: 'Upload MOM',
+            onClick: (row) => {
+                setSelectedWoId(row.id);
+                setSelectedKickoffId(row.kickoffMeetingId ?? null);
+                setIsUploadMomOpen(true);
+            },
+            icon: <Upload className="h-4 w-4" />,
+        },
+        {
+            label: 'View Details',
+            onClick: (row) => navigate(paths.operations.woBasicDetailShowPage(row.id)),
+            icon: <Eye className="h-4 w-4" />,
+        },
+    ], [navigate]);
+
+    // Get row actions based on active tab
+    const rowActions = activeTab === 'not_scheduled' ? notScheduledActions : scheduledActions;
 
     // Column definitions
     const colDefs = useMemo<ColDef<WoDetailsListResponseDto>[]>(
@@ -91,15 +154,17 @@ const KickOffListPage = () => {
                 field: 'projectName',
                 colId: 'projectName',
                 headerName: 'Project Name',
-                width: 150,
+                width: 180,
                 sortable: true,
+                filter: true,
             },
             {
                 field: 'woNumber',
                 colId: 'woNumber',
                 headerName: 'WO Number',
-                width: 120,
+                width: 130,
                 sortable: true,
+                filter: true,
             },
             dateCol<WoDetailsListResponseDto>('woDate', { includeTime: false }, {
                 headerName: 'WO Date',
@@ -108,47 +173,35 @@ const KickOffListPage = () => {
             }),
             currencyCol<WoDetailsListResponseDto>('woValuePreGst', {
                 headerName: 'WO Value',
-                width: 120,
+                width: 130,
                 colId: 'woValuePreGst',
             }),
             currencyCol<WoDetailsListResponseDto>('woValueGstAmt', {
                 headerName: 'GST Amount',
-                width: 120,
+                width: 130,
                 colId: 'woValueGstAmt',
             }),
             {
                 field: 'status',
                 colId: 'status',
                 headerName: 'WO Status',
-                width: 120,
-                cellRenderer: (params: any) => {
-                    return <Badge variant='outline' className="capitalize">
-                        {params.value?.replaceAll('_', ' ')}
+                width: 130,
+                cellRenderer: (params: any) => (
+                    <Badge variant="outline" className="capitalize">
+                        {params.value?.replaceAll('_', ' ') || '—'}
                     </Badge>
-                },
+                ),
             },
             {
                 field: 'woAcceptanceStatus',
                 colId: 'woAcceptanceStatus',
                 headerName: 'Acceptance',
-                width: 120,
-                cellRenderer: (params: any) => {
-                    return <Badge variant='outline' className="capitalize">
+                width: 130,
+                cellRenderer: (params: any) => (
+                    <Badge variant="outline" className="capitalize">
                         {params.value ? params.value?.replaceAll('_', ' ') : 'Pending'}
                     </Badge>
-                },
-            },
-            {
-                headerName: '',
-                field: 'kickoffMeetingId',
-                colId: 'kickoffMeetingId',
-                width: 130,
-                cellRenderer: (params: any) => {
-                    if (params.data.kickoffMeetingId) {
-                        return <Badge variant="default" className="bg-green-600">Scheduled</Badge>;
-                    }
-                    return <Badge variant="secondary">Not Scheduled</Badge>;
-                }
+                ),
             },
             {
                 headerName: '',
@@ -159,11 +212,11 @@ const KickOffListPage = () => {
                 width: 57,
             },
         ],
-        []
+        [rowActions]
     );
 
     // Loading state
-    if (loading && !tableData.length) {
+    if (loading && !allRows.length) {
         return (
             <Card>
                 <CardHeader>
@@ -172,6 +225,11 @@ const KickOffListPage = () => {
                 </CardHeader>
                 <CardContent className="p-6">
                     <div className="space-y-4">
+                        <div className="flex gap-2">
+                            {Array.from({ length: 2 }).map((_, i) => (
+                                <Skeleton key={i} className="h-10 w-32" />
+                            ))}
+                        </div>
                         <Skeleton className="h-[500px] w-full" />
                     </div>
                 </CardContent>
@@ -190,7 +248,7 @@ const KickOffListPage = () => {
                     <Alert variant="destructive">
                         <AlertCircle className="h-4 w-4" />
                         <AlertDescription>
-                            Failed to load. Please try again later.
+                            Failed to load kick-off meetings. Please try again later.
                         </AlertDescription>
                     </Alert>
                 </CardContent>
@@ -210,59 +268,95 @@ const KickOffListPage = () => {
                     </div>
                 </div>
             </CardHeader>
-            <CardContent>
-                {/* Search and Filters Row */}
-                <div className="flex items-center gap-4 pb-4">
-                    <div className="flex-1 flex justify-end">
-                        <div className="relative">
-                            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                type="text"
-                                placeholder="Search WOs..."
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                className="pl-8 w-64"
-                            />
+            <CardContent className="px-0">
+                <Tabs
+                    value={activeTab}
+                    onValueChange={(value) => setActiveTab(value as TabKey)}
+                >
+                    <TabsList className="m-auto mb-4 flex-wrap">
+                        {tabsConfig.map((tab) => (
+                            <TabsTrigger
+                                key={tab.key}
+                                value={tab.key}
+                                className="data-[state=active]:shadow-md flex items-center gap-1"
+                            >
+                                <span className="font-semibold text-sm">{tab.name}</span>
+                                <Badge variant="secondary" className="text-xs">
+                                    {tab.count}
+                                </Badge>
+                            </TabsTrigger>
+                        ))}
+                    </TabsList>
+
+                    {/* Search Row */}
+                    <div className="flex items-center gap-4 px-6 pb-4">
+                        <div className="flex-1 flex justify-end">
+                            <div className="relative">
+                                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    type="text"
+                                    placeholder="Search by project name, WO number..."
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    className="pl-8 w-80"
+                                />
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                {tableData.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-                        <FileX2 className="h-12 w-12 mb-4" />
-                        <p className="text-lg font-medium">No Accepted Work Orders found</p>
-                        <p className="text-sm mt-2">
-                            Kick-off meetings can only be scheduled for accepted work orders.
-                        </p>
-                    </div>
-                ) : (
-                    <DataTable
-                        data={tableData}
-                        columnDefs={colDefs as ColDef<any>[]}
-                        loading={loading}
-                        manualPagination={true}
-                        rowCount={totalRows}
-                        paginationState={pagination}
-                        onPaginationChange={setPagination}
-                        onPageSizeChange={handlePageSizeChange}
-                        showTotalCount={true}
-                        showLengthChange={true}
-                        gridOptions={{
-                            defaultColDef: {
-                                editable: false,
-                                filter: true,
-                                sortable: true,
-                                resizable: true,
-                            },
-                            onSortChanged: handleSortChanged,
-                            overlayNoRowsTemplate:
-                                '<span style="padding: 10px; text-align: center;">No Work Orders found</span>',
-                        }}
-                    />
-                )}
+                    {tabsConfig.map((tab) => (
+                        <TabsContent
+                            key={tab.key}
+                            value={tab.key}
+                            className="px-0 m-0 data-[state=inactive]:hidden"
+                        >
+                            {activeTab === tab.key && (
+                                <>
+                                    {tableData.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
+                                            <FileX2 className="h-12 w-12 mb-4" />
+                                            <p className="text-lg font-medium">
+                                                No kick-off meetings found
+                                            </p>
+                                            <p className="text-sm mt-2">
+                                                {tab.key === 'not_scheduled'
+                                                    ? 'All kick-off meetings have been scheduled.'
+                                                    : 'No kick-off meetings have been scheduled yet.'}
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <DataTable
+                                            data={tableData}
+                                            columnDefs={colDefs as ColDef<any>[]}
+                                            loading={loading}
+                                            manualPagination={true}
+                                            rowCount={totalRows}
+                                            paginationState={pagination}
+                                            onPaginationChange={setPagination}
+                                            onPageSizeChange={handlePageSizeChange}
+                                            showTotalCount={true}
+                                            showLengthChange={true}
+                                            gridOptions={{
+                                                defaultColDef: {
+                                                    editable: false,
+                                                    filter: true,
+                                                    sortable: true,
+                                                    resizable: true,
+                                                },
+                                                onSortChanged: handleSortChanged,
+                                                overlayNoRowsTemplate:
+                                                    '<span style="padding: 10px; text-align: center;">No kick-off meetings found</span>',
+                                            }}
+                                        />
+                                    )}
+                                </>
+                            )}
+                        </TabsContent>
+                    ))}
+                </Tabs>
             </CardContent>
 
-            {/* Modals */}
+            {/* Upload MOM Modal */}
             {selectedWoId && selectedKickoffId && (
                 <WoUploadMomDialog
                     isOpen={isUploadMomOpen}
