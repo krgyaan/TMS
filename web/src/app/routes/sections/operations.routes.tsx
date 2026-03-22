@@ -47,15 +47,15 @@ export default function OperationsRoutes() {
             <Route path="work-order/acceptance/:id/edit" element={<RouteWrapper><Wo_Details_Acceptance_Edit /></RouteWrapper>} />
             <Route path="work-order/acceptance/upload/:id" element={<RouteWrapper><Wo_Upload /></RouteWrapper>} />
 
-            <Route path="kick-off" element={<RouteWrapper><Operations_KickOff /></RouteWrapper>} />
-            <Route path="kick-off/create" element={<RouteWrapper><Operations_KickOffCreate /></RouteWrapper>} />
-            <Route path="kick-off/:id/edit" element={<RouteWrapper><Operations_KickOffEdit /></RouteWrapper>} />
-            <Route path="kick-off/:id" element={<RouteWrapper><Operations_KickOffShow /></RouteWrapper>} />
+            <Route path="work-order/kick-off" element={<RouteWrapper><Operations_KickOff /></RouteWrapper>} />
+            <Route path="work-order/kick-off/create/:id" element={<RouteWrapper><Operations_KickOffCreate /></RouteWrapper>} />
+            <Route path="work-order/kick-off/:id/edit" element={<RouteWrapper><Operations_KickOffEdit /></RouteWrapper>} />
+            <Route path="work-order/kick-off/:id" element={<RouteWrapper><Operations_KickOffShow /></RouteWrapper>} />
 
-            <Route path="contract-agreement" element={<RouteWrapper><Operations_ContractAgreement /></RouteWrapper>} />
-            <Route path="contract-agreement/create" element={<RouteWrapper><Operations_ContractAgreementCreate /></RouteWrapper>} />
-            <Route path="contract-agreement/:id/edit" element={<RouteWrapper><Operations_ContractAgreementEdit /></RouteWrapper>} />
-            <Route path="contract-agreement/:id" element={<RouteWrapper><Operations_ContractAgreementShow /></RouteWrapper>} />
+            <Route path="work-order/contract-agreement" element={<RouteWrapper><Operations_ContractAgreement /></RouteWrapper>} />
+            <Route path="work-order/contract-agreement/create/:id" element={<RouteWrapper><Operations_ContractAgreementCreate /></RouteWrapper>} />
+            <Route path="work-order/contract-agreement/:id/edit" element={<RouteWrapper><Operations_ContractAgreementEdit /></RouteWrapper>} />
+            <Route path="work-order/contract-agreement/:id" element={<RouteWrapper><Operations_ContractAgreementShow /></RouteWrapper>} />
 
             <Route path="project-dashboard" element={<RouteWrapper><Operations_ProjectDashboard /></RouteWrapper>} />
             <Route path="project-dashboard/purchase-order/create" element={<RouteWrapper><Operations_RaisePoFormPage /></RouteWrapper>} />

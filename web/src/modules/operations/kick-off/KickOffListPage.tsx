@@ -5,8 +5,7 @@ import { useMemo, useState, useEffect, useCallback } from 'react';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ActionMenu } from '@/components/ui/ActionMenu';
-import { AlertCircle, FileX2, Search, CheckCircle, FileText } from 'lucide-react';
+import { AlertCircle, FileX2, Search, CheckCircle, Eye } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useWoDetails } from '@/hooks/api/useWoDetails';
@@ -14,8 +13,10 @@ import type { WoDetailsListResponseDto, WoDetailsFilters } from '@/modules/opera
 import { currencyCol, dateCol } from '@/components/data-grid';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { useTeamFilter } from '@/hooks/useTeamFilter';
-import { WoKickoffMeetingDialog } from '../wo-details/components/WoKickoffMeetingDialog';
 import { WoUploadMomDialog } from '../wo-details/components/WoUploadMomDialog';
+import { useNavigate } from 'react-router-dom';
+import { paths } from '@/app/routes/paths';
+import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 
 const KickOffListPage = () => {
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
@@ -23,12 +24,11 @@ const KickOffListPage = () => {
     const [search, setSearch] = useState<string>('');
     const debouncedSearch = useDebouncedSearch(search, 300);
     const { teamId } = useTeamFilter();
+    const navigate = useNavigate();
 
     // Kickoff Modals State
     const [selectedWoId, setSelectedWoId] = useState<number | null>(null);
-    const [selectedBasicDetailId, setSelectedBasicDetailId] = useState<number | null>(null);
     const [selectedKickoffId, setSelectedKickoffId] = useState<number | null>(null);
-    const [isKickoffOpen, setIsKickoffOpen] = useState(false);
     const [isUploadMomOpen, setIsUploadMomOpen] = useState(false);
 
     // Reset pagination on search/team change
@@ -71,33 +71,18 @@ const KickOffListPage = () => {
     const tableData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
 
-    const getRowActions = (row: WoDetailsListResponseDto) => {
-        const actions: ActionItem<WoDetailsListResponseDto>[] = [];
-
-        if (row.kickoffMeetingId) {
-            actions.push({
-                label: 'Upload MOM',
-                onClick: (r) => {
-                    setSelectedWoId(r.id);
-                    setSelectedKickoffId(r.kickoffMeetingId!);
-                    setIsUploadMomOpen(true);
-                },
-                icon: <FileText className="h-4 w-4" />,
-            });
-        }
-
-        actions.push({
-            label: 'Kick-off Meeting',
-            onClick: (r) => {
-                setSelectedWoId(r.id);
-                setSelectedBasicDetailId(r.woBasicDetailId);
-                setIsKickoffOpen(true);
-            },
+    const rowActions: ActionItem<WoDetailsListResponseDto>[] = [
+        {
+            label: 'Initiate Kickoff',
+            onClick: (row) => navigate(paths.operations.woKickOffCreatePage(row.id)),
             icon: <CheckCircle className="h-4 w-4" />,
-        });
-
-        return actions;
-    };
+        },
+        {
+            label: 'View Details',
+            onClick: (row) => navigate(paths.operations.woBasicDetailShowPage(row.id)),
+            icon: <Eye className="h-4 w-4" />,
+        },
+    ];
 
     // Column definitions
     const colDefs = useMemo<ColDef<WoDetailsListResponseDto>[]>(
@@ -168,7 +153,7 @@ const KickOffListPage = () => {
             {
                 headerName: '',
                 filter: false,
-                cellRenderer: (params: any) => <ActionMenu rowData={params.data} actions={getRowActions(params.data)} />,
+                cellRenderer: createActionColumnRenderer(rowActions),
                 sortable: false,
                 pinned: 'right',
                 width: 57,
@@ -278,14 +263,6 @@ const KickOffListPage = () => {
             </CardContent>
 
             {/* Modals */}
-            {selectedWoId && selectedBasicDetailId && (
-                <WoKickoffMeetingDialog
-                    isOpen={isKickoffOpen}
-                    onOpenChange={setIsKickoffOpen}
-                    woDetailId={selectedWoId}
-                    woBasicDetailId={selectedBasicDetailId}
-                />
-            )}
             {selectedWoId && selectedKickoffId && (
                 <WoUploadMomDialog
                     isOpen={isUploadMomOpen}
