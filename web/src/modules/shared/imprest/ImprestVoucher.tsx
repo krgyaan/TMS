@@ -32,7 +32,7 @@ const ImprestVoucherList: React.FC = () => {
 
     // ✅ Fetch vouchers
     const { data: rows = [], isLoading } = useImprestVoucherList(queryUserId);
-    console.log(rows);
+    // console.log(rows);
 
     const actionItems = useMemo(
         () => [
@@ -70,6 +70,13 @@ const ImprestVoucherList: React.FC = () => {
         () => [
             // ✅ Employee / Beneficiary column
             { field: "beneficiaryName", headerName: "Employee" },
+            {
+                field: "voucherNumber",
+                headerName: "Voucher No.",
+                valueGetter: (p: any) => {
+                    return p.data?.voucherCode ? p.data.voucherCode : "-";
+                },
+            },
 
             // ✅ Voucher Period column (Year + Week + Range)
             {
