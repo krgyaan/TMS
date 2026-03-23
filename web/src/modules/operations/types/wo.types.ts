@@ -1211,6 +1211,12 @@ export interface KickoffMeeting {
   updatedAt: string;
 }
 
+export interface KickoffMeetingCount {
+  not_scheduled: number;
+  scheduled: number;
+  total: number;
+}
+
 export interface SaveKickoffMeetingDto {
   woDetailId: number;
   meetingDate?: string | null;

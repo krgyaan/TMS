@@ -3,6 +3,7 @@ import { BaseApiService } from './base.service';
 import type {
     KickOffFilters,
     KickoffMeeting,
+    KickoffMeetingCount,
     SaveKickoffMeetingDto,
     UpdateKickoffMeetingMomDto
 } from '@/modules/operations/types/wo.types';
@@ -45,6 +46,15 @@ class KickOffMeetingApiService extends BaseApiService {
 
         const queryString = search.toString();
         return this.get<PaginatedResponse<KickoffMeeting>>(queryString ? `/dashboard?${queryString}` : '/dashboard');
+    }
+
+    async getDashboardCounts(teamId?: number) {
+        const search = new URLSearchParams();
+        if (teamId !== undefined && teamId !== null) {
+            search.set('teamId', String(teamId));
+        }
+        const queryString = search.toString();
+        return this.get<KickoffMeetingCount>(queryString ? `/dashboard/counts?${queryString}` : '/dashboard/counts');
     }
 
     async getByWoDetailId(woDetailId: number): Promise<KickoffMeeting | null> {

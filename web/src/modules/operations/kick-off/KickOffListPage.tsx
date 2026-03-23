@@ -16,7 +16,7 @@ import type { KickOffListDto } from '@/modules/operations/types/wo.types';
 import { currencyCol, dateCol } from '@/components/data-grid';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { WoUploadMomDialog } from './components/WoUploadMomDialog';
-import { useKickoffMeetings } from '@/hooks/api/useKickoffMeeting';
+import { useKickoffMeetingDashboardCounts, useKickoffMeetings } from '@/hooks/api/useKickoffMeeting';
 
 type TabKey = 'scheduled' | 'not_scheduled';
 
@@ -61,6 +61,8 @@ const KickOffListPage = () => {
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );
 
+    const { data: counts } = useKickoffMeetingDashboardCounts();
+
     // Client-side filtering fallback (if backend doesn't support kickoffScheduled filter)
     const allRows = apiResponse?.data || [];
     const tableData = useMemo(() => {
@@ -74,20 +76,13 @@ const KickOffListPage = () => {
 
     const totalRows = apiResponse?.meta?.total || tableData.length;
 
-    // Calculate counts for tabs
-    const tabCounts = useMemo(() => {
-        const notScheduled = allRows.filter((row) => !row.id).length;
-        const scheduled = allRows.filter((row) => !!row.id).length;
-        return { notScheduled, scheduled };
-    }, [allRows]);
-
     // Tab configuration with counts
     const tabsConfig = useMemo(() => {
         return [
-            { key: 'not_scheduled' as const, name: 'Not Scheduled', count: tabCounts.notScheduled },
-            { key: 'scheduled' as const, name: 'Scheduled', count: tabCounts.scheduled },
+            { key: 'not_scheduled' as const, name: 'Not Scheduled', count: counts?.not_scheduled ?? 0 },
+            { key: 'scheduled' as const, name: 'Scheduled', count: counts?.scheduled ?? 0 },
         ];
-    }, [tabCounts]);
+    }, [counts]);
 
     // Action items for "Not Scheduled" tab
     const notScheduledActions: ActionItem<KickOffListDto>[] = useMemo(() => [
