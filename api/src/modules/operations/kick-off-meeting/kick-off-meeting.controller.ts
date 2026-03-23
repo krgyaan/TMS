@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, UseGuards, Query } from '@nestjs/common';
 import { KickOffMeetingService } from './kick-off-meeting.service';
 import { SaveKickOffMeetingSchema, UpdateKickOffMeetingMomSchema } from './dto/kick-off-meeting.dto';
 import type { SaveKickOffMeetingDto, UpdateKickOffMeetingMomDto } from './dto/kick-off-meeting.dto';
@@ -10,6 +10,46 @@ import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 @UseGuards(JwtAuthGuard)
 export class KickOffMeetingController {
   constructor(private readonly kickOffMeetingService: KickOffMeetingService) {}
+
+      @Get('dashboard')
+      async getDashboard(
+          @Query('tab') tab?: 'scheduled' | 'not_scheduled',
+          @Query('page') page?: string,
+          @Query('limit') limit?: string,
+          @Query('sortBy') sortBy?: string,
+          @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+          @Query('search') search?: string,
+          @CurrentUser() user?: ValidatedUser,
+          @Query('teamId') teamId?: string,
+      ) {
+          const parseNumber = (v?: string): number | undefined => {
+              if (!v) return undefined;
+              const num = parseInt(v, 10);
+              return Number.isNaN(num) ? undefined : num;
+          };
+          const result = await this.kickOffMeetingService.getDashboardData(tab, {
+              page: page ? parseInt(page, 10) : undefined,
+              limit: limit ? parseInt(limit, 10) : undefined,
+              sortBy,
+              sortOrder,
+              search,
+          }, user, parseNumber(teamId));
+
+          return result;
+      }
+
+      @Get('dashboard/counts')
+      getDashboardCounts(
+          @CurrentUser() user?: ValidatedUser,
+          @Query('teamId') teamId?: string,
+      ) {
+          const parseNumber = (v?: string): number | undefined => {
+              if (!v) return undefined;
+              const num = parseInt(v, 10);
+              return Number.isNaN(num) ? undefined : num;
+          };
+          return this.kickOffMeetingService.getDashboardCounts(user, parseNumber(teamId));
+      }
 
   @Get('wo-detail/:woDetailId')
   async getByWoDetailId(@Param('woDetailId', ParseIntPipe) woDetailId: number) {

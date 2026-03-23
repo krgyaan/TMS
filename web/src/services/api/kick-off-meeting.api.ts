@@ -16,8 +16,35 @@ class KickOffMeetingApiService extends BaseApiService {
         return this.get(`/${id}`);
     }
 
-    async getAll(filters: KickOffFilters): Promise<PaginatedResponse<KickoffMeeting>> {
-        return this.getAll(filters);
+    async getAll(params: KickOffFilters, teamId?: number): Promise<PaginatedResponse<KickoffMeeting>> {
+        const search = new URLSearchParams();
+
+        if (params) {
+            if (params.tab) {
+                search.set('tab', String(params.tab));
+            }
+            if (params.page) {
+                search.set('page', String(params.page));
+            }
+            if (params.limit) {
+                search.set('limit', String(params.limit));
+            }
+            if (params.sortBy) {
+                search.set('sortBy', params.sortBy);
+            }
+            if (params.sortOrder) {
+                search.set('sortOrder', params.sortOrder);
+            }
+            if (params.search) {
+                search.set('search', params.search);
+            }
+        }
+        if (teamId !== undefined && teamId !== null) {
+            search.set('teamId', String(teamId));
+        }
+
+        const queryString = search.toString();
+        return this.get<PaginatedResponse<KickoffMeeting>>(queryString ? `/dashboard?${queryString}` : '/dashboard');
     }
 
     async getByWoDetailId(woDetailId: number): Promise<KickoffMeeting | null> {

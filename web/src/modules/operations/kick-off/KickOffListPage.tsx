@@ -17,9 +17,9 @@ import { currencyCol, dateCol } from '@/components/data-grid';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { useTeamFilter } from '@/hooks/useTeamFilter';
 import { WoUploadMomDialog } from './components/WoUploadMomDialog';
-import { useKickoffMeeting } from '@/hooks/api/useKickoffMeeting';
+import { useKickoffMeetings } from '@/hooks/api/useKickoffMeeting';
 
-type TabKey = 'not_scheduled' | 'scheduled';
+type TabKey = 'scheduled' | 'not_scheduled';
 
 const KickOffListPage = () => {
     const [activeTab, setActiveTab] = useState<TabKey>('not_scheduled');
@@ -59,30 +59,24 @@ const KickOffListPage = () => {
     // Build filters based on active tab
     const filters: KickOffFilters = useMemo(() => {
         const baseFilters: KickOffFilters = {
+            tab: activeTab,
             page: pagination.pageIndex + 1,
             limit: pagination.pageSize,
             search: debouncedSearch || undefined,
             sortBy: sortModel[0]?.colId || 'woDate',
             sortOrder: sortModel[0]?.sort || 'desc',
             teamId: teamId === null ? undefined : teamId,
-            kickoffScheduled: true,
         };
-
-        // Add tab-specific filters
-        switch (activeTab) {
-            case 'not_scheduled':
-                baseFilters.kickoffScheduled = false;
-                break;
-            case 'scheduled':
-                baseFilters.kickoffScheduled = true;
-                break;
-        }
 
         return baseFilters;
     }, [activeTab, pagination, debouncedSearch, sortModel, teamId]);
 
     // Fetch data
-    const { data: apiResponse, isLoading: loading, error } = useKickoffMeeting(filters);
+    const { data: apiResponse, isLoading: loading, error } = useKickoffMeetings(
+        activeTab,
+        { page: pagination.pageIndex + 1, limit: pagination.pageSize, search: debouncedSearch || undefined },
+        { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
+    );
 
     // Client-side filtering fallback (if backend doesn't support kickoffScheduled filter)
     const allRows = apiResponse?.data || [];
@@ -107,8 +101,8 @@ const KickOffListPage = () => {
     // Tab configuration with counts
     const tabsConfig = useMemo(() => {
         return [
-            { key: 'not_scheduled' as const, name: 'Not Scheduled', count: tabCounts.notScheduled },
             { key: 'scheduled' as const, name: 'Scheduled', count: tabCounts.scheduled },
+            { key: 'not_scheduled' as const, name: 'Not Scheduled', count: tabCounts.notScheduled },
         ];
     }, [tabCounts]);
 

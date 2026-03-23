@@ -1,25 +1,61 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { kickOffMeetingApi } from '@/services/api/kick-off-meeting.api';
-import type { KickOffFilters, SaveKickoffMeetingDto, UpdateKickoffMeetingMomDto } from '@/modules/operations/types/wo.types';
+import type { SaveKickoffMeetingDto, UpdateKickoffMeetingMomDto } from '@/modules/operations/types/wo.types';
+import { useTeamFilter } from '../useTeamFilter';
 
 export const KICKOFF_MEETING_KEYS = {
     all: ['kickOffMeetings'] as const,
     byWoDetailId: (id: number) => [...KICKOFF_MEETING_KEYS.all, 'woDetailId', id] as const,
+    lists: () => [...KICKOFF_MEETING_KEYS.all, 'list'] as const,
+    detail: (id: number) => [...KICKOFF_MEETING_KEYS.all, 'detail', id] as const,
+    list: (filters?: Record<string, unknown>) => [...KICKOFF_MEETING_KEYS.lists(), { filters }] as const,
+    dashboardCounts: () => [...KICKOFF_MEETING_KEYS.all, 'dashboardCounts'] as const,
 };
 
-export const useKickoffMeetings = (filters: KickOffFilters) => {
+export const useKickoffMeetings = (
+    tab?: 'scheduled' | 'not_scheduled',
+    pagination: { page: number; limit: number; search?: string } = { page: 1, limit: 50 },
+    sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
+) => {
+    const { teamId, userId, dataScope } = useTeamFilter();
+        // Only pass teamId for Super User/Admin (dataScope === 'all') when a team is selected
+        const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+
+        const params = {
+            ...(tab && { tab }),
+            page: pagination.page,
+            limit: pagination.limit,
+            ...(sort?.sortBy && { sortBy: sort.sortBy }),
+            ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
+            ...(pagination.search && { search: pagination.search }),
+        };
+
+        const queryKeyFilters = {
+            tab,
+            ...pagination,
+            ...sort,
+            dataScope,
+            teamId: teamId ?? null,
+            userId: userId ?? null,
+        };
+
     return useQuery({
-        queryKey: KICKOFF_MEETING_KEYS.all,
-        queryFn: () => kickOffMeetingApi.getAll(filters),
-        staleTime: 5 * 60 * 1000,
+        queryKey: KICKOFF_MEETING_KEYS.list(queryKeyFilters),
+        queryFn: () => kickOffMeetingApi.getAll(params, teamIdParam),
+        placeholderData: (previousData) => {
+            if (previousData && typeof previousData === 'object' && 'data' in previousData && 'meta' in previousData) {
+                return previousData;
+            }
+            return undefined;
+        },
     });
 };
 
 export const useKickoffMeeting = (id: number) => {
     return useQuery({
-        queryKey: KICKOFF_MEETING_KEYS.all,
-        queryFn: () => kickOffMeetingApi.getOne(id),
-        staleTime: 5 * 60 * 1000,
+        queryKey: KICKOFF_MEETING_KEYS.byWoDetailId(id),
+        queryFn: () => kickOffMeetingApi.getByWoDetailId(id),
+        enabled: !!id,
     });
 };
 

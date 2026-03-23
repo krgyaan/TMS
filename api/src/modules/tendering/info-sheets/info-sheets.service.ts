@@ -851,10 +851,10 @@ export class TenderInfoSheetsService {
 
         const [websiteData, orgData] = await Promise.all([
             tender.website ? this.db.select({ name: websites.name, url: websites.url }).from(websites).where(eq(websites.id, tender.website)).limit(1) : Promise.resolve([]),
-            tender.organization ? this.db.select({ name: organizations.name }).from(organizations).where(eq(organizations.id, tender.organization)).limit(1) : Promise.resolve([]),
+            tender.organization ? this.db.select({ name: organizations.name, shortName: organizations.acronym }).from(organizations).where(eq(organizations.id, tender.organization)).limit(1) : Promise.resolve([]),
         ]);
         const websiteName = websiteData[0]?.name || websiteData[0]?.url || 'Not specified';
-        const organizationName = orgData[0]?.name || 'Not specified';
+        const organizationName = orgData[0]?.name || orgData[0]?.shortName || 'Not specified';
 
         // Format due date
         const dueDate = tender.dueDate ? new Date(tender.dueDate).toLocaleString('en-IN', {
@@ -875,7 +875,7 @@ export class TenderInfoSheetsService {
         // Format percentage
         const formatPercent = (value: string | null) => {
             if (!value) return '0';
-            return `${value}%`;
+            return `${value}`;
         };
 
         // Fetch all PQR and Finance documents for mapping

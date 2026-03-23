@@ -459,15 +459,13 @@ export interface UpdateWoDetailDto {
 }
 
 export interface KickOffFilters {
+  tab?: 'scheduled' | 'not_scheduled';
   page?: number;
   limit?: number;
   sortBy?: string;
   sortOrder?: SortOrder;
   search?: string;
   teamId?: number;
-  userId?: number;
-  dataScope?: string;
-  kickoffScheduled?: boolean;
 }
 
 export interface WoDetailsFilters {

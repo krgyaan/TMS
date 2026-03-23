@@ -9,6 +9,14 @@ import { SaveKickOffMeetingDto, UpdateKickOffMeetingMomDto } from './dto/kick-of
 export class KickOffMeetingService {
   constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
 
+  async getDashboardData(tab: string, filters: any, user: any, teamId?: number) {
+    return;
+  }
+
+  async getDashboardCounts(user: any, teamId?: number) {
+    return;
+  }
+
   async getByWoDetailId(woDetailId: number) {
     const [meeting] = await this.db
       .select()
