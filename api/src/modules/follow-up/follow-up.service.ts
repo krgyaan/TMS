@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, Inject, LoggerService, InternalServerErrorException } from "@nestjs/common";
-import { eq, ne, and, or, isNull, sql, desc, asc, like, SQL, inArray } from "drizzle-orm";
+import { eq, ne, and, or, isNull, sql, desc, asc, like, SQL, inArray, ilike } from "drizzle-orm";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 
@@ -263,7 +263,19 @@ export class FollowUpService {
             const conditions: SQL[] = [isNull(followUps.deletedAt)];
 
             if (search) {
-                conditions.push(or(like(followUps.partyName, `%${search}%`), like(followUps.area, `%${search}%`), sql`CAST(${followUps.amount} AS TEXT) LIKE ${`%${search}%`}`)!);
+                const pattern = `%${search}%`;
+
+                // Subquery: find user IDs whose name matches
+                const matchingUserIds = this.db.select({ id: users.id }).from(users).where(ilike(users.name, pattern));
+
+                conditions.push(
+                    or(
+                        ilike(followUps.partyName, pattern),
+                        ilike(followUps.area, pattern),
+                        sql`CAST(${followUps.amount} AS TEXT) ILIKE ${pattern}`,
+                        inArray(followUps.assignedToId, matchingUserIds) // 👈 name search
+                    )!
+                );
             }
 
             const today = new Date().toLocaleDateString("en-CA");
