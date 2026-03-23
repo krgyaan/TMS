@@ -12,10 +12,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Eye, FileX2, Search, CheckCircle, Upload } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import type { WoDetailsListResponseDto, KickOffFilters } from '@/modules/operations/types/wo.types';
+import type { WoDetailsListResponseDto } from '@/modules/operations/types/wo.types';
 import { currencyCol, dateCol } from '@/components/data-grid';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
-import { useTeamFilter } from '@/hooks/useTeamFilter';
 import { WoUploadMomDialog } from './components/WoUploadMomDialog';
 import { useKickoffMeetings } from '@/hooks/api/useKickoffMeeting';
 
@@ -28,7 +27,6 @@ const KickOffListPage = () => {
     const [search, setSearch] = useState<string>('');
     const debouncedSearch = useDebouncedSearch(search, 300);
     const navigate = useNavigate();
-    const { teamId } = useTeamFilter();
 
     // Upload MOM modal state
     const [selectedWoId, setSelectedWoId] = useState<number | null>(null);
@@ -56,21 +54,6 @@ const KickOffListPage = () => {
         setPagination({ pageIndex: 0, pageSize: newPageSize });
     }, []);
 
-    // Build filters based on active tab
-    const filters: KickOffFilters = useMemo(() => {
-        const baseFilters: KickOffFilters = {
-            tab: activeTab,
-            page: pagination.pageIndex + 1,
-            limit: pagination.pageSize,
-            search: debouncedSearch || undefined,
-            sortBy: sortModel[0]?.colId || 'woDate',
-            sortOrder: sortModel[0]?.sort || 'desc',
-            teamId: teamId === null ? undefined : teamId,
-        };
-
-        return baseFilters;
-    }, [activeTab, pagination, debouncedSearch, sortModel, teamId]);
-
     // Fetch data
     const { data: apiResponse, isLoading: loading, error } = useKickoffMeetings(
         activeTab,
@@ -83,9 +66,9 @@ const KickOffListPage = () => {
     const tableData = useMemo(() => {
         return allRows.filter((row) => {
             if (activeTab === 'not_scheduled') {
-                return !row.kickoffScheduled;
+                return !row.id;
             }
-            return !!row.kickoffMeetingId;
+            return !!row.id;
         });
     }, [allRows, activeTab]);
 
@@ -93,16 +76,16 @@ const KickOffListPage = () => {
 
     // Calculate counts for tabs
     const tabCounts = useMemo(() => {
-        const notScheduled = allRows.filter((row) => !row.kickoffMeetingId).length;
-        const scheduled = allRows.filter((row) => !!row.kickoffMeetingId).length;
+        const notScheduled = allRows.filter((row) => !row.id).length;
+        const scheduled = allRows.filter((row) => !!row.id).length;
         return { notScheduled, scheduled };
     }, [allRows]);
 
     // Tab configuration with counts
     const tabsConfig = useMemo(() => {
         return [
-            { key: 'scheduled' as const, name: 'Scheduled', count: tabCounts.scheduled },
             { key: 'not_scheduled' as const, name: 'Not Scheduled', count: tabCounts.notScheduled },
+            { key: 'scheduled' as const, name: 'Scheduled', count: tabCounts.scheduled },
         ];
     }, [tabCounts]);
 
@@ -156,7 +139,7 @@ const KickOffListPage = () => {
                 field: 'woNumber',
                 colId: 'woNumber',
                 headerName: 'WO Number',
-                width: 130,
+                width: 160,
                 sortable: true,
                 filter: true,
             },
@@ -176,24 +159,13 @@ const KickOffListPage = () => {
                 colId: 'woValueGstAmt',
             }),
             {
-                field: 'status',
-                colId: 'status',
+                field: 'woStatus',
+                colId: 'woStatus',
                 headerName: 'WO Status',
                 width: 130,
                 cellRenderer: (params: any) => (
                     <Badge variant="outline" className="capitalize">
                         {params.value?.replaceAll('_', ' ') || '—'}
-                    </Badge>
-                ),
-            },
-            {
-                field: 'woAcceptanceStatus',
-                colId: 'woAcceptanceStatus',
-                headerName: 'Acceptance',
-                width: 130,
-                cellRenderer: (params: any) => (
-                    <Badge variant="outline" className="capitalize">
-                        {params.value ? params.value?.replaceAll('_', ' ') : 'Pending'}
                     </Badge>
                 ),
             },

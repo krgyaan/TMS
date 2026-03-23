@@ -397,7 +397,7 @@ export interface WoDetailsListResponseDto {
   ldApplicable: boolean;
   isContractAgreement: boolean;
   oeWoAmendmentNeeded: boolean;
-  status: WoDetailsStatus;
+  woStatus: WoDetailsStatus;
   woAcceptanceId: number | null;
   woAcceptanceStatus: WoAcceptanceStatus | null;
   kickoffMeetingId?: number | null;
