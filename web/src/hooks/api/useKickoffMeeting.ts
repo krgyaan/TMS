@@ -9,7 +9,7 @@ export const KICKOFF_MEETING_KEYS = {
     lists: () => [...KICKOFF_MEETING_KEYS.all, 'list'] as const,
     detail: (id: number) => [...KICKOFF_MEETING_KEYS.all, 'detail', id] as const,
     list: (filters?: Record<string, unknown>) => [...KICKOFF_MEETING_KEYS.lists(), { filters }] as const,
-    dashboardCounts: () => [...KICKOFF_MEETING_KEYS.all, 'dashboardCounts'] as const,
+    dashboardCounts: (teamId?: number) => [...KICKOFF_MEETING_KEYS.all, 'dashboardCounts', { teamId }] as const,
 };
 
 export const useKickoffMeetings = (
@@ -48,6 +48,17 @@ export const useKickoffMeetings = (
             }
             return undefined;
         },
+    });
+};
+
+export const useKickoffMeetingDashboardCounts = () => {
+    const { teamId, dataScope } = useTeamFilter();
+    // Only pass teamId for Super User/Admin (dataScope === 'all') when a team is selected
+    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+
+    return useQuery({
+        queryKey: KICKOFF_MEETING_KEYS.dashboardCounts(teamIdParam),
+        queryFn: () => kickOffMeetingApi.getDashboardCounts(teamIdParam),
     });
 };
 
