@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState, useDeferredValue } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
@@ -143,6 +143,7 @@ const FollowupPage: React.FC = () => {
     ================================ */
     const [activeTab, setActiveTab] = useState<FollowUpQueryDto["tab"]>("ongoing");
     const [searchQuery, setSearchQuery] = useState("");
+    const [debouncedQuery, setDebouncedQuery] = useState<string | null>("");
 
     const [date, setDate] = useState<Date>();
     const [comment, setComment] = useState("");
@@ -154,17 +155,24 @@ const FollowupPage: React.FC = () => {
     const [proofImage, setProofImage] = useState<File | null>(null);
     const [stopRemarks, setStopRemarks] = useState("");
 
+    const deferedSearchQuery = useDeferredValue(searchQuery);
+
     const { canDelete } = useAuth();
+
+    const queryParams = useMemo(
+        () => ({
+            tab: activeTab,
+            page: 1,
+            limit: 10,
+            search: deferedSearchQuery || undefined,
+        }),
+        [activeTab, deferedSearchQuery]
+    );
 
     /* ================================
        DATA
     ================================ */
-    const { data, isLoading, error } = useFollowUpList({
-        tab: activeTab,
-        page: 1,
-        limit: 10,
-        search: searchQuery || undefined,
-    });
+    const { data, isLoading, error } = useFollowUpList(queryParams);
 
     const followups = data?.data ?? [];
 
@@ -179,11 +187,16 @@ const FollowupPage: React.FC = () => {
 
     const [personModalOpen, setPersonModalOpen] = useState(false);
     const [personList, setPersonList] = useState<FollowUpRow["followPerson"]>([]);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     const handleOpenUpdateModal = (id: number) => {
         setSelectedId(id);
         setUpdateModalOpen(true);
     };
+
+    // =============================
+    //     SEARCH LOGIC
+    // =============================
 
     const handleUpdateStatus = async () => {
         if (!selectedId) return;
@@ -289,6 +302,18 @@ const FollowupPage: React.FC = () => {
         setPersonList(persons ?? []);
         setPersonModalOpen(true);
     };
+    const gridOptions = useMemo(
+        () => ({
+            defaultColDef: { editable: false, filter: true },
+            pagination: true,
+            paginationPageSize: 20,
+            rowHeight: 48,
+            headerHeight: 44,
+            suppressCellFocus: true,
+            getRowId: (params: any) => String(params.data.id),
+        }),
+        []
+    );
 
     /* ================================
        COLUMNS
@@ -424,35 +449,6 @@ const FollowupPage: React.FC = () => {
     ];
 
     /* ================================
-       RENDER - LOADING
-    ================================ */
-    if (isLoading) {
-        return (
-            <Card>
-                <CardContent className="flex items-center justify-center h-64">
-                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                    <span className="ml-2 text-muted-foreground">Loading follow-ups…</span>
-                </CardContent>
-            </Card>
-        );
-    }
-
-    /* ================================
-       RENDER - ERROR
-    ================================ */
-    if (error) {
-        return (
-            <Card>
-                <CardContent className="flex flex-col items-center justify-center h-64 gap-2">
-                    <AlertCircle className="h-8 w-8 text-destructive" />
-                    <p className="text-sm font-medium">Failed to load follow-ups</p>
-                    <p className="text-xs text-muted-foreground">Please try again later</p>
-                </CardContent>
-            </Card>
-        );
-    }
-
-    /* ================================
        RENDER - MAIN
     ================================ */
     return (
@@ -487,35 +483,32 @@ const FollowupPage: React.FC = () => {
 
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                        <Input placeholder="Search follow-ups…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9 w-64" />
+                        <Input className="pl-10" placeholder="Search follow ups..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                     </div>
                 </div>
 
-                {/* Table */}
-                <div className="flex-1 min-h-0">
-                    <DataTable
-                        className="h-full"
-                        data={followups}
-                        columnDefs={columns}
-                        gridOptions={{
-                            defaultColDef: { editable: false, filter: true },
-                            pagination: true,
-                            paginationPageSize: 20,
-                            rowHeight: 48,
-                            headerHeight: 44,
-                            suppressCellFocus: true,
-                        }}
-                    />
+                <div className="flex-1 min-h-0 relative">
+                    {error ? (
+                        <div className="flex flex-col items-center justify-center h-64 gap-2">
+                            <AlertCircle className="h-8 w-8 text-destructive" />
+                            <p className="text-sm font-medium">Failed to load follow-ups</p>
+                            <p className="text-xs text-muted-foreground">Please try again later</p>
+                        </div>
+                    ) : isLoading ? (
+                        <div className="flex items-center justify-center h-64">
+                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                            <span className="ml-2 text-muted-foreground">Loading follow-ups…</span>
+                        </div>
+                    ) : followups.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 text-center">
+                            <MessageSquare className="h-10 w-10 text-muted-foreground/50 mb-3" />
+                            <p className="text-sm font-medium">No follow-ups found</p>
+                            <p className="text-xs text-muted-foreground mt-1">{searchQuery ? "Try adjusting your search query" : "Create a new follow-up to get started"}</p>
+                        </div>
+                    ) : (
+                        <DataTable className="h-full" data={followups} columnDefs={columns} gridOptions={gridOptions} />
+                    )}
                 </div>
-
-                {/* Empty State */}
-                {followups.length === 0 && !isLoading && (
-                    <div className="flex flex-col items-center justify-center py-12 text-center">
-                        <MessageSquare className="h-10 w-10 text-muted-foreground/50 mb-3" />
-                        <p className="text-sm font-medium">No follow-ups found</p>
-                        <p className="text-xs text-muted-foreground mt-1">{searchQuery ? "Try adjusting your search query" : "Create a new follow-up to get started"}</p>
-                    </div>
-                )}
             </CardContent>
 
             {/* ================================

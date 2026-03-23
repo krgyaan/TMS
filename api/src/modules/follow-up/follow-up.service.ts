@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, Inject, LoggerService, InternalServerErrorException } from "@nestjs/common";
-import { eq, ne, and, or, isNull, sql, desc, asc, like, SQL, inArray } from "drizzle-orm";
+import { eq, ne, and, or, isNull, sql, desc, asc, like, SQL, inArray, ilike } from "drizzle-orm";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 
@@ -73,6 +73,7 @@ export class FollowUpService {
             contactsCount: dto.contacts?.length ?? 0,
         });
 
+        this.logger.debug({ message: "The DATA received for creating follow up ", dto });
         try {
             // ------------------------
             // NORMALIZE CONTACTS
@@ -263,7 +264,19 @@ export class FollowUpService {
             const conditions: SQL[] = [isNull(followUps.deletedAt)];
 
             if (search) {
-                conditions.push(or(like(followUps.partyName, `%${search}%`), like(followUps.area, `%${search}%`), sql`CAST(${followUps.amount} AS TEXT) LIKE ${`%${search}%`}`)!);
+                const pattern = `%${search}%`;
+
+                // Subquery: find user IDs whose name matches
+                const matchingUserIds = this.db.select({ id: users.id }).from(users).where(ilike(users.name, pattern));
+
+                conditions.push(
+                    or(
+                        ilike(followUps.partyName, pattern),
+                        ilike(followUps.area, pattern),
+                        sql`CAST(${followUps.amount} AS TEXT) ILIKE ${pattern}`,
+                        inArray(followUps.assignedToId, matchingUserIds) // 👈 name search
+                    )!
+                );
             }
 
             const today = new Date().toLocaleDateString("en-CA");
@@ -394,7 +407,7 @@ export class FollowUpService {
     // UPDATE
     // ========================
 
-    async update(id: number, dto: any, files: Express.Multer.File[], currentUser: { id: number; name: string }): Promise<FollowUp> {
+    async update(id: number, dto: any, files: Express.Multer.File[], proofImage: Express.Multer.File | null, currentUser: { id: number; name: string }): Promise<FollowUp> {
         this.logger.info("Updating follow-up", {
             followUpId: id,
             userId: currentUser.id,
@@ -467,6 +480,10 @@ export class FollowUpService {
             if (data.proofText !== undefined) updateData.proofText = data.proofText;
             if (data.stopRemarks !== undefined) updateData.stopRemarks = data.stopRemarks;
 
+            if (proofImage) {
+                updateData.proofImagePath = proofImage.filename;
+            }
+
             // ========================
             // ATTACHMENTS
             // ========================
@@ -495,7 +512,7 @@ export class FollowUpService {
             // ========================
             // UPDATE FOLLOW-UP
             // ========================
-            await this.db.update(followUps).set(updateData).where(eq(followUps.id, id));
+            const [updated] = await this.db.update(followUps).set(updateData).where(eq(followUps.id, id)).returning();
 
             this.logger.info("Follow-up main record updated", {
                 followUpId: id,
@@ -543,11 +560,65 @@ export class FollowUpService {
             // ========================
             // RETURN UPDATED FOLLOW-UP
             // ========================
-            const [updated] = await this.db.select().from(followUps).where(eq(followUps.id, id)).limit(1);
 
-            this.logger.info("Follow-up updated successfully", {
-                followUpId: id,
-            });
+            // ✅ NEW: Send stop mail when follow-up is being stopped
+            if (Number(data.frequency) === 6) {
+                try {
+                    if (!existing.assignedToId) {
+                        this.logger.warn("assignedToId missing, stop mail skipped", { followUpId: id });
+                    } else {
+                        const googleConnection = await this.googleService.getSanitizedGoogleConnection(existing.assignedToId);
+
+                        if (!googleConnection) {
+                            this.logger.warn("Google connection missing, stop mail skipped", { followUpId: id });
+                        } else {
+                            const [assigneeUser] = await this.db.select().from(users).where(eq(users.id, existing.assignedToId));
+                            const [creatorUser] = existing.createdById ? await this.db.select().from(users).where(eq(users.id, existing.createdById)) : [undefined];
+
+                            const admin = await this.mailAudience.getAdmin();
+                            const [coordinator] = await this.db.select().from(users).where(eq(users.id, 8));
+
+                            const stopReasonNum = Number(data.stopReason ?? existing.stopReason);
+                            const isObjectiveAchieved = stopReasonNum === 2;
+                            const isRemarks = stopReasonNum === 4;
+
+                            const mailPayload = {
+                                followUpInitiator: creatorUser?.name ?? "Team",
+                                followUpFor: existing.followupFor ?? "",
+                                organizationName: existing.partyName,
+                                reason: STOP_REASON_LABELS[stopReasonNum] ?? "",
+                                remarks: data.stopRemarks ?? existing.stopRemarks ?? "",
+                                proofs: data.proofText ?? existing.proofText ?? "",
+                                isObjectiveAchieved,
+                                isRemarks,
+                                teamMember: assigneeUser?.name ?? "Team Member",
+                            };
+
+                            // ✅ Now correctly uses proofImage from param
+                            const attachments = proofImage ? { files: [proofImage.filename], baseDir: "accounts" } : undefined;
+
+                            await this.mailerService.sendMail(
+                                FollowupMailTemplates.STOP,
+                                mailPayload,
+                                {
+                                    to: creatorUser?.email ? [creatorUser.email] : [],
+                                    cc: [admin.email, coordinator?.email].filter(Boolean) as string[],
+                                    subject: `Follow Up Stopped — ${existing.followupFor ?? existing.partyName}`,
+                                    attachments,
+                                },
+                                googleConnection
+                            );
+
+                            this.logger.info("Stop mail sent successfully", { followUpId: id });
+                        }
+                    }
+                } catch (mailError: any) {
+                    this.logger.error("Stop mail failed (non-blocking)", {
+                        followUpId: id,
+                        error: mailError.message,
+                    });
+                }
+            }
 
             return updated;
         } catch (error: any) {
