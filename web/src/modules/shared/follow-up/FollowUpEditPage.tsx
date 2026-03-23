@@ -72,6 +72,7 @@ const FollowUpEditPage: React.FC = () => {
     const [existingAttachments, setExistingAttachments] = useState<string[]>([]);
     const [removedAttachments, setRemovedAttachments] = useState<string[]>([]);
     const [newFiles, setNewFiles] = useState<File[]>([]);
+    const [proofImage, setProofImage] = useState<File | null>(null);
 
     /* ✅ HYDRATE FORM FROM API */
     useEffect(() => {
@@ -150,6 +151,11 @@ const FollowUpEditPage: React.FC = () => {
 
         // 4️⃣ New files
         newFiles.forEach(file => formData.append("attachments", file));
+
+        // 5️⃣ Proof image (only when stop reason is Objective Achieved)
+        if (proofImage) {
+            formData.append("proofImage", proofImage);
+        }
 
         updateMutation.mutateAsync(
             { id: followupId, data: formData },
@@ -401,6 +407,14 @@ const FollowUpEditPage: React.FC = () => {
                                                         placeholder={stopReason === 2 ? "Provide proof of objective achievement..." : "Enter remarks..."}
                                                         className="min-h-[80px]"
                                                     />
+                                                    {/* ✅ NEW: Proof image upload for Objective Achieved */}
+                                                    {stopReason === 2 && (
+                                                        <div className="space-y-1 mt-2">
+                                                            <Label>Proof Image</Label>
+                                                            <Input type="file" accept="image/*" onChange={e => setProofImage(e.target.files?.[0] ?? null)} />
+                                                            {proofImage && <p className="text-xs text-muted-foreground">{proofImage.name}</p>}
+                                                        </div>
+                                                    )}
                                                 </>
                                             )}
                                         </div>
