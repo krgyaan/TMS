@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Eye, FileX2, Search, CheckCircle, Upload } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import type { WoDetailsListResponseDto } from '@/modules/operations/types/wo.types';
+import type { KickOffListDto } from '@/modules/operations/types/wo.types';
 import { currencyCol, dateCol } from '@/components/data-grid';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { WoUploadMomDialog } from './components/WoUploadMomDialog';
@@ -90,33 +90,33 @@ const KickOffListPage = () => {
     }, [tabCounts]);
 
     // Action items for "Not Scheduled" tab
-    const notScheduledActions: ActionItem<WoDetailsListResponseDto>[] = useMemo(() => [
+    const notScheduledActions: ActionItem<KickOffListDto>[] = useMemo(() => [
         {
             label: 'Initiate Kickoff',
-            onClick: (row) => navigate(paths.operations.woKickOffCreatePage(row.id)),
+            onClick: (row) => navigate(paths.operations.woKickOffCreatePage(row.woDetailId)),
             icon: <CheckCircle className="h-4 w-4" />,
         },
         {
             label: 'View Details',
-            onClick: (row) => navigate(paths.operations.woBasicDetailShowPage(row.id)),
+            onClick: (row) => navigate(paths.operations.woBasicDetailShowPage(row.woDetailId)),
             icon: <Eye className="h-4 w-4" />,
         },
     ], [navigate]);
 
     // Action items for "Scheduled" tab
-    const scheduledActions: ActionItem<WoDetailsListResponseDto>[] = useMemo(() => [
+    const scheduledActions: ActionItem<KickOffListDto>[] = useMemo(() => [
         {
             label: 'Upload MOM',
             onClick: (row) => {
-                setSelectedWoId(row.id);
-                setSelectedKickoffId(row.kickoffMeetingId ?? null);
+                setSelectedWoId(row.woDetailId);
+                setSelectedKickoffId(row.id ?? null);
                 setIsUploadMomOpen(true);
             },
             icon: <Upload className="h-4 w-4" />,
         },
         {
             label: 'View Details',
-            onClick: (row) => navigate(paths.operations.woBasicDetailShowPage(row.id)),
+            onClick: (row) => navigate(paths.operations.woBasicDetailShowPage(row.woDetailId)),
             icon: <Eye className="h-4 w-4" />,
         },
     ], [navigate]);
@@ -125,13 +125,13 @@ const KickOffListPage = () => {
     const rowActions = activeTab === 'not_scheduled' ? notScheduledActions : scheduledActions;
 
     // Column definitions
-    const colDefs = useMemo<ColDef<WoDetailsListResponseDto>[]>(
+    const colDefs = useMemo<ColDef<KickOffListDto>[]>(
         () => [
             {
                 field: 'projectName',
                 colId: 'projectName',
                 headerName: 'Project Name',
-                width: 180,
+                width: 200,
                 sortable: true,
                 filter: true,
             },
@@ -139,30 +139,30 @@ const KickOffListPage = () => {
                 field: 'woNumber',
                 colId: 'woNumber',
                 headerName: 'WO Number',
-                width: 160,
+                width: 200,
                 sortable: true,
                 filter: true,
             },
-            dateCol<WoDetailsListResponseDto>('woDate', { includeTime: false }, {
+            dateCol<KickOffListDto>('woDate', { includeTime: false }, {
                 headerName: 'WO Date',
-                width: 120,
+                width: 150,
                 colId: 'woDate',
             }),
-            currencyCol<WoDetailsListResponseDto>('woValuePreGst', {
+            currencyCol<KickOffListDto>('woValuePreGst', {
                 headerName: 'WO Value',
-                width: 130,
+                width: 150,
                 colId: 'woValuePreGst',
             }),
-            currencyCol<WoDetailsListResponseDto>('woValueGstAmt', {
+            currencyCol<KickOffListDto>('woValueGstAmt', {
                 headerName: 'GST Amount',
-                width: 130,
+                width: 150,
                 colId: 'woValueGstAmt',
             }),
             {
                 field: 'woStatus',
                 colId: 'woStatus',
                 headerName: 'WO Status',
-                width: 130,
+                width: 150,
                 cellRenderer: (params: any) => (
                     <Badge variant="outline" className="capitalize">
                         {params.value?.replaceAll('_', ' ') || '—'}

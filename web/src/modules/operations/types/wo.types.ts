@@ -397,10 +397,24 @@ export interface WoDetailsListResponseDto {
   ldApplicable: boolean;
   isContractAgreement: boolean;
   oeWoAmendmentNeeded: boolean;
-  woStatus: WoDetailsStatus;
+  status: WoDetailsStatus;
   woAcceptanceId: number | null;
   woAcceptanceStatus: WoAcceptanceStatus | null;
-  kickoffMeetingId?: number | null;
+}
+
+export interface KickOffListDto {
+  id: number;
+  woDetailId: number;
+  projectName: string;
+  woNumber: string;
+  woDate: string;
+  woValuePreGst: string;
+  woValueGstAmt: string;
+  woStatus: WoDetailsStatus;
+  meetingDate: string | null;
+  meetingLink: string | null;
+  momFilePath: string | null;
+  teamMember: string;
 }
 
 export interface CreateWoDetailDto {
