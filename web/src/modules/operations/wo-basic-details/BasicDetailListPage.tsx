@@ -110,7 +110,7 @@ const BasicDetailListPage = () => {
         },
         {
             label: 'Assign OE',
-            onClick: (row) => navigate(paths.operations.woBasicDetailShowPage((row.id))),
+            onClick: (row) => navigate(paths.operations.woAssignOePage((row.id))),
             icon: <UserPlus className="h-4 w-4" />,
         },
         {

@@ -48,10 +48,10 @@ export function AssignOeForm({ mode, existingData }: AssignOeFormProps) {
             if (mode === "create") {
                 const payload = mapFormToAssignOePayload(values);
                 const result = await createMutation.mutateAsync(payload);
-                navigate(paths.operations.woDetailCreatePage(result.id));
+                navigate(paths.operations.woAssignOePage(result.id));
             } else if (existingData?.id) {
                 const payload = mapFormToAssignOePayload(values);
-                await updateMutation.mutateAsync({ id: existingData.id, data: payload });
+                await createMutation.mutateAsync({ id: existingData.id, data: payload });
                 navigate(paths.operations.woBasicDetailListPage);
             }
         } catch (error: any) {
