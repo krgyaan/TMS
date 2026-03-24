@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 
 /* UI Components */
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,12 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 /* Icons */
-import { Filter, Download, Calendar as CalendarIcon, TrendingUp, MapPin, Building2, Package } from "lucide-react";
+import { Filter, Download, Calendar as CalendarIcon } from "lucide-react";
 
 /* Custom Hooks */
 import { useItemHeadings, useCustomerPerformance } from "./customer-performance.hooks";
-import type { CustomerPerformanceResponse, SummaryItem, MetricEntry } from "./customer-performance.types";
-import { useOrganization, useOrganizations } from "@/hooks/api/useOrganizations";
+import { useOrganizationsTrue } from "@/hooks/api/useOrganizations";
 import { useTeams } from "@/hooks/api/useTeams";
 
 /* ================================
@@ -89,7 +88,7 @@ export default function CustomerPerformanceDashboard() {
 
     // Fetch headings for dropdown
     const { data: headings = [], isLoading: headingsLoading } = useItemHeadings();
-    const { data: organizations = [] } = useOrganizations();
+    const { data: organizations = [] } = useOrganizationsTrue();
     const { data: teams = [] } = useTeams();
 
     // Fetch customer performance data
