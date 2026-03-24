@@ -282,22 +282,25 @@ export class CourierService {
 
     //Actual business logic begins from here
     async create(data: CreateCourierDto, files: Express.Multer.File[], userId: number) {
-        const dto = CreateCourierSchema.parse(data);
-        this.logger.info("Courier DTO", { data: dto });
+        this.logger.info("Courier DTO", { data });
 
         try {
-            const courierDocs = Array.isArray(files) ? files.map(file => file.filename) : [];
+            const courierDocs = Array.isArray(files) ? files.map(file => file.filename).filter(Boolean) : [];
+
+            if (!data.empFrom) {
+                this.logger.warn("empFrom not provided, falling back to userId", { userId });
+            }
 
             const values = {
                 userId,
-                toOrg: dto.toOrg,
-                toName: dto.toName,
-                toAddr: dto.toAddr,
-                toPin: dto.toPin,
-                toMobile: dto.toMobile,
-                empFrom: dto.empFrom ?? userId,
-                delDate: dto.delDate,
-                urgency: dto.urgency,
+                toOrg: data.toOrg,
+                toName: data.toName,
+                toAddr: data.toAddr,
+                toPin: data.toPin,
+                toMobile: data.toMobile,
+                empFrom: data.empFrom ?? userId,
+                delDate: data.delDate,
+                urgency: data.urgency,
                 courierDocs,
                 status: COURIER_STATUS.PENDING,
             };
@@ -310,46 +313,53 @@ export class CourierService {
                 throw new Error("Failed to create courier");
             }
 
-            this.logger.info("Courier created successfully", {
-                courierId: courier.id,
-            });
+            this.logger.info("Courier created successfully", { courierId: courier.id });
 
-            if (!dto.empFrom) {
-                this.logger.warn("Emp From not found while sending courier create mail.");
-            }
-
-            // ===== MAIL SIDE EFFECT (non-blocking for courier creation) =====
+            // ===== MAIL SIDE EFFECT (non-blocking) =====
             try {
-                const googleConnection = await this.googleService.getSanitizedGoogleConnection(dto.empFrom);
+                let googleConnection = await this.googleService.getSanitizedGoogleConnection(data.empFrom ?? userId);
 
                 if (!googleConnection) {
-                    this.logger.warn("Google connection missing, mail skipped", {
+                    this.logger.warn("Google connection missing for empFrom, attempting fallback", {
+                        empFrom: courier.empFrom,
                         courierId: courier.id,
                     });
-                    return courier;
+
+                    const FALLBACK_MAIL_USER_ID = Number(process.env.FALLBACK_MAIL_USER_ID);
+                    googleConnection = await this.googleService.getSanitizedGoogleConnection(FALLBACK_MAIL_USER_ID);
                 }
 
-                let toEmailsList = await this.mailAudience.getEmailsByRoleId(4, 8);
+                if (!googleConnection) {
+                    this.logger.warn("Fallback Google connection also missing, mail skipped", {
+                        courierId: courier.id,
+                    });
+                } else {
+                    const [[fromUser], [{ email: toEmail }, { email: ccMail }]] = await Promise.all([
+                        this.db.select({ name: users.name }).from(users).where(eq(users.id, courier.empFrom)).limit(1),
+                        Promise.all([this.mailAudience.getCoo(), this.mailAudience.getAdmin()]),
+                    ]);
 
-                let ccMail = await this.mailAudience.getEmailsByRoleId(2);
+                    this.logger.info("Mail recipients resolved", { to: toEmail, cc: ccMail });
 
-                this.logger.info("To Email List", { toEmailsList });
-                this.logger.info("CC Email List", { ccMail });
+                    await this.mailerService.sendMail(
+                        CourierMailTemplates.COURIER_REQUEST,
+                        {
+                            ...courier,
+                            fromName: fromUser?.name ?? "",
+                            dispatchLink: `${process.env.FRONTEND_URL}/shared/couriers/dispatch/${courier.id}`,
+                        },
+                        {
+                            to: Array.isArray(toEmail) ? toEmail : [toEmail],
+                            cc: Array.isArray(ccMail) ? ccMail : [ccMail],
+                            bcc: ["abhigaur.test@gmail.com"],
+                            subject: "Courier Dispatch Request",
+                            attachments: courierDocs.length ? { files: courierDocs, baseDir: "courier" } : undefined,
+                        },
+                        googleConnection
+                    );
 
-                await this.mailerService.sendMail(
-                    CourierMailTemplates.COURIER_REQUEST,
-                    {
-                        ...courier,
-                        dispatch_link: `${process.env.FRONTEND_URL}/courier/${courier.id}/dispatch`,
-                    },
-                    {
-                        to: toEmailsList,
-                        cc: ccMail,
-                        subject: "Courier Dispatch Request",
-                        attachments: courierDocs.length ? { files: courierDocs, baseDir: "courier" } : undefined,
-                    },
-                    googleConnection
-                );
+                    this.logger.info("Courier mail sent successfully", { courierId: courier.id });
+                }
             } catch (mailError: any) {
                 this.logger.error("Courier mail failed (non-blocking)", {
                     courierId: courier.id,
@@ -418,79 +428,67 @@ export class CourierService {
 
     // Update status (delivery info)
     async updateStatus(id: number, statusData: UpdateCourierStatusInput, file: Express.Multer.File | undefined) {
-        this.logger.info("Updating courier status", {
-            courierId: id,
-            status: statusData.status,
-            hasFile: !!file,
-        });
+        this.logger.info("Updating courier status", { courierId: id, status: statusData.status, hasFile: !!file });
 
         try {
             const courierCheck = await this.findOne(id);
-            if (!courierCheck) {
-                this.logger.warn("Courier not found for status update", { courierId: id });
-                throw new NotFoundException("Courier not found");
-            }
+            if (!courierCheck) throw new NotFoundException("Courier not found");
 
-            const [user] = await this.db.select({ name: users.name, email: users.email, userId: users.id }).from(users).where(eq(users.id, courierCheck.empFrom)).limit(1);
-            const [coo] = await this.db.select().from(users).where(eq(users.id, courierCheck.empFrom));
-
-            const googleConnection = await this.googleService.getSanitizedGoogleConnection(coo.id);
-
-            const updateData: Record<string, any> = {
-                status: statusData.status,
-                updatedAt: new Date(),
-            };
+            const updateData: Record<string, any> = { status: statusData.status, updatedAt: new Date() };
 
             if (statusData.status === COURIER_STATUS.DELIVERED) {
                 if (file) updateData.deliveryPod = file.filename;
-
-                if (statusData.delivery_date) updateData.deliveryDate = statusData.delivery_date; // ✅ already Date
-
-                if (statusData.within_time !== undefined) updateData.withinTime = statusData.within_time; // ✅ already boolean
+                if (statusData.delivery_date) updateData.deliveryDate = statusData.delivery_date;
+                if (statusData.within_time !== undefined) updateData.withinTime = statusData.within_time;
             }
 
             const [updated] = await this.db.update(couriers).set(updateData).where(eq(couriers.id, id)).returning();
-
             this.logger.info("Courier status updated in DB", { courierId: id });
 
-            let [to] = await this.db.select().from(users).where(eq(users.id, courierCheck.empFrom));
-            let toEmailsList = to.email;
-            let ccMail = await this.mailAudience.getEmailsByRoleId(2);
-
-            this.logger.info("To Email List", { toEmailsList });
-            this.logger.info("CC Email List", { ccMail });
-
             // ===== Mail side effect (non-blocking) =====
-            if (statusData.status === COURIER_STATUS.DELIVERED && googleConnection) {
-                const statusLabel = COURIER_STATUS_LABELS[statusData.status] || "-";
+            if (statusData.status === COURIER_STATUS.DELIVERED) {
                 try {
-                    await this.mailerService.sendMail(
-                        CourierMailTemplates.COURIER_STATUS_UPDATE,
-                        { ...updated, fromName: user.name, statusLabel },
-                        {
-                            to: [toEmailsList],
-                            cc: ccMail,
-                            subject: `Courier sent to ${updated.toOrg}`,
-                            attachments: file ? { files: file.filename, baseDir: "courier" } : undefined,
-                        },
-                        googleConnection
-                    );
+                    const [cooUser, [recipientUser], ccMail] = await Promise.all([
+                        this.mailAudience.getCoo(),
+                        this.db.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, courierCheck.empFrom)).limit(1),
+                        this.mailAudience.getAdmin().then(a => a.email),
+                    ]);
 
-                    this.logger.info("Courier delivery mail sent", { courierId: id });
+                    let googleConnection = await this.googleService.getSanitizedGoogleConnection(cooUser.id);
+
+                    if (!googleConnection) {
+                        this.logger.warn("COO Google connection missing, trying fallback", { courierId: id });
+                        googleConnection = await this.googleService.getSanitizedGoogleConnection(Number(process.env.FALLBACK_MAIL_USER_ID));
+                    }
+
+                    if (!googleConnection) {
+                        this.logger.warn("Fallback Google connection also missing, delivery mail skipped", { courierId: id });
+                    } else {
+                        this.logger.info("Mail recipients resolved", { to: recipientUser.email, cc: ccMail });
+
+                        await this.mailerService.sendMail(
+                            CourierMailTemplates.COURIER_STATUS_UPDATE,
+                            { ...updated, fromName: recipientUser.name, cooName: cooUser.name, statusLabel: COURIER_STATUS_LABELS[statusData.status] ?? "-" },
+                            {
+                                to: [recipientUser.email],
+                                cc: Array.isArray(ccMail) ? ccMail : [ccMail],
+                                bcc: ["abhigaur.test@gmail.com"],
+                                subject: `Courier sent to ${updated.toOrg}`,
+                                attachments: file ? { files: file.filename, baseDir: "courier" } : undefined,
+                            },
+                            googleConnection
+                        );
+
+                        this.logger.info("Courier delivery mail sent", { courierId: id });
+                    }
                 } catch (mailErr: any) {
-                    this.logger.error("Delivery mail failed (non-blocking)", {
-                        courierId: id,
-                        error: mailErr.message,
-                    });
+                    this.logger.error("Delivery mail failed (non-blocking)", { courierId: id, error: mailErr.message });
                 }
             }
 
             return updated;
         } catch (error: any) {
-            this.logger.error("Failed to update courier status", {
-                courierId: id,
-                error: error.message,
-            });
+            this.logger.error("Failed to update courier status", { courierId: id, error: error.message });
             throw error;
         }
     }
@@ -498,12 +496,7 @@ export class CourierService {
     /**
      * Dispatch with optional docket slip file (POST endpoint)
      */
-    async createDispatch(
-        id: number,
-        dispatchData: CreateDispatchInput, // ← use zod inferred type
-        file: Express.Multer.File | undefined,
-        userId: number
-    ) {
+    async createDispatch(id: number, dispatchData: CreateDispatchInput, file: Express.Multer.File | undefined, userId: number) {
         this.logger.info("Creating courier dispatch", {
             courierId: id,
             userId,
@@ -517,7 +510,7 @@ export class CourierService {
             const updateData: Record<string, any> = {
                 courierProvider: dispatchData.courierProvider.trim(),
                 docketNo: dispatchData.docketNo.trim(),
-                pickupDate: dispatchData.pickupDate, // ✅ already Date
+                pickupDate: dispatchData.pickupDate,
                 status: COURIER_STATUS.DISPATCHED,
                 updatedAt: new Date(),
             };
@@ -528,41 +521,61 @@ export class CourierService {
 
             this.logger.info("Courier dispatch saved", { courierId: id });
 
-            //MAILING LIST
-            const from = await this.mailAudience.getCoo();
-
-            const googleConnection = await this.googleService.getSanitizedGoogleConnection(from.id);
-
-            let [to] = await this.db.select().from(users).where(eq(users.id, courierCheck.empFrom));
-            let toEmailsList = to.email;
-
-            let ccMail = await this.mailAudience.getEmailsByRoleId(2);
-
-            this.logger.info("To Email List", { toEmailsList });
-            this.logger.info("CC Email List", { ccMail });
-
             // ===== Mail side effect (non-blocking) =====
-            if (googleConnection) {
-                try {
+            try {
+                const cooUser = await this.mailAudience.getCoo();
+                let googleConnection = await this.googleService.getSanitizedGoogleConnection(cooUser.id);
+
+                if (!googleConnection) {
+                    this.logger.warn("Google connection missing for COO, attempting fallback", {
+                        courierId: id,
+                    });
+
+                    const FALLBACK_MAIL_USER_ID = Number(process.env.FALLBACK_MAIL_USER_ID);
+                    googleConnection = await this.googleService.getSanitizedGoogleConnection(FALLBACK_MAIL_USER_ID);
+                }
+
+                if (!googleConnection) {
+                    this.logger.warn("Fallback Google connection also missing, dispatch mail skipped", {
+                        courierId: id,
+                    });
+                } else {
+                    // [CHANGED] recipientUser is empFrom user (to:), ccMail is now getAdmin()
+                    // to match the same mailing pattern as updateStatus
+                    const [[recipientUser], { email: ccMail }] = await Promise.all([
+                        this.db.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, courierCheck.empFrom)).limit(1),
+                        // [CHANGED] was getEmailsByRoleId(2), now getAdmin() to match updateStatus
+                        this.mailAudience.getAdmin(),
+                    ]);
+
+                    this.logger.info("Mail recipients resolved", {
+                        to: recipientUser.email,
+                        cc: ccMail,
+                    });
+
                     await this.mailerService.sendMail(
                         CourierMailTemplates.COURIER_DISPATCH,
-                        { ...courier, fromName: from.name },
+                        // [CHANGED] fromName is recipientUser (empFrom user), cooName is COO
+                        // mail is sent from COO to empFrom user
+                        { ...courier, fromName: recipientUser.name, cooName: cooUser.name },
                         {
-                            to: [toEmailsList],
-                            cc: ccMail,
+                            to: [recipientUser.email],
+                            // [CHANGED] ccMail now comes from getAdmin() instead of getEmailsByRoleId(2)
+                            cc: Array.isArray(ccMail) ? ccMail : [ccMail],
+                            bcc: ["abhigaur.test@gmail.com"],
                             subject: `Courier sent to ${courier.toOrg}`,
                             attachments: file ? { files: file.filename, baseDir: "courier" } : undefined,
                         },
                         googleConnection
                     );
 
-                    this.logger.info("Courier delivery mail sent", { courierId: id });
-                } catch (mailErr: any) {
-                    this.logger.error("Delivery mail failed (non-blocking)", {
-                        courierId: id,
-                        error: mailErr.message,
-                    });
+                    this.logger.info("Courier dispatch mail sent", { courierId: id });
                 }
+            } catch (mailErr: any) {
+                this.logger.error("Dispatch mail failed (non-blocking)", {
+                    courierId: id,
+                    error: mailErr.message,
+                });
             }
 
             return courier;

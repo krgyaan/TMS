@@ -21,7 +21,7 @@ import { diskStorage } from "multer";
 import { extname } from "path";
 
 import { CourierService } from "@/modules/courier/courier.service";
-import type { CreateCourierDto } from "@/modules/courier/zod/create-courier.schema";
+import { CreateCourierSchema, type CreateCourierDto } from "@/modules/courier/zod/create-courier.schema";
 import { type UpdateCourierInput, UpdateCourierSchema, type UpdateCourierDto } from "@/modules/courier/zod/update-courier.schema";
 import { CurrentUser } from "@/decorators/current-user.decorator";
 
@@ -105,9 +105,8 @@ export class CourierController {
 
     @Post()
     @UseInterceptors(FilesInterceptor("courierDocs[]", 10, multerConfig))
-    create(@Body() dto, @UploadedFiles() files: Express.Multer.File[], @Req() req) {
-        console.log("dto", dto);
-        return this.service.create(dto, files, req.user.sub);
+    create(@Body(new ZodValidationPipe(CreateCourierSchema)) dto: CreateCourierDto, @UploadedFiles() files: Express.Multer.File[], @CurrentUser() user: any) {
+        return this.service.create(dto, files, user.sub);
     }
 
     @Post(":id/dispatch")
