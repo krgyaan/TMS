@@ -88,6 +88,9 @@ export function WoUploadMomDialog({
                                 />
                             )}
                         </FieldWrapper>
+                        <p className="text-xs text-muted-foreground">
+                            Wo Detail Id: {woDetailId} | Kickoff Meeting Id: {kickoffMeetingId}
+                        </p>
 
                         <div className="flex justify-end gap-2 pt-4">
                             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting}>

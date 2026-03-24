@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Eye, FileX2, Search, CheckCircle, Upload } from 'lucide-react';
+import { AlertCircle, Eye, FileX2, Search, CheckCircle, Upload, ExternalLink } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import type { KickOffListDto } from '@/modules/operations/types/wo.types';
@@ -140,28 +140,48 @@ const KickOffListPage = () => {
             },
             dateCol<KickOffListDto>('woDate', { includeTime: false }, {
                 headerName: 'WO Date',
-                width: 150,
+                width: 120,
                 colId: 'woDate',
             }),
             currencyCol<KickOffListDto>('woValuePreGst', {
                 headerName: 'WO Value',
-                width: 150,
+                width: 120,
                 colId: 'woValuePreGst',
             }),
             currencyCol<KickOffListDto>('woValueGstAmt', {
                 headerName: 'GST Amount',
-                width: 150,
+                width: 120,
                 colId: 'woValueGstAmt',
             }),
             {
                 field: 'woStatus',
                 colId: 'woStatus',
                 headerName: 'WO Status',
-                width: 150,
+                width: 120,
                 cellRenderer: (params: any) => (
                     <Badge variant="outline" className="capitalize">
                         {params.value?.replaceAll('_', ' ') || '—'}
                     </Badge>
+                ),
+            },
+            dateCol<KickOffListDto>('meetingDate', { includeTime: false }, {
+                headerName: 'Meeting Date',
+                width: 150,
+                colId: 'meetingDate',
+            }),
+            {
+                field: 'meetingLink',
+                colId: 'meetingLink',
+                headerName: 'Meeting Link',
+                width: 150,
+                cellRenderer: (params: any) => (
+                    params.value ?
+                        <a href={params.value} target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:text-primary/80 cursor-pointer">
+                            <ExternalLink className="h-4 w-4" />
+                        </a>
+                        : '—'
                 ),
             },
             {
