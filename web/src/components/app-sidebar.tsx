@@ -59,8 +59,8 @@ const navMain: NavGroup[] = [
         items: [
             { title: "Work Order", url: paths.operations.woBasicDetailListPage, permission: "ops.work-order" },
             { title: "WO Approval", url: paths.operations.woDetailAcceptanceListPage, permission: "ops.wo-approval" },
-            { title: "Kick Off", url: paths.operations.kickOff, permission: "ops.kick-off" },
-            { title: "Contract Agreement", url: paths.operations.contractAgreement, permission: "ops.contract-agreement" },
+            { title: "Kick Off", url: paths.operations.woKickOffListPage, permission: "ops.kick-off" },
+            { title: "Contract Agreement", url: paths.operations.contractAgreementListPage, permission: "ops.contract-agreement" },
             { title: "Project Dashboard", url: paths.operations.projectDashboard, permission: "project-dashboard" },
         ],
     },
@@ -189,12 +189,12 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
 
     const displayUser = currentUser ??
         storedUser ?? {
-            id: 0,
-            name: "Gyan",
-            email: "gyan@volkenergie.in",
-            username: null,
-            mobile: null,
-        };
+        id: 0,
+        name: "Gyan",
+        email: "gyan@volkenergie.in",
+        username: null,
+        mobile: null,
+    };
 
     const filteredMenuItems = React.useMemo(() => filterMenu(currentUser, navMain), [currentUser]);
 

@@ -108,9 +108,18 @@ export const paths = {
         woAcceptanceEditPage: (id: number) => `/operations/work-order/acceptance/${id}/edit`,
         woRaiseQueryPage: (id: number) => `/operations/work-order/acceptance/raise-query/${id}`,
         woRaiseQueryEditPage: (id: number) => `/operations/work-order/acceptance/raise-query/${id}/edit`,
+        woUploadPage: (id: number) => `/operations/work-order/acceptance/upload/${id}`,
 
-        kickOff: "/operations/kick-off",
-        contractAgreement: "/operations/contract-agreement",
+        woKickOffListPage: "/operations/work-order/kick-off",
+        woKickOffCreatePage: (id: number) => `/operations/work-order/kick-off/create/${id}`,
+        woKickOffEditPage: (id: number) => `/operations/work-order/kick-off/${id}/edit`,
+        woKickOffShowPage: (id: number) => `/operations/work-order/kick-off/${id}`,
+
+        contractAgreementListPage: "/operations/work-order/contract-agreement",
+        contractAgreementCreatePage: "/operations/work-order/contract-agreement/create",
+        contractAgreementEditPage: (id: number) => `/operations/work-order/contract-agreement/${id}/edit`,
+        contractAgreementShowPage: (id: number) => `/operations/work-order/contract-agreement/${id}`,
+
         projectDashboard: "/operations/project-dashboard",
         raisePoForm: "/operations/project-dashboard/purchase-order/create",
         viewPoPage: (id: number) => `/operations/project-dashboard/purchase-order/view/${id}`,

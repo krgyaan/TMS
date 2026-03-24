@@ -3,37 +3,40 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
 import { useMemo, useState, useEffect, useCallback } from 'react';
+import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { ActionMenu } from '@/components/ui/ActionMenu';
-import { AlertCircle, Eye, FileX2, Search, Edit, CheckCircle, FileText } from 'lucide-react';
+import { AlertCircle, Eye, FileX2, Search, CheckCircle, Upload } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { useWoDetails, useWoDetailsDashboardSummary } from '@/hooks/api/useWoDetails';
-import type { WoDetailsListResponseDto, WoDetailsFilters } from '@/modules/operations/types/wo.types';
+import type { KickOffListDto } from '@/modules/operations/types/wo.types';
 import { currencyCol, dateCol } from '@/components/data-grid';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
-import { QuickFilter } from '@/components/ui/quick-filter';
-import { useTeamFilter } from '@/hooks/useTeamFilter';
+import { WoUploadMomDialog } from './components/WoUploadMomDialog';
+import { useKickoffMeetingDashboardCounts, useKickoffMeetings } from '@/hooks/api/useKickoffMeeting';
 
-type TabKey = 'pending' | 'accepted' | 'amendment-needed';
+type TabKey = 'scheduled' | 'not_scheduled';
 
-const WoDetailListPage = () => {
-    const [activeTab, setActiveTab] = useState<TabKey>('pending');
+const KickOffListPage = () => {
+    const [activeTab, setActiveTab] = useState<TabKey>('not_scheduled');
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
     const debouncedSearch = useDebouncedSearch(search, 300);
     const navigate = useNavigate();
-    const { teamId } = useTeamFilter();
 
-    // Reset pagination on tab/search/team change
+    // Upload MOM modal state
+    const [selectedWoId, setSelectedWoId] = useState<number | null>(null);
+    const [selectedKickoffId, setSelectedKickoffId] = useState<number | null>(null);
+    const [isUploadMomOpen, setIsUploadMomOpen] = useState(false);
+
+    // Reset pagination on tab/search change
     useEffect(() => {
         setPagination((p) => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, debouncedSearch, teamId]);
+    }, [activeTab, debouncedSearch]);
 
     const handleSortChanged = useCallback((event: any) => {
         const sortModel = event.api
@@ -51,185 +54,130 @@ const WoDetailListPage = () => {
         setPagination({ pageIndex: 0, pageSize: newPageSize });
     }, []);
 
-    // Build filters based on active tab
-    const filters: WoDetailsFilters = useMemo(() => {
-        const baseFilters: WoDetailsFilters = {
-            page: pagination.pageIndex + 1,
-            limit: pagination.pageSize,
-            sortBy: sortModel[0]?.colId,
-            sortOrder: sortModel[0]?.sort,
-            search: debouncedSearch,
-            teamId: teamId === null ? undefined : teamId,
-        };
-
-        switch (activeTab) {
-            case 'pending':
-                baseFilters.woAcceptance = false;
-                baseFilters.woAmendmentNeeded = false;
-                break;
-            case 'accepted':
-                baseFilters.woAcceptance = true;
-                break;
-            case 'amendment-needed':
-                baseFilters.woAmendmentNeeded = true;
-                break;
-        }
-
-        return baseFilters;
-    }, [activeTab, pagination, sortModel, debouncedSearch, teamId]);
-
     // Fetch data
-    const { data: dashboardSummary } = useWoDetailsDashboardSummary();
-    const { data: apiResponse, isLoading: loading, error } = useWoDetails(filters);
+    const { data: apiResponse, isLoading: loading, error } = useKickoffMeetings(
+        activeTab,
+        { page: pagination.pageIndex + 1, limit: pagination.pageSize, search: debouncedSearch || undefined },
+        { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
+    );
 
-    const tableData = apiResponse?.data || [];
-    const totalRows = apiResponse?.meta?.total || 0;
+    const { data: counts } = useKickoffMeetingDashboardCounts();
+
+    // Client-side filtering fallback (if backend doesn't support kickoffScheduled filter)
+    const allRows = apiResponse?.data || [];
+    const tableData = useMemo(() => {
+        return allRows.filter((row) => {
+            if (activeTab === 'not_scheduled') {
+                return !row.id;
+            }
+            return !!row.id;
+        });
+    }, [allRows, activeTab]);
+
+    const totalRows = apiResponse?.meta?.total || tableData.length;
 
     // Tab configuration with counts
     const tabsConfig = useMemo(() => {
-        const summary = dashboardSummary?.summary;
         return [
-            { key: 'pending' as const, name: 'Pending Acceptance', count: summary?.pending ?? 0 },
-            { key: 'accepted' as const, name: 'Accepted', count: summary?.accepted ?? 0 },
-            {
-                key: 'amendment-needed' as const,
-                name: 'Amendment Needed',
-                count: summary?.amendmentNeeded ?? 0,
-            },
+            { key: 'not_scheduled' as const, name: 'Not Scheduled', count: counts?.not_scheduled ?? 0 },
+            { key: 'scheduled' as const, name: 'Scheduled', count: counts?.scheduled ?? 0 },
         ];
-    }, [dashboardSummary]);
+    }, [counts]);
 
-    // Action items for each row
-    const rowActions: ActionItem<WoDetailsListResponseDto>[] = [
+    // Action items for "Not Scheduled" tab
+    const notScheduledActions: ActionItem<KickOffListDto>[] = useMemo(() => [
         {
-            label: 'WO Acceptance',
-            onClick: (row) => navigate(paths.operations.woAcceptancePage(row.id)),
+            label: 'Initiate Kickoff',
+            onClick: (row) => navigate(paths.operations.woKickOffCreatePage(row.woDetailId)),
             icon: <CheckCircle className="h-4 w-4" />,
         },
         {
-            label: 'Request for Clarification',
-            onClick: (row) => row.woAcceptanceStatus == 'queries_pending' ? navigate(paths.operations.woRaiseQueryEditPage(row.id)) : navigate(paths.operations.woRaiseQueryPage(row.id)),
-            icon: <FileX2 className="h-4 w-4" />,
+            label: 'View Details',
+            onClick: (row) => navigate(paths.operations.woBasicDetailShowPage(row.woDetailId)),
+            icon: <Eye className="h-4 w-4" />,
         },
+    ], [navigate]);
+
+    // Action items for "Scheduled" tab
+    const scheduledActions: ActionItem<KickOffListDto>[] = useMemo(() => [
         {
-            label: 'Wo Uploads',
-            onClick: (row) => navigate(paths.operations.woUploadPage(row.id)),
-            icon: <FileText className="h-4 w-4" />,
+            label: 'Upload MOM',
+            onClick: (row) => {
+                setSelectedWoId(row.woDetailId);
+                setSelectedKickoffId(row.id ?? null);
+                setIsUploadMomOpen(true);
+            },
+            icon: <Upload className="h-4 w-4" />,
         },
         {
             label: 'View Details',
-            onClick: (row) => navigate(paths.operations.woBasicDetailShowPage(row.id)),
+            onClick: (row) => navigate(paths.operations.woBasicDetailShowPage(row.woDetailId)),
             icon: <Eye className="h-4 w-4" />,
         },
-        {
-            label: 'Edit',
-            onClick: (row) => navigate(paths.operations.woAcceptanceEditPage(row.id)),
-            icon: <Edit className="h-4 w-4" />,
-        },
-    ];
+    ], [navigate]);
+
+    // Get row actions based on active tab
+    const rowActions = activeTab === 'not_scheduled' ? notScheduledActions : scheduledActions;
 
     // Column definitions
-    const colDefs = useMemo<ColDef<WoDetailsListResponseDto>[]>(
+    const colDefs = useMemo<ColDef<KickOffListDto>[]>(
         () => [
             {
                 field: 'projectName',
                 colId: 'projectName',
                 headerName: 'Project Name',
-                width: 150,
+                width: 200,
                 sortable: true,
+                filter: true,
             },
             {
                 field: 'woNumber',
                 colId: 'woNumber',
                 headerName: 'WO Number',
-                width: 120,
+                width: 200,
                 sortable: true,
+                filter: true,
             },
-            dateCol<WoDetailsListResponseDto>('woDate', { includeTime: false }, {
+            dateCol<KickOffListDto>('woDate', { includeTime: false }, {
                 headerName: 'WO Date',
-                width: 120,
+                width: 150,
                 colId: 'woDate',
             }),
-            currencyCol<WoDetailsListResponseDto>('woValuePreGst', {
+            currencyCol<KickOffListDto>('woValuePreGst', {
                 headerName: 'WO Value',
-                width: 120,
+                width: 150,
                 colId: 'woValuePreGst',
             }),
-            currencyCol<WoDetailsListResponseDto>('woValueGstAmt', {
+            currencyCol<KickOffListDto>('woValueGstAmt', {
                 headerName: 'GST Amount',
-                width: 120,
+                width: 150,
                 colId: 'woValueGstAmt',
             }),
             {
-                field: 'oeWoAmendmentNeeded',
-                colId: 'oeWoAmendmentNeeded',
-                headerName: 'Amendment',
-                width: 120,
-                cellRenderer: (params: any) => (
-                    <Badge variant={params.value ? 'default' : 'secondary'}>
-                        {params.value ? 'Yes' : 'No'}
-                    </Badge>
-                ),
-            },
-            {
-                field: 'ldApplicable',
-                colId: 'ldApplicable',
-                headerName: 'LD',
-                width: 90,
-                cellRenderer: (params: any) => (
-                    <Badge variant={params.value ? 'default' : 'secondary'}>
-                        {params.value ? 'Yes' : 'No'}
-                    </Badge>
-                ),
-            },
-            {
-                field: 'isContractAgreement',
-                colId: 'isContractAgreement',
-                headerName: 'Contract',
-                width: 100,
-                cellRenderer: (params: any) => (
-                    <div className="flex items-center gap-1">
-                        <FileText className={`h-4 w-4 ${params.value ? 'text-blue-600' : 'text-gray-400'}`} />
-                        <span>{params.value ? 'Yes' : 'No'}</span>
-                    </div>
-                ),
-            },
-            {
-                field: 'status',
-                colId: 'status',
+                field: 'woStatus',
+                colId: 'woStatus',
                 headerName: 'WO Status',
-                width: 120,
-                cellRenderer: (params: any) => {
-                    return <Badge variant='outline' className="capitalize">
-                        {params.value?.replaceAll('_', ' ')}
+                width: 150,
+                cellRenderer: (params: any) => (
+                    <Badge variant="outline" className="capitalize">
+                        {params.value?.replaceAll('_', ' ') || '—'}
                     </Badge>
-                },
-            },
-            {
-                field: 'woAcceptanceStatus',
-                colId: 'woAcceptanceStatus',
-                headerName: 'Acceptance',
-                width: 120,
-                cellRenderer: (params: any) => {
-                    return <Badge variant='outline' className="capitalize">
-                        {params.value ? params.value?.replaceAll('_', ' ') : 'Pending'}
-                    </Badge>
-                },
+                ),
             },
             {
                 headerName: '',
                 filter: false,
-                cellRenderer: (params: any) => <ActionMenu rowData={params.data} actions={rowActions} />,
+                cellRenderer: createActionColumnRenderer(rowActions),
                 sortable: false,
                 pinned: 'right',
                 width: 57,
             },
         ],
-        [rowActions, navigate]
+        [rowActions]
     );
 
     // Loading state
-    if (loading && !tableData.length) {
+    if (loading && !allRows.length) {
         return (
             <Card>
                 <CardHeader>
@@ -239,7 +187,7 @@ const WoDetailListPage = () => {
                 <CardContent className="p-6">
                     <div className="space-y-4">
                         <div className="flex gap-2">
-                            {Array.from({ length: 4 }).map((_, i) => (
+                            {Array.from({ length: 2 }).map((_, i) => (
                                 <Skeleton key={i} className="h-10 w-32" />
                             ))}
                         </div>
@@ -255,13 +203,13 @@ const WoDetailListPage = () => {
         return (
             <Card>
                 <CardHeader>
-                    <CardTitle>Work Orders - Details</CardTitle>
+                    <CardTitle>Kick-off Meetings</CardTitle>
                 </CardHeader>
                 <CardContent className="p-6">
                     <Alert variant="destructive">
                         <AlertCircle className="h-4 w-4" />
                         <AlertDescription>
-                            Failed to load WO details. Please try again later.
+                            Failed to load kick-off meetings. Please try again later.
                         </AlertDescription>
                     </Alert>
                 </CardContent>
@@ -274,9 +222,9 @@ const WoDetailListPage = () => {
             <CardHeader>
                 <div className="flex items-center justify-between">
                     <div>
-                        <CardTitle>Work Orders - Details</CardTitle>
+                        <CardTitle>Kick-off Meetings</CardTitle>
                         <CardDescription className="mt-2">
-                            Manage WO contractual details, LD, PBG, acceptance.
+                            Manage and schedule Kick-off Meetings for Accepted Work Orders.
                         </CardDescription>
                     </div>
                 </div>
@@ -286,7 +234,7 @@ const WoDetailListPage = () => {
                     value={activeTab}
                     onValueChange={(value) => setActiveTab(value as TabKey)}
                 >
-                    <TabsList className="m-auto mb-4">
+                    <TabsList className="m-auto mb-4 flex-wrap">
                         {tabsConfig.map((tab) => (
                             <TabsTrigger
                                 key={tab.key}
@@ -294,39 +242,24 @@ const WoDetailListPage = () => {
                                 className="data-[state=active]:shadow-md flex items-center gap-1"
                             >
                                 <span className="font-semibold text-sm">{tab.name}</span>
-                                <Badge
-                                    variant="secondary"
-                                    className="text-xs"
-                                >
+                                <Badge variant="secondary" className="text-xs">
                                     {tab.count}
                                 </Badge>
                             </TabsTrigger>
                         ))}
                     </TabsList>
 
-                    {/* Search and Filters Row */}
+                    {/* Search Row */}
                     <div className="flex items-center gap-4 px-6 pb-4">
-                        <QuickFilter
-                            options={[
-                                { label: 'LD Applicable', value: 'ld-applicable' },
-                                { label: 'PBG Required', value: 'pbg-required' },
-                                { label: 'Contract Needed', value: 'contract-needed' },
-                            ]}
-                            value=""
-                            onChange={(value) => {
-                                console.log(value);
-                            }}
-                        />
-
                         <div className="flex-1 flex justify-end">
                             <div className="relative">
                                 <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                 <Input
                                     type="text"
-                                    placeholder="Search..."
+                                    placeholder="Search by project name, WO number..."
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
-                                    className="pl-8 w-64"
+                                    className="pl-8 w-80"
                                 />
                             </div>
                         </div>
@@ -343,15 +276,13 @@ const WoDetailListPage = () => {
                                     {tableData.length === 0 ? (
                                         <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
                                             <FileX2 className="h-12 w-12 mb-4" />
-                                            <p className="text-lg font-medium">No WO details found</p>
+                                            <p className="text-lg font-medium">
+                                                No kick-off meetings found
+                                            </p>
                                             <p className="text-sm mt-2">
-                                                {tab.key === 'pending'
-                                                    ? 'WO details pending acceptance will appear here'
-                                                    : tab.key === 'accepted'
-                                                        ? 'Accepted WO details will be shown here'
-                                                        : tab.key === 'amendment-needed'
-                                                            ? 'WO details requiring amendments will appear here'
-                                                            : 'No WO details available'}
+                                                {tab.key === 'not_scheduled'
+                                                    ? 'All kick-off meetings have been scheduled.'
+                                                    : 'No kick-off meetings have been scheduled yet.'}
                                             </p>
                                         </div>
                                     ) : (
@@ -375,7 +306,7 @@ const WoDetailListPage = () => {
                                                 },
                                                 onSortChanged: handleSortChanged,
                                                 overlayNoRowsTemplate:
-                                                    '<span style="padding: 10px; text-align: center;">No WO details found</span>',
+                                                    '<span style="padding: 10px; text-align: center;">No kick-off meetings found</span>',
                                             }}
                                         />
                                     )}
@@ -385,8 +316,18 @@ const WoDetailListPage = () => {
                     ))}
                 </Tabs>
             </CardContent>
+
+            {/* Upload MOM Modal */}
+            {selectedWoId && selectedKickoffId && (
+                <WoUploadMomDialog
+                    isOpen={isUploadMomOpen}
+                    onOpenChange={setIsUploadMomOpen}
+                    woDetailId={selectedWoId}
+                    kickoffMeetingId={selectedKickoffId}
+                />
+            )}
         </Card>
     );
 };
 
-export default WoDetailListPage;
+export default KickOffListPage;

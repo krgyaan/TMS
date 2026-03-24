@@ -66,7 +66,12 @@ export type TenderFileContext =
     | 'bankNoc'
     | 'wo-draft'
     | 'wo-signed-copy'
-    | 'mcaClosure';
+    | 'mcaClosure'
+    | 'foa'
+    | 'sap-po'
+    | 'detailed-wo'
+    | 'final-wo'
+    | 'kickoff-mom';
 
 export interface FileConfig {
     context: string;
