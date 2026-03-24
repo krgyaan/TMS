@@ -112,12 +112,9 @@ export const paths = {
 
         woKickOffListPage: "/operations/work-order/kick-off",
         woKickOffCreatePage: (id: number) => `/operations/work-order/kick-off/create/${id}`,
-        woKickOffEditPage: (id: number) => `/operations/work-order/kick-off/${id}/edit`,
         woKickOffShowPage: (id: number) => `/operations/work-order/kick-off/${id}`,
 
         contractAgreementListPage: "/operations/work-order/contract-agreement",
-        contractAgreementCreatePage: "/operations/work-order/contract-agreement/create",
-        contractAgreementEditPage: (id: number) => `/operations/work-order/contract-agreement/${id}/edit`,
         contractAgreementShowPage: (id: number) => `/operations/work-order/contract-agreement/${id}`,
 
         projectDashboard: "/operations/project-dashboard",
