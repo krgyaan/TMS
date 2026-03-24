@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
 import { eq, desc, asc, sql, and, or, ilike, isNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { DRIZZLE } from '@db/database.module';
@@ -7,6 +7,7 @@ import { woBasicDetails, woContacts, woDetails } from '@db/schemas/operations';
 import { users } from '@db/schemas/auth/users.schema';
 import type { CreateWoBasicDetailDto, UpdateWoBasicDetailDto, AssignOeDto, BulkAssignOeDto, RemoveOeAssignmentDto, WoBasicDetailsQueryDto } from './dto/wo-basic-details.dto';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { projects, teams, tenderInfos } from '@/db/schemas';
 
 const oeFirstUser = alias(users, 'oeFirstUser');
 const oeSiteVisitUser = alias(users, 'oeSiteVisitUser');
@@ -16,6 +17,8 @@ export type WoBasicDetailRow = typeof woBasicDetails.$inferSelect;
 
 @Injectable()
 export class WoBasicDetailsService {
+    private readonly logger = new Logger(WoBasicDetailsService.name);
+
     constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
 
     private mapCreateToDb(data: CreateWoBasicDetailDto) {
@@ -326,18 +329,164 @@ export class WoBasicDetailsService {
             }
         }
 
+        let teamId: number | null = null;
+
+        if (data.tenderId) {
+            const [tender] = await this.db
+                .select({teamId: tenderInfos.team})
+                .from(tenderInfos)
+                .where(eq(tenderInfos.id, data.tenderId))
+                .limit(1);
+
+            if (!tender) {
+                this.logger.error(`Tender with ID ${data.tenderId} not found, skipping project creation`);
+                return;
+            }
+
+            teamId = tender.teamId;
+        }
+
         const insertValues = this.mapCreateToDb(data);
         if (userId) {
             insertValues.createdBy = userId;
             insertValues.updatedBy = userId;
+            insertValues.team = teamId;
         }
 
+        // Create WO Basic Detail
         const [row] = await this.db
             .insert(woBasicDetails)
             .values(insertValues)
             .returning();
 
+        // Create Project asynchronously (non-blocking)
+        this.safeCreateProject(data, row?.id);
+
         return this.mapRowToResponse(row!);
+    }
+
+    private async safeCreateProject(data: CreateWoBasicDetailDto, woBasicDetailId?: number): Promise<void> {
+        if (!woBasicDetailId) return;
+
+        setImmediate(async () => {
+            try {
+                let teamId: number | null = null;
+                let itemId: number | null = null;
+                let locationId: number | null = null;
+                let organisationId: number | null = null;
+
+                // Fetch details from tender (required for project creation)
+                if (data.tenderId) {
+                    const [tender] = await this.db
+                        .select({
+                            teamId: tenderInfos.team,
+                            itemId: tenderInfos.item,
+                            locationId: tenderInfos.location,
+                            organisationId: tenderInfos.organization,
+                        })
+                        .from(tenderInfos)
+                        .where(eq(tenderInfos.id, data.tenderId))
+                        .limit(1);
+
+                    if (!tender) {
+                        this.logger.error(`Tender with ID ${data.tenderId} not found, skipping project creation`);
+                        return;
+                    }
+
+                    teamId = tender.teamId;
+                    itemId = tender.itemId;
+                    locationId = tender.locationId;
+                    organisationId = tender.organisationId;
+                } else {
+                    // No tender linked - cannot create project without item
+                    this.logger.warn(`No tender linked to WO Basic Detail: ${woBasicDetailId}, skipping project creation`);
+                    return;
+                }
+
+                // Validate required field
+                if (!itemId) {
+                    this.logger.error(`Cannot create project: itemId is required for WO Basic Detail: ${woBasicDetailId}`);
+                    return;
+                }
+
+                // Get team name
+                const teamName = await this.getTeamName(teamId);
+
+                // Skip if project already exists
+                if (data.projectCode) {
+                    const exists = await this.projectCodeExists(data.projectCode);
+                    if (exists) {
+                        this.logger.warn(`Project ${data.projectCode} already exists, skipping`);
+                        return;
+                    }
+                }
+
+                const now = new Date();
+
+                await this.db.insert(projects).values({
+                    teamName,
+                    organisationId: organisationId ?? null,
+                    itemId: itemId,
+                    locationId: locationId ?? null,
+                    poNo: data.woNumber ?? null,
+                    projectCode: data.projectCode ?? null,
+                    projectName: data.projectName ?? null,
+                    poUpload: data.woDraft ?? null,
+                    poDate: this.parseDate(data.woDate),
+                    performanceProof: null,
+                    performanceDate: null,
+                    completionProof: null,
+                    completionDate: null,
+                    sapPoDate: null,
+                    sapPoNo: null,
+                    tenderId: data.tenderId ?? null,
+                    enquiryId: data.enquiryId ?? null,
+                    createdAt: now,
+                    updatedAt: now,
+                } as typeof projects.$inferInsert);
+
+                this.logger.log(`Project created for WO Basic Detail: ${woBasicDetailId}`);
+            } catch (error) {
+                this.logger.error(
+                    `Failed to create project for WO Basic Detail: ${woBasicDetailId}`,
+                    error instanceof Error ? error.stack : String(error),
+                );
+            }
+        });
+    }
+
+    private parseDate(dateValue: string | Date | null | undefined): Date | null {
+        if (!dateValue) return null;
+        if (dateValue instanceof Date) {
+            return isNaN(dateValue.getTime()) ? null : dateValue;
+        }
+        if (typeof dateValue === 'string') {
+            const parsed = new Date(dateValue);
+            return isNaN(parsed.getTime()) ? null : parsed;
+        }
+        return null;
+    }
+
+    private async getTeamName(teamId?: number | null): Promise<string> {
+        if (!teamId) return 'UNKNOWN';
+
+        const [teamRow] = await this.db
+            .select({ name: teams.name })
+            .from(teams)
+            .where(eq(teams.id, teamId))
+            .limit(1);
+
+        return teamRow?.name || 'UNKNOWN';
+    }
+
+    private async projectCodeExists(projectCode: string): Promise<boolean> {
+        const [existing] = await this.db
+            .select({ id: projects.id })
+            .from(projects)
+            .where(eq(projects.projectCode, projectCode))
+            .limit(1);
+
+        return !!existing;
     }
 
     async update(id: number, data: UpdateWoBasicDetailDto, userId?: number) {

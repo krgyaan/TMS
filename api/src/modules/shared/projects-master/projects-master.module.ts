@@ -7,6 +7,6 @@ import { ProjectsMasterService } from "./projects-master.service";
     imports: [DatabaseModule],
     controllers: [ProjectsMasterController],
     providers: [ProjectsMasterService],
-    exports: [ProjectsMasterService],
+    exports: [ProjectsMasterService, ProjectsMasterrModule],
 })
-export class ProjectsMasterrModule {}
+export class ProjectsMasterrModule { }

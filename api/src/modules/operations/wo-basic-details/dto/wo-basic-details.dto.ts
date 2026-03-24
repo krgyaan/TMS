@@ -9,6 +9,7 @@ import { z } from "zod";
  * Used by TE (Tendering Executive) within 12 hours of PO receipt
  */
 export const CreateWoBasicDetailSchema = z.object({
+  teamId: z.number().int().positive().optional(),
   // Source reference - one of these should be provided
   tenderId: z.number().int().positive().optional(),
   enquiryId: z.number().int().positive().optional(),
