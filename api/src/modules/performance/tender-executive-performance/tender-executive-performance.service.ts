@@ -2112,6 +2112,29 @@ export class TenderExecutiveService {
         OR (pi.instrument_type = 'BG' AND pi.action IN (0,1,2,3,4,5,6,7))
         );
         `);
+
+        let otherThanTms: any[] | null = null;
+
+        if (query.view === "team" && query.teamId === 1) {
+            const specialIds = [318, 322, 328, 320];
+
+            const rows = await exec(`
+        SELECT
+            pr.id               AS "requestId",
+            pr.project_name     AS "name",
+            pi.amount           AS "value",
+            pi.instrument_type  AS "instrumentType",
+            pi.status           AS "status",
+            pi.action           AS "action"
+        FROM payment_requests pr
+        JOIN payment_instruments pi ON pi.request_id = pr.id
+        WHERE pr.id IN (${specialIds.join(",")})
+        AND pi.status NOT ILIKE '%rejected%'
+    `);
+
+            otherThanTms = rows;
+        }
+
         /* =====================================================
        FINAL RESPONSE (dashboard-ready)
     ===================================================== */
@@ -2149,6 +2172,8 @@ export class TenderExecutiveService {
                 value: sumValue(closing),
                 drilldown: closing,
             },
+
+            otherThanTms,
         };
     }
 }

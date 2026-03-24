@@ -3,6 +3,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@
 import { useEmdCashFlow } from "../tender-executive.hooks";
 import { ColumnHeader } from "./emd-helpers";
 import { MetricCell } from "./MetricCell";
+import { OtherThanTmsBox } from "./otherThanTmsBox";
 
 /* ================================
    EMD TRACKING TABLE
@@ -36,6 +37,12 @@ export function EmdBacklogTable(props: { view: "user" | "team"; userId?: number;
                                 <ColumnHeader title="Received (Current Paid)" description="EMD received during the period for payments made during the period" />
                             </TableHead>
 
+                            {props.view === "team" && props.teamId === 1 && (
+                                <TableHead className="text-center">
+                                    <ColumnHeader title="Other than TMS" description="EMDs not linked to any tender in TMS" />
+                                </TableHead>
+                            )}
+
                             <TableHead className="text-center">
                                 <ColumnHeader title="Closing" description="EMD pending at the end of the period" />
                             </TableHead>
@@ -57,6 +64,8 @@ export function EmdBacklogTable(props: { view: "user" | "team"; userId?: number;
 
                             {/* Received for Current Paid */}
                             <MetricCell data={data.receivedForDuring} strong />
+
+                            {props.view === "team" && props.teamId === 1 && data.otherThanTms && <OtherThanTmsBox entries={data.otherThanTms} />}
 
                             {/* Closing */}
                             <MetricCell data={data.pendingAtEnd} />
