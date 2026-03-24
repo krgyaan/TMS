@@ -13,7 +13,7 @@ export class LocationsService {
     }
 
     async findAllTrue(): Promise<Location[]> {
-        return this.db.select().from(locations).where(eq(locations.status, true)).orderBy(locations.status);
+        return this.db.select().from(locations).where(eq(locations.status, true)).orderBy(locations.name);
     }
 
     async findById(id: number): Promise<Location | null> {
