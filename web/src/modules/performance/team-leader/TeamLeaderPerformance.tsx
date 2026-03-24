@@ -39,6 +39,7 @@ import { useUser, useUsers, useUsersByRole } from "@/hooks/api/useUsers";
 import type { TenderKpiKey } from "../tender-executive/tender-executive.types";
 import { useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
+import { Combobox } from "@/components/form/SelectField";
 
 /* ================================
    HELPERS
@@ -71,9 +72,9 @@ const STAGE_ROW_TYPE_MAP: Record<string, string> = {
 ================================ */
 
 export default function TeamLeaderPerformance() {
-    const [userId, setUserId] = useState<number | null>(10);
-    const [fromDate, setFromDate] = useState<string | null>("2025-10-01");
-    const [toDate, setToDate] = useState<string | null>("2025-11-30");
+    const [userId, setUserId] = useState<number | null>();
+    const [fromDate, setFromDate] = useState<string | null>("");
+    const [toDate, setToDate] = useState<string | null>("");
     const [selectedMetric, setSelectedMetric] = useState(null);
     const navigate = useNavigate();
 
@@ -287,18 +288,12 @@ export default function TeamLeaderPerformance() {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Team Leader</label>
-                                <Select value={userId ? userId.toString() : undefined} onValueChange={v => setUserId(Number(v))}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select User" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {users?.map(u => (
-                                            <SelectItem key={u.id} value={u.id.toString()}>
-                                                {u.name} {u?.team}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <Combobox
+                                    value={userId ? userId.toString() : ""}
+                                    onChange={v => setUserId(v ? Number(v) : null)}
+                                    options={users?.map(u => ({ id: u.id.toString(), name: `${u.name} ${u?.team ?? ""}`.trim() })) ?? []}
+                                    placeholder="Select User"
+                                />
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">From Date</label>

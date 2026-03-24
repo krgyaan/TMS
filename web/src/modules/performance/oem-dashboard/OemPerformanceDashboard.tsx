@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Combobox } from "@/components/form/SelectField";
+
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useOemOutcomes } from "./oem-performance.hooks";
 
@@ -389,18 +391,12 @@ export default function OemPerformanceDashboard() {
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Select OEM</label>
-                                <Select value={selectedOemId ? selectedOemId.toString() : undefined} onValueChange={v => setSelectedOemId(Number(v))}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select OEM" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {oems?.map(oem => (
-                                            <SelectItem key={oem.id} value={oem.id.toString()}>
-                                                {oem.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <Combobox
+                                    value={selectedOemId ? selectedOemId.toString() : ""}
+                                    onChange={v => setSelectedOemId(v ? Number(v) : null)}
+                                    options={oems.map(oem => ({ id: oem.id.toString(), name: oem.name }))}
+                                    placeholder="Select OEM"
+                                />
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">From Date</label>

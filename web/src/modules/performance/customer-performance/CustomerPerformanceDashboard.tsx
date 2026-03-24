@@ -15,6 +15,7 @@ import { Filter, Download, Calendar as CalendarIcon } from "lucide-react";
 import { useItemHeadings, useCustomerPerformance } from "./customer-performance.hooks";
 import { useOrganizationsTrue } from "@/hooks/api/useOrganizations";
 import { useTeams } from "@/hooks/api/useTeams";
+import { Combobox } from "@/components/form/SelectField";
 
 /* ================================
    HELPERS
@@ -178,55 +179,37 @@ export default function CustomerPerformanceDashboard() {
                 {/* ===== FILTER CARD ===== */}
                 <Card className="shadow-sm">
                     <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-3 w-full pl-30 gap-1">
+                        <div className="grid grid-cols-1 md:grid-cols-3 w-full gap-1">
                             {/* Organization Select */}
                             <div>
                                 <label className="text-sm font-medium">Organization</label>
-                                <Select value={selectedOrganization ? String(selectedOrganization) : undefined} onValueChange={v => setSelectedOrganization(Number(v))}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select Organization" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {organizations.map(org => (
-                                            <SelectItem key={org.id} value={org.id.toString()}>
-                                                {org.acronym}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <Combobox
+                                    value={selectedOrganization ? selectedOrganization.toString() : ""}
+                                    onChange={v => setSelectedOrganization(v ? Number(v) : null)}
+                                    options={organizations.map(org => ({ id: org.id.toString(), name: `${org.acronym}` }))}
+                                    placeholder="Select Organization"
+                                />
                             </div>
 
                             <div>
                                 <label>Team</label>
-                                <Select value={selectedTeam ? selectedTeam.toString() : undefined} onValueChange={v => setSelectedTeam(Number(v))}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select a Team" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {teams.slice(0, 2).map(team => (
-                                            <SelectItem key={team.id} value={team.id.toString()}>
-                                                {team.name.toUpperCase()}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <Combobox
+                                    value={selectedTeam ? selectedTeam.toString() : ""}
+                                    onChange={v => setSelectedTeam(v ? Number(v) : null)}
+                                    options={teams.slice(0, 2).map(team => ({ id: team.id.toString(), name: `${team.name.toUpperCase()}` }))}
+                                    placeholder="Select Team"
+                                />
                             </div>
 
                             {/* Item Heading Select */}
                             <div className="w-full">
                                 <label className="text-sm font-medium">Item Heading</label>
-                                <Select value={selectedHeadingId ? selectedHeadingId.toString() : undefined} onValueChange={v => setSelectedHeadingId(Number(v))}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select Item Heading" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {headings.map(heading => (
-                                            <SelectItem key={heading.id} value={heading.id.toString()}>
-                                                {heading.name} ({heading.team})
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <Combobox
+                                    value={selectedHeadingId ? selectedHeadingId.toString() : ""}
+                                    onChange={v => setSelectedHeadingId(v ? Number(v) : null)}
+                                    options={headings.map(heading => ({ id: heading.id.toString(), name: `${heading.name} (${heading.team})` }))}
+                                    placeholder="Select Item Heading"
+                                />
                             </div>
                         </div>
 

@@ -16,6 +16,7 @@ import { useLocationPerformance, type LocationPerformanceParams } from "./locati
 import { useItemHeadings } from "../business-performance/business-performance.hooks";
 import { useLocationsTrue } from "@/hooks/api/useLocations";
 import { useTeams } from "@/hooks/api/useTeams";
+import { Combobox } from "@/components/form/SelectField";
 
 /* ================================
    HELPERS
@@ -213,70 +214,45 @@ export default function LocationPerformanceDashboard() {
                             {/* Item Heading Select */}
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Item Heading</label>
-                                <Select value={selectedHeadingId ? selectedHeadingId.toString() : undefined} onValueChange={v => setSelectedHeadingId(Number(v))}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select Item Heading" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {headings.map(heading => (
-                                            <SelectItem key={heading.id} value={heading.id.toString()}>
-                                                {heading.name} ({heading.team})
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <Combobox
+                                    value={selectedHeadingId ? selectedHeadingId.toString() : ""}
+                                    onChange={v => setSelectedHeadingId(v ? Number(v) : null)}
+                                    options={headings.map(heading => ({ id: heading.id.toString(), name: `${heading.name} (${heading.team})` }))}
+                                    placeholder="Select Item Heading"
+                                />
                             </div>
 
                             <div>
                                 <label>State</label>
-                                <Select value={selectedLocation !== null ? String(selectedLocation) : undefined} onValueChange={v => setSelectedLocation(Number(v))}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Please Select Location" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {locations.map(location => {
-                                            const pascalName = location.name.toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
-
-                                            return (
-                                                <SelectItem key={location.id} value={location.id.toString()}>
-                                                    {pascalName}
-                                                </SelectItem>
-                                            );
-                                        })}
-                                    </SelectContent>
-                                </Select>
+                                <Combobox
+                                    value={selectedLocation !== null ? String(selectedLocation) : ""}
+                                    onChange={v => setSelectedLocation(v ? Number(v) : null)}
+                                    options={locations.map(location => ({
+                                        id: location.id.toString(),
+                                        name: location.name.toLowerCase().replace(/\b\w/g, char => char.toUpperCase()),
+                                    }))}
+                                    placeholder="Please Select Location"
+                                />
                             </div>
 
                             <div>
                                 <label>Team</label>
-                                <Select value={selectedTeam !== null ? String(selectedTeam) : undefined} onValueChange={v => setSelectedTeam(Number(v))}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Please Select Team" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {teams.slice(0, 2).map(team => {
-                                            return (
-                                                <SelectItem value={String(team.id)} key={team.id}>
-                                                    {team.name}
-                                                </SelectItem>
-                                            );
-                                        })}
-                                    </SelectContent>
-                                </Select>
+                                <Combobox
+                                    value={selectedTeam !== null ? String(selectedTeam) : ""}
+                                    onChange={v => setSelectedTeam(v ? Number(v) : null)}
+                                    options={teams.slice(0, 2).map(team => ({ id: String(team.id), name: team.name }))}
+                                    placeholder="Please Select Team"
+                                />
                             </div>
 
                             <div>
                                 <label>Area</label>
-                                <Select value={selectedArea !== null ? selectedArea : undefined} onValueChange={v => setSelectedArea(v)}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select Area" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {region.map(r => (
-                                            <SelectItem value={r}>{r}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <Combobox
+                                    value={selectedArea !== null ? selectedArea : ""}
+                                    onChange={v => setSelectedArea(v || null)}
+                                    options={region.map(r => ({ id: r, name: r }))}
+                                    placeholder="Select Area"
+                                />
                             </div>
                         </div>
                         <div className="flex flex-col md:flex-row md:justify-center md:items-center gap-3 p-3">

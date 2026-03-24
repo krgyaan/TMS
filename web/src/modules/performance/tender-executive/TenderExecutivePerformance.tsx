@@ -47,6 +47,7 @@ import { EmdReceivedTable } from "./components/EmdReceivedTable";
 import { StageBacklogV2Table } from "./components/StageBacklogV2Table";
 import { EmdBacklogTable } from "./components/EmdBacklogTable";
 import { StageBacklogV4Table } from "./components/StageBacklogV4Table";
+import { Combobox } from "@/components/form/SelectField";
 
 /* ================================
    HELPERS
@@ -317,51 +318,38 @@ export default function TenderExecutivePerformance() {
                             {/* TEAM SELECT */}
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Team</label>
-                                <Select
+                                <Combobox
                                     value={scope.view === "team" ? String(scope.teamId) : ""}
-                                    onValueChange={v =>
+                                    onChange={v =>
                                         setScope({
                                             view: "team",
                                             teamId: Number(v),
                                         })
                                     }
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select Team" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="1">AC Team</SelectItem>
-                                        <SelectItem value="2">DC Team</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                                    options={[
+                                        { id: "1", name: "AC Team" },
+                                        { id: "2", name: "DC Team" },
+                                    ]}
+                                    placeholder="Select Team"
+                                />
                             </div>
 
                             {/* USER SELECT */}
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Team Member</label>
-                                <Select
+                                <Combobox
                                     disabled={scope.view === "team"}
                                     value={scope.view === "user" ? String(scope.userId) : ""}
-                                    onValueChange={v =>
+                                    onChange={v =>
                                         setScope({
                                             view: "user",
                                             userId: Number(v),
                                         })
                                     }
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select User" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {users?.map(u => (
-                                            <SelectItem key={u.id} value={u.id.toString()}>
-                                                {u.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                    options={users?.map(u => ({ id: u.id.toString(), name: u.name })) ?? []}
+                                    placeholder="Select User"
+                                />
                             </div>
-
                             {/* FROM DATE */}
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">From Date</label>
