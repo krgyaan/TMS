@@ -20,3 +20,16 @@ export const WoBasicDetailFormSchema = z.object({
   teChecklistConfirmed: z.boolean().default(false),
   tmsDocuments: z.record(z.string(), z.boolean()).default({}),
 });
+
+export const AssignOeFormSchema = z.object({
+  woBasicDetailId: z.number().optional(),
+  oeFirst: z.number().nullable().optional(),
+  oeFirstAssignedAt: z.date().nullable().optional(),
+  oeFirstAssignedBy: z.number().nullable().optional(),
+  oeSiteVisit: z.number().nullable().optional(),
+  oeSiteVisitAssignedAt: z.date().nullable().optional(),
+  oeSiteVisitAssignedBy: z.number().nullable().optional(),
+  oeDocsPrep: z.number().nullable().optional(),
+  oeDocsPrepAssignedAt: z.date().nullable().optional(),
+  oeDocsPrepAssignedBy: z.number().nullable().optional(),
+});

@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { WoBasicDetailFormSchema } from "./basiDetail.schema";
-import type { WoBasicDetail, CreateWoBasicDetailDto, UpdateWoBasicDetailDto, WorkflowStage } from "@/modules/operations/types/wo.types";
+import { WoBasicDetailFormSchema, AssignOeFormSchema } from "./basiDetail.schema";
+import type { WoBasicDetail, CreateWoBasicDetailDto, UpdateWoBasicDetailDto, WorkflowStage, AssignOeDto } from "@/modules/operations/types/wo.types";
 
 export type WoBasicDetailFormValues = z.infer<typeof WoBasicDetailFormSchema>;
+export type AssignOeFormValues = z.infer<typeof AssignOeFormSchema>;
 
-export type { WoBasicDetail, CreateWoBasicDetailDto, UpdateWoBasicDetailDto, WorkflowStage };
+export type { WoBasicDetail, CreateWoBasicDetailDto, UpdateWoBasicDetailDto, WorkflowStage, AssignOeDto };

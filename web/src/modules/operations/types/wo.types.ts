@@ -155,17 +155,16 @@ export interface CreateWoBasicDetailDto {
 export interface UpdateWoBasicDetailDto extends Partial<Omit<CreateWoBasicDetailDto, 'tenderId' | 'enquiryId'>> {}
 
 export interface AssignOeDto {
-  assignmentType: OeAssignmentType;
-  oeUserId: number;
-  assignedBy?: number;
-}
-
-export interface BulkAssignOeDto {
-  assignments: Array<{
-    assignmentType: OeAssignmentType;
-    oeUserId: number;
-  }>;
-  assignedBy?: number;
+  woBasicDetailId: number | null;
+  oeFirst: number | null;
+  oeFirstAssignedAt: Date | null;
+  oeFirstAssignedBy: number | null;
+  oeSiteVisit: number | null;
+  oeSiteVisitAssignedAt: Date | null;
+  oeSiteVisitAssignedBy: number | null;
+  oeDocsPrep: number | null;
+  oeDocsPrepAssignedAt: Date | null;
+  oeDocsPrepAssignedBy: number | null;
 }
 
 export interface WoBasicDetailsFilters {

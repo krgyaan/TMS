@@ -1,5 +1,5 @@
-import type { WoBasicDetailFormValues } from "./basiDetail.types";
-import type { WoBasicDetail, CreateWoBasicDetailDto, UpdateWoBasicDetailDto } from "@/modules/operations/types/wo.types";
+import type { AssignOeFormValues, WoBasicDetailFormValues } from "./basiDetail.types";
+import type { WoBasicDetail, CreateWoBasicDetailDto, UpdateWoBasicDetailDto, AssignOeDto } from "@/modules/operations/types/wo.types";
 
 export const buildDefaultValues = (): WoBasicDetailFormValues => ({
   tenderId: null,
@@ -12,7 +12,7 @@ export const buildDefaultValues = (): WoBasicDetailFormValues => ({
   grossMargin: 0,
   projectCode: "",
   projectName: "",
-  wo_draft: [],
+  woDraft: [],
   teChecklistConfirmed: false,
   tmsDocuments: {
     "Complete Tender Documents": false,
@@ -52,7 +52,6 @@ export const mapResponseToForm = (data: WoBasicDetail): WoBasicDetailFormValues 
     projectCode: data.projectCode || "",
     projectName: data.projectName || "",
     wo_draft: safeParseJsonArray(data.woDraft),
-    teChecklistConfirmed: data.teChecklistConfirmed ?? false,
     tmsDocuments: data.tmsDocuments || {
       "Complete Tender Documents": false,
       "Tender Info": false,
@@ -74,7 +73,6 @@ export const mapFormToCreatePayload = (values: WoBasicDetailFormValues): CreateW
     projectCode: values.projectCode || "",
     projectName: values.projectName || "",
     currentStage: "basic_details",
-    teChecklistConfirmed: values.teChecklistConfirmed,
     tmsDocuments: values.tmsDocuments,
   };
 
@@ -84,7 +82,7 @@ export const mapFormToCreatePayload = (values: WoBasicDetailFormValues): CreateW
   if (values.budgetPreGst !== undefined) payload.budgetPreGst = String(values.budgetPreGst);
   if (values.receiptPreGst !== undefined) payload.receiptPreGst = String(values.receiptPreGst);
   if (values.grossMargin !== undefined) payload.grossMargin = String(values.grossMargin);
-  if (values.wo_draft && values.wo_draft.length > 0) payload.wo_draft = JSON.stringify(values.wo_draft);
+  if (values.woDraft && values.woDraft.length > 0) payload.woDraft = JSON.stringify(values.woDraft);
 
   return payload;
 };
@@ -95,7 +93,6 @@ export const mapFormToUpdatePayload = (values: WoBasicDetailFormValues): UpdateW
     woDate: values.woDate ? values.woDate.toISOString().split('T')[0] : undefined,
     projectCode: values.projectCode || "",
     projectName: values.projectName || "",
-    teChecklistConfirmed: values.teChecklistConfirmed,
     tmsDocuments: values.tmsDocuments,
   };
 
@@ -104,7 +101,22 @@ export const mapFormToUpdatePayload = (values: WoBasicDetailFormValues): UpdateW
   if (values.budgetPreGst !== undefined) payload.budgetPreGst = String(values.budgetPreGst);
   if (values.receiptPreGst !== undefined) payload.receiptPreGst = String(values.receiptPreGst);
   if (values.grossMargin !== undefined) payload.grossMargin = String(values.grossMargin);
-  if (values.wo_draft && values.wo_draft.length > 0) payload.wo_draft = JSON.stringify(values.wo_draft);
+  if (values.woDraft && values.woDraft.length > 0) payload.woDraft = JSON.stringify(values.woDraft);
 
   return payload;
+};
+
+export const mapFormToAssignOePayload = (values: AssignOeFormValues): AssignOeDto => {
+  return {
+    woBasicDetailId: values.woBasicDetailId ?? null,
+    oeFirst: values.oeFirst ?? null,
+    oeFirstAssignedAt: values.oeFirstAssignedAt ?? null,
+    oeFirstAssignedBy: values.oeFirstAssignedBy ?? null,
+    oeSiteVisit: values.oeSiteVisit ?? null,
+    oeSiteVisitAssignedAt: values.oeSiteVisitAssignedAt ?? null,
+    oeSiteVisitAssignedBy: values.oeSiteVisitAssignedBy ?? null,
+    oeDocsPrep: values.oeDocsPrep ?? null,
+    oeDocsPrepAssignedAt: values.oeDocsPrepAssignedAt ?? null,
+    oeDocsPrepAssignedBy: values.oeDocsPrepAssignedBy ?? null,
+  };
 };
