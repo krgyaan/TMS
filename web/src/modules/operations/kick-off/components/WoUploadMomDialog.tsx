@@ -32,7 +32,7 @@ export function WoUploadMomDialog({
     kickoffMeetingId,
     existingMomPath,
 }: WoUploadMomDialogProps) {
-    const updateMomMutation = useUpdateKickoffMom(woDetailId);
+    const updateMomMutation = useUpdateKickoffMom(kickoffMeetingId);
 
     const form = useForm<MomUploadFormValues>({
         resolver: zodResolver(MomUploadSchema),
@@ -55,9 +55,8 @@ export function WoUploadMomDialog({
         try {
             await updateMomMutation.mutateAsync({
                 id: kickoffMeetingId,
-                data: {
-                    momFilePath: values.momFilePath[0],
-                },
+                momFilePath: values.momFilePath[0],
+                status: 'mom_uploaded',
             });
             toast.success('MOM uploaded successfully');
             onOpenChange(false);

@@ -1224,5 +1224,7 @@ export interface SaveKickoffMeetingDto {
 }
 
 export interface UpdateKickoffMeetingMomDto {
+  id: number;
   momFilePath: string;
+  status: 'scheduled' | 'mom_uploaded';
 }
