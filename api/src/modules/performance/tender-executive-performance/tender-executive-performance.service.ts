@@ -1958,6 +1958,10 @@ export class TenderExecutiveService {
         const from = `${query.fromDate}T00:00:00.000Z`;
         const to = `${query.toDate}T23:59:59.999Z`;
 
+        /* ============================
+       BASE WHERE
+    ============================ */
+
         const baseWhere = () => {
             let w = `pr.purpose = 'EMD'`;
             if (query.view === "user" && query.userId) {
@@ -1970,11 +1974,13 @@ export class TenderExecutiveService {
         };
 
         const exec = async (sqlText: string) => (await this.db.execute(sql.raw(sqlText))).rows as any[];
+
         const sumValue = (rows: any[]) => rows.reduce((s, r) => s + Number(r.value ?? 0), 0);
 
         /* =====================================================
-       A. OPENING
-    ===================================================== */
+   A. OPENING
+===================================================== */
+
         const opening = await exec(`
         SELECT
             pi.id               AS "instrumentId",
@@ -1997,11 +2003,12 @@ export class TenderExecutiveService {
         OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (1,2))
         OR (pi.instrument_type = 'BG' AND pi.action IN (0,1,2,3,4,5,6,7))
         );
-    `);
+        `);
 
         /* =====================================================
-       B. PAID DURING PERIOD (ALL)
-    ===================================================== */
+   B. PAID DURING PERIOD (ALL)
+===================================================== */
+
         const paidDuring = await exec(`
         SELECT
             pi.id               AS "instrumentId",
@@ -2019,27 +2026,26 @@ export class TenderExecutiveService {
         AND pi.status NOT ILIKE '%rejected%'
         AND pi.status NOT ILIKE '%pending%'
         AND pi.instrument_type NOT IN ('Cheque')
-    `);
+        `);
 
         /* =====================================================
-       C. RECEIVED FOR PRIOR PAID
-       — transfer date now comes from instrument_transfer_details
-    ===================================================== */
+   C. RECEIVED FOR PRIOR PAID
+===================================================== */
+
         const receivedForPrior = await exec(`
         SELECT
-            pi.id                       AS "instrumentId",
-            pr.tender_id                AS "tenderId",
-            pi.amount                   AS "value",
-            itd.return_transfer_date    AS "transferDate",
-            pi.instrument_type          AS "instrumentType",
+            pi.id               AS "instrumentId",
+            pr.tender_id        AS "tenderId",
+            pi.amount           AS "value",
+            pi.transfer_date    AS "transferDate",
+            pi.instrument_type  AS "instrumentType",
             COALESCE(ti.tender_no, '-') AS "tenderNo",
             COALESCE(ti.tender_name, pr.project_name) AS "tenderName"
         FROM payment_requests pr
         JOIN payment_instruments pi ON pi.request_id = pr.id
         LEFT JOIN tender_infos ti ON ti.id = pr.tender_id
-        LEFT JOIN instrument_transfer_details itd ON itd.instrument_id = pi.id
         WHERE ${baseWhere()}
-        AND COALESCE(itd.transaction_date, pr.created_at) < '${from}'
+        AND COALESCE(pi.transfer_date, pr.created_at) < '${from}'
         AND ti.delete_status NOT IN (1)
         AND pi.status NOT ILIKE '%rejected%'
         AND pi.status NOT ILIKE '%pending%'
@@ -2048,27 +2054,26 @@ export class TenderExecutiveService {
         OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (3,4))
         OR (pi.instrument_type = 'BG' AND pi.action IN (8,9))
         );
-    `);
+        `);
 
         /* =====================================================
-       D. RECEIVED FOR DURING PAID
-       — transfer date now comes from instrument_transfer_details
-    ===================================================== */
+   D. RECEIVED FOR DURING PAID
+===================================================== */
+
         const receivedForDuring = await exec(`
         SELECT
-            pi.id                       AS "instrumentId",
-            pr.tender_id                AS "tenderId",
-            pi.amount                   AS "value",
-            pi.instrument_type          AS "instrumentType",
-            itd.return_transfer_date    AS "transferDate",
+            pi.id               AS "instrumentId",
+            pr.tender_id        AS "tenderId",
+            pi.amount           AS "value",
+            pi.instrument_type  AS "instrumentType",
+            pi.transfer_date    AS "transferDate",
             COALESCE(ti.tender_no, '-') AS "tenderNo",
             COALESCE(ti.tender_name, pr.project_name) AS "tenderName"
         FROM payment_requests pr
         JOIN payment_instruments pi ON pi.request_id = pr.id
         LEFT JOIN tender_infos ti ON ti.id = pr.tender_id
-        LEFT JOIN instrument_transfer_details itd ON itd.instrument_id = pi.id
         WHERE ${baseWhere()}
-        AND COALESCE(itd.transaction_date, pi.created_at) BETWEEN '${from}' AND '${to}'
+        AND COALESCE(pi.transfer_date, pi.created_at) BETWEEN '${from}' AND '${to}'
         AND ti.delete_status NOT IN (1)
         AND pi.status NOT ILIKE '%rejected%'
         AND pi.status NOT ILIKE '%pending%'
@@ -2077,11 +2082,13 @@ export class TenderExecutiveService {
         OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (3,4))
         OR (pi.instrument_type = 'BG' AND pi.action IN (8,9))
         );
-    `);
+        `);
 
         /* =====================================================
-       E. CLOSING — pending at end of period
-    ===================================================== */
+   E. CLOSING
+   Pending at end of period
+===================================================== */
+
         const closing = await exec(`
         SELECT
             pi.id               AS "instrumentId",
@@ -2104,7 +2111,7 @@ export class TenderExecutiveService {
         OR (pi.instrument_type IN ('Portal Payment','Bank Transfer') AND pi.action IN (1,2))
         OR (pi.instrument_type = 'BG' AND pi.action IN (0,1,2,3,4,5,6,7))
         );
-    `);
+        `);
 
         let otherThanTms: any[] | null = null;
 
@@ -2112,23 +2119,25 @@ export class TenderExecutiveService {
             const specialIds = [318, 322, 328, 320];
 
             const rows = await exec(`
-                SELECT
-                    pr.id                           AS "requestId",
-                    pr.project_name                 AS "name",
-                    pi.amount                       AS "value",
-                    pi.instrument_type              AS "instrumentType",
-                    pi.status                       AS "status",
-                    pi.action                       AS "action",
-                    itd.return_transfer_date        AS "returnTransferDate"
-                FROM payment_requests pr
-                JOIN payment_instruments pi ON pi.request_id = pr.id
-                LEFT JOIN instrument_transfer_details itd ON itd.instrument_id = pi.id
-                WHERE pr.id IN (${specialIds.join(",")})
-                AND pi.status NOT ILIKE '%rejected%'
-            `);
+        SELECT
+            pr.id               AS "requestId",
+            pr.project_name     AS "name",
+            pi.amount           AS "value",
+            pi.instrument_type  AS "instrumentType",
+            pi.status           AS "status",
+            pi.action           AS "action"
+        FROM payment_requests pr
+        JOIN payment_instruments pi ON pi.request_id = pr.id
+        WHERE pr.id IN (${specialIds.join(",")})
+        AND pi.status NOT ILIKE '%rejected%'
+    `);
 
             otherThanTms = rows;
         }
+
+        /* =====================================================
+       FINAL RESPONSE (dashboard-ready)
+    ===================================================== */
 
         return {
             from: new Date(from),
