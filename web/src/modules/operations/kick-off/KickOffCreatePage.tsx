@@ -6,8 +6,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { WoKickoffMeeting } from "./components/KickOffForm";
 
 const KickOffCreatePage = () => {
-    const { woId } = useParams();
-    const woDetailId = Number(woId);
+    const { id } = useParams();
+    const woDetailId = Number(id);
 
     const { data: woDetail, isLoading: isLoadingWoDetail } = useWoDetailById(woDetailId);
     const woBasicDetailId = woDetail?.woBasicDetailId;

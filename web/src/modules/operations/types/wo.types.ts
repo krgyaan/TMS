@@ -402,21 +402,6 @@ export interface WoDetailsListResponseDto {
   woAcceptanceStatus: WoAcceptanceStatus | null;
 }
 
-export interface KickOffListDto {
-  id: number;
-  woDetailId: number;
-  projectName: string;
-  woNumber: string;
-  woDate: string;
-  woValuePreGst: string;
-  woValueGstAmt: string;
-  woStatus: WoDetailsStatus;
-  meetingDate: string | null;
-  meetingLink: string | null;
-  momFilePath: string | null;
-  teamMember: string;
-}
-
 export interface CreateWoDetailDto {
   woBasicDetailId: number;
 }
@@ -470,16 +455,6 @@ export interface UpdateWoDetailDto {
   // Wizard
   currentPage?: number;
   status?: WoDetailsStatus;
-}
-
-export interface KickOffFilters {
-  tab?: 'scheduled' | 'not_scheduled';
-  page?: number;
-  limit?: number;
-  sortBy?: string;
-  sortOrder?: SortOrder;
-  search?: string;
-  teamId?: number;
 }
 
 export interface WoDetailsFilters {
@@ -1198,6 +1173,21 @@ export interface AcceptanceStatus {
 // KICK-OFF MEETING
 // ============================================
 
+export interface KickOffListDto {
+  id: number;
+  woDetailId: number;
+  projectName: string;
+  woNumber: string;
+  woDate: string;
+  woValuePreGst: string;
+  woValueGstAmt: string;
+  woStatus: WoDetailsStatus;
+  meetingDate: string | null;
+  meetingLink: string | null;
+  momFilePath: string | null;
+  teamMember: string;
+}
+
 export interface KickoffMeeting {
   id: number;
   woDetailId: number;
@@ -1224,5 +1214,73 @@ export interface SaveKickoffMeetingDto {
 }
 
 export interface UpdateKickoffMeetingMomDto {
+  id: number;
   momFilePath: string;
+  status: 'scheduled' | 'mom_uploaded';
+}
+
+export interface KickOffFilters {
+  tab?: 'scheduled' | 'not_scheduled';
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: SortOrder;
+  search?: string;
+  teamId?: number;
+}
+
+// ============================================
+// CONTRACT AGREEMENT
+// ============================================
+
+export interface ContractAgreementListDto {
+  id: number;
+  woDetailId: number;
+  projectName: string;
+  woNumber: string;
+  woDate: string;
+  woValuePreGst: string;
+  woValueGstAmt: string;
+  woStatus: WoDetailsStatus;
+  veSigned: string | null;
+  veSignedDate: string | null;
+  clientAndVeSigned: string | null;
+  clientAndVeSignedDate: string | null;
+  teamMember: string;
+}
+
+export interface ContractAgreement {
+  id: number;
+  woDetailId: number;
+  veSigned: string | null;
+  veSignedDate: string | null;
+  clientAndVeSigned: string | null;
+  clientAndVeSignedDate: string | null;
+  status: 'uploaded' | 'not_uploaded';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContractAgreementCount {
+  not_uploaded: number;
+  uploaded: number;
+  total: number;
+}
+
+export interface UpdateContractAgreementDto {
+  id: number;
+  veSigned?: string | null;
+  veSignedDate?: Date | null;
+  clientAndVeSigned?: string | null;
+  clientAndVeSignedDate?: Date | null;
+}
+
+export interface ContractAgreementFilters {
+  tab?: 'uploaded' | 'not_uploaded';
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: SortOrder;
+  search?: string;
+  teamId?: number;
 }

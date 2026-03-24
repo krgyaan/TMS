@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { kickOffMeetingApi } from '@/services/api/kick-off-meeting.api';
 import type { SaveKickoffMeetingDto, UpdateKickoffMeetingMomDto } from '@/modules/operations/types/wo.types';
 import { useTeamFilter } from '../useTeamFilter';
+import { toast } from 'sonner';
 
 export const KICKOFF_MEETING_KEYS = {
     all: ['kickOffMeetings'] as const,
@@ -84,24 +85,31 @@ export const useSaveKickoffMeeting = () => {
 
     return useMutation({
         mutationFn: (data: SaveKickoffMeetingDto) => kickOffMeetingApi.saveMeeting(data),
-        onSuccess: (data) => {
-            queryClient.invalidateQueries({
-                queryKey: KICKOFF_MEETING_KEYS.byWoDetailId(data.woDetailId),
-            });
+        onSuccess: () => {
+            queryClient.invalidateQueries({queryKey: KICKOFF_MEETING_KEYS.all});
+            queryClient.invalidateQueries({queryKey: KICKOFF_MEETING_KEYS.dashboardCounts()});
+            // toast.success('Meeting scheduled successfully');
+        },
+
+        onError: (error: any) => {
+            toast.error(error?.response?.data?.message || 'Failed to schedule meeting');
         },
     });
 };
 
-export const useUpdateKickoffMom = (woDetailId: number) => {
+export const useUpdateKickoffMom = (id: number) => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: UpdateKickoffMeetingMomDto }) =>
+        mutationFn: (data: UpdateKickoffMeetingMomDto) =>
             kickOffMeetingApi.updateMom(id, data),
         onSuccess: () => {
-            queryClient.invalidateQueries({
-                queryKey: KICKOFF_MEETING_KEYS.byWoDetailId(woDetailId),
-            });
+            queryClient.invalidateQueries({queryKey: KICKOFF_MEETING_KEYS.all});
+            queryClient.invalidateQueries({queryKey: KICKOFF_MEETING_KEYS.dashboardCounts()});
+            // toast.success('MoM updated successfully');
+        },
+        onError: (error: any) => {
+            toast.error(error?.response?.data?.message || 'Failed to update MoM');
         },
     });
 };

@@ -98,6 +98,7 @@ import { WoDocumentsModule } from "./modules/operations/wo-documents/wo-document
 import { WoQueriesModule } from "./modules/operations/wo-queries/wo-queries.module";
 import { CustomerPerformanceModule } from "./modules/performance/customer-performance/customer-performance.module";
 import { LocationPerformanceModule } from "./modules/performance/location-performance/location-performance.module";
+import { ContractAgreementModule } from "./modules/operations/contract-agreement/contract-agreement.module";
 @Module({
     imports: [
         ServeStaticModule.forRoot({
@@ -205,6 +206,7 @@ import { LocationPerformanceModule } from "./modules/performance/location-perfor
         LoanAdvanceModule,
         CustomerPerformanceModule,
         LocationPerformanceModule,
+        ContractAgreementModule,
     ],
     controllers: [AppController],
     providers: [
