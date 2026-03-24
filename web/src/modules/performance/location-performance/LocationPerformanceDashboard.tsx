@@ -14,7 +14,7 @@ import { Filter, Download, Calendar as CalendarIcon, MapPin, Building2, Package 
 /* Custom Hooks */
 import { useLocationPerformance, type LocationPerformanceParams } from "./location-performance.hooks"; // not created yet
 import { useItemHeadings } from "../business-performance/business-performance.hooks";
-import { useLocations } from "@/hooks/api/useLocations";
+import { useLocationsTrue } from "@/hooks/api/useLocations";
 import { useTeams } from "@/hooks/api/useTeams";
 
 /* ================================
@@ -97,7 +97,7 @@ export default function LocationPerformanceDashboard() {
     // Fetch location performance data
     const { data, isLoading: dataLoading } = useLocationPerformance(appliedParams);
 
-    const { data: locations = [] } = useLocations();
+    const { data: locations = [] } = useLocationsTrue();
     console.log({ message: "locations data" }, locations);
 
     const { data: teams = [] } = useTeams();
@@ -235,9 +235,11 @@ export default function LocationPerformanceDashboard() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         {locations.map(location => {
+                                            const pascalName = location.name.toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
+
                                             return (
                                                 <SelectItem key={location.id} value={location.id.toString()}>
-                                                    {location.name}
+                                                    {pascalName}
                                                 </SelectItem>
                                             );
                                         })}
