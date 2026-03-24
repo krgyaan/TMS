@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { SaveContractAgreementDto, UpdateContractAgreementDto } from '@/modules/operations/types/wo.types';
+import type { UpdateContractAgreementDto } from '@/modules/operations/types/wo.types';
 import { useTeamFilter } from '../useTeamFilter';
 import { toast } from 'sonner';
 import { contractAgreementApi } from '@/services/api/contract-agreement.api';
@@ -84,32 +84,14 @@ export const useSaveContractAgreement = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (data: SaveContractAgreementDto) => contractAgreementApi.saveContractAgreement(data),
+        mutationFn: (data: UpdateContractAgreementDto) => contractAgreementApi.updateContractAgreement(data.id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({queryKey: CONTRACT_AGREEMENT_KEYS.all});
             queryClient.invalidateQueries({queryKey: CONTRACT_AGREEMENT_KEYS.dashboardCounts()});
-            // toast.success('Meeting scheduled successfully');
         },
 
         onError: (error: any) => {
             toast.error(error?.response?.data?.message || 'Failed to schedule meeting');
-        },
-    });
-};
-
-export const useUpdateContractAgreement = (id: number) => {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: (data: UpdateContractAgreementDto) =>
-            contractAgreementApi.updateContractAgreement(id, data),
-        onSuccess: () => {
-            queryClient.invalidateQueries({queryKey: CONTRACT_AGREEMENT_KEYS.all});
-            queryClient.invalidateQueries({queryKey: CONTRACT_AGREEMENT_KEYS.dashboardCounts()});
-            // toast.success('MoM updated successfully');
-        },
-        onError: (error: any) => {
-            toast.error(error?.response?.data?.message || 'Failed to update MoM');
         },
     });
 };

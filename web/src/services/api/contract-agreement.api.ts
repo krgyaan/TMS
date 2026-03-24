@@ -3,7 +3,6 @@ import { BaseApiService } from './base.service';
 import type {
     ContractAgreement,
     ContractAgreementCount,
-    SaveContractAgreementDto,
     UpdateContractAgreementDto,
     ContractAgreementFilters
 } from '@/modules/operations/types/wo.types';
@@ -59,10 +58,6 @@ class ContractAgreementApiService extends BaseApiService {
 
     async getByWoDetailId(woDetailId: number): Promise<ContractAgreement | null> {
         return this.get<ContractAgreement>(`/wo-detail/${woDetailId}`);
-    }
-
-    async saveContractAgreement(data: SaveContractAgreementDto): Promise<ContractAgreement> {
-        return this.post<ContractAgreement>('', data);
     }
 
     async updateContractAgreement(id: number, data: UpdateContractAgreementDto): Promise<ContractAgreement> {

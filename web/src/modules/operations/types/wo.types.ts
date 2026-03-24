@@ -1267,20 +1267,12 @@ export interface ContractAgreementCount {
   total: number;
 }
 
-export interface SaveContractAgreementDto {
-  woDetailId: number;
-  veSigned?: string | null;
-  veSignedDate?: string | null;
-  clientAndVeSigned?: string | null;
-  clientAndVeSignedDate?: string | null;
-}
-
 export interface UpdateContractAgreementDto {
   id: number;
   veSigned?: string | null;
-  veSignedDate?: string | null;
+  veSignedDate?: Date | null;
   clientAndVeSigned?: string | null;
-  clientAndVeSignedDate?: string | null;
+  clientAndVeSignedDate?: Date | null;
 }
 
 export interface ContractAgreementFilters {
