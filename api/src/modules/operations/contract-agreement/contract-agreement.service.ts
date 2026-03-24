@@ -19,12 +19,14 @@ export class ContractAgreementService {
         const offset = (page - 1) * limit;
         const activeTab = tab ?? 'not_uploaded';
 
-        const conditions: any[] = [];
+        const conditions: any[] = [
+            eq(woDetails.status, 'completed'),
+        ];
         // Tab filter
         if (activeTab === 'not_uploaded') {
-            conditions.push(and(isNull(woDetails.veSigned), isNull(woDetails.clientAndVeSigned)));
+            conditions.push(isNull(woDetails.veSigned), isNull(woDetails.clientAndVeSigned));
         } else if (activeTab === 'uploaded') {
-            conditions.push(and(isNotNull(woDetails.veSigned), isNotNull(woDetails.clientAndVeSigned)));
+            conditions.push(isNotNull(woDetails.veSigned), isNotNull(woDetails.clientAndVeSigned));
         }
 
         // Search (optimized)
@@ -44,7 +46,7 @@ export class ContractAgreementService {
         // Sorting
         const sortBy = filters?.sortBy;
         const sortOrder = filters?.sortOrder === 'desc' ? desc : asc;
-        let orderByClause: any;
+        let orderByClause: any = desc(woDetails.id);
 
         if (sortBy) {
             switch (sortBy) {

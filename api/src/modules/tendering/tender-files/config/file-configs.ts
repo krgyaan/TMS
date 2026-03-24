@@ -69,7 +69,8 @@ export type TenderFileContext =
     | "mcaClosure"
     | "final-wo"
     | "detailed-wo"
-    | "kickoff-mom";
+    | "kickoff-mom"
+    | "contract-agreement";
 
 export interface FileConfig {
     maxFiles: number;
@@ -808,6 +809,16 @@ export const FILE_CONFIGS: Record<TenderFileContext, FileConfig> = {
         pdfQuality: 80,
     },
     "kickoff-mom": {
+        maxFiles: 1,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+        compressImages: true,
+        imageQuality: 80,
+        compressPdf: true,
+        pdfQuality: 80,
+    },
+    "contract-agreement": {
         maxFiles: 1,
         maxSizeBytes: MB(10),
         allowedMimeTypes: [...DOCS],
