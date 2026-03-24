@@ -204,7 +204,7 @@ export default function CustomerPerformanceDashboard() {
                                         <SelectValue placeholder="Select a Team" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {teams.map(team => (
+                                        {teams.slice(0, 2).map(team => (
                                             <SelectItem key={team.id} value={team.id.toString()}>
                                                 {team.name.toUpperCase()}
                                             </SelectItem>
