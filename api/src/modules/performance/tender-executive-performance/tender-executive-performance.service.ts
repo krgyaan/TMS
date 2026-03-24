@@ -2030,7 +2030,7 @@ export class TenderExecutiveService {
             pi.id                       AS "instrumentId",
             pr.tender_id                AS "tenderId",
             pi.amount                   AS "value",
-            itd.transaction_date        AS "transferDate",
+            itd.return_transfer_date    AS "transferDate",
             pi.instrument_type          AS "instrumentType",
             COALESCE(ti.tender_no, '-') AS "tenderNo",
             COALESCE(ti.tender_name, pr.project_name) AS "tenderName"
@@ -2060,7 +2060,7 @@ export class TenderExecutiveService {
             pr.tender_id                AS "tenderId",
             pi.amount                   AS "value",
             pi.instrument_type          AS "instrumentType",
-            itd.transaction_date        AS "transferDate",
+            itd.return_transfer_date    AS "transferDate",
             COALESCE(ti.tender_no, '-') AS "tenderNo",
             COALESCE(ti.tender_name, pr.project_name) AS "tenderName"
         FROM payment_requests pr
