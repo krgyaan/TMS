@@ -814,6 +814,9 @@ export class FollowUpService {
                 googleConnection
             );
 
+            //incrementing reminder count
+            this.incrementReminderCount(id);
+
             this.logger.info("Follow-up mail sent successfully", {
                 followUpId: id,
                 subject: payload.subject,
@@ -861,7 +864,15 @@ export class FollowUpService {
             const result = await this.db
                 .select()
                 .from(followUps)
-                .where(and(eq(followUps.frequency, frequency), sql`${followUps.startFrom} <= ${today}`, isNull(followUps.deletedAt), ne(followUps.frequency, 6)));
+                .where(
+                    and(
+                        eq(followUps.assignmentStatus, "initiated"),
+                        eq(followUps.frequency, frequency),
+                        sql`${followUps.startFrom} <= ${today}`,
+                        isNull(followUps.deletedAt),
+                        ne(followUps.frequency, 6)
+                    )
+                );
 
             this.logger.debug("Due follow-ups fetched", {
                 frequency,

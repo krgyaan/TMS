@@ -13,6 +13,7 @@ import { Filter, Download, Calendar as CalendarIcon, TrendingUp, MapPin, Buildin
 
 /* Custom Hooks */
 import { useItemHeadings, useBusinessPerformance } from "./business-performance.hooks"; // not created yet
+import { Combobox } from "@/components/form/SelectField";
 
 /* ================================
    TYPES
@@ -233,18 +234,12 @@ export default function BusinessPerformanceDashboard() {
                             {/* Item Heading Select */}
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Item Heading</label>
-                                <Select value={selectedHeadingId ? selectedHeadingId.toString() : undefined} onValueChange={v => setSelectedHeadingId(Number(v))}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select Item Heading" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {headings.map(heading => (
-                                            <SelectItem key={heading.id} value={heading.id.toString()}>
-                                                {heading.name} ({heading.team})
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <Combobox
+                                    value={selectedHeadingId ? selectedHeadingId.toString() : ""}
+                                    onChange={v => setSelectedHeadingId(v ? Number(v) : null)}
+                                    options={headings.map(heading => ({ id: heading.id.toString(), name: `${heading.name} (${heading.team})` }))}
+                                    placeholder="Select Item Heading"
+                                />
                             </div>
 
                             {/* From Date */}
