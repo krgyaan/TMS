@@ -140,6 +140,14 @@ export const woDetails = pgTable("wo_details", {
     // Status: 'draft' | 'in_progress' | 'completed' | 'submitted_for_review'
     status: varchar("status", { length: 50 }).default('draft'),
 
+    // VE Signed Contract Agreement
+    veSigned: varchar("ve_signed", { length: 500 }),
+    veSignedDate: date("ve_signed_date"),
+
+    // Client and VE Signed Contract Agreement
+    clientAndVeSigned: varchar("client_and_ve_signed", { length: 500 }),
+    clientAndVeSignedDate: date("client_and_ve_signed_date"),
+
     // Audit
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
