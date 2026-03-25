@@ -37,7 +37,8 @@ const BasicDetailShowPage = () => {
     };
 
     const handleBack = () => {
-        navigate(paths.operations.woBasicDetailListPage);
+        // history back
+        navigate(-1);
     };
 
     // Invalid ID

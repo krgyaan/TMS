@@ -288,7 +288,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                                 {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
                             </FieldWrapper>
 
-                            <FieldWrapper control={form.control} name="wo_draft" label="Upload LOA/GEM PO/LOI/Draft WO">
+                            <FieldWrapper control={form.control} name="woDraft" label="Upload LOA/GEM PO/LOI/Draft WO">
                                 {field => (
                                     <TenderFileUploader
                                         context="wo-draft"
