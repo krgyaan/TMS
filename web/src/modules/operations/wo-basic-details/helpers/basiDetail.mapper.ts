@@ -1,5 +1,5 @@
 import type { AssignOeFormValues, WoBasicDetailFormValues } from "./basiDetail.types";
-import type { WoBasicDetail, CreateWoBasicDetailDto, UpdateWoBasicDetailDto, AssignOeDto } from "@/modules/operations/types/wo.types";
+import type { WoBasicDetail, CreateWoBasicDetailDto, UpdateWoBasicDetailDto } from "@/modules/operations/types/wo.types";
 
 export const buildDefaultValues = (): WoBasicDetailFormValues => ({
   tenderId: null,
@@ -106,17 +106,37 @@ export const mapFormToUpdatePayload = (values: WoBasicDetailFormValues): UpdateW
   return payload;
 };
 
-export const mapFormToAssignOePayload = (values: AssignOeFormValues): AssignOeDto => {
-  return {
-    woBasicDetailId: values.woBasicDetailId ?? null,
-    oeFirst: values.oeFirst ?? null,
-    oeFirstAssignedAt: values.oeFirstAssignedAt ?? null,
-    oeFirstAssignedBy: values.oeFirstAssignedBy ?? null,
-    oeSiteVisit: values.oeSiteVisit ?? null,
-    oeSiteVisitAssignedAt: values.oeSiteVisitAssignedAt ?? null,
-    oeSiteVisitAssignedBy: values.oeSiteVisitAssignedBy ?? null,
-    oeDocsPrep: values.oeDocsPrep ?? null,
-    oeDocsPrepAssignedAt: values.oeDocsPrepAssignedAt ?? null,
-    oeDocsPrepAssignedBy: values.oeDocsPrepAssignedBy ?? null,
-  };
-};
+export function buildDefaultAssigeOeValues(): AssignOeFormValues {
+    return {
+        woBasicDetailId: 0,
+        oeFirst: null,
+        oeFirstAssignedAt: null,
+        oeFirstAssignedBy: null,
+        oeSiteVisit: null,
+        oeSiteVisitAssignedAt: null,
+        oeSiteVisitAssignedBy: null,
+        oeDocsPrep: null,
+        oeDocsPrepAssignedAt: null,
+        oeDocsPrepAssignedBy: null,
+    };
+}
+
+export function mapFormToAssignOePayload(data: WoBasicDetail | AssignOeFormValues): AssignOeFormValues {
+    // Handle both WoBasicDetail (from API) and AssignOeFormValues (from form)
+    const woBasicDetailId = 'woBasicDetailId' in data
+        ? data.woBasicDetailId
+        : data.id;
+
+    return {
+        woBasicDetailId: Number(woBasicDetailId),
+        oeFirst: data.oeFirst ? Number(data.oeFirst) : null,
+        oeFirstAssignedAt: data.oeFirstAssignedAt ?? null,
+        oeFirstAssignedBy: data.oeFirstAssignedBy ? Number(data.oeFirstAssignedBy) : null,
+        oeSiteVisit: data.oeSiteVisit ? Number(data.oeSiteVisit) : null,
+        oeSiteVisitAssignedAt: data.oeSiteVisitAssignedAt ?? null,
+        oeSiteVisitAssignedBy: data.oeSiteVisitAssignedBy ? Number(data.oeSiteVisitAssignedBy) : null,
+        oeDocsPrep: data.oeDocsPrep ? Number(data.oeDocsPrep) : null,
+        oeDocsPrepAssignedAt: data.oeDocsPrepAssignedAt ?? null,
+        oeDocsPrepAssignedBy: data.oeDocsPrepAssignedBy ? Number(data.oeDocsPrepAssignedBy) : null,
+    };
+}

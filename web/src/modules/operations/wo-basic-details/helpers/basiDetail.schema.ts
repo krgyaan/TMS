@@ -22,14 +22,23 @@ export const WoBasicDetailFormSchema = z.object({
 });
 
 export const AssignOeFormSchema = z.object({
-  woBasicDetailId: z.number().optional(),
-  oeFirst: z.number().nullable().optional(),
-  oeFirstAssignedAt: z.date().nullable().optional(),
-  oeFirstAssignedBy: z.number().nullable().optional(),
-  oeSiteVisit: z.number().nullable().optional(),
-  oeSiteVisitAssignedAt: z.date().nullable().optional(),
-  oeSiteVisitAssignedBy: z.number().nullable().optional(),
-  oeDocsPrep: z.number().nullable().optional(),
-  oeDocsPrepAssignedAt: z.date().nullable().optional(),
-  oeDocsPrepAssignedBy: z.number().nullable().optional(),
+    woBasicDetailId: z.number().int().positive(),
+    oeFirst: z.union([
+        z.number().int().positive(),
+        z.string().transform(val => val ? parseInt(val, 10) : null),
+    ]).nullable().optional(),
+    oeFirstAssignedAt: z.coerce.date().nullable().optional(),
+    oeFirstAssignedBy: z.number().int().positive().nullable().optional(),
+    oeSiteVisit: z.union([
+        z.number().int().positive(),
+        z.string().transform(val => val ? parseInt(val, 10) : null),
+    ]).nullable().optional(),
+    oeSiteVisitAssignedAt: z.coerce.date().nullable().optional(),
+    oeSiteVisitAssignedBy: z.number().int().positive().nullable().optional(),
+    oeDocsPrep: z.union([
+        z.number().int().positive(),
+        z.string().transform(val => val ? parseInt(val, 10) : null),
+    ]).nullable().optional(),
+    oeDocsPrepAssignedAt: z.coerce.date().nullable().optional(),
+    oeDocsPrepAssignedBy: z.number().int().positive().nullable().optional(),
 });

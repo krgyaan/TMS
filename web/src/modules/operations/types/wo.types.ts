@@ -97,6 +97,7 @@ export interface WoBasicDetail {
   id: number;
   tenderId: number | null;
   enquiryId: number | null;
+  team: number | null,
   woNumber: string | null;
   woDate: string | null;
   projectCode: string | null;
@@ -111,15 +112,15 @@ export interface WoBasicDetail {
   tmsDocuments: TmsDocuments | null;
   oeFirst: number | null;
   oeFirstName: string | null;
-  oeFirstAssignedAt: string | null;
+  oeFirstAssignedAt: Date | null;
   oeFirstAssignedBy: number | null;
   oeSiteVisit: number | null;
   oeSiteVisitName: string | null;
-  oeSiteVisitAssignedAt: string | null;
+  oeSiteVisitAssignedAt: Date | null;
   oeSiteVisitAssignedBy: number | null;
   oeDocsPrep: number | null;
   oeDocsPrepName: string | null;
-  oeDocsPrepAssignedAt: string | null;
+  oeDocsPrepAssignedAt: Date | null;
   oeDocsPrepAssignedBy: number | null;
   isWorkflowPaused: boolean;
   workflowPausedAt: string | null;

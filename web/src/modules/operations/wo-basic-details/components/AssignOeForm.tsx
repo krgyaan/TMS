@@ -1,61 +1,76 @@
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type SubmitHandler, useForm, type Resolver } from "react-hook-form";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
 import { ArrowLeft, Save } from "lucide-react";
 import { paths } from "@/app/routes/paths";
-import { AssignOeFormSchema } from "../helpers/basiDetail.schema";
-import type { WoBasicDetail, AssignOeFormValues } from "../helpers/basiDetail.types";
-import { buildDefaultValues, mapResponseToForm, mapFormToAssignOePayload } from "../helpers/basiDetail.mapper";
+import { AssignOeFormSchema } from "@/modules/operations/wo-basic-details/helpers/basiDetail.schema";
+import type { WoBasicDetail, AssignOeFormValues, AssignOeDto } from "@/modules/operations/wo-basic-details/helpers/basiDetail.types";
+import { buildDefaultAssigeOeValues, mapFormToAssignOePayload } from "@/modules/operations/wo-basic-details/helpers/basiDetail.mapper";
 import { useAssignOe } from "@/hooks/api/useWoBasicDetails";
 import { toast } from "sonner";
 import SelectField from "@/components/form/SelectField";
+import type { User } from "@/types/api.types";
 
 interface AssignOeFormProps {
     mode: "create" | "edit";
     existingData?: WoBasicDetail;
+    users?: User[];
 }
 
-export function AssignOeForm({ mode, existingData }: AssignOeFormProps) {
+export function AssignOeForm({ mode, existingData, users }: AssignOeFormProps) {
     const navigate = useNavigate();
-    const [searchParams] = useSearchParams();
-    const urlTenderId = searchParams.get("tenderId");
-    const createMutation = useAssignOe();
+    const { id: woBasicDetailsId } = useParams<{ id: string }>();
+    const assignOeMutation = useAssignOe();
 
     const initialValues = useMemo(() => {
         if (mode === "edit" && existingData) {
-            return mapResponseToForm(existingData);
+            return mapFormToAssignOePayload(existingData);
         }
-        const defaults = buildDefaultValues();
-        if (mode === "create" && urlTenderId) {
-            defaults.tenderId = Number(urlTenderId);
+        const defaults = buildDefaultAssigeOeValues();
+        if (woBasicDetailsId) {
+            defaults.woBasicDetailId = Number(woBasicDetailsId);
         }
         return defaults;
-    }, [mode, existingData, urlTenderId]);
+    }, [mode, existingData, woBasicDetailsId]);
 
     const form = useForm<AssignOeFormValues>({
         resolver: zodResolver(AssignOeFormSchema) as Resolver<AssignOeFormValues>,
         defaultValues: initialValues,
     });
 
-    const isSubmitting = createMutation.isPending;
+    // Reset form when initialValues change (e.g., when existingData loads)
+    useEffect(() => {
+        form.reset(initialValues);
+    }, [initialValues, form]);
+
+    const isSubmitting = assignOeMutation.isPending;
 
     const handleSubmit: SubmitHandler<AssignOeFormValues> = async values => {
+        console.log("Submitting values:", values);
+
         try {
-            if (mode === "create") {
-                const payload = mapFormToAssignOePayload(values);
-                const result = await createMutation.mutateAsync(payload);
-                navigate(paths.operations.woAssignOePage(result.id));
-            } else if (existingData?.id) {
-                const payload = mapFormToAssignOePayload(values);
-                await createMutation.mutateAsync({ id: existingData.id, data: payload });
-                navigate(paths.operations.woBasicDetailListPage);
+            const payload = mapFormToAssignOePayload(values) as AssignOeDto;
+            const targetId = Number(payload.woBasicDetailId) || existingData?.id;
+
+            if (!targetId) {
+                toast.error("Missing WO Basic Detail ID");
+                return;
             }
+
+            await assignOeMutation.mutateAsync({ id: targetId, data: payload });
+
+            toast.success("OE assignments saved successfully");
+
+            // Navigate back to list or stay on page
+            navigate(paths.operations.woBasicDetailListPage);
+
         } catch (error: any) {
-            toast.error(error?.message || "Failed to save basic detail");
+            console.error("Submit error:", error);
+            toast.error(error?.message || "Failed to save OE assignments");
         }
     };
 
@@ -69,8 +84,8 @@ export function AssignOeForm({ mode, existingData }: AssignOeFormProps) {
                         </CardTitle>
                         <CardDescription className="mt-2">
                             {mode === "create"
-                                ? "Create a new OEs for WO"
-                                : "Update OEs for WO"}
+                                ? "Assign OEs for this Work Order"
+                                : "Update OE assignments for this Work Order"}
                         </CardDescription>
                     </div>
                     <CardAction>
@@ -89,35 +104,58 @@ export function AssignOeForm({ mode, existingData }: AssignOeFormProps) {
                                 name="oeFirst"
                                 label="Primary OE"
                                 placeholder="Select Primary OE"
-                                options={[]}
+                                options={users?.map(user => ({
+                                    value: String(user.id),
+                                    label: user.name
+                                })) ?? []}
                             />
                             <SelectField
                                 control={form.control}
                                 name="oeDocsPrep"
                                 label="OE Docs Prep"
                                 placeholder="Select OE Docs Prep"
-                                options={[]}
+                                options={users?.map(user => ({
+                                    value: String(user.id),
+                                    label: user.name
+                                })) ?? []}
                             />
                             <SelectField
                                 control={form.control}
                                 name="oeSiteVisit"
                                 label="OE Site Visit"
                                 placeholder="Select OE Site Visit"
-                                options={[]}
+                                options={users?.map(user => ({
+                                    value: String(user.id),
+                                    label: user.name
+                                })) ?? []}
                             />
                         </div>
 
                         <div className="flex justify-end gap-2 pt-6 border-t">
-                            <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={isSubmitting}>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => navigate(-1)}
+                                disabled={isSubmitting}
+                            >
                                 Cancel
                             </Button>
-                            <Button type="button" variant="ghost" onClick={() => form.reset(initialValues)} disabled={isSubmitting}>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => form.reset(initialValues)}
+                                disabled={isSubmitting}
+                            >
                                 Reset
                             </Button>
-                            <Button type="submit" disabled={isSubmitting} className="bg-orange-500 hover:bg-orange-600 text-white">
+                            <Button
+                                type="submit"
+                                disabled={isSubmitting}
+                                className="bg-orange-500 hover:bg-orange-600 text-white"
+                            >
                                 {isSubmitting && <span className="animate-spin mr-2">⏳</span>}
                                 <Save className="mr-2 h-4 w-4" />
-                                Submit
+                                {mode === "create" ? "Assign" : "Update"}
                             </Button>
                         </div>
                     </form>

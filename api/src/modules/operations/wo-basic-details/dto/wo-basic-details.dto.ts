@@ -51,14 +51,16 @@ export type UpdateWoBasicDetailDto = z.infer<typeof UpdateWoBasicDetailSchema>;
  * Used by TL within 12 hours of Basic Details creation
  */
 export const AssignOeSchema = z.object({
-  assignmentType: z.enum(["first", "siteVisit", "docsPrep"], {
-    required_error: "Assignment type is required",
-    invalid_type_error: "Invalid assignment type",
-  }),
-  oeUserId: z.number().int().positive({
-    message: "Valid OE user ID is required",
-  }),
-  assignedBy: z.number().int().positive().optional(), // Auto-filled from auth context
+    woBasicDetailId: z.number().int().positive().optional(),
+    oeFirst: z.number().int().positive().nullable().optional(),
+    oeFirstAssignedAt: z.coerce.date().nullable().optional(),
+    oeFirstAssignedBy: z.number().int().positive().nullable().optional(),
+    oeSiteVisit: z.number().int().positive().nullable().optional(),
+    oeSiteVisitAssignedAt: z.coerce.date().nullable().optional(),
+    oeSiteVisitAssignedBy: z.number().int().positive().nullable().optional(),
+    oeDocsPrep: z.number().int().positive().nullable().optional(),
+    oeDocsPrepAssignedAt: z.coerce.date().nullable().optional(),
+    oeDocsPrepAssignedBy: z.number().int().positive().nullable().optional(),
 });
 
 export type AssignOeDto = z.infer<typeof AssignOeSchema>;
