@@ -566,7 +566,7 @@ export class UsersService {
     }
 
     async findUsersOfOps(teamId?: number) {
-        // users.team = 3, user is active, not deleted
+       // users.team = 3, user is active, not deleted
         const conditions = [
             eq(users.team, 3),
             isNull(users.deletedAt),

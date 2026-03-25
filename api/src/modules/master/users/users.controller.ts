@@ -43,6 +43,16 @@ export class UsersController {
         return this.usersService.findUsersByRole(roleId);
     }
 
+    @Get('of-ops')
+    async getUsersOfOps(@Query('team') team?: string) {
+        // If team is "undefined", "null", or empty string, treat as undefined
+        const isInvalid = !team || team === 'undefined' || team === 'null';
+        const teamId = isInvalid ? undefined : parseInt(team, 10);
+
+        // Final sanity check: if the string was something like "abc", parseInt returns NaN
+        return this.usersService.findUsersOfOps(isNaN(teamId!) ? undefined : teamId);
+    }
+
     @Get(":id")
     @CanRead("users")
     async getById(@Param("id", ParseIntPipe) id: number) {
@@ -236,11 +246,5 @@ export class UsersController {
     async getTeamMembers(@Param("teamId", ParseIntPipe) teamId: number) {
         const members = await this.usersService.getTeamMembers(teamId);
         return members;
-    }
-
-    @Get('of-ops')
-    async getUsersOfOps(@Query('team') team?: string) {
-        const teamId = team ? parseInt(team, 10) : undefined;
-        return this.usersService.findUsersOfOps(teamId);
     }
 }

@@ -66,7 +66,8 @@ class UsersService extends BaseApiService {
     }
 
     async getUsersOfOps(team?: number): Promise<User[]> {
-        const params = team !== undefined ? `?team=${team}` : "";
+        // Only add ?team= if it's a valid number
+        const params = (team !== undefined && !isNaN(team)) ? `?team=${team}` : "";
         return this.get<User[]>(`/of-ops${params}`);
     }
 }
