@@ -20,7 +20,7 @@ export class ContractAgreementService {
         const activeTab = tab ?? 'not_uploaded';
 
         const conditions: any[] = [
-            eq(woDetails.status, 'completed'),
+            eq(woDetails.isContractAgreement, true),
         ];
         // Tab filter
         if (activeTab === 'not_uploaded') {
@@ -132,8 +132,7 @@ export class ContractAgreementService {
 
     async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<{ 'uploaded': number; 'not_uploaded': number; total: number }> {
         // Apply role-based filtering
-        const roleFilterConditions: any[] = [];
-        const baseConditions = [...roleFilterConditions];
+        const baseConditions = [eq(woDetails.isContractAgreement, true)];
 
         // Count not_scheduled: kickoff IS NULL
         const notScheduledConditions = [...baseConditions, isNull(woDetails.veSigned), isNull(woDetails.clientAndVeSigned)];
