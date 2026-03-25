@@ -36,6 +36,14 @@ export function useUsersByRole(roleId: number) {
     });
 }
 
+export function useUsersOfOps(primaryTeam?: number | null) {
+    return useQuery({
+        queryKey: ["users", "ops", primaryTeam ?? "all"],
+        queryFn: () => usersService.getUsersOfOps(primaryTeam ?? undefined),
+        staleTime: 5 * 60 * 1000, // 5 minutes
+    });
+}
+
 export const useCreateUser = () => {
     const queryClient = useQueryClient();
 

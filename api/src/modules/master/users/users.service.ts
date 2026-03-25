@@ -564,4 +564,31 @@ export class UsersService {
             .where(and(eq(userRoles.roleId, roleId), isNull(users.deletedAt), eq(users.isActive, true)))
             .orderBy(asc(users.name));
     }
+
+    async findUsersOfOps(teamId?: number) {
+       // users.team = 3, user is active, not deleted
+        const conditions = [
+            eq(users.team, 3),
+            isNull(users.deletedAt),
+            eq(users.isActive, true),
+        ];
+
+        // If a specific team is provided, also filter by userProfiles.primaryTeamId
+        if (teamId !== undefined) {
+            conditions.push(eq(userProfiles.primaryTeamId, teamId));
+        }
+
+        return this.db
+            .select({
+                id: users.id,
+                name: users.name,
+                email: users.email,
+                teamName: teams.name,
+            })
+            .from(users)
+            .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+            .leftJoin(teams, eq(teams.id, userProfiles.primaryTeamId))
+            .where(and(...conditions))
+            .orderBy(asc(users.name));
+    }
 }

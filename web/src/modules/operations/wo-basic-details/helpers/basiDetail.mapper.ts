@@ -1,4 +1,4 @@
-import type { WoBasicDetailFormValues } from "./basiDetail.types";
+import type { AssignOeFormValues, WoBasicDetailFormValues } from "./basiDetail.types";
 import type { WoBasicDetail, CreateWoBasicDetailDto, UpdateWoBasicDetailDto } from "@/modules/operations/types/wo.types";
 
 export const buildDefaultValues = (): WoBasicDetailFormValues => ({
@@ -12,7 +12,7 @@ export const buildDefaultValues = (): WoBasicDetailFormValues => ({
   grossMargin: 0,
   projectCode: "",
   projectName: "",
-  wo_draft: [],
+  woDraft: [],
   teChecklistConfirmed: false,
   tmsDocuments: {
     "Complete Tender Documents": false,
@@ -52,7 +52,6 @@ export const mapResponseToForm = (data: WoBasicDetail): WoBasicDetailFormValues 
     projectCode: data.projectCode || "",
     projectName: data.projectName || "",
     wo_draft: safeParseJsonArray(data.woDraft),
-    teChecklistConfirmed: data.teChecklistConfirmed ?? false,
     tmsDocuments: data.tmsDocuments || {
       "Complete Tender Documents": false,
       "Tender Info": false,
@@ -74,7 +73,6 @@ export const mapFormToCreatePayload = (values: WoBasicDetailFormValues): CreateW
     projectCode: values.projectCode || "",
     projectName: values.projectName || "",
     currentStage: "basic_details",
-    teChecklistConfirmed: values.teChecklistConfirmed,
     tmsDocuments: values.tmsDocuments,
   };
 
@@ -84,7 +82,7 @@ export const mapFormToCreatePayload = (values: WoBasicDetailFormValues): CreateW
   if (values.budgetPreGst !== undefined) payload.budgetPreGst = String(values.budgetPreGst);
   if (values.receiptPreGst !== undefined) payload.receiptPreGst = String(values.receiptPreGst);
   if (values.grossMargin !== undefined) payload.grossMargin = String(values.grossMargin);
-  if (values.wo_draft && values.wo_draft.length > 0) payload.wo_draft = JSON.stringify(values.wo_draft);
+  if (values.woDraft && values.woDraft.length > 0) payload.woDraft = JSON.stringify(values.woDraft);
 
   return payload;
 };
@@ -95,7 +93,6 @@ export const mapFormToUpdatePayload = (values: WoBasicDetailFormValues): UpdateW
     woDate: values.woDate ? values.woDate.toISOString().split('T')[0] : undefined,
     projectCode: values.projectCode || "",
     projectName: values.projectName || "",
-    teChecklistConfirmed: values.teChecklistConfirmed,
     tmsDocuments: values.tmsDocuments,
   };
 
@@ -104,7 +101,42 @@ export const mapFormToUpdatePayload = (values: WoBasicDetailFormValues): UpdateW
   if (values.budgetPreGst !== undefined) payload.budgetPreGst = String(values.budgetPreGst);
   if (values.receiptPreGst !== undefined) payload.receiptPreGst = String(values.receiptPreGst);
   if (values.grossMargin !== undefined) payload.grossMargin = String(values.grossMargin);
-  if (values.wo_draft && values.wo_draft.length > 0) payload.wo_draft = JSON.stringify(values.wo_draft);
+  if (values.woDraft && values.woDraft.length > 0) payload.woDraft = JSON.stringify(values.woDraft);
 
   return payload;
 };
+
+export function buildDefaultAssigeOeValues(): AssignOeFormValues {
+    return {
+        woBasicDetailId: 0,
+        oeFirst: null,
+        oeFirstAssignedAt: null,
+        oeFirstAssignedBy: null,
+        oeSiteVisit: null,
+        oeSiteVisitAssignedAt: null,
+        oeSiteVisitAssignedBy: null,
+        oeDocsPrep: null,
+        oeDocsPrepAssignedAt: null,
+        oeDocsPrepAssignedBy: null,
+    };
+}
+
+export function mapFormToAssignOePayload(data: WoBasicDetail | AssignOeFormValues): AssignOeFormValues {
+    // Handle both WoBasicDetail (from API) and AssignOeFormValues (from form)
+    const woBasicDetailId = 'woBasicDetailId' in data
+        ? data.woBasicDetailId
+        : data.id;
+
+    return {
+        woBasicDetailId: Number(woBasicDetailId),
+        oeFirst: data.oeFirst ? Number(data.oeFirst) : null,
+        oeFirstAssignedAt: data.oeFirstAssignedAt ?? null,
+        oeFirstAssignedBy: data.oeFirstAssignedBy ? Number(data.oeFirstAssignedBy) : null,
+        oeSiteVisit: data.oeSiteVisit ? Number(data.oeSiteVisit) : null,
+        oeSiteVisitAssignedAt: data.oeSiteVisitAssignedAt ?? null,
+        oeSiteVisitAssignedBy: data.oeSiteVisitAssignedBy ? Number(data.oeSiteVisitAssignedBy) : null,
+        oeDocsPrep: data.oeDocsPrep ? Number(data.oeDocsPrep) : null,
+        oeDocsPrepAssignedAt: data.oeDocsPrepAssignedAt ?? null,
+        oeDocsPrepAssignedBy: data.oeDocsPrepAssignedBy ? Number(data.oeDocsPrepAssignedBy) : null,
+    };
+}

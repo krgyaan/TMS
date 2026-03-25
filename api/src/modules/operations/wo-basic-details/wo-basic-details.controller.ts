@@ -76,19 +76,10 @@ export class WoBasicDetailsController {
     async assignOe(
         @Param('id', ParseIntPipe) id: number,
         @Body() body: unknown,
+        @CurrentUser() currentUser: ValidatedUser,
     ) {
         const parsed = AssignOeSchema.parse(body) as AssignOeDto;
-        return this.woBasicDetailsService.assignOe(id, parsed);
-    }
-
-    @Post(':id/bulk-assign-oe')
-    @HttpCode(HttpStatus.OK)
-    async bulkAssignOe(
-        @Param('id', ParseIntPipe) id: number,
-        @Body() body: unknown,
-    ) {
-        const parsed = BulkAssignOeSchema.parse(body) as BulkAssignOeDto;
-        return this.woBasicDetailsService.bulkAssignOe(id, parsed);
+        return this.woBasicDetailsService.assignOe(id, parsed, currentUser?.sub);
     }
 
     @Delete(':id/remove-oe-assignment')
@@ -107,11 +98,6 @@ export class WoBasicDetailsController {
     }
 
     // UTILITY OPERATIONS
-    @Get('check-project-code/:projectCode')
-    async checkProjectCodeExists(@Param('projectCode') projectCode: string) {
-        return this.woBasicDetailsService.checkProjectCodeExists(projectCode);
-    }
-
     @Get('by-tender/:tenderId')
     async getByTenderId(@Param('tenderId', ParseIntPipe) tenderId: number) {
         return this.woBasicDetailsService.findByTenderId(tenderId);

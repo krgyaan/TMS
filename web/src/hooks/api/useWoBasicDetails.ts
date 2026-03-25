@@ -7,18 +7,10 @@ import type {
   WoBasicDetailsFilters,
   CreateWoBasicDetailDto,
   UpdateWoBasicDetailDto,
-  AssignOeDto,
-  BulkAssignOeDto,
-  RemoveOeAssignmentDto,
-  PauseWorkflowDto,
-  ResumeWorkflowDto,
-  UpdateWorkflowStageDto,
+  AssignOeDto
 } from '@/modules/operations/types/wo.types';
 
-// ============================================
 // QUERY KEYS
-// ============================================
-
 export const woBasicDetailsKeys = {
   all: ['wo-basic-details'] as const,
   lists: () => [...woBasicDetailsKeys.all, 'list'] as const,
@@ -38,13 +30,10 @@ export const woBasicDetailsKeys = {
   projectCodeCheck: (code: string) => [...woBasicDetailsKeys.all, 'project-code-check', code] as const,
 };
 
-// ============================================
 // QUERY HOOKS
-// ============================================
-
 export const useWoBasicDetails = (filters?: WoBasicDetailsFilters) => {
   const { queryParams: teamParams } = useTeamFilter();
-  
+
   const mergedFilters = {
     ...teamParams,
     ...(filters || {}),
@@ -108,28 +97,6 @@ export const useWoBasicDetailsDashboardSummary = () => {
   });
 };
 
-export const usePendingOeAssignments = () => {
-  const { teamId, dataScope } = useTeamFilter();
-  const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
-
-  return useQuery({
-    queryKey: woBasicDetailsKeys.pendingAssignments(teamIdParam ?? null),
-    queryFn: () => woBasicDetailsService.getPendingOeAssignments(teamIdParam),
-    staleTime: 0,
-  });
-};
-
-export const useWorkflowStatusSummary = () => {
-  const { teamId, dataScope } = useTeamFilter();
-  const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
-
-  return useQuery({
-    queryKey: woBasicDetailsKeys.workflowStatus(teamIdParam ?? null),
-    queryFn: () => woBasicDetailsService.getWorkflowStatusSummary(teamIdParam),
-    staleTime: 0,
-  });
-};
-
 export const useCheckProjectCode = (projectCode: string) => {
   return useQuery({
     queryKey: woBasicDetailsKeys.projectCodeCheck(projectCode),
@@ -138,10 +105,7 @@ export const useCheckProjectCode = (projectCode: string) => {
   });
 };
 
-// ============================================
 // MUTATION HOOKS
-// ============================================
-
 export const useCreateWoBasicDetail = () => {
   const queryClient = useQueryClient();
 
@@ -202,113 +166,6 @@ export const useAssignOe = () => {
       queryClient.invalidateQueries({ queryKey: woBasicDetailsKeys.oeAssignments(id) });
       queryClient.invalidateQueries({ queryKey: woBasicDetailsKeys.pendingAssignments() });
       toast.success('OE assigned successfully');
-    },
-    onError: (error: any) => {
-      toast.error(handleQueryError(error));
-    },
-  });
-};
-
-export const useBulkAssignOe = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: BulkAssignOeDto }) =>
-      woBasicDetailsService.bulkAssignOe(id, data),
-    onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: woBasicDetailsKeys.all });
-      queryClient.invalidateQueries({ queryKey: woBasicDetailsKeys.detail(id) });
-      queryClient.invalidateQueries({ queryKey: woBasicDetailsKeys.oeAssignments(id) });
-      queryClient.invalidateQueries({ queryKey: woBasicDetailsKeys.pendingAssignments() });
-      toast.success('OEs assigned successfully');
-    },
-    onError: (error: any) => {
-      toast.error(handleQueryError(error));
-    },
-  });
-};
-
-export const useRemoveOeAssignment = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: RemoveOeAssignmentDto }) =>
-      woBasicDetailsService.removeOeAssignment(id, data),
-    onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: woBasicDetailsKeys.all });
-      queryClient.invalidateQueries({ queryKey: woBasicDetailsKeys.detail(id) });
-      queryClient.invalidateQueries({ queryKey: woBasicDetailsKeys.oeAssignments(id) });
-      toast.success('OE assignment removed successfully');
-    },
-    onError: (error: any) => {
-      toast.error(handleQueryError(error));
-    },
-  });
-};
-
-// Workflow Control Mutations
-export const usePauseWorkflow = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ id, data }: { id: number; data?: PauseWorkflowDto }) =>
-      woBasicDetailsService.pauseWorkflow(id, data),
-    onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: woBasicDetailsKeys.all });
-      queryClient.invalidateQueries({ queryKey: woBasicDetailsKeys.detail(id) });
-      queryClient.invalidateQueries({ queryKey: woBasicDetailsKeys.workflowStatus() });
-      toast.success('Workflow paused successfully');
-    },
-    onError: (error: any) => {
-      toast.error(handleQueryError(error));
-    },
-  });
-};
-
-export const useResumeWorkflow = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ id, data }: { id: number; data?: ResumeWorkflowDto }) =>
-      woBasicDetailsService.resumeWorkflow(id, data),
-    onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: woBasicDetailsKeys.all });
-      queryClient.invalidateQueries({ queryKey: woBasicDetailsKeys.detail(id) });
-      queryClient.invalidateQueries({ queryKey: woBasicDetailsKeys.workflowStatus() });
-      toast.success('Workflow resumed successfully');
-    },
-    onError: (error: any) => {
-      toast.error(handleQueryError(error));
-    },
-  });
-};
-
-export const useUpdateWorkflowStage = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: UpdateWorkflowStageDto }) =>
-      woBasicDetailsService.updateWorkflowStage(id, data),
-    onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: woBasicDetailsKeys.all });
-      queryClient.invalidateQueries({ queryKey: woBasicDetailsKeys.detail(id) });
-      queryClient.invalidateQueries({ queryKey: woBasicDetailsKeys.dashboardSummary() });
-      toast.success('Workflow stage updated successfully');
-    },
-    onError: (error: any) => {
-      toast.error(handleQueryError(error));
-    },
-  });
-};
-
-export const useCalculateGrossMargin = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (id: number) => woBasicDetailsService.calculateGrossMargin(id),
-    onSuccess: (_, id) => {
-      queryClient.invalidateQueries({ queryKey: woBasicDetailsKeys.detail(id) });
-      toast.success('Gross margin calculated successfully');
     },
     onError: (error: any) => {
       toast.error(handleQueryError(error));

@@ -1,21 +1,5 @@
 import { BaseApiService } from './base.service';
-import type {
-  WoBasicDetail,
-  WoBasicDetailWithRelations,
-  CreateWoBasicDetailDto,
-  UpdateWoBasicDetailDto,
-  AssignOeDto,
-  BulkAssignOeDto,
-  RemoveOeAssignmentDto,
-  PauseWorkflowDto,
-  ResumeWorkflowDto,
-  UpdateWorkflowStageDto,
-  WoBasicDetailsFilters,
-  OeAssignments,
-  DashboardSummary,
-  WorkflowStatusSummary,
-  PaginatedResult,
-} from '@/modules/operations/types/wo.types';
+import type { WoBasicDetail, WoBasicDetailWithRelations, CreateWoBasicDetailDto, UpdateWoBasicDetailDto, AssignOeDto, WoBasicDetailsFilters, OeAssignments, DashboardSummary, PaginatedResult } from '@/modules/operations/types/wo.types';
 
 class WoBasicDetailsService extends BaseApiService {
   constructor() {
@@ -85,29 +69,8 @@ class WoBasicDetailsService extends BaseApiService {
     return this.post<WoBasicDetail>(`/${id}/assign-oe`, data);
   }
 
-  async bulkAssignOe(id: number, data: BulkAssignOeDto): Promise<WoBasicDetail> {
-    return this.post<WoBasicDetail>(`/${id}/bulk-assign-oe`, data);
-  }
-
-  async removeOeAssignment(id: number, data: RemoveOeAssignmentDto): Promise<WoBasicDetail> {
-    return this.delete<WoBasicDetail>(`/${id}/remove-oe-assignment`, { data });
-  }
-
   async getOeAssignments(id: number): Promise<OeAssignments> {
     return this.get<OeAssignments>(`/${id}/oe-assignments`);
-  }
-
-  // Workflow Control Operations
-  async pauseWorkflow(id: number, data?: PauseWorkflowDto): Promise<WoBasicDetail & { message: string }> {
-    return this.post<WoBasicDetail & { message: string }>(`/${id}/pause-workflow`, data || {});
-  }
-
-  async resumeWorkflow(id: number, data?: ResumeWorkflowDto): Promise<WoBasicDetail & { message: string }> {
-    return this.post<WoBasicDetail & { message: string }>(`/${id}/resume-workflow`, data || {});
-  }
-
-  async updateWorkflowStage(id: number, data: UpdateWorkflowStageDto): Promise<WoBasicDetail> {
-    return this.patch<WoBasicDetail>(`/${id}/workflow-stage`, data);
   }
 
   // Utility Operations
@@ -131,16 +94,6 @@ class WoBasicDetailsService extends BaseApiService {
   async getDashboardSummary(teamId?: number): Promise<DashboardSummary> {
     const query = teamId ? `?teamId=${teamId}` : '';
     return this.get<DashboardSummary>(`/dashboard/summary${query}`);
-  }
-
-  async getPendingOeAssignments(teamId?: number): Promise<{ count: number; data: WoBasicDetail[] }> {
-    const query = teamId ? `?teamId=${teamId}` : '';
-    return this.get<{ count: number; data: WoBasicDetail[] }>(`/dashboard/pending-assignments${query}`);
-  }
-
-  async getWorkflowStatusSummary(teamId?: number): Promise<WorkflowStatusSummary> {
-    const query = teamId ? `?teamId=${teamId}` : '';
-    return this.get<WorkflowStatusSummary>(`/dashboard/workflow-status${query}`);
   }
 }
 

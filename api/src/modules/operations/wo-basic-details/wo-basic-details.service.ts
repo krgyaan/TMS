@@ -71,6 +71,7 @@ export class WoBasicDetailsService {
             id: row.id,
             tenderId: row.tenderId,
             enquiryId: row.enquiryId,
+            team: row.team,
             woNumber: row.woNumber,
             woDate: row.woDate,
             projectCode: row.projectCode,
@@ -541,29 +542,32 @@ export class WoBasicDetailsService {
     }
 
     // OE ASSIGNMENT OPERATIONS
-    async assignOe(id: number, data: AssignOeDto) {
+    async assignOe(id: number, data: AssignOeDto, assignedByUserId?: number) {
         // Check if record exists
         await this.findById(id);
 
         const now = new Date();
         const updateValues: Record<string, unknown> = { updatedAt: now };
 
-        switch (data.assignmentType) {
-            case 'first':
-                updateValues.oeFirst = data.oeUserId;
-                updateValues.oeFirstAssignedAt = now;
-                updateValues.oeFirstAssignedBy = data.assignedBy ?? null;
-                break;
-            case 'siteVisit':
-                updateValues.oeSiteVisit = data.oeUserId;
-                updateValues.oeSiteVisitAssignedAt = now;
-                updateValues.oeSiteVisitAssignedBy = data.assignedBy ?? null;
-                break;
-            case 'docsPrep':
-                updateValues.oeDocsPrep = data.oeUserId;
-                updateValues.oeDocsPrepVisitAssignedAt = now;
-                updateValues.oeDocsPrepVisitAssignedBy = data.assignedBy ?? null;
-                break;
+        // Handle oeFirst assignment
+        if (data.oeFirst !== undefined) {
+            updateValues.oeFirst = data.oeFirst;
+            updateValues.oeFirstAssignedAt = data.oeFirstAssignedAt ?? now;
+            updateValues.oeFirstAssignedBy = data.oeFirstAssignedBy ?? assignedByUserId ?? null;
+        }
+
+        // Handle oeSiteVisit assignment
+        if (data.oeSiteVisit !== undefined) {
+            updateValues.oeSiteVisit = data.oeSiteVisit;
+            updateValues.oeSiteVisitAssignedAt = data.oeSiteVisitAssignedAt ?? now;
+            updateValues.oeSiteVisitAssignedBy = data.oeSiteVisitAssignedBy ?? assignedByUserId ?? null;
+        }
+
+        // Handle oeDocsPrep assignment
+        if (data.oeDocsPrep !== undefined) {
+            updateValues.oeDocsPrep = data.oeDocsPrep;
+            updateValues.oeDocsPrepAssignedAt = data.oeDocsPrepAssignedAt ?? now;
+            updateValues.oeDocsPrepAssignedBy = data.oeDocsPrepAssignedBy ?? assignedByUserId ?? null;
         }
 
         const [row] = await this.db

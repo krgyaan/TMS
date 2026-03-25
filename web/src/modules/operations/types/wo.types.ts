@@ -97,6 +97,7 @@ export interface WoBasicDetail {
   id: number;
   tenderId: number | null;
   enquiryId: number | null;
+  team: number | null,
   woNumber: string | null;
   woDate: string | null;
   projectCode: string | null;
@@ -111,15 +112,15 @@ export interface WoBasicDetail {
   tmsDocuments: TmsDocuments | null;
   oeFirst: number | null;
   oeFirstName: string | null;
-  oeFirstAssignedAt: string | null;
+  oeFirstAssignedAt: Date | null;
   oeFirstAssignedBy: number | null;
   oeSiteVisit: number | null;
   oeSiteVisitName: string | null;
-  oeSiteVisitAssignedAt: string | null;
+  oeSiteVisitAssignedAt: Date | null;
   oeSiteVisitAssignedBy: number | null;
   oeDocsPrep: number | null;
   oeDocsPrepName: string | null;
-  oeDocsPrepAssignedAt: string | null;
+  oeDocsPrepAssignedAt: Date | null;
   oeDocsPrepAssignedBy: number | null;
   isWorkflowPaused: boolean;
   workflowPausedAt: string | null;
@@ -155,17 +156,16 @@ export interface CreateWoBasicDetailDto {
 export interface UpdateWoBasicDetailDto extends Partial<Omit<CreateWoBasicDetailDto, 'tenderId' | 'enquiryId'>> {}
 
 export interface AssignOeDto {
-  assignmentType: OeAssignmentType;
-  oeUserId: number;
-  assignedBy?: number;
-}
-
-export interface BulkAssignOeDto {
-  assignments: Array<{
-    assignmentType: OeAssignmentType;
-    oeUserId: number;
-  }>;
-  assignedBy?: number;
+  woBasicDetailId: number | null;
+  oeFirst: number | null;
+  oeFirstAssignedAt: Date | null;
+  oeFirstAssignedBy: number | null;
+  oeSiteVisit: number | null;
+  oeSiteVisitAssignedAt: Date | null;
+  oeSiteVisitAssignedBy: number | null;
+  oeDocsPrep: number | null;
+  oeDocsPrepAssignedAt: Date | null;
+  oeDocsPrepAssignedBy: number | null;
 }
 
 export interface WoBasicDetailsFilters {
