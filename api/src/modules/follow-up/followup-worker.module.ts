@@ -7,9 +7,10 @@ import { FollowUpModule } from "./follow-up.module";
 import { FollowupWorker } from "./follow-up.worker";
 import { FollowUpService } from "./follow-up.service";
 import { LoggerModule } from "@/logger/logger.module";
+import { CoreModule } from "@/core/core.module";
 
 @Module({
-    imports: [ConfigModule, DatabaseModule, GoogleIntegrationModule, MailerModule, LoggerModule],
+    imports: [ConfigModule, DatabaseModule, GoogleIntegrationModule, MailerModule, LoggerModule, CoreModule],
     providers: [FollowupWorker, FollowUpService],
 })
 export class FollowupWorkerModule {}
