@@ -479,6 +479,8 @@ export class FollowUpService {
             if (data.stopReason !== undefined) updateData.stopReason = data.stopReason;
             if (data.proofText !== undefined) updateData.proofText = data.proofText;
             if (data.stopRemarks !== undefined) updateData.stopRemarks = data.stopRemarks;
+            //updating the status
+            updateData.assignmentStatus = "initiated";
 
             if (proofImage) {
                 updateData.proofImagePath = proofImage.filename;
