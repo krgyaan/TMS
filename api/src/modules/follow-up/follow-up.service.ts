@@ -479,6 +479,8 @@ export class FollowUpService {
             if (data.stopReason !== undefined) updateData.stopReason = data.stopReason;
             if (data.proofText !== undefined) updateData.proofText = data.proofText;
             if (data.stopRemarks !== undefined) updateData.stopRemarks = data.stopRemarks;
+            //updating the status
+            updateData.assignmentStatus = "initiated";
 
             if (proofImage) {
                 updateData.proofImagePath = proofImage.filename;
@@ -791,15 +793,37 @@ export class FollowUpService {
                 ccCount: payload.cc?.length ?? 0,
             });
 
-            const googleConnection = await this.googleService.getSanitizedGoogleConnection(payload.assignedToUserId);
+            //  attempt google connection for assignedToUserId first
+            let googleConnection = await this.googleService.getSanitizedGoogleConnection(payload.assignedToUserId);
 
+            // if missing, attempt fallback before giving up
             if (!googleConnection) {
-                this.logger.warn("Google connection missing for user", {
+                this.logger.warn("Google connection missing for assigned user, attempting fallback", {
                     followUpId: id,
                     userId: payload.assignedToUserId,
                 });
+
+                const FALLBACK_MAIL_USER_ID = Number(process.env.FALLBACK_MAIL_USER_ID);
+                googleConnection = await this.googleService.getSanitizedGoogleConnection(FALLBACK_MAIL_USER_ID);
+
+                this.logger.warn("Google connection for fallback id being used", {
+                    followUpId: id,
+                    userId: FALLBACK_MAIL_USER_ID,
+                });
+            }
+
+            // [CHANGED] only skip if fallback also fails
+            if (!googleConnection) {
+                this.logger.warn("Fallback Google connection also missing, follow-up mail skipped", {
+                    followUpId: id,
+                });
                 return;
             }
+
+            this.logger.debug("Entering mailer Service", {
+                followUpId: id,
+                googleConnection: googleConnection,
+            });
 
             await this.mailerService.sendMail(
                 payload.template,
@@ -814,7 +838,7 @@ export class FollowUpService {
                 googleConnection
             );
 
-            //incrementing reminder count
+            // incrementing reminder count
             this.incrementReminderCount(id);
 
             this.logger.info("Follow-up mail sent successfully", {
