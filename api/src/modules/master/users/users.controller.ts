@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, NotFoundException, Param, ParseIntPipe, Patch, Post, UseGuards, ForbiddenException } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, NotFoundException, Param, ParseIntPipe, Patch, Post, UseGuards, ForbiddenException, Query } from "@nestjs/common";
 import { z } from "zod";
 import { UsersService } from "@/modules/master/users/users.service";
 import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
@@ -236,5 +236,11 @@ export class UsersController {
     async getTeamMembers(@Param("teamId", ParseIntPipe) teamId: number) {
         const members = await this.usersService.getTeamMembers(teamId);
         return members;
+    }
+
+    @Get('of-ops')
+    async getUsersOfOps(@Query('team') team?: string) {
+        const teamId = team ? parseInt(team, 10) : undefined;
+        return this.usersService.findUsersOfOps(teamId);
     }
 }
