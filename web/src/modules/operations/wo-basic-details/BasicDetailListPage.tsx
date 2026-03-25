@@ -18,6 +18,8 @@ import type { WoBasicDetail, WoBasicDetailsFilters, WorkflowStage } from '@/modu
 import { currencyCol, dateCol } from '@/components/data-grid';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { QuickFilter } from '@/components/ui/quick-filter';
+import { Tooltip, TooltipTrigger } from '@radix-ui/react-tooltip';
+import { TooltipContent } from '@/components/ui/tooltip';
 
 type TabKey = 'basic_details' | 'wo_details' | 'wo_acceptance' | 'wo_upload' | 'completed';
 
@@ -198,6 +200,58 @@ const BasicDetailListPage = () => {
                 },
             },
             {
+                field: 'oeFirstName',
+                colId: 'oeFirstName',
+                headerName: 'OE',
+                width: 150,
+                cellRenderer: (params: { value: string | null; data: WoBasicDetail }) => {
+                    const { oeFirstName, oeSiteVisitName, oeDocsPrepName } = params.data;
+
+                    const uniqueOEs = [...new Set([oeFirstName, oeSiteVisitName, oeDocsPrepName].filter(Boolean))];
+                    const totalUnique = uniqueOEs.length;
+
+                    if (totalUnique === 0) {
+                        return (
+                            <Badge variant="outline" className="text-orange-600 border-orange-300">
+                                Unassigned
+                            </Badge>
+                        );
+                    }
+
+                    const primaryName = uniqueOEs[0];
+                    const additionalCount = totalUnique - 1;
+
+                    return (
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <div className="flex items-center gap-1">
+                                    <Badge variant="outline" className="text-xs cursor-pointer">
+                                        {primaryName}
+                                    </Badge>
+                                    {additionalCount > 0 && (<span>+{additionalCount}</span>)}
+                                </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <div className="text-xs space-y-1">
+                                    <p>
+                                        <strong>Primary OE:</strong>{' '}
+                                        {oeFirstName || <span className="text-muted-foreground">—</span>}
+                                    </p>
+                                    <p>
+                                        <strong>Site Visit:</strong>{' '}
+                                        {oeSiteVisitName || <span className="text-muted-foreground">—</span>}
+                                    </p>
+                                    <p>
+                                        <strong>Docs Prep:</strong>{' '}
+                                        {oeDocsPrepName || <span className="text-muted-foreground">—</span>}
+                                    </p>
+                                </div>
+                            </TooltipContent>
+                        </Tooltip>
+                    );
+                },
+            },
+            {
                 field: 'currentStage',
                 colId: 'currentStage',
                 headerName: 'Stage',
@@ -205,22 +259,6 @@ const BasicDetailListPage = () => {
                 sortable: true,
                 filter: true,
                 cellRenderer: (params: any) => getStageBadge(params.value),
-            },
-            {
-                field: 'oeFirstName',
-                colId: 'oeFirstName',
-                headerName: 'Primary OE',
-                width: 120,
-                cellRenderer: (params: any) => {
-                    if (!params.value) {
-                        return (
-                            <Badge variant="outline" className="text-orange-600 border-orange-300">
-                                Unassigned
-                            </Badge>
-                        );
-                    }
-                    return <span>{params.value}</span>;
-                },
             },
             {
                 headerName: '',
