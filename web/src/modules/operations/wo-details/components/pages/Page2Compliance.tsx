@@ -1,65 +1,82 @@
-import { useForm, type Resolver } from "react-hook-form";
+import { useEffect } from "react";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Form } from "@/components/ui/form";
-import { FieldWrapper } from "@/components/form/FieldWrapper";
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { DateInput } from "@/components/form/DateInput";
-import { SelectField } from "@/components/form/SelectField";
 import { ShieldCheck, FileText, Truck, Receipt } from "lucide-react";
 import { Page2FormSchema } from "../../helpers/woDetail.schema";
 import { WizardNavigation } from "../WizardNavigation";
-import { YES_NO_OPTIONS } from "../../helpers/constants";
+import { YES_NO_OPTIONS, WIZARD_CONFIG } from "../../helpers/constants";
+import { SelectField } from "@/components/form/SelectField";
+import { DateInput } from "@/components/form/DateInput";
+import { useAutoSave } from "@/hooks/api/useWoDetails";
+
 import type { Page2FormValues, PageFormProps } from "../../helpers/woDetail.types";
 
 interface Page2ComplianceProps extends PageFormProps {
     initialData?: Partial<Page2FormValues>;
 }
 
+const defaultValues: Page2FormValues = {
+    ldApplicable: "false",
+    maxLd: "",
+    ldStartDate: "",
+    maxLdDate: "",
+    isPbgApplicable: "false",
+    filledBgFormat: "",
+    isContractAgreement: "false",
+    contractAgreementFormat: "",
+    detailedPoApplicable: "false",
+};
+
 export function Page2Compliance({
+    woDetailId,
     initialData,
     onSubmit,
     onSkip,
     onBack,
+    onSaveDraft,
     isLoading,
+    isSaving,
 }: Page2ComplianceProps) {
     const form = useForm<Page2FormValues>({
-        resolver: zodResolver(Page2FormSchema) as Resolver<Page2FormValues>,
-        defaultValues: {
-            ldApplicable: 'false',
-            maxLd: "",
-            ldStartDate: "",
-            maxLdDate: "",
-            isPbgApplicable: 'false',
-            filledBgFormat: "",
-            isContractAgreement: 'false',
-            contractAgreementFormat: "",
-            detailedPoApplicable: 'false',
-            ...initialData,
-        },
+        resolver: zodResolver(Page2FormSchema),
+        defaultValues: { ...defaultValues, ...initialData },
     });
+
+    const { autoSave, isSaving: isAutoSaving } = useAutoSave(woDetailId, 2);
 
     const watchLdApplicable = form.watch("ldApplicable");
     const watchPbgApplicable = form.watch("isPbgApplicable");
     const watchContractAgreement = form.watch("isContractAgreement");
     const watchDetailedPo = form.watch("detailedPoApplicable");
 
+    useEffect(() => {
+        const subscription = form.watch((values) => {
+            if (values) autoSave(values);
+        });
+        return () => subscription.unsubscribe();
+    }, [form, autoSave]);
+
+    useEffect(() => {
+        if (initialData) {
+            form.reset({ ...defaultValues, ...initialData });
+        }
+    }, [initialData, form]);
+
     const handleFormSubmit = async (values: Page2FormValues) => {
-        // TODO: Call API to save page 2 data
-        console.log("Page 2 data:", values);
-        onSubmit();
+        await onSubmit(values);
     };
 
     const handleSaveDraft = async () => {
-        const values = form.getValues();
-        // TODO: Call API to save draft
-        console.log("Save draft:", values);
+        await onSaveDraft(form.getValues());
     };
 
     return (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
-                {/* 1. LD Section */}
+                {/* LD Section */}
                 <Card>
                     <CardHeader className="border-b bg-muted/10">
                         <CardTitle className="flex items-center gap-2">
@@ -74,39 +91,67 @@ export function Page2Compliance({
                                 control={form.control}
                                 name="ldApplicable"
                                 label="LD Applicable?"
-                                options={YES_NO_OPTIONS as any}
+                                options={YES_NO_OPTIONS}
                                 placeholder="Select"
                             />
 
-                            {watchLdApplicable === 'true' && (
+                            {watchLdApplicable === "true" && (
                                 <>
-                                    <FieldWrapper control={form.control} name="maxLd" label="Max LD %">
-                                        {(field) => (
-                                            <Input
-                                                {...field}
-                                                placeholder="e.g., 10.00"
-                                                type="number"
-                                                step="0.01"
-                                                min="0"
-                                                max="100"
-                                            />
+                                    <FormField
+                                        control={form.control}
+                                        name="maxLd"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Max LD %</FormLabel>
+                                                <FormControl>
+                                                    <Input
+                                                        {...field}
+                                                        placeholder="e.g., 10.00"
+                                                        type="number"
+                                                        step="0.01"
+                                                        min="0"
+                                                        max="100"
+                                                    />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
                                         )}
-                                    </FieldWrapper>
+                                    />
 
-                                    <FieldWrapper control={form.control} name="ldStartDate" label="LD Start Date">
-                                        {(field) => <DateInput {...field} />}
-                                    </FieldWrapper>
+                                    <FormField
+                                        control={form.control}
+                                        name="ldStartDate"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>LD Start Date</FormLabel>
+                                                <FormControl>
+                                                    <DateInput {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
 
-                                    <FieldWrapper control={form.control} name="maxLdDate" label="Max LD Date">
-                                        {(field) => <DateInput {...field} />}
-                                    </FieldWrapper>
+                                    <FormField
+                                        control={form.control}
+                                        name="maxLdDate"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Max LD Date</FormLabel>
+                                                <FormControl>
+                                                    <DateInput {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
                                 </>
                             )}
                         </div>
                     </CardContent>
                 </Card>
 
-                {/* 2. PBG Section */}
+                {/* PBG Section */}
                 <Card>
                     <CardHeader className="border-b bg-muted/10">
                         <CardTitle className="flex items-center gap-2">
@@ -121,19 +166,28 @@ export function Page2Compliance({
                                 control={form.control}
                                 name="isPbgApplicable"
                                 label="PBG Applicable?"
-                                options={YES_NO_OPTIONS as any}
+                                options={YES_NO_OPTIONS}
                                 placeholder="Select"
                             />
 
-                            {watchPbgApplicable === 'true' && (
-                                <FieldWrapper control={form.control} name="filledBgFormat" label="BG Format Required">
-                                    {(field) => (
-                                        <Input {...field} placeholder="Enter BG format name or code" />
+                            {watchPbgApplicable === "true" && (
+                                <FormField
+                                    control={form.control}
+                                    name="filledBgFormat"
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>BG Format Required</FormLabel>
+                                            <FormControl>
+                                                <Input {...field} placeholder="Enter BG format name or code" />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
                                     )}
-                                </FieldWrapper>
+                                />
                             )}
                         </div>
-                        {watchPbgApplicable === 'true' && (
+
+                        {watchPbgApplicable === "true" && (
                             <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-r-lg">
                                 <p className="text-sm text-orange-800">
                                     <strong>Note:</strong> Please fill the BG form (other than tender). This is compulsory for project compliance.
@@ -143,7 +197,7 @@ export function Page2Compliance({
                     </CardContent>
                 </Card>
 
-                {/* 3. Contract Agreement Section */}
+                {/* Contract Agreement Section */}
                 <Card>
                     <CardHeader className="border-b bg-muted/10">
                         <CardTitle className="flex items-center gap-2">
@@ -158,26 +212,30 @@ export function Page2Compliance({
                                 control={form.control}
                                 name="isContractAgreement"
                                 label="Contract Agreement Required?"
-                                options={YES_NO_OPTIONS as any}
+                                options={YES_NO_OPTIONS}
                                 placeholder="Select"
                             />
 
-                            {watchContractAgreement === 'true' && (
-                                <FieldWrapper
+                            {watchContractAgreement === "true" && (
+                                <FormField
                                     control={form.control}
                                     name="contractAgreementFormat"
-                                    label="Contract Agreement Format"
-                                >
-                                    {(field) => (
-                                        <Input {...field} placeholder="Specify contract format" />
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Contract Agreement Format</FormLabel>
+                                            <FormControl>
+                                                <Input {...field} placeholder="Specify contract format" />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
                                     )}
-                                </FieldWrapper>
+                                />
                             )}
                         </div>
                     </CardContent>
                 </Card>
 
-                {/* 4. Detailed PO Section */}
+                {/* Detailed PO Section */}
                 <Card>
                     <CardHeader className="border-b bg-muted/10">
                         <CardTitle className="flex items-center gap-2">
@@ -192,12 +250,12 @@ export function Page2Compliance({
                                 control={form.control}
                                 name="detailedPoApplicable"
                                 label="Detailed PO Applicable?"
-                                options={YES_NO_OPTIONS as any}
+                                options={YES_NO_OPTIONS}
                                 placeholder="Select"
                             />
                         </div>
 
-                        {watchDetailedPo === 'true' ? (
+                        {watchDetailedPo === "true" ? (
                             <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl flex gap-3 items-center">
                                 <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
                                     <FileText className="h-5 w-5" />
@@ -219,12 +277,12 @@ export function Page2Compliance({
                     </CardContent>
                 </Card>
 
-                {/* Navigation */}
                 <WizardNavigation
                     currentPage={2}
-                    totalPages={7}
-                    canSkip={true}
+                    totalPages={WIZARD_CONFIG.TOTAL_PAGES}
+                    canSkip={false}
                     isSubmitting={isLoading}
+                    isSaving={isSaving || isAutoSaving}
                     onBack={onBack}
                     onSubmit={() => form.handleSubmit(handleFormSubmit)()}
                     onSkip={onSkip}

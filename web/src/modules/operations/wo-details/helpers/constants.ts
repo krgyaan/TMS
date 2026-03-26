@@ -1,5 +1,3 @@
-// src/features/wo-details/helpers/constants.ts
-
 export const WIZARD_PAGES = [
   {
     pageNum: 1,
@@ -45,7 +43,14 @@ export const WIZARD_PAGES = [
   },
 ] as const;
 
+// Department options
 export const DEPARTMENTS = ["EIC", "User", "C&P", "Finance"] as const;
+export type Department = (typeof DEPARTMENTS)[number];
+
+export const DEPARTMENT_OPTIONS = DEPARTMENTS.map((dept) => ({
+  label: dept,
+  value: dept,
+}));
 
 export const TENDER_CHECKLIST_ITEMS = [
   { key: "completeTenderDocuments", label: "Complete Tender Documents" },
@@ -57,7 +62,18 @@ export const TENDER_CHECKLIST_ITEMS = [
   { key: "costingSheet", label: "Costing Sheet" },
   { key: "result", label: "Result" },
 ] as const;
+
+// Yes/No options for select fields - properly typed
 export const YES_NO_OPTIONS = [
-  { value: "true", label: "Yes" },
-  { value: "false", label: "No" },
+  { label: "Yes", value: "true" },
+  { label: "No", value: "false" },
 ] as const;
+
+export type YesNoValue = "true" | "false";
+
+export const WIZARD_CONFIG = {
+  TOTAL_PAGES: 7,
+  REQUIRED_PAGES: [1, 2, 4, 7],
+  SKIPPABLE_PAGES: [3, 5, 6],
+  AUTO_SAVE_DELAY_MS: 2000,
+} as const;
