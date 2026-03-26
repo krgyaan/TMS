@@ -10,10 +10,7 @@ import type {
   DocumentType,
 } from '@/modules/operations/types/wo.types';
 
-// ============================================
 // QUERY KEYS
-// ============================================
-
 export const woDocumentsKeys = {
   all: ['wo-documents'] as const,
   lists: () => [...woDocumentsKeys.all, 'list'] as const,
@@ -30,10 +27,7 @@ export const woDocumentsKeys = {
   summary: (woDetailId: number) => [...woDocumentsKeys.all, 'summary', woDetailId] as const,
 };
 
-// ============================================
 // QUERY HOOKS
-// ============================================
-
 export const useWoDocuments = (filters?: WoDocumentsFilters) => {
   return useQuery({
     queryKey: woDocumentsKeys.list(filters),
@@ -89,10 +83,7 @@ export const useDocumentsSummary = (woDetailId: number) => {
   });
 };
 
-// ============================================
 // MUTATION HOOKS
-// ============================================
-
 export const useUploadWoDocument = () => {
   const queryClient = useQueryClient();
 

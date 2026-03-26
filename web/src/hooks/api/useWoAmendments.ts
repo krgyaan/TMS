@@ -10,10 +10,7 @@ import type {
   CreateBulkWoAmendmentsDto,
 } from '@/modules/operations/types/wo.types';
 
-// ============================================
 // QUERY KEYS
-// ============================================
-
 export const woAmendmentsKeys = {
   all: ['wo-amendments'] as const,
   lists: () => [...woAmendmentsKeys.all, 'list'] as const,
@@ -25,10 +22,7 @@ export const woAmendmentsKeys = {
   topClauses: () => [...woAmendmentsKeys.all, 'top-clauses'] as const,
 };
 
-// ============================================
 // QUERY HOOKS
-// ============================================
-
 export const useWoAmendments = (filters?: WoAmendmentsFilters) => {
   return useQuery({
     queryKey: woAmendmentsKeys.list(filters),
@@ -67,10 +61,7 @@ export const useTopClausesStatistics = () => {
   });
 };
 
-// ============================================
 // MUTATION HOOKS
-// ============================================
-
 export const useCreateWoAmendment = () => {
   const queryClient = useQueryClient();
 

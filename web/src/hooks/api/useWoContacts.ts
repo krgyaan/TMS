@@ -26,10 +26,7 @@ export const woContactsKeys = {
   summary: (woBasicDetailId: number) => [...woContactsKeys.all, 'summary', woBasicDetailId] as const,
 };
 
-// ============================================
 // QUERY HOOKS
-// ============================================
-
 export const useWoContacts = (filters?: WoContactsFilters) => {
   return useQuery({
     queryKey: woContactsKeys.list(filters),
@@ -69,10 +66,7 @@ export const useContactsSummary = (woBasicDetailId: number) => {
   });
 };
 
-// ============================================
 // MUTATION HOOKS
-// ============================================
-
 export const useCreateWoContact = () => {
   const queryClient = useQueryClient();
 
