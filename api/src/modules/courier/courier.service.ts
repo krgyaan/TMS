@@ -325,8 +325,10 @@ export class CourierService {
                         courierId: courier.id,
                     });
 
-                    const FALLBACK_MAIL_USER_ID = Number(process.env.FALLBACK_MAIL_USER_ID);
-                    googleConnection = await this.googleService.getSanitizedGoogleConnection(FALLBACK_MAIL_USER_ID);
+                    const fallbackStr = process.env.FALLBACK_MAIL_USER_ID;
+                    if (fallbackStr && !isNaN(parseInt(fallbackStr))) {
+                        googleConnection = await this.googleService.getSanitizedGoogleConnection(parseInt(fallbackStr));
+                    }
                 }
 
                 if (!googleConnection) {
@@ -458,7 +460,10 @@ export class CourierService {
 
                     if (!googleConnection) {
                         this.logger.warn("COO Google connection missing, trying fallback", { courierId: id });
-                        googleConnection = await this.googleService.getSanitizedGoogleConnection(Number(process.env.FALLBACK_MAIL_USER_ID));
+                        const fallbackStr = process.env.FALLBACK_MAIL_USER_ID;
+                        if (fallbackStr && !isNaN(parseInt(fallbackStr))) {
+                            googleConnection = await this.googleService.getSanitizedGoogleConnection(parseInt(fallbackStr));
+                        }
                     }
 
                     if (!googleConnection) {
@@ -531,8 +536,10 @@ export class CourierService {
                         courierId: id,
                     });
 
-                    const FALLBACK_MAIL_USER_ID = Number(process.env.FALLBACK_MAIL_USER_ID);
-                    googleConnection = await this.googleService.getSanitizedGoogleConnection(FALLBACK_MAIL_USER_ID);
+                    const fallbackStr = process.env.FALLBACK_MAIL_USER_ID;
+                    if (fallbackStr && !isNaN(parseInt(fallbackStr))) {
+                        googleConnection = await this.googleService.getSanitizedGoogleConnection(parseInt(fallbackStr));
+                    }
                 }
 
                 if (!googleConnection) {

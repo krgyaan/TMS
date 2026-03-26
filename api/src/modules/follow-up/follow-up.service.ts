@@ -803,13 +803,16 @@ export class FollowUpService {
                     userId: payload.assignedToUserId,
                 });
 
-                const FALLBACK_MAIL_USER_ID = Number(process.env.FALLBACK_MAIL_USER_ID);
-                googleConnection = await this.googleService.getSanitizedGoogleConnection(FALLBACK_MAIL_USER_ID);
+                const fallbackStr = process.env.FALLBACK_MAIL_USER_ID;
+                if (fallbackStr && !isNaN(parseInt(fallbackStr))) {
+                    const FALLBACK_MAIL_USER_ID = parseInt(fallbackStr);
+                    googleConnection = await this.googleService.getSanitizedGoogleConnection(FALLBACK_MAIL_USER_ID);
 
-                this.logger.warn("Google connection for fallback id being used", {
-                    followUpId: id,
-                    userId: FALLBACK_MAIL_USER_ID,
-                });
+                    this.logger.warn("Google connection for fallback id being used", {
+                        followUpId: id,
+                        userId: FALLBACK_MAIL_USER_ID,
+                    });
+                }
             }
 
             // [CHANGED] only skip if fallback also fails
