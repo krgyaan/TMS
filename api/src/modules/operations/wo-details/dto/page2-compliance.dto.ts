@@ -1,10 +1,6 @@
 import { z } from "zod";
 import { PercentageSchema, PositiveIntSchema } from "./wo-details.dto";
-
-// ============================================
 // PAGE 2: COMPLIANCE OBLIGATIONS
-// ============================================
-
 /**
  * Save Page 2 data (all fields optional for drafts)
  */

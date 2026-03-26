@@ -8,6 +8,8 @@ import { paths } from "@/app/routes/paths";
 import { useWoBasicDetailWithRelations } from "@/hooks/api/useWoBasicDetails";
 import { useWoContactsByBasicDetail } from "@/hooks/api/useWoContacts";
 import BasicDetailView from "./components/BasicDetailView";
+import { WoDetailView } from '../wo-details/components/WoDetailView';
+import { useWoDetailWithRelations } from '@/hooks/api/useWoDetails';
 
 const BasicDetailShowPage = () => {
     const { id } = useParams<{ id: string }>();
@@ -167,12 +169,15 @@ const BasicDetailShowPage = () => {
                     </CardAction>
                 </div>
             </CardHeader>
-            <CardContent className="px-0 md:px-6">
+            <CardContent className="px-0 md:px-6 space-y-4">
                 <BasicDetailView
                     data={woBasicDetail}
                     contacts={contacts || []}
                     isLoading={false}
                 />
+                {woBasicDetail?.woDetail && (
+                    <WoDetailView data={woBasicDetail?.woDetail} />
+                )}
             </CardContent>
         </Card>
     );

@@ -1,10 +1,6 @@
 import { z } from "zod";
 import { SiteVisitPersonSchema } from "./wo-details.dto";
-
-// ============================================
 // PAGE 5: PROJECT EXECUTION
-// ============================================
-
 /**
  * Site Visit Person Input Schema (with validation)
  */

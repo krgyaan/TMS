@@ -1,10 +1,6 @@
 import { z } from "zod";
 import { DecimalSchema } from "./wo-details.dto";
-
-// ============================================
 // PAGE 6: ACTUAL PROJECT PROFITABILITY
-// ============================================
-
 /**
  * Budget Breakdown Schema
  */

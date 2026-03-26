@@ -10,6 +10,7 @@ const Assign_Oe = lazy(() => import("@/modules/operations/wo-basic-details/Assig
 
 const Wo_Details_Create = lazy(() => import("@/modules/operations/wo-details/WoDetailCreatePage"));
 const Wo_Details_Edit = lazy(() => import("@/modules/operations/wo-details/WoDetailEditPage"));
+const Wo_Details_Show = lazy(() => import("@/modules/operations/wo-details/WoDetailShowPage"));
 
 const Wo_Details_Acceptance = lazy(() => import("@/modules/operations/wo-details/WoDetailListPage"));
 const Wo_Details_Acceptance_Create = lazy(() => import("@/modules/operations/wo-details/WoAcceptancePage"));
@@ -38,6 +39,7 @@ export default function OperationsRoutes() {
             <Route path="work-order/details/basic/:id" element={<RouteWrapper><Basic_Details_Show /></RouteWrapper>} />
             <Route path="work-order/details/full/create/:woBasicDetailId" element={<RouteWrapper><Wo_Details_Create /></RouteWrapper>} />
             <Route path="work-order/details/full/:id/edit" element={<RouteWrapper><Wo_Details_Edit /></RouteWrapper>} />
+            <Route path="work-order/details/full/:id" element={<RouteWrapper><Wo_Details_Show /></RouteWrapper>} />
             <Route path="work-order/details/assign-oe/:id" element={<RouteWrapper><Assign_Oe /></RouteWrapper>} />
 
             <Route path="work-order/acceptance" element={<RouteWrapper><Wo_Details_Acceptance /></RouteWrapper>} />

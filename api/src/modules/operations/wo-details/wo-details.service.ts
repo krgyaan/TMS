@@ -1,10 +1,17 @@
 import { Inject, Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
-import { eq, desc, asc, sql, and, gte, lte, or, isNull, ne, ilike } from 'drizzle-orm';
+import { eq, desc, asc, sql, and, or, isNull, ne, ilike } from 'drizzle-orm';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { woDetails, woBasicDetails, woContacts, woBillingBoq, woBuybackBoq, woBillingAddresses, woShippingAddresses, woAmendments, woQueries, woDocuments, woAcceptance } from '@db/schemas/operations';
-import type { CreateWoDetailDto, UpdateWoDetailDto, WoDetailsListResponseDto, WoDetailsQueryDto, SavePage4Dto, SkipPageDto, TenderDocumentsChecklist, WoDetailsStatus } from './dto/wo-details.dto';
+import type { CreateWoDetailDto, UpdateWoDetailDto, WoDetailsListResponseDto, WoDetailsQueryDto, TenderDocumentsChecklist, WoDetailsStatus, WizardValidationResult, WizardInitResponse, ImportContactsResponse } from './dto/wo-details.dto';
+import type { SavePage1Dto, SubmitPage1Dto, Page1ContactDto } from './dto/page1-handover.dto';
+import type { SavePage2Dto, SubmitPage2Dto } from './dto/page2-compliance.dto';
+import type { SavePage3Dto, SubmitPage3Dto } from './dto/page3-swot.dto';
+import type { SavePage4Dto, SubmitPage4Dto } from './dto/page4-billing.dto';
+import type { SavePage5Dto, SubmitPage5Dto } from './dto/page5-execution.dto';
+import type { SavePage6Dto, SubmitPage6Dto } from './dto/page6-profitability.dto';
+import type { SavePage7Dto, SubmitPage7Dto } from './dto/page7-acceptance.dto';
 
 export type WoDetailRow = typeof woDetails.$inferSelect;
 
@@ -19,11 +26,31 @@ const TENDER_CHECKLIST_ITEMS = [
   'result',
 ] as const;
 
+const REQUIRED_PAGES = [1, 2, 4, 7] as const;
+const SKIPPABLE_PAGES = [3, 5, 6] as const;
+const TOTAL_PAGES = 7;
+
+// Type union for page data
+type PageData =
+  | SavePage1Dto
+  | SubmitPage1Dto
+  | SavePage2Dto
+  | SubmitPage2Dto
+  | SavePage3Dto
+  | SubmitPage3Dto
+  | SavePage4Dto
+  | SubmitPage4Dto
+  | SavePage5Dto
+  | SubmitPage5Dto
+  | SavePage6Dto
+  | SubmitPage6Dto
+  | SavePage7Dto
+  | SubmitPage7Dto;
+
 @Injectable()
 export class WoDetailsService {
   constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
 
-  // MAPPING FUNCTIONS
   private mapRowToResponse(row: WoDetailRow) {
     return {
       id: row.id,
@@ -32,7 +59,8 @@ export class WoDetailsService {
       // Page 1
       tenderDocumentsChecklist: row.tenderDocumentsChecklist,
       checklistCompletedAt: row.checklistCompletedAt?.toISOString() ?? null,
-      checklistIncompleteNotifiedAt: row.checklistIncompleteNotifiedAt?.toISOString() ?? null,
+      checklistIncompleteNotifiedAt:
+        row.checklistIncompleteNotifiedAt?.toISOString() ?? null,
 
       // Page 2
       ldApplicable: row.ldApplicable ?? false,
@@ -78,12 +106,13 @@ export class WoDetailsService {
       oeAmendmentSubmittedAt: row.oeAmendmentSubmittedAt?.toISOString() ?? null,
       oeSignaturePrepared: row.oeSignaturePrepared ?? false,
       courierRequestPrepared: row.courierRequestPrepared ?? false,
-      courierRequestPreparedAt: row.courierRequestPreparedAt?.toISOString() ?? null,
+      courierRequestPreparedAt:
+        row.courierRequestPreparedAt?.toISOString() ?? null,
 
       // Wizard Progress
       currentPage: row.currentPage ?? 1,
-      completedPages: row.completedPages ?? [],
-      skippedPages: row.skippedPages ?? [],
+      completedPages: (row.completedPages as number[]) ?? [],
+      skippedPages: (row.skippedPages as number[]) ?? [],
       startedAt: row.startedAt?.toISOString() ?? null,
       completedAt: row.completedAt?.toISOString() ?? null,
 
@@ -110,32 +139,29 @@ export class WoDetailsService {
       oeWoAmendmentNeeded: !!row.oeWoAmendmentNeeded,
       status: (row.status as WoDetailsStatus) || 'draft',
       woAcceptanceId: row.woAcceptanceId ?? null,
-      woAcceptanceStatus: (row.woAcceptanceStatus as any) ?? null,
+      woAcceptanceStatus: row.woAcceptanceStatus ?? null,
     };
   }
 
   private getVisibilityConditions(user: ValidatedUser, teamId?: number) {
     const conditions: any[] = [];
 
-    // Role ID 1 = Super User, 2 = Admin: Show all, respect teamId filter if provided
     if (user.roleId === 1 || user.roleId === 2) {
       if (teamId !== undefined && teamId !== null) {
         conditions.push(eq(woBasicDetails.team, teamId));
       }
     } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
-      // Team Leader, Coordinator, Engineer: Filter by teamId
       if (user.teamId) {
         conditions.push(eq(woBasicDetails.team, user.teamId));
       }
     } else {
-      // Other roles: Show where they created or are assigned as OE
       conditions.push(
         or(
           eq(woBasicDetails.createdBy, user.sub),
           eq(woBasicDetails.oeFirst, user.sub),
           eq(woBasicDetails.oeSiteVisit, user.sub),
           eq(woBasicDetails.oeDocsPrep, user.sub),
-          eq(woDetails.createdBy, user.sub)
+          eq(woDetails.createdBy, user.sub),
         ),
       );
     }
@@ -153,12 +179,14 @@ export class WoDetailsService {
     const search = filters?.search?.trim();
 
     const orderFn = sortOrder === 'desc' ? desc : asc;
+    const conditions: any[] = [
+        eq(woDetails.status, 'completed')
+    ];
 
-    const conditions: any[] = [];
-
-    // Apply role-based filtering
     if (filters?.user) {
-      conditions.push(...this.getVisibilityConditions(filters.user, filters.teamId));
+      conditions.push(
+        ...this.getVisibilityConditions(filters.user, filters.teamId),
+      );
     }
 
     if (filters?.woBasicDetailId) {
@@ -171,44 +199,45 @@ export class WoDetailsService {
       conditions.push(eq(woDetails.ldApplicable, filters.ldApplicable));
     }
     if (filters?.isContractAgreement !== undefined) {
-      conditions.push(eq(woDetails.isContractAgreement, filters.isContractAgreement));
+      conditions.push(
+        eq(woDetails.isContractAgreement, filters.isContractAgreement),
+      );
     }
 
-    if (filters?.woAmendmentNeeded !== undefined && filters?.woAmendmentNeeded === true) {
+    if (filters?.woAmendmentNeeded === true) {
       conditions.push(eq(woDetails.oeWoAmendmentNeeded, true));
-    } else if (filters?.woAcceptance !== undefined && filters?.woAcceptance === true) {
+    } else if (filters?.woAcceptance === true) {
       conditions.push(
         and(
           eq(woAcceptance.status, 'completed'),
-          eq(woAcceptance.decision, 'accepted')
-        )
+          eq(woAcceptance.decision, 'accepted'),
+        ),
       );
-    } else if (filters?.woAcceptance === false && filters?.woAmendmentNeeded === false) {
-      // Pending tab: Not accepted and not amendment needed
+    } else if (
+      filters?.woAcceptance === false &&
+      filters?.woAmendmentNeeded === false
+    ) {
       conditions.push(
         and(
-          // Not accepted
           or(
             isNull(woAcceptance.id),
             ne(woAcceptance.status, 'completed'),
-            ne(woAcceptance.decision, 'accepted')
+            ne(woAcceptance.decision, 'accepted'),
           ),
-          // Not amendment needed
           and(
             eq(woDetails.oeWoAmendmentNeeded, false),
             or(
               isNull(woAcceptance.id),
               and(
                 ne(woAcceptance.status, 'awaiting_amendment'),
-                ne(woAcceptance.decision, 'amendment_needed')
-              )
-            )
-          )
-        )
+                ne(woAcceptance.decision, 'amendment_needed'),
+              ),
+            ),
+          ),
+        ),
       );
     }
 
-    // Search condition
     if (search) {
       const searchStr = `%${search}%`;
       conditions.push(
@@ -222,7 +251,6 @@ export class WoDetailsService {
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-    // Determine sorting
     let orderByClause: any;
     switch (sortBy) {
       case 'woNumber':
@@ -257,28 +285,34 @@ export class WoDetailsService {
       this.db
         .select({ count: sql<number>`count(distinct ${woDetails.id})::int` })
         .from(woDetails)
-        .leftJoin(woBasicDetails, eq(woDetails.woBasicDetailId, woBasicDetails.id))
+        .leftJoin(
+          woBasicDetails,
+          eq(woDetails.woBasicDetailId, woBasicDetails.id),
+        )
         .leftJoin(woAcceptance, eq(woDetails.id, woAcceptance.woDetailId))
         .where(whereClause)
         .then(([r]) => Number(r?.count ?? 0)),
       this.db
         .select({
-            id: woDetails.id,
-            woBasicDetailId: woDetails.woBasicDetailId,
-            projectName: woBasicDetails.projectName,
-            woNumber: woBasicDetails.woNumber,
-            woDate: woBasicDetails.woDate,
-            woValuePreGst: woBasicDetails.woValuePreGst,
-            woValueGstAmt: woBasicDetails.woValueGstAmt,
-            ldApplicable: woDetails.ldApplicable,
-            isContractAgreement: woDetails.isContractAgreement,
-            oeWoAmendmentNeeded: woDetails.oeWoAmendmentNeeded,
-            status: woDetails.status,
-            woAcceptanceId: woAcceptance?.id,
-            woAcceptanceStatus: woAcceptance?.status,
-         })
+          id: woDetails.id,
+          woBasicDetailId: woDetails.woBasicDetailId,
+          projectName: woBasicDetails.projectName,
+          woNumber: woBasicDetails.woNumber,
+          woDate: woBasicDetails.woDate,
+          woValuePreGst: woBasicDetails.woValuePreGst,
+          woValueGstAmt: woBasicDetails.woValueGstAmt,
+          ldApplicable: woDetails.ldApplicable,
+          isContractAgreement: woDetails.isContractAgreement,
+          oeWoAmendmentNeeded: woDetails.oeWoAmendmentNeeded,
+          status: woDetails.status,
+          woAcceptanceId: woAcceptance?.id,
+          woAcceptanceStatus: woAcceptance?.status,
+        })
         .from(woDetails)
-        .leftJoin(woBasicDetails, eq(woDetails.woBasicDetailId, woBasicDetails.id))
+        .leftJoin(
+          woBasicDetails,
+          eq(woDetails.woBasicDetailId, woBasicDetails.id),
+        )
         .leftJoin(woAcceptance, eq(woDetails.id, woAcceptance.woDetailId))
         .where(whereClause)
         .orderBy(orderByClause)
@@ -413,7 +447,6 @@ export class WoDetailsService {
   }
 
   async create(data: CreateWoDetailDto, userId?: number) {
-    // Check if WO Detail already exists
     const existing = await this.db
       .select({ id: woDetails.id })
       .from(woDetails)
@@ -422,11 +455,10 @@ export class WoDetailsService {
 
     if (existing.length > 0) {
       throw new ConflictException(
-        `WO Detail already exists for Basic Detail ID ${data.woBasicDetailId}`
+        `WO Detail already exists for Basic Detail ID ${data.woBasicDetailId}`,
       );
     }
 
-    // Verify WO Basic Detail exists
     const [basicDetail] = await this.db
       .select({ id: woBasicDetails.id })
       .from(woBasicDetails)
@@ -435,7 +467,7 @@ export class WoDetailsService {
 
     if (!basicDetail) {
       throw new NotFoundException(
-        `WO Basic Detail with ID ${data.woBasicDetailId} not found`
+        `WO Basic Detail with ID ${data.woBasicDetailId} not found`,
       );
     }
 
@@ -456,7 +488,6 @@ export class WoDetailsService {
       })
       .returning();
 
-    // Update basic detail stage
     await this.db
       .update(woBasicDetails)
       .set({ currentStage: 'wo_details', updatedAt: now })
@@ -473,43 +504,73 @@ export class WoDetailsService {
       updatedBy: userId ?? null,
     };
 
-    // Map all update fields
+    // Map all fields from UpdateWoDetailDto
     if (data.tenderDocumentsChecklist !== undefined) {
       updateValues.tenderDocumentsChecklist = data.tenderDocumentsChecklist;
     }
-    if (data.ldApplicable !== undefined) updateValues.ldApplicable = data.ldApplicable;
+    if (data.ldApplicable !== undefined)
+      updateValues.ldApplicable = data.ldApplicable;
     if (data.maxLd !== undefined) updateValues.maxLd = data.maxLd;
-    if (data.ldStartDate !== undefined) updateValues.ldStartDate = data.ldStartDate;
+    if (data.ldStartDate !== undefined)
+      updateValues.ldStartDate = data.ldStartDate;
     if (data.maxLdDate !== undefined) updateValues.maxLdDate = data.maxLdDate;
-    if (data.isPbgApplicable !== undefined) updateValues.isPbgApplicable = data.isPbgApplicable;
-    if (data.filledBgFormat !== undefined) updateValues.filledBgFormat = data.filledBgFormat;
+    if (data.isPbgApplicable !== undefined)
+      updateValues.isPbgApplicable = data.isPbgApplicable;
+    if (data.filledBgFormat !== undefined)
+      updateValues.filledBgFormat = data.filledBgFormat;
     if (data.pbgBgId !== undefined) updateValues.pbgBgId = data.pbgBgId;
-    if (data.isContractAgreement !== undefined) updateValues.isContractAgreement = data.isContractAgreement;
-    if (data.contractAgreementFormat !== undefined) updateValues.contractAgreementFormat = data.contractAgreementFormat;
-    if (data.detailedPoApplicable !== undefined) updateValues.detailedPoApplicable = data.detailedPoApplicable;
-    if (data.detailedPoFollowupId !== undefined) updateValues.detailedPoFollowupId = data.detailedPoFollowupId;
-    if (data.swotStrengths !== undefined) updateValues.swotStrengths = data.swotStrengths;
-    if (data.swotWeaknesses !== undefined) updateValues.swotWeaknesses = data.swotWeaknesses;
-    if (data.swotOpportunities !== undefined) updateValues.swotOpportunities = data.swotOpportunities;
-    if (data.swotThreats !== undefined) updateValues.swotThreats = data.swotThreats;
-    if (data.siteVisitNeeded !== undefined) updateValues.siteVisitNeeded = data.siteVisitNeeded;
-    if (data.siteVisitPerson !== undefined) updateValues.siteVisitPerson = data.siteVisitPerson;
-    if (data.documentsFromTendering !== undefined) updateValues.documentsFromTendering = data.documentsFromTendering;
-    if (data.documentsNeeded !== undefined) updateValues.documentsNeeded = data.documentsNeeded;
-    if (data.documentsInHouse !== undefined) updateValues.documentsInHouse = data.documentsInHouse;
-    if (data.costingSheetLink !== undefined) updateValues.costingSheetLink = data.costingSheetLink || null;
-    if (data.hasDiscrepancies !== undefined) updateValues.hasDiscrepancies = data.hasDiscrepancies;
-    if (data.discrepancyComments !== undefined) updateValues.discrepancyComments = data.discrepancyComments;
-    if (data.budgetPreGst !== undefined) updateValues.budgetPreGst = data.budgetPreGst;
-    if (data.budgetSupply !== undefined) updateValues.budgetSupply = data.budgetSupply;
-    if (data.budgetService !== undefined) updateValues.budgetService = data.budgetService;
-    if (data.budgetFreight !== undefined) updateValues.budgetFreight = data.budgetFreight;
-    if (data.budgetAdmin !== undefined) updateValues.budgetAdmin = data.budgetAdmin;
-    if (data.budgetBuybackSale !== undefined) updateValues.budgetBuybackSale = data.budgetBuybackSale;
-    if (data.oeWoAmendmentNeeded !== undefined) updateValues.oeWoAmendmentNeeded = data.oeWoAmendmentNeeded;
-    if (data.oeSignaturePrepared !== undefined) updateValues.oeSignaturePrepared = data.oeSignaturePrepared;
-    if (data.courierRequestPrepared !== undefined) updateValues.courierRequestPrepared = data.courierRequestPrepared;
-    if (data.currentPage !== undefined) updateValues.currentPage = data.currentPage;
+    if (data.isContractAgreement !== undefined)
+      updateValues.isContractAgreement = data.isContractAgreement;
+    if (data.contractAgreementFormat !== undefined)
+      updateValues.contractAgreementFormat = data.contractAgreementFormat;
+    if (data.detailedPoApplicable !== undefined)
+      updateValues.detailedPoApplicable = data.detailedPoApplicable;
+    if (data.detailedPoFollowupId !== undefined)
+      updateValues.detailedPoFollowupId = data.detailedPoFollowupId;
+    if (data.swotStrengths !== undefined)
+      updateValues.swotStrengths = data.swotStrengths;
+    if (data.swotWeaknesses !== undefined)
+      updateValues.swotWeaknesses = data.swotWeaknesses;
+    if (data.swotOpportunities !== undefined)
+      updateValues.swotOpportunities = data.swotOpportunities;
+    if (data.swotThreats !== undefined)
+      updateValues.swotThreats = data.swotThreats;
+    if (data.siteVisitNeeded !== undefined)
+      updateValues.siteVisitNeeded = data.siteVisitNeeded;
+    if (data.siteVisitPerson !== undefined)
+      updateValues.siteVisitPerson = data.siteVisitPerson;
+    if (data.documentsFromTendering !== undefined)
+      updateValues.documentsFromTendering = data.documentsFromTendering;
+    if (data.documentsNeeded !== undefined)
+      updateValues.documentsNeeded = data.documentsNeeded;
+    if (data.documentsInHouse !== undefined)
+      updateValues.documentsInHouse = data.documentsInHouse;
+    if (data.costingSheetLink !== undefined)
+      updateValues.costingSheetLink = data.costingSheetLink || null;
+    if (data.hasDiscrepancies !== undefined)
+      updateValues.hasDiscrepancies = data.hasDiscrepancies;
+    if (data.discrepancyComments !== undefined)
+      updateValues.discrepancyComments = data.discrepancyComments;
+    if (data.budgetPreGst !== undefined)
+      updateValues.budgetPreGst = data.budgetPreGst;
+    if (data.budgetSupply !== undefined)
+      updateValues.budgetSupply = data.budgetSupply;
+    if (data.budgetService !== undefined)
+      updateValues.budgetService = data.budgetService;
+    if (data.budgetFreight !== undefined)
+      updateValues.budgetFreight = data.budgetFreight;
+    if (data.budgetAdmin !== undefined)
+      updateValues.budgetAdmin = data.budgetAdmin;
+    if (data.budgetBuybackSale !== undefined)
+      updateValues.budgetBuybackSale = data.budgetBuybackSale;
+    if (data.oeWoAmendmentNeeded !== undefined)
+      updateValues.oeWoAmendmentNeeded = data.oeWoAmendmentNeeded;
+    if (data.oeSignaturePrepared !== undefined)
+      updateValues.oeSignaturePrepared = data.oeSignaturePrepared;
+    if (data.courierRequestPrepared !== undefined)
+      updateValues.courierRequestPrepared = data.courierRequestPrepared;
+    if (data.currentPage !== undefined)
+      updateValues.currentPage = data.currentPage;
     if (data.status !== undefined) updateValues.status = data.status;
 
     const [row] = await this.db
@@ -524,28 +585,70 @@ export class WoDetailsService {
   async delete(id: number): Promise<void> {
     const detail = await this.findById(id);
 
-    // Cascading delete handled by DB, but let's be explicit
+    // Delete all related data
     await Promise.all([
       this.db.delete(woBillingBoq).where(eq(woBillingBoq.woDetailId, id)),
       this.db.delete(woBuybackBoq).where(eq(woBuybackBoq.woDetailId, id)),
-      this.db.delete(woBillingAddresses).where(eq(woBillingAddresses.woDetailId, id)),
-      this.db.delete(woShippingAddresses).where(eq(woShippingAddresses.woDetailId, id)),
+      this.db
+        .delete(woBillingAddresses)
+        .where(eq(woBillingAddresses.woDetailId, id)),
+      this.db
+        .delete(woShippingAddresses)
+        .where(eq(woShippingAddresses.woDetailId, id)),
       this.db.delete(woAmendments).where(eq(woAmendments.woDetailId, id)),
       this.db.delete(woQueries).where(eq(woQueries.woDetailsId, id)),
       this.db.delete(woDocuments).where(eq(woDocuments.woDetailId, id)),
       this.db.delete(woAcceptance).where(eq(woAcceptance.woDetailId, id)),
+      // Delete contacts associated with the WO Basic Detail
+      this.db
+        .delete(woContacts)
+        .where(eq(woContacts.woBasicDetailId, detail.woBasicDetailId)),
     ]);
 
     await this.db.delete(woDetails).where(eq(woDetails.id, id));
   }
-
   // WIZARD OPERATIONS
+  async initializeWizard(
+    woBasicDetailId: number,
+    userId?: number,
+  ): Promise<WizardInitResponse> {
+    const existing = await this.findByWoBasicDetailId(woBasicDetailId);
+
+    if (existing) {
+      return {
+        id: existing.id,
+        woBasicDetailId: existing.woBasicDetailId,
+        status: existing.status,
+        currentPage: existing.currentPage,
+        completedPages: existing.completedPages as number[],
+        skippedPages: existing.skippedPages as number[],
+        createdAt: existing.createdAt,
+        isExisting: true,
+      };
+    }
+
+    const result = await this.create({ woBasicDetailId }, userId);
+
+    return {
+      id: result.id,
+      woBasicDetailId: result.woBasicDetailId,
+      status: result.status,
+      currentPage: result.currentPage,
+      completedPages: result.completedPages as number[],
+      skippedPages: result.skippedPages as number[],
+      createdAt: result.createdAt,
+      isExisting: false,
+    };
+  }
+
   async getWizardProgress(id: number) {
     const detail = await this.findById(id);
 
-    const totalPages = 7;
-    const completedCount = detail.completedPages.length;
-    const percentComplete = Math.round((completedCount / totalPages) * 100);
+    const completedCount = (detail.completedPages as number[]).length;
+    const skippedCount = (detail.skippedPages as number[]).length;
+    const percentComplete = Math.round(
+      ((completedCount + skippedCount) / TOTAL_PAGES) * 100,
+    );
 
     const blockers = this.getSubmissionBlockers(detail);
 
@@ -562,38 +665,244 @@ export class WoDetailsService {
     };
   }
 
+  async validateWizard(id: number): Promise<WizardValidationResult> {
+    const detail = await this.findByIdWithRelations(id);
+    const completedPages = detail.completedPages as number[];
+    const skippedPages = detail.skippedPages as number[];
+
+    const missingRequiredPages = REQUIRED_PAGES.filter(
+      (page) =>
+        !completedPages.includes(page) && !skippedPages.includes(page),
+    );
+
+    const incompletePages: number[] = [];
+    const errors: Record<number, string[]> = {};
+
+    // Validate Page 1
+    if (completedPages.includes(1)) {
+      const page1Errors: string[] = [];
+
+      if (!detail.contacts || detail.contacts.length === 0) {
+        page1Errors.push('At least one contact is required');
+      } else {
+        const contactsWithoutName = detail.contacts.filter(
+          (c) => !c.name || !c.name.trim(),
+        );
+        if (contactsWithoutName.length > 0) {
+          page1Errors.push('All contacts must have a name');
+        }
+      }
+
+      if (!this.isChecklistComplete(detail.tenderDocumentsChecklist)) {
+        // Warning only - doesn't block submission
+        page1Errors.push(
+          'Tender documents checklist is incomplete (notification will be sent)',
+        );
+      }
+
+      // Only mark as incomplete if contacts are missing/invalid
+      if (!detail.contacts || detail.contacts.length === 0) {
+        incompletePages.push(1);
+        errors[1] = page1Errors.filter(
+          (e) => !e.includes('notification'),
+        );
+      }
+    }
+
+    // Validate Page 2
+    if (completedPages.includes(2)) {
+      const page2Errors: string[] = [];
+
+      if (
+        detail.ldApplicable &&
+        (!detail.maxLd || !detail.ldStartDate || !detail.maxLdDate)
+      ) {
+        page2Errors.push('LD details are incomplete');
+      }
+
+      if (
+        detail.isPbgApplicable &&
+        !detail.filledBgFormat &&
+        !detail.pbgBgId
+      ) {
+        page2Errors.push('PBG details are incomplete');
+      }
+
+      if (detail.isContractAgreement && !detail.contractAgreementFormat) {
+        page2Errors.push('Contract agreement format is required');
+      }
+
+      if (page2Errors.length > 0) {
+        incompletePages.push(2);
+        errors[2] = page2Errors;
+      }
+    }
+
+    // Validate Page 4
+    if (completedPages.includes(4)) {
+      const page4Errors: string[] = [];
+
+      if (!detail.billingBoq || detail.billingBoq.length === 0) {
+        page4Errors.push('At least one billing BOQ item is required');
+      }
+
+      if (!detail.billingAddresses || detail.billingAddresses.length === 0) {
+        page4Errors.push('At least one billing address is required');
+      }
+
+      if (!detail.shippingAddresses || detail.shippingAddresses.length === 0) {
+        page4Errors.push('At least one shipping address is required');
+      }
+
+      if (page4Errors.length > 0) {
+        incompletePages.push(4);
+        errors[4] = page4Errors;
+      }
+    }
+
+    // Validate Page 5
+    if (completedPages.includes(5)) {
+      const page5Errors: string[] = [];
+
+      if (
+        detail.siteVisitNeeded &&
+        (!detail.siteVisitPerson ||
+          !(detail.siteVisitPerson as any)?.name?.trim())
+      ) {
+        page5Errors.push('Site visit person details are required');
+      }
+
+      if (page5Errors.length > 0) {
+        incompletePages.push(5);
+        errors[5] = page5Errors;
+      }
+    }
+
+    // Validate Page 6
+    if (completedPages.includes(6)) {
+      const page6Errors: string[] = [];
+
+      if (!detail.budgetPreGst) {
+        page6Errors.push('Budget Pre-GST is required');
+      }
+
+      if (detail.hasDiscrepancies && !detail.discrepancyComments?.trim()) {
+        page6Errors.push('Discrepancy comments are required');
+      }
+
+      if (page6Errors.length > 0) {
+        incompletePages.push(6);
+        errors[6] = page6Errors;
+      }
+    }
+
+    // Validate Page 7
+    if (completedPages.includes(7)) {
+      const page7Errors: string[] = [];
+
+      if (
+        detail.oeWoAmendmentNeeded === null ||
+        detail.oeWoAmendmentNeeded === undefined
+      ) {
+        page7Errors.push('Amendment decision is required');
+      }
+
+      if (detail.oeWoAmendmentNeeded === false) {
+        if (!detail.oeSignaturePrepared) {
+          page7Errors.push('OE signature must be prepared');
+        }
+        if (!detail.courierRequestPrepared) {
+          page7Errors.push('Courier request must be prepared');
+        }
+      }
+
+      if (page7Errors.length > 0) {
+        incompletePages.push(7);
+        errors[7] = page7Errors;
+      }
+    }
+
+    const isValid =
+      missingRequiredPages.length === 0 && incompletePages.length === 0;
+
+    return {
+      isValid,
+      missingRequiredPages,
+      incompletePages,
+      errors,
+    };
+  }
+
   private getSubmissionBlockers(detail: any): string[] {
     const blockers: string[] = [];
+    const completedPages = (detail.completedPages as number[]) || [];
 
-    // Page 7 must be completed (not skipped)
-    if (!detail.completedPages.includes(7)) {
-      blockers.push('Page 7 (WO Acceptance) must be completed');
-    }
-
-    // If amendment needed, can't submit
-    if (detail.oeWoAmendmentNeeded === true) {
-      blockers.push('WO Amendment is pending');
-    }
-
-    // If no amendment needed, signature and courier must be prepared
-    if (detail.oeWoAmendmentNeeded === false) {
-      if (!detail.oeSignaturePrepared) {
-        blockers.push('OE Signature must be prepared');
+    // Check required pages
+    for (const page of REQUIRED_PAGES) {
+      if (!completedPages.includes(page)) {
+        blockers.push(`Page ${page} must be completed`);
       }
-      if (!detail.courierRequestPrepared) {
-        blockers.push('Courier request must be prepared');
+    }
+
+    // Page 7 specific checks
+    if (completedPages.includes(7)) {
+      if (detail.oeWoAmendmentNeeded === true) {
+        blockers.push('WO Amendment is pending');
+      }
+
+      if (detail.oeWoAmendmentNeeded === false) {
+        if (!detail.oeSignaturePrepared) {
+          blockers.push('OE Signature must be prepared');
+        }
+        if (!detail.courierRequestPrepared) {
+          blockers.push('Courier request must be prepared');
+        }
       }
     }
 
     return blockers;
   }
-
-  async savePage(id: number, pageNum: number, data: any, userId?: number) {
+  // PAGE SAVE/SUBMIT OPERATIONS
+  async savePageDraft(
+    id: number,
+    pageNum: number,
+    data: PageData,
+    userId?: number,
+  ) {
     const detail = await this.findById(id);
 
-    if (pageNum < 1 || pageNum > 7) {
-      throw new BadRequestException('Invalid page number');
-    }
+    const updateValues: Record<string, unknown> = {
+      updatedAt: new Date(),
+      updatedBy: userId ?? null,
+    };
+
+    // Map page-specific data to update values
+    this.mapPageDataToUpdate(pageNum, data, updateValues);
+
+    const [row] = await this.db
+      .update(woDetails)
+      .set(updateValues as Partial<typeof woDetails.$inferInsert>)
+      .where(eq(woDetails.id, id))
+      .returning();
+
+    // Handle page-specific related data
+    await this.savePageRelatedData(
+      id,
+      detail.woBasicDetailId,
+      pageNum,
+      data,
+    );
+
+    return this.mapRowToResponse(row!);
+  }
+
+  async savePage(
+    id: number,
+    pageNum: number,
+    data: PageData,
+    userId?: number,
+  ) {
+    const detail = await this.findById(id);
 
     const updateValues: Record<string, unknown> = {
       updatedAt: new Date(),
@@ -614,20 +923,24 @@ export class WoDetailsService {
       .where(eq(woDetails.id, id))
       .returning();
 
-    // Handle Page 4 separately (BOQ and addresses)
-    if (pageNum === 4 && data) {
-      await this.savePage4Data(id, data);
-    }
+    // Handle page-specific related data
+    await this.savePageRelatedData(
+      id,
+      detail.woBasicDetailId,
+      pageNum,
+      data,
+    );
 
     return this.mapRowToResponse(row!);
   }
 
-  async submitPage(id: number, pageNum: number, data: any, userId?: number) {
+  async submitPage(
+    id: number,
+    pageNum: number,
+    data: PageData,
+    userId?: number,
+  ) {
     const detail = await this.findById(id);
-
-    if (pageNum < 1 || pageNum > 7) {
-      throw new BadRequestException('Invalid page number');
-    }
 
     const now = new Date();
     const updateValues: Record<string, unknown> = {
@@ -644,50 +957,25 @@ export class WoDetailsService {
     this.mapPageDataToUpdate(pageNum, data, updateValues);
 
     // Mark page as completed
-    const completedPages = [...(detail.completedPages || [])];
+    const completedPages = [...((detail.completedPages as number[]) || [])];
     if (!completedPages.includes(pageNum)) {
       completedPages.push(pageNum);
     }
     updateValues.completedPages = completedPages;
 
     // Remove from skipped if was skipped
-    const skippedPages = (detail.skippedPages || []).filter((p: number) => p !== pageNum);
+    const skippedPages = ((detail.skippedPages as number[]) || []).filter(
+      (p: number) => p !== pageNum,
+    );
     updateValues.skippedPages = skippedPages;
 
     // Move to next page if not on last
-    if (pageNum < 7) {
+    if (pageNum < TOTAL_PAGES) {
       updateValues.currentPage = pageNum + 1;
     }
 
     // Page-specific timestamps
-    if (pageNum === 1 && data.tenderDocumentsChecklist) {
-      const checklist = data.tenderDocumentsChecklist as TenderDocumentsChecklist;
-      const allComplete = TENDER_CHECKLIST_ITEMS.every((key) => checklist[key] === true);
-      if (allComplete) {
-        updateValues.checklistCompletedAt = now;
-      } else {
-        // TODO: Send notification to Tendering TL and TE
-        updateValues.checklistIncompleteNotifiedAt = now;
-      }
-    }
-
-    if (pageNum === 3) {
-      updateValues.swotCompletedAt = now;
-    }
-
-    if (pageNum === 6 && data.hasDiscrepancies) {
-      // TODO: Send notification to TL and TE
-      updateValues.discrepancyNotifiedAt = now;
-    }
-
-    if (pageNum === 7) {
-      if (data.oeWoAmendmentNeeded) {
-        updateValues.oeAmendmentSubmittedAt = now;
-      }
-      if (data.courierRequestPrepared) {
-        updateValues.courierRequestPreparedAt = now;
-      }
-    }
+    this.setPageTimestamps(pageNum, data, updateValues, now);
 
     const [row] = await this.db
       .update(woDetails)
@@ -695,24 +983,34 @@ export class WoDetailsService {
       .where(eq(woDetails.id, id))
       .returning();
 
-    // Handle Page 4 separately
-    if (pageNum === 4 && data) {
-      await this.savePage4Data(id, data);
-    }
+    // Handle page-specific related data
+    await this.savePageRelatedData(
+      id,
+      detail.woBasicDetailId,
+      pageNum,
+      data,
+    );
 
-    return this.mapRowToResponse(row!);
+    return {
+      ...this.mapRowToResponse(row!),
+      message: `Page ${pageNum} submitted successfully`,
+      nextPage: pageNum < TOTAL_PAGES ? pageNum + 1 : null,
+    };
   }
 
-  async skipPage(id: number, pageNum: number, data?: SkipPageDto, userId?: number) {
+  async skipPage(
+    id: number,
+    pageNum: number,
+    data?: { reason?: string },
+    userId?: number,
+  ) {
     const detail = await this.findById(id);
 
-    if (pageNum < 1 || pageNum > 7) {
-      throw new BadRequestException('Invalid page number');
-    }
-
-    // Page 7 cannot be skipped
-    if (pageNum === 7) {
-      throw new BadRequestException('Page 7 (WO Acceptance) cannot be skipped');
+    // Check if page can be skipped
+    if (!(SKIPPABLE_PAGES as readonly number[]).includes(pageNum)) {
+      throw new BadRequestException(
+        `Page ${pageNum} cannot be skipped. Required pages: ${REQUIRED_PAGES.join(', ')}`,
+      );
     }
 
     const now = new Date();
@@ -727,18 +1025,20 @@ export class WoDetailsService {
     }
 
     // Mark page as skipped
-    const skippedPages = [...(detail.skippedPages || [])];
+    const skippedPages = [...((detail.skippedPages as number[]) || [])];
     if (!skippedPages.includes(pageNum)) {
       skippedPages.push(pageNum);
     }
     updateValues.skippedPages = skippedPages;
 
     // Remove from completed if was completed
-    const completedPages = (detail.completedPages || []).filter((p: number) => p !== pageNum);
+    const completedPages = ((detail.completedPages as number[]) || []).filter(
+      (p: number) => p !== pageNum,
+    );
     updateValues.completedPages = completedPages;
 
     // Move to next page
-    if (pageNum < 7) {
+    if (pageNum < TOTAL_PAGES) {
       updateValues.currentPage = pageNum + 1;
     }
 
@@ -748,7 +1048,11 @@ export class WoDetailsService {
       .where(eq(woDetails.id, id))
       .returning();
 
-    return this.mapRowToResponse(row!);
+    return {
+      ...this.mapRowToResponse(row!),
+      message: `Page ${pageNum} skipped`,
+      nextPage: pageNum < TOTAL_PAGES ? pageNum + 1 : null,
+    };
   }
 
   async submitForReview(id: number, userId?: number) {
@@ -795,19 +1099,33 @@ export class WoDetailsService {
       message: 'WO Details submitted for TL review',
     };
   }
-
+  // GET PAGE DATA
   async getPageData(id: number, pageNum: number) {
     const detail = await this.findByIdWithRelations(id);
 
     switch (pageNum) {
       case 1:
         return {
-          contacts: detail.contacts,
+          contacts: detail.contacts.map((c) => ({
+            id: c.id,
+            organization: c.organization,
+            departments: c.departments,
+            name: c.name,
+            designation: c.designation,
+            phone: c.phone,
+            email: c.email,
+            createdAt: c.createdAt.toISOString(),
+            updatedAt: c.updatedAt.toISOString(),
+          })),
           tenderDocumentsChecklist: detail.tenderDocumentsChecklist,
           checklistCompletedAt: detail.checklistCompletedAt,
           checklistIncompleteNotifiedAt: detail.checklistIncompleteNotifiedAt,
-          isChecklistComplete: this.isChecklistComplete(detail.tenderDocumentsChecklist),
-          incompleteItems: this.getIncompleteChecklistItems(detail.tenderDocumentsChecklist),
+          isChecklistComplete: this.isChecklistComplete(
+            detail.tenderDocumentsChecklist,
+          ),
+          incompleteItems: this.getIncompleteChecklistItems(
+            detail.tenderDocumentsChecklist,
+          ),
         };
 
       case 2:
@@ -844,10 +1162,46 @@ export class WoDetailsService {
         const billingTotal = this.calculateTotal(detail.billingBoq);
         const buybackTotal = this.calculateTotal(detail.buybackBoq);
         return {
-          billingBoq: detail.billingBoq,
-          buybackBoq: detail.buybackBoq,
-          billingAddresses: detail.billingAddresses,
-          shippingAddresses: detail.shippingAddresses,
+          billingBoq: detail.billingBoq.map((item) => ({
+            id: item.id,
+            srNo: item.srNo,
+            itemDescription: item.itemDescription,
+            quantity: item.quantity,
+            rate: item.rate,
+            amount: item.amount,
+            sortOrder: item.sortOrder,
+            createdAt: item.createdAt.toISOString(),
+            updatedAt: item.updatedAt.toISOString(),
+          })),
+          buybackBoq: detail.buybackBoq.map((item) => ({
+            id: item.id,
+            srNo: item.srNo,
+            itemDescription: item.itemDescription,
+            quantity: item.quantity,
+            rate: item.rate,
+            amount: item.amount,
+            sortOrder: item.sortOrder,
+            createdAt: item.createdAt.toISOString(),
+            updatedAt: item.updatedAt.toISOString(),
+          })),
+          billingAddresses: detail.billingAddresses.map((addr) => ({
+            id: addr.id,
+            srNos: addr.srNos,
+            customerName: addr.customerName,
+            address: addr.address,
+            gst: addr.gst,
+            createdAt: addr.createdAt.toISOString(),
+            updatedAt: addr.updatedAt.toISOString(),
+          })),
+          shippingAddresses: detail.shippingAddresses.map((addr) => ({
+            id: addr.id,
+            srNos: addr.srNos,
+            customerName: addr.customerName,
+            address: addr.address,
+            gst: addr.gst,
+            createdAt: addr.createdAt.toISOString(),
+            updatedAt: addr.updatedAt.toISOString(),
+          })),
           billingTotal,
           buybackTotal,
         };
@@ -887,7 +1241,6 @@ export class WoDetailsService {
           oeSignaturePrepared: detail.oeSignaturePrepared,
           courierRequestPrepared: detail.courierRequestPrepared,
           courierRequestPreparedAt: detail.courierRequestPreparedAt,
-          amendments: detail.amendments,
           canSubmitForReview: this.getSubmissionBlockers(detail).length === 0,
           blockers: this.getSubmissionBlockers(detail),
         };
@@ -896,66 +1249,241 @@ export class WoDetailsService {
         throw new BadRequestException('Invalid page number');
     }
   }
+  // IMPORT OPERATIONS
+  async importTenderContacts(
+    woBasicDetailId: number,
+    woDetailId: number,
+  ): Promise<ImportContactsResponse> {
+    // Verify WO Detail exists
+    await this.findById(woDetailId);
 
-  // HELPER METHODS
-  private mapPageDataToUpdate(pageNum: number, data: any, updateValues: Record<string, unknown>) {
+    // Get contacts from wo_contacts table
+    const contacts = await this.db
+      .select()
+      .from(woContacts)
+      .where(eq(woContacts.woBasicDetailId, woBasicDetailId));
+
+    return {
+      contacts: contacts.map((contact) => ({
+        id: contact.id,
+        name: contact.name ?? '',
+        designation: contact.designation ?? '',
+        phone: contact.phone ?? '',
+        email: contact.email ?? '',
+        organization: contact.organization ?? '',
+        departments: contact.departments ?? undefined,
+      })),
+      importedCount: contacts.length,
+    };
+  }
+  // PRIVATE HELPER METHODS
+  private mapPageDataToUpdate(
+    pageNum: number,
+    data: any,
+    updateValues: Record<string, unknown>,
+  ) {
     switch (pageNum) {
       case 1:
         if (data.tenderDocumentsChecklist !== undefined) {
           updateValues.tenderDocumentsChecklist = data.tenderDocumentsChecklist;
         }
+        // Contacts are handled separately in savePageRelatedData
         break;
 
       case 2:
-        if (data.ldApplicable !== undefined) updateValues.ldApplicable = data.ldApplicable;
+        if (data.ldApplicable !== undefined)
+          updateValues.ldApplicable = data.ldApplicable;
         if (data.maxLd !== undefined) updateValues.maxLd = data.maxLd;
-        if (data.ldStartDate !== undefined) updateValues.ldStartDate = data.ldStartDate;
-        if (data.maxLdDate !== undefined) updateValues.maxLdDate = data.maxLdDate;
-        if (data.isPbgApplicable !== undefined) updateValues.isPbgApplicable = data.isPbgApplicable;
-        if (data.filledBgFormat !== undefined) updateValues.filledBgFormat = data.filledBgFormat;
+        if (data.ldStartDate !== undefined)
+          updateValues.ldStartDate = data.ldStartDate;
+        if (data.maxLdDate !== undefined)
+          updateValues.maxLdDate = data.maxLdDate;
+        if (data.isPbgApplicable !== undefined)
+          updateValues.isPbgApplicable = data.isPbgApplicable;
+        if (data.filledBgFormat !== undefined)
+          updateValues.filledBgFormat = data.filledBgFormat;
         if (data.pbgBgId !== undefined) updateValues.pbgBgId = data.pbgBgId;
-        if (data.isContractAgreement !== undefined) updateValues.isContractAgreement = data.isContractAgreement;
-        if (data.contractAgreementFormat !== undefined) updateValues.contractAgreementFormat = data.contractAgreementFormat;
-        if (data.detailedPoApplicable !== undefined) updateValues.detailedPoApplicable = data.detailedPoApplicable;
-        if (data.detailedPoFollowupId !== undefined) updateValues.detailedPoFollowupId = data.detailedPoFollowupId;
+        if (data.isContractAgreement !== undefined)
+          updateValues.isContractAgreement = data.isContractAgreement;
+        if (data.contractAgreementFormat !== undefined)
+          updateValues.contractAgreementFormat = data.contractAgreementFormat;
+        if (data.detailedPoApplicable !== undefined)
+          updateValues.detailedPoApplicable = data.detailedPoApplicable;
+        if (data.detailedPoFollowupId !== undefined)
+          updateValues.detailedPoFollowupId = data.detailedPoFollowupId;
         break;
 
       case 3:
-        if (data.swotStrengths !== undefined) updateValues.swotStrengths = data.swotStrengths;
-        if (data.swotWeaknesses !== undefined) updateValues.swotWeaknesses = data.swotWeaknesses;
-        if (data.swotOpportunities !== undefined) updateValues.swotOpportunities = data.swotOpportunities;
-        if (data.swotThreats !== undefined) updateValues.swotThreats = data.swotThreats;
+        if (data.swotStrengths !== undefined)
+          updateValues.swotStrengths = data.swotStrengths;
+        if (data.swotWeaknesses !== undefined)
+          updateValues.swotWeaknesses = data.swotWeaknesses;
+        if (data.swotOpportunities !== undefined)
+          updateValues.swotOpportunities = data.swotOpportunities;
+        if (data.swotThreats !== undefined)
+          updateValues.swotThreats = data.swotThreats;
         break;
 
       case 4:
-        // Handled separately in savePage4Data
+        // BOQ and Addresses are handled separately in savePageRelatedData
         break;
 
       case 5:
-        if (data.siteVisitNeeded !== undefined) updateValues.siteVisitNeeded = data.siteVisitNeeded;
-        if (data.siteVisitPerson !== undefined) updateValues.siteVisitPerson = data.siteVisitPerson;
-        if (data.documentsFromTendering !== undefined) updateValues.documentsFromTendering = data.documentsFromTendering;
-        if (data.documentsNeeded !== undefined) updateValues.documentsNeeded = data.documentsNeeded;
-        if (data.documentsInHouse !== undefined) updateValues.documentsInHouse = data.documentsInHouse;
+        if (data.siteVisitNeeded !== undefined)
+          updateValues.siteVisitNeeded = data.siteVisitNeeded;
+        if (data.siteVisitPerson !== undefined)
+          updateValues.siteVisitPerson = data.siteVisitPerson;
+        if (data.documentsFromTendering !== undefined)
+          updateValues.documentsFromTendering = data.documentsFromTendering;
+        if (data.documentsNeeded !== undefined)
+          updateValues.documentsNeeded = data.documentsNeeded;
+        if (data.documentsInHouse !== undefined)
+          updateValues.documentsInHouse = data.documentsInHouse;
         break;
 
       case 6:
-        if (data.costingSheetLink !== undefined) updateValues.costingSheetLink = data.costingSheetLink || null;
-        if (data.hasDiscrepancies !== undefined) updateValues.hasDiscrepancies = data.hasDiscrepancies;
-        if (data.discrepancyComments !== undefined) updateValues.discrepancyComments = data.discrepancyComments;
-        if (data.budgetPreGst !== undefined) updateValues.budgetPreGst = data.budgetPreGst;
-        if (data.budgetSupply !== undefined) updateValues.budgetSupply = data.budgetSupply;
-        if (data.budgetService !== undefined) updateValues.budgetService = data.budgetService;
-        if (data.budgetFreight !== undefined) updateValues.budgetFreight = data.budgetFreight;
-        if (data.budgetAdmin !== undefined) updateValues.budgetAdmin = data.budgetAdmin;
-        if (data.budgetBuybackSale !== undefined) updateValues.budgetBuybackSale = data.budgetBuybackSale;
+        if (data.costingSheetLink !== undefined)
+          updateValues.costingSheetLink = data.costingSheetLink || null;
+        if (data.hasDiscrepancies !== undefined)
+          updateValues.hasDiscrepancies = data.hasDiscrepancies;
+        if (data.discrepancyComments !== undefined)
+          updateValues.discrepancyComments = data.discrepancyComments;
+        if (data.budgetPreGst !== undefined)
+          updateValues.budgetPreGst = data.budgetPreGst;
+
+        // Handle budget breakdown (nested object from frontend)
+        if (data.budgetBreakdown !== undefined) {
+          const breakdown = data.budgetBreakdown;
+          if (breakdown.supply !== undefined)
+            updateValues.budgetSupply = breakdown.supply;
+          if (breakdown.service !== undefined)
+            updateValues.budgetService = breakdown.service;
+          if (breakdown.freight !== undefined)
+            updateValues.budgetFreight = breakdown.freight;
+          if (breakdown.admin !== undefined)
+            updateValues.budgetAdmin = breakdown.admin;
+          if (breakdown.buybackSale !== undefined)
+            updateValues.budgetBuybackSale = breakdown.buybackSale;
+        }
+
+        // Also handle flat fields (backwards compatibility)
+        if (data.budgetSupply !== undefined)
+          updateValues.budgetSupply = data.budgetSupply;
+        if (data.budgetService !== undefined)
+          updateValues.budgetService = data.budgetService;
+        if (data.budgetFreight !== undefined)
+          updateValues.budgetFreight = data.budgetFreight;
+        if (data.budgetAdmin !== undefined)
+          updateValues.budgetAdmin = data.budgetAdmin;
+        if (data.budgetBuybackSale !== undefined)
+          updateValues.budgetBuybackSale = data.budgetBuybackSale;
         break;
 
       case 7:
-        if (data.oeWoAmendmentNeeded !== undefined) updateValues.oeWoAmendmentNeeded = data.oeWoAmendmentNeeded;
-        if (data.oeSignaturePrepared !== undefined) updateValues.oeSignaturePrepared = data.oeSignaturePrepared;
-        if (data.courierRequestPrepared !== undefined) updateValues.courierRequestPrepared = data.courierRequestPrepared;
+        if (data.oeWoAmendmentNeeded !== undefined)
+          updateValues.oeWoAmendmentNeeded = data.oeWoAmendmentNeeded;
+        if (data.oeSignaturePrepared !== undefined)
+          updateValues.oeSignaturePrepared = data.oeSignaturePrepared;
+        if (data.courierRequestPrepared !== undefined)
+          updateValues.courierRequestPrepared = data.courierRequestPrepared;
         break;
+    }
+  }
+
+  private setPageTimestamps(
+    pageNum: number,
+    data: any,
+    updateValues: Record<string, unknown>,
+    now: Date,
+  ) {
+    switch (pageNum) {
+      case 1:
+        if (data.tenderDocumentsChecklist) {
+          const checklist = data.tenderDocumentsChecklist as TenderDocumentsChecklist;
+          const allComplete = TENDER_CHECKLIST_ITEMS.every(
+            (key) => checklist[key] === true,
+          );
+          if (allComplete) {
+            updateValues.checklistCompletedAt = now;
+          } else {
+            updateValues.checklistIncompleteNotifiedAt = now;
+          }
+        }
+        break;
+
+      case 3:
+        updateValues.swotCompletedAt = now;
+        break;
+
+      case 6:
+        if (data.hasDiscrepancies) {
+          updateValues.discrepancyNotifiedAt = now;
+        }
+        break;
+
+      case 7:
+        if (data.oeWoAmendmentNeeded) {
+          updateValues.oeAmendmentSubmittedAt = now;
+        }
+        if (data.courierRequestPrepared) {
+          updateValues.courierRequestPreparedAt = now;
+        }
+        break;
+    }
+  }
+
+  private async savePageRelatedData(
+    woDetailId: number,
+    woBasicDetailId: number,
+    pageNum: number,
+    data: any,
+  ) {
+    switch (pageNum) {
+      case 1:
+        if (data.contacts !== undefined) {
+          await this.savePage1Contacts(woBasicDetailId, data.contacts);
+        }
+        break;
+
+      case 4:
+        await this.savePage4Data(woDetailId, data);
+        break;
+
+      // Page 7 amendments are handled by WoAmendmentsModule
+      // If you need to save amendments inline, add that logic here
+    }
+  }
+
+  private async savePage1Contacts(
+    woBasicDetailId: number,
+    contacts: Page1ContactDto[],
+  ) {
+    const now = new Date();
+
+    // Delete existing contacts for this WO Basic Detail
+    await this.db
+      .delete(woContacts)
+      .where(eq(woContacts.woBasicDetailId, woBasicDetailId));
+
+    // Insert new contacts
+    if (contacts && contacts.length > 0) {
+      const contactRows = contacts
+        .filter((contact) => contact.name?.trim()) // Filter out empty contacts
+        .map((contact) => ({
+          woBasicDetailId,
+          organization: contact.organization || null,
+          departments: contact.departments || null,
+          name: contact.name || null,
+          designation: contact.designation || null,
+          phone: contact.phone || null,
+          email: contact.email || null,
+          createdAt: now,
+          updatedAt: now,
+        }));
+
+      if (contactRows.length > 0) {
+        await this.db.insert(woContacts).values(contactRows);
+      }
     }
   }
 
@@ -964,10 +1492,10 @@ export class WoDetailsService {
 
     // Handle Billing BOQ
     if (data.billingBoq !== undefined) {
-      // Delete existing
-      await this.db.delete(woBillingBoq).where(eq(woBillingBoq.woDetailId, woDetailId));
+      await this.db
+        .delete(woBillingBoq)
+        .where(eq(woBillingBoq.woDetailId, woDetailId));
 
-      // Insert new
       if (data.billingBoq.length > 0) {
         const billingItems = data.billingBoq.map((item, index) => ({
           woDetailId,
@@ -975,7 +1503,9 @@ export class WoDetailsService {
           itemDescription: item.itemDescription,
           quantity: item.quantity,
           rate: item.rate,
-          amount: (parseFloat(item.quantity) * parseFloat(item.rate)).toFixed(2),
+          amount: (
+            parseFloat(item.quantity) * parseFloat(item.rate)
+          ).toFixed(2),
           sortOrder: item.sortOrder ?? index + 1,
           createdAt: now,
           updatedAt: now,
@@ -986,7 +1516,9 @@ export class WoDetailsService {
 
     // Handle Buyback BOQ
     if (data.buybackBoq !== undefined) {
-      await this.db.delete(woBuybackBoq).where(eq(woBuybackBoq.woDetailId, woDetailId));
+      await this.db
+        .delete(woBuybackBoq)
+        .where(eq(woBuybackBoq.woDetailId, woDetailId));
 
       if (data.buybackBoq.length > 0) {
         const buybackItems = data.buybackBoq.map((item, index) => ({
@@ -995,7 +1527,9 @@ export class WoDetailsService {
           itemDescription: item.itemDescription,
           quantity: item.quantity,
           rate: item.rate,
-          amount: (parseFloat(item.quantity) * parseFloat(item.rate)).toFixed(2),
+          amount: (
+            parseFloat(item.quantity) * parseFloat(item.rate)
+          ).toFixed(2),
           sortOrder: item.sortOrder ?? index + 1,
           createdAt: now,
           updatedAt: now,
@@ -1006,7 +1540,9 @@ export class WoDetailsService {
 
     // Handle Billing Addresses
     if (data.billingAddresses !== undefined) {
-      await this.db.delete(woBillingAddresses).where(eq(woBillingAddresses.woDetailId, woDetailId));
+      await this.db
+        .delete(woBillingAddresses)
+        .where(eq(woBillingAddresses.woDetailId, woDetailId));
 
       if (data.billingAddresses.length > 0) {
         const billingAddrs = data.billingAddresses.map((addr) => ({
@@ -1024,7 +1560,9 @@ export class WoDetailsService {
 
     // Handle Shipping Addresses
     if (data.shippingAddresses !== undefined) {
-      await this.db.delete(woShippingAddresses).where(eq(woShippingAddresses.woDetailId, woDetailId));
+      await this.db
+        .delete(woShippingAddresses)
+        .where(eq(woShippingAddresses.woDetailId, woDetailId));
 
       if (data.shippingAddresses.length > 0) {
         const shippingAddrs = data.shippingAddresses.map((addr) => ({
@@ -1041,12 +1579,16 @@ export class WoDetailsService {
     }
   }
 
-  private isChecklistComplete(checklist: TenderDocumentsChecklist | null): boolean {
+  private isChecklistComplete(
+    checklist: TenderDocumentsChecklist | null,
+  ): boolean {
     if (!checklist) return false;
     return TENDER_CHECKLIST_ITEMS.every((key) => checklist[key] === true);
   }
 
-  private getIncompleteChecklistItems(checklist: TenderDocumentsChecklist | null): string[] {
+  private getIncompleteChecklistItems(
+    checklist: TenderDocumentsChecklist | null,
+  ): string[] {
     if (!checklist) return [...TENDER_CHECKLIST_ITEMS];
     return TENDER_CHECKLIST_ITEMS.filter((key) => checklist[key] !== true);
   }
@@ -1070,10 +1612,11 @@ export class WoDetailsService {
     const total = supply + service + freight + admin - buyback;
     return total.toFixed(2);
   }
-
   // DASHBOARD
   async getDashboardSummary(user: ValidatedUser, teamId?: number) {
-    const conditions: any[] = [];
+    const conditions: any[] = [
+        eq(woDetails.status, 'completed')
+    ];
     if (user) {
       conditions.push(...this.getVisibilityConditions(user, teamId));
     }
@@ -1087,13 +1630,19 @@ export class WoDetailsService {
       })
       .from(woDetails)
       .leftJoin(woAcceptance, eq(woDetails.id, woAcceptance.woDetailId))
-      .leftJoin(woBasicDetails, eq(woDetails.woBasicDetailId, woBasicDetails.id))
+      .leftJoin(
+        woBasicDetails,
+        eq(woDetails.woBasicDetailId, woBasicDetails.id),
+      )
       .where(whereClause);
 
     const acceptedCount = summary?.accepted ?? 0;
     const amendmentNeededCount = summary?.amendmentNeeded ?? 0;
     const totalCount = summary?.total ?? 0;
-    const pendingCount = Math.max(0, totalCount - acceptedCount - amendmentNeededCount);
+    const pendingCount = Math.max(
+      0,
+      totalCount - acceptedCount - amendmentNeededCount,
+    );
 
     return {
       summary: {

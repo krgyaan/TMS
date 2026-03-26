@@ -1,8 +1,5 @@
 import { z } from "zod";
-
-// ============================================
 // PAGE 3: SWOT ANALYSIS
-// ============================================
 
 /**
  * Save Page 3 data (all fields optional)

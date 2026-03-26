@@ -1,38 +1,52 @@
+import { useEffect } from "react";
 import { useForm, useFieldArray, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Form } from "@/components/ui/form";
-import { FieldWrapper } from "@/components/form/FieldWrapper";
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { SelectField } from "@/components/form/SelectField";
 import { Plus, Trash2, FileEdit, CheckCircle2, Pen, Truck, AlertTriangle, ShieldCheck } from "lucide-react";
+
 import { Page7FormSchema } from "@/modules/operations/wo-details/helpers/woDetail.schema";
 import { WizardNavigation } from "@/modules/operations/wo-details/components/WizardNavigation";
-import { YES_NO_OPTIONS } from "@/modules/operations/wo-details/helpers/constants";
-import type { Page7FormValues, PageFormProps } from "@/modules/operations/wo-details/helpers/woDetail.types";
+import { YES_NO_OPTIONS, WIZARD_CONFIG } from "@/modules/operations/wo-details/helpers/constants";
+import { SelectField } from "@/components/form/SelectField";
+import { useAutoSave } from "@/hooks/api/useWoDetails";
+
+import type { Page7FormValues, PageFormProps, Amendment } from "@/modules/operations/wo-details/helpers/woDetail.types";
 
 interface Page7AcceptanceProps extends PageFormProps {
     initialData?: Partial<Page7FormValues>;
 }
 
+const defaultAmendment: Amendment = {
+    pageNo: "",
+    clauseNo: "",
+    currentStatement: "",
+    correctedStatement: "",
+};
+
+const defaultValues: Page7FormValues = {
+    oeWoAmendmentNeeded: "false",
+    amendments: [],
+    oeSignaturePrepared: "false",
+    courierRequestPrepared: "false",
+};
+
 export function Page7Acceptance({
+    woDetailId,
     initialData,
     onSubmit,
     onSkip,
     onBack,
+    onSaveDraft,
     isLoading,
+    isSaving,
 }: Page7AcceptanceProps) {
     const form = useForm<Page7FormValues>({
         resolver: zodResolver(Page7FormSchema) as Resolver<Page7FormValues>,
-        defaultValues: {
-            oeWoAmendmentNeeded: 'false',
-            amendments: [],
-            oeSignaturePrepared: 'false',
-            courierRequestPrepared: 'false',
-            ...initialData,
-        },
+        defaultValues: { ...defaultValues, ...initialData },
     });
 
     const {
@@ -41,31 +55,42 @@ export function Page7Acceptance({
         remove: removeAmendment,
     } = useFieldArray({ control: form.control, name: "amendments" });
 
+    const { autoSave, isSaving: isAutoSaving } = useAutoSave(woDetailId, 7);
+
     const watchAmendmentNeeded = form.watch("oeWoAmendmentNeeded");
 
+    useEffect(() => {
+        const subscription = form.watch((values) => {
+            if (values) autoSave(values);
+        });
+        return () => subscription.unsubscribe();
+    }, [form, autoSave]);
+
+    useEffect(() => {
+        if (initialData) {
+            form.reset({ ...defaultValues, ...initialData });
+        }
+    }, [initialData, form]);
+
     const handleFormSubmit = async (values: Page7FormValues) => {
-        console.log("Page 7 data:", values);
-        onSubmit();
+        await onSubmit(values);
     };
 
     const handleSaveDraft = async () => {
-        const values = form.getValues();
-        console.log("Save draft:", values);
+        await onSaveDraft(form.getValues());
     };
 
     return (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
-                {/* 1. Amendment Decision */}
+                {/* Amendment Decision */}
                 <Card>
                     <CardHeader className="border-b bg-muted/10">
                         <CardTitle className="flex items-center gap-2">
                             <FileEdit className="h-5 w-5 text-orange-500" />
                             WO Amendment Decision
                         </CardTitle>
-                        <CardDescription>
-                            Does this WO require any amendments before acceptance?
-                        </CardDescription>
+                        <CardDescription>Does this WO require any amendments before acceptance?</CardDescription>
                     </CardHeader>
                     <CardContent className="p-6">
                         <div className="max-w-xs">
@@ -73,33 +98,30 @@ export function Page7Acceptance({
                                 control={form.control}
                                 name="oeWoAmendmentNeeded"
                                 label="Amendment Needed?"
-                                options={YES_NO_OPTIONS as any}
+                                options={YES_NO_OPTIONS}
                                 placeholder="Select"
                             />
                         </div>
                     </CardContent>
                 </Card>
 
-                {/* 2. Amendments List (if needed) */}
-                {watchAmendmentNeeded === 'true' && (
+                {/* Amendments List */}
+                {watchAmendmentNeeded === "true" && (
                     <Card>
                         <CardHeader className="border-b bg-muted/10">
                             <CardTitle className="flex items-center gap-2">
                                 <AlertTriangle className="h-5 w-5 text-orange-500" />
                                 Amendment Details
                             </CardTitle>
-                            <CardDescription>
-                                Specify all required corrections for the Work Order.
-                            </CardDescription>
+                            <CardDescription>Specify all required corrections for the Work Order.</CardDescription>
                         </CardHeader>
                         <CardContent className="p-6 space-y-6">
                             {amendmentFields.map((field, index) => (
-                                <div
-                                    key={field.id}
-                                    className="p-6 border rounded-2xl space-y-6 relative"
-                                >
+                                <div key={field.id} className="p-6 border rounded-2xl space-y-6 relative">
                                     <div className="flex justify-between items-center">
-                                        <h4 className="font-bold text-sm uppercase tracking-wider text-orange-800">Amendment #{index + 1}</h4>
+                                        <h4 className="font-bold text-sm uppercase tracking-wider text-orange-800">
+                                            Amendment #{index + 1}
+                                        </h4>
                                         <Button
                                             variant="ghost"
                                             size="icon"
@@ -112,52 +134,72 @@ export function Page7Acceptance({
                                     </div>
 
                                     <div className="grid gap-6 md:grid-cols-6 items-start">
-                                        <FieldWrapper
+                                        <FormField
                                             control={form.control}
                                             name={`amendments.${index}.pageNo`}
-                                            label="Page Number"
-                                        >
-                                            {(field) => <Input {...field} placeholder="e.g., 12" />}
-                                        </FieldWrapper>
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Page Number</FormLabel>
+                                                    <FormControl>
+                                                        <Input {...field} placeholder="e.g., 12" />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
 
-                                        <FieldWrapper
+                                        <FormField
                                             control={form.control}
                                             name={`amendments.${index}.clauseNo`}
-                                            label="Clause Number"
-                                        >
-                                            {(field) => <Input {...field} placeholder="e.g., 5.1.a" />}
-                                        </FieldWrapper>
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Clause Number</FormLabel>
+                                                    <FormControl>
+                                                        <Input {...field} placeholder="e.g., 5.1.a" />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
 
                                         <div className="md:col-span-4 grid grid-cols-2 gap-6">
-                                            <FieldWrapper
+                                            <FormField
                                                 control={form.control}
                                                 name={`amendments.${index}.currentStatement`}
-                                                label="Current Statement in WO"
-                                            >
-                                                {(field) => (
-                                                    <Textarea
-                                                        {...field}
-                                                        placeholder="Copy the exact text from the PO/WO..."
-                                                        rows={2}
-                                                        className="bg-white"
-                                                    />
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>Current Statement in WO</FormLabel>
+                                                        <FormControl>
+                                                            <Textarea
+                                                                {...field}
+                                                                placeholder="Copy the exact text from the PO/WO..."
+                                                                rows={2}
+                                                                className="bg-white"
+                                                            />
+                                                        </FormControl>
+                                                        <FormMessage />
+                                                    </FormItem>
                                                 )}
-                                            </FieldWrapper>
+                                            />
 
-                                            <FieldWrapper
+                                            <FormField
                                                 control={form.control}
                                                 name={`amendments.${index}.correctedStatement`}
-                                                label="Proposed Corrected Statement"
-                                            >
-                                                {(field) => (
-                                                    <Textarea
-                                                        {...field}
-                                                        placeholder="How it should read after amendment..."
-                                                        rows={2}
-                                                        className="bg-white border-green-200 focus:border-green-500"
-                                                    />
+                                                render={({ field }) => (
+                                                    <FormItem>
+                                                        <FormLabel>Proposed Corrected Statement</FormLabel>
+                                                        <FormControl>
+                                                            <Textarea
+                                                                {...field}
+                                                                placeholder="How it should read after amendment..."
+                                                                rows={2}
+                                                                className="bg-white border-green-200 focus:border-green-500"
+                                                            />
+                                                        </FormControl>
+                                                        <FormMessage />
+                                                    </FormItem>
                                                 )}
-                                            </FieldWrapper>
+                                            />
                                         </div>
                                     </div>
                                 </div>
@@ -166,40 +208,31 @@ export function Page7Acceptance({
                             <Button
                                 type="button"
                                 variant="outline"
-                                onClick={() =>
-                                    appendAmendment({
-                                        pageNo: "",
-                                        clauseNo: "",
-                                        currentStatement: "",
-                                        correctedStatement: "",
-                                    })
-                                }
+                                onClick={() => appendAmendment(defaultAmendment)}
                                 className="w-full border-dashed border-2 py-6 hover:bg-orange-50 hover:border-orange-200"
                             >
                                 <Plus className="h-4 w-4 mr-2" />
                                 Add Another Amendment
                             </Button>
 
-                            {form.formState.errors.amendments && (
+                            {form.formState.errors.amendments?.root && (
                                 <p className="text-sm text-destructive font-medium">
-                                    {form.formState.errors.amendments.message as string}
+                                    {form.formState.errors.amendments.root.message}
                                 </p>
                             )}
                         </CardContent>
                     </Card>
                 )}
 
-                {/* 3. Acceptance Actions (if no amendments) */}
-                {watchAmendmentNeeded === 'false' && (
+                {/* Acceptance Actions */}
+                {watchAmendmentNeeded === "false" && (
                     <Card>
                         <CardHeader className="border-b bg-muted/10">
                             <CardTitle className="flex items-center gap-2">
                                 <CheckCircle2 className="h-5 w-5 text-green-600" />
                                 Final Acceptance Checklist
                             </CardTitle>
-                            <CardDescription>
-                                Complete these steps to finalize Work Order acceptance.
-                            </CardDescription>
+                            <CardDescription>Complete these steps to finalize Work Order acceptance.</CardDescription>
                         </CardHeader>
                         <CardContent className="p-6 space-y-6">
                             <div className="grid gap-6 md:grid-cols-2">
@@ -217,7 +250,7 @@ export function Page7Acceptance({
                                         control={form.control}
                                         name="oeSignaturePrepared"
                                         label="Signature Applied?"
-                                        options={YES_NO_OPTIONS as any}
+                                        options={YES_NO_OPTIONS}
                                         placeholder="Select"
                                     />
                                 </div>
@@ -236,7 +269,7 @@ export function Page7Acceptance({
                                         control={form.control}
                                         name="courierRequestPrepared"
                                         label="Courier Initiated?"
-                                        options={YES_NO_OPTIONS as any}
+                                        options={YES_NO_OPTIONS}
                                         placeholder="Select"
                                     />
                                 </div>
@@ -255,12 +288,12 @@ export function Page7Acceptance({
                     </Card>
                 )}
 
-                {/* Navigation */}
                 <WizardNavigation
                     currentPage={7}
-                    totalPages={7}
+                    totalPages={WIZARD_CONFIG.TOTAL_PAGES}
                     canSkip={false}
                     isSubmitting={isLoading}
+                    isSaving={isSaving || isAutoSaving}
                     onBack={onBack}
                     onSubmit={() => form.handleSubmit(handleFormSubmit)()}
                     onSkip={onSkip}

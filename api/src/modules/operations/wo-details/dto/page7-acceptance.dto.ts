@@ -1,9 +1,5 @@
 import { z } from "zod";
-
-// ============================================
 // PAGE 7: WO ACCEPTANCE (OE STEP)
-// ============================================
-
 /**
  * Save Page 7 data (all optional for drafts)
  */

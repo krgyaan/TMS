@@ -1,45 +1,58 @@
-import { useForm, type Resolver } from "react-hook-form";
+import { useEffect, useMemo } from "react";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Form } from "@/components/ui/form";
-import { FieldWrapper } from "@/components/form/FieldWrapper";
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { SelectField } from "@/components/form/SelectField";
 import { Link2, AlertCircle, Calculator } from "lucide-react";
+
 import { Page6FormSchema } from "@/modules/operations/wo-details/helpers/woDetail.schema";
 import { WizardNavigation } from "@/modules/operations/wo-details/components/WizardNavigation";
-import { YES_NO_OPTIONS } from "@/modules/operations/wo-details/helpers/constants";
+import { YES_NO_OPTIONS, WIZARD_CONFIG } from "@/modules/operations/wo-details/helpers/constants";
+import { SelectField } from "@/components/form/SelectField";
+import { useAutoSave } from "@/hooks/api/useWoDetails";
+
 import type { Page6FormValues, PageFormProps } from "@/modules/operations/wo-details/helpers/woDetail.types";
 
 interface Page6ProfitabilityProps extends PageFormProps {
     initialData?: Partial<Page6FormValues>;
-    costingSheetBudget?: string; // From pricing module
+    costingSheetBudget?: string;
 }
 
+const defaultValues: Page6FormValues = {
+    costingSheetLink: "",
+    hasDiscrepancies: "false",
+    discrepancyComments: "",
+    budgetPreGst: "",
+    budgetSupply: "",
+    budgetService: "",
+    budgetFreight: "",
+    budgetAdmin: "",
+    budgetBuybackSale: "",
+};
+
 export function Page6Profitability({
+    woDetailId,
     initialData,
     costingSheetBudget,
     onSubmit,
     onSkip,
     onBack,
+    onSaveDraft,
     isLoading,
+    isSaving,
 }: Page6ProfitabilityProps) {
     const form = useForm<Page6FormValues>({
-        resolver: zodResolver(Page6FormSchema) as Resolver<Page6FormValues>,
+        resolver: zodResolver(Page6FormSchema),
         defaultValues: {
-            costingSheetLink: "",
-            hasDiscrepancies: 'false',
-            discrepancyComments: "",
+            ...defaultValues,
             budgetPreGst: costingSheetBudget || "",
-            budgetSupply: "",
-            budgetService: "",
-            budgetFreight: "",
-            budgetAdmin: "",
-            budgetBuybackSale: "",
             ...initialData,
         },
     });
+
+    const { autoSave, isSaving: isAutoSaving } = useAutoSave(woDetailId, 6);
 
     const watchHasDiscrepancies = form.watch("hasDiscrepancies");
     const watchBudgetSupply = form.watch("budgetSupply");
@@ -48,28 +61,39 @@ export function Page6Profitability({
     const watchBudgetAdmin = form.watch("budgetAdmin");
     const watchBudgetBuybackSale = form.watch("budgetBuybackSale");
 
-    // Calculate total budget
-    const totalBudget =
-        (parseFloat(watchBudgetSupply || "0") || 0) +
-        (parseFloat(watchBudgetService || "0") || 0) +
-        (parseFloat(watchBudgetFreight || "0") || 0) +
-        (parseFloat(watchBudgetAdmin || "0") || 0) -
-        (parseFloat(watchBudgetBuybackSale || "0") || 0);
+    const totalBudget = useMemo(() => {
+        return (
+            (parseFloat(watchBudgetSupply || "0") || 0) +
+            (parseFloat(watchBudgetService || "0") || 0) +
+            (parseFloat(watchBudgetFreight || "0") || 0) +
+            (parseFloat(watchBudgetAdmin || "0") || 0) -
+            (parseFloat(watchBudgetBuybackSale || "0") || 0)
+        );
+    }, [watchBudgetSupply, watchBudgetService, watchBudgetFreight, watchBudgetAdmin, watchBudgetBuybackSale]);
+
+    useEffect(() => {
+        const subscription = form.watch((values) => {
+            if (values) autoSave(values);
+        });
+        return () => subscription.unsubscribe();
+    }, [form, autoSave]);
+
+    useEffect(() => {
+        if (initialData) {
+            form.reset({
+                ...defaultValues,
+                budgetPreGst: costingSheetBudget || "",
+                ...initialData,
+            });
+        }
+    }, [initialData, costingSheetBudget, form]);
 
     const handleFormSubmit = async (values: Page6FormValues) => {
-        // If discrepancies exist, notify TL and TE
-        if (values.hasDiscrepancies === 'true') {
-            // TODO: Trigger email notification
-            console.log("Discrepancy notification to TL and TE:", values.discrepancyComments);
-        }
-
-        console.log("Page 6 data:", values);
-        onSubmit();
+        await onSubmit(values);
     };
 
     const handleSaveDraft = async () => {
-        const values = form.getValues();
-        console.log("Save draft:", values);
+        await onSaveDraft(form.getValues());
     };
 
     return (
@@ -85,19 +109,19 @@ export function Page6Profitability({
                         <CardDescription>Reference the original costing sheet for this project.</CardDescription>
                     </CardHeader>
                     <CardContent className="p-6">
-                        <FieldWrapper
+                        <FormField
                             control={form.control}
                             name="costingSheetLink"
-                            label="Costing Sheet URL"
-                        >
-                            {(field) => (
-                                <Input
-                                    {...field}
-                                    type="url"
-                                    placeholder="https://docs.google.com/spreadsheets/..."
-                                />
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Costing Sheet URL</FormLabel>
+                                    <FormControl>
+                                        <Input {...field} type="url" placeholder="https://docs.google.com/spreadsheets/..." />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
                             )}
-                        </FieldWrapper>
+                        />
                     </CardContent>
                 </Card>
 
@@ -108,9 +132,7 @@ export function Page6Profitability({
                             <AlertCircle className="h-5 w-5 text-orange-500" />
                             PO/WO Comparison & Discrepancies
                         </CardTitle>
-                        <CardDescription>
-                            Compare the costing sheet with the received PO/WO.
-                        </CardDescription>
+                        <CardDescription>Compare the costing sheet with the received PO/WO.</CardDescription>
                     </CardHeader>
                     <CardContent className="p-6 space-y-6">
                         <div className="max-w-xs">
@@ -118,32 +140,34 @@ export function Page6Profitability({
                                 control={form.control}
                                 name="hasDiscrepancies"
                                 label="Discrepancies Found?"
-                                options={YES_NO_OPTIONS as any}
+                                options={YES_NO_OPTIONS}
                                 placeholder="Select"
                             />
                         </div>
 
-                        {watchHasDiscrepancies === 'true' && (
+                        {watchHasDiscrepancies === "true" && (
                             <div className="space-y-4">
-                                <FieldWrapper
+                                <FormField
                                     control={form.control}
                                     name="discrepancyComments"
-                                    label="Discrepancy Details"
-                                >
-                                    {(field) => (
-                                        <Textarea
-                                            {...field}
-                                            placeholder="Describe the discrepancies found between costing and PO..."
-                                            rows={4}
-                                            className="bg-white"
-                                        />
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Discrepancy Details</FormLabel>
+                                            <FormControl>
+                                                <Textarea
+                                                    {...field}
+                                                    placeholder="Describe the discrepancies found between costing and PO..."
+                                                    rows={4}
+                                                    className="bg-white"
+                                                />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
                                     )}
-                                </FieldWrapper>
+                                />
                                 <div className="flex items-center gap-2 text-red-800">
                                     <AlertCircle className="h-5 w-5 text-red-500" />
-                                    <p className="text-sm font-semibold">
-                                        Please describe the discrepancies. TL and TE will be notified.
-                                    </p>
+                                    <p className="text-sm font-semibold">TL and TE will be notified of these discrepancies.</p>
                                 </div>
                             </div>
                         )}
@@ -159,71 +183,110 @@ export function Page6Profitability({
                         </CardTitle>
                         <CardDescription>
                             {costingSheetBudget
-                                ? `Validated with Pricing Module: ₹${parseFloat(
-                                    costingSheetBudget
-                                ).toLocaleString()}`
+                                ? `Validated with Pricing Module: ₹${parseFloat(costingSheetBudget).toLocaleString()}`
                                 : "Enter the budget breakdown manually."}
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="p-6 space-y-8">
                         <div className="max-w-md">
-                            <FieldWrapper control={form.control} name="budgetPreGst" label="Total Value (Pre-GST)">
-                                {(field) => (
-                                    <Input
-                                        {...field}
-                                        placeholder="0.00"
-                                        type="number"
-                                        step="0.01"
-                                        className="text-xl font-bold h-12"
-                                    />
+                            <FormField
+                                control={form.control}
+                                name="budgetPreGst"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Total Value (Pre-GST)</FormLabel>
+                                        <FormControl>
+                                            <Input {...field} placeholder="0.00" type="number" step="0.01" className="text-xl font-bold h-12" />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
                                 )}
-                            </FieldWrapper>
+                            />
                         </div>
 
                         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                            <FieldWrapper control={form.control} name="budgetSupply" label="Supply Component">
-                                {(field) => (
-                                    <Input {...field} placeholder="0.00" type="number" step="0.01" />
+                            <FormField
+                                control={form.control}
+                                name="budgetSupply"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Supply Component</FormLabel>
+                                        <FormControl>
+                                            <Input {...field} placeholder="0.00" type="number" step="0.01" />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
                                 )}
-                            </FieldWrapper>
+                            />
 
-                            <FieldWrapper control={form.control} name="budgetService" label="Service Component">
-                                {(field) => (
-                                    <Input {...field} placeholder="0.00" type="number" step="0.01" />
+                            <FormField
+                                control={form.control}
+                                name="budgetService"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Service Component</FormLabel>
+                                        <FormControl>
+                                            <Input {...field} placeholder="0.00" type="number" step="0.01" />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
                                 )}
-                            </FieldWrapper>
+                            />
 
-                            <FieldWrapper control={form.control} name="budgetFreight" label="Freight/Logistics">
-                                {(field) => (
-                                    <Input {...field} placeholder="0.00" type="number" step="0.01" />
+                            <FormField
+                                control={form.control}
+                                name="budgetFreight"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Freight/Logistics</FormLabel>
+                                        <FormControl>
+                                            <Input {...field} placeholder="0.00" type="number" step="0.01" />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
                                 )}
-                            </FieldWrapper>
+                            />
 
-                            <FieldWrapper control={form.control} name="budgetAdmin" label="Admin/Misc.">
-                                {(field) => (
-                                    <Input {...field} placeholder="0.00" type="number" step="0.01" />
+                            <FormField
+                                control={form.control}
+                                name="budgetAdmin"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Admin/Misc.</FormLabel>
+                                        <FormControl>
+                                            <Input {...field} placeholder="0.00" type="number" step="0.01" />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
                                 )}
-                            </FieldWrapper>
+                            />
 
-                            <FieldWrapper control={form.control} name="budgetBuybackSale" label="Buyback Adjustment">
-                                {(field) => (
-                                    <Input {...field} placeholder="0.00" type="number" step="0.01" />
+                            <FormField
+                                control={form.control}
+                                name="budgetBuybackSale"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Buyback Adjustment</FormLabel>
+                                        <FormControl>
+                                            <Input {...field} placeholder="0.00" type="number" step="0.01" />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
                                 )}
-                            </FieldWrapper>
+                            />
                         </div>
 
                         <div className="p-6 bg-muted/50 rounded-2xl border border-dashed flex flex-col md:flex-row justify-between items-center gap-4">
                             <div className="space-y-1">
-                                <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Calculated Reconciliation</span>
+                                <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                                    Calculated Reconciliation
+                                </span>
                                 <p className="text-xs text-muted-foreground">
                                     (Supply + Service + Freight + Admin - Buyback Sale)
                                 </p>
                             </div>
                             <div className="text-right">
-                                <span
-                                    className={`text-3xl font-black ${totalBudget < 0 ? "text-destructive" : "text-primary"
-                                        }`}
-                                >
+                                <span className={`text-3xl font-black ${totalBudget < 0 ? "text-destructive" : "text-primary"}`}>
                                     ₹{totalBudget.toLocaleString()}
                                 </span>
                             </div>
@@ -231,12 +294,12 @@ export function Page6Profitability({
                     </CardContent>
                 </Card>
 
-                {/* Navigation */}
                 <WizardNavigation
                     currentPage={6}
-                    totalPages={7}
+                    totalPages={WIZARD_CONFIG.TOTAL_PAGES}
                     canSkip={true}
                     isSubmitting={isLoading}
+                    isSaving={isSaving || isAutoSaving}
                     onBack={onBack}
                     onSubmit={() => form.handleSubmit(handleFormSubmit)()}
                     onSkip={onSkip}

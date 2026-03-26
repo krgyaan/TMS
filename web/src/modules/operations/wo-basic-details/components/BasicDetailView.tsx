@@ -128,19 +128,19 @@ export function BasicDetailView({
         );
     }
 
-    const hasOeAssignments = data.oeFirst || data.oeSiteVisit || data.oeDocsPrep;
-    const hasTmsDocuments = data.tmsDocuments && Object.keys(data.tmsDocuments).length > 0;
+    const hasOeAssignments = data?.oeFirst || data?.oeSiteVisit || data?.oeDocsPrep;
+    const hasTmsDocuments = data?.tmsDocuments && Object.keys(data?.tmsDocuments).length > 0;
     const hasContacts = contacts && contacts.length > 0;
-    const hasWorkflowPauseInfo = data.isWorkflowPaused || data.workflowPausedAt || data.workflowResumedAt;
+    const hasWorkflowPauseInfo = data?.isWorkflowPaused || data?.workflowPausedAt || data?.workflowResumedAt;
 
-    const grossMarginValue = data.grossMargin ? parseFloat(String(data.grossMargin)) : null;
-    const woDraftFiles = parseWoDraft(data.woDraft);
+    const grossMarginValue = data?.grossMargin ? parseFloat(String(data?.grossMargin)) : null;
+    const woDraftFiles = parseWoDraft(data?.woDraft);
 
     // Calculate TMS documents completion stats
     const tmsDocsComplete = hasTmsDocuments
-        ? Object.values(data.tmsDocuments!).filter(Boolean).length
+        ? Object.values(data?.tmsDocuments!).filter(Boolean).length
         : 0;
-    const tmsDocsTotal = hasTmsDocuments ? Object.keys(data.tmsDocuments!).length : TMS_DOC_LIST.length;
+    const tmsDocsTotal = hasTmsDocuments ? Object.keys(data?.tmsDocuments!).length : TMS_DOC_LIST.length;
 
     return (
         <Card className={className}>
@@ -158,21 +158,21 @@ export function BasicDetailView({
                             Workflow Progress
                         </span>
                         <div className="flex items-center gap-2">
-                            {data.isWorkflowPaused && (
+                            {hasWorkflowPauseInfo && (
                                 <Badge variant="secondary" className="gap-1">
                                     <Pause className="h-3 w-3" />
                                     Paused
                                 </Badge>
                             )}
-                            <Badge variant={getStageVariant(data.currentStage) as any}>
-                                {STAGES.find((s) => s.key === data.currentStage)?.label || 'Not Started'}
+                            <Badge variant={getStageVariant(data?.currentStage) as any}>
+                                {STAGES.find((s) => s.key === data?.currentStage)?.label || 'Not Started'}
                             </Badge>
                         </div>
                     </div>
-                    <Progress value={getStageProgress(data.currentStage)} className="h-2" />
+                    <Progress value={getStageProgress(data?.currentStage)} className="h-2" />
                     <div className="flex justify-between text-xs text-muted-foreground">
                         {STAGES.map((stage, index) => {
-                            const currentIndex = getStageIndex(data.currentStage);
+                            const currentIndex = getStageIndex(data?.currentStage);
                             const isCompleted = index < currentIndex;
                             const isCurrent = index === currentIndex;
                             return (
@@ -404,7 +404,7 @@ export function BasicDetailView({
                                 <TableRow className="bg-muted/50">
                                     <TableCell colSpan={4} className="font-semibold text-sm">
                                         <div className="flex items-center gap-2">
-                                            {data.isWorkflowPaused ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                                            {hasWorkflowPauseInfo ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
                                             Workflow Status
                                         </div>
                                     </TableCell>
@@ -414,7 +414,7 @@ export function BasicDetailView({
                                         Status
                                     </TableCell>
                                     <TableCell>
-                                        {data.isWorkflowPaused ? (
+                                        {hasWorkflowPauseInfo ? (
                                             <Badge variant="secondary" className="gap-1">
                                                 <Pause className="h-3 w-3" />
                                                 Paused (PO Amendment)
