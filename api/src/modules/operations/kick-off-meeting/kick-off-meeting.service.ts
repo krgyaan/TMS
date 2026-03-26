@@ -8,7 +8,7 @@ import { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import { users } from '@/db/schemas';
-import { woBasicDetails, woDetails } from '@/db/schemas/operations';
+import { woAcceptance, woBasicDetails, woDetails } from '@/db/schemas/operations';
 
 @Injectable()
 export class KickOffMeetingService {
@@ -20,7 +20,9 @@ export class KickOffMeetingService {
         const offset = (page - 1) * limit;
         const activeTab = tab ?? 'not_scheduled';
 
-        const conditions: any[] = [];
+        const conditions: any[] = [
+            eq(woAcceptance.status, 'completed')
+        ];
         // Tab filter
         if (activeTab === 'not_scheduled') {
             conditions.push(isNull(sql`latest_kickoff.id`));
@@ -110,6 +112,7 @@ export class KickOffMeetingService {
             .leftJoin(woBasicDetails, eq(woBasicDetails.id, woDetails.woBasicDetailId))
             .leftJoin(users, eq(users.id, woBasicDetails.oeFirst))
             .leftJoin(latestKickoff, eq(latestKickoff.woDetailId, woDetails.id))
+            .leftJoin(woAcceptance, eq(woAcceptance.woDetailId, woDetails.id))
             .where(whereClause);
 
         const total = Number(countResult?.count || 0);
@@ -136,6 +139,7 @@ export class KickOffMeetingService {
             .leftJoin(woBasicDetails, eq(woBasicDetails.id, woDetails.woBasicDetailId))
             .leftJoin(users, eq(users.id, woBasicDetails.oeFirst))
             .leftJoin(latestKickoff, eq(latestKickoff.woDetailId, woDetails.id))
+            .leftJoin(woAcceptance, eq(woAcceptance.woDetailId, woDetails.id))
             .where(whereClause)
             .orderBy(orderByClause)
             .limit(limit)
@@ -185,7 +189,7 @@ export class KickOffMeetingService {
             )
             .as('latest_kickoff');
 
-        const baseConditions = [...roleFilterConditions];
+        const baseConditions = [...roleFilterConditions, eq(woAcceptance.status, 'completed')];
 
         // Count not_scheduled: kickoff IS NULL
         const notScheduledConditions = [...baseConditions, isNull(sql`latest_kickoff.id`)];
@@ -200,6 +204,7 @@ export class KickOffMeetingService {
                 .leftJoin(woBasicDetails, eq(woBasicDetails.id, woDetails.woBasicDetailId))
                 .leftJoin(users, eq(users.id, woBasicDetails.oeFirst))
                 .leftJoin(latestKickoff, eq(latestKickoff.woDetailId, woDetails.id))
+                .leftJoin(woAcceptance, eq(woAcceptance.woDetailId, woDetails.id))
                 .where(notScheduledConditions.length ? and(...notScheduledConditions) : undefined)
                 .then(r => Number(r[0]?.count || 0)),
             this.db
@@ -208,6 +213,7 @@ export class KickOffMeetingService {
                 .leftJoin(woBasicDetails, eq(woBasicDetails.id, woDetails.woBasicDetailId))
                 .leftJoin(users, eq(users.id, woBasicDetails.oeFirst))
                 .leftJoin(latestKickoff, eq(latestKickoff.woDetailId, woDetails.id))
+                .leftJoin(woAcceptance, eq(woAcceptance.woDetailId, woDetails.id))
                 .where(scheduledConditions.length ? and(...scheduledConditions) : undefined)
                 .then(r => Number(r[0]?.count || 0)),
         ]);

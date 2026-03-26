@@ -51,10 +51,6 @@ type PageData =
 export class WoDetailsService {
   constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
 
-  // ============================================
-  // MAPPING FUNCTIONS
-  // ============================================
-
   private mapRowToResponse(row: WoDetailRow) {
     return {
       id: row.id,
@@ -173,10 +169,7 @@ export class WoDetailsService {
     return conditions;
   }
 
-  // ============================================
   // CRUD OPERATIONS
-  // ============================================
-
   async findAll(filters?: WoDetailsQueryDto & { user?: ValidatedUser }) {
     const page = filters?.page ?? 1;
     const limit = Math.min(Math.max(filters?.limit ?? 50, 1), 100);
@@ -186,7 +179,9 @@ export class WoDetailsService {
     const search = filters?.search?.trim();
 
     const orderFn = sortOrder === 'desc' ? desc : asc;
-    const conditions: any[] = [];
+    const conditions: any[] = [
+        eq(woDetails.status, 'completed')
+    ];
 
     if (filters?.user) {
       conditions.push(
@@ -612,11 +607,7 @@ export class WoDetailsService {
 
     await this.db.delete(woDetails).where(eq(woDetails.id, id));
   }
-
-  // ============================================
   // WIZARD OPERATIONS
-  // ============================================
-
   async initializeWizard(
     woBasicDetailId: number,
     userId?: number,
@@ -871,11 +862,7 @@ export class WoDetailsService {
 
     return blockers;
   }
-
-  // ============================================
   // PAGE SAVE/SUBMIT OPERATIONS
-  // ============================================
-
   async savePageDraft(
     id: number,
     pageNum: number,
@@ -1112,11 +1099,7 @@ export class WoDetailsService {
       message: 'WO Details submitted for TL review',
     };
   }
-
-  // ============================================
   // GET PAGE DATA
-  // ============================================
-
   async getPageData(id: number, pageNum: number) {
     const detail = await this.findByIdWithRelations(id);
 
@@ -1266,11 +1249,7 @@ export class WoDetailsService {
         throw new BadRequestException('Invalid page number');
     }
   }
-
-  // ============================================
   // IMPORT OPERATIONS
-  // ============================================
-
   async importTenderContacts(
     woBasicDetailId: number,
     woDetailId: number,
@@ -1297,11 +1276,7 @@ export class WoDetailsService {
       importedCount: contacts.length,
     };
   }
-
-  // ============================================
   // PRIVATE HELPER METHODS
-  // ============================================
-
   private mapPageDataToUpdate(
     pageNum: number,
     data: any,
@@ -1637,13 +1612,11 @@ export class WoDetailsService {
     const total = supply + service + freight + admin - buyback;
     return total.toFixed(2);
   }
-
-  // ============================================
   // DASHBOARD
-  // ============================================
-
   async getDashboardSummary(user: ValidatedUser, teamId?: number) {
-    const conditions: any[] = [];
+    const conditions: any[] = [
+        eq(woDetails.status, 'completed')
+    ];
     if (user) {
       conditions.push(...this.getVisibilityConditions(user, teamId));
     }
