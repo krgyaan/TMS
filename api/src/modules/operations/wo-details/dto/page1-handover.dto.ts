@@ -1,10 +1,6 @@
 import { z } from "zod";
 import { TenderDocumentsChecklistSchema, PositiveIntSchema } from "./wo-details.dto";
-
-// ============================================
 // PAGE 1: PROJECT HANDOVER
-// ============================================
-
 /**
  * Department Enum
  */

@@ -1,26 +1,48 @@
 import { z } from 'zod';
 
+// COMMON SCHEMAS
+
 export const DecimalSchema = z
   .string()
-  .regex(/^\d+(\.\d{1,2})?$/, "Invalid decimal format")
+  .regex(/^\d+(\.\d{1,2})?$/, 'Invalid decimal format')
   .or(z.number().transform(String));
 
 export const PercentageSchema = z
   .string()
-  .regex(/^(100(\.00?)?|\d{1,2}(\.\d{1,2})?)$/, "Invalid percentage (0-100)")
+  .regex(/^(100(\.00?)?|\d{1,2}(\.\d{1,2})?)$/, 'Invalid percentage (0-100)')
   .or(z.number().min(0).max(100).transform(String));
 
 export const PositiveIntSchema = z.number().int().positive();
 
+// Helper for boolean transformation (handles both boolean and string)
+const BooleanSchema = z
+  .union([z.boolean(), z.enum(['true', 'false'])])
+  .transform((val) => (typeof val === 'boolean' ? val : val === 'true'));
+
+const OptionalBooleanSchema = BooleanSchema.optional();
 
 // ENUMS
+
 export const WoDetailsStatusEnum = z.enum([
-  'draft', 'in_progress', 'completed', 'submitted_for_review'
+  'draft',
+  'in_progress',
+  'completed',
+  'submitted_for_review',
 ]);
 
 export const WoAcceptanceStatusEnum = z.enum([
-  'pending_review', 'in_review', 'queries_pending', 'awaiting_amendment', 'pending_signatures', 'pending_courier', 'completed'
+  'pending_review',
+  'in_review',
+  'queries_pending',
+  'awaiting_amendment',
+  'pending_signatures',
+  'pending_courier',
+  'completed',
 ]);
+
+export type WoDetailsStatus = z.infer<typeof WoDetailsStatusEnum>;
+
+// RESPONSE SCHEMAS
 
 export const WoDetailsListResponseSchema = z.object({
   id: z.number().int().positive(),
@@ -38,23 +60,26 @@ export const WoDetailsListResponseSchema = z.object({
   woAcceptanceStatus: WoAcceptanceStatusEnum.nullable(),
 });
 
-export type WoDetailsListResponseDto = z.infer<typeof WoDetailsListResponseSchema>;
+export type WoDetailsListResponseDto = z.infer<
+  typeof WoDetailsListResponseSchema
+>;
 
-export type WoDetailsStatus = z.infer<typeof WoDetailsStatusEnum>;
+// COMMON DATA SCHEMAS
 
-// COMMON SCHEMAS
 export const TenderDocumentsChecklistSchema = z.object({
-  completeTenderDocuments: z.boolean().default(false),
-  tenderInfo: z.boolean().default(false),
-  emdInformation: z.boolean().default(false),
-  physicalDocumentsSubmission: z.boolean().default(false),
-  rfqAndQuotation: z.boolean().default(false),
-  documentChecklist: z.boolean().default(false),
-  costingSheet: z.boolean().default(false),
-  result: z.boolean().default(false),
+  completeTenderDocuments: BooleanSchema.default(false),
+  tenderInfo: BooleanSchema.default(false),
+  emdInformation: BooleanSchema.default(false),
+  physicalDocumentsSubmission: BooleanSchema.default(false),
+  rfqAndQuotation: BooleanSchema.default(false),
+  documentChecklist: BooleanSchema.default(false),
+  costingSheet: BooleanSchema.default(false),
+  result: BooleanSchema.default(false),
 });
 
-export type TenderDocumentsChecklist = z.infer<typeof TenderDocumentsChecklistSchema>;
+export type TenderDocumentsChecklist = z.infer<
+  typeof TenderDocumentsChecklistSchema
+>;
 
 export const SiteVisitPersonSchema = z.object({
   name: z.string().max(255),
@@ -64,47 +89,53 @@ export const SiteVisitPersonSchema = z.object({
 
 export type SiteVisitPerson = z.infer<typeof SiteVisitPersonSchema>;
 
-// CREATE
+// CREATE / UPDATE
+
 export const CreateWoDetailSchema = z.object({
   woBasicDetailId: z.number().int().positive(),
 });
 
 export type CreateWoDetailDto = z.infer<typeof CreateWoDetailSchema>;
 
-// UPDATE (Full)
 export const UpdateWoDetailSchema = z.object({
-  // Page 1: Project Handover
+  // Page 1
   tenderDocumentsChecklist: TenderDocumentsChecklistSchema.optional(),
 
-  // Page 2: Compliance Obligations
-  ldApplicable: z.boolean().optional(),
+  // Page 2
+  ldApplicable: OptionalBooleanSchema,
   maxLd: PercentageSchema.nullable().optional(),
   ldStartDate: z.string().date().nullable().optional(),
   maxLdDate: z.string().date().nullable().optional(),
-  isPbgApplicable: z.boolean().optional(),
+  isPbgApplicable: OptionalBooleanSchema,
   filledBgFormat: z.string().max(255).nullable().optional(),
   pbgBgId: z.number().int().positive().nullable().optional(),
-  isContractAgreement: z.boolean().optional(),
+  isContractAgreement: OptionalBooleanSchema,
   contractAgreementFormat: z.string().max(255).nullable().optional(),
-  detailedPoApplicable: z.boolean().optional(),
+  detailedPoApplicable: OptionalBooleanSchema,
   detailedPoFollowupId: z.number().int().positive().nullable().optional(),
 
-  // Page 3: SWOT Analysis
+  // Page 3
   swotStrengths: z.string().nullable().optional(),
   swotWeaknesses: z.string().nullable().optional(),
   swotOpportunities: z.string().nullable().optional(),
   swotThreats: z.string().nullable().optional(),
 
-  // Page 5: Project Execution
-  siteVisitNeeded: z.boolean().optional(),
+  // Page 5
+  siteVisitNeeded: OptionalBooleanSchema,
   siteVisitPerson: SiteVisitPersonSchema.nullable().optional(),
   documentsFromTendering: z.array(z.string()).nullable().optional(),
   documentsNeeded: z.array(z.string()).nullable().optional(),
   documentsInHouse: z.array(z.string()).nullable().optional(),
 
-  // Page 6: Profitability
-  costingSheetLink: z.string().url().max(500).nullable().optional().or(z.literal('')),
-  hasDiscrepancies: z.boolean().optional(),
+  // Page 6
+  costingSheetLink: z
+    .string()
+    .url()
+    .max(500)
+    .nullable()
+    .optional()
+    .or(z.literal('')),
+  hasDiscrepancies: OptionalBooleanSchema,
   discrepancyComments: z.string().nullable().optional(),
   budgetPreGst: DecimalSchema.nullable().optional(),
   budgetSupply: DecimalSchema.nullable().optional(),
@@ -113,10 +144,10 @@ export const UpdateWoDetailSchema = z.object({
   budgetAdmin: DecimalSchema.nullable().optional(),
   budgetBuybackSale: DecimalSchema.nullable().optional(),
 
-  // Page 7: WO Acceptance (OE Step)
-  oeWoAmendmentNeeded: z.boolean().optional(),
-  oeSignaturePrepared: z.boolean().optional(),
-  courierRequestPrepared: z.boolean().optional(),
+  // Page 7
+  oeWoAmendmentNeeded: OptionalBooleanSchema,
+  oeSignaturePrepared: OptionalBooleanSchema,
+  courierRequestPrepared: OptionalBooleanSchema,
 
   // Wizard Progress
   currentPage: z.number().int().min(1).max(7).optional(),
@@ -125,12 +156,23 @@ export const UpdateWoDetailSchema = z.object({
 
 export type UpdateWoDetailDto = z.infer<typeof UpdateWoDetailSchema>;
 
-// QUERY/FILTERS
+// QUERY / FILTERS
+
 export const WoDetailsQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1).optional(),
   limit: z.coerce.number().int().positive().max(100).default(50).optional(),
   sortBy: z
-    .enum(['createdAt', 'updatedAt', 'currentPage', 'status', 'woNumber', 'woDate', 'projectName', 'woValuePreGst', 'woValueGstAmt'])
+    .enum([
+      'createdAt',
+      'updatedAt',
+      'currentPage',
+      'status',
+      'woNumber',
+      'woDate',
+      'projectName',
+      'woValuePreGst',
+      'woValueGstAmt',
+    ])
     .default('createdAt')
     .optional(),
   sortOrder: z.enum(['asc', 'desc']).default('desc').optional(),
@@ -162,15 +204,20 @@ export const WoDetailsQuerySchema = z.object({
   createdAtFrom: z.string().datetime().optional(),
   createdAtTo: z.string().datetime().optional(),
   teamId: z.coerce.number().int().positive().optional(),
-  woAcceptance: z.enum(['true', 'false']).transform((val) => val === 'true').optional(),
-  woAmendmentNeeded: z.enum(['true', 'false']).transform((val) => val === 'true').optional(),
+  woAcceptance: z
+    .enum(['true', 'false'])
+    .transform((val) => val === 'true')
+    .optional(),
+  woAmendmentNeeded: z
+    .enum(['true', 'false'])
+    .transform((val) => val === 'true')
+    .optional(),
 });
 
 export type WoDetailsQueryDto = z.infer<typeof WoDetailsQuerySchema>;
 
-// PAGE-SPECIFIC SCHEMAS (Save/Submit)
+// PAGE 1: PROJECT HANDOVER
 
-// Page 1
 export const SavePage1Schema = z.object({
   tenderDocumentsChecklist: TenderDocumentsChecklistSchema.optional(),
 });
@@ -182,33 +229,34 @@ export const SubmitPage1Schema = z.object({
 export type SavePage1Dto = z.infer<typeof SavePage1Schema>;
 export type SubmitPage1Dto = z.infer<typeof SubmitPage1Schema>;
 
-// Page 2
+// PAGE 2: COMPLIANCE
+
 export const SavePage2Schema = z.object({
-  ldApplicable: z.boolean().optional(),
+  ldApplicable: OptionalBooleanSchema,
   maxLd: PercentageSchema.nullable().optional(),
   ldStartDate: z.string().date().nullable().optional(),
   maxLdDate: z.string().date().nullable().optional(),
-  isPbgApplicable: z.boolean().optional(),
+  isPbgApplicable: OptionalBooleanSchema,
   filledBgFormat: z.string().max(255).nullable().optional(),
   pbgBgId: z.number().int().positive().nullable().optional(),
-  isContractAgreement: z.boolean().optional(),
+  isContractAgreement: OptionalBooleanSchema,
   contractAgreementFormat: z.string().max(255).nullable().optional(),
-  detailedPoApplicable: z.boolean().optional(),
+  detailedPoApplicable: OptionalBooleanSchema,
   detailedPoFollowupId: z.number().int().positive().nullable().optional(),
 });
 
 export const SubmitPage2Schema = z
   .object({
-    ldApplicable: z.boolean(),
+    ldApplicable: BooleanSchema,
     maxLd: PercentageSchema.nullable().optional(),
     ldStartDate: z.string().date().nullable().optional(),
     maxLdDate: z.string().date().nullable().optional(),
-    isPbgApplicable: z.boolean(),
+    isPbgApplicable: BooleanSchema,
     filledBgFormat: z.string().max(255).nullable().optional(),
     pbgBgId: z.number().int().positive().nullable().optional(),
-    isContractAgreement: z.boolean(),
+    isContractAgreement: BooleanSchema,
     contractAgreementFormat: z.string().max(255).nullable().optional(),
-    detailedPoApplicable: z.boolean(),
+    detailedPoApplicable: BooleanSchema,
     detailedPoFollowupId: z.number().int().positive().nullable().optional(),
   })
   .superRefine((data, ctx) => {
@@ -256,7 +304,8 @@ export const SubmitPage2Schema = z
 export type SavePage2Dto = z.infer<typeof SavePage2Schema>;
 export type SubmitPage2Dto = z.infer<typeof SubmitPage2Schema>;
 
-// Page 3
+// PAGE 3: SWOT
+
 export const SavePage3Schema = z.object({
   swotStrengths: z.string().nullable().optional(),
   swotWeaknesses: z.string().nullable().optional(),
@@ -269,10 +318,11 @@ export const SubmitPage3Schema = SavePage3Schema;
 export type SavePage3Dto = z.infer<typeof SavePage3Schema>;
 export type SubmitPage3Dto = z.infer<typeof SubmitPage3Schema>;
 
-// Page 4 - BOQ Items
+// PAGE 4: BILLING BOQ
+
 export const BOQItemSchema = z.object({
   id: z.number().int().positive().optional(),
-  srNo: z.number().int().positive(),
+  srNo: z.coerce.number().int().positive(),
   itemDescription: z.string().min(1, 'Item description is required'),
   quantity: DecimalSchema,
   rate: DecimalSchema,
@@ -289,7 +339,10 @@ export const AddressSchema = z.object({
   address: z.string().min(1, 'Address is required'),
   gst: z
     .string()
-    .regex(/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/, 'Invalid GST')
+    .regex(
+      /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/,
+      'Invalid GST',
+    )
     .nullable()
     .optional()
     .or(z.literal('')),
@@ -303,10 +356,16 @@ export const SavePage4Schema = z.object({
 });
 
 export const SubmitPage4Schema = z.object({
-  billingBoq: z.array(BOQItemSchema).min(1, 'At least one billing BOQ item is required'),
+  billingBoq: z
+    .array(BOQItemSchema)
+    .min(1, 'At least one billing BOQ item is required'),
   buybackBoq: z.array(BOQItemSchema).optional().default([]),
-  billingAddresses: z.array(AddressSchema).min(1, 'At least one billing address is required'),
-  shippingAddresses: z.array(AddressSchema).min(1, 'At least one shipping address is required'),
+  billingAddresses: z
+    .array(AddressSchema)
+    .min(1, 'At least one billing address is required'),
+  shippingAddresses: z
+    .array(AddressSchema)
+    .min(1, 'At least one shipping address is required'),
 });
 
 export type SavePage4Dto = z.infer<typeof SavePage4Schema>;
@@ -314,9 +373,10 @@ export type SubmitPage4Dto = z.infer<typeof SubmitPage4Schema>;
 export type BOQItemDto = z.infer<typeof BOQItemSchema>;
 export type AddressDto = z.infer<typeof AddressSchema>;
 
-// Page 5
+// PAGE 5: EXECUTION
+
 export const SavePage5Schema = z.object({
-  siteVisitNeeded: z.boolean().optional(),
+  siteVisitNeeded: OptionalBooleanSchema,
   siteVisitPerson: SiteVisitPersonSchema.nullable().optional(),
   documentsFromTendering: z.array(z.string()).nullable().optional(),
   documentsNeeded: z.array(z.string()).nullable().optional(),
@@ -325,7 +385,7 @@ export const SavePage5Schema = z.object({
 
 export const SubmitPage5Schema = z
   .object({
-    siteVisitNeeded: z.boolean(),
+    siteVisitNeeded: BooleanSchema,
     siteVisitPerson: SiteVisitPersonSchema.nullable().optional(),
     documentsFromTendering: z.array(z.string()).nullable().optional(),
     documentsNeeded: z.array(z.string()).nullable().optional(),
@@ -344,10 +404,17 @@ export const SubmitPage5Schema = z
 export type SavePage5Dto = z.infer<typeof SavePage5Schema>;
 export type SubmitPage5Dto = z.infer<typeof SubmitPage5Schema>;
 
-// Page 6
+// PAGE 6: PROFITABILITY
+
 export const SavePage6Schema = z.object({
-  costingSheetLink: z.string().url().max(500).nullable().optional().or(z.literal('')),
-  hasDiscrepancies: z.boolean().optional(),
+  costingSheetLink: z
+    .string()
+    .url()
+    .max(500)
+    .nullable()
+    .optional()
+    .or(z.literal('')),
+  hasDiscrepancies: OptionalBooleanSchema,
   discrepancyComments: z.string().nullable().optional(),
   budgetPreGst: DecimalSchema.nullable().optional(),
   budgetSupply: DecimalSchema.nullable().optional(),
@@ -359,8 +426,14 @@ export const SavePage6Schema = z.object({
 
 export const SubmitPage6Schema = z
   .object({
-    costingSheetLink: z.string().url().max(500).nullable().optional().or(z.literal('')),
-    hasDiscrepancies: z.boolean(),
+    costingSheetLink: z
+      .string()
+      .url()
+      .max(500)
+      .nullable()
+      .optional()
+      .or(z.literal('')),
+    hasDiscrepancies: BooleanSchema,
     discrepancyComments: z.string().nullable().optional(),
     budgetPreGst: DecimalSchema,
     budgetSupply: DecimalSchema.nullable().optional(),
@@ -382,18 +455,19 @@ export const SubmitPage6Schema = z
 export type SavePage6Dto = z.infer<typeof SavePage6Schema>;
 export type SubmitPage6Dto = z.infer<typeof SubmitPage6Schema>;
 
-// Page 7
+// PAGE 7: ACCEPTANCE
+
 export const SavePage7Schema = z.object({
-  oeWoAmendmentNeeded: z.boolean().optional(),
-  oeSignaturePrepared: z.boolean().optional(),
-  courierRequestPrepared: z.boolean().optional(),
+  oeWoAmendmentNeeded: OptionalBooleanSchema,
+  oeSignaturePrepared: OptionalBooleanSchema,
+  courierRequestPrepared: OptionalBooleanSchema,
 });
 
 export const SubmitPage7Schema = z
   .object({
-    oeWoAmendmentNeeded: z.boolean(),
-    oeSignaturePrepared: z.boolean(),
-    courierRequestPrepared: z.boolean(),
+    oeWoAmendmentNeeded: BooleanSchema,
+    oeSignaturePrepared: BooleanSchema,
+    courierRequestPrepared: BooleanSchema,
   })
   .superRefine((data, ctx) => {
     if (data.oeWoAmendmentNeeded) {
@@ -434,14 +508,26 @@ export const SubmitPage7Schema = z
 export type SavePage7Dto = z.infer<typeof SavePage7Schema>;
 export type SubmitPage7Dto = z.infer<typeof SubmitPage7Schema>;
 
-// Skip Page
+// SKIP PAGE
+
 export const SkipPageSchema = z.object({
   reason: z.string().max(500).optional(),
 });
 
 export type SkipPageDto = z.infer<typeof SkipPageSchema>;
 
-// Page Schema Maps
+// IMPORT TENDER CONTACTS
+
+export const ImportTenderContactsSchema = z.object({
+  woBasicDetailId: z.number().int().positive(),
+});
+
+export type ImportTenderContactsDto = z.infer<
+  typeof ImportTenderContactsSchema
+>;
+
+// PAGE SCHEMA MAPS
+
 export const PageSaveSchemas = {
   1: SavePage1Schema,
   2: SavePage2Schema,
@@ -461,3 +547,36 @@ export const PageSubmitSchemas = {
   6: SubmitPage6Schema,
   7: SubmitPage7Schema,
 } as const;
+
+// RESPONSE TYPES
+
+export interface WizardInitResponse {
+  id: number;
+  woBasicDetailId: number;
+  status: string;
+  currentPage: number;
+  completedPages: number[];
+  skippedPages: number[];
+  createdAt: string;
+  isExisting: boolean;
+}
+
+export interface WizardValidationResult {
+  isValid: boolean;
+  missingRequiredPages: number[];
+  incompletePages: number[];
+  errors: Record<number, string[]>;
+}
+
+export interface ImportContactsResponse {
+  contacts: Array<{
+    id: number;
+    name: string;
+    designation: string;
+    phone: string;
+    email: string;
+    organization: string;
+    departments?: string;
+  }>;
+  importedCount: number;
+}

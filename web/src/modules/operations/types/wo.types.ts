@@ -1,7 +1,4 @@
-// ============================================
 // COMMON TYPES
-// ============================================
-
 export interface PaginationMeta {
   total: number;
   page: number;
@@ -15,11 +12,7 @@ export interface PaginatedResult<T> {
 }
 
 export type SortOrder = 'asc' | 'desc';
-
-// ============================================
 // ENUMS
-// ============================================
-
 export type WorkflowStage =
   | 'basic_details'
   | 'wo_details'
@@ -76,11 +69,7 @@ export type DocumentType =
 export type Department = 'EIC' | 'User' | 'C&P' | 'Finance';
 
 export type OeAssignmentType = 'first' | 'siteVisit' | 'docsPrep';
-
-// ============================================
 // WO BASIC DETAILS
-// ============================================
-
 export interface TmsDocuments {
   completeTenderDocuments?: boolean;
   tenderInfo?: boolean;
@@ -221,11 +210,7 @@ export interface WoBasicDetailsDashboardSummary {
   };
   generatedAt: string;
 }
-
-// ============================================
 // WO CONTACTS
-// ============================================
-
 export interface WoContact {
   id: number;
   woBasicDetailId: number;
@@ -279,11 +264,7 @@ export interface ContactsSummary {
   total: number;
   byDepartment: Record<Department, number>;
 }
-
-// ============================================
 // WO DETAILS (Wizard Pages 1-7)
-// ============================================
-
 export interface TenderDocumentsChecklist {
   completeTenderDocuments: boolean;
   tenderInfo: boolean;
@@ -507,11 +488,7 @@ export interface WizardStatus {
   woDetailId: number;
   woBasicDetailId: number;
 }
-
-// ============================================
 // WO BILLING BOQ
-// ============================================
-
 export interface WoBillingBoq {
   id: number;
   woDetailId: number;
@@ -546,11 +523,7 @@ export interface CreateBulkWoBillingBoqDto {
   woDetailId: number;
   items: Omit<CreateWoBillingBoqDto, 'woDetailId'>[];
 }
-
-// ============================================
 // WO BUYBACK BOQ
-// ============================================
-
 export interface WoBuybackBoq {
   id: number;
   woDetailId: number;
@@ -585,11 +558,7 @@ export interface CreateBulkWoBuybackBoqDto {
   woDetailId: number;
   items: Omit<CreateWoBuybackBoqDto, 'woDetailId'>[];
 }
-
-// ============================================
 // WO BILLING ADDRESSES
-// ============================================
-
 export type SrNos = number[] | 'all';
 
 export interface WoBillingAddress {
@@ -622,11 +591,7 @@ export interface CreateBulkWoBillingAddressDto {
   woDetailId: number;
   addresses: Omit<CreateWoBillingAddressDto, 'woDetailId'>[];
 }
-
-// ============================================
 // WO SHIPPING ADDRESSES
-// ============================================
-
 export interface WoShippingAddress {
   id: number;
   woDetailId: number;
@@ -657,11 +622,7 @@ export interface CreateBulkWoShippingAddressDto {
   woDetailId: number;
   addresses: Omit<CreateWoShippingAddressDto, 'woDetailId'>[];
 }
-
-// ============================================
 // WO ACCEPTANCE (TL Review)
-// ============================================
-
 export interface WoAcceptance {
   id: number;
   woDetailId: number;
@@ -766,11 +727,7 @@ export interface AcceptanceStatusResponse {
   };
   courierStatus: 'not_required' | 'pending' | 'sent';
 }
-
-// ============================================
 // WO AMENDMENTS
-// ============================================
-
 export interface WoAmendment {
   id: number;
   woDetailId: number;
@@ -849,11 +806,7 @@ export interface AmendmentsSummary {
   communicated: number;
   resolved: number;
 }
-
-// ============================================
 // WO QUERIES
-// ============================================
-
 export interface WoQuery {
   id: number;
   woDetailsId: number;
@@ -937,11 +890,7 @@ export interface QuerySlaStatus {
   slaComplianceRate: number;
   slaThresholdHours: number;
 }
-
-// ============================================
 // WO DOCUMENTS
-// ============================================
-
 export interface WoDocument {
   id: number;
   woDetailId: number | null;
@@ -1005,11 +954,7 @@ export interface DocumentsSummary {
     filePath: string;
   }>;
 }
-
-// ============================================
 // DASHBOARD & REPORTS
-// ============================================
-
 export interface WoDetailsDashboardSummary {
   summary: {
     pending: number;
@@ -1066,11 +1011,7 @@ export interface WoTimeline {
     isResponseOverdue: boolean;
   };
 }
-
-// ============================================
 // PAGE-SPECIFIC DATA TYPES (for Wizard)
-// ============================================
-
 export interface Page1Data {
   contacts: WoContact[];
   tenderDocumentsChecklist: TenderDocumentsChecklist | null;
@@ -1168,11 +1109,7 @@ export interface AcceptanceStatus {
     followupId: number | null;
     courierId: number | null;
 }
-
-// ============================================
 // KICK-OFF MEETING
-// ============================================
-
 export interface KickOffListDto {
   id: number;
   woDetailId: number;
@@ -1228,11 +1165,7 @@ export interface KickOffFilters {
   search?: string;
   teamId?: number;
 }
-
-// ============================================
 // CONTRACT AGREEMENT
-// ============================================
-
 export interface ContractAgreementListDto {
   id: number;
   woDetailId: number;
