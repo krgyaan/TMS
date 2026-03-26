@@ -10,15 +10,9 @@ import { CourierModule } from '@/modules/courier/courier.module';
 import { WoAmendmentsModule } from '../wo-amendments/wo-amendments.module';
 
 @Module({
-    imports: [
-        DatabaseModule,
-        EmailModule,
-        FollowUpModule,
-        CourierModule,
-        WoAmendmentsModule,
-    ],
+    imports: [DatabaseModule, EmailModule, FollowUpModule, CourierModule, WoAmendmentsModule],
     controllers: [WoDetailsController, WoAcceptanceController],
     providers: [WoDetailsService, WoAcceptanceService],
     exports: [WoDetailsService, WoAcceptanceService],
 })
-export class WoDetailsModule {}
+export class WoDetailsModule { }
