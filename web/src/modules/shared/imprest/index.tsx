@@ -52,7 +52,7 @@ const StatusToggle: React.FC<{
                     type="button"
                     onClick={e => {
                         e.stopPropagation();
-                        if (!active && !disabled) onClick();
+                        if (!disabled) onClick(); //  allows toggling in both directions
                     }}
                     disabled={disabled}
                     className={cn(
@@ -152,6 +152,31 @@ const ImprestEmployeeDashboard: React.FC = () => {
             </Card>
         );
     }
+
+    // Add these state variables near your other useState declarations
+    const [unapproveDialog, setUnapproveDialog] = useState<{
+        open: boolean;
+        label: string;
+        onConfirm: () => void;
+    }>({ open: false, label: "", onConfirm: () => {} });
+
+    // Helper to trigger any toggle — shows confirm dialog if currently active
+    const handleStatusToggle = (isActive: boolean, label: string, onToggle: () => void) => {
+        if (isActive) {
+            // Currently active → unapproving, so show confirmation
+            setUnapproveDialog({
+                open: true,
+                label,
+                onConfirm: () => {
+                    onToggle();
+                    setUnapproveDialog(d => ({ ...d, open: false }));
+                },
+            });
+        } else {
+            // Currently inactive → approving, no confirmation needed
+            onToggle();
+        }
+    };
 
     const numericUserId = isOwnPage ? user?.id : requestedUserId;
     console.log(numericUserId);
@@ -418,7 +443,7 @@ const ImprestEmployeeDashboard: React.FC = () => {
                                 active={row.approvalStatus === 1}
                                 label="Approved"
                                 icon={CheckCircle}
-                                onClick={() => approveMutation.mutate(row.id)}
+                                onClick={() => handleStatusToggle(row.approvalStatus === 1, "Approved", () => approveMutation.mutate(row.id))}
                                 disabled={!canMutateStatus || approveMutation.isPending}
                             />
 
@@ -426,7 +451,7 @@ const ImprestEmployeeDashboard: React.FC = () => {
                                 active={row.tallyStatus === 1}
                                 label="Tallied"
                                 icon={ListChecks}
-                                onClick={() => tallyMutation.mutate(row.id)}
+                                onClick={() => handleStatusToggle(row.tallyStatus === 1, "Tallied", () => tallyMutation.mutate(row.id))}
                                 disabled={!canMutateStatus || tallyMutation.isPending}
                             />
 
@@ -434,7 +459,7 @@ const ImprestEmployeeDashboard: React.FC = () => {
                                 active={row.proofStatus === 1}
                                 label="Proof Verified"
                                 icon={FileCheck}
-                                onClick={() => proofMutation.mutate(row.id)}
+                                onClick={() => handleStatusToggle(row.proofStatus === 1, "Proof Verified", () => proofMutation.mutate(row.id))}
                                 disabled={!canMutateStatus || proofMutation.isPending}
                             />
                         </div>
@@ -968,6 +993,26 @@ const ImprestEmployeeDashboard: React.FC = () => {
                             </Button>
                         </div>
                     )}
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={unapproveDialog.open} onOpenChange={open => setUnapproveDialog(d => ({ ...d, open }))}>
+                <DialogContent className="sm:max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>Remove {unapproveDialog.label}?</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to mark this record as <strong>not {unapproveDialog.label.toLowerCase()}</strong>?
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="flex justify-end gap-2 pt-2">
+                        <Button variant="outline" onClick={() => setUnapproveDialog(d => ({ ...d, open: false }))}>
+                            Cancel
+                        </Button>
+                        <Button variant="destructive" onClick={unapproveDialog.onConfirm}>
+                            Yes, Remove
+                        </Button>
+                    </div>
                 </DialogContent>
             </Dialog>
         </Card>

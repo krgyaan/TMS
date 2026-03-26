@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { FileSearch, Wrench, Headset, BarChart3, Banknote, Users, Gauge, Settings, Share2, LayoutDashboard } from "lucide-react";
+import { FileSearch, Wrench, Headset, BarChart3, Banknote, Users, Gauge, Settings, Share2, LayoutDashboard, Briefcase, Shield } from "lucide-react";
 
 import { NavMain } from "@/components/nav-main";
 import { NavUser } from "@/components/nav-user";
@@ -133,6 +133,19 @@ const navMain: NavGroup[] = [
         ],
     },
     {
+        title: "HRMS",
+        icon: Briefcase,
+        items: [{ title: "My Assets", url: paths.hrms.myAssets, permission: "hrms.view" }],
+    },
+    {
+        title: "HR Administration",
+        icon: Shield,
+        items: [
+            { title: "Asset Administration", url: "/hrms/assets", permission: "hrms.admin.view" },
+            { title: "Register Employee", url: paths.hrms.employeeRegistration, permission: "hrms.admin.view" },
+        ],
+    },
+    {
         title: "Settings",
         icon: Settings,
         items: [
@@ -189,12 +202,12 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
 
     const displayUser = currentUser ??
         storedUser ?? {
-        id: 0,
-        name: "Gyan",
-        email: "gyan@volkenergie.in",
-        username: null,
-        mobile: null,
-    };
+            id: 0,
+            name: "-",
+            email: "-",
+            username: null,
+            mobile: null,
+        };
 
     const filteredMenuItems = React.useMemo(() => filterMenu(currentUser, navMain), [currentUser]);
 

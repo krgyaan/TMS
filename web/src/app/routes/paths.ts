@@ -325,4 +325,13 @@ export const paths = {
         projectsEdit: (id: number | string) => `/document-dashboard/projects/${id}/edit`,
         projectsView: (id: number | string) => `/document-dashboard/projects/${id}`,
     },
+
+    // ==================== HRMS ====================
+    hrms: {
+        dashboard: "/hrms",
+        employeeRegistration: "/hrms/employees/register",
+        employeeProfile: (id: number | string) => `/hrms/employees/${id}`,
+        assetAssignment: "/hrms/assets/assign",
+        myAssets: "/hrms/assets/my",
+    },
 };

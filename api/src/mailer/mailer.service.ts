@@ -87,7 +87,11 @@ export class MailerService {
     async sendAsUser(payload: SendMailInput, connection: GoogleConnection) {
         const isSandbox = process.env.MAIL_MODE === "sandbox";
 
-        const finalTo = isSandbox ? [process.env.MAIL_SANDBOX_TO!] : payload.to;
+        const sandboxToEmails = process.env.MAIL_SANDBOX_TO 
+            ? process.env.MAIL_SANDBOX_TO.split(",").map(e => e.trim()) 
+            : payload.to;
+
+        const finalTo = isSandbox ? sandboxToEmails : payload.to;
         const finalCc = isSandbox ? [] : payload.cc;
         const finalBcc = isSandbox ? [] : payload.bcc;
 
@@ -208,25 +212,34 @@ export class MailerService {
 
             // ================= SANDBOX OVERRIDE =================
             if (isSandbox) {
+                const sandboxSenderIdStr = process.env.MAIL_SENDER_ID;
+                const sandboxSenderId = sandboxSenderIdStr ? parseInt(sandboxSenderIdStr) : NaN;
+
                 this.logger.warn("SANDBOX MODE ACTIVE — overriding sender and recipients", {
                     originalSenderUserId: connection.userId,
-                    sandboxSenderUserId: process.env.MAIL_SENDER_ID,
+                    sandboxSenderUserId: !isNaN(sandboxSenderId) ? sandboxSenderId : "Using original",
                     originalTo: meta.to,
                     sandboxTo: process.env.MAIL_SANDBOX_TO,
                 });
 
-                const sandboxConnection = await this.googleService.getSanitizedGoogleConnection(parseInt(process.env.MAIL_SENDER_ID!));
+                if (!isNaN(sandboxSenderId)) {
+                    const sandboxConnection = await this.googleService.getSanitizedGoogleConnection(sandboxSenderId);
 
-                if (!sandboxConnection) {
-                    this.logger.error("Sandbox Google connection missing for user " + process.env.MAIL_SENDER_ID);
-                    throw new Error("Sandbox Google connection not found");
+                    if (!sandboxConnection) {
+                        this.logger.error("Sandbox Google connection missing for user " + sandboxSenderId);
+                        throw new Error("Sandbox Google connection not found");
+                    }
+
+                    finalConnection = sandboxConnection;
                 }
 
-                finalConnection = sandboxConnection;
+                const sandboxToEmails = process.env.MAIL_SANDBOX_TO 
+                    ? process.env.MAIL_SANDBOX_TO.split(",").map(e => e.trim()) 
+                    : meta.to;
 
                 finalMeta = {
                     ...meta,
-                    to: [process.env.MAIL_SANDBOX_TO!],
+                    to: sandboxToEmails,
                     cc: [],
                     bcc: [],
                 };

@@ -43,6 +43,15 @@ export interface UserProfile {
     dateOfExit: string | null;
     timezone: string | null;
     locale: string | null;
+    middleName: string | null;
+    phone: string | null;
+    maritalStatus: string | null;
+    nationality: string | null;
+    aadharNumber: string | null;
+    panNumber: string | null;
+    currentAddress: any;
+    permanentAddress: any;
+    emergencyContact: any;
     createdAt: string | null;
     updatedAt: string | null;
 }
