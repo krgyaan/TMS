@@ -28,20 +28,27 @@ export class EmployeeImprestService {
     ) {}
 
     /* ----------------------------- CREATE ----------------------------- */
-    /* ----------------------------- CREATE ----------------------------- */
-    async createWithTransfer(data: CreateEmployeeImprestDto, files: Express.Multer.File[], senderUserId: number) {
+    async createWithTransfer(data: CreateEmployeeImprestDto, files: Express.Multer.File[]) {
         const isTransfer = Number(data.categoryId) === TRANSFER_CATEGORY_ID;
 
+        this.logger.debug("Logging the dto", {
+            dto: data,
+        });
+
+        if (!data.userId) {
+            throw new Error("No sender user found. Kindly login again");
+        }
+
         if (isTransfer) {
-            if (!data.teamId) {
+            if (!data.transferToId) {
                 throw new BadRequestException("Team member is required for transfer");
             }
 
             // Fetch sender name from DB — never trust client for this
-            const [sender] = await this.db.select({ name: users.name }).from(users).where(eq(users.id, senderUserId)).limit(1);
+            const [sender] = await this.db.select({ name: users.name }).from(users).where(eq(users.id, data.userId)).limit(1);
 
             // Fetch receiver name from DB — never trust client for this
-            const [receiver] = await this.db.select({ name: users.name }).from(users).where(eq(users.id, data.teamId)).limit(1);
+            const [receiver] = await this.db.select({ name: users.name }).from(users).where(eq(users.id, data.transferToId)).limit(1);
 
             if (!receiver) {
                 throw new BadRequestException("Selected team member not found");
@@ -54,7 +61,7 @@ export class EmployeeImprestService {
             return await this.db.transaction(async tx => {
                 // Record 1: Credit the receiver in employee_imprest_transactions
                 await tx.insert(employeeImprestTransactions).values({
-                    userId: data.teamId!,
+                    userId: data.transferToId!,
                     txnDate: new Date().toISOString().split("T")[0],
                     teamMemberName: receiverName,
                     amount: data.amount,
@@ -69,7 +76,7 @@ export class EmployeeImprestService {
                     .values({
                         userId: data.userId,
                         categoryId: data.categoryId,
-                        teamId: data.teamId,
+                        teamId: isTransfer ? Number(data.transferToId) : null,
                         partyName: null, // always null for cat 22
                         projectName: null, // always null for cat 22
                         amount: data.amount,
@@ -174,29 +181,35 @@ export class EmployeeImprestService {
                     userId: employeeImprests.userId,
 
                     categoryId: employeeImprests.categoryId,
-                    categoryName: imprestCategories.name, // ✅ THIS IS WHAT YOU WERE MISSING
+                    categoryName: imprestCategories.name,
 
                     teamId: employeeImprests.teamId,
+                    teamName: users.name, // ✅
+
+                    formattedCategory: sql<string>`
+                    CASE 
+                        WHEN ${employeeImprests.categoryId} = 22 
+                        THEN 'Transfer To Team Member - ' || ${users.name}
+                        ELSE ${imprestCategories.name}
+                    END
+                    `.as("formattedCategory"),
+
                     partyName: employeeImprests.partyName,
                     projectName: employeeImprests.projectName,
 
-                    ip: employeeImprests.ip,
                     amount: employeeImprests.amount,
-                    strtotime: employeeImprests.strtotime,
                     remark: employeeImprests.remark,
 
                     invoiceProof: employeeImprests.invoiceProof,
                     approvalStatus: employeeImprests.approvalStatus,
                     tallyStatus: employeeImprests.tallyStatus,
                     proofStatus: employeeImprests.proofStatus,
-                    status: employeeImprests.status,
 
-                    approvedDate: employeeImprests.approvedDate,
                     createdAt: employeeImprests.createdAt,
-                    updatedAt: employeeImprests.updatedAt,
                 })
                 .from(employeeImprests)
                 .leftJoin(imprestCategories, eq(imprestCategories.id, employeeImprests.categoryId))
+                .leftJoin(users, eq(users.id, employeeImprests.teamId)) // ✅ IMPORTANT
                 .where(eq(employeeImprests.userId, userId))
                 .orderBy(desc(employeeImprests.createdAt));
 
