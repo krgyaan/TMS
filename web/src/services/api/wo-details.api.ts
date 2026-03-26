@@ -70,7 +70,6 @@ class WoDetailsService extends BaseApiService {
     super('/wo-details');
   }
 
-
   // PRIVATE HELPERS
   private buildQueryString(filters?: WoDetailsFilters): string {
     if (!filters) return '';

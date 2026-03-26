@@ -15,6 +15,7 @@ import { Page6Profitability } from "./pages/Page6Profitability";
 import { Page7Acceptance } from "./pages/Page7Acceptance";
 
 import type { WizardState, WoDetailData } from "../helpers/woDetail.types";
+import { useInitializeWizard, useSubmitForReview, useSubmitPage, useWizardProgress, useWoDetailByBasicDetail } from "@/hooks/api/useWoDetails";
 
 interface WoDetailsWizardProps {
     mode: "create" | "edit";
@@ -32,8 +33,36 @@ export function WoDetailsWizard({
     initialPage = 1,
 }: WoDetailsWizardProps) {
     const navigate = useNavigate();
-    const [isLoading, setIsLoading] = useState(false);
+
+    // ADD CONSOLE LOGS
+    console.log('🔷 WoDetailsWizard mounted', {
+        mode,
+        woBasicDetailId,
+        existingWoDetailId,
+        initialPage,
+    });
+    // State
     const [woDetailId, setWoDetailId] = useState<number | null>(existingWoDetailId || null);
+    console.log('🔷 woDetailId state:', woDetailId);
+    // Queries
+    const { data: existingDetail, isLoading: isLoadingExisting } = useWoDetailByBasicDetail(
+        woBasicDetailId
+    );
+    console.log('🔷 existingDetail:', existingDetail);
+    const { data: wizardProgress } = useWizardProgress(woDetailId);
+    console.log('🔷 wizardProgress:', wizardProgress);
+    const [isLoading, setIsLoading] = useState(false);
+
+    // Mutations
+    const initializeWizard = useInitializeWizard();
+    const submitPage = useSubmitPage();
+    const submitForReview = useSubmitForReview();
+
+    console.log('🔷 Mutations:', {
+        initializeWizard: initializeWizard.isPending,
+        submitPage: submitPage.isPending,
+        submitForReview: submitForReview.isPending,
+    });
 
     const [wizardState, setWizardState] = useState<WizardState>({
         currentPage: initialPage,
@@ -46,16 +75,44 @@ export function WoDetailsWizard({
 
     // Initialize from existing data in edit mode
     useEffect(() => {
-        if (mode === "edit" && existingData) {
-            setWizardState((prev) => ({
-                ...prev,
-                currentPage: initialPage || existingData.currentPage || 1,
-                completedPages: existingData.completedPages || [],
-                skippedPages: existingData.skippedPages || [],
-                status: existingData.status || "draft",
-            }));
+        console.log('🔷 Initialize effect running', {
+            mode,
+            woDetailId,
+            isLoadingExisting,
+            existingDetail,
+        });
+
+        if (mode === 'create' && !woDetailId && !isLoadingExisting) {
+            if (existingDetail?.id) {
+                console.log('🔷 Using existing detail:', existingDetail.id);
+                setWoDetailId(existingDetail.id);
+                setWizardState((prev) => ({
+                    ...prev,
+                    woDetailId: existingDetail.id,
+                    currentPage: existingDetail.currentPage || 1,
+                    completedPages: existingDetail.completedPages || [],
+                    skippedPages: existingDetail.skippedPages || [],
+                    status: existingDetail.status || 'draft',
+                }));
+            } else {
+                console.log('🔷 Calling initializeWizard for:', woBasicDetailId);
+
+                initializeWizard.mutate(woBasicDetailId, {
+                    onSuccess: (result) => {
+                        console.log('🔷 Initialize success:', result);
+                        setWoDetailId(result.id);
+                        setWizardState((prev) => ({
+                            ...prev,
+                            woDetailId: result.id,
+                        }));
+                    },
+                    onError: (error) => {
+                        console.error('🔴 Initialize error:', error);
+                    },
+                });
+            }
         }
-    }, [mode, existingData, initialPage]);
+    }, [mode, woDetailId, existingDetail, isLoadingExisting, woBasicDetailId]);
 
     const handleSubmitPage = () => {
         const { currentPage, completedPages } = wizardState;

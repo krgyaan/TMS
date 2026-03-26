@@ -9,10 +9,7 @@ import { woBasicDetailsKeys } from './useWoBasicDetails';
 import type { WoDetailsFilters, CreateWoDetailDto, UpdateWoDetailDto, RequestAmendmentDto, WoAcceptanceDecisionDto } from '@/modules/operations/types/wo.types';
 import type { Page1FormValues, Page2FormValues, Page3FormValues, Page4FormValues, Page5FormValues, Page6FormValues, Page7FormValues, WizardValidationResult, PageData } from '@/modules/operations/wo-details/helpers/woDetail.types';
 
-// ============================================
 // QUERY KEYS
-// ============================================
-
 export const woDetailsKeys = {
   all: ['wo-details'] as const,
   lists: () => [...woDetailsKeys.all, 'list'] as const,
@@ -38,9 +35,9 @@ export const woDetailsKeys = {
   slaCompliance: () => [...woDetailsKeys.all, 'sla-compliance'] as const,
 };
 
-// ============================================
 // WIZARD QUERY HOOKS (ESSENTIAL - USED BY FORMS)
-// ============================================
+console.log('🔷 woDetailsService:', woDetailsService);
+console.log('🔷 Available methods:', Object.keys(woDetailsService));
 
 export const useWoDetailByBasicDetail = (woBasicDetailId: number) => {
   return useQuery({
@@ -106,10 +103,7 @@ export const usePage7Data = (woDetailId: number | null) => {
   return usePageData<Page7FormValues>(woDetailId, 7);
 };
 
-// ============================================
 // WIZARD MUTATION HOOKS (ESSENTIAL - USED BY FORMS)
-// ============================================
-
 // Initialize wizard (create empty WoDetail)
 export const useInitializeWizard = () => {
   const queryClient = useQueryClient();
@@ -238,10 +232,7 @@ export const useSubmitForReview = () => {
   });
 };
 
-// ============================================
 // AUTO-SAVE HOOK (ESSENTIAL - USED BY FORMS)
-// ============================================
-
 export const useAutoSave = (
   woDetailId: number | null,
   pageNum: number,
@@ -281,10 +272,7 @@ export const useAutoSave = (
   };
 };
 
-// ============================================
 // PREFETCH HOOK (ESSENTIAL - USED BY WIZARD)
-// ============================================
-
 export const usePrefetchNextPage = (woDetailId: number | null, currentPage: number) => {
   const queryClient = useQueryClient();
 
@@ -300,10 +288,7 @@ export const usePrefetchNextPage = (woDetailId: number | null, currentPage: numb
   }, [woDetailId, currentPage, queryClient]);
 };
 
-// ============================================
 // IMPORT/INTEGRATION HOOKS
-// ============================================
-
 export const useImportTenderContacts = () => {
   const queryClient = useQueryClient();
 
@@ -337,10 +322,7 @@ export const useFetchCostingData = (woBasicDetailId: number) => {
   });
 };
 
-// ============================================
 // BASIC QUERY HOOKS
-// ============================================
-
 export const useWoDetails = (filters?: WoDetailsFilters) => {
   const { teamId, userId, dataScope } = useTeamFilter();
 
@@ -389,10 +371,7 @@ export const useWoTimeline = (id: number) => {
   });
 };
 
-// ============================================
 // DASHBOARD QUERY HOOKS
-// ============================================
-
 export const useWoDetailsDashboardSummary = () => {
   const { teamId } = useTeamFilter();
 
@@ -430,10 +409,7 @@ export const useSlaComplianceReport = () => {
   });
 };
 
-// ============================================
 // BASIC MUTATION HOOKS
-// ============================================
-
 export const useCreateWoDetail = () => {
   const queryClient = useQueryClient();
 
@@ -502,10 +478,7 @@ export const useSavePageData = () => {
   });
 };
 
-// ============================================
 // ACCEPTANCE WORKFLOW MUTATIONS
-// ============================================
-
 export const useAcceptWo = () => {
   const queryClient = useQueryClient();
 
