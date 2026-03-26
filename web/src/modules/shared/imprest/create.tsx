@@ -17,19 +17,28 @@ import { paths } from "@/app/routes/paths";
 import { useCreateImprest } from "./imprest.hooks";
 import { createImprestSchema, type CreateImprestInput } from "./imprest.schema";
 import SelectField from "@/components/form/SelectField";
+import SelectInput from "@/components/SelectInput";
 import { useProjectOptions } from "@/hooks/useSelectOptions";
 import { useImprestCategories } from "@/hooks/api/useImprestCategories";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUsers } from "@/hooks/api/useUsers";
 
 registerPlugin(FilePondPluginFileValidateType, FilePondPluginImagePreview);
+
+const TEAM_MEMBER_CATEGORY_ID = 22;
 
 const EmployeeImprestForm: React.FC = () => {
     const navigate = useNavigate();
     const projectOptions = useProjectOptions();
     const { data: imprestCategories = [] } = useImprestCategories();
     const { user } = useAuth();
+    const { data: allUsers = [] } = useUsers();
 
     const [pondFiles, setPondFiles] = useState<File[]>([]);
+    const [selectedTransferUserId, setSelectedTransferUserId] = useState<string>("");
+    const [transferUserError, setTransferUserError] = useState<string>("");
+
+    // Single mutation — backend decides what to insert based on categoryId
     const createMutation = useCreateImprest();
 
     const methods = useForm<CreateImprestInput>({
@@ -51,24 +60,54 @@ const EmployeeImprestForm: React.FC = () => {
         formState: { errors },
         handleSubmit,
         setValue,
+        watch,
     } = methods;
 
-    // ✅ ensure userId is set once user loads
     useEffect(() => {
         if (user?.id) {
             setValue("userId", user.id);
         }
     }, [user, setValue]);
 
+    const watchedCategoryId = watch("categoryId");
+    const isTransferMode = Number(watchedCategoryId) === TEAM_MEMBER_CATEGORY_ID;
+
+    // Reset transfer state when category changes
+    useEffect(() => {
+        setSelectedTransferUserId("");
+        setTransferUserError("");
+    }, [watchedCategoryId]);
+
+    // All users except self
+    const transferUserOptions = allUsers.filter(u => u.id !== user?.id).map(u => ({ id: String(u.id), name: u.name }));
+
     const onSubmit = async (data: CreateImprestInput) => {
-        await createMutation.mutateAsync({ data, files: pondFiles });
+        // Validate transfer user selection before submitting
+        if (isTransferMode && !selectedTransferUserId) {
+            setTransferUserError("Please select a team member");
+            return;
+        }
+
+        setTransferUserError("");
+
+        await createMutation.mutateAsync({
+            data: {
+                ...data,
+                // teamId carries the receiver's userId — backend uses this
+                // to create the transaction record and the imprest record
+                teamId: isTransferMode ? Number(selectedTransferUserId) : (data.teamId ?? undefined),
+            },
+            files: pondFiles,
+        });
+
         navigate(paths.shared.imprest);
     };
 
     const handlePondProcess = (items: any[]) => {
-        const files = items.map(fi => fi.file).filter(Boolean);
-        setPondFiles(files);
+        setPondFiles(items.map(fi => fi.file).filter(Boolean));
     };
+
+    const isPending = createMutation.isPending;
 
     return (
         <div className="container mx-auto py-6">
@@ -94,42 +133,57 @@ const EmployeeImprestForm: React.FC = () => {
                     <FormProvider {...methods}>
                         <form onSubmit={handleSubmit(onSubmit as any)} className="space-y-6">
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                {/* Party Name */}
-                                <div className="space-y-2">
-                                    <Label>Party Name</Label>
-                                    <Input placeholder="Party Name" {...register("partyName")} />
-                                    {errors.partyName && <p className="text-sm text-red-600">{errors.partyName.message}</p>}
-                                </div>
-
-                                {/* Project Select (string) */}
-                                <SelectField
-                                    control={control}
-                                    name="projectName"
-                                    label="Select Project"
-                                    placeholder="-- Select Project --"
-                                    options={projectOptions}
-                                />
-
-                                {/* Amount */}
-                                <div className="space-y-2">
-                                    <Label>Amount</Label>
-                                    <Input type="number" placeholder="Amount" {...register("amount")} />
-                                    {errors.amount && <p className="text-sm text-red-600">{errors.amount.message}</p>}
-                                </div>
-
-                                {/* Category Select (number) */}
+                                {/* Category — always shown */}
                                 <SelectField
                                     control={control}
                                     name="categoryId"
                                     label="Select Category"
                                     placeholder="-- Select Category --"
                                     options={imprestCategories.map(i => ({
-                                        id: String(i.id), // SelectField gives string → zod coerces to number
+                                        id: String(i.id),
                                         name: i.name,
                                     }))}
                                 />
 
-                                {/* Proof Upload */}
+                                {/* Party Name — hidden in transfer mode */}
+                                {!isTransferMode && (
+                                    <div className="space-y-2">
+                                        <Label>Party Name</Label>
+                                        <Input placeholder="Party Name" {...register("partyName")} />
+                                        {errors.partyName && <p className="text-sm text-red-600">{errors.partyName.message}</p>}
+                                    </div>
+                                )}
+
+                                {/* Project — hidden in transfer mode */}
+                                {!isTransferMode && (
+                                    <SelectField control={control} name="projectName" label="Select Project" placeholder="-- Select Project --" options={projectOptions} />
+                                )}
+
+                                {/* Transfer To — only shown in transfer mode */}
+                                {isTransferMode && (
+                                    <div className="space-y-2">
+                                        <SelectInput
+                                            label="Transfer To"
+                                            placeholder="-- Select Team Member --"
+                                            value={selectedTransferUserId}
+                                            options={transferUserOptions}
+                                            onChange={val => {
+                                                setSelectedTransferUserId(val);
+                                                if (val) setTransferUserError("");
+                                            }}
+                                        />
+                                        {transferUserError && <p className="text-sm text-red-600">{transferUserError}</p>}
+                                    </div>
+                                )}
+
+                                {/* Amount — always shown */}
+                                <div className="space-y-2">
+                                    <Label>Amount</Label>
+                                    <Input type="number" placeholder="Amount" {...register("amount")} />
+                                    {errors.amount && <p className="text-sm text-red-600">{errors.amount.message}</p>}
+                                </div>
+
+                                {/* File upload — always shown */}
                                 <div className="space-y-2 lg:col-span-3">
                                     <Label>Invoice / Proof</Label>
                                     <FilePond
@@ -146,7 +200,7 @@ const EmployeeImprestForm: React.FC = () => {
                                     />
                                 </div>
 
-                                {/* Remarks */}
+                                {/* Remarks — always shown */}
                                 <div className="space-y-2 lg:col-span-3">
                                     <Label>Remarks</Label>
                                     <Textarea rows={4} {...register("remark")} />
@@ -154,8 +208,8 @@ const EmployeeImprestForm: React.FC = () => {
                             </div>
 
                             <div className="flex justify-end">
-                                <Button type="submit" disabled={createMutation.isLoading}>
-                                    {createMutation.isLoading ? "Submitting..." : "Submit"}
+                                <Button type="submit" disabled={isPending}>
+                                    {isPending ? "Submitting…" : "Submit"}
                                 </Button>
                             </div>
                         </form>

@@ -30,14 +30,19 @@ export class EmployeeImprestController {
 
     @Post()
     @UseInterceptors(FilesInterceptor("files", 10, multerConfig))
-    create(@Req() req: Request, @UploadedFiles() files: Express.Multer.File[]) {
+    create(@Req() req, @UploadedFiles() files: Express.Multer.File[]) {
         const parsed = CreateEmployeeImprestSchema.safeParse(req.body);
 
         if (!parsed.success) {
             throw new BadRequestException(parsed.error.flatten());
         }
 
-        return this.service.create(parsed.data, files);
+        // Pass sender's userId from JWT — service resolves name from DB
+        return this.service.createWithTransfer(
+            parsed.data,
+            files ?? [],
+            req.user.sub // sender's userId
+        );
     }
 
     @Get()

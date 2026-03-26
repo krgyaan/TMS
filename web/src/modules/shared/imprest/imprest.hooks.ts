@@ -26,6 +26,8 @@ import {
     getImprestPaymentHistory,
     deleteImprestPaymentHistory,
     type CreateImprestInput,
+    creditImprest,
+    type CreditImprestInput,
     getImprestVoucher,
 } from "./imprest.api";
 
@@ -285,5 +287,21 @@ export const useUpdateImprest = () => {
         },
 
         onError: () => toast.error("Failed to update imprest"),
+    });
+};
+
+export const useCreditImprest = () => {
+    const qc = useQueryClient();
+
+    return useMutation({
+        mutationFn: (data: CreditImprestInput) => creditImprest(data),
+
+        onSuccess: () => {
+            toast.success("Transfer recorded successfully");
+            qc.invalidateQueries({ queryKey: imprestKeys.root });
+            qc.invalidateQueries({ queryKey: imprestPaymentHistoryKeys.all });
+        },
+
+        onError: () => toast.error("Failed to record transfer"),
     });
 };

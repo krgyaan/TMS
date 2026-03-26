@@ -178,3 +178,16 @@ export const updateImprest = async (id: number, data: Partial<ImprestRow>) => {
     const res = await api.patch(`/employee-imprest/${id}`, data);
     return res.data;
 };
+
+export interface CreditImprestInput {
+    userId: number;
+    txnDate: string; // "YYYY-MM-DD"
+    teamMemberName: string;
+    amount: number;
+    projectName?: string;
+}
+
+export const creditImprest = async (data: CreditImprestInput) => {
+    const res = await api.post("/accounts/imprest/credit", data);
+    return res.data;
+};

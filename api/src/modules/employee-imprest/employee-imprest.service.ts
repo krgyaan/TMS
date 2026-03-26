@@ -14,8 +14,9 @@ import type { CreateEmployeeImprestDto } from "@/modules/employee-imprest/zod/cr
 import type { UpdateEmployeeImprestDto } from "@/modules/employee-imprest/zod/update-employee-imprest.schema";
 import { CreateEmployeeImprestCreditDto } from "../imprest-admin/zod/create-employee-imprest-credit.schema";
 import { employeeImprestVouchers } from "@/db/schemas/accounts/employee-imprest-voucher";
-import { imprestCategories } from "@/db/schemas";
+import { imprestCategories, users } from "@/db/schemas";
 
+const TRANSFER_CATEGORY_ID = 22;
 @Injectable()
 export class EmployeeImprestService {
     constructor(
@@ -27,19 +28,72 @@ export class EmployeeImprestService {
     ) {}
 
     /* ----------------------------- CREATE ----------------------------- */
-    async create(data: CreateEmployeeImprestDto, files: Express.Multer.File[]) {
-        // console.log(userId);
+    /* ----------------------------- CREATE ----------------------------- */
+    async createWithTransfer(data: CreateEmployeeImprestDto, files: Express.Multer.File[], senderUserId: number) {
+        const isTransfer = Number(data.categoryId) === TRANSFER_CATEGORY_ID;
 
-        const result = await this.db
+        if (isTransfer) {
+            if (!data.teamId) {
+                throw new BadRequestException("Team member is required for transfer");
+            }
+
+            // Fetch sender name from DB — never trust client for this
+            const [sender] = await this.db.select({ name: users.name }).from(users).where(eq(users.id, senderUserId)).limit(1);
+
+            // Fetch receiver name from DB — never trust client for this
+            const [receiver] = await this.db.select({ name: users.name }).from(users).where(eq(users.id, data.teamId)).limit(1);
+
+            if (!receiver) {
+                throw new BadRequestException("Selected team member not found");
+            }
+
+            const senderName = sender?.name ?? "Unknown";
+            const receiverName = receiver.name;
+
+            // Both inserts wrapped in a transaction — if one fails, both roll back
+            return await this.db.transaction(async tx => {
+                // Record 1: Credit the receiver in employee_imprest_transactions
+                await tx.insert(employeeImprestTransactions).values({
+                    userId: data.teamId!,
+                    txnDate: new Date().toISOString().split("T")[0],
+                    teamMemberName: receiverName,
+                    amount: data.amount,
+                    projectName: `Transfered from ${senderName}`,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                });
+
+                // Record 2: Imprest expense for the sender
+                const [imprest] = await tx
+                    .insert(employeeImprests)
+                    .values({
+                        userId: data.userId,
+                        categoryId: data.categoryId,
+                        teamId: data.teamId,
+                        partyName: null, // always null for cat 22
+                        projectName: null, // always null for cat 22
+                        amount: data.amount,
+                        remark: data.remark,
+                        invoiceProof: files.map(f => f.filename),
+                        createdAt: new Date(),
+                        updatedAt: new Date(),
+                    })
+                    .returning();
+
+                return imprest;
+            });
+        }
+
+        // Normal flow — any other category
+        const [imprest] = await this.db
             .insert(employeeImprests)
             .values({
                 ...data,
-                invoiceProof: files.map(f => f.filename), // store filenames of uploaded files
+                invoiceProof: files.map(f => f.filename),
             })
             .returning();
 
-        console.log(result);
-        return result[0];
+        return imprest;
     }
 
     /* ----------------------------- READ ------------------------------ */
