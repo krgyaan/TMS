@@ -23,6 +23,7 @@ const PerformanceRoutes = lazy(() => import("./sections/performance.routes"));
 const IntegrationsRoutes = lazy(() => import("./sections/integrations.routes"));
 const SharedRoutes = lazy(() => import("./sections/shared.routes"));
 const DocumentDashboardRoutes = lazy(() => import("./sections/document-dashboard.routes"));
+const HrmsRoutes = lazy(() => import("./sections/hrms.routes"));
 const Profile = lazy(() => import("@/modules/profile"));
 
 export default function AppRoutes() {
@@ -165,6 +166,16 @@ export default function AppRoutes() {
                         element={
                             <RouteWrapper>
                                 <DocumentDashboardRoutes />
+                            </RouteWrapper>
+                        }
+                    />
+
+                    {/* HRMS Dashboard */}
+                    <Route
+                        path="hrms/*"
+                        element={
+                            <RouteWrapper>
+                                <HrmsRoutes />
                             </RouteWrapper>
                         }
                     />
