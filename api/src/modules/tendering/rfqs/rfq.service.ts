@@ -176,7 +176,6 @@ export class RfqsService {
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
             inArray(tenderInfos.rfqRequired, ['yes', 'Yes', 'YES']),
-            ne(tenderInfos.rfqTo, ""), // NOT empty string
         ];
 
         // Apply role-based filtering
