@@ -135,14 +135,14 @@ const navMain: NavGroup[] = [
     {
         title: "HRMS",
         icon: Briefcase,
-        items: [{ title: "My Assets", url: paths.hrms.myAssets, permission: "hrms.view" }],
+        items: [{ title: "My Assets", url: paths.hrms.myAssets, permission: "hrms" }],
     },
     {
         title: "HR Administration",
         icon: Shield,
         items: [
-            { title: "Asset Administration", url: "/hrms/assets", permission: "hrms.admin.view" },
-            { title: "Register Employee", url: paths.hrms.employeeRegistration, permission: "hrms.admin.view" },
+            { title: "Asset Administration", url: "/hrms/assets", permission: "hrms.admin" },
+            { title: "Register Employee", url: paths.hrms.employeeRegistration, permission: "hrms.admin" },
         ],
     },
     {
