@@ -1,6 +1,8 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import { RequestExtensionsService } from './request-extension.service';
-import { CreateRequestExtensionDto, CreateRequestExtensionSchema } from './dto/request-extension.dto';
+import { CreateRequestExtensionDto, CreateRequestExtensionSchema, UpdateRequestExtensionDto, UpdateRequestExtensionSchema } from './dto/request-extension.dto';
+import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 @Controller('request-extensions')
 export class RequestExtensionsController {
@@ -37,11 +39,8 @@ export class RequestExtensionsController {
     }
 
     @Patch(':id')
-    async update(
-        @Param('id', ParseIntPipe) id: number,
-        @Body() body: unknown,
-    ) {
-        const parsed = CreateRequestExtensionSchema.parse(body) as CreateRequestExtensionDto;
+    async update(@Param('id', ParseIntPipe) id: number, @Body() body: unknown) {
+        const parsed = UpdateRequestExtensionSchema.parse(body) as UpdateRequestExtensionDto;
         return this.requestExtensionsService.update(id, parsed);
     }
 
