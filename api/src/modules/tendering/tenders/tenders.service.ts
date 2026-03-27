@@ -19,7 +19,7 @@ import { Logger } from '@nestjs/common';
 import type { PaginatedResult, TenderInfoWithNames, TenderReference, TenderForPayment, TenderForRfq, TenderForPhysicalDocs, TenderForApproval } from '@/modules/tendering/types/shared.types';
 import { TimersService } from '@/modules/timers/timers.service';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { bidSubmissions, tenderResults, timerTrackers } from '@/db/schemas';
+import { bidSubmissions, tenderResults, timerTrackers, emailLogs } from '@/db/schemas';
 
 export type TenderListFilters = {
     statusIds?: number[];
@@ -825,10 +825,10 @@ export class TenderInfosService {
         if (data.documents) {
             try {
                 // Ensure it's an array for attachment resolution
-                const docPaths = Array.isArray(data.documents) 
-                  ? data.documents 
+                const docPaths = Array.isArray(data.documents)
+                  ? data.documents
                   : JSON.parse(data.documents);
-                
+
                 if (Array.isArray(docPaths)) {
                     attachments = docPaths.map(path => ({
                         filename: path.split('/').pop() || 'document.pdf',
@@ -961,13 +961,13 @@ export class TenderInfosService {
         // Collect newly updated documents or existing documents if not updated
         let attachments: { filename: string, path: string }[] = [];
         const documentsString = changedData.documents !== undefined ? changedData.documents : newTender.documents;
-        
+
         if (documentsString) {
             try {
-                const docPaths = Array.isArray(documentsString) 
-                  ? documentsString 
+                const docPaths = Array.isArray(documentsString)
+                  ? documentsString
                   : JSON.parse(documentsString);
-                
+
                 if (Array.isArray(docPaths)) {
                     attachments = docPaths.map(path => ({
                         filename: path.split('/').pop() || 'document.pdf',
@@ -1235,5 +1235,34 @@ export class TenderInfosService {
             .where(whereClause);
 
         return result?.count ?? 0;
+    }
+
+    async getMailingLogs(tenderId: number) {
+        return this.db
+            .select({
+                id: emailLogs.id,
+                from: emailLogs.fromEmail,
+                to: emailLogs.toEmails,
+                cc: emailLogs.ccEmails,
+                eventType: emailLogs.eventType,
+                subject: emailLogs.subject,
+                bodyHtml: emailLogs.bodyHtml,
+                status: emailLogs.status,
+                errorMessage: emailLogs.errorMessage,
+                attempts: emailLogs.attempts,
+                createdAt: emailLogs.createdAt,
+                sentAt: emailLogs.sentAt,
+                lastAttemptAt: emailLogs.lastAttemptAt,
+                referenceType: emailLogs.referenceType,
+                referenceId: emailLogs.referenceId,
+            })
+            .from(emailLogs)
+            .where(
+                and(
+                    eq(emailLogs.referenceType, 'tender'),
+                    eq(emailLogs.referenceId, tenderId)
+                )
+            )
+            .orderBy(desc(emailLogs.createdAt));
     }
 }
