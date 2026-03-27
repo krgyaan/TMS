@@ -732,7 +732,6 @@ export class RfqsService {
         if (tab === 'pending' || tab === 'sent' || tab === 'responses') {
             baseConditions.push(
                 inArray(tenderInfos.rfqRequired, ['yes', 'Yes', 'YES']),
-                ne(tenderInfos.rfqTo, "")
             );
         }
 
