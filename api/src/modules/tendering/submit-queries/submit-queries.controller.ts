@@ -1,6 +1,8 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import { SubmitQueriesService } from './submit-queries.service';
-import { CreateSubmitQueriesDto, CreateSubmitQueriesSchema, UpdateSubmitQueriesSchema } from './dto/submit-queries.dto';
+import { CreateSubmitQueriesDto, CreateSubmitQueriesSchema, UpdateSubmitQueriesDto, UpdateSubmitQueriesSchema } from './dto/submit-queries.dto';
+import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 @Controller('submit-queries')
 export class SubmitQueriesController {
@@ -37,11 +39,8 @@ export class SubmitQueriesController {
     }
 
     @Patch(':id')
-    async update(
-        @Param('id', ParseIntPipe) id: number,
-        @Body() body: unknown,
-    ) {
-        const parsed = UpdateSubmitQueriesSchema.parse(body) as CreateSubmitQueriesDto;
+    async update(@Param('id', ParseIntPipe) id: number, @Body() body: unknown) {
+        const parsed = UpdateSubmitQueriesSchema.parse(body) as UpdateSubmitQueriesDto;
         return this.submitQueriesService.update(id, parsed);
     }
 

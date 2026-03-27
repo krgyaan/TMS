@@ -4,7 +4,9 @@ import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { CreateSubmitQueriesDto, UpdateSubmitQueriesDto, ClientContact, QueryListItem } from './dto/submit-queries.dto';
 import { submitQueries, submitQueriesLists } from '@/db/schemas/tendering/submit-queries.schema';
-import { tenderInfos } from '@/db/schemas';
+import { tenderInfos, teams, userProfiles, users, companies } from '@/db/schemas';
+import { EmailService } from '../../email/email.service';
+import { RecipientResolver } from '../../email/recipient.resolver';
 
 export type SubmitQueriesFilters = {
     page?: number;
@@ -27,7 +29,11 @@ export type SubmitQueryResponse = {
 
 @Injectable()
 export class SubmitQueriesService {
-    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
+    constructor(
+        @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly emailService: EmailService,
+        private readonly recipientResolver: RecipientResolver,
+    ) {}
 
     // Map create DTO to database insert values
     private mapCreateToDb(data: CreateSubmitQueriesDto) {
@@ -173,7 +179,7 @@ export class SubmitQueriesService {
     }
 
     async create(data: CreateSubmitQueriesDto) {
-        return await this.db.transaction(async (tx) => {
+        const result = await this.db.transaction(async (tx) => {
             // Insert main record
             const insertValues = this.mapCreateToDb(data);
             const [inserted] = await tx
@@ -201,10 +207,23 @@ export class SubmitQueriesService {
             // Use transaction context for findById
             return this.findById(inserted.id, tx as unknown as DbInstance);
         });
+
+        // Trigger email notification
+        const [tender] = await this.db
+            .select({ teamMember: tenderInfos.teamMember })
+            .from(tenderInfos)
+            .where(eq(tenderInfos.id, result.tenderId))
+            .limit(1);
+
+        if (tender && tender.teamMember) {
+            await this.sendMail(result.id, tender.teamMember);
+        }
+
+        return result;
     }
 
     async update(id: number, data: UpdateSubmitQueriesDto) {
-        return await this.db.transaction(async (tx) => {
+        const result = await this.db.transaction(async (tx) => {
             // Check if record exists
             const [existing] = await tx
                 .select({ id: submitQueries.id })
@@ -251,6 +270,19 @@ export class SubmitQueriesService {
             // Use transaction context for findById
             return this.findById(id, tx as unknown as DbInstance);
         });
+
+        // Trigger email notification
+        const [tender] = await this.db
+            .select({ teamMember: tenderInfos.teamMember })
+            .from(tenderInfos)
+            .where(eq(tenderInfos.id, result.tenderId))
+            .limit(1);
+
+        if (tender && tender.teamMember) {
+            await this.sendMail(result.id, tender.teamMember);
+        }
+
+        return result;
     }
 
     async delete(id: number): Promise<void> {
@@ -262,5 +294,89 @@ export class SubmitQueriesService {
         if (!row) {
             throw new NotFoundException(`Submit Query with ID ${id} not found`);
         }
+    }
+
+    async sendMail(id: number, fromUserId: number) {
+        const sub = await this.findById(id);
+        const tender = await this.db
+            .select()
+            .from(tenderInfos)
+            .where(eq(tenderInfos.id, sub.tenderId))
+            .limit(1)
+            .then(rows => rows[0]);
+
+        if (!tender) throw new NotFoundException('Tender not found');
+
+        // Resolve DC Team recipients
+        const dcTeam = await this.db
+            .select({ id: teams.id })
+            .from(teams)
+            .where(eq(teams.name, 'DC'))
+            .limit(1)
+            .then(rows => rows[0]);
+
+        if (!dcTeam) throw new NotFoundException('DC Team not found');
+
+        const [admin, tl, coord] = await Promise.all([
+            this.recipientResolver.getTeamAdmin(dcTeam.id),
+            this.recipientResolver.getTeamLeader(dcTeam.id),
+            this.recipientResolver.getTeamCoordinator(dcTeam.id),
+        ]);
+
+        const externalCc = sub.clientContacts.flatMap(c => c.cc_emails || []);
+        const cc = [...new Set([...externalCc, admin, tl, coord].filter(Boolean) as string[])];
+
+        // Fetch Assignee (TE) details
+        const assignee = await this.db
+            .select({
+                name: users.name,
+                email: users.email,
+                phone: userProfiles.phone,
+            })
+            .from(users)
+            .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+            .where(eq(users.id, tender.teamMember || 0))
+            .limit(1)
+            .then(rows => rows[0]);
+
+        // Fetch Company details
+        const company = await this.db
+            .select()
+            .from(companies)
+            .limit(1)
+            .then(rows => rows[0]);
+
+        const to = [{ type: 'emails', emails: sub.clientContacts.map(c => c.client_email).filter(Boolean) as string[] }] as any;
+
+        if (!to[0].emails.length) throw new Error('No client emails found to send to');
+
+        return await this.emailService.sendTenderEmail({
+            tenderId: tender.id,
+            fromUserId,
+            to,
+            cc: [{ type: 'emails', emails: cc }] as any,
+            // Clarifications needed - Tender No.
+            subject: `Clarifications needed - ${tender.tenderNo}`,
+            template: 'tender-submit-query',
+            data: {
+                tender_no: tender.tenderNo,
+                date: new Date().toLocaleDateString('en-IN'),
+                queries: sub.queries.map(q => ({
+                    page_no: q.pageNo,
+                    clause_no: q.clauseNo,
+                    query_type: q.queryType,
+                    current_statement: q.currentStatement,
+                    requested_statement: q.requestedStatement,
+                })),
+                client_details: {
+                    name: sub.clientContacts[0]?.client_name || 'Sir/Madam',
+                },
+                assignee: assignee?.name || 'Tender Executive',
+                te_mobile: assignee?.phone || '',
+                te_email: assignee?.email || '',
+                ve_address: company?.registeredAddress || 'B1/D8 2nd Floor, Mohan Cooperative Industrial Estate, New Delhi 110044',
+            },
+            eventType: 'Submit Query Sent',
+        });
     }
 }
