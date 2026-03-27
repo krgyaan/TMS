@@ -211,6 +211,11 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
 
     const filteredMenuItems = React.useMemo(() => filterMenu(currentUser, navMain), [currentUser]);
 
+
+    console.log("USER:", currentUser);
+    console.log("CHECK hrms:", canRead(currentUser, "hrms"));
+    console.log("CHECK hrms.admin:", canRead(currentUser, "hrms.admin"));
+
     const logoutMutation = useLogout();
 
     const handleLogout = React.useCallback(() => {
