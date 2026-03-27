@@ -42,7 +42,7 @@ export function TenderView({
     isLoading = false,
     className = '',
 }: TenderViewProps) {
-    const documents = parseDocuments(tender.documents);
+    const documents = parseDocuments(tender?.documents);
     if (isLoading) {
         return (
             <Card className={className}>
