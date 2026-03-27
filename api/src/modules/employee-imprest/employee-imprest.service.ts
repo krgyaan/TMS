@@ -344,31 +344,43 @@ export class EmployeeImprestService {
             throw new NotFoundException("Imprest not found");
         }
 
+        const newStatus = imprest.proofStatus === 1 ? 0 : 1;
+
         await this.db
             .update(employeeImprests)
             .set({
-                proofStatus: 1,
+                proofStatus: newStatus,
             })
             .where(eq(employeeImprests.id, imprestId));
 
         return {
             success: true,
-            message: "Proof approved successfully",
+            message: newStatus === 1 ? "Proof approved successfully" : "Proof approval removed",
         };
     }
 
     async approveImprest({ imprestId, userId }: { imprestId: number; userId: number }) {
+        const imprest = await this.db.query.employeeImprests.findFirst({
+            where: eq(employeeImprests.id, imprestId),
+        });
+
+        if (!imprest) {
+            throw new NotFoundException("Imprest not found");
+        }
+
+        const newStatus = imprest.approvalStatus === 1 ? 0 : 1;
+
         await this.db
             .update(employeeImprests)
             .set({
-                approvalStatus: 1, // Laravel: buttonstatus = 1
-                approvedDate: new Date(), // Laravel: Carbon::now()
+                approvalStatus: newStatus,
+                approvedDate: newStatus === 1 ? new Date() : null,
             })
             .where(eq(employeeImprests.id, imprestId));
 
         return {
             success: true,
-            message: "Imprest approved successfully",
+            message: newStatus === 1 ? "Imprest approved successfully" : "Imprest approval removed",
         };
     }
 
@@ -381,16 +393,18 @@ export class EmployeeImprestService {
             throw new NotFoundException("Imprest not found");
         }
 
+        const newStatus = imprest.tallyStatus === 1 ? 0 : 1;
+
         await this.db
             .update(employeeImprests)
             .set({
-                tallyStatus: 1,
+                tallyStatus: newStatus,
             })
             .where(eq(employeeImprests.id, imprestId));
 
         return {
             success: true,
-            message: "Tally Entry added successfully",
+            message: newStatus === 1 ? "Tally Entry added successfully" : "Tally Entry removed",
         };
     }
 
