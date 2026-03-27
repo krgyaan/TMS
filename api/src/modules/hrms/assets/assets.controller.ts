@@ -6,7 +6,7 @@ import { JwtAuthGuard } from "@/modules/auth/guards/jwt-auth.guard";
 // Schema maps to NewEmployeeAsset (ignoring timestamps)
 const BaseAssetSchema = z.object({
   userId: z.number(),
-  assetCode: z.string(),
+  assetCode: z.string().optional().nullable(),
   assetType: z.string(),
   assetCategory: z.string().optional().nullable(),
   brand: z.string().optional().nullable(),
@@ -18,7 +18,7 @@ const BaseAssetSchema = z.object({
   assetValue: z.string().optional().nullable(),
   assetCondition: z.string().optional(),
   assignedDate: z.coerce.date(),
-  assignedBy: z.number().optional().nullable(),
+  assignedBy: z.coerce.number().optional().nullable(),
   expectedReturnDate: z.coerce.date().optional().nullable(),
   purpose: z.string().optional().nullable(),
   assetLocation: z.string().optional().nullable(),
@@ -35,6 +35,10 @@ const BaseAssetSchema = z.object({
   returnCondition: z.string().optional().nullable(),
   damageRemarks: z.string().optional().nullable(),
   deductionAmount: z.string().optional().nullable(),
+  purchaseDate: z.coerce.date().optional().nullable(),
+  purchasePrice: z.string().optional().nullable(),
+  purchaseFrom: z.string().optional().nullable(),
+  remarks: z.string().optional().nullable(),
 });
 
 type CreateAssetDto = z.infer<typeof BaseAssetSchema>;
@@ -97,7 +101,15 @@ export class AssetsController {
         // Zod parses stringified coercions properly (from FormData)
         // Adjust strings to numbers for validation if they come as formData strings
         if (typeof body.userId === "string") body.userId = parseInt(body.userId, 10);
-        if (body.assignedBy && typeof body.assignedBy === "string") body.assignedBy = parseInt(body.assignedBy, 10);
+
+        // Parse accessories from JSON string (FormData only sends strings)
+        if (typeof body.accessories === "string") {
+            try {
+                body.accessories = JSON.parse(body.accessories);
+            } catch {
+                body.accessories = [];
+            }
+        }
 
         // Remove file fields from body to prevent Zod validation errors
         delete body.assetPhotos;
@@ -113,6 +125,7 @@ export class AssetsController {
             warrantyFrom: parsed.warrantyFrom ? toDateString(parsed.warrantyFrom) : null,
             warrantyTo: parsed.warrantyTo ? toDateString(parsed.warrantyTo) : null,
             returnDate: parsed.returnDate ? toDateString(parsed.returnDate) : null,
+            purchaseDate: parsed.purchaseDate ? toDateString(parsed.purchaseDate) : null,
             assetPhotos: assetPhotos,
             purchaseInvoiceUrl: purchaseInvoice,
             warrantyCardUrl: warrantyCard,
