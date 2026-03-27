@@ -84,11 +84,7 @@ export class PhysicalDocsController {
 
     @Get('by-tender/:tenderId')
     async getByTenderId(@Param('tenderId', ParseIntPipe) tenderId: number) {
-        const physicalDoc = await this.physicalDocsService.findByTenderIdWithPersons(tenderId);
-        if (!physicalDoc) {
-            throw new NotFoundException(`Physical doc for tender ID ${tenderId} not found`);
-        }
-        return physicalDoc;
+        return this.physicalDocsService.findByTenderIdWithPersons(tenderId);
     }
 
     @Get(':id')

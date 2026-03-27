@@ -64,17 +64,7 @@ export const usePhysicalDoc = (id: number | null) => {
 export const usePhysicalDocByTenderId = (tenderId: number | null) => {
     return useQuery({
         queryKey: physicalDocsKey.byTender(tenderId ?? 0),
-        queryFn: async () => {
-            try {
-                return await physicalDocsService.getByTenderId(tenderId ?? 0);
-            } catch (error: any) {
-                // Handle 404 gracefully - return null if resource doesn't exist
-                if (error?.response?.status === 404) {
-                    return null;
-                }
-                throw error;
-            }
-        },
+        queryFn: () => physicalDocsService.getByTenderId(tenderId ?? 0),
         enabled: !!tenderId,
     });
 };
