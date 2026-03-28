@@ -10,6 +10,10 @@ class LocationsService extends BaseApiService {
         return await this.get<Location[]>();
     }
 
+    async getAllTrue(): Promise<Location[]> {
+        return await this.get<Location[]>("/list-true");
+    }
+
     async getById(id: number): Promise<Location> {
         return this.get<Location>(`/${id}`);
     }

@@ -43,6 +43,11 @@ export class PayOnPortalController {
         return this.payOnPortalService.getDashboardCounts();
     }
 
+    @Get('requests/:id')
+    async getById(@Param('id', ParseIntPipe) id: number) {
+        return this.payOnPortalService.getById(id);
+    }
+
     @Put('instruments/:id/action')
     @UseInterceptors(FilesInterceptor('files', 20, biDashboardMulterConfig))
     async updateAction(

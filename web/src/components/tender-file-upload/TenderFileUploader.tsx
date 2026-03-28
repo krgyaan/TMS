@@ -157,7 +157,7 @@ export function TenderFileUploader({
                                     rel="noopener noreferrer"
                                     className="flex-1 text-sm truncate hover:underline"
                                 >
-                                    {fileName}
+                                    {(fileName.length > 20 ? fileName.slice(0, 15) + '...' + fileName.slice(-10) : fileName)}
                                 </a>
                                 {!disabled && (
                                     <Button

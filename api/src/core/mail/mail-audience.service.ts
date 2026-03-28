@@ -1,0 +1,43 @@
+import { Injectable, Inject } from "@nestjs/common";
+import { eq, and } from "drizzle-orm";
+
+import { users } from "@db/schemas/auth/users.schema";
+import { userRoles } from "@db/schemas/auth/user-roles.schema";
+
+import { DRIZZLE } from "@/db/database.module";
+import type { DbInstance } from "@/db";
+import { id } from "zod/v4/locales";
+
+@Injectable()
+export class MailAudienceService {
+    constructor(
+        @Inject(DRIZZLE)
+        private readonly db: DbInstance
+    ) {}
+
+    async getEmailsByRoleId(roleId: number, teamId?: number): Promise<string[]> {
+        const conditions = teamId ? and(eq(userRoles.roleId, roleId), eq(users.team, teamId)) : eq(userRoles.roleId, roleId);
+
+        const result = await this.db.select({ email: users.email }).from(users).innerJoin(userRoles, eq(users.id, userRoles.userId)).where(conditions);
+
+        return result.map(r => r.email);
+    }
+
+    async getCoo(): Promise<typeof users.$inferSelect> {
+        const [user] = await this.db.select().from(users).where(eq(users.id, 64));
+
+        return user;
+    }
+
+    async getAdmin(): Promise<typeof users.$inferSelect> {
+        const [user] = await this.db.select().from(users).where(eq(users.id, 7));
+
+        return user;
+    }
+
+    async getCoordinator(): Promise<typeof users.$inferSelect | null> {
+        const result = await this.db.select({ user: users }).from(users).innerJoin(userRoles, eq(users.id, userRoles.userId)).where(eq(userRoles.roleId, 4)).limit(1);
+
+        return result.length ? result[0].user : null;
+    }
+}

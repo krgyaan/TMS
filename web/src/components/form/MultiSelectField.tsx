@@ -1,8 +1,9 @@
 import { type Control, type FieldPath, type FieldValues } from 'react-hook-form';
+import { useRef, useEffect, useState } from 'react';
 import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Badge } from '@/components/ui/badge';
 import { Check, ChevronsUpDown, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -32,6 +33,26 @@ export function MultiSelectField<
     className,
     maxChips = 3,
 }: MultiSelectFieldProps<TFieldValues, TName>) {
+    const triggerRef = useRef<HTMLButtonElement>(null);
+    const [popoverWidth, setPopoverWidth] = useState<string>('auto');
+
+    useEffect(() => {
+        const updateWidth = () => {
+            if (triggerRef.current) {
+                const width = triggerRef.current.offsetWidth;
+                setPopoverWidth(`${width}px`);
+            }
+        };
+
+        // Use requestAnimationFrame to ensure DOM is ready
+        requestAnimationFrame(() => {
+            updateWidth();
+        });
+
+        window.addEventListener('resize', updateWidth);
+        return () => window.removeEventListener('resize', updateWidth);
+    }, []);
+
     return (
         <FormField
             control={control}
@@ -57,6 +78,7 @@ export function MultiSelectField<
                             <PopoverTrigger asChild>
                                 <FormControl>
                                     <Button
+                                        ref={triggerRef}
                                         type="button"
                                         variant="outline"
                                         role="combobox"
@@ -96,31 +118,37 @@ export function MultiSelectField<
                                 </FormControl>
                             </PopoverTrigger>
 
-                            <PopoverContent className="w-full p-0">
+                            <PopoverContent 
+                                className="p-0" 
+                                align="start"
+                                style={{ width: popoverWidth !== 'auto' ? popoverWidth : undefined }}
+                            >
                                 <Command>
                                     <CommandInput placeholder="Search..." />
                                     <CommandEmpty>No options found.</CommandEmpty>
 
-                                    <CommandGroup>
-                                        {options.map((option) => {
-                                            const isSelected = selected.includes(option.value);
+                                    <CommandList>
+                                        <CommandGroup>
+                                            {options.map((option) => {
+                                                const isSelected = selected.includes(option.value);
 
-                                            return (
-                                                <CommandItem
-                                                    key={option.value}
-                                                    onSelect={() => toggleOption(option.value)}
-                                                >
-                                                    <Check
-                                                        className={cn(
-                                                            'mr-2 h-4 w-4',
-                                                            isSelected ? 'opacity-100' : 'opacity-0'
-                                                        )}
-                                                    />
-                                                    {option.label}
-                                                </CommandItem>
-                                            );
-                                        })}
-                                    </CommandGroup>
+                                                return (
+                                                    <CommandItem
+                                                        key={option.value}
+                                                        onSelect={() => toggleOption(option.value)}
+                                                    >
+                                                        <Check
+                                                            className={cn(
+                                                                'mr-2 h-4 w-4',
+                                                                isSelected ? 'opacity-100' : 'opacity-0'
+                                                            )}
+                                                        />
+                                                        {option.label}
+                                                    </CommandItem>
+                                                );
+                                            })}
+                                        </CommandGroup>
+                                    </CommandList>
                                 </Command>
 
                                 {selected.length > 0 && (

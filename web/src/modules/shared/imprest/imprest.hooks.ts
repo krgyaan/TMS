@@ -13,7 +13,6 @@ import {
 
     // vouchers
     getImprestVouchers,
-    getImprestVoucherById,
     accountApproveVoucher,
     adminApproveVoucher,
 
@@ -22,10 +21,18 @@ import {
     tallyImprest,
     proofImprest,
     addImprestRemark,
+
+    //PAYMENT HISTORY
+    getImprestPaymentHistory,
+    deleteImprestPaymentHistory,
     type CreateImprestInput,
+    creditImprest,
+    type CreditImprestInput,
+    getImprestVoucher,
 } from "./imprest.api";
 
-import type { ImprestVoucherRow } from "./imprest.types";
+import type { EmployeeImprestDashboard, ImprestPaymentHistoryRow, ImprestVoucherRow } from "./imprest.types";
+import type { UpdateImprestInput } from "./imprest.schema";
 
 /* ---------------- QUERY KEYS ---------------- */
 
@@ -45,13 +52,29 @@ export const imprestVoucherKeys = {
     detail: (id: number) => [...imprestVoucherKeys.root, "detail", id] as const,
 };
 
+export const imprestPaymentHistoryKeys = {
+    all: ["imprest-payment-history"] as const,
+    byUser: (userId: number) => ["imprest-payment-history", userId] as const,
+    list: (userId?: number) => [...imprestPaymentHistoryKeys.all, userId ?? "all"] as const,
+};
+
 /* ---------------- IMPREST LIST ---------------- */
 
 export const useImprestList = (userId?: number) => {
-    return useQuery({
+    return useQuery<EmployeeImprestDashboard>({
         queryKey: imprestKeys.list(userId),
-        queryFn: () => (userId ? getUserImprests(userId) : getMyImprests()),
-        enabled: userId === undefined || !!userId,
+
+        queryFn: () => {
+            if (userId) {
+                return getUserImprests(userId);
+            }
+            return getMyImprests();
+        },
+
+        // Enable:
+        // - When viewing own page (userId undefined)
+        // - When viewing another user (valid userId number)
+        enabled: userId === undefined || typeof userId === "number",
     });
 };
 
@@ -67,23 +90,6 @@ export const useCreateImprest = () => {
             qc.invalidateQueries({ queryKey: imprestKeys.root });
         },
         onError: () => toast.error("Failed to create imprest"),
-    });
-};
-
-/* ---------------- UPDATE ---------------- */
-
-export const useUpdateImprest = () => {
-    const qc = useQueryClient();
-
-    return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: any }) => updateImprest(id, data),
-
-        onSuccess: () => {
-            toast.success("Updated successfully");
-            qc.invalidateQueries({ queryKey: imprestKeys.root });
-        },
-
-        onError: () => toast.error("Failed to update imprest"),
     });
 };
 
@@ -198,11 +204,42 @@ export const useImprestVoucherList = (userId?: number) => {
     });
 };
 
-export const useImprestVoucherView = (id: number) => {
+export const useImprestVoucherView = (params: { userId: number; from: string; to: string }) => {
     return useQuery({
-        queryKey: imprestVoucherKeys.detail(id),
-        queryFn: () => getImprestVoucherById(id),
-        enabled: !!id,
+        queryKey: imprestVoucherKeys.detail(params),
+        queryFn: () => getImprestVoucher(params),
+        enabled: !!params.userId && !!params.from && !!params.to,
+    });
+};
+
+/**
+ * ==========================
+ * PAYMENT HISTORY (BY USER)
+ * ==========================
+ */
+export const useImprestPaymentHistory = (userId?: number) => {
+    return useQuery<ImprestPaymentHistoryRow[]>({
+        queryKey: imprestPaymentHistoryKeys.list(userId),
+        queryFn: () => getImprestPaymentHistory(userId),
+    });
+};
+
+/**
+ * ==========================
+ * DELETE PAYMENT HISTORY
+ * ==========================
+ */
+export const useDeleteImprestPaymentHistory = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: deleteImprestPaymentHistory,
+        onSuccess: () => {
+            queryClient.invalidateQueries({
+                queryKey: imprestPaymentHistoryKeys.all,
+                exact: false,
+            });
+        },
     });
 };
 
@@ -235,5 +272,36 @@ export const useAdminApproveVoucher = () => {
         },
 
         onError: () => toast.error("Failed to update voucher"),
+    });
+};
+
+export const useUpdateImprest = () => {
+    const qc = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, data }: { id: number; data: UpdateImprestInput }) => updateImprest(id, data),
+
+        onSuccess: () => {
+            toast.success("Updated successfully");
+            qc.invalidateQueries({ queryKey: imprestKeys.root });
+        },
+
+        onError: () => toast.error("Failed to update imprest"),
+    });
+};
+
+export const useCreditImprest = () => {
+    const qc = useQueryClient();
+
+    return useMutation({
+        mutationFn: (data: CreditImprestInput) => creditImprest(data),
+
+        onSuccess: () => {
+            toast.success("Transfer recorded successfully");
+            qc.invalidateQueries({ queryKey: imprestKeys.root });
+            qc.invalidateQueries({ queryKey: imprestPaymentHistoryKeys.all });
+        },
+
+        onError: () => toast.error("Failed to record transfer"),
     });
 };

@@ -1,18 +1,4 @@
-import {
-    Controller,
-    Post,
-    Get,
-    Delete,
-    Param,
-    Body,
-    UseInterceptors,
-    UploadedFiles,
-    Res,
-    StreamableFile,
-    HttpCode,
-    HttpStatus,
-    NotFoundException,
-} from '@nestjs/common';
+import { Controller, Post, Get, Delete, Param, Body, UseInterceptors, UploadedFiles, Res, StreamableFile, HttpCode, HttpStatus, NotFoundException, } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import type { Response } from 'express';
 import { createReadStream } from 'fs';

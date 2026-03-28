@@ -14,6 +14,12 @@ export const getFollowUpDetail = async (id: number): Promise<FollowUpDetailsDto>
     return data;
 };
 
+// ✅ GET MAIL PREVIEW
+export const getEmdMailPreview = async (emdId: number): Promise<{ html: string | null; message?: string }> => {
+    const { data } = await api.get(`/follow-up/preview-mail/${emdId}`);
+    return data;
+};
+
 // ✅ CREATE
 export const createFollowUp = async (payload: CreateFollowUpDto) => {
     console.log(payload);

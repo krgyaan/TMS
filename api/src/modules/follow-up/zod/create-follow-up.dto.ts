@@ -4,7 +4,7 @@ import { z } from "zod";
 export const contactPersonSchema = z.object({
     id: z.number().optional(),
     followUpId: z.number().optional(),
-    name: z.string().min(1, "Contact name is required"),
+    name: z.string().optional(),
     email: z.string().email().nullable().optional(),
     phone: z.string().nullable().optional(),
     org: z.string().nullable().optional(),
@@ -24,11 +24,13 @@ export const createFollowUpSchema = z.object({
     // VARCHAR(50) in DB
     followupFor: z.string().nullable().optional(),
 
-    assignedToId: z.number().positive().nullable(), // DB allows NULL
-    createdById: z.number().positive().nullable(), // DB allows NULL
+    assignedToId: z.number().nonnegative().nullable(), // DB allows NULL
+    createdById: z.number().nonnegative().nullable(), // DB allows NULL
 
     comment: z.string().nullable().optional(),
     details: z.string().nullable().optional(),
+
+    assignmentStatus: z.string().optional(),
 
     contacts: z.array(contactPersonSchema).min(1, "At least one contact person is required"),
 

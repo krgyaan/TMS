@@ -10,13 +10,11 @@ export const CreateCourierSchema = z.object({
 
     empFrom: z.coerce.number().int().positive("Please select an employee"),
 
-    delDate: z
-        .string()
-        .min(1, "Expected delivery date is required")
-        .refine(v => !isNaN(Date.parse(v)), "Invalid date"),
+    // keep it, but optional
+    delDate: z.coerce.date(),
 
     urgency: z.coerce.number().int().min(1).max(2),
 });
 
-export class CreateCourierDto extends createZodDto(CreateCourierSchema) {}
+export type CreateCourierDto = z.infer<typeof CreateCourierSchema>;
 export type CreateCourierInput = z.infer<typeof CreateCourierSchema>;

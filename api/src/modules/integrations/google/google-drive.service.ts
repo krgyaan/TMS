@@ -202,7 +202,7 @@ export class GoogleDriveService {
     }
 
     /**
-     * Check for duplicate sheet name in the year folder
+     * Check for duplicate sheet name in the team's root folder
      */
     async checkDuplicateInFolder(
         userId: number,
@@ -219,57 +219,79 @@ export class GoogleDriveService {
         const client = await this.getAuthenticatedClient(userId);
         const drive = google.drive({ version: 'v3', auth: client });
 
-        const year = new Date().getFullYear();
-        const yearFolderId = await this.ensureYearFolder(
-            drive,
-            teamConfig.folderId,
-            year,
-        );
-
-        // Search for existing file with same name
-        const searchResponse = await drive.files.list({
-            q: `'${yearFolderId}' in parents and name = '${sheetName}' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false`,
-            fields: 'files(id, name, webViewLink)',
-            spaces: 'drive',
-        });
-
-        if (searchResponse.data.files && searchResponse.data.files.length > 0) {
-            const existingFile = searchResponse.data.files[0];
-
-            // Find next available number suffix
-            let suffix = 1;
-            let suggestedName = `${sheetName} (${suffix})`;
-
-            // Check for existing numbered versions
-            const numberedSearch = await drive.files.list({
-                q: `'${yearFolderId}' in parents and name contains '${sheetName} (' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false`,
-                fields: 'files(name)',
+        try {
+            // Search for existing file with same name in the team's root folder
+            const searchResponse = await drive.files.list({
+                q: `'${teamConfig.folderId}' in parents and name = '${sheetName}' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false`,
+                fields: 'files(id, name, webViewLink)',
                 spaces: 'drive',
             });
 
-            if (numberedSearch.data.files) {
-                const existingNumbers = numberedSearch.data.files
-                    .map((f) => {
-                        const match = f.name?.match(/\((\d+)\)$/);
-                        return match ? parseInt(match[1], 10) : 0;
-                    })
-                    .filter((n) => n > 0);
+            if (searchResponse.data.files && searchResponse.data.files.length > 0) {
+                const existingFile = searchResponse.data.files[0];
 
-                if (existingNumbers.length > 0) {
-                    suffix = Math.max(...existingNumbers) + 1;
-                    suggestedName = `${sheetName} (${suffix})`;
+                // Find next available number suffix
+                let suffix = 1;
+                let suggestedName = `${sheetName} (${suffix})`;
+
+                // Check for existing numbered versions
+                try {
+                    const numberedSearch = await drive.files.list({
+                        q: `'${teamConfig.folderId}' in parents and name contains '${sheetName} (' and mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false`,
+                        fields: 'files(name)',
+                        spaces: 'drive',
+                    });
+
+                    if (numberedSearch.data.files) {
+                        const existingNumbers = numberedSearch.data.files
+                            .map((f) => {
+                                const match = f.name?.match(/\((\d+)\)$/);
+                                return match ? parseInt(match[1], 10) : 0;
+                            })
+                            .filter((n) => n > 0);
+
+                        if (existingNumbers.length > 0) {
+                            suffix = Math.max(...existingNumbers) + 1;
+                            suggestedName = `${sheetName} (${suffix})`;
+                        }
+                    }
+                } catch (error: any) {
+                    // If we can't check numbered versions, just use the base suggestion
+                    this.logger.warn(`Could not check for numbered versions: ${error?.message || String(error)}`);
                 }
+
+                return {
+                    isDuplicate: true,
+                    existingSheetUrl: existingFile.webViewLink || undefined,
+                    existingSheetId: existingFile.id || undefined,
+                    suggestedName,
+                };
             }
 
-            return {
-                isDuplicate: true,
-                existingSheetUrl: existingFile.webViewLink || undefined,
-                existingSheetId: existingFile.id || undefined,
-                suggestedName,
-            };
-        }
+            return { isDuplicate: false };
+        } catch (error: any) {
+            const errorMessage = error?.message || String(error);
+            const errorCode = error?.code || error?.response?.status;
 
-        return { isDuplicate: false };
+            // Handle permission errors specifically
+            // Note: drive.file scope may not allow listing files in shared folders
+            // If we can't check for duplicates due to permissions, we'll proceed anyway
+            // The sheet creation will fail if there are real permission issues
+            if (errorMessage.includes('Insufficient Permission') || 
+                errorMessage.includes('insufficient') ||
+                errorCode === 403) {
+                this.logger.warn(
+                    `Cannot check for duplicates in folder ${teamConfig.folderId} for user ${userId} due to permissions. Proceeding with sheet creation. Error: ${errorMessage}`,
+                );
+                // Return no duplicate found - let the creation proceed
+                // If there's a real duplicate, Google Drive will handle it during creation
+                return { isDuplicate: false };
+            }
+
+            // Re-throw other errors
+            this.logger.error(`Error checking for duplicate sheet: ${errorMessage}`);
+            throw error;
+        }
     }
 
     /**
@@ -309,13 +331,6 @@ export class GoogleDriveService {
         const client = await this.getAuthenticatedClient(userId);
         const drive = google.drive({ version: 'v3', auth: client });
 
-        const year = new Date().getFullYear();
-        const yearFolderId = await this.ensureYearFolder(
-            drive,
-            teamConfig.folderId,
-            year,
-        );
-
         let sheetId: string;
         let sheetUrl: string;
 
@@ -332,7 +347,7 @@ export class GoogleDriveService {
                     fileId: teamConfig.templateId,
                     requestBody: {
                         name: sheetName,
-                        parents: [yearFolderId],
+                        parents: [teamConfig.folderId],
                     },
                     fields: 'id, webViewLink',
                 });
@@ -348,21 +363,21 @@ export class GoogleDriveService {
                     return this.createBlankSheet(
                         drive,
                         sheetName,
-                        yearFolderId,
+                        teamConfig.folderId,
                     );
                 }
                 throw error;
             }
         } else {
             // Create blank sheet
-            return this.createBlankSheet(drive, sheetName, yearFolderId);
+            return this.createBlankSheet(drive, sheetName, teamConfig.folderId);
         }
 
         return {
             sheetId,
             sheetUrl,
             sheetTitle: sheetName,
-            folderId: yearFolderId,
+            folderId: teamConfig.folderId,
         };
     }
 

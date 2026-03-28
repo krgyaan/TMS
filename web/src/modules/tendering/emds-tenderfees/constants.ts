@@ -65,7 +65,7 @@ export const PURPOSE_OPTIONS = [
 ];
 
 export const BG_PURPOSE_OPTIONS = [
-    { value: 'EMD', label: 'EMD (Bid Bond)' },
+    { value: 'EMD', label: 'EMD' },
     { value: 'ADVANCE_PAYMENT', label: 'Advance Payment' },
     { value: 'SECURITY_BOND_DEPOSIT', label: 'Security Bond/Deposit' },
     { value: 'BID_BOND', label: 'Bid Bond' },
@@ -78,9 +78,6 @@ export const DELIVERY_OPTIONS = [
     { value: 'TENDER_DUE', label: 'Tender Due Date' },
     { value: '24', label: '24 Hours' },
     { value: '48', label: '48 Hours' },
-    { value: '72', label: '72 Hours' },
-    { value: '96', label: '96 Hours' },
-    { value: '120', label: '120 Hours' },
 ];
 
 export const BG_NEEDED_IN_OPTIONS = [
@@ -91,13 +88,22 @@ export const BG_NEEDED_IN_OPTIONS = [
 ];
 
 export const BANKS = [
-    { value: 'SBI', label: 'State Bank of India' },
-    { value: 'HDFC', label: 'HDFC Bank' },
-    { value: 'ICICI', label: 'ICICI Bank' },
+    { value: 'BGLIMIT_0771', label: 'BG Limit' },
+    { value: 'AU_8316', label: 'AU 8316' },
+    { value: 'AU_5242', label: 'AU 5242' },
+    { value: 'AU_5180', label: 'AU 5180' },
+    { value: 'AU_5190', label: 'AU 5190' },
+    { value: 'AU_9589', label: 'AU 9589' },
     { value: 'YESBANK_2011', label: 'Yes Bank 2011' },
     { value: 'YESBANK_0771', label: 'Yes Bank 0771' },
-    { value: 'PNB', label: 'Punjab National Bank' },
-    { value: 'BGLIMIT', label: 'BG Limit' },
+    { value: 'HDFC_0026', label: 'HDFC Bank 0026' },
+    { value: 'HDFC_2828', label: 'HDFC Bank 2828' },
+    { value: 'HDFC_2501', label: 'HDFC Bank 2501' },
+    { value: 'HDFC_6446', label: 'HDFC Bank 6446' },
+    { value: 'HDFC_0445', label: 'HDFC Bank 0445' },
+    { value: 'PNB_6011', label: 'PNB Bank 6011' },
+    { value: 'SBI', label: 'State Bank of India' },
+    { value: 'ICICI', label: 'ICICI Bank' },
 ];
 
 export const YES_NO_OPTIONS = [
@@ -161,7 +167,7 @@ export function normalizeModeValue(mode: string | null | undefined): string {
 
 // Helper to get allowed modes from comma-separated string or array
 export function parseAllowedModes(modes: string | string[] | null | undefined): string[] {
-    if (!modes) return [];
+    if (!modes) return ['DD', 'FDR', 'CHEQUE', 'BG', 'BT', 'POP'];
 
     const modeArray = Array.isArray(modes)
         ? modes
@@ -482,3 +488,78 @@ export function getActionColor(action: number | null): string {
     if (action === 2) return 'yellow'; // Followup
     return 'green'; // Further stages
 }
+
+
+export const formatValue = (value?: string | number | null) => {
+    if (value === null || value === undefined || value === "") return "—";
+    return value;
+};
+
+export const getStatusBadgeVariant = (status: string) => {
+    const statusLower = status.toLowerCase();
+    if (statusLower === "pending") return "secondary";
+    if (statusLower === "approved" || statusLower === "received") return "default";
+    if (statusLower === "rejected" || statusLower === "cancelled") return "destructive";
+    return "outline";
+};
+
+export const BI_STATUSES = {
+     'DD_ACCOUNTS_FORM_PENDING': 'PENDING',
+     'DD_ACCOUNTS_FORM_ACCEPTED': 'ACCOUNTS_FORM_ACCEPTED',
+     'DD_ACCOUNTS_FORM_REJECTED': 'ACCOUNTS_FORM_REJECTED',
+     'DD_FOLLOWUP_INITIATED': 'FOLLOWUP_INITIATED',
+     'DD_RETURN_VIA_COURIER': 'COURIER_RETURN_RECEIVED',
+     'DD_RETURN_VIA_BANK_TRANSFER': 'BANK_RETURN_COMPLETED',
+     'DD_SETTLED_WITH_PROJECT': 'PROJECT_SETTLEMENT_COMPLETED',
+     'DD_CANCELLATION_REQUESTED': 'CANCELLATION_REQUESTED',
+     'DD_CANCELLED_AT_BRANCH': 'CANCELLED_AT_BRANCH',
+
+    'FDR_ACCOUNTS_FORM_PENDING': 'PENDING',
+    'FDR_ACCOUNTS_FORM_ACCEPTED': 'ACCOUNTS_FORM_ACCEPTED',
+    'FDR_ACCOUNTS_FORM_REJECTED': 'ACCOUNTS_FORM_REJECTED',
+    'FDR_FOLLOWUP_INITIATED': 'FOLLOWUP_INITIATED',
+    'FDR_RETURN_VIA_COURIER': 'COURIER_RETURN_RECEIVED',
+    'FDR_RETURN_VIA_BANK_TRANSFER': 'BANK_RETURN_COMPLETED',
+    'FDR_SETTLED_WITH_PROJECT': 'PROJECT_SETTLEMENT_COMPLETED',
+    'FDR_CANCELLATION_REQUESTED': 'CANCELLATION_REQUESTED',
+    'FDR_CANCELLED_AT_BRANCH': 'CANCELLED_AT_BRANCH',
+
+    'CHEQUE_ACCOUNTS_FORM_PENDING': 'PENDING',
+    'CHEQUE_ACCOUNTS_FORM_ACCEPTED': 'ACCOUNTS_FORM_ACCEPTED',
+    'CHEQUE_ACCOUNTS_FORM_REJECTED': 'ACCOUNTS_FORM_REJECTED',
+    'CHEQUE_FOLLOWUP_INITIATED': 'FOLLOWUP_INITIATED',
+    'CHEQUE_STOP_FROM_BANK': 'STOP_REQUESTED',
+    'CHEQUE_DEPOSITED_IN_BANK': 'DEPOSITED_IN_BANK',
+    'CHEQUE_PAID_VIA_BANK_TRANSFER': 'PAID_VIA_BANK_TRANSFER',
+    'CHEQUE_CANCELLED_TORN': 'CANCELLED_TORN',
+
+    'BG_ACCOUNTS_FORM_PENDING': 'PENDING',
+    'BG_ACCOUNTS_FORM_ACCEPTED': 'ACCOUNTS_FORM_ACCEPTED',
+    'BG_ACCOUNTS_FORM_REJECTED': 'ACCOUNTS_FORM_REJECTED',
+    'BG_CREATED': 'BG_CREATED',
+    'BG_FDR_DETAILS_CAPTURED': 'FDR_DETAILS_CAPTURED',
+    'BG_FOLLOWUP_INITIATED': 'FOLLOWUP_INITIATED',
+    'BG_EXTENSION_REQUESTED': 'EXTENSION_REQUESTED',
+    'BG_RETURN_VIA_COURIER': 'COURIER_RETURN_RECEIVED',
+    'BG_CANCELLATION_REQUESTED': 'CANCELLATION_REQUESTED',
+    'BG_BG_CANCELLATION_CONFIRMED': 'BG_CANCELLATION_CONFIRMED',
+    'BG_FDR_CANCELLED_CONFIRMED': 'FDR_CANCELLED_CONFIRMED',
+
+    'Bank Transfer_ACCOUNTS_FORM_PENDING': 'PENDING',
+    'Bank Transfer_ACCOUNTS_FORM_ACCEPTED': 'ACCOUNTS_FORM_ACCEPTED',
+    'Bank Transfer_ACCOUNTS_FORM_REJECTED': 'ACCOUNTS_FORM_REJECTED',
+    'Bank Transfer_FOLLOWUP_INITIATED': 'FOLLOWUP_INITIATED',
+    'Bank Transfer_RETURN_VIA_BANK_TRANSFER': 'RETURN_VIA_BANK_TRANSFER',
+    'Bank Transfer_SETTLED_WITH_PROJECT': 'SETTLED_WITH_PROJECT',
+
+    'Portal Payment_ACCOUNTS_FORM_PENDING': 'PENDING',
+    'Portal Payment_ACCOUNTS_FORM_ACCEPTED': 'ACCOUNTS_FORM_ACCEPTED',
+    'Portal Payment_ACCOUNTS_FORM_REJECTED': 'ACCOUNTS_FORM_REJECTED',
+    'Portal Payment_FOLLOWUP_INITIATED': 'FOLLOWUP_INITIATED',
+    'Portal Payment_RETURN_VIA_BANK_TRANSFER': 'RETURN_VIA_BANK_TRANSFER',
+    'Portal Payment_SETTLED_WITH_PROJECT': 'SETTLED_WITH_PROJECT',
+} as const;
+
+export const getReadableStatusName = (status: keyof typeof BI_STATUSES) => {
+  return BI_STATUSES[status].replaceAll('_', ' ');
+};

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { bidSubmissionsService } from '@/services/api/bid-submissions.service';
 import { toast } from 'sonner';
 import type { PaginatedResult, BidSubmissionDashboardCounts, BidSubmissionDashboardRow, BidSubmissionListParams, SubmitBidDto, MarkAsMissedDto } from '@/types/api.types';
+import { useTeamFilter } from '@/hooks/useTeamFilter';
 
 export const bidSubmissionsKey = {
     all: ['bid-submissions'] as const,
@@ -14,21 +15,29 @@ export const bidSubmissionsKey = {
 
 export const useBidSubmissions = (
     tab?: 'pending' | 'submitted' | 'disqualified' | 'tender-dnb',
-    pagination: { page: number; limit: number } = { page: 1, limit: 50 },
+    pagination: { page: number; limit: number; search?: string } = { page: 1, limit: 50 },
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
+    const { teamId, userId, dataScope } = useTeamFilter();
+    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+
     const params: BidSubmissionListParams = {
         tab,
         page: pagination.page,
         limit: pagination.limit,
         ...(sort?.sortBy && { sortBy: sort.sortBy }),
         ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
+        ...(pagination.search && { search: pagination.search }),
+        ...(teamIdParam !== undefined ? { teamId: teamIdParam } : {}),
     };
 
     const queryKeyFilters = {
         tab,
         ...pagination,
         ...sort,
+        dataScope,
+        teamId: teamId ?? null,
+        userId: userId ?? null,
     };
 
     return useQuery<PaginatedResult<BidSubmissionDashboardRow>>({
@@ -112,11 +121,15 @@ export const useUpdateBidSubmission = () => {
 };
 
 export const useBidSubmissionsDashboardCounts = () => {
+    const { teamId, userId, dataScope } = useTeamFilter();
+    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const queryKey = [...bidSubmissionsKey.dashboardCounts(), dataScope, teamId ?? null, userId ?? null];
+
     return useQuery<BidSubmissionDashboardCounts>({
-        queryKey: bidSubmissionsKey.dashboardCounts(),
-        queryFn: () => bidSubmissionsService.getDashboardCounts(),
-        staleTime: 30000, // Cache for 30 seconds
-        retry: 2, // Retry failed requests twice
+        queryKey,
+        queryFn: () => bidSubmissionsService.getDashboardCounts(teamIdParam),
+        staleTime: 0,
+        retry: 2,
     });
 };
 
