@@ -1,9 +1,8 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, ArrowLeft, ExternalLink } from 'lucide-react';
+import { useState, useCallback, useMemo } from 'react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertCircle, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useTender } from '@/hooks/api/useTenders';
@@ -13,12 +12,12 @@ import { usePhysicalDocByTenderId } from '@/hooks/api/usePhysicalDocs';
 import { useRfqByTenderId } from '@/hooks/api/useRfqs';
 import { usePaymentRequestsByTender } from '@/hooks/api/useEmds';
 import { useDocumentChecklistByTender } from '@/hooks/api/useDocumentChecklists';
+import { useCostingSheetByTender } from '@/hooks/api/useCostingSheets';
 import { useBidSubmissionByTender } from '@/hooks/api/useBidSubmissions';
 import { useVendorOrganizations } from '@/hooks/api/useVendorOrganizations';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { paths } from '@/app/routes/paths';
-import type { TenderWithRelations } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 import { TenderView } from '@/modules/tendering/tenders/components/TenderView';
 import { InfoSheetView } from '@/modules/tendering/info-sheet/components/InfoSheetView';
 import { TenderApprovalView } from '@/modules/tendering/tender-approval/components/TenderApprovalView';
@@ -26,158 +25,228 @@ import { PhysicalDocsView } from '@/modules/tendering/physical-docs/components/P
 import { RfqView } from '@/modules/tendering/rfqs/components/RfqView';
 import { EmdTenderFeeShow } from '@/modules/tendering/emds-tenderfees/components/EmdTenderFeeShow';
 import { DocumentChecklistView } from '@/modules/tendering/checklists/components/DocumentChecklistView';
-import { useCostingSheetByTender } from '@/hooks/api/useCostingSheets';
 import { BidSubmissionView } from '@/modules/tendering/bid-submissions/components/BidSubmissionView';
+import type { TenderWithRelations } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
+import {
+    ShowPageLayout,
+    type StepConfig,
+    type StepStatus,
+} from "@/modules/tendering/components/ShowPageLayout";
 
 export default function CostingApprovalViewPage() {
     const { tenderId: tenderIdParam } = useParams<{ tenderId: string }>();
     const navigate = useNavigate();
+    const tenderId = tenderIdParam ? parseInt(tenderIdParam, 10) : 0;
 
-    if (!tenderIdParam) {
-        return (
-            <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>Invalid Tender ID.</AlertDescription>
-            </Alert>
-        );
-    }
-
-    const tenderId = Number(tenderIdParam);
+    // ── Data fetching ──
     const { data: tender, isLoading: tenderLoading, error: tenderError } = useTender(tenderId);
     const { data: approval, isLoading: approvalLoading } = useTenderApproval(tenderId);
     const { data: infoSheet, isLoading: infoSheetLoading } = useInfoSheet(tenderId);
     const { data: physicalDoc, isLoading: physicalDocLoading } = usePhysicalDocByTenderId(tenderId);
     const { data: rfq, isLoading: rfqLoading } = useRfqByTenderId(tenderId);
-    const { data: paymentRequests, isLoading: paymentRequestsLoading } = usePaymentRequestsByTender(tenderId);
+    const { data: paymentRequests, isLoading: requestsLoading } = usePaymentRequestsByTender(tenderId);
     const { data: documentChecklist, isLoading: documentChecklistLoading } = useDocumentChecklistByTender(tenderId);
     const { data: costingSheet, isLoading: costingSheetLoading } = useCostingSheetByTender(tenderId);
     const { data: bidSubmission, isLoading: bidSubmissionLoading } = useBidSubmissionByTender(tenderId);
     const { data: vendorOrganizations } = useVendorOrganizations();
 
-    if (tenderError) {
-        return (
-            <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                    Failed to load tender. You may not have permission to access this resource.
-                </AlertDescription>
-            </Alert>
-        );
-    }
-
-    if (tenderLoading || costingSheetLoading) {
-        return <Skeleton className="h-[800px]" />;
-    }
-
-    if (tenderError || (!tenderLoading && !tender)) {
-        return (
-            <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>Costing sheet or tender not found.</AlertDescription>
-            </Alert>
-        );
-    }
-
-    // Combine tender and approval into TenderWithRelations
     const tenderWithRelations: TenderWithRelations | null = tender
-        ? {
-            ...tender,
-            approval: approval || null,
-        }
+        ? { ...tender, approval: approval || null }
         : null;
 
     const selectedVendorOrganizations = vendorOrganizations?.filter(vo =>
         costingSheet?.oemVendorIds?.includes(vo.id) || false
     ) || [];
 
-    return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <Button variant="outline" onClick={() => navigate(paths.tendering.costingApprovals)}>
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back
-                </Button>
-            </div>
-            <Tabs defaultValue="tender-details" className="space-y-4">
-                <TabsList className="grid w-fit grid-cols-7 gap-2">
-                    <TabsTrigger value="tender-details">Tender Details</TabsTrigger>
-                    <TabsTrigger value="physical-docs">Physical Docs</TabsTrigger>
-                    <TabsTrigger value="rfq">RFQ</TabsTrigger>
-                    <TabsTrigger value="emds-tenderfees">EMD</TabsTrigger>
-                    <TabsTrigger value="document-checklist"> Checklist</TabsTrigger>
-                    <TabsTrigger value="bid-submission">Bid Submission</TabsTrigger>
-                    <TabsTrigger value="costing-details">Costing</TabsTrigger>
-                </TabsList>
+    // ── Derive step statuses ──
+    const steps: StepConfig[] = useMemo(() => {
+        function getStatus(hasData: boolean, loading: boolean): StepStatus {
+            if (loading) return "loading";
+            if (hasData) return "completed";
+            return "pending";
+        }
 
-                {/* Tender Details - Merged Tender, Info Sheet, and Approval */}
-                <TabsContent value="tender-details" className="space-y-6">
-                    {tenderWithRelations ? (
-                        <TenderView
-                            tender={tenderWithRelations}
-                            isLoading={tenderLoading || approvalLoading}
-                        />
-                    ) : (
-                        <Alert>
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertDescription>Tender information not available.</AlertDescription>
-                        </Alert>
-                    )}
-                    <InfoSheetView
-                        infoSheet={infoSheet || null}
-                        isLoading={infoSheetLoading}
-                    />
-                    {tenderWithRelations && (
-                        <TenderApprovalView
-                            tender={tenderWithRelations}
-                            isLoading={tenderLoading || approvalLoading}
-                        />
-                    )}
-                </TabsContent>
+        return [
+            {
+                id: "tender-details",
+                label: "Tender Details",
+                shortLabel: "Tender Details",
+                stepNumber: 1,
+                hasData: !!tender,
+                isLoading: tenderLoading || approvalLoading || infoSheetLoading,
+                status: getStatus(!!tender, tenderLoading),
+            },
+            {
+                id: "physical-docs",
+                label: "Physical Documents",
+                shortLabel: "Physical Docs",
+                stepNumber: 2,
+                hasData: !!physicalDoc,
+                isLoading: physicalDocLoading,
+                status: getStatus(!!physicalDoc, physicalDocLoading),
+            },
+            {
+                id: "rfq",
+                label: "RFQ & Responses",
+                shortLabel: "RFQ",
+                stepNumber: 3,
+                hasData: Array.isArray(rfq) && rfq.length > 0,
+                isLoading: rfqLoading,
+                status: getStatus(Array.isArray(rfq) && rfq.length > 0, rfqLoading),
+            },
+            {
+                id: "emd-fees",
+                label: "EMD & Tender Fees",
+                shortLabel: "EMD / Fees",
+                stepNumber: 4,
+                hasData: !!paymentRequests && paymentRequests.length > 0,
+                isLoading: requestsLoading,
+                status: getStatus(!!paymentRequests && paymentRequests.length > 0, requestsLoading),
+            },
+            {
+                id: "checklist",
+                label: "Document Checklist",
+                shortLabel: "Checklist",
+                stepNumber: 5,
+                hasData: !!documentChecklist,
+                isLoading: documentChecklistLoading,
+                status: getStatus(!!documentChecklist, documentChecklistLoading),
+            },
+            {
+                id: "bid-submission",
+                label: "Bid Submission",
+                shortLabel: "Bid",
+                stepNumber: 6,
+                hasData: !!bidSubmission,
+                isLoading: bidSubmissionLoading,
+                status: getStatus(!!bidSubmission, bidSubmissionLoading),
+            },
+            {
+                id: "costing-details",
+                label: "Costing Details",
+                shortLabel: "Costing",
+                stepNumber: 7,
+                hasData: !!costingSheet,
+                isLoading: costingSheetLoading,
+                status: getStatus(!!costingSheet, costingSheetLoading),
+            },
+        ];
+    }, [
+        tender, tenderLoading, approvalLoading, infoSheetLoading,
+        physicalDoc, physicalDocLoading,
+        rfq, rfqLoading,
+        paymentRequests, requestsLoading,
+        documentChecklist, documentChecklistLoading,
+        bidSubmission, bidSubmissionLoading,
+        costingSheet, costingSheetLoading
+    ]);
 
-                {/* Physical Docs */}
-                <TabsContent value="physical-docs">
+    // ── View state ──
+    const [expandedSections, setExpandedSections] = useState<Set<string>>(
+        new Set(["costing-details"])
+    );
+    const [activeSection, setActiveSection] = useState("costing-details");
+
+    // ── Handlers ──
+    const toggleSection = useCallback((id: string) => {
+        setExpandedSections((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    }, []);
+
+    const expandAll = useCallback(
+        () => setExpandedSections(new Set(steps.map((s) => s.id))),
+        [steps]
+    );
+    const collapseAll = useCallback(() => setExpandedSections(new Set()), []);
+
+    const jumpToSection = useCallback((id: string) => {
+        setActiveSection(id);
+        const el = document.getElementById(`section-${id}`);
+        if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+    }, []);
+
+    // ── Section content renderers ──
+    const renderSectionContent = (stepId: string) => {
+        switch (stepId) {
+            case "tender-details":
+                return (
+                    <div className="space-y-6">
+                        {tenderWithRelations ? (
+                            <TenderView
+                                tender={tenderWithRelations}
+                                isLoading={tenderLoading || approvalLoading}
+                            />
+                        ) : tenderLoading ? (
+                            <div className="animate-pulse h-48 bg-muted rounded-lg" />
+                        ) : (
+                            <Alert>
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertDescription>Tender information not available.</AlertDescription>
+                            </Alert>
+                        )}
+                        <InfoSheetView
+                            infoSheet={infoSheet || null}
+                            isLoading={infoSheetLoading}
+                        />
+                        {tenderWithRelations && (
+                            <TenderApprovalView
+                                tender={tenderWithRelations}
+                                isLoading={tenderLoading || approvalLoading}
+                            />
+                        )}
+                    </div>
+                );
+
+            case "physical-docs":
+                return (
                     <PhysicalDocsView
                         physicalDoc={physicalDoc || null}
                         isLoading={physicalDocLoading}
                     />
-                </TabsContent>
+                );
 
-                {/* RFQ */}
-                <TabsContent value="rfq">
+            case "rfq":
+                return (
                     <RfqView
                         rfq={Array.isArray(rfq) && rfq.length > 0 ? rfq[0] : null}
                         tender={tender || undefined}
                         isLoading={rfqLoading}
                     />
-                </TabsContent>
+                );
 
-                {/* EMD & Tender Fees */}
-                <TabsContent value="emds-tenderfees">
+            case "emd-fees":
+                return (
                     <EmdTenderFeeShow
                         paymentRequests={paymentRequests || null}
                         tender={tender || null}
-                        isLoading={paymentRequestsLoading}
+                        isLoading={requestsLoading}
                     />
-                </TabsContent>
+                );
 
-                {/* Document Checklist */}
-                <TabsContent value="document-checklist">
+            case "checklist":
+                return (
                     <DocumentChecklistView
                         checklist={documentChecklist || null}
                         isLoading={documentChecklistLoading}
                     />
-                </TabsContent>
+                );
 
-                {/* Bid Submission */}
-                <TabsContent value="bid-submission">
+            case "bid-submission":
+                return (
                     <BidSubmissionView
                         bidSubmission={bidSubmission || null}
                         isLoading={bidSubmissionLoading}
                     />
-                </TabsContent>
+                );
 
-                {/* Costing Details */}
-                <TabsContent value="costing-details">
+            case "costing-details":
+                return (
                     <Card>
                         <CardHeader>
                             <div className="flex items-center justify-between">
@@ -195,10 +264,10 @@ export default function CostingApprovalViewPage() {
                             </div>
                         </CardHeader>
                         <CardContent className="space-y-8">
-                            {/* Tender Information */}
+                            {/* Tender Information Summary (Optional since we have Tender Details above, but keeping consistency with original view) */}
                             <div className="space-y-4">
                                 <h4 className="font-semibold text-base text-primary border-b pb-2">
-                                    Tender Information
+                                    Summary
                                 </h4>
                                 <div className="grid gap-4 md:grid-cols-2 bg-muted/30 p-4 rounded-lg">
                                     <div>
@@ -209,18 +278,8 @@ export default function CostingApprovalViewPage() {
                                         <p className="text-sm font-medium text-muted-foreground">Team Member</p>
                                         <p className="text-base font-semibold">{tender?.teamMemberName || '—'}</p>
                                     </div>
-                                    <div className="md:col-span-2">
-                                        <p className="text-sm font-medium text-muted-foreground">Tender Name</p>
-                                        <p className="text-base font-semibold">{tender?.tenderName}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium text-muted-foreground">Due Date</p>
-                                        <p className="text-base font-semibold">
-                                            {tender?.dueDate ? formatDateTime(tender.dueDate as Date) : '—'}
-                                        </p>
-                                    </div>
                                     {costingSheet?.googleSheetUrl && (
-                                        <div>
+                                        <div className="md:col-span-2">
                                             <p className="text-sm font-medium text-muted-foreground">Google Sheet</p>
                                             <a
                                                 href={costingSheet?.googleSheetUrl}
@@ -430,8 +489,45 @@ export default function CostingApprovalViewPage() {
                             </div>
                         </CardContent>
                     </Card>
-                </TabsContent>
-            </Tabs>
-        </div>
+                );
+
+            default:
+                return null;
+        }
+    };
+
+    if (!tenderId) {
+        return (
+            <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>Invalid Tender ID</AlertDescription>
+            </Alert>
+        );
+    }
+
+    if (tenderError) {
+        return (
+            <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Error loading tender</AlertTitle>
+                <AlertDescription>{tenderError.message}</AlertDescription>
+            </Alert>
+        );
+    }
+
+    return (
+        <ShowPageLayout
+            steps={steps}
+            activeSection={activeSection}
+            onJump={jumpToSection}
+            onSectionVisible={setActiveSection}
+            expandedSections={expandedSections}
+            onToggleSection={toggleSection}
+            onExpandAll={expandAll}
+            onCollapseAll={collapseAll}
+            onBack={() => navigate(paths.tendering.costingApprovals)}
+            backLabel="Back to Costing Approvals"
+            renderSectionContent={renderSectionContent}
+        />
     );
 }
