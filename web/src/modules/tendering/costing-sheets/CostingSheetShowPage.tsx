@@ -1,9 +1,5 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { useState, useCallback, useMemo } from "react";
 import { useTender } from "@/hooks/api/useTenders";
 import { useTenderApproval } from "@/hooks/api/useTenderApprovals";
 import { useInfoSheet } from "@/hooks/api/useInfoSheets";
@@ -24,10 +20,241 @@ import { EmdTenderFeeShow } from "@/modules/tendering/emds-tenderfees/components
 import { DocumentChecklistView } from "@/modules/tendering/checklists/components/DocumentChecklistView";
 import { CostingSheetView } from "./components/CostingSheetView";
 import { BidSubmissionView } from "@/modules/tendering/bid-submissions/components/BidSubmissionView";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
+import {
+    ShowPageLayout,
+    type StepConfig,
+    type StepStatus,
+} from "@/modules/tendering/components/ShowPageLayout";
 
 export default function CostingSheetShowPage() {
     const { tenderId: tenderIdParam } = useParams<{ tenderId: string }>();
     const navigate = useNavigate();
+    const tenderId = tenderIdParam ? Number(tenderIdParam) : null;
+
+    // ── Data fetching ──
+    const { data: tender, isLoading: tenderLoading } = useTender(tenderId);
+    const { data: approval, isLoading: approvalLoading } = useTenderApproval(tenderId);
+    const { data: infoSheet, isLoading: infoSheetLoading } = useInfoSheet(tenderId);
+    const { data: physicalDoc, isLoading: physicalDocLoading } = usePhysicalDocByTenderId(tenderId);
+    const { data: rfq, isLoading: rfqLoading } = useRfqByTenderId(tenderId);
+    const { data: paymentRequests, isLoading: requestsLoading } = usePaymentRequestsByTender(tenderId);
+    const { data: documentChecklist, isLoading: documentChecklistLoading } = useDocumentChecklistByTender(tenderId ?? 0);
+    const { data: costingSheet, isLoading: costingSheetLoading } = useCostingSheetByTender(tenderId ?? 0);
+    const { data: bidSubmission, isLoading: bidSubmissionLoading } = useBidSubmissionByTender(tenderId ?? 0);
+
+    const tenderWithRelations: TenderWithRelations | null = tender
+        ? { ...tender, approval: approval || null }
+        : null;
+
+
+    // ── Derive step statuses ──
+    const steps: StepConfig[] = useMemo(() => {
+        function getStatus(hasData: boolean, loading: boolean): StepStatus {
+            if (loading) return "loading";
+            if (hasData) return "completed";
+            return "pending";
+        }
+
+        return [
+            {
+                id: "tender-details",
+                label: "Tender Details",
+                shortLabel: "Tender Details",
+                stepNumber: 1,
+                hasData: !!tender,
+                isLoading: tenderLoading || approvalLoading || infoSheetLoading,
+                status: getStatus(!!tender, tenderLoading),
+            },
+            {
+                id: "physical-docs",
+                label: "Physical Documents",
+                shortLabel: "Physical Docs",
+                stepNumber: 2,
+                hasData: !!physicalDoc,
+                isLoading: physicalDocLoading,
+                status: getStatus(!!physicalDoc, physicalDocLoading),
+            },
+            {
+                id: "rfq",
+                label: "RFQ & Responses",
+                shortLabel: "RFQ",
+                stepNumber: 3,
+                hasData: Array.isArray(rfq) && rfq.length > 0,
+                isLoading: rfqLoading,
+                status: getStatus(Array.isArray(rfq) && rfq.length > 0, rfqLoading),
+            },
+            {
+                id: "emd-fees",
+                label: "EMD & Tender Fees",
+                shortLabel: "EMD / Fees",
+                stepNumber: 4,
+                hasData: !!paymentRequests && paymentRequests.length > 0,
+                isLoading: requestsLoading,
+                status: getStatus(!!paymentRequests && paymentRequests.length > 0, requestsLoading),
+            },
+            {
+                id: "checklist",
+                label: "Document Checklist",
+                shortLabel: "Checklist",
+                stepNumber: 5,
+                hasData: !!documentChecklist,
+                isLoading: documentChecklistLoading,
+                status: getStatus(!!documentChecklist, documentChecklistLoading),
+            },
+            {
+                id: "costing",
+                label: "Costing Sheet",
+                shortLabel: "Costing",
+                stepNumber: 6,
+                hasData: !!costingSheet,
+                isLoading: costingSheetLoading,
+                status: getStatus(!!costingSheet, costingSheetLoading),
+            },
+            {
+                id: "bid-submission",
+                label: "Bid Submission",
+                shortLabel: "Bid",
+                stepNumber: 7,
+                hasData: !!bidSubmission,
+                isLoading: bidSubmissionLoading,
+                status: getStatus(!!bidSubmission, bidSubmissionLoading),
+            },
+        ];
+    }, [
+        tender,
+        tenderLoading,
+        approvalLoading,
+        infoSheetLoading,
+        physicalDoc,
+        physicalDocLoading,
+        rfq,
+        rfqLoading,
+        paymentRequests,
+        requestsLoading,
+        documentChecklist,
+        documentChecklistLoading,
+        costingSheet,
+        costingSheetLoading,
+        bidSubmission,
+        bidSubmissionLoading,
+    ]);
+
+    // ── View state ──
+    const [expandedSections, setExpandedSections] = useState<Set<string>>(
+        new Set(["costing"])
+    );
+    const [activeSection, setActiveSection] = useState("costing");
+
+    // ── Handlers ──
+    const toggleSection = useCallback((id: string) => {
+        setExpandedSections((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    }, []);
+
+    const expandAll = useCallback(
+        () => setExpandedSections(new Set(steps.map((s) => s.id))),
+        [steps]
+    );
+    const collapseAll = useCallback(() => setExpandedSections(new Set()), []);
+
+    const jumpToSection = useCallback((id: string) => {
+        setActiveSection(id);
+        const el = document.getElementById(`section-${id}`);
+        if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+    }, []);
+
+    // ── Section content renderers ──
+    const renderSectionContent = (stepId: string) => {
+        switch (stepId) {
+            case "tender-details":
+                return (
+                    <div className="space-y-6">
+                        {tenderWithRelations ? (
+                            <TenderView
+                                tender={tenderWithRelations}
+                                isLoading={tenderLoading || approvalLoading}
+                            />
+                        ) : (
+                            <Alert>
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertDescription>Tender information not available.</AlertDescription>
+                            </Alert>
+                        )}
+                        <InfoSheetView
+                            infoSheet={infoSheet || null}
+                            isLoading={infoSheetLoading}
+                        />
+                        {tenderWithRelations && (
+                            <TenderApprovalView
+                                tender={tenderWithRelations}
+                                isLoading={tenderLoading || approvalLoading}
+                            />
+                        )}
+                    </div>
+                );
+
+            case "physical-docs":
+                return (
+                    <PhysicalDocsView
+                        physicalDoc={physicalDoc || null}
+                        isLoading={physicalDocLoading}
+                    />
+                );
+
+            case "rfq":
+                return (
+                    <RfqView
+                        rfq={Array.isArray(rfq) && rfq.length > 0 ? rfq[0] : null}
+                        tender={tender ?? undefined}
+                        isLoading={rfqLoading}
+                    />
+                );
+
+            case "emd-fees":
+                return (
+                    <EmdTenderFeeShow
+                        paymentRequests={paymentRequests || null}
+                        tender={tender || null}
+                        isLoading={requestsLoading}
+                    />
+                );
+
+            case "checklist":
+                return (
+                    <DocumentChecklistView
+                        checklist={documentChecklist || null}
+                        isLoading={documentChecklistLoading}
+                    />
+                );
+
+            case "costing":
+                return (
+                    <CostingSheetView
+                        costingSheet={costingSheet || null}
+                        isLoading={costingSheetLoading}
+                    />
+                );
+
+            case "bid-submission":
+                return (
+                    <BidSubmissionView
+                        bidSubmission={bidSubmission || null}
+                        isLoading={bidSubmissionLoading}
+                    />
+                );
+
+            default:
+                return null;
+        }
+    };
 
     if (!tenderIdParam) {
         return (
@@ -38,144 +265,19 @@ export default function CostingSheetShowPage() {
         );
     }
 
-    const tenderId = Number(tenderIdParam);
-    const { data: tender, isLoading: tenderLoading, error: tenderError } = useTender(tenderId);
-    const { data: approval, isLoading: approvalLoading } = useTenderApproval(tenderId);
-    const { data: infoSheet, isLoading: infoSheetLoading } = useInfoSheet(tenderId);
-    const { data: physicalDoc, isLoading: physicalDocLoading } = usePhysicalDocByTenderId(tenderId);
-    const { data: rfq, isLoading: rfqLoading } = useRfqByTenderId(tenderId);
-    const { data: paymentRequests, isLoading: requestsLoading } = usePaymentRequestsByTender(tenderId);
-    const { data: documentChecklist, isLoading: documentChecklistLoading } = useDocumentChecklistByTender(tenderId);
-    const { data: costingSheet, isLoading: costingSheetLoading } = useCostingSheetByTender(tenderId);
-    const { data: bidSubmission, isLoading: bidSubmissionLoading } = useBidSubmissionByTender(tenderId);
-
-    const isLoading = tenderLoading || approvalLoading || costingSheetLoading;
-
-    if (tenderError || (!tenderLoading && !tender)) {
-        return (
-            <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                    Tender not found or failed to load.
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="ml-4"
-                        onClick={() => navigate(paths.tendering.costingSheets)}
-                    >
-                        Back to List
-                    </Button>
-                </AlertDescription>
-            </Alert>
-        );
-    }
-
-    if (isLoading) {
-        return <Skeleton className="h-[800px]" />;
-    }
-
-    // Combine tender and approval into TenderWithRelations
-    const tenderWithRelations: TenderWithRelations | null = tender
-        ? {
-            ...tender,
-            approval: approval || null,
-        }
-        : null;
-
     return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <Button variant="outline" onClick={() => navigate(paths.tendering.costingSheets)}>
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back
-                </Button>
-            </div>
-            <Tabs defaultValue="tender-details" className="space-y-4">
-                <TabsList className="grid w-fit grid-cols-7 gap-2">
-                    <TabsTrigger value="tender-details">Tender Details</TabsTrigger>
-                    <TabsTrigger value="physical-docs">Physical Docs</TabsTrigger>
-                    <TabsTrigger value="rfq">RFQ</TabsTrigger>
-                    <TabsTrigger value="emds-tenderfees">EMD & Tender Fees</TabsTrigger>
-                    <TabsTrigger value="document-checklist">Document Checklist</TabsTrigger>
-                    <TabsTrigger value="costing-details">Costing Details</TabsTrigger>
-                    <TabsTrigger value="bid-submission">Bid Submission</TabsTrigger>
-                </TabsList>
-
-                {/* Tender Details - Merged Tender, Info Sheet, and Approval */}
-                <TabsContent value="tender-details" className="space-y-6">
-                    {tenderWithRelations ? (
-                        <TenderView
-                            tender={tenderWithRelations}
-                            isLoading={isLoading}
-                        />
-                    ) : (
-                        <Alert>
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertDescription>Tender information not available.</AlertDescription>
-                        </Alert>
-                    )}
-                    <InfoSheetView
-                        infoSheet={infoSheet || null}
-                        isLoading={infoSheetLoading}
-                    />
-                    {tenderWithRelations && (
-                        <TenderApprovalView
-                            tender={tenderWithRelations}
-                            isLoading={isLoading}
-                        />
-                    )}
-                </TabsContent>
-
-                {/* Physical Docs */}
-                <TabsContent value="physical-docs">
-                    <PhysicalDocsView
-                        physicalDoc={physicalDoc || null}
-                        isLoading={physicalDocLoading}
-                    />
-                </TabsContent>
-
-                {/* RFQ */}
-                <TabsContent value="rfq">
-                    <RfqView
-                        rfq={Array.isArray(rfq) && rfq.length > 0 ? rfq[0] : null}
-                        tender={tender || undefined}
-                        isLoading={rfqLoading}
-                    />
-                </TabsContent>
-
-                {/* EMD & Tender Fees */}
-                <TabsContent value="emds-tenderfees">
-                    <EmdTenderFeeShow
-                        paymentRequests={paymentRequests || null}
-                        tender={tender || null}
-                        isLoading={requestsLoading}
-                    />
-                </TabsContent>
-
-                {/* Document Checklist */}
-                <TabsContent value="document-checklist">
-                    <DocumentChecklistView
-                        checklist={documentChecklist || null}
-                        isLoading={documentChecklistLoading}
-                    />
-                </TabsContent>
-
-                {/* Costing Details */}
-                <TabsContent value="costing-details">
-                    <CostingSheetView
-                        costingSheet={costingSheet || null}
-                        isLoading={costingSheetLoading}
-                    />
-                </TabsContent>
-
-                {/* Bid Submission */}
-                <TabsContent value="bid-submission">
-                    <BidSubmissionView
-                        bidSubmission={bidSubmission || null}
-                        isLoading={bidSubmissionLoading}
-                    />
-                </TabsContent>
-            </Tabs>
-        </div>
+        <ShowPageLayout
+            steps={steps}
+            activeSection={activeSection}
+            onJump={jumpToSection}
+            onSectionVisible={setActiveSection}
+            expandedSections={expandedSections}
+            onToggleSection={toggleSection}
+            onExpandAll={expandAll}
+            onCollapseAll={collapseAll}
+            onBack={() => navigate(paths.tendering.costingSheets)}
+            backLabel="Back to Costing Sheets"
+            renderSectionContent={renderSectionContent}
+        />
     );
 }
