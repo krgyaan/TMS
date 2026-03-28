@@ -30,11 +30,11 @@ export interface CreateImprestInput {
     project_name?: string | null;
     amount: number;
     category?: string | null;
-    team_id?: number | null;
+    transferToId?: number | null;
     remark?: string | null;
 }
 
-export const createImprest = async ({ data, files }: { data: CreateImprestInput; files: File[] }) => {
+export const createImprest = async ({ data, files }: { data: any; files: File[] }) => {
     const formData = new FormData();
 
     // Append form fields

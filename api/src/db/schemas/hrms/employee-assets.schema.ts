@@ -17,6 +17,9 @@ export const employeeAssets = pgTable('hrms_employee_assets', {
   licenseKey:          varchar('license_key', { length: 500 }),
   assetValue:          numeric('asset_value', { precision: 12, scale: 2 }),
   assetCondition:      varchar('asset_condition', { length: 20 }).notNull().default('good'),
+  purchaseDate:        date('purchase_date'),
+  purchasePrice:       numeric('purchase_price', { precision: 12, scale: 2 }),
+  purchaseFrom:        varchar('purchase_from', { length: 255 }),
   assignedDate:        date('assigned_date').notNull(),
   assignedBy:          bigint('assigned_by', { mode: 'number' }),
   expectedReturnDate:  date('expected_return_date'),
@@ -35,6 +38,7 @@ export const employeeAssets = pgTable('hrms_employee_assets', {
   returnCondition:     varchar('return_condition', { length: 20 }),
   damageRemarks:       text('damage_remarks'),
   deductionAmount:     numeric('deduction_amount', { precision: 12, scale: 2 }),
+  remarks:             text('remarks'),
   createdAt:           timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:           timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

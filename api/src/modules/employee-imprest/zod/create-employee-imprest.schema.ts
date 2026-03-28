@@ -28,6 +28,8 @@ export const CreateEmployeeImprestSchema = z.object({
     status: z.coerce.number().int().optional(),
 
     approvedDate: z.coerce.date().optional().nullable(),
+
+    transferToId: z.coerce.number().int().optional(),
 });
 
 export type CreateEmployeeImprestDto = z.infer<typeof CreateEmployeeImprestSchema>;

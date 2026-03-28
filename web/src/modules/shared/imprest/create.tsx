@@ -79,7 +79,15 @@ const EmployeeImprestForm: React.FC = () => {
     }, [watchedCategoryId]);
 
     // All users except self
-    const transferUserOptions = allUsers.filter(u => u.id !== user?.id).map(u => ({ id: String(u.id), name: u.name }));
+    const transferUserOptions = allUsers
+        .filter(u => u.id !== user?.id && u.isActive === true)
+        .map(u => ({
+            id: String(u.id),
+            // Convert to Title Case for uniformity
+            name: u.name?.toLowerCase().replace(/\b\w/g, char => char.toUpperCase()),
+        }))
+        // Sort alphabetically by name
+        .sort((a, b) => a.name.localeCompare(b.name));
 
     const onSubmit = async (data: CreateImprestInput) => {
         // Validate transfer user selection before submitting
@@ -93,9 +101,8 @@ const EmployeeImprestForm: React.FC = () => {
         await createMutation.mutateAsync({
             data: {
                 ...data,
-                // teamId carries the receiver's userId — backend uses this
-                // to create the transaction record and the imprest record
-                teamId: isTransferMode ? Number(selectedTransferUserId) : (data.teamId ?? undefined),
+                transferToId: isTransferMode ? Number(selectedTransferUserId) : null,
+                user,
             },
             files: pondFiles,
         });

@@ -135,14 +135,14 @@ const navMain: NavGroup[] = [
     {
         title: "HRMS",
         icon: Briefcase,
-        items: [{ title: "My Assets", url: paths.hrms.myAssets, permission: "hrms.view" }],
+        items: [{ title: "My Assets", url: paths.hrms.myAssets, permission: "hrms" }],
     },
     {
         title: "HR Administration",
         icon: Shield,
         items: [
-            { title: "Asset Administration", url: "/hrms/assets", permission: "hrms.admin.view" },
-            { title: "Register Employee", url: paths.hrms.employeeRegistration, permission: "hrms.admin.view" },
+            { title: "Asset Administration", url: "/hrms/assets", permission: "hrms.admin" },
+            { title: "Register Employee", url: paths.hrms.employeeRegistration, permission: "hrms.admin" },
         ],
     },
     {
@@ -210,6 +210,11 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
         };
 
     const filteredMenuItems = React.useMemo(() => filterMenu(currentUser, navMain), [currentUser]);
+
+
+    console.log("USER:", currentUser);
+    console.log("CHECK hrms:", canRead(currentUser, "hrms"));
+    console.log("CHECK hrms.admin:", canRead(currentUser, "hrms.admin"));
 
     const logoutMutation = useLogout();
 

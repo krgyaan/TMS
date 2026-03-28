@@ -38,11 +38,7 @@ export class EmployeeImprestController {
         }
 
         // Pass sender's userId from JWT — service resolves name from DB
-        return this.service.createWithTransfer(
-            parsed.data,
-            files ?? [],
-            req.user.sub // sender's userId
-        );
+        return this.service.createWithTransfer(parsed.data, files ?? []);
     }
 
     @Get()

@@ -384,7 +384,7 @@ const ImprestEmployeeDashboard: React.FC = () => {
                 minWidth: 140,
             },
             {
-                field: "categoryName",
+                field: "formattedCategory",
                 headerName: "Category",
                 flex: 1,
                 minWidth: 140,
