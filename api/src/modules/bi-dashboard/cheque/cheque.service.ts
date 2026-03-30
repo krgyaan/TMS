@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, NotFoundException, BadRequestException, forwardRef } from '@nestjs/common';
-import { eq, and, inArray, isNull, isNotNull, sql, asc, desc, ne, notInArray, or } from 'drizzle-orm';
+import { eq, and, inArray, isNull, isNotNull, sql, asc, desc, ne, notInArray, or, ilike } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import {
@@ -71,7 +71,10 @@ export class ChequeService {
                 ne(paymentInstruments.action, 6), // not cancelled
                 eq(paymentInstruments.action, 1),
                 eq(paymentInstruments.status, CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED),
-                eq(instrumentChequeDetails.chequeReason, 'Payable'),
+                or(
+                    ilike(instrumentChequeDetails.chequeReason, 'Payable'),
+                    ilike(instrumentChequeDetails.chequeReason, 'other_payment')
+                ),
                 this.getNotExpiredCondition(),
             );
         } else if (tab === 'cheque-paid-stop') {
