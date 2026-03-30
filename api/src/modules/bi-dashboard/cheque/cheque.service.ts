@@ -72,8 +72,8 @@ export class ChequeService {
                 eq(paymentInstruments.action, 1),
                 eq(paymentInstruments.status, CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED),
                 or(
-                    ilike(instrumentChequeDetails.chequeReason, 'Payable'),
-                    ilike(instrumentChequeDetails.chequeReason, 'other_payment')
+                    ilike(instrumentChequeDetails.chequeReason, '%Payable%'),
+                    ilike(instrumentChequeDetails.chequeReason, '%other_payment%')
                 ),
                 this.getNotExpiredCondition(),
             );
