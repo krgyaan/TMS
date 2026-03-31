@@ -8,7 +8,7 @@ export const CreateRequestExtensionSchema = z.object({
         org: z.string().min(1),
         name: z.string().min(1),
         email: z.string().email(),
-        phone: z.string().min(1),
+        phone: z.string().optional(),
     })).min(1, "At least one client is required"),
 
 });
