@@ -16,12 +16,6 @@ import {
   ArrowLeft, 
   Loader2, 
   UploadCloud, 
-  Monitor, 
-  Smartphone, 
-  Laptop, 
-  Keyboard,
-  Car,
-  CreditCard,
   Package,
   Info,
   ShoppingCart,
@@ -30,6 +24,9 @@ import {
 import { useUsers } from "@/hooks/api/useUsers";
 import { useCreateHrmsAsset } from "@/hooks/api/useHrmsAssets";
 import { useCurrentUser } from "@/hooks/api/useAuth";
+import { toOptions, toValue, ASSET_TYPE, ASSET_CATEGORY, ASSET_CONDITION, ASSET_LOCATION, ASSET_STATUS, ACCESSORIES_LIST } from "./constants";
+import { paths } from "@/app/routes/paths";
+
 
 const assetSchema = z.object({
   // Asset Information
@@ -74,63 +71,7 @@ const assetSchema = z.object({
 
 type AssetFormData = z.infer<typeof assetSchema>;
 
-const ASSET_TYPES = [
-  { value: "Laptop", label: "Laptop", icon: Laptop },
-  { value: "Desktop", label: "Desktop", icon: Monitor },
-  { value: "Mobile", label: "Mobile", icon: Smartphone },
-  { value: "Monitor", label: "Monitor", icon: Monitor },
-  { value: "Keyboard", label: "Keyboard", icon: Keyboard },
-  { value: "Mouse", label: "Mouse", icon: Package },
-  { value: "Printer", label: "Printer", icon: Package },
-  { value: "Vehicle", label: "Vehicle", icon: Car },
-  { value: "IDCard", label: "ID Card", icon: CreditCard },
-  { value: "AccessCard", label: "Access Card", icon: CreditCard },
-  { value: "SIMCard", label: "SIM Card", icon: CreditCard },
-  { value: "Other", label: "Other", icon: Package },
-];
-
-const ASSET_CATEGORIES = [
-  { value: "ITEquipment", label: "IT Equipment" },
-  { value: "OfficeFurniture", label: "Office Furniture" },
-  { value: "Vehicle", label: "Vehicle" },
-  { value: "Stationery", label: "Stationery" },
-];
-
-const ASSET_CONDITIONS = [
-  { value: "New", label: "New", color: "bg-green-100 text-green-800" },
-  { value: "Good", label: "Good", color: "bg-blue-100 text-blue-800" },
-  { value: "Fair", label: "Fair", color: "bg-yellow-100 text-yellow-800" },
-  { value: "Poor", label: "Poor", color: "bg-red-100 text-red-800" },
-];
-
-// Only Assigned and Available on the assignment page
-const ASSET_STATUSES = [
-  { value: "Assigned", label: "Assigned" },
-  { value: "Available", label: "Available" },
-];
-
-const ACCESSORIES_LIST = [
-  { id: "charger", label: "Charger" },
-  { id: "battery", label: "Battery" },
-  { id: "bag", label: "Bag/Case" },
-  { id: "mouse", label: "Mouse" },
-  { id: "keyboard", label: "Keyboard" },
-  { id: "cables", label: "Cables" },
-  { id: "adapter", label: "Adapter" },
-  { id: "headphones", label: "Headphones" },
-  { id: "stand", label: "Stand/Dock" },
-  { id: "stylus", label: "Stylus/Pen" },
-];
-
-const LOCATIONS = [
-  { value: "Office", label: "Office" },
-  { value: "Home", label: "Home (Remote)" },
-  { value: "Field", label: "Field/Site" },
-  { value: "Warehouse", label: "Warehouse" },
-];
-
-
-const MOBILE_TYPES = ["Mobile", "SIMCard"];
+const MOBILE_TYPES = ["3", "11"];  // Mobile, SIM Card
 
 const AssetAssignment: React.FC = () => {
   const navigate = useNavigate();
@@ -153,14 +94,14 @@ const AssetAssignment: React.FC = () => {
     watch,
   } = useForm<AssetFormData>({
     resolver: zodResolver(assetSchema),
-    defaultValues: {
-      assetType: "Laptop",
-      assetCategory: "ITEquipment",
-      assetCondition: "New",
-      assetStatus: "Assigned",
-      assignedDate: new Date().toISOString().split("T")[0],
-      accessories: [],
-    },
+      defaultValues: {
+        assetType: "1",     // Laptop
+        assetCategory: "1", // IT Equipment
+        assetCondition: "1", // New
+        assetStatus: "1",   // Assigned
+        assignedDate: new Date().toISOString().split("T")[0],
+        accessories: [],
+      }
   });
 
   const watchAssetType = watch("assetType");
@@ -223,7 +164,7 @@ const AssetAssignment: React.FC = () => {
       }
 
       await createAssetMutation.mutateAsync(formData);
-      navigate("/hrms/assets");
+      navigate(paths.hrms.assetAdminDashboard);
     } catch (e) {
       console.error(e);
     }
@@ -237,7 +178,7 @@ const AssetAssignment: React.FC = () => {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => navigate("/hrms/assets")}
+            onClick={() => navigate(paths.hrms.assetAdminDashboard)}
             className="flex items-center space-x-2"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -276,7 +217,7 @@ const AssetAssignment: React.FC = () => {
                   Asset Type <span className="text-red-500">*</span>
                 </Label>
                 <Select
-                  defaultValue="Laptop"
+                  defaultValue="1"
                   onValueChange={handleAssetTypeChange}
                   disabled={isSubmitting}
                 >
@@ -284,10 +225,9 @@ const AssetAssignment: React.FC = () => {
                     <SelectValue placeholder="Select Asset Type" />
                   </SelectTrigger>
                   <SelectContent>
-                    {ASSET_TYPES.map((type) => (
+                    {toOptions(ASSET_TYPE).map((type) => (
                       <SelectItem key={type.value} value={type.value}>
                         <div className="flex items-center gap-2">
-                          <type.icon className="h-4 w-4" />
                           {type.label}
                         </div>
                       </SelectItem>
@@ -305,7 +245,7 @@ const AssetAssignment: React.FC = () => {
                   Asset Category <span className="text-red-500">*</span>
                 </Label>
                 <Select
-                  defaultValue="ITEquipment"
+                  defaultValue="1"
                   onValueChange={(val) => setValue("assetCategory", val)}
                   disabled={isSubmitting}
                 >
@@ -313,7 +253,7 @@ const AssetAssignment: React.FC = () => {
                     <SelectValue placeholder="Select Category" />
                   </SelectTrigger>
                   <SelectContent>
-                    {ASSET_CATEGORIES.map((cat) => (
+                    {toOptions(ASSET_CATEGORY).map((cat) => (
                       <SelectItem key={cat.value} value={cat.value}>
                         {cat.label}
                       </SelectItem>
@@ -376,7 +316,7 @@ const AssetAssignment: React.FC = () => {
                   Asset Condition <span className="text-red-500">*</span>
                 </Label>
                 <Select
-                  defaultValue="New"
+                  defaultValue="1"
                   onValueChange={(val) => setValue("assetCondition", val)}
                   disabled={isSubmitting}
                 >
@@ -384,9 +324,9 @@ const AssetAssignment: React.FC = () => {
                     <SelectValue placeholder="Select Condition" />
                   </SelectTrigger>
                   <SelectContent>
-                    {ASSET_CONDITIONS.map((cond) => (
+                    {toOptions(ASSET_CONDITION).map((cond) => (
                       <SelectItem key={cond.value} value={cond.value}>
-                        <Badge variant="secondary" className={cond.color}>
+                        <Badge variant="secondary">
                           {cond.label}
                         </Badge>
                       </SelectItem>
@@ -550,7 +490,7 @@ const AssetAssignment: React.FC = () => {
                     <SelectValue placeholder="Select Location" />
                   </SelectTrigger>
                   <SelectContent>
-                    {LOCATIONS.map((loc) => (
+                    {toOptions(ASSET_LOCATION).map((loc) => (
                       <SelectItem key={loc.value} value={loc.value}>
                         {loc.label}
                       </SelectItem>
@@ -565,7 +505,7 @@ const AssetAssignment: React.FC = () => {
                   Current Status <span className="text-red-500">*</span>
                 </Label>
                 <Select
-                  defaultValue="Assigned"
+                  defaultValue="1"
                   onValueChange={(val) => setValue("assetStatus", val)}
                   disabled={isSubmitting}
                 >
@@ -573,7 +513,7 @@ const AssetAssignment: React.FC = () => {
                     <SelectValue placeholder="Select Status" />
                   </SelectTrigger>
                   <SelectContent>
-                    {ASSET_STATUSES.map((status) => (
+                    {toOptions(ASSET_STATUS).map((status) => (
                       <SelectItem key={status.value} value={status.value}>
                         {status.label}
                       </SelectItem>
@@ -862,7 +802,7 @@ const AssetAssignment: React.FC = () => {
             <Button
               type="button"
               variant="outline"
-              onClick={() => navigate("/hrms/assets")}
+              onClick={() => navigate(paths.hrms.assetAdminDashboard)}
               disabled={isSubmitting}
             >
               Cancel

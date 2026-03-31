@@ -11,6 +11,7 @@ import { Eye, Edit, Plus, PcCase, MonitorSmartphone } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { dateCol } from '@/components/data-grid';
+import { paths } from '@/app/routes/paths';
 
 const AssetAdminDashboard: React.FC = () => {
     const navigate = useNavigate();
@@ -21,12 +22,17 @@ const AssetAdminDashboard: React.FC = () => {
     const rowActions: ActionItem<any>[] = [
         {
             label: 'View Details',
-            onClick: (row) => console.log('View', row), 
+            onClick: (row) => navigate(paths.hrms.assetView(row.id)),
             icon: <Eye className="h-4 w-4" />,
         },
         {
             label: 'Edit',
-            onClick: (row) => console.log('Edit', row), 
+            onClick: (row) => navigate(paths.hrms.assetEdit(row.id)),
+            icon: <Edit className="h-4 w-4" />,
+        },
+        {
+            label: 'Status',
+            onClick: (row) => navigate(paths.hrms.assetStatus(row.id)),
             icon: <Edit className="h-4 w-4" />,
         },
     ];
@@ -133,7 +139,7 @@ const AssetAdminDashboard: React.FC = () => {
                                 View and manage all company assets and user assignments.
                             </CardDescription>
                         </div>
-                        <Button onClick={() => navigate('/hrms/assets/assign')} size="lg">
+                        <Button onClick={() => navigate(paths.hrms.assignAsset)} size="lg">
                             <Plus className="h-5 w-5 mr-2" />
                             Assign New Asset
                         </Button>
@@ -145,7 +151,7 @@ const AssetAdminDashboard: React.FC = () => {
                             <PcCase className="h-12 w-12 mb-4 text-muted-foreground/50" />
                             <p className="text-lg font-medium">No assets deployed</p>
                             <p className="text-sm text-muted-foreground mt-1">Assign your first asset to an employee to get started.</p>
-                            <Button variant="outline" className="mt-4" onClick={() => navigate('/hrms/assets/assign')}>
+                            <Button variant="outline" className="mt-4" onClick={() => navigate(paths.hrms.assignAsset)}>
                                 Assign Asset
                             </Button>
                         </div>
