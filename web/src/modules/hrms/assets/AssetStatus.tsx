@@ -55,7 +55,7 @@ import {
 } from "@/hooks/api/useHrmsAssets";
 import { paths } from "@/app/routes/paths";
 import {
-  ASSET_STATUS,
+  ASSET_STATUS_KEYS,
   ASSET_CONDITION,
   ASSET_LOCATION,
   DAMAGE_TYPE,
@@ -325,6 +325,9 @@ const AssetStatus: React.FC = () => {
   const { data: users = [] } = useUsers();
   const updateStatusMutation = useUpdateHrmsAssetStatus();
 
+  const hasInitialized = React.useRef(false);
+
+
   const {
     register,
     handleSubmit,
@@ -335,28 +338,31 @@ const AssetStatus: React.FC = () => {
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
-  });
-
+    defaultValues: {
+      assetStatus: "",
+    },
+});
   const status = watch("assetStatus");
   const currentStatus = asset?.assetStatus;
 
   useEffect(() => {
-    if (asset) {
-      reset({
-        assetStatus: asset.assetStatus || "",
-        userId: asset.userId,
-        assignedDate: asset.assignedDate?.split("T")[0] || "",
-        expectedReturnDate: asset.expectedReturnDate?.split("T")[0] || "",
-        purpose: asset.purpose || "",
-        assetLocation: asset.assetLocation || "",
-        returnDate: asset.returnDate?.split("T")[0] || "",
-        assetCondition: asset.assetCondition || "",
-        damageDate: new Date().toISOString().split("T")[0],
-        lostDate: new Date().toISOString().split("T")[0],
-        repairStartDate: new Date().toISOString().split("T")[0],
-      });
-    }
-  }, [asset, reset]);
+    if (!asset || hasInitialized.current) return;
+    hasInitialized.current = true;
+
+    reset({
+      assetStatus: asset.assetStatus || "",
+      userId: asset.userId,
+      assignedDate: asset.assignedDate?.split("T")[0] || "",
+      expectedReturnDate: asset.expectedReturnDate?.split("T")[0] || "",
+      purpose: asset.purpose || "",
+      assetLocation: asset.assetLocation || "",
+      returnDate: asset.returnDate?.split("T")[0] || "",
+      assetCondition: asset.assetCondition || "",
+      damageDate: new Date().toISOString().split("T")[0],
+      lostDate: new Date().toISOString().split("T")[0],
+      repairStartDate: new Date().toISOString().split("T")[0],
+    });
+  }, [asset?.id]); // ← ONLY asset.id, not asset or reset
 
   const onSubmit = async (data: FormData) => {
     try {
@@ -373,12 +379,12 @@ const AssetStatus: React.FC = () => {
     }
   };
 
-  const isAssigned = status === ASSET_STATUS.ASSIGNED;
-  const isAvailable = status === ASSET_STATUS.AVAILABLE;
-  const isReturned = status === ASSET_STATUS.RETURNED;
-  const isDamaged = status === ASSET_STATUS.DAMAGED;
-  const isLost = status === ASSET_STATUS.LOST;
-  const isUnderRepair = status === ASSET_STATUS.UNDER_REPAIR;
+  const isAssigned = status === ASSET_STATUS_KEYS.ASSIGNED;
+  const isAvailable = status === ASSET_STATUS_KEYS.AVAILABLE;
+  const isReturned = status === ASSET_STATUS_KEYS.RETURNED;
+  const isDamaged = status === ASSET_STATUS_KEYS.DAMAGED;
+  const isLost = status === ASSET_STATUS_KEYS.LOST;
+  const isUnderRepair = status === ASSET_STATUS_KEYS.UNDER_REPAIR;
 
   if (assetLoading) {
     return (
