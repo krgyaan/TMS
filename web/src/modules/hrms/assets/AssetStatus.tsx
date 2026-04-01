@@ -116,7 +116,6 @@ const schema = z.object({
   // Assignment
   userId: z.coerce.number().optional(),
   assignedDate: z.string().optional(),
-  expectedReturnDate: z.string().optional(),
   purpose: z.string().optional(),
   assetLocation: z.string().optional(),
   
@@ -353,7 +352,6 @@ const AssetStatus: React.FC = () => {
       assetStatus: asset.assetStatus || "",
       userId: asset.userId,
       assignedDate: asset.assignedDate?.split("T")[0] || "",
-      expectedReturnDate: asset.expectedReturnDate?.split("T")[0] || "",
       purpose: asset.purpose || "",
       assetLocation: asset.assetLocation || "",
       returnDate: asset.returnDate?.split("T")[0] || "",
@@ -516,7 +514,7 @@ const AssetStatus: React.FC = () => {
               this assignment.
             </InfoBox>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
               <FormField label="Assign To" required>
                 <Controller
                   control={control}
@@ -544,14 +542,6 @@ const AssetStatus: React.FC = () => {
                 />
               </FormField>
 
-              <FormField label="Assignment Date" required>
-                <Input type="date" {...register("assignedDate")} />
-              </FormField>
-
-              <FormField label="Expected Return Date">
-                <Input type="date" {...register("expectedReturnDate")} />
-              </FormField>
-
               <FormField label="Location">
                 <Controller
                   control={control}
@@ -572,6 +562,11 @@ const AssetStatus: React.FC = () => {
                   )}
                 />
               </FormField>
+
+              <FormField label="Assignment Date" required>
+                <Input type="date" {...register("assignedDate")} />
+              </FormField>
+
 
               <FormField label="Purpose" className="md:col-span-2">
                 <Textarea
