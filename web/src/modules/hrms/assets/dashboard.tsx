@@ -7,7 +7,7 @@ import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { Eye, Edit, Plus, PcCase, MonitorSmartphone } from 'lucide-react';
+import { Eye, Plus, PcCase, MonitorSmartphone, Pencil, BadgeCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { dateCol } from '@/components/data-grid';
@@ -29,12 +29,12 @@ const AssetAdminDashboard: React.FC = () => {
         {
             label: 'Edit',
             onClick: (row) => navigate(paths.hrms.assetEdit(row.id)),
-            icon: <Edit className="h-4 w-4" />,
+            icon: <Pencil className="h-4 w-4" />,
         },
         {
             label: 'Status',
             onClick: (row) => navigate(paths.hrms.assetStatus(row.id)),
-            icon: <Edit className="h-4 w-4" />,
+            icon: <BadgeCheck className="h-4 w-4" />,
         },
     ];
 
