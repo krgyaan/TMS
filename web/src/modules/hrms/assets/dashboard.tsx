@@ -17,6 +17,7 @@ import { ASSET_STATUS } from './constants';
 const AssetAdminDashboard: React.FC = () => {
     const navigate = useNavigate();
     const { data: assets, isLoading } = useHrmsAssetsAll();
+    console.log(assets);
 
     const tableData = assets || [];
 
@@ -76,12 +77,12 @@ const AssetAdminDashboard: React.FC = () => {
                 )
             },
             {
-                field: 'userId',
+                field: 'assignedTo',
                 headerName: 'Assigned To',
                 width: 150,
                 sortable: true,
                 filter: true,
-                cellRenderer: (params: any) => <span className="font-medium">EMP-{params.value}</span>,
+                cellRenderer: (params: any) => <span className="font-medium">{params.value ?? '—'}</span>,
             },
             dateCol<any>('assignedDate', { includeTime: false }, {
                 headerName: 'Assigned Date',
