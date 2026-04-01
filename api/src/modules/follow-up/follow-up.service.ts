@@ -16,6 +16,7 @@ import {
     type FollowUpQueryDto,
     type FollowUpDetailsDto,
     updateFollowUpSchema,
+    updateFollowUpStatusSchema,
 } from "@/modules/follow-up/zod";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
@@ -718,16 +719,27 @@ export class FollowUpService {
             throw new NotFoundException(`Follow-up with ID ${id} not found`);
         }
 
+        const parsed = updateFollowUpStatusSchema.safeParse(dto);
+        if (!parsed.success) {
+            this.logger.warn("Validation failed while updating follow-up status", {
+                followUpId: id,
+                errors: parsed.error.flatten(),
+            });
+            throw new BadRequestException(parsed.error.flatten());
+        }
+
+        const data = parsed.data;
+
         const updateData: Partial<typeof followUps.$inferInsert> = {
-            latestComment: dto.latestComment ? `${dto.latestComment} - ${currentUser.name}` : existing.latestComment,
+            latestComment: data.latestComment ? `${data.latestComment} - ${currentUser.name}` : existing.latestComment,
             assignmentStatus: "initiated",
             updatedAt: new Date(),
         };
 
-        if (dto.frequency) updateData.frequency = dto.frequency;
-        if (dto.stopReason) updateData.stopReason = dto.stopReason;
-        if (dto.proofText) updateData.proofText = dto.proofText;
-        if (dto.stopRemarks) updateData.stopRemarks = dto.stopRemarks;
+        if (data.frequency) updateData.frequency = data.frequency;
+        if (data.stopReason) updateData.stopReason = data.stopReason;
+        if (data.proofText) updateData.proofText = data.proofText;
+        if (data.stopRemarks) updateData.stopRemarks = data.stopRemarks;
         if (proofImage) {
             updateData.proofImagePath = proofImage.filename;
         }
@@ -737,6 +749,67 @@ export class FollowUpService {
             followUpId: updated.id,
             newStatus: updated.assignmentStatus,
         });
+
+        // ✅ NEW: Send stop mail when follow-up is being stopped
+        if (Number(data.frequency) === 6) {
+            try {
+                const googleConnection = await this.resolveGoogleConnection(existing.assignedToId, {
+                    action: "stop_mail",
+                    followUpId: id,
+                });
+
+                if (!googleConnection) {
+                    this.logger.warn("Google connection completely missing (primary and fallback failed), stop mail skipped", {
+                        followUpId: id,
+                    });
+                } else {
+                    const [assigneeUser] = existing.assignedToId 
+                        ? await this.db.select().from(users).where(eq(users.id, existing.assignedToId))
+                        : [undefined];
+                    const [creatorUser] = existing.createdById ? await this.db.select().from(users).where(eq(users.id, existing.createdById)) : [undefined];
+
+                    const admin = await this.mailAudience.getAdmin();
+                    const [coordinator] = await this.db.select().from(users).where(eq(users.id, 8));
+
+                    const stopReasonNum = Number(data.stopReason ?? existing.stopReason);
+                    const isObjectiveAchieved = stopReasonNum === 2;
+                    const isRemarks = stopReasonNum === 4;
+
+                    const mailPayload = {
+                        followUpInitiator: creatorUser?.name ?? "Team",
+                        followUpFor: existing.followupFor ?? "",
+                        organizationName: existing.partyName,
+                        reason: STOP_REASON_LABELS[stopReasonNum] ?? "",
+                        remarks: data.stopRemarks ?? existing.stopRemarks ?? "",
+                        proofs: data.proofText ?? existing.proofText ?? "",
+                        isObjectiveAchieved,
+                        isRemarks,
+                        teamMember: assigneeUser?.name ?? "Team Member",
+                    };
+
+                    const attachments = proofImage ? { files: [proofImage.filename], baseDir: "accounts" } : undefined;
+
+                    await this.mailerService.sendMail(
+                        FollowupMailTemplates.STOP,
+                        mailPayload,
+                        {
+                            to: creatorUser?.email ? [creatorUser.email] : [],
+                            cc: [admin.email, coordinator?.email].filter(Boolean) as string[],
+                            subject: `Follow Up Stopped — ${existing.followupFor ?? existing.partyName}`,
+                            attachments,
+                        },
+                        googleConnection
+                    );
+
+                    this.logger.info("Stop mail sent successfully for status update", { followUpId: id });
+                }
+            } catch (mailError: any) {
+                this.logger.error("Stop mail failed for status update (non-blocking)", {
+                    followUpId: id,
+                    error: mailError.message,
+                });
+            }
+        }
 
         return updated;
     }

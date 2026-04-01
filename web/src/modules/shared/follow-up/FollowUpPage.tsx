@@ -214,6 +214,11 @@ const FollowupPage: React.FC = () => {
             return;
         }
 
+        if (frequency === 6 && stopReason === 2 && !proofText.trim()) {
+            toast.error("Please provide proof details");
+            return;
+        }
+
         if (frequency !== 6 && !date) {
             toast.error("Please select the next follow-up date");
             return;
