@@ -5,7 +5,7 @@ import {
 
 export const employeeAssets = pgTable('hrms_employee_assets', {
   id:                  bigserial('id', { mode: 'number' }).primaryKey(),
-  userId:              bigint('user_id', { mode: 'number' }).notNull(),
+  userId:              bigint('user_id', { mode: 'number' }),
   assetCode:           varchar('asset_code', { length: 100 }).notNull().unique(),
   assetType:           varchar('asset_type', { length: 50 }).notNull(),
   assetCategory:       varchar('asset_category', { length: 50 }),
@@ -20,7 +20,7 @@ export const employeeAssets = pgTable('hrms_employee_assets', {
   purchaseDate:        date('purchase_date'),
   purchasePrice:       numeric('purchase_price', { precision: 12, scale: 2 }),
   purchaseFrom:        varchar('purchase_from', { length: 255 }),
-  assignedDate:        date('assigned_date').notNull(),
+  assignedDate:        date('assigned_date'),
   assignedBy:          bigint('assigned_by', { mode: 'number' }),
   expectedReturnDate:  date('expected_return_date'),
   purpose:             text('purpose'),
