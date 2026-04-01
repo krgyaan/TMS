@@ -1,3 +1,5 @@
+import AssetAdminDashboard from "@/modules/hrms/assets/dashboard";
+
 export const paths = {
     // ==================== AUTH ====================
     auth: {
@@ -329,10 +331,17 @@ export const paths = {
 
     // ==================== HRMS ====================
     hrms: {
-        dashboard: "/hrms",
         employeeRegistration: "/hrms/employees/register",
         employeeProfile: (id: number | string) => `/hrms/employees/${id}`,
-        assetAssignment: "/hrms/assets/assign",
+        
         myAssets: "/hrms/assets/my",
+        
+        dashboard: "/hrms/admin",
+
+        assetAdminDashboard: "/hrms/admin/assets",
+        assignAsset: "/hrms/admin/assets/assign",
+        assetEdit: (id: number) => `/hrms/admin/assets/edit/${id}`,
+        assetStatus: (id: number) => `/hrms/admin/assets/status/${id}`,
+        assetView: (id: number) => `/hrms/admin/assets/view/${id}`,
     },
 };

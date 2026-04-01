@@ -141,7 +141,7 @@ const navMain: NavGroup[] = [
         title: "HR Administration",
         icon: Shield,
         items: [
-            { title: "Asset Administration", url: "/hrms/assets", permission: "hrms.admin" },
+            { title: "Asset Administration", url: "/hrms/admin/assets", permission: "hrms.admin" },
             { title: "Register Employee", url: paths.hrms.employeeRegistration, permission: "hrms.admin" },
         ],
     },
