@@ -104,8 +104,10 @@ export const useUpdateHrmsAsset = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: Partial<EmployeeAsset> }) =>
-            hrmsAssetsService.update(id, data),
+        mutationFn: ({ id, data }: {
+            id: number;
+            data: Partial<EmployeeAsset> | FormData;
+        }) => hrmsAssetsService.update(id, data),
         onSuccess: (asset) => {
             queryClient.invalidateQueries({ queryKey: hrmsAssetKeys.all });
             queryClient.invalidateQueries({ queryKey: hrmsAssetKeys.detail(asset.id) });

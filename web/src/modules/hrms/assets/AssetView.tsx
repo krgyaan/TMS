@@ -1,7 +1,7 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useHrmsAssetView } from '@/hooks/api/useHrmsAssets';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -71,6 +71,14 @@ const AssetView: React.FC = () => {
         {condition ?? "Good"}
       </Badge>
     );
+  };
+
+  // Mirrors courier module: store filename only, prefix URL client-side.
+  // Also handles legacy records that stored the full relative path.
+  const getAssetFileUrl = (storedValue: string | null | undefined): string => {
+    if (!storedValue) return "";
+    if (storedValue.startsWith("uploads/")) return `/${storedValue}`;
+    return `/uploads/hrms/assets/${storedValue}`;
   };
 
   if (isLoading) {
@@ -300,13 +308,13 @@ const AssetView: React.FC = () => {
                   {asset.assetPhotos.map((photo: string, idx: number) => (
                     <a
                       key={idx}
-                      href={`/${photo}`}
+                      href={getAssetFileUrl(photo)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="aspect-square rounded-lg overflow-hidden border hover:opacity-80 transition-opacity"
                     >
                       <img
-                        src={`/${photo}`}
+                        src={getAssetFileUrl(photo)}
                         alt={`Asset ${idx + 1}`}
                         className="w-full h-full object-cover"
                       />
@@ -403,9 +411,15 @@ interface DocumentLinkProps {
 }
 
 const DocumentLink: React.FC<DocumentLinkProps> = ({ label, url }) => {
+  const getAssetFileUrl = (storedValue: string) => {
+    if (!storedValue) return "";
+    if (storedValue.startsWith("uploads/")) return `/${storedValue}`;
+    return `/uploads/hrms/assets/${storedValue}`;
+  };
+
   return (
     <a
-      href={`/${url}`}
+      href={getAssetFileUrl(url)}
       target="_blank"
       rel="noopener noreferrer"
       className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors group"

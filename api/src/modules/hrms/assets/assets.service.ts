@@ -196,6 +196,11 @@ export class AssetsService {
 
   async update(id: number, data: Partial<NewEmployeeAsset>): Promise<EmployeeAsset> {
     const cleanData = stripUndefined(data);
+
+    if (Object.keys(cleanData).length === 0) {
+      throw new Error("No fields provided for update");
+    }
+
     const rows = await this.db
       .update(employeeAssets)
       .set({ ...cleanData, updatedAt: new Date() })
@@ -205,6 +210,7 @@ export class AssetsService {
     if (!rows[0]) {
       throw new NotFoundException(`Asset with ID ${id} not found`);
     }
+
     return rows[0];
   }
 

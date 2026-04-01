@@ -187,7 +187,10 @@ class HrmsAssetsService extends BaseApiService {
     /**
      * Update asset (general edit)
      */
-    async update(id: number, data: Partial<EmployeeAsset>): Promise<EmployeeAsset> {
+    async update(
+        id: number,
+        data: Partial<EmployeeAsset> | FormData
+    ): Promise<EmployeeAsset> {
         return this.patch<EmployeeAsset>(`/${id}`, data);
     }
 
