@@ -138,8 +138,21 @@ export class AssetsService {
   }
 
   async findAll(): Promise<any[]> {
-    const rows = await this.db.select().from(employeeAssets);
-    return rows.map(row => this.resolveLabels(row));
+    const rows = await this.db
+      .select({
+        asset: employeeAssets,
+        assignedTo: users.name,
+      })
+      .from(employeeAssets)
+      .leftJoin(users, eq(employeeAssets.userId, users.id));
+
+    return rows.map(row => {
+      // Merge user name into the asset object for labels resolution
+      return this.resolveLabels({
+        ...row.asset,
+        assignedTo: row.assignedTo
+      } as any);
+    });
   }
 
   async findByUserId(userId: number): Promise<any[]> {
