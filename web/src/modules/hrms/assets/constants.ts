@@ -1,5 +1,5 @@
 // src/pages/hrms/assets/constants.ts
-export const ASSET_STATUS = {
+export const ASSET_STATUS_KEYS = {
   ASSIGNED: "1",
   AVAILABLE: "2",
   UNDER_REPAIR: "3",
@@ -8,7 +8,7 @@ export const ASSET_STATUS = {
   RETURNED: "6",
 } as const;
 
-export const ASSET_STATUS_LABELS: Record<string, string> = {
+export const ASSET_STATUS: Record<string, string> = {
   "1": "Assigned",
   "2": "Available",
   "3": "Under Repair",

@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { dateCol } from '@/components/data-grid';
 import { paths } from '@/app/routes/paths';
+import { ASSET_STATUS } from './constants';
 
 const AssetAdminDashboard: React.FC = () => {
     const navigate = useNavigate();
@@ -92,7 +93,7 @@ const AssetAdminDashboard: React.FC = () => {
                 width: 130,
                 sortable: true,
                 filter: true,
-                cellRenderer: (params: any) => getStatusBadge(params.value),
+                cellRenderer: (params: any) => getStatusBadge(ASSET_STATUS[params.value]),
             },
             {
                 headerName: '',
