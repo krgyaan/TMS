@@ -16,6 +16,7 @@ import {
     type FollowUpQueryDto,
     type FollowUpDetailsDto,
     updateFollowUpSchema,
+    updateFollowUpStatusSchema,
 } from "@/modules/follow-up/zod";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
@@ -186,10 +187,13 @@ export class FollowUpService {
                         return followUp;
                     }
 
-                    const googleConnection = await this.googleService.getSanitizedGoogleConnection(followUp.createdById);
+                    const googleConnection = await this.resolveGoogleConnection(followUp.createdById, {
+                        action: "create",
+                        followUpId: followUp.id,
+                    });
 
                     if (!googleConnection) {
-                        this.logger.warn("Google connection missing, mail skipped", {
+                        this.logger.warn("Google connection completely missing (primary and fallback failed), follow-up creation mail skipped", {
                             followUpId: followUp.id,
                         });
                         return followUp;
@@ -566,53 +570,56 @@ export class FollowUpService {
             // ✅ NEW: Send stop mail when follow-up is being stopped
             if (Number(data.frequency) === 6) {
                 try {
-                    if (!existing.assignedToId) {
-                        this.logger.warn("assignedToId missing, stop mail skipped", { followUpId: id });
+                    const googleConnection = await this.resolveGoogleConnection(existing.assignedToId, {
+                        action: "stop_mail",
+                        followUpId: id,
+                    });
+
+                    if (!googleConnection) {
+                        this.logger.warn("Google connection completely missing (primary and fallback failed), stop mail skipped", {
+                            followUpId: id,
+                        });
                     } else {
-                        const googleConnection = await this.googleService.getSanitizedGoogleConnection(existing.assignedToId);
+                        const [assigneeUser] = existing.assignedToId 
+                            ? await this.db.select().from(users).where(eq(users.id, existing.assignedToId))
+                            : [undefined];
+                        const [creatorUser] = existing.createdById ? await this.db.select().from(users).where(eq(users.id, existing.createdById)) : [undefined];
 
-                        if (!googleConnection) {
-                            this.logger.warn("Google connection missing, stop mail skipped", { followUpId: id });
-                        } else {
-                            const [assigneeUser] = await this.db.select().from(users).where(eq(users.id, existing.assignedToId));
-                            const [creatorUser] = existing.createdById ? await this.db.select().from(users).where(eq(users.id, existing.createdById)) : [undefined];
+                        const admin = await this.mailAudience.getAdmin();
+                        const [coordinator] = await this.db.select().from(users).where(eq(users.id, 8));
 
-                            const admin = await this.mailAudience.getAdmin();
-                            const [coordinator] = await this.db.select().from(users).where(eq(users.id, 8));
+                        const stopReasonNum = Number(data.stopReason ?? existing.stopReason);
+                        const isObjectiveAchieved = stopReasonNum === 2;
+                        const isRemarks = stopReasonNum === 4;
 
-                            const stopReasonNum = Number(data.stopReason ?? existing.stopReason);
-                            const isObjectiveAchieved = stopReasonNum === 2;
-                            const isRemarks = stopReasonNum === 4;
+                        const mailPayload = {
+                            followUpInitiator: creatorUser?.name ?? "Team",
+                            followUpFor: existing.followupFor ?? "",
+                            organizationName: existing.partyName,
+                            reason: STOP_REASON_LABELS[stopReasonNum] ?? "",
+                            remarks: data.stopRemarks ?? existing.stopRemarks ?? "",
+                            proofs: data.proofText ?? existing.proofText ?? "",
+                            isObjectiveAchieved,
+                            isRemarks,
+                            teamMember: assigneeUser?.name ?? "Team Member",
+                        };
 
-                            const mailPayload = {
-                                followUpInitiator: creatorUser?.name ?? "Team",
-                                followUpFor: existing.followupFor ?? "",
-                                organizationName: existing.partyName,
-                                reason: STOP_REASON_LABELS[stopReasonNum] ?? "",
-                                remarks: data.stopRemarks ?? existing.stopRemarks ?? "",
-                                proofs: data.proofText ?? existing.proofText ?? "",
-                                isObjectiveAchieved,
-                                isRemarks,
-                                teamMember: assigneeUser?.name ?? "Team Member",
-                            };
+                        // ✅ Now correctly uses proofImage from param
+                        const attachments = proofImage ? { files: [proofImage.filename], baseDir: "accounts" } : undefined;
 
-                            // ✅ Now correctly uses proofImage from param
-                            const attachments = proofImage ? { files: [proofImage.filename], baseDir: "accounts" } : undefined;
+                        await this.mailerService.sendMail(
+                            FollowupMailTemplates.STOP,
+                            mailPayload,
+                            {
+                                to: creatorUser?.email ? [creatorUser.email] : [],
+                                cc: [admin.email, coordinator?.email].filter(Boolean) as string[],
+                                subject: `Follow Up Stopped — ${existing.followupFor ?? existing.partyName}`,
+                                attachments,
+                            },
+                            googleConnection
+                        );
 
-                            await this.mailerService.sendMail(
-                                FollowupMailTemplates.STOP,
-                                mailPayload,
-                                {
-                                    to: creatorUser?.email ? [creatorUser.email] : [],
-                                    cc: [admin.email, coordinator?.email].filter(Boolean) as string[],
-                                    subject: `Follow Up Stopped — ${existing.followupFor ?? existing.partyName}`,
-                                    attachments,
-                                },
-                                googleConnection
-                            );
-
-                            this.logger.info("Stop mail sent successfully", { followUpId: id });
-                        }
+                        this.logger.info("Stop mail sent successfully", { followUpId: id });
                     }
                 } catch (mailError: any) {
                     this.logger.error("Stop mail failed (non-blocking)", {
@@ -712,16 +719,27 @@ export class FollowUpService {
             throw new NotFoundException(`Follow-up with ID ${id} not found`);
         }
 
+        const parsed = updateFollowUpStatusSchema.safeParse(dto);
+        if (!parsed.success) {
+            this.logger.warn("Validation failed while updating follow-up status", {
+                followUpId: id,
+                errors: parsed.error.flatten(),
+            });
+            throw new BadRequestException(parsed.error.flatten());
+        }
+
+        const data = parsed.data;
+
         const updateData: Partial<typeof followUps.$inferInsert> = {
-            latestComment: dto.latestComment ? `${dto.latestComment} - ${currentUser.name}` : existing.latestComment,
+            latestComment: data.latestComment ? `${data.latestComment} - ${currentUser.name}` : existing.latestComment,
             assignmentStatus: "initiated",
             updatedAt: new Date(),
         };
 
-        if (dto.frequency) updateData.frequency = dto.frequency;
-        if (dto.stopReason) updateData.stopReason = dto.stopReason;
-        if (dto.proofText) updateData.proofText = dto.proofText;
-        if (dto.stopRemarks) updateData.stopRemarks = dto.stopRemarks;
+        if (data.frequency) updateData.frequency = data.frequency;
+        if (data.stopReason) updateData.stopReason = data.stopReason;
+        if (data.proofText) updateData.proofText = data.proofText;
+        if (data.stopRemarks) updateData.stopRemarks = data.stopRemarks;
         if (proofImage) {
             updateData.proofImagePath = proofImage.filename;
         }
@@ -731,6 +749,67 @@ export class FollowUpService {
             followUpId: updated.id,
             newStatus: updated.assignmentStatus,
         });
+
+        // ✅ NEW: Send stop mail when follow-up is being stopped
+        if (Number(data.frequency) === 6) {
+            try {
+                const googleConnection = await this.resolveGoogleConnection(existing.assignedToId, {
+                    action: "stop_mail",
+                    followUpId: id,
+                });
+
+                if (!googleConnection) {
+                    this.logger.warn("Google connection completely missing (primary and fallback failed), stop mail skipped", {
+                        followUpId: id,
+                    });
+                } else {
+                    const [assigneeUser] = existing.assignedToId 
+                        ? await this.db.select().from(users).where(eq(users.id, existing.assignedToId))
+                        : [undefined];
+                    const [creatorUser] = existing.createdById ? await this.db.select().from(users).where(eq(users.id, existing.createdById)) : [undefined];
+
+                    const admin = await this.mailAudience.getAdmin();
+                    const [coordinator] = await this.db.select().from(users).where(eq(users.id, 8));
+
+                    const stopReasonNum = Number(data.stopReason ?? existing.stopReason);
+                    const isObjectiveAchieved = stopReasonNum === 2;
+                    const isRemarks = stopReasonNum === 4;
+
+                    const mailPayload = {
+                        followUpInitiator: creatorUser?.name ?? "Team",
+                        followUpFor: existing.followupFor ?? "",
+                        organizationName: existing.partyName,
+                        reason: STOP_REASON_LABELS[stopReasonNum] ?? "",
+                        remarks: data.stopRemarks ?? existing.stopRemarks ?? "",
+                        proofs: data.proofText ?? existing.proofText ?? "",
+                        isObjectiveAchieved,
+                        isRemarks,
+                        teamMember: assigneeUser?.name ?? "Team Member",
+                    };
+
+                    const attachments = proofImage ? { files: [proofImage.filename], baseDir: "accounts" } : undefined;
+
+                    await this.mailerService.sendMail(
+                        FollowupMailTemplates.STOP,
+                        mailPayload,
+                        {
+                            to: creatorUser?.email ? [creatorUser.email] : [],
+                            cc: [admin.email, coordinator?.email].filter(Boolean) as string[],
+                            subject: `Follow Up Stopped — ${existing.followupFor ?? existing.partyName}`,
+                            attachments,
+                        },
+                        googleConnection
+                    );
+
+                    this.logger.info("Stop mail sent successfully for status update", { followUpId: id });
+                }
+            } catch (mailError: any) {
+                this.logger.error("Stop mail failed for status update (non-blocking)", {
+                    followUpId: id,
+                    error: mailError.message,
+                });
+            }
+        }
 
         return updated;
     }
@@ -767,6 +846,46 @@ export class FollowUpService {
     }
 
     // ==========================
+    // GOOGLE CONNECTION HELPER
+    // ==========================
+    private async resolveGoogleConnection(targetUserId: number | null, contextData: Record<string, any>): Promise<any> {
+        this.logger.info("Resolving Google connection", { ...contextData, targetUserId });
+
+        let googleConnection: any = null;
+
+        if (targetUserId) {
+            googleConnection = await this.googleService.getSanitizedGoogleConnection(targetUserId);
+        }
+
+        if (googleConnection) {
+            this.logger.info("Successfully resolved primary Google connection", { ...contextData, resolvedUserId: targetUserId });
+            return googleConnection;
+        }
+
+        this.logger.warn("Primary Google connection missing, attempting fallback", {
+            ...contextData,
+            missingUserId: targetUserId,
+        });
+
+        const fallbackStr = process.env.FALLBACK_MAIL_USER_ID;
+        if (fallbackStr && !isNaN(parseInt(fallbackStr))) {
+            const FALLBACK_MAIL_USER_ID = parseInt(fallbackStr);
+            googleConnection = await this.googleService.getSanitizedGoogleConnection(FALLBACK_MAIL_USER_ID);
+            
+            if (googleConnection) {
+                 this.logger.info("Google connection for fallback id being used", {
+                    ...contextData,
+                    fallbackUserId: FALLBACK_MAIL_USER_ID,
+                 });
+                 return googleConnection;
+            }
+        }
+
+        this.logger.error("Fallback Google connection also missing", { ...contextData });
+        return null;
+    }
+
+    // ==========================
     // MAILING BEGINS HERE
     // ==========================
     async processFollowupMail(id: number) {
@@ -793,31 +912,14 @@ export class FollowUpService {
                 ccCount: payload.cc?.length ?? 0,
             });
 
-            //  attempt google connection for assignedToUserId first
-            let googleConnection = await this.googleService.getSanitizedGoogleConnection(payload.assignedToUserId);
+            //  attempt google connection
+            const googleConnection = await this.resolveGoogleConnection(payload.assignedToUserId, {
+                action: "process_followup_mail",
+                followUpId: id,
+            });
 
-            // if missing, attempt fallback before giving up
             if (!googleConnection) {
-                this.logger.warn("Google connection missing for assigned user, attempting fallback", {
-                    followUpId: id,
-                    userId: payload.assignedToUserId,
-                });
-
-                const fallbackStr = process.env.FALLBACK_MAIL_USER_ID;
-                if (fallbackStr && !isNaN(parseInt(fallbackStr))) {
-                    const FALLBACK_MAIL_USER_ID = parseInt(fallbackStr);
-                    googleConnection = await this.googleService.getSanitizedGoogleConnection(FALLBACK_MAIL_USER_ID);
-
-                    this.logger.warn("Google connection for fallback id being used", {
-                        followUpId: id,
-                        userId: FALLBACK_MAIL_USER_ID,
-                    });
-                }
-            }
-
-            // [CHANGED] only skip if fallback also fails
-            if (!googleConnection) {
-                this.logger.warn("Fallback Google connection also missing, follow-up mail skipped", {
+                this.logger.warn("Google connection completely missing (primary and fallback failed), follow-up mail skipped", {
                     followUpId: id,
                 });
                 return;
