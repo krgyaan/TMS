@@ -60,9 +60,22 @@ const ProjectsShowPage = () => {
     const formatOrDash = (value?: string | null) =>
         value && value.toString().trim().length > 0 ? value : "—";
 
-    const poUploads = project.poUpload ?? [];
-    const performanceProof = project.performanceProof ?? [];
-    const completionProof = project.completionProof ?? [];
+    const parseFileArray = (val: any): string[] => {
+        if (Array.isArray(val)) return val;
+        if (typeof val === "string") {
+            try {
+                const parsed = JSON.parse(val);
+                return Array.isArray(parsed) ? parsed : (val.trim() ? [val] : []);
+            } catch {
+                return val.trim() ? [val] : [];
+            }
+        }
+        return [];
+    };
+
+    const poUploads = parseFileArray(project.poUpload);
+    const performanceProof = parseFileArray(project.performanceProof);
+    const completionProof = parseFileArray(project.completionProof);
 
     return (
         <Card>

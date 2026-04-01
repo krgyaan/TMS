@@ -28,6 +28,19 @@ export const buildDefaultValues = (): ProjectMasterFormValues => ({
 
 const toStringOrEmpty = (v: string | null | undefined): string => (v ?? "") as string;
 
+const toArray = (v: any): string[] => {
+    if (Array.isArray(v)) return v;
+    if (typeof v === "string") {
+        try {
+            const parsed = JSON.parse(v);
+            return Array.isArray(parsed) ? parsed : (v.trim() ? [v] : []);
+        } catch {
+            return v.trim() ? [v] : [];
+        }
+    }
+    return [];
+};
+
 export const mapResponseToForm = (
     existing: ProjectMasterResponse | ProjectMasterListRow | null,
 ): ProjectMasterFormValues => {
@@ -46,10 +59,10 @@ export const mapResponseToForm = (
         poDate: toStringOrEmpty(row.poDate),
         projectCode: row.projectCode ? row.projectCode : "",
         projectName: row.projectName ? row.projectName : "",
-        poUpload: row.poUpload ?? [],
-        performanceProof: row.performanceProof ?? [],
+        poUpload: toArray(row.poUpload),
+        performanceProof: toArray(row.performanceProof),
         performanceDate: toStringOrEmpty(row.performanceDate),
-        completionProof: row.completionProof ?? [],
+        completionProof: toArray(row.completionProof),
         completionDate: toStringOrEmpty(row.completionDate),
         sapPoDate: toStringOrEmpty(row.sapPoDate),
         sapPoNo: toStringOrEmpty(row.sapPoNo),
