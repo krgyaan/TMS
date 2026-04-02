@@ -101,6 +101,7 @@ import { LocationPerformanceModule } from "./modules/performance/location-perfor
 import { ContractAgreementModule } from "./modules/operations/contract-agreement/contract-agreement.module";
 import { EmployeeProfilesModule } from "@/modules/hrms/employee-profiles/employee-profiles.module";
 import { AssetsModule } from "@/modules/hrms/assets/assets.module";
+import { AccountChecklistModule } from './modules/accounts/account-checklist/account-checklist.module';
 @Module({
     imports: [
         ServeStaticModule.forRoot({
@@ -211,15 +212,16 @@ import { AssetsModule } from "@/modules/hrms/assets/assets.module";
         ContractAgreementModule,
         EmployeeProfilesModule,
         AssetsModule,
+        AccountChecklistModule,
     ],
-    controllers: [AppController],
+    controllers: [AppController,],
     providers: [
         AppService,
         {
             provide: APP_GUARD,
             useClass: JwtAuthGuard,
         },
-        AllExceptionsFilter,
+        AllExceptionsFilter
     ],
 })
 export class AppModule {}
