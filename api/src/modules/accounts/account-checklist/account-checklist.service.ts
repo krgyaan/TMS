@@ -89,8 +89,11 @@ export class AccountChecklistService {
                     sql`accountable_user.id = ${accountChecklist.accountability}::bigint`
                 );
 
+            const normalizedRole = userRole?.toLowerCase() || "";
+            const isAdminView = ["admin", "super user", "coordinator"].includes(normalizedRole);
+
             // Apply role-based filtering
-            if (!["admin", "coordinator"].includes(userRole)) {
+            if (!isAdminView) {
                 query = query.where(
                     or(
                         eq(accountChecklist.responsibility, String(userId)),
@@ -124,7 +127,10 @@ export class AccountChecklistService {
 
         let groupedChecklists: GroupedChecklists = {};
         
-        if (["admin", "coordinator"].includes(userRole)) {
+        const normalizedRole = userRole?.toLowerCase() || "";
+        const isAdminView = ["1", "2", "3"].includes(normalizedRole);
+        
+        if (isAdminView) {
             // Group by responsibility
             checklists.forEach(checklist => {
                 const key = checklist.responsibility;
@@ -148,7 +154,7 @@ export class AccountChecklistService {
         let userTasksResponsibility: any[] = [];
         let userTasksAccountability: any[] = [];
 
-        if (!["admin", "coordinator"].includes(userRole)) {
+        if (!isAdminView) {
             // Get incomplete responsibility tasks
             userTasksResponsibility = await this.db
                 .select()

@@ -12,17 +12,21 @@ import {
     UseInterceptors,
     UploadedFile,
     BadRequestException,
+    Inject,
 } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { diskStorage } from "multer";
 import { extname } from "path";
 import { ZodValidationPipe } from "nestjs-zod";
 
+import { Logger } from "winston";
+
 import { AccountChecklistService } from "./account-checklist.service";
 import { CurrentUser } from "@/decorators/current-user.decorator";
 import { CanDelete } from "@/modules/auth/decorators";
 
 import { z } from "zod";
+import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 
 // ✅ 1. Base schema (NO refine)
 const BaseChecklistSchema = z.object({
@@ -130,13 +134,19 @@ const checklistFileConfig = {
 
 @Controller("accounts/checklists")
 export class AccountChecklistController {
-    constructor(private readonly service: AccountChecklistService) {}
+    constructor(private readonly service: AccountChecklistService,
+
+    @Inject(WINSTON_MODULE_PROVIDER)
+    private readonly logger: Logger,
+    ) {}
 
     /**
      * Get all checklists (index view)
      */
     @Get()
     getIndex(@CurrentUser() user: any) {
+        this.logger.debug(user);
+        this.logger.debug("This is a test");
         return this.service.getIndexData(user.sub, user.role);
     }
 
