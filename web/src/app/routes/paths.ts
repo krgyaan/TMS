@@ -174,6 +174,13 @@ export const paths = {
         fixedExpenses: "/accounts/fixed-expenses",
         projects: "/projects",
         tdsChecklists: "/accounts/tds-checklists",
+
+        taskChecklists: "/accounts/task-checklists",
+        taskChecklistsCreate: "/accounts/task-checklists/create",
+
+        taskChecklistsEdit: (id: number) => `/accounts/task-checklists/${id}/edit`,
+        taskChecklistsView: (id: number) => `/accounts/task-checklists/${id}`,
+        taskChecklistsReport:(id: number) => `/accounts/task-checklists/${id}/report`,
     },
 
     // ==================== CRM ====================
