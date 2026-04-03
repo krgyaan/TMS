@@ -102,6 +102,7 @@ import { ContractAgreementModule } from "./modules/operations/contract-agreement
 import { EmployeeProfilesModule } from "@/modules/hrms/employee-profiles/employee-profiles.module";
 import { AssetsModule } from "@/modules/hrms/assets/assets.module";
 import { AccountChecklistModule } from './modules/accounts/account-checklist/account-checklist.module';
+import { AccountChecklistSchedulerModule } from "./modules/accounts/account-checklist/account-checklist-scheduler.module";
 @Module({
     imports: [
         ServeStaticModule.forRoot({
@@ -213,6 +214,7 @@ import { AccountChecklistModule } from './modules/accounts/account-checklist/acc
         EmployeeProfilesModule,
         AssetsModule,
         AccountChecklistModule,
+        AccountChecklistSchedulerModule,
     ],
     controllers: [AppController,],
     providers: [
