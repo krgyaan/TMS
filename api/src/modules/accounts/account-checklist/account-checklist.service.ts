@@ -15,6 +15,7 @@ import type { CreateChecklistDto, UpdateChecklistInput, ResponsibilityRemarkDto,
 import { MailerService } from "@/mailer/mailer.service";
 import { GoogleService } from "@/modules/integrations/google/google.service";
 import { MailAudienceService } from "@/core/mail/mail-audience.service";
+import { join } from "path";
 
 // Helper types
 export interface GroupedChecklists {
@@ -778,10 +779,103 @@ export class AccountChecklistService {
     }
 
     /**
-     * Send EOD checklist reports (called by cron job)
+     * Generate checklist tasks (daily at 01:00)
      */
-    async sendEODChecklistReports() {
-        this.logger.info("Starting EOD checklist reports");
+    async generateChecklistTasks() {
+        this.logger.info("🟢 generateChecklistTasks started");
+        
+        const today = new Date();
+        const dayOfWeek = today.getDay(); // 0=Sunday, 6=Saturday
+        const dayOfMonth = today.getDate();
+
+        this.logger.info(`📆 Today: ${today.toDateString()}, Day of week: ${dayOfWeek}, Day of month: ${dayOfMonth}`);
+
+        // Only run on Mon-Sat (skip Sunday)
+        if (dayOfWeek === 0) {
+            this.logger.info("⛔ Today is Sunday. Skipping task creation.");
+            return;
+        }
+
+        // 8:00 PM today
+        const dueDateResp = new Date(today);
+        dueDateResp.setHours(20, 0, 0, 0);
+
+        const startOfDay = new Date(dueDateResp);
+        startOfDay.setHours(0, 0, 0, 0);
+        const endOfDay = new Date(dueDateResp);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        const checklists = await this.db.select().from(accountChecklist);
+        this.logger.info(`📋 Total checklists found: ${checklists.length}`);
+
+        let created = 0;
+
+        for (const checklist of checklists) {
+            let shouldInsert = false;
+            let reason = "";
+
+            if (checklist.frequency === "Daily" || checklist.frequency === "daily") {
+                shouldInsert = true;
+                reason = "Daily";
+            } else if (checklist.frequency === "Weekly" || checklist.frequency === "weekly") {
+                if (checklist.frequencyCondition !== null && dayOfWeek === checklist.frequencyCondition) {
+                    shouldInsert = true;
+                    reason = "Weekly (matches today)";
+                } else {
+                    reason = "Weekly (does not match today)";
+                }
+            } else if (checklist.frequency === "Monthly" || checklist.frequency === "monthly") {
+                if (checklist.frequencyCondition !== null && dayOfMonth === checklist.frequencyCondition) {
+                    shouldInsert = true;
+                    reason = "Monthly (matches today)";
+                } else {
+                    reason = "Monthly (does not match today)";
+                }
+            } else {
+                reason = "frequency does not match today";
+            }
+
+            this.logger.info(`Checklist #${checklist.id} [${checklist.taskName}] frequency: ${checklist.frequency} | Reason: ${reason}`);
+
+            if (shouldInsert) {
+                const [exists] = await this.db
+                    .select({ id: accountChecklistReport.id })
+                    .from(accountChecklistReport)
+                    .where(
+                        and(
+                            eq(accountChecklistReport.checklistId, checklist.id),
+                            eq(accountChecklistReport.responsibleUserId, Number(checklist.responsibility)),
+                            eq(accountChecklistReport.accountableUserId, Number(checklist.accountability)),
+                            gte(accountChecklistReport.dueDate, startOfDay),
+                            lte(accountChecklistReport.dueDate, endOfDay)
+                        )
+                    )
+                    .limit(1);
+
+                if (!exists) {
+                    await this.db.insert(accountChecklistReport).values({
+                        checklistId: checklist.id,
+                        responsibleUserId: Number(checklist.responsibility),
+                        accountableUserId: Number(checklist.accountability),
+                        dueDate: dueDateResp,
+                    });
+                    created++;
+                    this.logger.info(`  -> Created checklist task for users ${checklist.responsibility} (resp) & ${checklist.accountability} (acct) due ${dueDateResp}`);
+                } else {
+                    this.logger.info(`  -> Checklist task already exists due ${dueDateResp}`);
+                }
+            } else {
+                this.logger.info(`  -> Skipped: ${reason}`);
+            }
+        }
+        this.logger.info(`Checklist tasks generated: ${created}`);
+    }
+
+    /**
+     * Enqueue EOD checklist reports (called by cron job)
+     */
+    async enqueueEodMails(queue: import("bullmq").Queue) {
+        this.logger.info("Starting enqueue EOD checklist reports");
 
         try {
             const today = new Date();
@@ -790,7 +884,6 @@ export class AccountChecklistService {
             const tomorrow = new Date(today);
             tomorrow.setDate(tomorrow.getDate() + 1);
 
-            // Get today's reports
             const todayReports = await this.db
                 .select()
                 .from(accountChecklistReport)
@@ -805,7 +898,7 @@ export class AccountChecklistService {
                     )
                 );
 
-            // Group by accountable user, then by responsible user
+            // Group by accountable user
             const grouped: {
                 [accountableId: string]: {
                     [responsibleId: string]: any[];
@@ -825,96 +918,203 @@ export class AccountChecklistService {
                     grouped[accountableId][responsibleId] = [];
                 }
 
+                // Push serializable data to avoid Date issues with BullMQ
                 grouped[accountableId][responsibleId].push({
-                    report: account_checklist_report,
-                    checklist: account_checklist,
+                    task_name: account_checklist.taskName,
+                    completed_at: account_checklist_report.respCompletedAt || account_checklist_report.accCompletedAt,
+                    remark: account_checklist_report.respRemark || account_checklist_report.accRemark,
                 });
             });
 
-            // Get COO and admin emails
-            const coo = await this.mailAudience.getCoo();
-            const admin = await this.mailAudience.getAdmin();
-            const adminEmails = Array.isArray(admin.email) ? admin.email : [admin.email];
-
-            // Send emails for each accountable user
+            // Enqueue
             for (const [accountableId, responsibleGroups] of Object.entries(grouped)) {
-                const [accountableUser] = await this.db
-                    .select()
-                    .from(users)
-                    .where(eq(users.id, parseInt(accountableId)))
-                    .limit(1);
-
-                if (!accountableUser || !accountableUser.email) {
-                    this.logger.warn("Accountable user not found or email missing", {
-                        accountableId,
-                    });
-                    continue;
-                }
-
-                for (const [responsibleId, reports] of Object.entries(responsibleGroups)) {
-                    const [responsibleUser] = await this.db
-                        .select()
-                        .from(users)
-                        .where(eq(users.id, parseInt(responsibleId)))
-                        .limit(1);
-
-                    if (!responsibleUser) {
-                        continue;
+                await queue.add(
+                    "send-checklist-mail",
+                    {
+                        accountableId: parseInt(accountableId),
+                        responsibleGroups,
+                        date: new Date().toDateString() // Pass date string
+                    },
+                    {
+                        attempts: 3,
+                        backoff: { type: "exponential", delay: 10000 },
                     }
-
-                    const tasks = reports.map(({ report, checklist }) => ({
-                        task_name: checklist.taskName,
-                        responsible_user: responsibleUser.name,
-                        accountable_user: accountableUser.name,
-                        completed_at: report.respCompletedAt || report.accCompletedAt,
-                        remark: report.respRemark || report.accRemark,
-                    }));
-
-                    const singleTablesPayload = [{
-                        responsible_user: responsibleUser.name,
-                        tasks,
-                    }];
-
-                    // Determine CC based on responsible user
-                    const cc = parseInt(responsibleId) === 44
-                        ? ["md@comfortinnkarnal.com", "kainaat@volksenergie.in"]
-                        : adminEmails;
-
-                    this.logger.info("Sending report email", {
-                        to: accountableUser.email,
-                        cc,
-                        responsibleUser: responsibleUser.name,
-                    });
-
-                    // Get Google connection for sending email
-                    let googleConnection = await this.googleService.getSanitizedGoogleConnection(
-                        parseInt(responsibleId)
-                    );
-
-                    if (!googleConnection) {
-                        const fallbackUserId = process.env.FALLBACK_MAIL_USER_ID;
-                        if (fallbackUserId) {
-                            googleConnection = await this.googleService.getSanitizedGoogleConnection(
-                                parseInt(fallbackUserId)
-                            );
-                        }
-                    }
-
-                    if (googleConnection) {
-                        // Send email using your mailer service
-                        // You'll need to create the mail template
-                        // await this.mailerService.sendMail(...)
-                    }
-                }
+                );
             }
 
-            this.logger.info("EOD checklist reports sent successfully");
+            // Also enqueue the admin compilation mail
+            await queue.add(
+                "send-checklist-admin-mail",
+                {
+                    grouped,
+                    date: new Date().toDateString()
+                },
+                {
+                    attempts: 3,
+                    backoff: { type: "exponential", delay: 10000 },
+                }
+            );
+
+            this.logger.info("EOD checklist reports enqueued successfully");
         } catch (error: any) {
-            this.logger.error("Failed to send EOD checklist reports", {
+            this.logger.error("Failed to enqueue EOD checklist reports", {
                 error: error.message,
                 stack: error.stack,
             });
             throw error;
+        }
+    }
+
+    /**
+     * Process Job from Queue
+     */
+    async processChecklistMail(jobData: any, jobName: string) {
+        this.logger.info(`Processing Checklist Mail: ${jobName}`, { jobData });
+        
+        if (jobName === "send-checklist-mail") {
+            const { accountableId, responsibleGroups, date } = jobData;
+            
+            const [accountableUser] = await this.db
+                .select()
+                .from(users)
+                .where(eq(users.id, accountableId))
+                .limit(1);
+
+            if (!accountableUser || !accountableUser.email) {
+                this.logger.warn("Accountable user not found or email missing", { accountableId });
+                return;
+            }
+
+            const adminEmails = ['goyal@volksenergie.in', 'arathi@volksenergie.in', 'imran@volksenergie.in'];
+
+            for (const [responsibleIdStr, tasks] of Object.entries(responsibleGroups)) {
+                const responsibleId = parseInt(responsibleIdStr);
+                const [responsibleUser] = await this.db
+                    .select()
+                    .from(users)
+                    .where(eq(users.id, responsibleId))
+                    .limit(1);
+
+                if (!responsibleUser) continue;
+
+                // Format tasks for the template
+                const formattedTasks = (tasks as any[]).map(t => ({
+                    task_name: t.task_name,
+                    accountable_user: accountableUser.name,
+                    completed_at: t.completed_at,
+                    remark: t.remark,
+                }));
+
+                const singleTablesPayload = [{
+                    responsible_user: responsibleUser.name,
+                    tasks: formattedTasks,
+                }];
+
+                const cc = responsibleId === 44
+                    ? ['md@comfortinnkarnal.com', 'kainaat@volksenergie.in', 'accounts@jsa.net.in']
+                    : adminEmails;
+
+                this.logger.info(`Sending ${responsibleUser.name}'s report to accountable user: ${accountableUser.email}`);
+
+                let googleConnection = await this.googleService.getSanitizedGoogleConnection(responsibleId);
+
+                if (!googleConnection) {
+                    const fallbackUserId = process.env.FALLBACK_MAIL_USER_ID;
+                    if (fallbackUserId) {
+                        googleConnection = await this.googleService.getSanitizedGoogleConnection(parseInt(fallbackUserId));
+                    }
+                }
+
+                if (googleConnection) {
+                    try {
+                        await this.mailerService.sendMail(
+                            {
+                                name: "checklist-report.hbs",
+                                basePath: join(process.cwd(), "src", "modules", "accounts", "account-checklist", "mails"),
+                            },
+                            {
+                                date,
+                                tables: singleTablesPayload,
+                            },
+                            {
+                                to: [accountableUser.email],
+                                cc,
+                                subject: `Account Checklist Report - ${date}`,
+                            },
+                            googleConnection
+                        );
+                        this.logger.info("Email sent for single checklist report");
+                    } catch(e: any) {
+                        this.logger.error("Error sending mail inside loop", { error: e.message });
+                    }
+                } else {
+                    this.logger.warn(`No Google Connection found for user ${responsibleId} and no fallback`);
+                }
+            }
+        } else if (jobName === "send-checklist-admin-mail") {
+            const { grouped, date } = jobData;
+            const adminEmails = ['goyal@volksenergie.in', 'arathi@volksenergie.in', 'imran@volksenergie.in'];
+
+            const allTasks: any[] = [];
+
+            for (const [accIdStr, respGroups] of Object.entries(grouped)) {
+                let accName = "";
+                const accId = parseInt(accIdStr);
+                const [accUser] = await this.db.select().from(users).where(eq(users.id, accId)).limit(1);
+                if (accUser) accName = accUser.name;
+
+                for (const [respIdStr, tasks] of Object.entries(respGroups as any)) {
+                    let respName = "";
+                    const respId = parseInt(respIdStr);
+                    const [respUser] = await this.db.select().from(users).where(eq(users.id, respId)).limit(1);
+                    if (respUser) respName = respUser.name;
+
+                    for (const t of (tasks as any[])) {
+                        allTasks.push({
+                            task_name: t.task_name,
+                            responsible_user: respName,
+                            accountable_user: accName,
+                            completed_at: t.completed_at,
+                            remark: t.remark,
+                        });
+                    }
+                }
+            }
+
+            if (allTasks.length > 0) {
+                const fallbackUserId = process.env.FALLBACK_MAIL_USER_ID;
+                if (!fallbackUserId) {
+                    this.logger.warn("No fallback user ID to send admin consolidated mail");
+                    return;
+                }
+                
+                const googleConnection = await this.googleService.getSanitizedGoogleConnection(parseInt(fallbackUserId));
+                
+                if (googleConnection) {
+                    try {
+                        await this.mailerService.sendMail(
+                            {
+                                name: "checklist-report.hbs",
+                                basePath: join(process.cwd(), "src", "modules", "accounts", "account-checklist", "mails"),
+                            },
+                            {
+                                date,
+                                tables: [{ responsible_user: 'All', tasks: allTasks }],
+                            },
+                            {
+                                to: adminEmails,
+                                subject: `Account Checklist Consolidated Report - ${date}`,
+                            },
+                            googleConnection
+                        );
+                        this.logger.info("Admin consolidated email sent");
+                    } catch(e: any) {
+                        this.logger.error("Error sending admin consolidated mail", { error: e.message });
+                    }
+                } else {
+                    this.logger.warn("No Google Connection fallback found for admin email");
+                }
+            }
         }
     }
 }
