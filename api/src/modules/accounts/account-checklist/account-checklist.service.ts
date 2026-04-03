@@ -128,7 +128,7 @@ export class AccountChecklistService {
         let groupedChecklists: GroupedChecklists = {};
         
         const normalizedRole = userRole?.toLowerCase() || "";
-        const isAdminView = ["1", "2", "3"].includes(normalizedRole);
+        const isAdminView = ["admin", "super user", "coordinator"].includes(normalizedRole);
         
         if (isAdminView) {
             // Group by responsibility
@@ -157,23 +157,26 @@ export class AccountChecklistService {
         if (!isAdminView) {
             // Get incomplete responsibility tasks
             userTasksResponsibility = await this.db
-                .select()
-                .from(accountChecklistReport)
-                .leftJoin(
-                    accountChecklist,
-                    eq(accountChecklistReport.checklistId, accountChecklist.id)
-                )
-                .where(
-                    and(
-                        eq(accountChecklistReport.responsibleUserId, userId),
-                        isNull(accountChecklistReport.respCompletedAt)
-                    )
-                )
-                .orderBy(accountChecklistReport.dueDate);
+                .select(
+                    {
+                        id: accountChecklistReport.id,
+                        dueDate: accountChecklistReport.dueDate,
+                        respCompletedAt: accountChecklistReport.respCompletedAt,
+                        accCompletedAt: accountChecklistReport.accCompletedAt,
+                        respRemark: accountChecklistReport.respRemark,
+                        respResultFile: accountChecklistReport.respResultFile,
+                        responsibleUserName: sql<string>`responsible_user.name`,
+                        accountableUserName: sql<string>`accountable_user.name`,
 
-            // Get incomplete accountability tasks
-            userTasksAccountability = await this.db
-                .select()
+                        createdAt: accountChecklist.createdAt, 
+                        updatedAt: accountChecklist.updatedAt,  
+
+                        checklistId: accountChecklist.id,
+                        description: accountChecklist.description,
+                        taskName: accountChecklist.taskName,
+                        frequency: accountChecklist.frequency,
+                    }
+                )
                 .from(accountChecklistReport)
                 .leftJoin(
                     accountChecklist,
@@ -183,13 +186,58 @@ export class AccountChecklistService {
                     sql`${users} as responsible_user`,
                     sql`responsible_user.id = ${accountChecklist.responsibility}::bigint`
                 )
+                .leftJoin(
+                    sql`${users} as accountable_user`,
+                    sql`accountable_user.id = ${accountChecklist.accountability}::bigint`
+                )
+                .where(
+                    and(
+                        eq(accountChecklistReport.responsibleUserId, userId),
+                        isNull(accountChecklistReport.respCompletedAt)
+                    )
+                )
+                .orderBy(desc(accountChecklistReport.dueDate));
+
+            // Get incomplete accountability tasks
+            userTasksAccountability = await this.db
+                .select(                    {
+                        id: accountChecklistReport.id,
+                        dueDate: accountChecklistReport.dueDate,
+                        respCompletedAt: accountChecklistReport.respCompletedAt,
+                        accCompletedAt: accountChecklistReport.accCompletedAt,
+                        respRemark: accountChecklistReport.respRemark,
+                        respResultFile: accountChecklistReport.respResultFile,
+                        responsibleUserName: sql<string>`responsible_user.name`,
+                        accountableUserName: sql<string>`accountable_user.name`,
+
+                        createdAt: accountChecklist.createdAt, 
+                        updatedAt: accountChecklist.updatedAt,  
+
+                        checklistId: accountChecklist.id,
+                        description: accountChecklist.description,
+                        taskName: accountChecklist.taskName,
+                        frequency: accountChecklist.frequency,
+                    })
+                .from(accountChecklistReport)
+                .leftJoin(
+                    accountChecklist,
+                    eq(accountChecklistReport.checklistId, accountChecklist.id)
+                )
+                .leftJoin(
+                    sql`${users} as responsible_user`,
+                    sql`responsible_user.id = ${accountChecklist.responsibility}::bigint`
+                )
+                .leftJoin(
+                    sql`${users} as accountable_user`,
+                    sql`accountable_user.id = ${accountChecklist.accountability}::bigint`
+                )
                 .where(
                     and(
                         eq(accountChecklistReport.accountableUserId, userId),
                         isNull(accountChecklistReport.accCompletedAt)
                     )
                 )
-                .orderBy(accountChecklistReport.dueDate);
+                .orderBy(desc(accountChecklistReport.dueDate));
         }
 
         return {
@@ -471,7 +519,8 @@ export class AccountChecklistService {
         this.logger.info("Getting tasks", { data });
 
         try {
-            const userId = data.user;
+            console.log({"task data": data});
+            const userId = String(data.user);
             const month = data.month;
             
             const startDate = new Date(`${month}-01`);
