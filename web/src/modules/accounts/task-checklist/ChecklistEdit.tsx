@@ -6,7 +6,7 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
-import ChecklistForm, { type ChecklistFormData } from "@/modules/accounts/task-checklist/components/CheckListForm";
+import ChecklistForm, { type ChecklistFormData } from "@/modules/accounts/task-checklist/components/ChecklistForm";
 import { useChecklist, useUpdateChecklist } from "@/modules/accounts/task-checklist/task-checklist.hooks";
 import { useGetTeamMembers } from "@/hooks/api/useUsers"; 
 import { paths } from "@/app/routes/paths";
