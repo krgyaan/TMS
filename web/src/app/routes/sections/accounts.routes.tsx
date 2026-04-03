@@ -11,9 +11,14 @@ const Accounts_LoanAdvances_View = lazy(() => import("@/modules/accounts/loan-ad
 const Accounts_LoanAdvances_Emi = lazy(() => import("@/modules/accounts/loan-advances/LoanEmiPage"));
 const Accounts_LoanAdvances_Tds = lazy(() => import("@/modules/accounts/loan-advances/LoanTdsPage"));
 const Accounts_LoanAdvances_Closure = lazy(() => import("@/modules/accounts/loan-advances/LoanClosurePage"));
-const Accounts_TaskChecklists = lazy(() => import("@/modules/accounts/task-checlkists"));
 const Accounts_GSTChecklists = lazy(() => import("@/modules/accounts/gst-checklists"));
 const Accounts_FixedExpenses = lazy(() => import("@/modules/accounts/fixed-expenses"));
+
+const TaskChecklistDashboard = lazy(() => import("@/modules/accounts/task-checklist/ChecklistDashboard"));
+const TaskChecklistCreate = lazy(() => import("@/modules/accounts/task-checklist/ChecklistCreate"));
+const TaskChecklistEdit = lazy(() => import("@/modules/accounts/task-checklist/ChecklistEdit"));
+const TaskChecklistView = lazy(() => import("@/modules/accounts/task-checklist/ChecklistView"));
+const TaskChecklistReport = lazy(() => import("@/modules/accounts/task-checklist/ChecklistReport"));
 
 const Imprest_Admin_UserView = lazy(() => import("@/modules/accounts/imprest/ImprestAdminUserView"));
 
@@ -32,9 +37,15 @@ export default function AccountsRoutes() {
             <Route path="loan-advances/emis/:id" element={<RouteWrapper><Accounts_LoanAdvances_Emi /></RouteWrapper>} />
             <Route path="loan-advances/tds/:id" element={<RouteWrapper><Accounts_LoanAdvances_Tds /></RouteWrapper>} />
             <Route path="loan-advances/closure/:id" element={<RouteWrapper><Accounts_LoanAdvances_Closure /></RouteWrapper>} />
-            <Route path="account-checklists" element={<RouteWrapper><Accounts_TaskChecklists /></RouteWrapper>} />
+            <Route path="account-checklists" element={<RouteWrapper><TaskChecklistDashboard /></RouteWrapper>} />
             <Route path="gst-checklists" element={<RouteWrapper><Accounts_GSTChecklists /></RouteWrapper>} />
             <Route path="fixed-expenses" element={<RouteWrapper><Accounts_FixedExpenses /></RouteWrapper>} />
+
+            <Route path="task-checklists" element={<RouteWrapper><TaskChecklistDashboard /></RouteWrapper>} />
+            <Route path="task-checklists/create" element={<RouteWrapper><TaskChecklistCreate /></RouteWrapper>} />
+            <Route path="task-checklists/:id/edit" element={<RouteWrapper><TaskChecklistEdit /></RouteWrapper>} />
+            <Route path="task-checklists/:id/view" element={<RouteWrapper><TaskChecklistView /></RouteWrapper>} />
+            <Route path="task-checklists/:id/report" element={<RouteWrapper><TaskChecklistReport /></RouteWrapper>} />
         </Routes>
     );
 }

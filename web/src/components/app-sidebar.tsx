@@ -93,7 +93,7 @@ const navMain: NavGroup[] = [
             { title: "Imprests", url: paths.accounts.imprests, permission: "accounts.imprests" },
             // { title: "Financial Docs", url: paths.accounts.financialDocs, permission: "accounts.financial-docs" },
             { title: "Loan & Advances", url: paths.accounts.loanAdvances, permission: "accounts.loan-advances" },
-            { title: "Accounts Checklists", url: paths.accounts.accountChecklists, permission: "accounts.checklists" },
+            { title: "Accounts Checklists", url: paths.accounts.taskChecklists, permission: "accounts.checklists" },
             { title: "TDS Checklists", url: paths.accounts.tdsChecklists, permission: "accounts.tds-checklists" },
             { title: "GST Checklists", url: paths.accounts.gstChecklists, permission: "accounts.gst-checklists" },
             { title: "Fixed Expenses", url: paths.accounts.fixedExpenses, permission: "accounts.fixed-expenses" },
@@ -210,11 +210,6 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
         };
 
     const filteredMenuItems = React.useMemo(() => filterMenu(currentUser, navMain), [currentUser]);
-
-
-    console.log("USER:", currentUser);
-    console.log("CHECK hrms:", canRead(currentUser, "hrms"));
-    console.log("CHECK hrms.admin:", canRead(currentUser, "hrms.admin"));
 
     const logoutMutation = useLogout();
 
