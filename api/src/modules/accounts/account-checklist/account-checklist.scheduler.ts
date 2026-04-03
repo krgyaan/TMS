@@ -28,7 +28,7 @@ export class AccountChecklistScheduler {
     }
 
     // app:send-eod-checklist-mail — Mon–Fri 20:10
-    @Cron("10 20 * * 1-5")
+    @Cron("20 19 * * 1-5")
     async handleEodMails() {
         this.logger.info("Cron tick at enqueueEodMails", { timestamp: new Date() });
         try {
