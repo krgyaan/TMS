@@ -15,6 +15,7 @@ import { teams } from "@/db/schemas/master/teams.schema";
 import { organizations } from "@/db/schemas/master/organizations.schema";
 import { items } from "@/db/schemas/master/items.schema";
 import { locations } from "@/db/schemas/master/locations.schema";
+import { imprestCategories, users } from "@/db/schemas";
 
 @Injectable()
 export class ProjectsService {
@@ -35,9 +36,27 @@ export class ProjectsService {
 
         const woAcceptance = basicDetail ? (await this.db.select().from(woDetails).where(eq(woDetails.woBasicDetailId, basicDetail.id)))[0] : undefined;
 
-        const imprests = project.projectName ? await this.db.select().from(employeeImprests).where(eq(employeeImprests.projectName, project.projectName)) : [];
+        const imprests = project.projectName ? await this.db.select({
+            id: employeeImprests.id,
+            amount: employeeImprests.amount,
+            projectName: employeeImprests.projectName,
+            partyName: employeeImprests.partyName,
+            category: imprestCategories.name,
+            status: employeeImprests.status,
+            approvalDate: employeeImprests.approvedDate,
+            proof: employeeImprests.invoiceProof,
+            remark: employeeImprests.remark,
+            userId: employeeImprests.userId,
+            userName: users.name,
+        })
+        .from(employeeImprests)
+        .innerJoin(users, eq(users.id, employeeImprests.userId))
+        .innerJoin(imprestCategories, eq(imprestCategories.id, employeeImprests.categoryId))
+        .where(eq(employeeImprests.projectName, project.projectName)) : [];
 
-        const imprestSum = imprests.reduce((s, i) => s + (i.amount ?? 0), 0);
+        const imprestSum = imprests.reduce((sum: number, item) => {
+            return sum + Number(item.amount ?? 0);
+        }, 0);
 
         const purchaseOrdersData = tender ? await this.db.select().from(purchaseOrders).where(eq(purchaseOrders.tenderId, tender.id)) : [];
 
