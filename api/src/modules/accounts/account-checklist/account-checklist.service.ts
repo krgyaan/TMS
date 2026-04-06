@@ -15,7 +15,7 @@ import type { CreateChecklistDto, UpdateChecklistInput, ResponsibilityRemarkDto,
 import { MailerService } from "@/mailer/mailer.service";
 import { GoogleService } from "@/modules/integrations/google/google.service";
 import { MailAudienceService } from "@/core/mail/mail-audience.service";
-import { join } from "path";
+
 
 // Helper types
 export interface GroupedChecklists {
@@ -1029,8 +1029,8 @@ export class AccountChecklistService {
                     try {
                         await this.mailerService.sendMail(
                             {
-                                name: "checklist-report.hbs",
-                                basePath: join(process.cwd(), "src", "modules", "accounts", "account-checklist", "mails"),
+                                name: "checklist-report",
+                                basePath: "modules/accounts/account-checklist/mails",
                             },
                             {
                                 date,
@@ -1096,7 +1096,7 @@ export class AccountChecklistService {
                         await this.mailerService.sendMail(
                             {
                                 name: "checklist-report",
-                                basePath: join(process.cwd(), "src", "modules", "accounts", "account-checklist", "mails"),
+                                basePath: "modules/accounts/account-checklist/mails",
                             },
                             {
                                 date,
