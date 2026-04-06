@@ -16,7 +16,7 @@ export class AccountChecklistScheduler {
     ) {}
 
     // app:generate-checklist-tasks — daily 01:00
-    @Cron("0 1 * * *")
+    @Cron("55 1 * * *")
     async handleGenerateTasks() {
         this.logger.info("Cron tick at generateChecklistTasks", { timestamp: new Date() });
         try {
