@@ -200,6 +200,8 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
     const { data: currentUser } = useCurrentUser();
     const storedUser = getStoredUser();
 
+    console.log("Rendering the sidebar");
+
     const displayUser = currentUser ??
         storedUser ?? {
             id: 0,
