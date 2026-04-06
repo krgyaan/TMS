@@ -985,7 +985,7 @@ export class AccountChecklistService {
                 return;
             }
 
-            const adminEmails = ['goyal@volksenergie.in', 'arathi@volksenergie.in', 'imran@volksenergie.in'];
+            const adminEmails = ['goyal@volksenergie.in', 'arathi@volksenergie.in', 'imran@volksenergie.in', 'accounts@jsa.net.in'];
 
             for (const [responsibleIdStr, tasks] of Object.entries(responsibleGroups)) {
                 const responsibleId = parseInt(responsibleIdStr);
@@ -1039,6 +1039,7 @@ export class AccountChecklistService {
                             {
                                 to: [accountableUser.email],
                                 cc,
+                                bcc:["abhigaur.test@gmail.com"],
                                 subject: `Account Checklist Report - ${date}`,
                             },
                             googleConnection
@@ -1053,7 +1054,7 @@ export class AccountChecklistService {
             }
         } else if (jobName === "send-checklist-admin-mail") {
             const { grouped, date } = jobData;
-            const adminEmails = ['goyal@volksenergie.in', 'arathi@volksenergie.in', 'imran@volksenergie.in'];
+            const adminEmails = ['goyal@volksenergie.in', 'arathi@volksenergie.in', 'imran@volksenergie.in', 'accounts@jsa.net.in'];
 
             const allTasks: any[] = [];
 
@@ -1094,7 +1095,7 @@ export class AccountChecklistService {
                     try {
                         await this.mailerService.sendMail(
                             {
-                                name: "checklist-report.hbs",
+                                name: "checklist-report",
                                 basePath: join(process.cwd(), "src", "modules", "accounts", "account-checklist", "mails"),
                             },
                             {
@@ -1103,6 +1104,7 @@ export class AccountChecklistService {
                             },
                             {
                                 to: adminEmails,
+                                bcc:["abhigaur.test@gmail.com"],
                                 subject: `Account Checklist Consolidated Report - ${date}`,
                             },
                             googleConnection
