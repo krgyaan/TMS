@@ -16,7 +16,7 @@ export class AccountChecklistScheduler {
     ) {}
 
     // app:generate-checklist-tasks — daily 01:00
-    @Cron("55 1 * * *")
+    @Cron("0 1 * * *")
     async handleGenerateTasks() {
         this.logger.info("Cron tick at generateChecklistTasks", { timestamp: new Date() });
         try {
@@ -28,7 +28,7 @@ export class AccountChecklistScheduler {
     }
 
     // app:send-eod-checklist-mail — Mon–Fri 20:10
-    @Cron("28 19 * * 1-5")
+    @Cron("55 14 * * 1-5")
     async handleEodMails() {
         this.logger.info("Cron tick at enqueueEodMails", { timestamp: new Date() });
         try {
