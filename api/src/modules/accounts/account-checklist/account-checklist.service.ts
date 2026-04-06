@@ -1029,7 +1029,7 @@ export class AccountChecklistService {
                     try {
                         await this.mailerService.sendMail(
                             {
-                                name: "checklist-report.hbs",
+                                name: "checklist-report",
                                 basePath: join(process.cwd(), "src", "modules", "accounts", "account-checklist", "mails"),
                             },
                             {
