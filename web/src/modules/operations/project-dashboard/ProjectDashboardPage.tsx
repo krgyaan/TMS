@@ -198,7 +198,7 @@ const ProofViewer: React.FC<ProofViewerProps> = ({
         
         // If it's a relative path, prepend the API base URL
         // Adjust this based on your backend URL structure
-        const baseUrl = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+        const baseUrl = "https://tmsv2.volksenergie.in/uploads/employeeimprest";
         
         // Remove leading slash if present to avoid double slashes
         const cleanPath = url.startsWith('/') ? url : `/${url}`;
