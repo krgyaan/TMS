@@ -1127,7 +1127,7 @@ export default function ProjectDashboardPage() {
                                         <Button 
                                             size="sm" 
                                             variant="outline"
-                                            onClick={() => navigate(paths.operations.raisePoForm)}
+                                            onClick={() => navigate(paths.operations.raisePoForm(projectId))}
                                         >
                                             <Plus className="mr-1.5 h-4 w-4" /> 
                                             Raise PO
