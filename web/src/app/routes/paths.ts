@@ -122,7 +122,7 @@ export const paths = {
         contractAgreementShowPage: (id: number) => `/operations/work-order/contract-agreement/${id}`,
 
         projectDashboard: "/operations/project-dashboard",
-        raisePoForm: "/operations/project-dashboard/purchase-order/create",
+        raisePoForm:(id: number) => `/operations/project-dashboard/purchase-order/create/${id}`,
         viewPoPage: (id: number) => `/operations/project-dashboard/purchase-order/view/${id}`,
     },
 
