@@ -16,10 +16,17 @@ import { organizations } from "@/db/schemas/master/organizations.schema";
 import { items } from "@/db/schemas/master/items.schema";
 import { locations } from "@/db/schemas/master/locations.schema";
 import { imprestCategories, users } from "@/db/schemas";
+import { WINSTON_MODULE_PROVIDER } from "nest-winston";
+import { Logger } from "winston";
 
 @Injectable()
 export class ProjectsService {
-    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
+    constructor(
+        @Inject(DRIZZLE) private readonly db: DbInstance,
+        
+        @Inject(WINSTON_MODULE_PROVIDER)
+        private readonly logger: Logger,
+    ) {}
 
     // ================= DASHBOARD =================
     async getDashboardData(projectId: number) {
@@ -113,47 +120,98 @@ export class ProjectsService {
 
     // ================= CREATE PO =================
     async createPurchaseOrder(body: any) {
-        const poNumber = await this.generatePONumber(body.tenderId);
+    const poNumber = await this.generatePONumber(body.tenderId);
 
-        const project = (await this.db.select().from(projects).where(eq(projects.tenderId, body.tenderId)))[0];
+    const project = (
+        await this.db
+        .select()
+        .from(projects)
+        .where(eq(projects.tenderId, body.tenderId))
+    )[0];
 
-        const seller = (await this.db.select().from(projectParties).where(eq(projectParties.id, body.sellerId)))[0];
+    // Insert the purchase order
+    const po = (
+        await this.db
+        .insert(purchaseOrders)
+        .values({
+            tenderId: body.tenderId,
+            poNumber,
+            poDate: body.poDate,
+            projectName: project?.projectName,
+            
+            // Seller Info
+            sellerName: body.sellerName,
+            sellerAddress: body.sellerAddress,
+            sellerEmail: body.sellerEmail,
+            sellerGstNo: body.sellerGstNo,
+            sellerPanNo: body.sellerPanNo,
+            sellerMsmeNo: body.sellerMsmeNo,
+            
+            // Ship To Info
+            shipToName: body.shipToName,
+            shippingAddress: body.shippingAddress,
+            shipToGst: body.shipToGst,
+            shipToPan: body.shipToPan,
+            
+            // Optional fields
+            quotationNo: body.quotationNo,
+            quotationDate: body.quotationDate,
+            paymentTerms: body.paymentTerms,
+            deliveryPeriod: body.deliveryPeriod,
+            remarks: body.remarks,
+        })
+        .returning()
+    )[0];
 
-        const po = (
-            await this.db
-                .insert(purchaseOrders)
-                .values({
-                    ...body,
-                    poNumber,
-                    projectName: project?.projectName,
-                    sellerName: seller?.name,
-                    sellerAddress: seller?.address,
-                    sellerEmail: seller?.email,
-                    sellerGstNo: seller?.gstNo,
-                    sellerPanNo: seller?.pan,
-                    sellerMsmeNo: seller?.msme,
-                })
-                .returning()
-        )[0];
-
+    // Insert products
+    if (body.products && body.products.length > 0) {
         for (const product of body.products) {
-            await this.db.insert(purchaseOrderProducts).values({
-                purchaseOrderId: po.id,
-                ...product,
-            });
+        await this.db.insert(purchaseOrderProducts).values({
+            purchaseOrderId: po.id,
+            description: product.description,
+            hsnSac: product.hsnSac,
+            qty: product.qty,
+            rate: product.rate.toString(),
+            gstRate: product.gstRate.toString(),
+        });
         }
+    }
 
-        return po;
+    this.logger.info(`Purchase Order created: ${poNumber}`);
+    return po;
     }
 
     async getPurchaseOrder(id: number) {
         const po = (await this.db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id)))[0];
-        const products = await this.db.select().from(purchaseOrderProducts).where(eq(purchaseOrderProducts.purchaseOrderId, id));
-
-        return { ...po, products };
+        if (!po) throw new NotFoundException("Purchase Order not found");
+        const poProducts = await this.db.select().from(purchaseOrderProducts).where(eq(purchaseOrderProducts.purchaseOrderId, id));
+        return { ...po, products: poProducts };
     }
 
     async createParty(body: any) {
-        return (await this.db.insert(projectParties).values(body).returning())[0];
+    const party = (
+        await this.db
+        .insert(projectParties)
+        .values({
+            name: body.name,
+            email: body.email || null,
+            address: body.address || null,
+            gstNo: body.gstNo || null,
+            pan: body.pan || null,
+            msme: body.msme || null,
+        })
+        .returning()
+    )[0];
+
+    this.logger.info(`Party created: ${party.name} (ID: ${party.id})`);
+    return party;
+    }
+
+    async listParties() {
+    const res = await this.db
+        .select()
+        .from(projectParties)
+        .orderBy(desc(projectParties.createdAt));
+    return res;
     }
 }
