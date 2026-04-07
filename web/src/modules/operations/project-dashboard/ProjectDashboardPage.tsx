@@ -257,28 +257,53 @@ const ProofViewer: React.FC<ProofViewerProps> = ({
         // Image rendering
         if (fileType === 'image' && !imageError) {
             return (
-                <div className="absolute inset-0 flex items-center justify-center overflow-auto p-4">
-                    {imageLoading && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-muted/50">
-                            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-                        </div>
-                    )}
-                    <img
-                        src={fullUrl}
-                        alt={`Proof ${currentIndex + 1}`}
-                        className={cn(
-                            "max-w-none transition-transform duration-200",
-                            imageLoading && "opacity-0"
+                <div className="absolute inset-0 overflow-auto p-4">
+                    {/* Centering wrapper */}
+                    <div className="flex items-center justify-center min-w-full min-h-full">
+                        
+                        {/* Loader */}
+                        {imageLoading && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-muted/50 z-10">
+                                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                            </div>
                         )}
-                        style={{
-                            transform: `scale(${zoom}) rotate(${rotation}deg)`,
-                        }}
-                        onLoad={() => setImageLoading(false)}
-                        onError={() => {
-                            setImageError(true);
-                            setImageLoading(false);
-                        }}
-                    />
+
+                        {/* Image */}
+                        <img
+                            src={fullUrl}
+                            alt={`Proof ${currentIndex + 1}`}
+                            className={cn(
+                                "transition-transform duration-200 object-contain",
+                                imageLoading && "opacity-0"
+                            )}
+                            style={{
+                                maxWidth: "100%",
+                                maxHeight: "100%",
+                                transform: `scale(${zoom}) rotate(${rotation}deg)`,
+                                transformOrigin: "center center",
+                            }}
+                            onLoad={(e) => {
+                                const img = e.currentTarget;
+                                const container = img.parentElement;
+
+                                if (container) {
+                                    const scaleX = container.clientWidth / img.naturalWidth;
+                                    const scaleY = container.clientHeight / img.naturalHeight;
+
+                                    // Fit image initially (like Google Drive)
+                                    const fitScale = Math.min(scaleX, scaleY, 1);
+                                    setZoom(fitScale);
+                                }
+
+                                setImageLoading(false);
+                            }}
+                            onError={() => {
+                                console.error("Image failed:", fullUrl);
+                                setImageError(true);
+                                setImageLoading(false);
+                            }}
+                        />
+                    </div>
                 </div>
             );
         }
