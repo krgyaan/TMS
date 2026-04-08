@@ -6,6 +6,7 @@ import {
   fetchPoParties,
   createPurchaseOrder,
   createPoParty,
+  fetchPurchaseOrderById,
   type CreatePurchaseOrderDTO,
   type CreatePartyDTO 
 } from "./project-dashboard.api";
@@ -35,6 +36,14 @@ export const usePoParties = () => {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };
+
+export const usePurchaseOrderDetails = (id: number) => {
+  return useQuery({
+    queryKey: [],
+    queryFn: () => fetchPurchaseOrderById(id),
+    enabled: !!id,
+  })
+}
 
 // Create Purchase Order mutation
 export const useCreatePurchaseOrder = () => {
