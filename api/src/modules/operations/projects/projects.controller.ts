@@ -1,31 +1,60 @@
-import { Controller, Get, Post, Param, Body, ParseIntPipe } from "@nestjs/common";
+// src/modules/projects/projects.controller.ts
+
+import {
+  Controller,
+  Get,
+  Post,
+  Param,
+  Body,
+  ParseIntPipe,
+  HttpCode,
+  HttpStatus,
+  Put,
+} from "@nestjs/common";
 
 import { ProjectsService } from "./projects.service";
 
 @Controller("projects")
 export class ProjectsController {
-    constructor(private readonly service: ProjectsService) {}
+  constructor(private readonly service: ProjectsService) {}
 
-    @Get(":projectId")
-    getDashboard(@Param("projectId", ParseIntPipe) projectId: number) {
-        return this.service.getDashboardData(projectId);
-    }
+  @Get("/details/:projectId")
+  getDashboard(@Param("projectId", ParseIntPipe) projectId: number) {
+    return this.service.getDashboardData(projectId);
+  }
 
-    // 🔹 Create Purchase Order
-    @Post("purchase-orders")
-    createPurchaseOrder(@Body() body: any) {
-        return this.service.createPurchaseOrder(body);
-    }
+  // Create Purchase Order
+  @Post("purchase-orders")
+  @HttpCode(HttpStatus.CREATED)
+  createPurchaseOrder(@Body() body: any) {
+    return this.service.createPurchaseOrder(body);
+  }
 
-    // 🔹 View Purchase Order
-    @Get("purchase-orders/:id")
-    getPurchaseOrder(@Param("id", ParseIntPipe) id: number) {
-        return this.service.getPurchaseOrder(id);
-    }
+  // Create Party
+  @Post("purchase-orders/parties")
+  @HttpCode(HttpStatus.CREATED)
+  createParty(@Body() body: any) {
+    return this.service.createParty(body);
+  }
 
-    // 🔹 Create Project Party
-    @Post("parties")
-    createParty(@Body() body: any) {
-        return this.service.createParty(body);
-    }
+  // List Parties
+  @Get("purchase-orders/parties")
+  listParties() {
+    return this.service.listParties();
+  }
+
+  // Get Purchase Order by ID
+  @Get("purchase-orders/:id")
+  getPurchaseOrder(@Param("id", ParseIntPipe) id: number) {
+    return this.service.getPurchaseOrder(id);
+  }
+
+  @Put("purchase-orders/:id")
+  @HttpCode(HttpStatus.OK)
+  updatePurchaseOrder(
+      @Param("id", ParseIntPipe) id: number,
+      @Body() body: any
+  ) {
+      return this.service.updatePurchaseOrder(id, body);
+}
 }

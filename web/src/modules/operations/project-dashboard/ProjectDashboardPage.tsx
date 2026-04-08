@@ -16,7 +16,8 @@ import {
     ZoomOut,
     RotateCw,
     Maximize2,
-    AlertCircle
+    AlertCircle,
+    Edit
 } from "lucide-react";
 
 /* UI Components */
@@ -39,7 +40,7 @@ import {
     TooltipTrigger 
 } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { useProjectsMaster } from "@/hooks/api/useProjects";
 import { useProjectDashboardDetails } from "./project-dashboard.hooks";
@@ -703,8 +704,12 @@ const ProofViewer: React.FC<ProofViewerProps> = ({
    MAIN COMPONENT
 ================================ */
 export default function ProjectDashboardPage() {
+    const [searchParams] = useSearchParams();
+
+    const id = searchParams.get("id"); // string | null
+
     const form = useForm<{ projectId: number | null }>({
-        defaultValues: { projectId: 277 },
+        defaultValues: { projectId: id },
     });
 
     const projectId = form.watch("projectId");
@@ -759,6 +764,11 @@ export default function ProjectDashboardPage() {
             label: "View Details",
             icon: <Eye className="h-4 w-4" />,
             onClick: (row) => navigate(paths.operations.viewPoPage(row.id)),
+        },
+        {
+            label: "Edit PO",
+            icon: <Edit className="h-4 w-4" />,
+            onClick: (row) => navigate(paths.operations.editPoPage(row.id)),
         },
         {
             label: "Download PO",
@@ -1127,7 +1137,7 @@ export default function ProjectDashboardPage() {
                                         <Button 
                                             size="sm" 
                                             variant="outline"
-                                            onClick={() => navigate(paths.operations.raisePoForm)}
+                                            onClick={() => navigate(paths.operations.raisePoForm(projectId))}
                                         >
                                             <Plus className="mr-1.5 h-4 w-4" /> 
                                             Raise PO

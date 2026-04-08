@@ -1,7 +1,7 @@
-import { pgTable, integer, varchar, text, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, integer, varchar, text, timestamp, bigserial } from "drizzle-orm/pg-core";
 
 export const projectParties = pgTable("project_parties", {
-    id: integer("id").primaryKey(),
+    id: bigserial("id", { mode: "number" }).primaryKey(), 
     name: varchar("name", { length: 255 }),
     gstNo: varchar("gst_no", { length: 50 }),
     msme: varchar("msme", { length: 50 }),
