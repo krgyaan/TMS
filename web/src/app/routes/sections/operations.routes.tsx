@@ -28,7 +28,8 @@ const Operations_ContractAgreementShow = lazy(() => import("@/modules/operations
 
 const Operations_ProjectDashboard = lazy(() => import("@/modules/operations/project-dashboard/ProjectDashboardPage"));
 const Operations_RaisePoFormPage = lazy(() => import("@/modules/operations/project-dashboard/RaisePoFormPage"));
-const Operations_ViewPoPage = lazy(() => import("@/modules/operations/project-dashboard/ViewPoPage"));
+const Operations_ViewPoPage = lazy(() => import("@/modules/operations/project-dashboard/ViewPOPage"));
+const Operations_EditPOPage = lazy(() => import("@/modules/operations/project-dashboard/EditPOPage"));
 
 export default function OperationsRoutes() {
     return (
@@ -57,8 +58,9 @@ export default function OperationsRoutes() {
             <Route path="work-order/contract-agreement/:id" element={<RouteWrapper><Operations_ContractAgreementShow /></RouteWrapper>} />
 
             <Route path="project-dashboard" element={<RouteWrapper><Operations_ProjectDashboard /></RouteWrapper>} />
-            <Route path="project-dashboard/purchase-order/create" element={<RouteWrapper><Operations_RaisePoFormPage /></RouteWrapper>} />
-            <Route path="project-dashboard/purchase-order/:id/view" element={<RouteWrapper><Operations_ViewPoPage /></RouteWrapper>} />
+            <Route path="project-dashboard/purchase-order/create/:id" element={<RouteWrapper><Operations_RaisePoFormPage /></RouteWrapper>} />
+            <Route path="project-dashboard/purchase-order/:id" element={<RouteWrapper><Operations_ViewPoPage /></RouteWrapper>} />
+            <Route path="project-dashboard/purchase-order/:id/edit" element={<RouteWrapper><Operations_EditPOPage /></RouteWrapper>}></Route>
         </Routes>
     );
 }

@@ -30,7 +30,19 @@ import { redisConnection } from "@/config/redis.config";
                 return new Queue("followup-mail-queue", { connection });
             },
         },
+        {
+            provide: "CHECKLIST_QUEUE",
+            inject: ["REDIS_CONNECTION"],
+            useFactory: (connection: IORedis | null) => {
+                if (!connection) {
+                    return {
+                        add: async () => {},
+                    } as unknown as Queue;
+                }
+                return new Queue("checklist-mail-queue", { connection });
+            },
+        },
     ],
-    exports: ["FOLLOWUP_QUEUE", "REDIS_CONNECTION"],
+    exports: ["FOLLOWUP_QUEUE", "CHECKLIST_QUEUE", "REDIS_CONNECTION"],
 })
 export class QueueModule { }

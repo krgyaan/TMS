@@ -121,9 +121,10 @@ export const paths = {
         contractAgreementListPage: "/operations/work-order/contract-agreement",
         contractAgreementShowPage: (id: number) => `/operations/work-order/contract-agreement/${id}`,
 
-        projectDashboard: "/operations/project-dashboard",
-        raisePoForm: "/operations/project-dashboard/purchase-order/create",
-        viewPoPage: (id: number) => `/operations/project-dashboard/purchase-order/view/${id}`,
+        projectDashboard: (id?: number) => id ? `/operations/project-dashboard?id=${id}` : "/operations/project-dashboard",
+        raisePoForm:(id: number) => `/operations/project-dashboard/purchase-order/create/${id}`,
+        viewPoPage: (id: number) => `/operations/project-dashboard/purchase-order/${id}`,
+        editPoPage: (id: number) => `/operations/project-dashboard/purchase-order/${id}/edit`,
     },
 
     // ==================== SERVICES ====================
@@ -174,6 +175,13 @@ export const paths = {
         fixedExpenses: "/accounts/fixed-expenses",
         projects: "/projects",
         tdsChecklists: "/accounts/tds-checklists",
+
+        taskChecklists: "/accounts/task-checklists",
+        taskChecklistsCreate: "/accounts/task-checklists/create",
+
+        taskChecklistsEdit: (id: number) => `/accounts/task-checklists/${id}/edit`,
+        taskChecklistsView: (id: number) => `/accounts/task-checklists/${id}`,
+        taskChecklistsReport:(id: number) => `/accounts/task-checklists/${id}/report`,
     },
 
     // ==================== CRM ====================

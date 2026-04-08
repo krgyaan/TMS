@@ -1,6 +1,6 @@
-// src/pages/project-dashboard/RaisePO.tsx
+// src/pages/project-dashboard/EditPurchaseOrder.tsx
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -24,6 +24,7 @@ import {
   ChevronDown,
   ChevronUp,
   Copy,
+  Save,
 } from "lucide-react";
 
 /* UI Components */
@@ -77,11 +78,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 // Hooks
 import {
   usePoParties,
-  useProjectDashboardDetails,
-  useCreatePurchaseOrder,
+  usePurchaseOrderDetails,
+  useUpdatePurchaseOrder,
   useCreatePoParty,
 } from "./project-dashboard.hooks";
-import type { CreatePurchaseOrderDTO, CreatePartyDTO } from "./project-dashboard.api";
+import type { UpdatePurchaseOrderDTO, CreatePartyDTO } from "./project-dashboard.api";
 import { paths } from "@/app/routes/paths";
 
 /* ================================
@@ -151,8 +152,10 @@ const formatCurrency = (amount: number) => {
   }).format(amount);
 };
 
-const formatDate = (date: Date) => {
-  return date.toISOString().split("T")[0];
+const formatDate = (date: string | Date) => {
+  if (!date) return "";
+  const d = new Date(date);
+  return d.toISOString().split("T")[0];
 };
 
 const generateUniqueId = () => {
@@ -192,27 +195,55 @@ const FormSkeleton = () => (
 );
 
 /* ================================
+   NOT FOUND COMPONENT
+================================ */
+const NotFound = ({ message, onBack }: { message: string; onBack: () => void }) => (
+  <div className="container mx-auto py-6 max-w-6xl">
+    <Card className="border-destructive/50">
+      <CardContent className="flex flex-col items-center justify-center py-16">
+        <AlertCircle className="h-16 w-16 text-destructive mb-4" />
+        <h2 className="text-xl font-semibold mb-2">Not Found</h2>
+        <p className="text-muted-foreground mb-6">{message}</p>
+        <Button onClick={onBack} variant="outline">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Go Back
+        </Button>
+      </CardContent>
+    </Card>
+  </div>
+);
+
+/* ================================
    MAIN COMPONENT
 ================================ */
-export default function RaisePoFormPage() {
+export default function EditPOPage() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const projectId = Number(id);
+  const purchaseOrderId = Number(id);
 
   // API Hooks
-  const { data: projectDetails, isLoading: isProjectLoading } = useProjectDashboardDetails(projectId);
-  console.log(projectDetails);
+  const {
+    data: poData,
+    isLoading: isPOLoading,
+    isError: isPOError,
+    error: poError,
+  } = usePurchaseOrderDetails(purchaseOrderId);
+
+  console.log("data" , poData);
+
+  const projectId = poData?.projectId;
 
   const { data: partiesData, isLoading: isPartiesLoading } = usePoParties();
-  const createPOMutation = useCreatePurchaseOrder();
+  const updatePOMutation = useUpdatePurchaseOrder();
   const createPartyMutation = useCreatePoParty();
 
   // Parties list from API
   const parties: Party[] = partiesData || [];
 
   // Form States
+  const [isInitialized, setIsInitialized] = useState(false);
   const [isAddPartyOpen, setIsAddPartyOpen] = useState(false);
-  const [currentDate, setCurrentDate] = useState(formatDate(new Date()));
+  const [poDate, setPoDate] = useState("");
   const [errors, setErrors] = useState<FormErrors>({});
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
 
@@ -264,6 +295,68 @@ export default function RaisePoFormPage() {
     pan: "",
     msme: "",
   });
+
+  // Initialize form with PO data
+  useEffect(() => {
+    if (poData && !isInitialized) {
+      // Set PO Date
+      setPoDate(formatDate(poData.poDate));
+
+      // Set Seller Info
+      setSellerInfo({
+        sellerId: "",
+        sellerName: poData.sellerName || "",
+        sellerEmail: poData.sellerEmail || "",
+        sellerAddress: poData.sellerAddress || "",
+        sellerGstNo: poData.sellerGstNo || "",
+        sellerPanNo: poData.sellerPanNo || "",
+        sellerMsmeNo: poData.sellerMsmeNo || "",
+      });
+
+      // Set Ship To Info
+      setShipToInfo({
+        partyId: "",
+        shipToName: poData.shipToName || "",
+        shippingAddress: poData.shippingAddress || "",
+        shipToGst: poData.shipToGst || "",
+        shipToPan: poData.shipToPan || "",
+      });
+
+      // Set Products
+      if (poData.products && poData.products.length > 0) {
+        setProducts(
+          poData.products.map((p: any) => ({
+            id: generateUniqueId(),
+            description: p.description || "",
+            hsnSac: p.hsnSac || "",
+            qty: Number(p.qty) || 0,
+            rate: Number(p.rate) || 0,
+            gstRate: Number(p.gstRate) || 18,
+          }))
+        );
+      }
+
+      // Set Optional Fields
+      setQuotationNo(poData.quotationNo || "");
+      setQuotationDate(poData.quotationDate ? formatDate(poData.quotationDate) : "");
+      setPaymentTerms(poData.paymentTerms || "");
+      setDeliveryPeriod(poData.deliveryPeriod || "");
+      setRemarks(poData.remarks || "");
+
+      // Check if any optional field has value to expand section
+      if (
+        poData.quotationNo ||
+        poData.quotationDate ||
+        poData.paymentTerms ||
+        poData.deliveryPeriod ||
+        poData.remarks
+      ) {
+        setIsAdvancedOpen(true);
+      }
+
+      setIsInitialized(true);
+    }
+  }, [poData, isInitialized]);
 
   // Calculations
   const calculations = useMemo(() => {
@@ -422,11 +515,6 @@ export default function RaisePoFormPage() {
       return;
     }
 
-    if (!projectDetails?.tender?.id) {
-      toast.error("Project tender information not found.");
-      return;
-    }
-
     try {
       const validProducts = products
         .filter((p) => p.description.trim() && p.qty > 0 && p.rate > 0)
@@ -438,9 +526,8 @@ export default function RaisePoFormPage() {
           gstRate: p.gstRate,
         }));
 
-      const poData: CreatePurchaseOrderDTO = {
-        tenderId: projectDetails.tender.id,
-        poDate: currentDate,
+      const updateData: UpdatePurchaseOrderDTO = {
+        poDate,
         sellerId: sellerInfo.sellerId ? Number(sellerInfo.sellerId) : undefined,
         sellerName: sellerInfo.sellerName,
         sellerEmail: sellerInfo.sellerEmail,
@@ -460,21 +547,39 @@ export default function RaisePoFormPage() {
         remarks: remarks || undefined,
       };
 
-      const result = await createPOMutation.mutateAsync(poData);
+      await updatePOMutation.mutateAsync({
+        id: Number(purchaseOrderId),
+        data: updateData,
+      });
 
-      toast.success(`PO #${result.poNumber} has been created successfully.`);
+      toast.success(`PO #${poData?.poNumber} has been updated successfully.`);
       navigate(paths.operations.projectDashboard(projectId));
     } catch (error: any) {
-      toast.error(error?.message || "Failed to create purchase order. Please try again.");
+      toast.error(
+        error?.message || "Failed to update purchase order. Please try again."
+      );
     }
   };
 
   // Loading state
-  if (isProjectLoading) {
+  if (isPOLoading) {
     return (
       <div className="container mx-auto py-6 max-w-6xl">
         <FormSkeleton />
       </div>
+    );
+  }
+
+  // Error state
+  if (isPOError || !poData) {
+    return (
+      <NotFound
+        message={
+          (poError as any)?.message ||
+          "The purchase order you're looking for doesn't exist or has been removed."
+        }
+        onBack={() => navigate(-1)}
+      />
     );
   }
 
@@ -496,21 +601,22 @@ export default function RaisePoFormPage() {
             <div>
               <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
                 <Receipt className="h-6 w-6" />
-                Raise Purchase Order
+                Edit Purchase Order
               </h1>
               <p className="text-muted-foreground">
-                {projectDetails?.project?.projectName || "Loading..."}
+                {poData?.projectName || "Loading..."}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <Badge variant="outline" className="text-sm">
-              <FileText className="mr-2 h-3 w-3" />
-              {projectDetails?.tender?.tenderNumber || "N/A"}
+            <Badge variant="secondary" className="text-sm font-mono">
+              <Hash className="mr-1 h-3 w-3" />
+              {poData?.poNumber || "N/A"}
             </Badge>
-            <Badge variant="secondary" className="text-sm">
+            <Badge variant="outline" className="text-sm">
               <Calendar className="mr-2 h-3 w-3" />
-              {new Date().toLocaleDateString("en-IN", {
+              Created:{" "}
+              {new Date(poData?.createdAt).toLocaleDateString("en-IN", {
                 day: "2-digit",
                 month: "short",
                 year: "numeric",
@@ -535,7 +641,9 @@ export default function RaisePoFormPage() {
                 <FileText className="h-5 w-5" />
                 PO Details
               </CardTitle>
-              <CardDescription>Basic purchase order information</CardDescription>
+              <CardDescription>
+                Basic purchase order information
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -544,10 +652,11 @@ export default function RaisePoFormPage() {
                     <Hash className="h-3.5 w-3.5 text-muted-foreground" />
                     PO Number
                   </Label>
-                  <Input value="Auto-generated" readOnly className="bg-muted" />
-                  <p className="text-xs text-muted-foreground">
-                    Will be generated upon submission
-                  </p>
+                  <Input
+                    value={poData?.poNumber || ""}
+                    readOnly
+                    className="bg-muted font-mono"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2">
@@ -556,7 +665,7 @@ export default function RaisePoFormPage() {
                   </Label>
                   <Input
                     className="bg-muted"
-                    value={projectDetails?.project?.projectName || ""}
+                    value={poData?.projectName || ""}
                     readOnly
                   />
                 </div>
@@ -567,8 +676,8 @@ export default function RaisePoFormPage() {
                   </Label>
                   <Input
                     type="date"
-                    value={currentDate}
-                    onChange={(e) => setCurrentDate(e.target.value)}
+                    value={poDate}
+                    onChange={(e) => setPoDate(e.target.value)}
                   />
                 </div>
               </div>
@@ -584,7 +693,9 @@ export default function RaisePoFormPage() {
                     <Building2 className="h-5 w-5" />
                     Seller Information
                   </CardTitle>
-                  <CardDescription>Select or enter seller/vendor details</CardDescription>
+                  <CardDescription>
+                    Select or enter seller/vendor details
+                  </CardDescription>
                 </div>
                 <Dialog open={isAddPartyOpen} onOpenChange={setIsAddPartyOpen}>
                   <DialogTrigger asChild>
@@ -613,10 +724,13 @@ export default function RaisePoFormPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label>Select Existing Seller</Label>
-                  <Select value={sellerInfo.sellerId} onValueChange={handleSellerChange}>
+                  <Label>Replace with Existing Seller</Label>
+                  <Select
+                    value={sellerInfo.sellerId}
+                    onValueChange={handleSellerChange}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="Choose a seller..." />
+                      <SelectValue placeholder="Choose a seller to replace..." />
                     </SelectTrigger>
                     <SelectContent>
                       {isPartiesLoading ? (
@@ -681,7 +795,10 @@ export default function RaisePoFormPage() {
                   <Input
                     value={sellerInfo.sellerGstNo}
                     onChange={(e) =>
-                      setSellerInfo({ ...sellerInfo, sellerGstNo: e.target.value.toUpperCase() })
+                      setSellerInfo({
+                        ...sellerInfo,
+                        sellerGstNo: e.target.value.toUpperCase(),
+                      })
                     }
                     placeholder="e.g. 27ABCDE1234F1Z5"
                     className="font-mono"
@@ -711,7 +828,10 @@ export default function RaisePoFormPage() {
                   <Input
                     value={sellerInfo.sellerPanNo}
                     onChange={(e) =>
-                      setSellerInfo({ ...sellerInfo, sellerPanNo: e.target.value.toUpperCase() })
+                      setSellerInfo({
+                        ...sellerInfo,
+                        sellerPanNo: e.target.value.toUpperCase(),
+                      })
                     }
                     placeholder="e.g. ABCDE1234F"
                     className="font-mono"
@@ -723,7 +843,10 @@ export default function RaisePoFormPage() {
                   <Input
                     value={sellerInfo.sellerMsmeNo}
                     onChange={(e) =>
-                      setSellerInfo({ ...sellerInfo, sellerMsmeNo: e.target.value.toUpperCase() })
+                      setSellerInfo({
+                        ...sellerInfo,
+                        sellerMsmeNo: e.target.value.toUpperCase(),
+                      })
                     }
                     placeholder="e.g. UDYAM-XX-00-0000000"
                     className="font-mono"
@@ -742,7 +865,9 @@ export default function RaisePoFormPage() {
                     <Truck className="h-5 w-5" />
                     Ship To Details
                   </CardTitle>
-                  <CardDescription>Delivery destination information</CardDescription>
+                  <CardDescription>
+                    Delivery destination information
+                  </CardDescription>
                 </div>
                 <Dialog>
                   <DialogTrigger asChild>
@@ -771,10 +896,13 @@ export default function RaisePoFormPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label>Select Destination</Label>
-                  <Select value={shipToInfo.partyId} onValueChange={handleShipToChange}>
+                  <Label>Replace with Existing Destination</Label>
+                  <Select
+                    value={shipToInfo.partyId}
+                    onValueChange={handleShipToChange}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="Choose shipping destination..." />
+                      <SelectValue placeholder="Choose destination to replace..." />
                     </SelectTrigger>
                     <SelectContent>
                       {isPartiesLoading ? (
@@ -822,7 +950,10 @@ export default function RaisePoFormPage() {
                 <Textarea
                   value={shipToInfo.shippingAddress}
                   onChange={(e) =>
-                    setShipToInfo({ ...shipToInfo, shippingAddress: e.target.value })
+                    setShipToInfo({
+                      ...shipToInfo,
+                      shippingAddress: e.target.value,
+                    })
                   }
                   placeholder="Enter complete shipping address"
                   rows={3}
@@ -835,7 +966,10 @@ export default function RaisePoFormPage() {
                   <Input
                     value={shipToInfo.shipToGst}
                     onChange={(e) =>
-                      setShipToInfo({ ...shipToInfo, shipToGst: e.target.value.toUpperCase() })
+                      setShipToInfo({
+                        ...shipToInfo,
+                        shipToGst: e.target.value.toUpperCase(),
+                      })
                     }
                     placeholder="e.g. 27ABCDE1234F1Z5"
                     className="font-mono"
@@ -847,7 +981,10 @@ export default function RaisePoFormPage() {
                   <Input
                     value={shipToInfo.shipToPan}
                     onChange={(e) =>
-                      setShipToInfo({ ...shipToInfo, shipToPan: e.target.value.toUpperCase() })
+                      setShipToInfo({
+                        ...shipToInfo,
+                        shipToPan: e.target.value.toUpperCase(),
+                      })
                     }
                     placeholder="e.g. ABCDE1234F"
                     className="font-mono"
@@ -871,10 +1008,15 @@ export default function RaisePoFormPage() {
                     </Badge>
                   </CardTitle>
                   <CardDescription>
-                    Add products or services to this purchase order
+                    Edit products or services in this purchase order
                   </CardDescription>
                 </div>
-                <Button type="button" variant="outline" size="sm" onClick={addProduct}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addProduct}
+                >
                   <Plus className="mr-2 h-4 w-4" />
                   Add Product
                 </Button>
@@ -927,7 +1069,11 @@ export default function RaisePoFormPage() {
                             <Input
                               value={product.description}
                               onChange={(e) =>
-                                updateProduct(product.id, "description", e.target.value)
+                                updateProduct(
+                                  product.id,
+                                  "description",
+                                  e.target.value
+                                )
                               }
                               placeholder="Enter product description"
                             />
@@ -948,7 +1094,11 @@ export default function RaisePoFormPage() {
                               min="0"
                               value={product.qty || ""}
                               onChange={(e) =>
-                                updateProduct(product.id, "qty", Number(e.target.value))
+                                updateProduct(
+                                  product.id,
+                                  "qty",
+                                  Number(e.target.value)
+                                )
                               }
                               placeholder="0"
                               className="text-right"
@@ -961,7 +1111,11 @@ export default function RaisePoFormPage() {
                               step="0.01"
                               value={product.rate || ""}
                               onChange={(e) =>
-                                updateProduct(product.id, "rate", Number(e.target.value))
+                                updateProduct(
+                                  product.id,
+                                  "rate",
+                                  Number(e.target.value)
+                                )
                               }
                               placeholder="0.00"
                               className="text-right"
@@ -996,14 +1150,20 @@ export default function RaisePoFormPage() {
                               <TooltipContent side="left" className="p-3">
                                 <div className="text-sm space-y-1">
                                   <div className="flex justify-between gap-4">
-                                    <span className="text-muted-foreground">Subtotal:</span>
-                                    <span className="font-medium">{formatCurrency(lineTotal)}</span>
+                                    <span className="text-muted-foreground">
+                                      Subtotal:
+                                    </span>
+                                    <span className="font-medium">
+                                      {formatCurrency(lineTotal)}
+                                    </span>
                                   </div>
                                   <div className="flex justify-between gap-4">
                                     <span className="text-muted-foreground">
                                       GST ({product.gstRate}%):
                                     </span>
-                                    <span className="font-medium">{formatCurrency(gstAmount)}</span>
+                                    <span className="font-medium">
+                                      {formatCurrency(gstAmount)}
+                                    </span>
                                   </div>
                                   <Separator className="my-1" />
                                   <div className="flex justify-between gap-4 font-semibold">
@@ -1053,7 +1213,10 @@ export default function RaisePoFormPage() {
                   </TableBody>
                   <TableFooter>
                     <TableRow>
-                      <TableCell colSpan={6} className="text-right font-medium">
+                      <TableCell
+                        colSpan={6}
+                        className="text-right font-medium"
+                      >
                         Subtotal
                       </TableCell>
                       <TableCell className="text-right font-medium">
@@ -1062,7 +1225,10 @@ export default function RaisePoFormPage() {
                       <TableCell></TableCell>
                     </TableRow>
                     <TableRow>
-                      <TableCell colSpan={6} className="text-right font-medium">
+                      <TableCell
+                        colSpan={6}
+                        className="text-right font-medium"
+                      >
                         Total GST
                       </TableCell>
                       <TableCell className="text-right font-medium">
@@ -1071,7 +1237,10 @@ export default function RaisePoFormPage() {
                       <TableCell></TableCell>
                     </TableRow>
                     <TableRow>
-                      <TableCell colSpan={6} className="text-right font-bold text-lg">
+                      <TableCell
+                        colSpan={6}
+                        className="text-right font-bold text-lg"
+                      >
                         Grand Total
                       </TableCell>
                       <TableCell className="text-right font-bold text-lg">
@@ -1176,7 +1345,9 @@ export default function RaisePoFormPage() {
                 <Calculator className="h-5 w-5 text-muted-foreground" />
                 <div>
                   <p className="text-sm text-muted-foreground">Total PO Value</p>
-                  <p className="text-2xl font-bold">{formatCurrency(calculations.grandTotal)}</p>
+                  <p className="text-2xl font-bold">
+                    {formatCurrency(calculations.grandTotal)}
+                  </p>
                 </div>
               </div>
               <Separator orientation="vertical" className="h-12" />
@@ -1187,29 +1358,41 @@ export default function RaisePoFormPage() {
                 </div>
                 <div>
                   <p className="text-muted-foreground">Subtotal</p>
-                  <p className="font-semibold">{formatCurrency(calculations.subtotal)}</p>
+                  <p className="font-semibold">
+                    {formatCurrency(calculations.subtotal)}
+                  </p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">GST</p>
-                  <p className="font-semibold">{formatCurrency(calculations.totalGst)}</p>
+                  <p className="font-semibold">
+                    {formatCurrency(calculations.totalGst)}
+                  </p>
                 </div>
               </div>
             </div>
 
             <div className="flex items-center gap-4">
-              <Button type="button" variant="outline" onClick={() => navigate(-1)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => navigate(-1)}
+              >
                 Cancel
               </Button>
-              <Button type="submit" disabled={createPOMutation.isPending} className="min-w-[160px]">
-                {createPOMutation.isPending ? (
+              <Button
+                type="submit"
+                disabled={updatePOMutation.isPending}
+                className="min-w-[160px]"
+              >
+                {updatePOMutation.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Creating PO...
+                    Saving...
                   </>
                 ) : (
                   <>
-                    <CheckCircle2 className="mr-2 h-4 w-4" />
-                    Create PO
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Changes
                   </>
                 )}
               </Button>
@@ -1259,7 +1442,9 @@ const AddPartyDialog: React.FC<AddPartyDialogProps> = ({
             </Label>
             <Input
               value={newParty.name}
-              onChange={(e) => setNewParty({ ...newParty, name: e.target.value })}
+              onChange={(e) =>
+                setNewParty({ ...newParty, name: e.target.value })
+              }
               placeholder="Enter party name"
             />
           </div>
@@ -1268,7 +1453,9 @@ const AddPartyDialog: React.FC<AddPartyDialogProps> = ({
             <Input
               type="email"
               value={newParty.email}
-              onChange={(e) => setNewParty({ ...newParty, email: e.target.value })}
+              onChange={(e) =>
+                setNewParty({ ...newParty, email: e.target.value })
+              }
               placeholder="example@email.com"
             />
           </div>
@@ -1278,7 +1465,9 @@ const AddPartyDialog: React.FC<AddPartyDialogProps> = ({
           <Label>Address</Label>
           <Textarea
             value={newParty.address}
-            onChange={(e) => setNewParty({ ...newParty, address: e.target.value })}
+            onChange={(e) =>
+              setNewParty({ ...newParty, address: e.target.value })
+            }
             placeholder="Enter complete address"
             rows={2}
           />
@@ -1294,7 +1483,9 @@ const AddPartyDialog: React.FC<AddPartyDialogProps> = ({
                 <TooltipTrigger>
                   <Info className="h-3.5 w-3.5 text-muted-foreground" />
                 </TooltipTrigger>
-                <TooltipContent>15-character GST identification number</TooltipContent>
+                <TooltipContent>
+                  15-character GST identification number
+                </TooltipContent>
               </Tooltip>
             </Label>
             <Input
@@ -1314,7 +1505,9 @@ const AddPartyDialog: React.FC<AddPartyDialogProps> = ({
                 <TooltipTrigger>
                   <Info className="h-3.5 w-3.5 text-muted-foreground" />
                 </TooltipTrigger>
-                <TooltipContent>10-character Permanent Account Number</TooltipContent>
+                <TooltipContent>
+                  10-character Permanent Account Number
+                </TooltipContent>
               </Tooltip>
             </Label>
             <Input

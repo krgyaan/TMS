@@ -25,7 +25,7 @@ export function SelectField<TFieldValues extends FieldValues, TName extends Fiel
     placeholder,
     disabled,
 }: SelectFieldProps<TFieldValues, TName>) {
-    const normalizedOptions = React.useMemo<SelectOption[]>(() => options.map(option => ("id" in option ? option : { id: option.value, name: option.label })), [options]);
+    const normalizedOptions = React.useMemo<SelectOption[]>(() => (options || []).map(option => ("id" in option ? option : { id: option.value, name: option.label })), [options]);
 
     return (
         <FieldWrapper control={control} name={name} label={label}>

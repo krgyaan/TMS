@@ -17,10 +17,11 @@ export class FollowupScheduler {
     async handleFollowups() {
         const now = new Date();
 
-        console.log("Cron tick at", now);
         const window = this.getCurrentWindow(now);
-        // console.log("Window:", window);
         if (!window) return;
+        
+        console.log("Window:", window);
+        console.log("Cron tick at", now);
 
         const followups = await this.followUpService.getDueFollowupsForCurrentWindow(window.frequency);
 

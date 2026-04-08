@@ -3,9 +3,11 @@ dotenv.config();
 
 import { NestFactory } from "@nestjs/core";
 import { FollowupWorkerModule } from "./modules/follow-up/followup-worker.module";
+import { AccountChecklistWorkerModule } from "./modules/accounts/account-checklist/account-checklist-worker.module";
 
 async function bootstrap() {
     await NestFactory.createApplicationContext(FollowupWorkerModule);
-    console.log("✅ Followup worker started");
+    await NestFactory.createApplicationContext(AccountChecklistWorkerModule);
+    console.log("✅ Workers started");
 }
 bootstrap();

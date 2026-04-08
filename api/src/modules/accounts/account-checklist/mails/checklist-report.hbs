@@ -1,0 +1,29 @@
+<div>
+    <p style="font-weight: bold; text-align: center;">Account Checklist Report for {{ date }}</p>
+    {{#each tables}}
+        <p style="font-weight: bold; text-align: center;">Responsible: {{ this.responsible_user }}</p>
+        <table style="width:100%; border-collapse: collapse; margin-bottom: 20px; border: 1px solid #ddd;">
+            <thead>
+                <tr>
+                    <th style="font-weight: bold; padding: 8px; border: 1px solid #ddd;">Task Name</th>
+                    <th style="font-weight: bold; padding: 8px; border: 1px solid #ddd;">Accountable</th>
+                    <th style="font-weight: bold; padding: 8px; border: 1px solid #ddd;">Status</th>
+                    <th style="font-weight: bold; padding: 8px; border: 1px solid #ddd;">Remark</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each this.tasks}}
+                    <tr style="border: 1px solid #ddd;">
+                        <td style="padding: 8px; border: 1px solid #ddd;">{{ this.task_name }}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">{{ this.accountable_user }}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">
+                            {{#if this.completed_at}}Completed{{else}}Pending{{/if}}
+                        </td>
+                        <td style="padding: 8px; border: 1px solid #ddd;">{{ this.remark }}</td>
+                    </tr>
+                {{/each}}
+            </tbody>
+        </table>
+        <br>
+    {{/each}}
+</div>
