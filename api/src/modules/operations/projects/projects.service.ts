@@ -105,13 +105,13 @@ export class ProjectsService {
 
         const last = await this.db
             .select()
-            .from(projects)
-            .where(like(projects.projectCode, `${prefix}/%`))
-            .orderBy(desc(projects.id));
+            .from(purchaseOrders)
+            .where(like(purchaseOrders.poNumber, `${prefix}/%`))
+            .orderBy(desc(purchaseOrders.id));
 
         let next = 1;
-        if (last[0]?.projectCode) {
-            const match = last[0].projectCode.match(/(\d{4})$/);
+        if (last[0]?.poNumber) {
+            const match = last[0].poNumber.match(/(\d{4})$/);
             if (match) next = parseInt(match[1]) + 1;
         }
 
