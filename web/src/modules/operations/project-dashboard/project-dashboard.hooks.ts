@@ -7,8 +7,10 @@ import {
   createPurchaseOrder,
   createPoParty,
   fetchPurchaseOrderById,
+  updatePurchaseOrder,
   type CreatePurchaseOrderDTO,
-  type CreatePartyDTO 
+  type CreatePartyDTO,
+  type UpdatePurchaseOrderDTO
 } from "./project-dashboard.api";
 
 export const projectsDashboardKeys = {
@@ -56,6 +58,17 @@ export const useCreatePurchaseOrder = () => {
     },
   });
 };
+
+export const useUpdatePurchaseOrder = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({id, data} : {id: number, data : UpdatePurchaseOrderDTO}) => updatePurchaseOrder(id, data),
+    onSuccess: () =>{
+      queryClient.invalidateQueries({ queryKey: projectsDashboardKeys.all });
+    }
+  })
+}
 
 // Create Party mutation
 export const useCreatePoParty = () => {

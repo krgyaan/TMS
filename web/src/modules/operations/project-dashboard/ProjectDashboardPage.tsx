@@ -16,7 +16,8 @@ import {
     ZoomOut,
     RotateCw,
     Maximize2,
-    AlertCircle
+    AlertCircle,
+    Edit
 } from "lucide-react";
 
 /* UI Components */
@@ -763,6 +764,11 @@ export default function ProjectDashboardPage() {
             label: "View Details",
             icon: <Eye className="h-4 w-4" />,
             onClick: (row) => navigate(paths.operations.viewPoPage(row.id)),
+        },
+        {
+            label: "Edit PO",
+            icon: <Edit className="h-4 w-4" />,
+            onClick: (row) => navigate(paths.operations.editPoPage(row.id)),
         },
         {
             label: "Download PO",

@@ -30,8 +30,10 @@ export const createPoParty = async (data: CreatePartyDTO): Promise<any> => {
 // Get Purchase Order by ID
 export const fetchPurchaseOrderById = async (id: number): Promise<any> => {
   const res = await api.get(`${BASE_URL}/purchase-orders/${id}`);
+  console.log("data received: ", res);
   return res.data;
 };
+
 
 // Types
 export interface CreatePurchaseOrderDTO {
@@ -80,3 +82,41 @@ export interface CreatePartyDTO {
   pan?: string;
   msme?: string;
 }
+
+export interface UpdatePurchaseOrderDTO {
+  poDate: string;
+  
+  // Seller Info
+  sellerId?: number;
+  sellerName: string;
+  sellerEmail: string;
+  sellerAddress: string;
+  sellerGstNo: string;
+  sellerPanNo: string;
+  sellerMsmeNo: string;
+  
+  // Ship To Info
+  shipToName: string;
+  shippingAddress: string;
+  shipToGst: string;
+  shipToPan: string;
+  
+  // Products
+  products: CreateProductDTO[];
+  
+  // Optional fields
+  quotationNo?: string;
+  quotationDate?: string;
+  paymentTerms?: string;
+  deliveryPeriod?: string;
+  remarks?: string;
+}
+
+
+export const updatePurchaseOrder = async (
+  id: number,
+  data: UpdatePurchaseOrderDTO
+): Promise<any> => {
+  const res = await api.put(`${BASE_URL}/purchase-orders/${id}`, data);
+  return res.data;
+};

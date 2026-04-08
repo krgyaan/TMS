@@ -124,6 +124,7 @@ export const paths = {
         projectDashboard: (id?: number) => id ? `/operations/project-dashboard?id=${id}` : "/operations/project-dashboard",
         raisePoForm:(id: number) => `/operations/project-dashboard/purchase-order/create/${id}`,
         viewPoPage: (id: number) => `/operations/project-dashboard/purchase-order/${id}`,
+        editPoPage: (id: number) => `/operations/project-dashboard/purchase-order/${id}/edit`,
     },
 
     // ==================== SERVICES ====================

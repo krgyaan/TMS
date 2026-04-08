@@ -390,8 +390,8 @@ export default function ViewPOPage() {
     // Implement PDF generation logic
   };
 
-  const handleEdit = () => {
-    navigate(`/operations/projects/po/${purchaseOrderId}/edit`);
+  const handleEdit = (id: number) => {
+    navigate(paths.operations.editPoPage(id));
   };
 
 
@@ -472,7 +472,7 @@ export default function ViewPOPage() {
             </Tooltip>
 
 
-            <Button onClick={handleEdit} className="gap-2">
+            <Button onClick={() => handleEdit(purchaseOrderId)} className="gap-2">
               <Edit className="h-4 w-4" />
               <span className="hidden sm:inline">Edit PO</span>
             </Button>
@@ -516,25 +516,7 @@ export default function ViewPOPage() {
                     Total Value
                   </p>
                   <p className="text-lg font-bold truncate print:text-base">
-                    {formatCurrency(poData.grandTotal)}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="print:shadow-none print:border">
-            <CardContent className="pt-6 print:pt-4 print:pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-lg bg-primary/10 print:p-2">
-                  <Package className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground font-medium">
-                    Line Items
-                  </p>
-                  <p className="text-lg font-bold print:text-base">
-                    {poData.products.length}
+                    {formatCurrency(poData.total.totalWithGst)}
                   </p>
                 </div>
               </div>
@@ -559,23 +541,6 @@ export default function ViewPOPage() {
             </CardContent>
           </Card>
 
-          <Card className="print:shadow-none print:border">
-            <CardContent className="pt-6 print:pt-4 print:pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-lg bg-primary/10 print:p-2">
-                  <Truck className="h-5 w-5 text-primary" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground font-medium">
-                    Delivery
-                  </p>
-                  <p className="text-sm font-bold truncate print:text-xs">
-                    {poData.deliveryPeriod || "Not specified"}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
         {/* ==================== SELLER & SHIP TO ==================== */}
@@ -906,7 +871,7 @@ export default function ViewPOPage() {
               <Printer className="mr-2 h-4 w-4" />
               Print
             </Button>
-            <Button onClick={handleEdit}>
+            <Button onClick={() => handleEdit(purchaseOrderId)}>
               <Edit className="mr-2 h-4 w-4" />
               Edit PO
             </Button>

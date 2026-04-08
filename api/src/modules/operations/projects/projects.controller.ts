@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   HttpCode,
   HttpStatus,
+  Put,
 } from "@nestjs/common";
 
 import { ProjectsService } from "./projects.service";
@@ -47,4 +48,13 @@ export class ProjectsController {
   getPurchaseOrder(@Param("id", ParseIntPipe) id: number) {
     return this.service.getPurchaseOrder(id);
   }
+
+  @Put("purchase-orders/:id")
+  @HttpCode(HttpStatus.OK)
+  updatePurchaseOrder(
+      @Param("id", ParseIntPipe) id: number,
+      @Body() body: any
+  ) {
+      return this.service.updatePurchaseOrder(id, body);
+}
 }
