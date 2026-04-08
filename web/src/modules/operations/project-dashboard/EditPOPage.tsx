@@ -1255,7 +1255,7 @@ export default function EditPOPage() {
           </Card>
 
           {/* Additional Details */}
-          <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
+          {/* <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
             <Card>
               <CollapsibleTrigger asChild>
                 <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
@@ -1334,7 +1334,7 @@ export default function EditPOPage() {
                 </CardContent>
               </CollapsibleContent>
             </Card>
-          </Collapsible>
+          </Collapsible> */}
 
           <Separator />
 
