@@ -39,7 +39,7 @@ import {
     TooltipTrigger 
 } from "@/components/ui/tooltip";
 import { Separator } from "@/components/ui/separator";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { useProjectsMaster } from "@/hooks/api/useProjects";
 import { useProjectDashboardDetails } from "./project-dashboard.hooks";
@@ -703,8 +703,12 @@ const ProofViewer: React.FC<ProofViewerProps> = ({
    MAIN COMPONENT
 ================================ */
 export default function ProjectDashboardPage() {
+    const [searchParams] = useSearchParams();
+
+    const id = searchParams.get("id"); // string | null
+
     const form = useForm<{ projectId: number | null }>({
-        defaultValues: { projectId: 277 },
+        defaultValues: { projectId: id },
     });
 
     const projectId = form.watch("projectId");
