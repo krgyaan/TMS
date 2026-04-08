@@ -82,6 +82,7 @@ import {
   useCreatePoParty,
 } from "./project-dashboard.hooks";
 import type { CreatePurchaseOrderDTO, CreatePartyDTO } from "./project-dashboard.api";
+import { paths } from "@/app/routes/paths";
 
 /* ================================
    TYPES
@@ -462,7 +463,7 @@ export default function RaisePoFormPage() {
       const result = await createPOMutation.mutateAsync(poData);
 
       toast.success(`PO #${result.poNumber} has been created successfully.`);
-      navigate(`/projects/${projectId}`);
+      navigate(paths.operations.projectDashboard(projectId));
     } catch (error: any) {
       toast.error(error?.message || "Failed to create purchase order. Please try again.");
     }
