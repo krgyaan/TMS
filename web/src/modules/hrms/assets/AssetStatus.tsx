@@ -108,48 +108,69 @@ const STATUS_CONFIG: Record<string, {
   },
 };
 
+
+// ─── Utils ───────────────────────────────────────────────────────────────────
+
+const sanitizePayload = (data: any) => {
+  return Object.fromEntries(
+    Object.entries(data).map(([key, value]) => {
+      // Convert empty string → null
+      if (value === "") return [key, null];
+
+      // Convert numeric fields properly
+      if (["repairEstimatedCost", "deductionAmount"].includes(key)) {
+        return [key, value !== null && value !== undefined ? Number(value) : null];
+      }
+
+      return [key, value];
+    })
+  );
+};
+
 // ─── Schema ───────────────────────────────────────────────────────────────────
+
+const emptyToNull = (val: any) => (val === "" ? null : val);
 
 const schema = z.object({
   assetStatus: z.string().min(1, "Status is required"),
-  
+
   // Assignment
   userId: z.coerce.number().optional(),
-  assignedDate: z.string().optional(),
-  purpose: z.string().optional(),
-  assetLocation: z.string().optional(),
-  
+  assignedDate: z.string().optional().transform(emptyToNull),
+  purpose: z.string().optional().transform(emptyToNull),
+  assetLocation: z.string().optional().transform(emptyToNull),
+
   // Return
-  returnDate: z.string().optional(),
-  returnCondition: z.string().optional(),
-  assetCondition: z.string().optional(),
-  
+  returnDate: z.string().optional().transform(emptyToNull),
+  returnCondition: z.string().optional().transform(emptyToNull),
+  assetCondition: z.string().optional().transform(emptyToNull),
+
   // Damage
-  damageDate: z.string().optional(),
-  damageType: z.string().optional(),
-  damageDescription: z.string().optional(),
-  isRepairable: z.string().optional(),
-  
+  damageDate: z.string().optional().transform(emptyToNull),
+  damageType: z.string().optional().transform(emptyToNull),
+  damageDescription: z.string().optional().transform(emptyToNull),
+  isRepairable: z.string().optional().transform(emptyToNull),
+
   // Loss
-  lostDate: z.string().optional(),
-  lostLocation: z.string().optional(),
-  lostCircumstances: z.string().optional(),
-  policeReportNumber: z.string().optional(),
-  policeReportDate: z.string().optional(),
-  
+  lostDate: z.string().optional().transform(emptyToNull),
+  lostLocation: z.string().optional().transform(emptyToNull),
+  lostCircumstances: z.string().optional().transform(emptyToNull),
+  policeReportNumber: z.string().optional().transform(emptyToNull),
+  policeReportDate: z.string().optional().transform(emptyToNull),
+
   // Repair
-  repairStartDate: z.string().optional(),
-  repairEndDate: z.string().optional(),
-  repairEstimatedCost: z.string().optional(),
-  repairVendor: z.string().optional(),
-  repairDescription: z.string().optional(),
-  
+  repairStartDate: z.string().optional().transform(emptyToNull),
+  repairEndDate: z.string().optional().transform(emptyToNull),
+  repairEstimatedCost: z.string().optional().transform(emptyToNull),
+  repairVendor: z.string().optional().transform(emptyToNull),
+  repairDescription: z.string().optional().transform(emptyToNull),
+
   // Financial
-  deductionAmount: z.string().optional(),
-  deductionReason: z.string().optional(),
-  
+  deductionAmount: z.string().optional().transform(emptyToNull),
+  deductionReason: z.string().optional().transform(emptyToNull),
+
   // General
-  remarks: z.string().optional(),
+  remarks: z.string().optional().transform(emptyToNull),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -271,7 +292,7 @@ const HistoryTimeline: React.FC<{ history: any[] }> = ({ history }) => {
 
   return (
     <div className="space-y-4">
-      {history.slice(0, 5).map((entry, index) => {
+      {history.map((entry, index) => {
         const config = STATUS_CONFIG[entry.newStatus];
         const Icon = config?.icon || Package;
 
@@ -297,6 +318,11 @@ const HistoryTimeline: React.FC<{ history: any[] }> = ({ history }) => {
               {entry.previousStatus && (
                 <p className="text-sm text-muted-foreground mt-0.5">
                   From: {entry.previousStatusLabel || STATUS_CONFIG[entry.previousStatus]?.label || entry.previousStatus}
+                  {entry.assignedTo && (
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      Assigned To: {entry.assignedTo}
+                    </p>
+                  )}
                 </p>
               )}
               {entry.remarks && (
@@ -323,6 +349,8 @@ const AssetStatus: React.FC = () => {
   const { data: history = [] } = useHrmsAssetHistory(Number(id));
   const { data: users = [] } = useUsers();
   const updateStatusMutation = useUpdateHrmsAssetStatus();
+
+  const [showAllHistory, setShowAllHistory] = React.useState(false);
 
   const hasInitialized = React.useRef(false);
 
@@ -902,11 +930,20 @@ const AssetStatus: React.FC = () => {
             title="Status History"
             description="Recent status changes for this asset"
           >
-            <HistoryTimeline history={history} />
+            <HistoryTimeline
+              history={showAllHistory ? history : history.slice(0, 5)}
+            />
             {history.length > 5 && (
-              <Button variant="outline" className="w-full mt-4">
-                View All History ({history.length} entries)
-              </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full mt-4"
+                  onClick={() => setShowAllHistory((prev) => !prev)}
+                >
+                  {showAllHistory
+                    ? "Show Less"
+                    : `View All History (${history.length} entries)`}
+                </Button>
             )}
           </FormSection>
         )}

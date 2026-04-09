@@ -57,45 +57,45 @@ export interface StatusUpdateDto {
   assetStatus: string;
   
   // Assignment fields
-  userId?: number;
-  assignedDate?: string;
-  expectedReturnDate?: string;
-  purpose?: string;
-  assetLocation?: string;
+  userId?: number | null;
+  assignedDate?: string | null;
+  expectedReturnDate?: string | null;
+  purpose?: string | null;
+  assetLocation?: string | null;
   
   // Return fields
-  returnDate?: string;
-  returnCondition?: string;
+  returnDate?: string | null;
+  returnCondition?: string | null;
   
   // Damage fields
-  damageDate?: string;
-  damageType?: string;
-  damageDescription?: string;
-  isRepairable?: string;
-  assetCondition?: string;
+  damageDate?: string | null;
+  damageType?: string | null;
+  damageDescription?: string | null;
+  isRepairable?: string | null;
+  assetCondition?: string | null;
   
   // Loss fields
-  lostDate?: string;
-  lostLocation?: string;
-  lostCircumstances?: string;
-  policeReportNumber?: string;
-  policeReportDate?: string;
+  lostDate?: string | null;
+  lostLocation?: string | null;
+  lostCircumstances?: string | null;
+  policeReportNumber?: string | null;
+  policeReportDate?: string | null;
   
   // Repair fields
-  repairStartDate?: string;
-  repairEndDate?: string;
-  repairEstimatedCost?: string;
-  repairActualCost?: string;
-  repairVendor?: string;
-  repairDescription?: string;
+  repairStartDate?: string | null;
+  repairEndDate?: string | null;
+  repairEstimatedCost?: string | null;
+  repairActualCost?: string | null;
+  repairVendor?: string | null;
+  repairDescription?: string | null;
   
   // Financial
-  deductionAmount?: string;
-  deductionReason?: string;
+  deductionAmount?: string | null;
+  deductionReason?: string | null;
   
   // General
-  remarks?: string;
-  changedByUserId?: number;
+  remarks?: string | null;
+  changedByUserId?: number | null;
 }
 
 // ─── Service ──────────────────────────────────────────────────────────────────
@@ -116,14 +116,14 @@ export class AssetsService {
     };
   }
 
-  private resolveHistoryLabels(history: AssetTrackingHistory) {
+  private resolveHistoryLabels(history: any) {
     return {
       ...history,
       previousStatusLabel: history.previousStatus ? ASSET_STATUS_LABELS[history.previousStatus] ?? history.previousStatus : null,
       newStatusLabel: ASSET_STATUS_LABELS[history.newStatus] ?? history.newStatus,
-      assetLocationLabel: history.assetLocation ? ASSET_LOCATION_LABELS[history.assetLocation] ?? history.assetLocation : null,
-      returnConditionLabel: history.returnCondition ? ASSET_CONDITION_LABELS[history.returnCondition] ?? history.returnCondition : null,
-      assetConditionAfterLabel: history.assetConditionAfter ? ASSET_CONDITION_LABELS[history.assetConditionAfter] ?? history.assetConditionAfter : null,
+      // assetLocationLabel: history.assetLocation ? ASSET_LOCATION_LABELS[history.assetLocation] ?? history.assetLocation : null,
+      // returnConditionLabel: history.returnCondition ? ASSET_CONDITION_LABELS[history.returnCondition] ?? history.returnCondition : null,
+      // assetConditionAfterLabel: history.assetConditionAfter ? ASSET_CONDITION_LABELS[history.assetConditionAfter] ?? history.assetConditionAfter : null,
     };
   }
 
@@ -255,26 +255,31 @@ export class AssetsService {
 
       case "2": // Available
         // Clear assignment
+        assetUpdate.userId = null;
         assetUpdate.returnDate = data.returnDate || new Date().toISOString().split('T')[0];
         break;
 
       case "3": // Under Repair
+        // assetUpdate.userId = null;
         assetUpdate.assetLocation = "5"; // Repair Center
         assetUpdate.damageRemarks = data.repairDescription || null;
         break;
 
       case "4": // Damaged
+        // assetUpdate.userId = null;
         assetUpdate.assetCondition = data.assetCondition || "5";
         assetUpdate.damageRemarks = data.damageDescription || null;
         assetUpdate.deductionAmount = data.deductionAmount || null;
         break;
 
       case "5": // Lost
+        // assetUpdate.userId = null;
         assetUpdate.damageRemarks = data.lostCircumstances || null;
         assetUpdate.deductionAmount = data.deductionAmount || null;
         break;
 
       case "6": // Returned
+        assetUpdate.userId = null;
         assetUpdate.returnDate = data.returnDate;
         assetUpdate.returnCondition = data.returnCondition || null;
         assetUpdate.assetCondition = data.assetCondition || null;
@@ -360,9 +365,15 @@ export class AssetsService {
 
   async getAssetHistory(assetId: number): Promise<any[]> {
     const rows = await this.db
-      .select()
+      .select({
+        previousStatus: assetTrackingHistory.previousStatus,
+        newStatus: assetTrackingHistory.newStatus,
+        createdAt : assetTrackingHistory.createdAt,
+        assignedTo: users.name,
+      })
       .from(assetTrackingHistory)
       .where(eq(assetTrackingHistory.assetId, assetId))
+      .innerJoin(users, eq(assetTrackingHistory.assignedToUserId, users.id))
       .orderBy(desc(assetTrackingHistory.createdAt));
     
     return rows.map(row => this.resolveHistoryLabels(row));

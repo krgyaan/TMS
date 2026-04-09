@@ -129,7 +129,7 @@ const AssetEdit: React.FC = () => {
   useEffect(() => {
     if (asset) {
       const formData: any = {
-        userId: String(asset.userId),
+        userId: asset.userId ?? "",
         assetCode: asset.assetCode || '',
         assetType: asset.assetType || '',
         assetCategory: asset.assetCategory || '',
@@ -207,7 +207,7 @@ const handleRemovePhoto = (photo: string) => {
 
       // Normal fields
       Object.entries(data).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== "") {
+        if (value !== undefined && value !== null && value !== "" && value !== "null") {
           if (Array.isArray(value)) {
             formData.append(key, JSON.stringify(value));
           } else {
