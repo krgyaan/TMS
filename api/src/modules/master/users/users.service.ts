@@ -1,4 +1,4 @@
-﻿import { Inject, Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
+import { Inject, Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
 import { randomBytes } from "node:crypto";
 import { hash, verify } from "argon2";
 import { and, eq, isNull, inArray, asc } from "drizzle-orm";
@@ -67,6 +67,7 @@ export type UserAuthInfo = {
     oldTeamId: number | null;
     dataScope: DataScope;
     canSwitchTeams: boolean;
+    permissions: string[];
 };
 
 @Injectable()
@@ -207,27 +208,48 @@ export class UsersService {
                 roleId: roles.id,
                 primaryTeamId: userProfiles.primaryTeamId,
                 oldTeamId: users.team,
+                permissionModule: permissions.module,
+                permissionAction : permissions.action,
             })
             .from(users)
             .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
             .leftJoin(userRoles, eq(userRoles.userId, users.id))
+            .leftJoin(userPermissions, eq(userPermissions.userId, users.id))
+            .leftJoin(permissions, eq(permissions.id, userPermissions.permissionId))
             .leftJoin(roles, eq(roles.id, userRoles.roleId))
-            .where(and(eq(users.id, userId), isNull(users.deletedAt)))
-            .limit(1);
+            .where(and(eq(users.id, userId), isNull(users.deletedAt)));
 
-        const row = rows[0];
-        if (!row) return null;
+            if (!rows.length) return null;
 
-        return {
-            userId: row.userId,
-            email: row.email,
-            roleName: row.roleName,
-            roleId: row.roleId,
-            primaryTeamId: row.primaryTeamId,
-            oldTeamId: row.oldTeamId,
-            dataScope: getDataScope(row.roleName ?? ""),
-            canSwitchTeams: canSwitchTeams(row.roleName ?? ""),
-        };
+            const base = rows[0];
+
+            // ✅ Build permission strings: "module:action"
+            const permissionsList = [
+                ...new Set(
+                    rows
+                        .filter(
+                            (row) =>
+                                row.permissionModule !== null &&
+                                row.permissionAction !== null
+                        )
+                        .map(
+                            (row) =>
+                                `${row.permissionModule}:${row.permissionAction}`
+                        )
+                ),
+            ];
+
+            return {
+                userId: base.userId,
+                email: base.email,
+                roleName: base.roleName,
+                roleId: base.roleId,
+                primaryTeamId: base.primaryTeamId,
+                oldTeamId: base.oldTeamId,
+                dataScope: getDataScope(base.roleName ?? ""),
+                canSwitchTeams: canSwitchTeams(base.roleName ?? ""),
+                permissions: permissionsList,
+            };
     }
 
     // NEW: Assign role to user

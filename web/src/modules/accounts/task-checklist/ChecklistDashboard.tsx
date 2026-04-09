@@ -618,7 +618,7 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, type, onViewDetails, onOpenRema
 // ==================== Main Dashboard Component ====================
 const ChecklistDashboard: React.FC = () => {
     const navigate = useNavigate();
-    const { user, isAdmin, isSuperUser } = useAuth();
+    const { user, isAdmin, isSuperUser, canRead, canDelete} = useAuth();
     const {id } = useParams();
 
     // State
@@ -647,6 +647,11 @@ const ChecklistDashboard: React.FC = () => {
     const deleteMutation = useDeleteChecklist();
 
     const isAdminUser = isAdmin || isSuperUser;
+    const isAccountCoordinator = canRead('accounts.checklist-admin');
+
+    console.log({isAccountCoordinator : isAccountCoordinator});
+    const canDeleteChecklist = canDelete('accounts.checklist-admin') 
+    const canCreateChecklist = isAdmin || isSuperUser || isAccountCoordinator;
     const userId = user?.id?.toString() || "";
 
 
@@ -774,9 +779,11 @@ const ChecklistDashboard: React.FC = () => {
                                 <FileEdit className="h-4 w-4 mr-1" />
                                 Edit
                             </Button>
-                            <Button size="sm" variant="destructive" onClick={() => handleDelete(checklist)}>
-                                <Trash className="h-4 w-4" />
-                            </Button>
+                            {canDeleteChecklist && (
+                                <Button size="sm" variant="destructive" onClick={() => handleDelete(checklist)}>
+                                    <Trash className="h-4 w-4" />
+                                </Button>
+                            )}
                         </div>
                     );
                 },
@@ -817,7 +824,7 @@ const ChecklistDashboard: React.FC = () => {
     const totalUsers = Object.keys(groupedChecklists).length;
 
     // ==================== Admin View ====================
-    if (isAdminUser) {
+    if (isAdminUser || isAccountCoordinator) {
         return (
             <>
                 <div className="space-y-6">
@@ -853,10 +860,12 @@ const ChecklistDashboard: React.FC = () => {
                                         Manage account checklist tasks and assignments
                                     </CardDescription>
                                 </div>
-                                <Button onClick={() => navigate(paths.accounts.taskChecklistsCreate)}>
-                                    <Plus className="h-4 w-4 mr-2" />
-                                    Add New Checklist
-                                </Button>
+                                {canCreateChecklist && (
+                                    <Button onClick={() => navigate(paths.accounts.taskChecklistsCreate)}>
+                                        <Plus className="h-4 w-4 mr-2" />
+                                        Add New Checklist
+                                    </Button>
+                                )}
                             </div>
                         </CardHeader>
 
@@ -879,14 +888,6 @@ const ChecklistDashboard: React.FC = () => {
                                     icon={<ListTodo className="h-12 w-12 text-muted-foreground" />}
                                     title="No checklists found"
                                     description={adminSearch ? "Try adjusting your search terms" : "Create your first checklist to get started"}
-                                    action={
-                                        !adminSearch && (
-                                            <Button onClick={() => navigate(paths.accounts.taskChecklistsCreate)}>
-                                                <Plus className="h-4 w-4 mr-2" />
-                                                Add New Checklist
-                                            </Button>
-                                        )
-                                    }
                                 />
                             ) : (
                                 <>

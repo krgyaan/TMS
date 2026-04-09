@@ -121,7 +121,7 @@ export class AccountChecklistService {
     /**
      * Get grouped checklists for index view
      */
-    async getIndexData(userId: number, userRole: string) {
+    async getIndexData(userId: number, userRole: string, userPermissions: string[]) {
         this.logger.info("Getting index data", { userId, userRole });
 
         const checklists = await this.findAll(userId, userRole);
@@ -129,9 +129,21 @@ export class AccountChecklistService {
         let groupedChecklists: GroupedChecklists = {};
         
         const normalizedRole = userRole?.toLowerCase() || "";
+        const hasAdminViewPermission = userPermissions.includes('accounts.checklist-admin:read');
+    
+        this.logger.debug({
+            message: "Check Whether the user has admin view permission",
+            hasAdminViewPermission: hasAdminViewPermission
+        });
+        
         const isAdminView = ["admin", "super user", "coordinator"].includes(normalizedRole);
         
-        if (isAdminView) {
+        this.logger.debug({
+            message: "Check Whether the user is admin or not",
+            isAdminView: isAdminView
+        });
+        
+        if (isAdminView || hasAdminViewPermission) {
             // Group by responsibility
             checklists.forEach(checklist => {
                 const key = checklist.responsibility;
@@ -155,7 +167,7 @@ export class AccountChecklistService {
         let userTasksResponsibility: any[] = [];
         let userTasksAccountability: any[] = [];
 
-        if (!isAdminView) {
+        if (!isAdminView || hasAdminViewPermission) {
             // Get incomplete responsibility tasks
             userTasksResponsibility = await this.db
                 .select(

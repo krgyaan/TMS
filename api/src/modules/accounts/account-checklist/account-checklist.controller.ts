@@ -145,9 +145,8 @@ export class AccountChecklistController {
      */
     @Get()
     getIndex(@CurrentUser() user: any) {
-        this.logger.debug(user);
-        this.logger.debug("This is a test");
-        return this.service.getIndexData(user.sub, user.role);
+        this.logger.debug(`User object: ${JSON.stringify(user, null, 2)}`);
+        return this.service.getIndexData(user.sub, user.role, user.permissions);
     }
 
     /**
@@ -193,7 +192,7 @@ export class AccountChecklistController {
      * Delete a checklist
      */
     @Delete(":id")
-    @CanDelete("accounts.checklists")
+    @CanDelete("accounts.checklist-admin")
     delete(@Param("id", ParseIntPipe) id: number) {
         return this.service.delete(id);
     }
