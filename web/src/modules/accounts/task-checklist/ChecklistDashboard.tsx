@@ -618,7 +618,7 @@ const TaskRow: React.FC<TaskRowProps> = ({ task, type, onViewDetails, onOpenRema
 // ==================== Main Dashboard Component ====================
 const ChecklistDashboard: React.FC = () => {
     const navigate = useNavigate();
-    const { user, isAdmin, isSuperUser } = useAuth();
+    const { user, isAdmin, isSuperUser, canRead, canDelete} = useAuth();
     const {id } = useParams();
 
     // State
@@ -647,6 +647,8 @@ const ChecklistDashboard: React.FC = () => {
     const deleteMutation = useDeleteChecklist();
 
     const isAdminUser = isAdmin || isSuperUser;
+    const isAccountCoordinator = canRead('accounts.checklist-admin');
+    const canDeleteChecklist = canDelete('accounts.checklist-admin') 
     const userId = user?.id?.toString() || "";
 
 
@@ -774,9 +776,11 @@ const ChecklistDashboard: React.FC = () => {
                                 <FileEdit className="h-4 w-4 mr-1" />
                                 Edit
                             </Button>
-                            <Button size="sm" variant="destructive" onClick={() => handleDelete(checklist)}>
-                                <Trash className="h-4 w-4" />
-                            </Button>
+                            {canDeleteChecklist && (
+                                <Button size="sm" variant="destructive" onClick={() => handleDelete(checklist)}>
+                                    <Trash className="h-4 w-4" />
+                                </Button>
+                            )}
                         </div>
                     );
                 },
@@ -817,7 +821,7 @@ const ChecklistDashboard: React.FC = () => {
     const totalUsers = Object.keys(groupedChecklists).length;
 
     // ==================== Admin View ====================
-    if (isAdminUser) {
+    if (isAdminUser || isAccountCoordinator) {
         return (
             <>
                 <div className="space-y-6">
