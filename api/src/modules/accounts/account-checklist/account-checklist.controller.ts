@@ -154,7 +154,7 @@ export class AccountChecklistController {
      */
     @Get("all")
     getAll(@CurrentUser() user: any) {
-        return this.service.findAll(user.sub, user.role);
+        return this.service.findAll(user.sub, user.role, user.permissions);
     }
 
     /**
