@@ -60,8 +60,8 @@ export class AccountChecklistService {
     /**
      * Get all checklists with user details, filtered by role
      */
-    async findAll(userId: number, userRole: string) {
-        this.logger.info("Fetching checklists", { userId, userRole });
+    async findAll(userId: number, userRole: string, userPermissions: string[]) {
+        this.logger.info("Fetching checklists", { userId, userRole, userPermissions });
 
         try {
             let query = this.db
@@ -91,10 +91,11 @@ export class AccountChecklistService {
                 );
 
             const normalizedRole = userRole?.toLowerCase() || "";
+            const hasAdminViewPermission = userPermissions.includes("accounts.checklist-admin:read");
             const isAdminView = ["admin", "super user", "coordinator"].includes(normalizedRole);
 
             // Apply role-based filtering
-            if (!isAdminView) {
+            if (!isAdminView && !hasAdminViewPermission) {
                 query = query.where(
                     or(
                         eq(accountChecklist.responsibility, String(userId)),
@@ -124,7 +125,7 @@ export class AccountChecklistService {
     async getIndexData(userId: number, userRole: string, userPermissions: string[]) {
         this.logger.info("Getting index data", { userId, userRole });
 
-        const checklists = await this.findAll(userId, userRole);
+        const checklists = await this.findAll(userId, userRole, userPermissions);
 
         let groupedChecklists: GroupedChecklists = {};
         
