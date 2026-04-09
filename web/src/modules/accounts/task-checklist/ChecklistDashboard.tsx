@@ -648,6 +648,8 @@ const ChecklistDashboard: React.FC = () => {
 
     const isAdminUser = isAdmin || isSuperUser;
     const isAccountCoordinator = canRead('accounts.checklist-admin');
+
+    console.log({isAccountCoordinator : isAccountCoordinator});
     const canDeleteChecklist = canDelete('accounts.checklist-admin') 
     const canCreateChecklist = isAdmin || isSuperUser || isAccountCoordinator;
     const userId = user?.id?.toString() || "";
@@ -886,14 +888,6 @@ const ChecklistDashboard: React.FC = () => {
                                     icon={<ListTodo className="h-12 w-12 text-muted-foreground" />}
                                     title="No checklists found"
                                     description={adminSearch ? "Try adjusting your search terms" : "Create your first checklist to get started"}
-                                    action={
-                                        !adminSearch && (
-                                            <Button onClick={() => navigate(paths.accounts.taskChecklistsCreate)}>
-                                                <Plus className="h-4 w-4 mr-2" />
-                                                Add New Checklist
-                                            </Button>
-                                        )
-                                    }
                                 />
                             ) : (
                                 <>
