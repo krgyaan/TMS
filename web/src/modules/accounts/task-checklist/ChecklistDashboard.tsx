@@ -649,6 +649,7 @@ const ChecklistDashboard: React.FC = () => {
     const isAdminUser = isAdmin || isSuperUser;
     const isAccountCoordinator = canRead('accounts.checklist-admin');
     const canDeleteChecklist = canDelete('accounts.checklist-admin') 
+    const canCreateChecklist = isAdmin || isSuperUser || isAccountCoordinator;
     const userId = user?.id?.toString() || "";
 
 
@@ -857,10 +858,12 @@ const ChecklistDashboard: React.FC = () => {
                                         Manage account checklist tasks and assignments
                                     </CardDescription>
                                 </div>
-                                <Button onClick={() => navigate(paths.accounts.taskChecklistsCreate)}>
-                                    <Plus className="h-4 w-4 mr-2" />
-                                    Add New Checklist
-                                </Button>
+                                {canCreateChecklist && (
+                                    <Button onClick={() => navigate(paths.accounts.taskChecklistsCreate)}>
+                                        <Plus className="h-4 w-4 mr-2" />
+                                        Add New Checklist
+                                    </Button>
+                                )}
                             </div>
                         </CardHeader>
 
