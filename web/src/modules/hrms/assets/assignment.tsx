@@ -124,7 +124,7 @@ const AnimatedCard: React.FC<{
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const statusConfig: Record<string, { color: string; icon: React.ReactNode }> = {
     "1": { color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20", icon: <UserCheck className="h-3 w-3" /> },
-    "2": { color: "bg-blue-500/10 text-blue-600 border-blue-500/20", icon: <CheckCircle2 className="h-3 w-3" /> },
+    "2": { color: "bg-amber-500/10 text-amber-600 border-amber-500/20", icon: <CheckCircle2 className="h-3 w-3" /> },
     "3": { color: "bg-amber-500/10 text-amber-600 border-amber-500/20", icon: <Loader2 className="h-3 w-3" /> },
     "4": { color: "bg-red-500/10 text-red-600 border-red-500/20", icon: <Info className="h-3 w-3" /> },
     "5": { color: "bg-gray-500/10 text-gray-600 border-gray-500/20", icon: <Info className="h-3 w-3" /> },
@@ -193,7 +193,11 @@ const AssetAssignment: React.FC = () => {
     setValue("assetStatus", value);
     // If switching to Assigned, set default assigned date
     if (value === "1") {
-      setValue("assignedDate", new Date().toISOString().split("T")[0]);
+      const currentAssignedDate = watch("assignedDate");
+
+      if (!currentAssignedDate) {
+        setValue("assignedDate", new Date().toISOString().split("T")[0]);
+      }
     } else {
       // Clear assignment fields when not assigning
       setValue("userId", undefined);
@@ -308,7 +312,7 @@ const AssetAssignment: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-3">
-              {toOptions(ASSET_STATUS).map((status) => (
+              {toOptions(ASSET_STATUS).slice(0,2).map((status) => (
                 <button
                   key={status.value}
                   type="button"
@@ -487,61 +491,7 @@ const AssetAssignment: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Section 2: Purchase Details */}
-        <Card className="transition-all duration-300 hover:shadow-md">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <div className="p-2 rounded-lg bg-green-500/10">
-                <ShoppingCart className="h-5 w-5 text-green-600" />
-              </div>
-              Purchase Details
-            </CardTitle>
-            <CardDescription>Information about how and when this asset was purchased</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Purchase Date */}
-              <div className="space-y-2">
-                <Label htmlFor="purchaseDate">Purchase Date</Label>
-                <Input
-                  type="date"
-                  id="purchaseDate"
-                  {...register("purchaseDate")}
-                  disabled={isSubmitting}
-                  className="transition-all duration-200 hover:border-primary/50"
-                />
-              </div>
-
-              {/* Purchase Price */}
-              <div className="space-y-2">
-                <Label htmlFor="purchasePrice">Purchase Price (₹)</Label>
-                <Input
-                  id="purchasePrice"
-                  {...register("purchasePrice")}
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  disabled={isSubmitting}
-                  className="transition-all duration-200 hover:border-primary/50"
-                />
-              </div>
-
-              {/* Purchase From (Vendor) */}
-              <div className="space-y-2">
-                <Label htmlFor="purchaseFrom">Purchase From (Vendor)</Label>
-                <Input
-                  id="purchaseFrom"
-                  {...register("purchaseFrom")}
-                  placeholder="e.g. TechAlly, Optimist"
-                  disabled={isSubmitting}
-                  className="transition-all duration-200 hover:border-primary/50"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Section 3: Assignment Details - Conditionally Rendered */}
+                {/* Section 3: Assignment Details - Conditionally Rendered */}
         <AnimatedCard show={isAssigning}>
           <Card className="border-2 border-emerald-500/30 bg-gradient-to-br from-emerald-50/50 to-background dark:from-emerald-950/20 transition-all duration-300 hover:shadow-lg">
             <CardHeader>
@@ -640,6 +590,61 @@ const AssetAssignment: React.FC = () => {
             </CardContent>
           </Card>
         </AnimatedCard>
+
+
+        {/* Section 2: Purchase Details */}
+        <Card className="transition-all duration-300 hover:shadow-md">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-green-500/10">
+                <ShoppingCart className="h-5 w-5 text-green-600" />
+              </div>
+              Purchase Details
+            </CardTitle>
+            <CardDescription>Information about how and when this asset was purchased</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Purchase Date */}
+              <div className="space-y-2">
+                <Label htmlFor="purchaseDate">Purchase Date</Label>
+                <Input
+                  type="date"
+                  id="purchaseDate"
+                  {...register("purchaseDate")}
+                  disabled={isSubmitting}
+                  className="transition-all duration-200 hover:border-primary/50"
+                />
+              </div>
+
+              {/* Purchase Price */}
+              <div className="space-y-2">
+                <Label htmlFor="purchasePrice">Purchase Price (₹)</Label>
+                <Input
+                  id="purchasePrice"
+                  {...register("purchasePrice")}
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  disabled={isSubmitting}
+                  className="transition-all duration-200 hover:border-primary/50"
+                />
+              </div>
+
+              {/* Purchase From (Vendor) */}
+              <div className="space-y-2">
+                <Label htmlFor="purchaseFrom">Purchase From (Vendor)</Label>
+                <Input
+                  id="purchaseFrom"
+                  {...register("purchaseFrom")}
+                  placeholder="e.g. TechAlly, Optimist"
+                  disabled={isSubmitting}
+                  className="transition-all duration-200 hover:border-primary/50"
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Section 4: Asset Identification */}
         <Card className="transition-all duration-300 hover:shadow-md">
