@@ -10,6 +10,8 @@ import * as fs from "fs";
 
 const ASSET_UPLOAD_DIR = "uploads/hrms/assets";
 
+const emptyToNull = (val: any) => val === "" ? null : val;
+
 // Schema for base asset creation
 const optionalDate = z
   .string()
@@ -18,7 +20,7 @@ const optionalDate = z
   .pipe(z.coerce.date().optional());
 
 const BaseAssetSchema = z.object({
-  userId: z.coerce.number(),
+  userId: z.coerce.number().optional(),
   assetCode: z.string().optional().nullable(),
   assetType: z.string(),
   assetCategory: z.string().optional().nullable(),
@@ -30,7 +32,7 @@ const BaseAssetSchema = z.object({
   licenseKey: z.string().optional().nullable(),
   assetValue: z.string().optional().nullable(),
   assetCondition: z.string().optional(),
-  assignedDate: z.coerce.date(),
+  assignedDate: z.coerce.date().optional(),
   assignedBy: z.coerce.number().optional().nullable(),
   expectedReturnDate: z.coerce.date().optional().nullable(),
   purpose: z.string().optional().nullable(),
@@ -61,44 +63,44 @@ const StatusUpdateSchema = z.object({
   assetStatus: z.string(),
   
   // Assignment
-  userId: z.coerce.number().optional(),
-  assignedDate: z.string().optional(),
-  expectedReturnDate: z.string().optional(),
-  purpose: z.string().optional(),
-  assetLocation: z.string().optional(),
+  userId: z.coerce.number().optional().nullable(),
+  assignedDate: z.string().optional().nullable().transform(emptyToNull),
+  expectedReturnDate: z.string().optional().nullable(),
+  purpose: z.string().optional().nullable(),
+  assetLocation: z.string().optional().nullable(),
   
   // Return
-  returnDate: z.string().optional(),
-  returnCondition: z.string().optional(),
+  returnDate: z.string().optional().nullable().transform(emptyToNull),
+  returnCondition: z.string().optional().nullable(),
   
   // Damage
-  damageDate: z.string().optional(),
-  damageType: z.string().optional(),
-  damageDescription: z.string().optional(),
-  isRepairable: z.string().optional(),
-  assetCondition: z.string().optional(),
+  damageDate: z.string().optional().nullable(),
+  damageType: z.string().optional().nullable(),
+  damageDescription: z.string().optional().nullable(),
+  isRepairable: z.string().optional().nullable(),
+  assetCondition: z.string().optional().nullable(),
   
   // Loss
-  lostDate: z.string().optional(),
-  lostLocation: z.string().optional(),
-  lostCircumstances: z.string().optional(),
-  policeReportNumber: z.string().optional(),
-  policeReportDate: z.string().optional(),
+  lostDate: z.string().optional().nullable(),
+  lostLocation: z.string().optional().nullable(),
+  lostCircumstances: z.string().optional().nullable(),
+  policeReportNumber: z.string().optional().nullable(),
+  policeReportDate: z.string().optional().nullable(),
   
   // Repair
-  repairStartDate: z.string().optional(),
-  repairEndDate: z.string().optional(),
-  repairEstimatedCost: z.string().optional(),
-  repairActualCost: z.string().optional(),
-  repairVendor: z.string().optional(),
-  repairDescription: z.string().optional(),
+  repairStartDate: z.string().optional().nullable(),
+  repairEndDate: z.string().optional().nullable().transform(emptyToNull),
+  repairEstimatedCost: z.string().optional().nullable(),
+  repairActualCost: z.string().optional().nullable(),
+  repairVendor: z.string().optional().nullable(),
+  repairDescription: z.string().optional().nullable(),
   
   // Financial
-  deductionAmount: z.string().optional(),
-  deductionReason: z.string().optional(),
+  deductionAmount: z.string().optional().nullable(),
+  deductionReason: z.string().optional().nullable(),
   
   // General
-  remarks: z.string().optional(),
+  remarks: z.string().optional().nullable(),
 });
 
 function toDateString(date?: Date | null): string | null {
