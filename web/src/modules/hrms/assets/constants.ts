@@ -10,11 +10,7 @@ export const ASSET_STATUS_KEYS = {
 
 export const ASSET_STATUS: Record<string, string> = {
   "1": "Assigned",
-  "2": "Available",
-  "3": "Under Repair",
-  "4": "Damaged",
-  "5": "Lost",
-  "6": "Returned",
+  "2": "Available"
 };
 
 export const ASSET_CONDITION: Record<string, string> = {
