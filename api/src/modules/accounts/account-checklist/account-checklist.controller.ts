@@ -193,7 +193,7 @@ export class AccountChecklistController {
      * Delete a checklist
      */
     @Delete(":id")
-    @CanDelete("accounts.checklists")
+    @CanDelete("accounts.checklist-admin")
     delete(@Param("id", ParseIntPipe) id: number) {
         return this.service.delete(id);
     }
