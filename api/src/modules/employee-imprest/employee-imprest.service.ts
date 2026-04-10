@@ -59,18 +59,8 @@ export class EmployeeImprestService {
 
             // Both inserts wrapped in a transaction — if one fails, both roll back
             return await this.db.transaction(async tx => {
-                // Record 1: Credit the receiver in employee_imprest_transactions
-                await tx.insert(employeeImprestTransactions).values({
-                    userId: data.transferToId!,
-                    txnDate: new Date().toISOString().split("T")[0],
-                    teamMemberName: receiverName,
-                    amount: data.amount,
-                    projectName: `Transfered from ${senderName}`,
-                    createdAt: new Date(),
-                    updatedAt: new Date(),
-                });
 
-                // Record 2: Imprest expense for the sender
+                // Record 1: Imprest expense for the sender
                 const [imprest] = await tx
                     .insert(employeeImprests)
                     .values({
@@ -86,6 +76,18 @@ export class EmployeeImprestService {
                         updatedAt: new Date(),
                     })
                     .returning();
+
+                // Record 2: Credit the receiver in employee_imprest_transactions
+                await tx.insert(employeeImprestTransactions).values({
+                    userId: data.transferToId!,
+                    txnDate: new Date().toISOString().split("T")[0],
+                    teamMemberName: receiverName,
+                    amount: data.amount,
+                    projectName: `Transfered from ${senderName}`,
+                    imprestId: imprest.id,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                });
 
                 return imprest;
             });
@@ -282,29 +284,185 @@ export class EmployeeImprestService {
             throw new NotFoundException("Employee imprest not found");
         }
 
-        const updateData: Record<string, any> = {
-            updatedAt: new Date(),
-        };
+        const oldIsTransfer = Number(existing.categoryId) === TRANSFER_CATEGORY_ID;
+        const newIsTransfer = Number(data.categoryId ?? existing.categoryId) === TRANSFER_CATEGORY_ID;
 
-        // Editable fields
-        if (data.partyName !== undefined) updateData.partyName = data.partyName;
-        if (data.projectName !== undefined) updateData.projectName = data.projectName;
-        if (data.categoryId !== undefined) updateData.categoryId = data.categoryId;
-        if (data.teamId !== undefined) updateData.teamId = data.teamId;
-        if (data.amount !== undefined) updateData.amount = data.amount;
-        if (data.remark !== undefined) updateData.remark = data.remark;
+        return await this.db.transaction(async tx => {
 
-        // Status / workflow fields (allowed as per your instruction)
-        if (data.approvalStatus !== undefined) updateData.approvalStatus = data.approvalStatus;
-        if (data.proofStatus !== undefined) updateData.proofStatus = data.proofStatus;
-        if (data.tallyStatus !== undefined) updateData.tallyStatus = data.tallyStatus;
-        if (data.status !== undefined) updateData.status = data.status;
-        if (data.approvedDate !== undefined) updateData.approvedDate = data.approvedDate;
+            // =========================
+            // 1️⃣ CHECK LINKED TRANSACTION
+            // =========================
+            const existingTxn = await tx.query.employeeImprestTransactions.findFirst({
+                where: eq(employeeImprestTransactions.imprestId, id),
+            });
 
-        const [updated] = await this.db.update(employeeImprests).set(updateData).where(eq(employeeImprests.id, id)).returning();
+            const hasLinkedTxn = !!existingTxn;
 
-        return updated;
+            if (oldIsTransfer && !hasLinkedTxn) {
+                throw new BadRequestException(
+                    "This transfer cannot be edited because it was created before system upgrade. Please delete and recreate it."
+                );
+            }
+
+            // =========================
+            // 2️⃣ DETERMINE ACTIONS
+            // =========================
+            const isReceiverChanged = data.teamId !== undefined && data.teamId !== existing.teamId;
+            const isAmountChanged = data.amount !== undefined && data.amount !== existing.amount;
+
+            const shouldDeleteOld =
+                oldIsTransfer &&
+                (
+                    !newIsTransfer ||      // transfer → non-transfer
+                    isReceiverChanged      // receiver changed
+                );
+
+            // =========================
+            // 3️⃣ DELETE OLD TRANSFER (if needed)
+            // =========================
+            if (shouldDeleteOld) {
+                const deleted = await tx
+                    .delete(employeeImprestTransactions)
+                    .where(eq(employeeImprestTransactions.imprestId, id))
+                    .returning();
+
+                if (deleted.length === 0) {
+                    throw new BadRequestException(
+                        "Unable to update transfer: linked transaction not found."
+                    );
+                }
+            }
+
+            // =========================
+            // 4️⃣ UPDATE IMPREST
+            // =========================
+            const updateData: Record<string, any> = {
+                updatedAt: new Date(),
+            };
+
+            if (data.userId !== undefined) updateData.userId = data.userId;
+            if (data.partyName !== undefined) updateData.partyName = data.partyName;
+            if (data.projectName !== undefined) updateData.projectName = data.projectName;
+            if (data.categoryId !== undefined) updateData.categoryId = data.categoryId;
+            if (data.teamId !== undefined) updateData.teamId = data.teamId;
+            if (data.amount !== undefined) updateData.amount = data.amount;
+            if (data.remark !== undefined) updateData.remark = data.remark;
+
+            if (data.approvalStatus !== undefined) updateData.approvalStatus = data.approvalStatus;
+            if (data.proofStatus !== undefined) updateData.proofStatus = data.proofStatus;
+            if (data.tallyStatus !== undefined) updateData.tallyStatus = data.tallyStatus;
+            if (data.status !== undefined) updateData.status = data.status;
+            if (data.approvedDate !== undefined) updateData.approvedDate = data.approvedDate;
+
+            const [updated] = await tx
+                .update(employeeImprests)
+                .set(updateData)
+                .where(eq(employeeImprests.id, id))
+                .returning();
+
+            // =========================
+            // 5️⃣ HANDLE TRANSFER LOGIC
+            // =========================
+
+            // ➕ CREATE (non-transfer → transfer)
+            if (!oldIsTransfer && newIsTransfer) {
+                const receiverId = data.teamId;
+                
+                if(!updated.userId){
+                    throw new BadRequestException("User ID missing for transfer");
+                }
+                
+                if (!receiverId) {
+                    throw new BadRequestException("Transfer requires a team member");
+                }
+
+                const [sender] = await tx
+                    .select({ name: users.name })
+                    .from(users)
+                    .where(eq(users.id, updated.userId))
+                    .limit(1);
+
+                const [receiver] = await tx
+                    .select({ name: users.name })
+                    .from(users)
+                    .where(eq(users.id, receiverId))
+                    .limit(1);
+
+                await tx.insert(employeeImprestTransactions).values({
+                    imprestId: updated.id,
+                    userId: receiverId,
+                    txnDate: new Date().toISOString().split("T")[0],
+                    teamMemberName: receiver?.name ?? "Unknown",
+                    amount: updated.amount,
+                    projectName: `Transfered from ${sender?.name ?? "Unknown"}`,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                });
+            }
+
+            // ✏️ UPDATE AMOUNT ONLY
+            else if (oldIsTransfer && newIsTransfer && isAmountChanged && !isReceiverChanged) {
+                await tx
+                    .update(employeeImprestTransactions)
+                    .set({
+                        amount: data.amount,
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(employeeImprestTransactions.imprestId, id));
+            }
+
+            // 🔁 RECREATE (receiver changed)
+            else if (oldIsTransfer && newIsTransfer && isReceiverChanged) {
+                const receiverId = data.teamId!;
+                const amount = data.amount ?? existing.amount;
+
+                if(!updated.userId){
+                    throw new BadRequestException("User ID not found for the imprest.")
+                }
+
+                const [sender] = await tx
+                    .select({ name: users.name })
+                    .from(users)
+                    .where(eq(users.id, updated.userId))
+                    .limit(1);
+
+                const [receiver] = await tx
+                    .select({ name: users.name })
+                    .from(users)
+                    .where(eq(users.id, receiverId))
+                    .limit(1);
+
+                await tx.insert(employeeImprestTransactions).values({
+                    imprestId: updated.id,
+                    userId: receiverId,
+                    txnDate: new Date().toISOString().split("T")[0],
+                    teamMemberName: receiver?.name ?? "Unknown",
+                    amount,
+                    projectName: `Transfered from ${sender?.name ?? "Unknown"}`,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                });
+            }
+
+            // (transfer → non-transfer already handled by delete)
+
+            return updated;
+        });
     }
+
+    private async deleteExistingTransfer(tx: any, existing: any) {
+        const deleted = await tx
+            .delete(employeeImprestTransactions)
+            .where(eq(employeeImprestTransactions.imprestId, existing.id))
+            .returning();
+
+        if (deleted.length === 0) {
+            throw new BadRequestException(
+                "Unable to delete transfer: linked transaction not found. This record may be legacy or inconsistent."
+            );
+        }
+    }
+    
     /* ------------------------- UPLOAD DOCUMENTS ------------------------ */
     async uploadDocs(id: number, files: Express.Multer.File[], userId: number) {
         const existing = await this.findOne(id);
@@ -420,4 +578,36 @@ export class EmployeeImprestService {
 
         return { success: true };
     }
+
+
+    async deleteProof(id: number, filename: string, userId: number) {
+        const existing = await this.findOne(id);
+        
+        if (!existing) {
+            throw new NotFoundException("Employee imprest not found");
+        }
+
+        if (!Array.isArray(existing.invoiceProof)) {
+            throw new InternalServerErrorException("invoiceProof is corrupted");
+        }
+
+        const updatedProofs = existing.invoiceProof.filter(f => f !== filename);
+
+        const [updated] = await this.db
+            .update(employeeImprests)
+            .set({
+                invoiceProof: updatedProofs,
+                updatedAt: new Date(),
+            })
+            .where(eq(employeeImprests.id, id))
+            .returning();
+
+        // Optionally: delete file from disk
+        // const filePath = join('./uploads/employeeimprest', filename);
+        // if (existsSync(filePath)) unlinkSync(filePath);
+
+        return updated;
+    }
+
+    
 }
