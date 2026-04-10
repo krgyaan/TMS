@@ -311,6 +311,7 @@ export const paths = {
         imprest: "/shared/imprests",
         imprestUser: (id: number) => `/shared/imprests/user/${id}`,
         imprestCreate: "/shared/imprests/create",
+        imprestEdit: (id: number) => `/shared/imprests/${id}/edit`,
         imprestPaymentHistory: "/shared/imprests/payment-history",
         imprestPaymentHistoryByUser: (id: number) => `/shared/imprests/payment-history?userId=${id}`,
 
