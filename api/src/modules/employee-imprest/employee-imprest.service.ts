@@ -204,6 +204,7 @@ export class EmployeeImprestService {
 
                     invoiceProof: employeeImprests.invoiceProof,
                     approvalStatus: employeeImprests.approvalStatus,
+                    accRemark : employeeImprests.accRemark,
                     tallyStatus: employeeImprests.tallyStatus,
                     proofStatus: employeeImprests.proofStatus,
 
@@ -607,6 +608,47 @@ export class EmployeeImprestService {
         // if (existsSync(filePath)) unlinkSync(filePath);
 
         return updated;
+    }
+
+    async addAccountRemark(id, remark){
+        const imprest = await this.db.query.employeeImprests.findFirst(
+            {
+                where: eq(employeeImprests.id , id),
+            });
+
+        if(!imprest){
+            throw new BadRequestException(`Imprest #${id} not Found `);
+        }
+
+        //updating the imprest
+        try {
+            const [updated] = await this.db
+                .update(employeeImprests)
+                .set({
+                    accRemark: remark.trim(),
+                    updatedAt: new Date(),
+                })
+                .where(eq(employeeImprests.id, id))
+                .returning();
+
+            this.logger.info("Account remark added", {
+                id,
+            });
+
+            return {
+                success: true,
+                message: "Remark added successfully",
+                data: updated,
+            };
+        } catch (error: any) {
+            this.logger.error("Failed to add account remark", {
+                id,
+                message: error?.message,
+            });
+
+            throw new InternalServerErrorException("Failed to add remark");
+        }
+
     }
 
     
