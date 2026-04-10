@@ -106,6 +106,11 @@ export class EmployeeImprestController {
         return this.service.uploadDocs(id, files, userId);
     }
 
+    @Patch(":id/account-remark")
+    addAccRemark(@Param("id", ParseIntPipe) id: number, @Body () body :{remark: string}){
+        return this.service.addAccountRemark(id, body.remark);
+    }
+
     @Delete(":id/proof/:filename")
     deleteProof(
         @Param("id", ParseIntPipe) id: number,
