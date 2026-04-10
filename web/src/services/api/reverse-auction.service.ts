@@ -37,14 +37,22 @@ class ReverseAuctionService extends BaseApiService {
             if (filters.search) {
                 search.set('search', filters.search);
             }
+            if (filters.teamId !== undefined && filters.teamId !== null) {
+                search.set('teamId', String(filters.teamId));
+            }
         }
 
         const queryString = search.toString();
         return this.get<RaDashboardResponse>(queryString ? `/dashboard?${queryString}` : '/dashboard');
     }
 
-    async getDashboardCounts(): Promise<RaDashboardCounts> {
-        return this.get<RaDashboardCounts>('/dashboard/counts');
+    async getDashboardCounts(teamId?: number): Promise<RaDashboardCounts> {
+        const params = new URLSearchParams();
+        if (teamId !== undefined && teamId !== null) {
+            params.append('teamId', teamId.toString());
+        }
+        const query = params.toString();
+        return this.get<RaDashboardCounts>(query ? `/dashboard/counts?${query}` : '/dashboard/counts');
     }
 
     async getById(id: number): Promise<ReverseAuction> {
@@ -55,12 +63,12 @@ class ReverseAuctionService extends BaseApiService {
         return this.get<ReverseAuction>(`/tender/${tenderId}`);
     }
 
-    async scheduleRa(id: number, data: ScheduleRaDto): Promise<ReverseAuction> {
-        return this.patch<ReverseAuction>(`/${id}/schedule`, data);
+    async scheduleRa(tenderId: number, data: ScheduleRaDto): Promise<ReverseAuction> {
+        return this.post<ReverseAuction>(`/${tenderId}/schedule`, data);
     }
 
-    async uploadResult(id: number, data: UploadRaResultDto): Promise<ReverseAuction> {
-        return this.patch<ReverseAuction>(`/${id}/upload-result`, data);
+    async uploadResult(raId: number, data: UploadRaResultDto): Promise<ReverseAuction> {
+        return this.patch<ReverseAuction>(`/${raId}/upload-result`, data);
     }
 }
 

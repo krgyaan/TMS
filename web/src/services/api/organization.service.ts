@@ -1,13 +1,17 @@
-import { BaseApiService } from './base.service';
-import type { Organization, CreateOrganizationDto, UpdateOrganizationDto } from '@/types/api.types';
+import { BaseApiService } from "./base.service";
+import type { Organization, CreateOrganizationDto, UpdateOrganizationDto } from "@/types/api.types";
 
 class OrganizationsService extends BaseApiService {
     constructor() {
-        super('/organizations');
+        super("/organizations");
     }
 
     async getAll(): Promise<Organization[]> {
-        return this.get<Organization[]>('');
+        return this.get<Organization[]>("");
+    }
+
+    async getAllTrue(): Promise<Organization[]> {
+        return this.get<Organization[]>("/list-true");
     }
 
     async getById(id: number): Promise<Organization> {
@@ -15,7 +19,7 @@ class OrganizationsService extends BaseApiService {
     }
 
     async create(data: CreateOrganizationDto): Promise<Organization> {
-        return this.post<Organization>('', data);
+        return this.post<Organization>("", data);
     }
 
     async update(id: number, data: UpdateOrganizationDto): Promise<Organization> {

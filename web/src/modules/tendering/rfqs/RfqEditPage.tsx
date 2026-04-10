@@ -46,12 +46,13 @@ export default function RfqEditPage() {
         );
     }
 
-    if (error || !tender || !rfqData) {
+    const rfq = Array.isArray(rfqData) ? rfqData[0] : null;
+    if (error || !tender || !rfq) {
         return (
             <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                    {!tender ? 'Failed to load tender.' : 'Failed to load RFQ data.'} Please try again.
+                    {!tender ? 'Failed to load tender.' : 'No RFQ found to edit.'} Please try again.
                 </AlertDescription>
                 <Button variant="outline" size="sm" onClick={() => navigate(paths.tendering.rfqs)}>
                     Go Back
@@ -70,13 +71,13 @@ export default function RfqEditPage() {
         teamMemberName: tender.teamMemberName || '',
         statusName: tender.statusName || '',
         dueDate: tender.dueDate,
-        rfqId: rfqData.id,
+        rfqId: rfq.id,
         vendorOrganizationNames: null,
     };
 
     return (
         <div>
-            <RfqForm tenderData={tenderData} initialData={rfqData} />
+            <RfqForm tenderData={tenderData} initialData={rfq} />
         </div>
     );
 }

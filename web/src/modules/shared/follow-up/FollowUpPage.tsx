@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState, useDeferredValue } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
@@ -34,6 +34,7 @@ import {
     Upload,
     ImagePlus,
     X,
+    Trash,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import DataTable from "@/components/ui/data-table";
@@ -41,9 +42,10 @@ import type { ColDef } from "ag-grid-community";
 import { paths } from "@/app/routes/paths";
 import { cn } from "@/lib/utils";
 
-import { useFollowUpList, useUpdateFollowUpStatus } from "@/modules/shared/follow-up/follow-up.hooks";
+import { useDeleteFollowUp, useFollowUpList, useUpdateFollowUpStatus } from "@/modules/shared/follow-up/follow-up.hooks";
 import type { FollowUpRow, FollowUpQueryDto, UpdateFollowUpStatusDto } from "@/modules/shared/follow-up/follow-up.types";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 /* ================================
    LABEL MAPS
@@ -51,10 +53,10 @@ import { toast } from "sonner";
 const FREQUENCY_LABELS: Record<number, string> = {
     1: "Daily",
     2: "Alternate Days",
-    3: "Weekly",
-    4: "Bi-Weekly",
-    5: "Monthly",
-    6: "Stopped",
+    3: "Twice a day",
+    4: "Weekly",
+    5: "Biweekly",
+    6: "Stop",
 };
 
 const STOP_REASON_LABELS: Record<number, string> = {
@@ -141,6 +143,7 @@ const FollowupPage: React.FC = () => {
     ================================ */
     const [activeTab, setActiveTab] = useState<FollowUpQueryDto["tab"]>("ongoing");
     const [searchQuery, setSearchQuery] = useState("");
+    const [debouncedQuery, setDebouncedQuery] = useState<string | null>("");
 
     const [date, setDate] = useState<Date>();
     const [comment, setComment] = useState("");
@@ -152,19 +155,29 @@ const FollowupPage: React.FC = () => {
     const [proofImage, setProofImage] = useState<File | null>(null);
     const [stopRemarks, setStopRemarks] = useState("");
 
+    const deferedSearchQuery = useDeferredValue(searchQuery);
+
+    const { canDelete } = useAuth();
+
+    const queryParams = useMemo(
+        () => ({
+            tab: activeTab,
+            page: 1,
+            limit: 10,
+            search: deferedSearchQuery || undefined,
+        }),
+        [activeTab, deferedSearchQuery]
+    );
+
     /* ================================
        DATA
     ================================ */
-    const { data, isLoading, error } = useFollowUpList({
-        tab: activeTab,
-        page: 1,
-        limit: 10,
-        search: searchQuery || undefined,
-    });
+    const { data, isLoading, error } = useFollowUpList(queryParams);
 
     const followups = data?.data ?? [];
 
     const updateStatusMutation = useUpdateFollowUpStatus();
+    const deleteMutation = useDeleteFollowUp();
 
     /* ================================
        MODALS
@@ -174,11 +187,16 @@ const FollowupPage: React.FC = () => {
 
     const [personModalOpen, setPersonModalOpen] = useState(false);
     const [personList, setPersonList] = useState<FollowUpRow["followPerson"]>([]);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     const handleOpenUpdateModal = (id: number) => {
         setSelectedId(id);
         setUpdateModalOpen(true);
     };
+
+    // =============================
+    //     SEARCH LOGIC
+    // =============================
 
     const handleUpdateStatus = async () => {
         if (!selectedId) return;
@@ -193,6 +211,11 @@ const FollowupPage: React.FC = () => {
 
         if (frequency === 6 && stopReason === 4 && !stopRemarks.trim()) {
             toast.error("Please provide remarks for stopping");
+            return;
+        }
+
+        if (frequency === 6 && stopReason === 2 && !proofText.trim()) {
+            toast.error("Please provide proof details");
             return;
         }
 
@@ -262,6 +285,15 @@ const FollowupPage: React.FC = () => {
         }
     };
 
+    const handleDelete = useCallback(
+        (id: number) => {
+            if (window.confirm(`Are you sure you want to delete this FollowUp ?`)) {
+                deleteMutation.mutate(id);
+            }
+        },
+        [deleteMutation]
+    );
+
     const resetForm = () => {
         setComment("");
         setFrequency(1);
@@ -275,6 +307,18 @@ const FollowupPage: React.FC = () => {
         setPersonList(persons ?? []);
         setPersonModalOpen(true);
     };
+    const gridOptions = useMemo(
+        () => ({
+            defaultColDef: { editable: false, filter: true },
+            pagination: true,
+            paginationPageSize: 20,
+            rowHeight: 48,
+            headerHeight: 44,
+            suppressCellFocus: true,
+            getRowId: (params: any) => String(params.data.id),
+        }),
+        []
+    );
 
     /* ================================
        COLUMNS
@@ -390,6 +434,7 @@ const FollowupPage: React.FC = () => {
                             <IconAction icon={RefreshCw} label="Auto Followup" onClick={() => navigate(paths.shared.followUpEdit(row.id))} />
                             <IconAction icon={FileEdit} label="Update Status" onClick={() => handleOpenUpdateModal(row.id)} />
                             <IconAction icon={Eye} label="View Details" onClick={() => navigate(paths.shared.followUpShow(row.id))} />
+                            {canDelete("shared.followups") && <IconAction icon={Trash} label="Delete" onClick={() => handleDelete(row.id)} />}
                         </div>
                     );
                 },
@@ -407,35 +452,6 @@ const FollowupPage: React.FC = () => {
         { value: "angry", label: "Angry / External", icon: AlertCircle },
         { value: "future", label: "Future", icon: Calendar },
     ];
-
-    /* ================================
-       RENDER - LOADING
-    ================================ */
-    if (isLoading) {
-        return (
-            <Card>
-                <CardContent className="flex items-center justify-center h-64">
-                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                    <span className="ml-2 text-muted-foreground">Loading follow-ups…</span>
-                </CardContent>
-            </Card>
-        );
-    }
-
-    /* ================================
-       RENDER - ERROR
-    ================================ */
-    if (error) {
-        return (
-            <Card>
-                <CardContent className="flex flex-col items-center justify-center h-64 gap-2">
-                    <AlertCircle className="h-8 w-8 text-destructive" />
-                    <p className="text-sm font-medium">Failed to load follow-ups</p>
-                    <p className="text-xs text-muted-foreground">Please try again later</p>
-                </CardContent>
-            </Card>
-        );
-    }
 
     /* ================================
        RENDER - MAIN
@@ -472,35 +488,32 @@ const FollowupPage: React.FC = () => {
 
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                        <Input placeholder="Search follow-ups…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-9 w-64" />
+                        <Input className="pl-10" placeholder="Search follow ups..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                     </div>
                 </div>
 
-                {/* Table */}
-                <div className="flex-1 min-h-0">
-                    <DataTable
-                        className="h-full"
-                        data={followups}
-                        columnDefs={columns}
-                        gridOptions={{
-                            defaultColDef: { editable: false, filter: true },
-                            pagination: true,
-                            paginationPageSize: 20,
-                            rowHeight: 48,
-                            headerHeight: 44,
-                            suppressCellFocus: true,
-                        }}
-                    />
+                <div className="flex-1 min-h-0 relative">
+                    {error ? (
+                        <div className="flex flex-col items-center justify-center h-64 gap-2">
+                            <AlertCircle className="h-8 w-8 text-destructive" />
+                            <p className="text-sm font-medium">Failed to load follow-ups</p>
+                            <p className="text-xs text-muted-foreground">Please try again later</p>
+                        </div>
+                    ) : isLoading ? (
+                        <div className="flex items-center justify-center h-64">
+                            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                            <span className="ml-2 text-muted-foreground">Loading follow-ups…</span>
+                        </div>
+                    ) : followups.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 text-center">
+                            <MessageSquare className="h-10 w-10 text-muted-foreground/50 mb-3" />
+                            <p className="text-sm font-medium">No follow-ups found</p>
+                            <p className="text-xs text-muted-foreground mt-1">{searchQuery ? "Try adjusting your search query" : "Create a new follow-up to get started"}</p>
+                        </div>
+                    ) : (
+                        <DataTable className="h-full" data={followups} columnDefs={columns} gridOptions={gridOptions} />
+                    )}
                 </div>
-
-                {/* Empty State */}
-                {followups.length === 0 && !isLoading && (
-                    <div className="flex flex-col items-center justify-center py-12 text-center">
-                        <MessageSquare className="h-10 w-10 text-muted-foreground/50 mb-3" />
-                        <p className="text-sm font-medium">No follow-ups found</p>
-                        <p className="text-xs text-muted-foreground mt-1">{searchQuery ? "Try adjusting your search query" : "Create a new follow-up to get started"}</p>
-                    </div>
-                )}
             </CardContent>
 
             {/* ================================
@@ -781,8 +794,8 @@ const FollowupPage: React.FC = () => {
                                         ? "This will mark the follow-up as successfully achieved."
                                         : "This action will stop all future follow-ups."
                                     : date
-                                    ? `Next follow-up: ${date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`
-                                    : "Select a date for the next follow-up."}
+                                      ? `Next follow-up: ${date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`
+                                      : "Select a date for the next follow-up."}
                             </p>
                             <div className="flex items-center gap-2 flex-shrink-0">
                                 <Button

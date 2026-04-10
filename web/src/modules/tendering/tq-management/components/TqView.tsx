@@ -1,23 +1,17 @@
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Pencil, ArrowLeft, FileText, Download, ExternalLink, AlertCircle } from 'lucide-react';
-import type { TenderQuery, TenderQueryItem } from '../helpers/tqManagement.types';
+import { FileText, Download, ExternalLink, AlertCircle } from 'lucide-react';
+import type { TenderQuery, TenderQueryItem, TenderQueryStatus } from '../helpers/tqManagement.types';
 import type { TqType } from '@/types/api.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
-import { tenderFilesService } from '@/services/api/tender-files.service';
 
 interface TqViewProps {
     tqData?: TenderQuery | null;
     tqItems?: TenderQueryItem[] | null;
     tqTypes?: TqType[] | null;
     isLoading?: boolean;
-    showEditButton?: boolean;
-    showBackButton?: boolean;
-    onEdit?: () => void;
-    onBack?: () => void;
     className?: string;
 }
 
@@ -26,22 +20,18 @@ export function TqView({
     tqItems,
     tqTypes,
     isLoading = false,
-    showEditButton = true,
-    showBackButton = true,
-    onEdit,
-    onBack,
     className = '',
 }: TqViewProps) {
     if (isLoading) {
         return (
             <Card className={className}>
-                <CardHeader>
-                    <Skeleton className="h-8 w-48" />
+                <CardHeader className="pb-3">
+                    <Skeleton className="h-5 w-40" />
                 </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
-                        {Array.from({ length: 8 }).map((_, i) => (
-                            <Skeleton key={i} className="h-12 w-full" />
+                <CardContent className="pt-0">
+                    <div className="space-y-2">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                            <Skeleton key={i} className="h-10 w-full" />
                         ))}
                     </div>
                 </CardContent>
@@ -52,15 +42,16 @@ export function TqView({
     if (!tqData) {
         return (
             <Card className={className}>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <FileText className="h-5 w-5" />
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
                         TQ Management
                     </CardTitle>
                 </CardHeader>
-                <CardContent>
-                    <div className="text-center py-8 text-muted-foreground">
-                        No TQ data available for this tender yet.
+                <CardContent className="pt-0">
+                    <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                        <FileText className="h-8 w-8 mb-2 opacity-50" />
+                        <p className="text-sm">No TQ data available for this tender yet.</p>
                     </div>
                 </CardContent>
             </Card>
@@ -121,20 +112,6 @@ export function TqView({
                     <FileText className="h-5 w-5" />
                     TQ Details
                 </CardTitle>
-                <CardAction className="flex gap-2">
-                    {showEditButton && onEdit && (
-                        <Button variant="default" size="sm" onClick={onEdit}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit
-                        </Button>
-                    )}
-                    {showBackButton && onBack && (
-                        <Button variant="outline" size="sm" onClick={onBack}>
-                            <ArrowLeft className="h-4 w-4 mr-2" />
-                            Back
-                        </Button>
-                    )}
-                </CardAction>
             </CardHeader>
             <CardContent className="space-y-8">
                 {/* Status Badge */}
@@ -145,7 +122,7 @@ export function TqView({
                 </div>
 
                 {/* TQ Received Details */}
-                {tqData.status !== 'Qualified, No TQ received' && tqData.status !== 'Disqualified, No TQ received' && (
+                {(tqData.status as TenderQueryStatus) !== 'Qualified, No TQ received' && (tqData.status as TenderQueryStatus) !== 'Disqualified, No TQ received' && (
                     <div className="space-y-4">
                         <h4 className="font-semibold text-base text-primary border-b pb-2">
                             TQ Received Details
@@ -208,7 +185,7 @@ export function TqView({
                                                     <td className="px-4 py-3 text-sm">
                                                         <Badge variant="outline">{getTqTypeName(item.tqTypeId)}</Badge>
                                                     </td>
-                                                    <td className="px-4 py-3 text-sm whitespace-pre-wrap">
+                                                    <td className="px-4 py-3 text-sm whitespace-pre-wrap break-words">
                                                         {item.queryDescription}
                                                     </td>
                                                 </tr>
@@ -283,7 +260,7 @@ export function TqView({
                 )}
 
                 {/* TQ Missed Details */}
-                {tqData.status === 'Disqualified, TQ missed' && (
+                {(tqData.status as TenderQueryStatus) === 'Disqualified, TQ missed' && (
                     <div className="space-y-4">
                         <h4 className="font-semibold text-base text-destructive border-b pb-2">
                             Missed TQ Analysis
@@ -291,19 +268,19 @@ export function TqView({
                         <div className="space-y-4 bg-red-50 dark:bg-red-950/20 p-4 rounded-lg border border-red-200 dark:border-red-800">
                             <div>
                                 <p className="text-sm font-medium text-muted-foreground mb-2">Reason for Missing</p>
-                                <p className="text-sm text-destructive whitespace-pre-wrap">
+                                <p className="text-sm text-destructive whitespace-pre-wrap break-words">
                                     {tqData.missedReason || '—'}
                                 </p>
                             </div>
                             <div>
                                 <p className="text-sm font-medium text-muted-foreground mb-2">Prevention Measures</p>
-                                <p className="text-sm text-destructive whitespace-pre-wrap">
+                                <p className="text-sm text-destructive whitespace-pre-wrap break-words">
                                     {tqData.preventionMeasures || '—'}
                                 </p>
                             </div>
                             <div>
                                 <p className="text-sm font-medium text-muted-foreground mb-2">TMS Improvements Needed</p>
-                                <p className="text-sm text-destructive whitespace-pre-wrap">
+                                <p className="text-sm text-destructive whitespace-pre-wrap break-words">
                                     {tqData.tmsImprovements || '—'}
                                 </p>
                             </div>
@@ -312,7 +289,7 @@ export function TqView({
                 )}
 
                 {/* No TQ */}
-                {(tqData.status === 'Qualified, No TQ received' || tqData.status === 'Disqualified, No TQ received') && (
+                {(tqData.status as TenderQueryStatus) === 'Qualified, No TQ received' || (tqData.status as TenderQueryStatus) === 'Disqualified, No TQ received' && (
                     <div className="space-y-4">
                         <Alert>
                             <AlertCircle className="h-4 w-4" />

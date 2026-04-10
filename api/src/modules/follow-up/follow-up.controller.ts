@@ -19,7 +19,7 @@ import {
 import { FollowUpService } from "@/modules/follow-up/follow-up.service";
 import { CurrentUser } from "@/decorators/current-user.decorator";
 
-import { FilesInterceptor, FileInterceptor } from "@nestjs/platform-express";
+import { FilesInterceptor, FileInterceptor, FileFieldsInterceptor } from "@nestjs/platform-express";
 import { diskStorage } from "multer";
 import { extname } from "path";
 
@@ -56,9 +56,9 @@ export class FollowUpController {
     // ========================
 
     @Post()
-    async create(@Body() dto: CreateFollowUpDto, @Req() req) {
-        console.log("Follow up called");
-        return this.service.create(dto, req.user.id);
+    async create(@Body() dto: CreateFollowUpDto, @CurrentUser() user: any) {
+        console.log("Follow up called. User ID:", user?.sub);
+        return this.service.create(dto, user.sub);
     }
 
     // ========================
@@ -95,10 +95,25 @@ export class FollowUpController {
     // ========================
 
     @Put(":id")
-    @UseInterceptors(FilesInterceptor("attachments", 10, followUpAttachmentsMulterConfig))
-    async update(@Param("id", ParseIntPipe) id: number, @Body() dto: any, @Req() req, @UploadedFiles() attachments: Express.Multer.File[]) {
-        const res = this.service.update(id, dto, attachments, req.user);
-        return res;
+    @UseInterceptors(
+        FileFieldsInterceptor(
+            [
+                { name: "attachments", maxCount: 10 },
+                { name: "proofImage", maxCount: 1 },
+            ],
+            followUpAttachmentsMulterConfig // same storage config works for both
+        )
+    )
+    async update(
+        @Param("id", ParseIntPipe) id: number,
+        @Body() dto: any,
+        @Req() req,
+        @UploadedFiles() files: { attachments?: Express.Multer.File[]; proofImage?: Express.Multer.File[] }
+    ) {
+        const attachments = files?.attachments ?? [];
+        const proofImage = files?.proofImage?.[0] ?? null;
+
+        return this.service.update(id, dto, attachments, proofImage, req.user);
     }
 
     // ========================
@@ -117,8 +132,23 @@ export class FollowUpController {
     // DELETE (SOFT DELETE)
     // ========================
     @Delete(":id")
-    async remove(@Param("id", ParseIntPipe) id: number) {
-        return this.service.remove(id);
+    async remove(@Param("id", ParseIntPipe) id: number, @CurrentUser() user) {
+        return this.service.delete(id, user.sub);
+    }
+
+    // ========================
+    // MAILING AND PREVIEWS
+    // ========================
+
+    @Get("preview-mail/:emdId")
+    async previewEmdMail(@Param("emdId", ParseIntPipe) emdId: number) {
+        return this.service.getPreviewHtml(emdId);
+    }
+
+    @Get("test-followup/:id")
+    async test(@Param("id") id: number) {
+        await this.service.processFollowupMail(id);
+        return "Triggered";
     }
 
     // ========================

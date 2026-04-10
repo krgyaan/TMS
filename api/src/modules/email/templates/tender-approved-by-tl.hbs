@@ -34,11 +34,20 @@
             <li>The selected mode of Processing Fee: {{data.processingFeeMode}}</li>
             <li>The selected mode of Tender Fees: {{data.tenderFeesMode}}</li>
             <li>The selected mode of EMD: {{data.emdMode}}</li>
-            <li>Raise RFQ <a href="{{data.rfqLink}}">Here</a> to {{data.vendor}}</li>
+            <li>RFQ Required: {{#if data.rfqRequired}}{{#if (eq data.rfqRequired "yes")}}Yes{{else}}No{{/if}}{{else}}Not specified{{/if}}</li>
+            {{#if (eq data.rfqRequired "yes")}}
+                <li>Raise RFQ <a href="{{data.rfqLink}}">Here</a> to {{data.vendor}}</li>
+            {{else if (eq data.rfqRequired "no")}}
+                <li>Quotation files have been uploaded ({{data.quotationFilesCount}} file(s)) - see attachments</li>
+            {{else}}
+                <li>Raise RFQ <a href="{{data.rfqLink}}">Here</a> to {{data.vendor}}</li>
+            {{/if}}
             <li>Courier Physical Documents: {{data.phyDocs}}</li>
         </ul>
-        <p>PQR Selection is {{#if data.pqrApproved}}approved{{else}}Rejected, please use the revised PQR documents{{/if}}.</p>
-        <p>Finance Doc Selection is {{#if data.finApproved}}approved{{else}}Rejected, please use the revised Finance Docs{{/if}}.</p>
+        <p><b>Selected Technical Documents (PQR):</b> {{data.technicalDocs}}</p>
+        <p>PQR Selection is {{#if data.pqrApproved}}approved{{else}}Rejected, please use the revised PQR documents{{#if data.alternativeTechnicalDocs}}: {{data.alternativeTechnicalDocs}}{{/if}}{{/if}}.</p>
+        <p><b>Selected Financial Documents:</b> {{data.financialDocs}}</p>
+        <p>Finance Doc Selection is {{#if data.finApproved}}approved{{else}}Rejected, please use the revised Finance Docs{{#if data.alternativeFinancialDocs}}: {{data.alternativeFinancialDocs}}{{/if}}{{/if}}.</p>
     {{else if data.isReview}}
         <p>Please complete the tender info form and resend it.</p>
     {{else if data.isRejected}}

@@ -387,6 +387,7 @@ const VendorsPage = () => {
                                                             {vendor.email}
                                                         </div>
                                                     )}
+                                                    {vendor.mobile && <div className="flex items-center gap-2 text-sm text-muted-foreground">{vendor.mobile}</div>}
                                                     {vendor.address && (
                                                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                                             <MapPin className="h-3 w-3" />

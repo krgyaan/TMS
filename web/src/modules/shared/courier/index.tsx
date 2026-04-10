@@ -182,6 +182,7 @@ const CourierDashboard: React.FC = () => {
                 width: 140,
                 valueGetter: (p: any) => formatDate(p.data?.createdAt),
             },
+            { field: "empFromUser.name", headerName: "From (Name)", width: 160 },
             { field: "toName", headerName: "To (Name)", width: 160 },
             { field: "toOrg", headerName: "Organization", width: 160 },
             {
@@ -196,24 +197,28 @@ const CourierDashboard: React.FC = () => {
                 headerName: "Provider",
                 width: 130,
                 valueGetter: (p: any) => p.data?.courierProvider ?? "-",
+                hide: activeTab === "pending",
             },
             {
                 field: "pickupDate",
                 headerName: "Pickup Date",
                 width: 150,
                 valueGetter: (p: any) => formatDateTime(p.data?.pickupDate),
+                hide: activeTab === "pending",
             },
             {
                 field: "docketNo",
                 headerName: "Docket No",
                 width: 130,
                 valueGetter: (p: any) => p.data?.docketNo ?? "-",
+                hide: activeTab === "pending",
             },
             {
                 field: "deliveryDate",
                 headerName: "Delivery Date",
                 width: 150,
                 valueGetter: (p: any) => formatDateTime(p.data?.deliveryDate),
+                hide: activeTab === "pending",
             },
             {
                 headerName: "Timer",

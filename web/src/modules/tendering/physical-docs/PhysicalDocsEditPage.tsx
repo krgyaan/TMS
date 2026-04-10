@@ -7,13 +7,14 @@ import { Button } from "@/components/ui/button";
 import { paths } from "@/app/routes/paths";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import type { PhysicalDocsResponse } from './helpers/physicalDocs.types';
 
 const PhysicalDocsEdit = () => {
     const navigate = useNavigate();
-    const { id } = useParams<{ id: string }>();
-    const tenderId = id ? parseInt(id) : null;
+    const { tenderId } = useParams<{ tenderId: string }>();
+    const tenderIdNumber = tenderId ? parseInt(tenderId) : null;
 
-    const { data: physicalDoc, isLoading, error } = usePhysicalDocByTenderId(tenderId);
+    const { data: physicalDoc, isLoading, error } = usePhysicalDocByTenderId(tenderIdNumber);
 
     if (!tenderId) {
         return <Alert variant="destructive">
@@ -47,7 +48,7 @@ const PhysicalDocsEdit = () => {
 
     return (
         <div>
-            <PhysicalDocsForm tenderId={physicalDoc.tenderId} mode="edit" existingData={physicalDoc} />
+            <PhysicalDocsForm tenderId={tenderIdNumber!} mode="edit" existingData={physicalDoc as PhysicalDocsResponse} />
         </div>
     )
 }

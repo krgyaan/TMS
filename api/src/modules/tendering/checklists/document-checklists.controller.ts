@@ -1,7 +1,10 @@
 import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, Query, UsePipes, ValidationPipe, Logger } from '@nestjs/common';
 import { DocumentChecklistsService, type DocumentChecklistFilters } from '@/modules/tendering/checklists/document-checklists.service';
 import type { CreateDocumentChecklistDto, UpdateDocumentChecklistDto } from '@/modules/tendering/checklists/dto/document-checklist.dto';
-import { type TimerData, WorkflowService } from '@/modules/timers/services/workflow.service';
+import { TimersService } from '@/modules/timers/timers.service';
+import { getFrontendTimer } from '@/modules/timers/timer-helper';
+import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 @Controller('document-checklists')
 @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
@@ -9,7 +12,7 @@ export class DocumentChecklistsController {
     private readonly logger = new Logger(DocumentChecklistsController.name);
     constructor(
         private readonly documentChecklistsService: DocumentChecklistsService,
-        private readonly workflowService: WorkflowService
+        private readonly timersService: TimersService
     ) { }
 
     @Get('dashboard')
@@ -20,30 +23,25 @@ export class DocumentChecklistsController {
         @Query('sortBy') sortBy?: string,
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
         @Query('search') search?: string,
+        @CurrentUser() user?: ValidatedUser,
+        @Query('teamId') teamId?: string,
     ) {
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
         const result = await this.documentChecklistsService.getDashboardData(tab, {
             page: page ? parseInt(page, 10) : undefined,
             limit: limit ? parseInt(limit, 10) : undefined,
             sortBy,
             sortOrder,
             search,
-        });
+        }, user, parseNumber(teamId));
         // Add timer data to each tender
         const dataWithTimers = await Promise.all(
             result.data.map(async (tender) => {
-                let timer: TimerData | null = null;
-                try {
-                    timer = await this.workflowService.getTimerForStep('TENDER', tender.tenderId, 'document_checklist');
-                    if (!timer.hasTimer) {
-                        timer = null;
-                    }
-                } catch (error) {
-                    this.logger.error(
-                        `Failed to get timer for tender ${tender.tenderId}:`,
-                        error
-                    );
-                }
-
+                const timer = await getFrontendTimer(this.timersService, 'TENDER', tender.tenderId, 'document_checklist');
                 return {
                     ...tender,
                     timer
@@ -58,8 +56,16 @@ export class DocumentChecklistsController {
     }
 
     @Get('dashboard/counts')
-    getDashboardCounts() {
-        return this.documentChecklistsService.getDashboardCounts();
+    getDashboardCounts(
+        @CurrentUser() user?: ValidatedUser,
+        @Query('teamId') teamId?: string,
+    ) {
+        const parseNumber = (v?: string): number | undefined => {
+            if (!v) return undefined;
+            const num = parseInt(v, 10);
+            return Number.isNaN(num) ? undefined : num;
+        };
+        return this.documentChecklistsService.getDashboardCounts(user, parseNumber(teamId));
     }
 
     @Get('tender/:tenderId')
