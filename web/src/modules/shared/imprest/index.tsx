@@ -126,7 +126,7 @@ const ImprestEmployeeDashboard: React.FC = () => {
     let userDetails = null;
 
     const canMutateStatus = canUpdate("accounts.imprests");
-    const canMutateStatusAdmin = canUpdate("accounts.imprests-admin");
+    const canMutateStatusAdmin = canUpdate("accounts.imprest-admin");
     const canDeleteStatus = canDelete("accounts.imprests");
 
     const isAuthorized = hasPermission("shared.imprests", "read");
