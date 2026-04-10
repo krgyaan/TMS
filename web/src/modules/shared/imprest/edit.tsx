@@ -384,7 +384,7 @@ const EmployeeImprestEditForm: React.FC = () => {
                                     {error instanceof Error ? error.message : "An unexpected error occurred"}
                                 </p>
                             </div>
-                            <Button variant="outline" onClick={() => navigate(paths.shared.imprest)}>
+                            <Button variant="outline" onClick={() => imprest?.userId ? navigate(paths.shared.imprestUser(imprest.userId)) : navigate(paths.accounts.imprests)}>
                                 <ArrowLeft className="h-4 w-4 mr-2" />
                                 Back to List
                             </Button>
