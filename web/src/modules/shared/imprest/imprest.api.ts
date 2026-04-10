@@ -95,8 +95,8 @@ export const proofImprest = async (id: number) => {
 };
 
 // ---------- ACCOUNT REMARK ----------
-export const addImprestRemark = async (id: number, remark: string) => {
-    const res = await api.post(`/employee-imprest/${id}/remark`, {
+export const addImprestAccRemark = async (id: number, remark: string) => {
+    const res = await api.patch(`/employee-imprest/${id}/account-remark`, {
         remark,
     });
     return res.data;
