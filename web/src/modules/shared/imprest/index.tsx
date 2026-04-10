@@ -15,7 +15,7 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 
 import { paths } from "@/app/routes/paths";
-import { useImprestList, useDeleteImprest, useUploadImprestProofs, useApproveImprest, useTallyImprest, useProofImprest, useUpdateImprest } from "./imprest.hooks";
+import { useImprestList, useDeleteImprest, useUploadImprestProofs, useApproveImprest, useTallyImprest, useProofImprest, useUpdateImprest, useAddImprestAccRemark} from "./imprest.hooks";
 
 import type { ImprestProof, ImprestRow, ProofItem } from "./imprest.types";
 import { Textarea } from "@/components/ui/textarea";
@@ -183,6 +183,7 @@ const ImprestEmployeeDashboard: React.FC = () => {
     console.log(numericUserId);
 
     const { data, isLoading, error } = useImprestList(numericUserId);
+    const addRemarkMutation = useAddImprestAccRemark();
 
     console.log("invoiceProof", data?.invoiceProof);
 
@@ -259,15 +260,28 @@ const ImprestEmployeeDashboard: React.FC = () => {
 
     const openRemarkModal = (row: ImprestRow) => {
         setRemarkRow(row);
-        setRemarkText("");
+        setRemarkText(row.accRemark ?? "");
         setRemarkOpen(true);
     };
 
     const submitAddRemark = (e?: React.FormEvent) => {
         e?.preventDefault();
+
         if (!remarkRow || !remarkText.trim()) return;
-        // Add your remark mutation here
-        setRemarkOpen(false);
+
+        addRemarkMutation.mutate(
+            {
+                id: remarkRow.id,
+                remark: remarkText.trim(),
+            },
+            {
+                onSuccess: () => {
+                    setRemarkOpen(false);
+                    setRemarkText("");
+                    setRemarkRow(null);
+                },
+            }
+        );
     };
 
     const openEditModal = (row: ImprestRow) => {
@@ -393,15 +407,34 @@ const ImprestEmployeeDashboard: React.FC = () => {
             {
                 field: "amount",
                 headerName: "Amount",
-                width: 120,
+                width: 90,
+                maxWidth: 100,
                 valueFormatter: p => formatINR(p.value),
-                cellClass: "font-medium tabular-nums",
+                cellClass: "",
             },
             {
                 field: "remark",
                 headerName: "Remarks",
                 flex: 1,
                 minWidth: 140,
+                cellStyle: {
+                    whiteSpace: "normal",
+                    wordBreak: "break-word",
+                    lineHeight: "1.4",
+                },
+                autoHeight: true,
+            },
+            {
+                field: "accRemark",
+                headerName: "Acc Remark",
+                flex: 1,
+                minWidth: 120,
+                cellStyle: {
+                    whiteSpace: "normal",
+                    wordBreak: "break-word",
+                    lineHeight: "1.4",
+                },
+                autoHeight: true,
             },
             {
                 field: "invoiceProof",
@@ -738,7 +771,9 @@ const ImprestEmployeeDashboard: React.FC = () => {
                         gridOptions={{
                             pagination: true,
                             paginationPageSize: 20,
-                            rowHeight: 48,
+                            getRowHeight: params => {
+                                return params.node.rowHeight || "auto";
+                            },
                             headerHeight: 44,
                             suppressCellFocus: true,
                             onGridReady: params => {
