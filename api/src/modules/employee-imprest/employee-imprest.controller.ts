@@ -105,4 +105,13 @@ export class EmployeeImprestController {
         console.log("Files received:", files);
         return this.service.uploadDocs(id, files, userId);
     }
+
+    @Delete(":id/proof/:filename")
+    deleteProof(
+        @Param("id", ParseIntPipe) id: number,
+        @Param("filename") filename: string,
+        @CurrentUser("id") userId: number
+    ) {
+        return this.service.deleteProof(id, decodeURIComponent(filename), userId);
+    }
 }
