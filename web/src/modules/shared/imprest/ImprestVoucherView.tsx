@@ -330,13 +330,13 @@ const ImprestVoucherView: React.FC = () => {
 
             {/* ---------------- Actions ---------------- */}
             <div className="voucher-actions">
-                {canMutateStatus && !isSigned(voucher.accountsSignedBy) && (
+                {canMutateStatus &&  (
                     <Button variant="outline" onClick={() => setAccModalOpen(true)}>
                         Approve by Accounts
                     </Button>
                 )}
 
-                {canMutateStatus && !isSigned(voucher.adminSignedBy) && (
+                {canMutateStatus &&  (
                     <Button variant="outline" onClick={() => setAdminModalOpen(true)}>
                         Approve by CEO
                     </Button>
