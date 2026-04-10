@@ -321,7 +321,7 @@ const EmployeeImprestEditForm: React.FC = () => {
                 });
             }
 
-            navigate(paths.shared.imprest);
+            navigate(-1);
         } catch (err) {
             console.error("Failed to update imprest:", err);
         }
