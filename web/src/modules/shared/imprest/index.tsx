@@ -126,6 +126,7 @@ const ImprestEmployeeDashboard: React.FC = () => {
     let userDetails = null;
 
     const canMutateStatus = canUpdate("accounts.imprests");
+    const canMutateStatusAdmin = canUpdate("accounts.imprests-admin");
     const canDeleteStatus = canDelete("accounts.imprests");
 
     const isAuthorized = hasPermission("shared.imprests", "read");
@@ -444,7 +445,7 @@ const ImprestEmployeeDashboard: React.FC = () => {
                                 label="Approved"
                                 icon={CheckCircle}
                                 onClick={() => handleStatusToggle(row.approvalStatus === 1, "Approved", () => approveMutation.mutate(row.id))}
-                                disabled={!canMutateStatus || approveMutation.isPending}
+                                disabled={!canMutateStatusAdmin || approveMutation.isPending}
                             />
 
                             <StatusToggle
@@ -452,7 +453,7 @@ const ImprestEmployeeDashboard: React.FC = () => {
                                 label="Tallied"
                                 icon={ListChecks}
                                 onClick={() => handleStatusToggle(row.tallyStatus === 1, "Tallied", () => tallyMutation.mutate(row.id))}
-                                disabled={!canMutateStatus || tallyMutation.isPending}
+                                disabled={!canMutateStatusAdmin || tallyMutation.isPending}
                             />
 
                             <StatusToggle
@@ -460,7 +461,7 @@ const ImprestEmployeeDashboard: React.FC = () => {
                                 label="Proof Verified"
                                 icon={FileCheck}
                                 onClick={() => handleStatusToggle(row.proofStatus === 1, "Proof Verified", () => proofMutation.mutate(row.id))}
-                                disabled={!canMutateStatus || proofMutation.isPending}
+                                disabled={!canMutateStatusAdmin || proofMutation.isPending}
                             />
                         </div>
                     );
@@ -478,7 +479,8 @@ const ImprestEmployeeDashboard: React.FC = () => {
                         <div className="flex items-center gap-1">
                             <IconAction icon={MessageSquarePlus} label="Add Remark" onClick={() => openRemarkModal(row)} />
                             <IconAction icon={ImagePlus} label="Add Proof" onClick={() => openAddProof(row.id)} />
-                            {canMutateStatus && <IconAction icon={Pencil} label="Edit Imprest" onClick={() => openEditModal(row)} />}
+                            {/* {canMutateStatus && <IconAction icon={Pencil} label="Edit Imprest" onClick={() => openEditModal(row)} />} */}
+                            {canMutateStatusAdmin && <IconAction icon={Pencil} label="Edit Imprest" onClick={() => navigate(paths.shared.imprestEdit(row.id))} />}
                             {canDeleteStatus && <IconAction icon={Trash2} label="Delete" onClick={() => handleDelete(row)} variant="destructive" />}
                         </div>
                     );

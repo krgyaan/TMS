@@ -47,17 +47,68 @@ export const createImprestSchema = z
 
 export type CreateImprestInput = z.infer<typeof createImprestSchema>;
 
-export const updateImprestSchema = z.object({
-    partyName: z.string().nullable().optional(),
-    projectName: z.string().nullable().optional(),
 
-    categoryId: z.preprocess(v => (v === "" || v === undefined ? null : Number(v)), z.number().nullable()).optional(),
+export const updateImprestSchema = z
+  .object({
+    userId: z.preprocess(
+      (v) => (v === "" || v === undefined ? undefined : Number(v)),
+      z.number().min(1, "User is required")
+    ),
 
-    teamId: z.preprocess(v => (v === "" || v === undefined ? null : Number(v)), z.number().nullable()).optional(),
+    categoryId: z.preprocess(
+      (v) => (v === "" || v === null ? undefined : Number(v)),
+      z.number().min(1, "Category is required")
+    ),
 
-    amount: z.preprocess(v => (v === "" || v === undefined ? undefined : Number(v)), z.number().int().min(1)).optional(),
+    teamId: z.preprocess(
+      (v) => (v === "" || v === undefined ? null : Number(v)),
+      z.number().nullable().optional()
+    ),
 
-    remark: z.string().nullable().optional(),
-});
+    amount: z.preprocess(
+      (v) => {
+        if (v === "" || v === undefined) return undefined;
+        const num = Number(v);
+        return isNaN(num) ? undefined : num;
+      },
+      z.number().min(1, "Amount must be greater than 0")
+    ),
+
+    partyName: z.string().optional(),
+    projectName: z.string().optional(),
+    remark: z.string().optional(),
+
+    approvalStatus: z.number().optional(),
+    approvedDate: z.string().nullable().optional(),
+  })
+  .superRefine((data, ctx) => {
+    const isTransfer = data.categoryId === 22;
+
+    if (isTransfer) {
+      if (!data.teamId) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Transfer user is required",
+          path: ["teamId"],
+        });
+      }
+    } else {
+      if (!data.partyName || data.partyName.trim() === "") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Party name is required",
+          path: ["partyName"],
+        });
+      }
+
+      if (!data.projectName || data.projectName.trim() === "") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Project is required",
+          path: ["projectName"],
+        });
+      }
+    }
+  });
 
 export type UpdateImprestInput = z.infer<typeof updateImprestSchema>;
