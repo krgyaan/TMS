@@ -20,7 +20,7 @@ import {
     approveImprest,
     tallyImprest,
     proofImprest,
-    addImprestRemark,
+    addImprestAccRemark,
 
     //PAYMENT HISTORY
     getImprestPaymentHistory,
@@ -165,11 +165,11 @@ export const useProofImprest = () => {
 
 /* ---------------- REMARK ---------------- */
 
-export const useAddImprestRemark = () => {
+export const useAddImprestAccRemark = () => {
     const qc = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, remark }: { id: number; remark: string }) => addImprestRemark(id, remark),
+        mutationFn: ({ id, remark }: { id: number; remark: string }) => addImprestAccRemark(id, remark),
 
         onSuccess: () => {
             toast.success("Remark added successfully");
