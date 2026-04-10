@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 export const UpdateEmployeeImprestSchema = z.object({
+    userId: z.coerce.number(),
     // relations
     categoryId: z.coerce.number().int().optional().nullable(),
     teamId: z.coerce.number().int().optional().nullable(),
