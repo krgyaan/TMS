@@ -45,9 +45,11 @@ import {
 } from "@/modules/accounts/task-checklist/task-checklist.hooks";
 import type { Checklist, ChecklistReport } from "@/modules/accounts/task-checklist/task-checklist.types";
 import { paths } from "@/app/routes/paths";
+import AdminChecklistView from "./components/AdminChecklistView";
+import UserChecklistView from "./components/UserChecklistView";
 
 // ==================== Pagination Component ====================
-interface PaginationProps {
+export interface PaginationProps {
     currentPage: number;
     totalPages: number;
     totalItems: number;
@@ -56,7 +58,7 @@ interface PaginationProps {
     onItemsPerPageChange: (items: number) => void;
 }
 
-const Pagination: React.FC<PaginationProps> = ({
+export const Pagination: React.FC<PaginationProps> = ({
     currentPage,
     totalPages,
     totalItems,
@@ -169,7 +171,7 @@ interface SearchInputProps {
     placeholder?: string;
 }
 
-const SearchInput: React.FC<SearchInputProps> = ({ value, onChange, placeholder = "Search..." }) => {
+export const SearchInput: React.FC<SearchInputProps> = ({ value, onChange, placeholder = "Search..." }) => {
     return (
         <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -194,84 +196,9 @@ const SearchInput: React.FC<SearchInputProps> = ({ value, onChange, placeholder 
     );
 };
 
-// ==================== Stats Card Component ====================
-interface StatsCardProps {
-    title: string;
-    value: number | string;
-    icon: React.ReactNode;
-    description?: string;
-}
-
-const StatsCard: React.FC<StatsCardProps> = ({ title, value, icon, description }) => {
-    return (
-        <Card>
-            <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                        <p className="text-sm font-medium text-muted-foreground">{title}</p>
-                        <p className="text-2xl font-bold">{value}</p>
-                        {description && (
-                            <p className="text-xs text-muted-foreground">{description}</p>
-                        )}
-                    </div>
-                    <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-                        {icon}
-                    </div>
-                </div>
-            </CardContent>
-        </Card>
-    );
-};
-
-// ==================== Timer Component ====================
-const Timer: React.FC<{ dueDate: string; isSaturday?: boolean }> = ({ dueDate, isSaturday = false }) => {
-    const [timeLeft, setTimeLeft] = useState<number>(0);
-
-    React.useEffect(() => {
-        const calculateTimeLeft = () => {
-            let targetDate = new Date(dueDate);
-            if (isSaturday) {
-                targetDate.setDate(targetDate.getDate() + 2);
-            }
-            const now = new Date();
-            const secondsLeft = differenceInSeconds(targetDate, now);
-            setTimeLeft(secondsLeft);
-        };
-
-        calculateTimeLeft();
-        const interval = setInterval(calculateTimeLeft, 1000);
-        return () => clearInterval(interval);
-    }, [dueDate, isSaturday]);
-
-    const formatTime = (seconds: number) => {
-        const isNegative = seconds < 0;
-        const absSeconds = Math.abs(seconds);
-        const days = Math.floor(absSeconds / 86400);
-        const hours = Math.floor((absSeconds % 86400) / 3600);
-        const mins = Math.floor((absSeconds % 3600) / 60);
-        const secs = absSeconds % 60;
-
-        const parts = [];
-        if (days > 0) parts.push(`${days}d`);
-        if (hours > 0) parts.push(`${hours}h`);
-        if (mins > 0) parts.push(`${mins}m`);
-        if (secs > 0 || parts.length === 0) parts.push(`${secs}s`);
-
-        return `${isNegative ? "-" : ""}${parts.join(" ")}`;
-    };
-
-    const isOverdue = timeLeft < 0;
-
-    return (
-        <Badge variant={isOverdue ? "destructive" : "secondary"} className="font-mono text-xs">
-            <Clock className="h-3 w-3 mr-1" />
-            {formatTime(timeLeft)}
-        </Badge>
-    );
-};
 
 // ==================== Remark Modal Component ====================
-interface RemarkModalProps {
+export interface RemarkModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     type: "responsibility" | "accountability";
@@ -279,13 +206,13 @@ interface RemarkModalProps {
     taskName: string;
 }
 
-const safeFormat = (date?: string | Date) => {
+export const safeFormat = (date?: string | Date) => {
     if (!date) return "-";
     const d = new Date(date);
     return isNaN(d.getTime()) ? "-" : format(d, "dd MMM yyyy");
 };
 
-const RemarkModal: React.FC<RemarkModalProps> = ({ open, onOpenChange, type, reportId, taskName }) => {
+export const RemarkModal: React.FC<RemarkModalProps> = ({ open, onOpenChange, type, reportId, taskName }) => {
     const [remark, setRemark] = useState("");
     const [file, setFile] = useState<File | null>(null);
 
@@ -404,13 +331,13 @@ const RemarkModal: React.FC<RemarkModalProps> = ({ open, onOpenChange, type, rep
 };
 
 // ==================== Task Details Sheet Component ====================
-interface TaskDetailsSheetProps {
+export interface TaskDetailsSheetProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     checklist: Checklist | null;
 }
 
-const TaskDetailsSheet: React.FC<TaskDetailsSheetProps> = ({ open, onOpenChange, checklist }) => {
+export const TaskDetailsSheet: React.FC<TaskDetailsSheetProps> = ({ open, onOpenChange, checklist }) => {
     if (!checklist) return null;
 
     return (
@@ -472,148 +399,7 @@ const TaskDetailsSheet: React.FC<TaskDetailsSheetProps> = ({ open, onOpenChange,
     );
 };
 
-// ==================== Empty State Component ====================
-interface EmptyStateProps {
-    icon?: React.ReactNode;
-    title: string;
-    description?: string;
-    action?: React.ReactNode;
-}
 
-const EmptyState: React.FC<EmptyStateProps> = ({ icon, title, description, action }) => {
-    return (
-        <div className="flex flex-col items-center justify-center py-12 px-4">
-            {icon && <div className="mb-4">{icon}</div>}
-            <h3 className="text-lg font-medium text-center">{title}</h3>
-            {description && (
-                <p className="text-sm text-muted-foreground text-center mt-1 max-w-sm">{description}</p>
-            )}
-            {action && <div className="mt-4">{action}</div>}
-        </div>
-    );
-};
-
-// ==================== Task Row Component for User View ====================
-interface TaskRowProps {
-    task: ChecklistReport;
-    type: "responsibility" | "accountability";
-    onViewDetails: (checklist: Checklist) => void;
-    onOpenRemark: (reportId: number, type: "responsibility" | "accountability", checklist: Checklist) => void;
-}
-
-const TaskRow: React.FC<TaskRowProps> = ({ task, type, onViewDetails, onOpenRemark }) => {
-    const isSaturday = task.dueDate ? new Date(task.dueDate).getDay() === 6 : false;
-    const canComplete = type === "accountability" ? !!task.respCompletedAt && !task.accCompletedAt : true;
-
-    if (type === "responsibility") {
-        return (
-            <tr className="border-b hover:bg-muted/30 transition-colors">
-                <td className="p-4">
-                    <div className="font-medium">{task?.taskName || "-"}</div>
-                </td>
-                <td className="p-4 text-sm text-muted-foreground">
-                    {task.dueDate ? format(new Date(task.dueDate), "dd MMM yyyy, hh:mm a") : "-"}
-                </td>
-                <td className="p-4">
-                    {task.dueDate ? <Timer dueDate={task.dueDate} /> : "-"}
-                </td>
-                <td className="p-4">
-                    <div className="flex gap-2">
-                        {task.id && (
-                            <>
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => onViewDetails(task!)}
-                                >
-                                    <Eye className="h-4 w-4 mr-1" />
-                                    Details
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    onClick={() => onOpenRemark(task.id!, "responsibility", task!)}
-                                >
-                                    Complete
-                                </Button>
-                            </>
-                        )}
-                    </div>
-                </td>
-            </tr>
-        );
-    }
-
-    return (
-        <tr className="border-b hover:bg-muted/30 transition-colors">
-            <td className="p-4">
-                <div className="font-medium">{task?.taskName || "-"}</div>
-            </td>
-            <td className="p-4 text-sm">{task?.responsibleUserName || "-"}</td>
-            <td className="p-4 text-sm">
-                {task.respCompletedAt ? (
-                    <Badge variant="secondary" className="font-normal">
-                        <CheckCircle2 className="h-3 w-3 mr-1" />
-                        {format(new Date(task.respCompletedAt), "dd MMM yyyy")}
-                    </Badge>
-                ) : (
-                    <Badge variant="outline" className="font-normal">Pending</Badge>
-                )}
-            </td>
-            <td className="p-4 text-sm max-w-[200px]">
-                <span className="truncate block" title={task.respRemark || ""}>
-                    {task.respRemark || "-"}
-                </span>
-            </td>
-            <td className="p-4 text-sm">
-                {task.respResultFile ? (
-                    <a
-                        href={`/uploads/checklist/${task.respResultFile}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary hover:underline inline-flex items-center gap-1"
-                    >
-                        <Eye className="h-3 w-3" />
-                        View
-                    </a>
-                ) : (
-                    "-"
-                )}
-            </td>
-            <td className="p-4">
-                {task.dueDate ? <Timer dueDate={task.dueDate} isSaturday={isSaturday} /> : "-"}
-            </td>
-            <td className="p-4">
-                <div className="flex gap-2">
-                    {task.id && (
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => onViewDetails(task)}
-                        >
-                            <Eye className="h-4 w-4" />
-                        </Button>
-                    )}
-                    {task.id && canComplete ? (
-                        <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => onOpenRemark(task.id!, "accountability", task)}
-                        >
-                            Complete
-                        </Button>
-                    ) : (
-                        !task.accCompletedAt && (
-                            <Button size="sm" variant="ghost" disabled title="Waiting for responsible user">
-                                <Clock className="h-4 w-4 mr-1" />
-                                Waiting
-                            </Button>
-                        )
-                    )}
-                </div>
-            </td>
-        </tr>
-    );
-};
 
 // ==================== Main Dashboard Component ====================
 const ChecklistDashboard: React.FC = () => {
@@ -823,365 +609,138 @@ const ChecklistDashboard: React.FC = () => {
     const totalTasks = Object.values(groupedChecklists).flat().length;
     const totalUsers = Object.keys(groupedChecklists).length;
 
-    // ==================== Admin View ====================
-    if (isAdminUser || isAccountCoordinator) {
+        const adminProps = {
+            totalTasks,
+            totalUsers,
+            groupedChecklists,
+            filteredAdminData,
+            paginatedAdminEntries,
+            adminSearch,
+            setAdminSearch,
+            adminCurrentPage,
+            adminTotalPages,
+            adminItemsPerPage,
+            setAdminCurrentPage,
+            setAdminItemsPerPage,
+            canCreateChecklist,
+            adminColumns,
+        };
+
+        // User Props
+        const userProps = {
+            userId,
+            userTasksResponsibility,
+            userTasksAccountability,
+
+            respSearch,
+            setRespSearch,
+            respCurrentPage,
+            respTotalPages,
+            respItemsPerPage,
+            setRespCurrentPage,
+            setRespItemsPerPage,
+            filteredRespTasks,
+            paginatedRespTasks,
+
+            accSearch,
+            setAccSearch,
+            accCurrentPage,
+            accTotalPages,
+            accItemsPerPage,
+            setAccCurrentPage,
+            setAccItemsPerPage,
+            filteredAccTasks,
+            paginatedAccTasks,
+
+            onViewDetails: openDetails,
+            onOpenRemark: openRemarkModal,
+        };
+
+        if (isAdminUser) {
+            return (
+                <>
+                    <AdminChecklistView {...adminProps} />
+
+                    {/* Shared Components */}
+                    <TaskDetailsSheet
+                        open={detailsSheetOpen}
+                        onOpenChange={setDetailsSheetOpen}
+                        checklist={selectedTask}
+                    />
+
+                    {selectedReportId && selectedTask && (
+                        <RemarkModal
+                            open={remarkModalOpen}
+                            onOpenChange={setRemarkModalOpen}
+                            type={remarkType}
+                            reportId={selectedReportId}
+                            taskName={selectedTask.taskName}
+                        />
+                    )}
+                </>
+            );
+        }
+
+        if (isAccountCoordinator) {
+            return (
+                <>
+                    <Tabs defaultValue="user" className="w-full">
+                        <TabsList className="mb-4">
+                            <TabsTrigger value="user">User View</TabsTrigger>
+                            <TabsTrigger value="admin">Admin View</TabsTrigger>
+                        </TabsList>
+
+                        <TabsContent value="user">
+                            <UserChecklistView {...userProps} />
+                        </TabsContent>
+
+                        <TabsContent value="admin">
+                            <AdminChecklistView {...adminProps} />
+                        </TabsContent>
+                    </Tabs>
+
+                    {/* Shared Components */}
+                    <TaskDetailsSheet
+                        open={detailsSheetOpen}
+                        onOpenChange={setDetailsSheetOpen}
+                        checklist={selectedTask}
+                    />
+
+                    {selectedReportId && selectedTask && (
+                        <RemarkModal
+                            open={remarkModalOpen}
+                            onOpenChange={setRemarkModalOpen}
+                            type={remarkType}
+                            reportId={selectedReportId}
+                            taskName={selectedTask.taskName}
+                        />
+                    )}
+                </>
+            );
+        }
+
+        // ==================== Normal User ====================
         return (
             <>
-                <div className="space-y-6">
-                    {/* Stats Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <StatsCard
-                            title="Total Tasks"
-                            value={totalTasks}
-                            icon={<ListTodo className="h-6 w-6 text-muted-foreground" />}
-                            description="All checklist tasks"
-                        />
-                        <StatsCard
-                            title="Assigned Users"
-                            value={totalUsers}
-                            icon={<Users className="h-6 w-6 text-muted-foreground" />}
-                            description="Users with tasks"
-                        />
-                        <StatsCard
-                            title="Groups"
-                            value={Object.keys(groupedChecklists).length}
-                            icon={<CheckCircle2 className="h-6 w-6 text-muted-foreground" />}
-                            description="Task groups"
-                        />
-                    </div>
+                <UserChecklistView {...userProps} />
 
-                    {/* Main Card */}
-                    <Card>
-                        <CardHeader className="border-b">
-                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                                <div>
-                                    <CardTitle>Account Checklists</CardTitle>
-                                    <CardDescription className="mt-1">
-                                        Manage account checklist tasks and assignments
-                                    </CardDescription>
-                                </div>
-                                {canCreateChecklist && (
-                                    <Button onClick={() => navigate(paths.accounts.taskChecklistsCreate)}>
-                                        <Plus className="h-4 w-4 mr-2" />
-                                        Add New Checklist
-                                    </Button>
-                                )}
-                            </div>
-                        </CardHeader>
+                <TaskDetailsSheet
+                    open={detailsSheetOpen}
+                    onOpenChange={setDetailsSheetOpen}
+                    checklist={selectedTask}
+                />
 
-                        <CardContent className="p-6">
-                            {/* Search */}
-                            <div className="mb-6">
-                                <SearchInput
-                                    value={adminSearch}
-                                    onChange={(value) => {
-                                        setAdminSearch(value);
-                                        setAdminCurrentPage(1);
-                                    }}
-                                    placeholder="Search by task name, user, or frequency..."
-                                />
-                            </div>
-
-                            {/* Content */}
-                            {Object.keys(filteredAdminData).length === 0 ? (
-                                <EmptyState
-                                    icon={<ListTodo className="h-12 w-12 text-muted-foreground" />}
-                                    title="No checklists found"
-                                    description={adminSearch ? "Try adjusting your search terms" : "Create your first checklist to get started"}
-                                />
-                            ) : (
-                                <>
-                                    <Accordion type="single" collapsible className="w-full">
-                                        {paginatedAdminEntries.map(([responsibility, checklists]) => {
-                                            const firstChecklist = checklists[0];
-                                            const responsibleName = firstChecklist?.responsibleUserName || "Unassigned";
-                                            const responsibleId = firstChecklist?.responsibility || null;
-
-                                            return (
-                                                <AccordionItem key={responsibility} value={responsibility} className="border rounded-lg mb-3 px-4">
-                                                    <div className="flex items-center justify-between w-full">
-                                                        <AccordionTrigger className="hover:no-underline py-4">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
-                                                                    <Users className="h-4 w-4 text-muted-foreground" />
-                                                                </div>
-                                                                <span className="font-medium">{responsibleName}</span>
-                                                                <Badge variant="secondary">
-                                                                    {checklists.length} {checklists.length === 1 ? 'Task' : 'Tasks'}
-                                                                </Badge>
-                                                            </div>
-                                                        </AccordionTrigger>
-
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                navigate(paths.accounts.taskChecklistsReport(Number(responsibleId)));
-                                                            }}
-                                                        >
-                                                            <Eye className="h-4 w-4 mr-1" />
-                                                            Report
-                                                        </Button>
-                                                    </div>
-                                                    <AccordionContent>
-                                                        <div className="pt-2 pb-4">
-                                                            <DataTable
-                                                                data={checklists}
-                                                                loading={false}
-                                                                columnDefs={adminColumns}
-                                                                gridOptions={{
-                                                                    defaultColDef: { filter: true, sortable: true },
-                                                                    domLayout: "autoHeight",
-                                                                }}
-                                                            />
-                                                        </div>
-                                                    </AccordionContent>
-                                                </AccordionItem>
-                                            );
-                                        })}
-                                    </Accordion>
-
-                                    {/* Pagination */}
-                                    {Object.keys(filteredAdminData).length > adminItemsPerPage && (
-                                        <Pagination
-                                            currentPage={adminCurrentPage}
-                                            totalPages={adminTotalPages}
-                                            totalItems={Object.keys(filteredAdminData).length}
-                                            itemsPerPage={adminItemsPerPage}
-                                            onPageChange={setAdminCurrentPage}
-                                            onItemsPerPageChange={(items) => {
-                                                setAdminItemsPerPage(items);
-                                                setAdminCurrentPage(1);
-                                            }}
-                                        />
-                                    )}
-                                </>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* Modals */}
-                <TaskDetailsSheet open={detailsSheetOpen} onOpenChange={setDetailsSheetOpen} checklist={selectedTask} />
+                {selectedReportId && selectedTask && (
+                    <RemarkModal
+                        open={remarkModalOpen}
+                        onOpenChange={setRemarkModalOpen}
+                        type={remarkType}
+                        reportId={selectedReportId}
+                        taskName={selectedTask.taskName}
+                    />
+                )}
             </>
         );
-    }
-
-    // ==================== User View ====================
-    return (
-        <>
-            <div className="space-y-6">
-                {/* Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <StatsCard
-                        title="My Responsibility Tasks"
-                        value={userTasksResponsibility.length}
-                        icon={<ListTodo className="h-6 w-6 text-muted-foreground" />}
-                        description="Tasks you need to complete"
-                    />
-                    <StatsCard
-                        title="My Accountability Tasks"
-                        value={userTasksAccountability.length}
-                        icon={<CheckCircle2 className="h-6 w-6 text-muted-foreground" />}
-                        description="Tasks you need to verify"
-                    />
-                    <StatsCard
-                        title="Pending Review"
-                        value={userTasksAccountability.filter(t => t.respCompletedAt && !t.accCompletedAt).length}
-                        icon={<Clock className="h-6 w-6 text-muted-foreground" />}
-                        description="Ready for your review"
-                    />
-                </div>
-
-                {/* Main Card */}
-                <Card>
-                    <CardHeader className="border-b">
-                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                            <div>
-                                <CardTitle>My Checklists</CardTitle>
-                                <CardDescription className="mt-1">
-                                    Track your responsibility and accountability tasks
-                                </CardDescription>
-                            </div>
-                            <Button onClick={() => navigate(paths.accounts.taskChecklistsReport(Number(userId)))}>
-                                <Eye className="h-4 w-4 mr-2" />
-                                View Report
-                            </Button>
-                        </div>
-                    </CardHeader>
-
-                    <CardContent className="p-0">
-                        <Tabs defaultValue="responsibility" className="w-full">
-                            <div className="border-b px-6 pt-4">
-                                <TabsList className="grid w-full max-w-md grid-cols-2">
-                                    <TabsTrigger value="responsibility" className="flex items-center gap-2">
-                                        My Responsibility
-                                        <Badge variant="secondary" className="ml-1">
-                                            {userTasksResponsibility.length}
-                                        </Badge>
-                                    </TabsTrigger>
-                                    <TabsTrigger value="accountability" className="flex items-center gap-2">
-                                        My Accountability
-                                        <Badge variant="secondary" className="ml-1">
-                                            {userTasksAccountability.length}
-                                        </Badge>
-                                    </TabsTrigger>
-                                </TabsList>
-                            </div>
-
-                            {/* Responsibility Tab */}
-                            <TabsContent value="responsibility" className="m-0">
-                                <div className="p-6">
-                                    {/* Search */}
-                                    <div className="mb-6">
-                                        <SearchInput
-                                            value={respSearch}
-                                            onChange={(value) => {
-                                                setRespSearch(value);
-                                                setRespCurrentPage(1);
-                                            }}
-                                            placeholder="Search tasks..."
-                                        />
-                                    </div>
-
-                                    {filteredRespTasks.length === 0 ? (
-                                        <EmptyState
-                                            icon={<CheckCircle2 className="h-12 w-12 text-green-500" />}
-                                            title={respSearch ? "No matching tasks" : "No pending responsibility tasks"}
-                                            description={respSearch ? "Try adjusting your search" : "You're all caught up!"}
-                                        />
-                                    ) : (
-                                        <>
-                                            <div className="overflow-x-auto rounded-lg border">
-                                                <table className="w-full">
-                                                    <thead>
-                                                        <tr className="border-b bg-muted/50">
-                                                            <th className="text-left p-4 font-semibold text-sm">Task Name</th>
-                                                            <th className="text-left p-4 font-semibold text-sm">Due Date</th>
-                                                            <th className="text-left p-4 font-semibold text-sm">Time Remaining</th>
-                                                            <th className="text-left p-4 font-semibold text-sm">Actions</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {paginatedRespTasks.map((task) => (
-                                                            <TaskRow
-                                                                key={task.id}
-                                                                task={task}
-                                                                type="responsibility"
-                                                                onViewDetails={openDetails}
-                                                                onOpenRemark={openRemarkModal}
-                                                            />
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-
-                                            {/* Pagination */}
-                                            {filteredRespTasks.length > respItemsPerPage && (
-                                                <Pagination
-                                                    currentPage={respCurrentPage}
-                                                    totalPages={respTotalPages}
-                                                    totalItems={filteredRespTasks.length}
-                                                    itemsPerPage={respItemsPerPage}
-                                                    onPageChange={setRespCurrentPage}
-                                                    onItemsPerPageChange={(items) => {
-                                                        setRespItemsPerPage(items);
-                                                        setRespCurrentPage(1);
-                                                    }}
-                                                />
-                                            )}
-                                        </>
-                                    )}
-                                </div>
-                            </TabsContent>
-
-                            {/* Accountability Tab */}
-                            <TabsContent value="accountability" className="m-0">
-                                <div className="p-6">
-                                    {/* Search */}
-                                    <div className="mb-6">
-                                        <SearchInput
-                                            value={accSearch}
-                                            onChange={(value) => {
-                                                setAccSearch(value);
-                                                setAccCurrentPage(1);
-                                            }}
-                                            placeholder="Search by task or responsible user..."
-                                        />
-                                    </div>
-
-                                    {filteredAccTasks.length === 0 ? (
-                                        <EmptyState
-                                            icon={<CheckCircle2 className="h-12 w-12 text-green-500" />}
-                                            title={accSearch ? "No matching tasks" : "No pending accountability tasks"}
-                                            description={accSearch ? "Try adjusting your search" : "You're all caught up!"}
-                                        />
-                                    ) : (
-                                        <>
-                                            <div className="overflow-x-auto rounded-lg border">
-                                                <table className="w-full">
-                                                    <thead>
-                                                        <tr className="border-b bg-muted/50">
-                                                            <th className="text-left p-4 font-semibold text-sm">Task Name</th>
-                                                            <th className="text-left p-4 font-semibold text-sm">Responsible User</th>
-                                                            <th className="text-left p-4 font-semibold text-sm">Resp. Completed</th>
-                                                            <th className="text-left p-4 font-semibold text-sm">Remark</th>
-                                                            <th className="text-left p-4 font-semibold text-sm">File</th>
-                                                            <th className="text-left p-4 font-semibold text-sm">Time Remaining</th>
-                                                            <th className="text-left p-4 font-semibold text-sm">Actions</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {paginatedAccTasks.map((task) => (
-                                                            <TaskRow
-                                                                key={task.id}
-                                                                task={task}
-                                                                type="accountability"
-                                                                onViewDetails={openDetails}
-                                                                onOpenRemark={openRemarkModal}
-                                                            />
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-
-                                            {/* Pagination */}
-                                            {filteredAccTasks.length > accItemsPerPage && (
-                                                <Pagination
-                                                    currentPage={accCurrentPage}
-                                                    totalPages={accTotalPages}
-                                                    totalItems={filteredAccTasks.length}
-                                                    itemsPerPage={accItemsPerPage}
-                                                    onPageChange={setAccCurrentPage}
-                                                    onItemsPerPageChange={(items) => {
-                                                        setAccItemsPerPage(items);
-                                                        setAccCurrentPage(1);
-                                                    }}
-                                                />
-                                            )}
-                                        </>
-                                    )}
-                                </div>
-                            </TabsContent>
-                        </Tabs>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* Modals */}
-            <TaskDetailsSheet open={detailsSheetOpen} onOpenChange={setDetailsSheetOpen} checklist={selectedTask} />
-            {selectedReportId && selectedTask && (
-                <RemarkModal
-                    open={remarkModalOpen}
-                    onOpenChange={setRemarkModalOpen}
-                    type={remarkType}
-                    reportId={selectedReportId}
-                    taskName={selectedTask.taskName}
-                />
-            )}
-        </>
-    );
 };
 
 export default ChecklistDashboard;
