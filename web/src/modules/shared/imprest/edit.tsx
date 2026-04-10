@@ -405,7 +405,7 @@ const EmployeeImprestEditForm: React.FC = () => {
                     <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => navigate(paths.shared.imprest)}
+                        onClick={() => imprest?.userId ? navigate(paths.shared.imprestUser(imprest.userId)) : navigate(paths.accounts.imprests)}
                     >
                         <ArrowLeft className="h-4 w-4 mr-2" />
                         Back
