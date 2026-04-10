@@ -29,6 +29,8 @@ import {
     creditImprest,
     type CreditImprestInput,
     getImprestVoucher,
+    getImprestById,
+    deleteImprestProof,
 } from "./imprest.api";
 
 import type { EmployeeImprestDashboard, ImprestPaymentHistoryRow, ImprestVoucherRow } from "./imprest.types";
@@ -286,7 +288,10 @@ export const useUpdateImprest = () => {
             qc.invalidateQueries({ queryKey: imprestKeys.root });
         },
 
-        onError: () => toast.error("Failed to update imprest"),
+        onError: (e) => {
+            const errorMessage = e?.response?.data?.message || e.message || "Something went wrong";
+            toast.error(`Failed to update imprest: ${errorMessage}`);
+        },
     });
 };
 
@@ -303,5 +308,29 @@ export const useCreditImprest = () => {
         },
 
         onError: () => toast.error("Failed to record transfer"),
+    });
+};
+
+
+export const useImprestDetail = (id: number) => {
+    return useQuery({
+        queryKey: imprestKeys.detail(id),
+        queryFn: () => getImprestById(id),
+        enabled: !!id && id > 0,
+    });
+};
+
+export const useDeleteImprestProof = () => {
+    const qc = useQueryClient();
+    
+    return useMutation({
+        mutationFn: ({ id, filename }: { id: number; filename: string }) => 
+            deleteImprestProof(id, filename),
+        onSuccess: (_, variables) => {
+            toast.success("Proof deleted successfully");
+            qc.invalidateQueries({ queryKey: imprestKeys.detail(variables.id) });
+            qc.invalidateQueries({ queryKey: imprestKeys.root });
+        },
+        onError: () => toast.error("Failed to delete proof"),
     });
 };

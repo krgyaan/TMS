@@ -179,6 +179,16 @@ export const updateImprest = async (id: number, data: Partial<ImprestRow>) => {
     return res.data;
 };
 
+export const getImprestById = async (id: number): Promise<ImprestRow> => {
+    const res = await api.get(`/employee-imprest/${id}`);
+    return res.data;
+};
+
+export const deleteImprestProof = async (id: number, filename: string) => {
+    const res = await api.delete(`/employee-imprest/${id}/proof/${encodeURIComponent(filename)}`);
+    return res.data;
+};
+
 export interface CreditImprestInput {
     userId: number;
     txnDate: string; // "YYYY-MM-DD"
