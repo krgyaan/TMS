@@ -722,7 +722,7 @@ export class ChequeService {
                 .from(instrumentDdDetails)
                 .innerJoin(paymentInstruments, eq(paymentInstruments.id, instrumentDdDetails.instrumentId))
                 .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-                .where(eq(instrumentDdDetails.instrumentId, result.linkedDdId))
+                .where(eq(instrumentDdDetails.id, result.linkedDdId))
                 .limit(1);
             if (ddRow) {
                 // Fix: Convert ddDate from string to Date if necessary
