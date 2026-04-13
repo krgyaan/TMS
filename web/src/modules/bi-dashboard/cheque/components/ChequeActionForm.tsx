@@ -51,6 +51,9 @@ export function ChequeActionForm({ instrumentId, instrumentData }: ChequeActionF
             action: '',
             contacts: [],
             cheque_images: [],
+            cheque_no: instrumentData?.chequeNo || '',
+            amount: instrumentData?.amount || undefined,
+            due_date: instrumentData?.chequeDate ? new Date(instrumentData.chequeDate).toISOString() : undefined,
         },
     });
 
