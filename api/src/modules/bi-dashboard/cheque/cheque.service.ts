@@ -73,6 +73,7 @@ export class ChequeService {
                 eq(paymentInstruments.status, CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED),
                 or(
                     ilike(instrumentChequeDetails.chequeReason, '%Payable%'),
+                    ilike(instrumentChequeDetails.chequeReason, '%DD%'),
                     ilike(instrumentChequeDetails.chequeReason, '%other_payment%')
                 ),
                 this.getNotExpiredCondition(),
@@ -302,6 +303,9 @@ export class ChequeService {
         files: Express.Multer.File[],
         user: any,
     ) {
+        this.logger.debug("Printing the id ", instrumentId);
+
+        this.logger.debug("Printing the body of action update", body);
         const [instrument] = await this.db
             .select()
             .from(paymentInstruments)
@@ -421,6 +425,9 @@ export class ChequeService {
             if (body.cheque_reason) chequeDetailsUpdate.chequeReason = body.cheque_reason;
             if (body.due_date) chequeDetailsUpdate.dueDate = body.due_date;
         } else if (body.action === 'accounts-form-1') {
+            if (body.cheque_no) chequeDetailsUpdate.chequeNo = body.cheque_no;
+            if (body.due_date) chequeDetailsUpdate.dueDate = body.due_date;
+
             // Handle receiving_cheque_handed_over
             const receivingChequeFile = getFileForField('receiving_cheque_handed_over', files, body, fileIndexTracker);
             const receivingChequePath = getFilePathFromBody('receiving_cheque_handed_over', body);
