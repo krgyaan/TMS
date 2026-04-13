@@ -67,12 +67,8 @@ export class FollowUpController {
 
     @Get()
     async findAll(@Query() query: FollowUpQueryDto, @CurrentUser() user) {
-        const staticUser = {
-            id: 3,
-            role: "admin",
-        };
 
-        let data = await this.service.findAll(query, staticUser);
+        let data = await this.service.findAll(query, user);
         return data;
     }
 

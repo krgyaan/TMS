@@ -260,12 +260,16 @@ export class FollowUpService {
     // FIND ALL
     // ========================
 
-    async findAll(query: FollowUpQueryDto, currentUser: { id: number; role: string }) {
+    async findAll(query: FollowUpQueryDto, currentUser: any) {
         const { tab, search, page, limit, sortBy, sortOrder } = query;
 
         try {
             const offset = (page - 1) * limit;
             const conditions: SQL[] = [isNull(followUps.deletedAt)];
+
+            if(currentUser.role != 'admin' || currentUser.role != 'super-admin'){
+                conditions.push(eq(followUps.assignedToId, currentUser.id))
+            }
 
             if (search) {
                 const pattern = `%${search}%`;
@@ -278,7 +282,7 @@ export class FollowUpService {
                         ilike(followUps.partyName, pattern),
                         ilike(followUps.area, pattern),
                         sql`CAST(${followUps.amount} AS TEXT) ILIKE ${pattern}`,
-                        inArray(followUps.assignedToId, matchingUserIds) // 👈 name search
+                        inArray(followUps.assignedToId, matchingUserIds) 
                     )!
                 );
             }
