@@ -96,7 +96,7 @@ export class FollowupMailDataBuilder {
             return ["priyanka@volksenergie.in", "ahkamul@volksenergie.in", "arathi@volksenergie.in"];
         }
 
-        return ["admin@volksenergie.in", "coordinator@volksenergie.in"];
+        return [];
     }
 
     // private resolveCc(area: string) {
