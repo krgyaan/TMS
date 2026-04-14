@@ -47,6 +47,7 @@ export const STOP_REASON_LABELS: Record<number, string> = {
     4: "Other",
 };
 
+
 const UPLOAD_DIR = path.join(process.cwd(), "uploads", "accounts");
 
 @Injectable()
@@ -262,12 +263,15 @@ export class FollowUpService {
 
     async findAll(query: FollowUpQueryDto, currentUser: any) {
         const { tab, search, page, limit, sortBy, sortOrder } = query;
+        this.logger.debug({message: "Printing the current user", currentUser});
 
         try {
             const offset = (page - 1) * limit;
             const conditions: SQL[] = [isNull(followUps.deletedAt)];
 
-            if(currentUser.role != 'admin' || currentUser.role != 'super-admin'){
+            if(currentUser.roleId != "1" && currentUser.roleId != "2"){
+                this.logger.debug({message: "Is not admin"});
+
                 conditions.push(eq(followUps.assignedToId, currentUser.id))
             }
 
