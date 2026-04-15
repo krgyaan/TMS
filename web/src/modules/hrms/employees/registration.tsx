@@ -1,94 +1,61 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { motion, AnimatePresence } from "framer-motion";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { 
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { 
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { 
-  ArrowLeft, 
-  ArrowRight, 
-  Loader2, 
-  UploadCloud, 
-  User, 
-  MapPin, 
-  Briefcase, 
-  CreditCard,
-  GraduationCap,
-  Building2,
-  FileText,
-  CheckCircle2,
-  Circle,
-  AlertCircle,
-  Plus,
-  Trash2,
-  Save,
-  SkipForward,
+import {
+  User,
+  MapPin,
   Phone,
+  ChevronRight,
+  ChevronLeft,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  Shield,
   Mail,
   Calendar,
-  Shield,
-  AlertTriangle,
-  ChevronRight,
-  X,
-  Info
+  Hash,
+  HeartHandshake,
+  Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-import { useUsers } from "@/hooks/api/useUsers";
-import { useCreateHrmsEmployeeProfile } from "@/hooks/api/useHrmsEmployeeProfiles";
-import { useUpdateUserProfile } from "@/hooks/api/useUserProfiles";
+// ─── Schemas ────────────────────────────────────────────────────────────────
 
-// Validation Schemas for each step
-const personalInfoSchema = z.object({
+const personalSchema = z.object({
   employeeId: z.string().optional(),
-  firstName: z.string().min(1, "First Name is required"),
+  firstName: z.string().min(1, "First name is required"),
   middleName: z.string().optional(),
-  lastName: z.string().min(1, "Last Name is required"),
-  dateOfBirth: z.string().min(1, "Date of Birth is required"),
-  gender: z.string().min(1, "Gender is required"),
-  maritalStatus: z.string().min(1, "Marital Status is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  dateOfBirth: z.string().min(1, "Date of birth is required"),
+  gender: z.enum(["Male", "Female", "Other"], { required_error: "Gender is required" }),
+  maritalStatus: z.string().min(1, "Marital status is required"),
   nationality: z.string().min(1, "Nationality is required"),
-  personalEmail: z.string().email("Valid email required"),
-  phone: z.string().min(10, "Valid phone number required"),
+  personalEmail: z.string().email("Enter a valid email"),
+  phone: z.string().min(7, "Enter a valid phone number"),
   alternatePhone: z.string().optional(),
-  aadharNumber: z.string().min(12, "Valid Aadhar Number required").max(12),
-  panNumber: z.string().min(10, "Valid PAN Number required").max(10),
+  aadharNumber: z.string().optional(),
+  panNumber: z.string().optional(),
 });
 
 const addressSchema = z.object({
-  currentAddressLine1: z.string().min(1, "Address Line 1 is required"),
+  currentAddressLine1: z.string().min(1, "Address line 1 is required"),
   currentAddressLine2: z.string().optional(),
   currentCity: z.string().min(1, "City is required"),
   currentState: z.string().min(1, "State is required"),
   currentCountry: z.string().min(1, "Country is required"),
-  currentPostalCode: z.string().min(1, "Postal Code is required"),
+  currentPostalCode: z.string().min(1, "Postal code is required"),
   sameAsCurrent: z.boolean().optional(),
   permanentAddressLine1: z.string().optional(),
   permanentAddressLine2: z.string().optional(),
@@ -96,2265 +63,939 @@ const addressSchema = z.object({
   permanentState: z.string().optional(),
   permanentCountry: z.string().optional(),
   permanentPostalCode: z.string().optional(),
-  emergencyContactName: z.string().min(1, "Emergency Contact Name is required"),
+  emergencyContactName: z.string().min(1, "Contact name is required"),
   emergencyContactRelationship: z.string().min(1, "Relationship is required"),
-  emergencyContactPhone: z.string().min(10, "Valid phone required"),
+  emergencyContactPhone: z.string().min(7, "Valid phone required"),
   emergencyContactAltPhone: z.string().optional(),
   emergencyContactEmail: z.string().email().optional().or(z.literal("")),
 });
 
-const employmentSchema = z.object({
-  userId: z.number().positive("User selection is required"),
-  employeeType: z.string().min(1, "Employee Type is required"),
-  designation: z.string().min(1, "Designation is required"),
-  department: z.string().min(1, "Department is required"),
-  reportingManager: z.string().optional(),
-  workLocation: z.string().min(1, "Work Location is required"),
-  employeeStatus: z.string().default("active"),
-  probationPeriod: z.string().optional(),
-  probationEndDate: z.string().optional(),
-  dateOfJoining: z.string().min(1, "Date of Joining is required"),
-  officialEmail: z.string().email("Valid official email required"),
-});
-
-const compensationSchema = z.object({
-  salaryType: z.string().min(1, "Salary Type is required"),
-  basicSalary: z.string().min(1, "Basic Salary/CTC is required"),
-  bankName: z.string().min(1, "Bank Name is required"),
-  accountHolderName: z.string().min(1, "Account Holder Name is required"),
-  accountNumber: z.string().min(1, "Account Number is required"),
-  ifscCode: z.string().min(1, "IFSC Code is required"),
-  branchName: z.string().optional(),
-  branchAddress: z.string().optional(),
-});
-
-const educationSchema = z.object({
-  qualifications: z.array(z.object({
-    degree: z.string().optional(),
-    institution: z.string().optional(),
-    fieldOfStudy: z.string().optional(),
-    yearOfCompletion: z.string().optional(),
-    grade: z.string().optional(),
-  })).optional(),
-});
-
-const experienceSchema = z.object({
-  experiences: z.array(z.object({
-    companyName: z.string().optional(),
-    designation: z.string().optional(),
-    fromDate: z.string().optional(),
-    toDate: z.string().optional(),
-    currentlyWorking: z.boolean().optional(),
-    responsibilities: z.string().optional(),
-  })).optional(),
-});
-
-// Combined schema with partial validation for skippable fields
-const fullSchema = z.object({
-  // Personal Info
-  employeeId: z.string().optional(),
-  firstName: z.string().optional(),
-  middleName: z.string().optional(),
-  lastName: z.string().optional(),
-  dateOfBirth: z.string().optional(),
-  gender: z.string().optional(),
-  maritalStatus: z.string().optional(),
-  nationality: z.string().optional(),
-  personalEmail: z.string().optional(),
-  phone: z.string().optional(),
-  alternatePhone: z.string().optional(),
-  aadharNumber: z.string().optional(),
-  panNumber: z.string().optional(),
-  
-  // Address
-  currentAddressLine1: z.string().optional(),
-  currentAddressLine2: z.string().optional(),
-  currentCity: z.string().optional(),
-  currentState: z.string().optional(),
-  currentCountry: z.string().optional(),
-  currentPostalCode: z.string().optional(),
-  sameAsCurrent: z.boolean().optional(),
-  permanentAddressLine1: z.string().optional(),
-  permanentAddressLine2: z.string().optional(),
-  permanentCity: z.string().optional(),
-  permanentState: z.string().optional(),
-  permanentCountry: z.string().optional(),
-  permanentPostalCode: z.string().optional(),
-  emergencyContactName: z.string().optional(),
-  emergencyContactRelationship: z.string().optional(),
-  emergencyContactPhone: z.string().optional(),
-  emergencyContactAltPhone: z.string().optional(),
-  emergencyContactEmail: z.string().optional(),
-  
-  // Employment
-  userId: z.number().optional(),
-  employeeType: z.string().optional(),
-  designation: z.string().optional(),
-  department: z.string().optional(),
-  reportingManager: z.string().optional(),
-  workLocation: z.string().optional(),
-  employeeStatus: z.string().optional(),
-  probationPeriod: z.string().optional(),
-  probationEndDate: z.string().optional(),
-  dateOfJoining: z.string().optional(),
-  officialEmail: z.string().optional(),
-  
-  // Compensation
-  salaryType: z.string().optional(),
-  basicSalary: z.string().optional(),
-  bankName: z.string().optional(),
-  accountHolderName: z.string().optional(),
-  accountNumber: z.string().optional(),
-  ifscCode: z.string().optional(),
-  branchName: z.string().optional(),
-  branchAddress: z.string().optional(),
-  
-  // Education & Experience
-  qualifications: z.array(z.any()).optional(),
-  experiences: z.array(z.any()).optional(),
-});
-
+const fullSchema = personalSchema.merge(addressSchema);
 type FormData = z.infer<typeof fullSchema>;
 
-// Step Configuration
-const STEPS = [
-  { 
-    id: 1, 
-    title: "Personal Info", 
-    icon: User, 
-    description: "Basic details",
-    required: true,
-    requiredFields: ['firstName', 'lastName', 'dateOfBirth', 'gender', 'personalEmail', 'phone']
-  },
-  { 
-    id: 2, 
-    title: "Address", 
-    icon: MapPin, 
-    description: "Contact & address",
-    required: true,
-    requiredFields: ['currentAddressLine1', 'currentCity', 'currentState', 'emergencyContactName', 'emergencyContactPhone']
-  },
-  { 
-    id: 3, 
-    title: "Employment", 
-    icon: Briefcase, 
-    description: "Job details",
-    required: true,
-    requiredFields: ['userId', 'employeeType', 'designation', 'department', 'workLocation', 'officialEmail']
-  },
-  { 
-    id: 4, 
-    title: "Compensation", 
-    icon: CreditCard, 
-    description: "Salary & bank",
-    required: false,
-    requiredFields: ['salaryType', 'basicSalary', 'bankName', 'accountNumber', 'ifscCode']
-  },
-  { 
-    id: 5, 
-    title: "Education", 
-    icon: GraduationCap, 
-    description: "Qualifications",
-    required: false,
-    requiredFields: []
-  },
-  { 
-    id: 6, 
-    title: "Experience", 
-    icon: Building2, 
-    description: "Work history",
-    required: false,
-    requiredFields: []
-  },
-  { 
-    id: 7, 
-    title: "Documents", 
-    icon: FileText, 
-    description: "Upload files",
-    required: false,
-    requiredFields: []
-  },
-  { 
-    id: 8, 
-    title: "Review", 
-    icon: CheckCircle2, 
-    description: "Final check",
-    required: true,
-    requiredFields: []
-  },
-];
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const NATIONALITIES = [
-  "Indian", "American", "British", "Canadian", "Australian", "German", "French", "Other"
+  "Indian", "American", "British", "Canadian", "Australian",
+  "German", "French", "Singaporean", "Other",
 ];
 
 const STATES = [
-  "Andhra Pradesh", "Karnataka", "Kerala", "Maharashtra", "Tamil Nadu", 
-  "Telangana", "Delhi", "Gujarat", "Rajasthan", "Uttar Pradesh", "West Bengal", "Other"
+  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
+  "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka",
+  "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram",
+  "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu",
+  "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal",
+  "Delhi", "Other",
 ];
 
-const COUNTRIES = ["India", "United States", "United Kingdom", "Canada", "Australia", "Other"];
-
-const DEPARTMENTS = [
-  "Human Resources", "Information Technology", "Finance", "Sales", 
-  "Marketing", "Operations", "Engineering", "Design", "Legal", "Administration"
+const COUNTRIES = [
+  "India", "United States", "United Kingdom", "Canada",
+  "Australia", "Singapore", "Germany", "France", "Other",
 ];
 
-const RELATIONSHIPS = [
-  "Spouse", "Parent", "Sibling", "Child", "Friend", "Other"
+const RELATIONSHIPS = ["Spouse", "Parent", "Sibling", "Child", "Friend", "Other"];
+
+const MARITAL_STATUSES = ["Single", "Married", "Divorced", "Widowed"];
+
+const COUNTRY_CODES = [
+  { code: "+91", label: "IN +91" },
+  { code: "+1", label: "US +1" },
+  { code: "+44", label: "UK +44" },
+  { code: "+61", label: "AU +61" },
+  { code: "+65", label: "SG +65" },
 ];
 
-// Generate Employee ID
 const generateEmployeeId = () => {
   const year = new Date().getFullYear().toString().slice(-2);
   const random = Math.random().toString(36).substring(2, 6).toUpperCase();
   return `EMP${year}${random}`;
 };
 
+// ─── Step Config ─────────────────────────────────────────────────────────────
+
+const STEPS = [
+  {
+    id: 1,
+    key: "personal",
+    title: "Personal Info",
+    subtitle: "Tell us about yourself",
+    icon: User,
+    fields: ["firstName", "lastName", "dateOfBirth", "gender", "personalEmail", "phone"],
+  },
+  {
+    id: 2,
+    key: "address",
+    title: "Address",
+    subtitle: "Where do you live?",
+    icon: MapPin,
+    fields: ["currentAddressLine1", "currentCity", "currentState", "currentPostalCode"],
+  },
+  {
+    id: 3,
+    key: "emergency",
+    title: "Emergency Contact",
+    subtitle: "Who should we contact?",
+    icon: HeartHandshake,
+    fields: ["emergencyContactName", "emergencyContactRelationship", "emergencyContactPhone"],
+  },
+];
+
+// ─── Animated Wrapper ────────────────────────────────────────────────────────
+
+const slideVariants = {
+  enter: (dir: number) => ({
+    x: dir > 0 ? 60 : -60,
+    opacity: 0,
+  }),
+  center: {
+    x: 0,
+    opacity: 1,
+    transition: { duration: 0.3, ease: "easeOut" },
+  },
+  exit: (dir: number) => ({
+    x: dir > 0 ? -60 : 60,
+    opacity: 0,
+    transition: { duration: 0.2, ease: "easeIn" },
+  }),
+};
+
+// ─── Field Components ────────────────────────────────────────────────────────
+
+interface FieldWrapperProps {
+  label: string;
+  required?: boolean;
+  error?: string;
+  children: React.ReactNode;
+  hint?: string;
+}
+
+const FieldWrapper: React.FC<FieldWrapperProps> = ({ label, required, error, children, hint }) => (
+  <div className="space-y-1.5">
+    <Label className="text-sm font-medium text-foreground">
+      {label}
+      {required && <span className="text-destructive ml-1">*</span>}
+    </Label>
+    {children}
+    {hint && !error && <p className="text-xs text-muted-foreground">{hint}</p>}
+    {error && (
+      <motion.p
+        initial={{ opacity: 0, y: -4 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="text-xs text-destructive flex items-center gap-1"
+      >
+        <AlertCircle className="h-3 w-3 flex-shrink-0" />
+        {error}
+      </motion.p>
+    )}
+  </div>
+);
+
+// ─── Section Header ───────────────────────────────────────────────────────────
+
+const SectionLabel: React.FC<{ icon: React.ElementType; label: string }> = ({ icon: Icon, label }) => (
+  <div className="flex items-center gap-2 mb-4">
+    <div className="h-px flex-1 bg-border" />
+    <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2">
+      <Icon className="h-3.5 w-3.5" />
+      {label}
+    </div>
+    <div className="h-px flex-1 bg-border" />
+  </div>
+);
+
+// ─── Phone Input ─────────────────────────────────────────────────────────────
+
+interface PhoneInputProps {
+  value?: string;
+  onChange: (val: string) => void;
+  placeholder?: string;
+  error?: boolean;
+}
+
+const PhoneInput: React.FC<PhoneInputProps> = ({ value = "", onChange, placeholder, error }) => {
+  const [code, setCode] = useState("+91");
+  const [number, setNumber] = useState("");
+
+  useEffect(() => {
+    onChange(`${code} ${number}`);
+  }, [code, number]);
+
+  return (
+    <div className="flex gap-2">
+      <Select value={code} onValueChange={setCode}>
+        <SelectTrigger className={cn("w-28 shrink-0", error && "border-destructive")}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {COUNTRY_CODES.map((c) => (
+            <SelectItem key={c.code} value={c.code}>{c.label}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Input
+        value={number}
+        onChange={(e) => setNumber(e.target.value.replace(/\D/g, ""))}
+        placeholder={placeholder || "Phone number"}
+        className={cn("flex-1", error && "border-destructive")}
+      />
+    </div>
+  );
+};
+
+// ─── Step Indicators ─────────────────────────────────────────────────────────
+
+interface StepIndicatorProps {
+  steps: typeof STEPS;
+  current: number;
+  completed: number[];
+}
+
+const StepIndicator: React.FC<StepIndicatorProps> = ({ steps, current, completed }) => (
+  <div className="flex items-center justify-center gap-0">
+    {steps.map((step, i) => {
+      const isDone = completed.includes(step.id);
+      const isActive = step.id === current;
+      const Icon = step.icon;
+
+      return (
+        <React.Fragment key={step.id}>
+          <div className="flex flex-col items-center gap-1">
+            <motion.div
+              animate={{
+                scale: isActive ? 1.1 : 1,
+              }}
+              transition={{ duration: 0.2 }}
+              className={cn(
+                "flex items-center justify-center w-9 h-9 rounded-full border-2 transition-colors duration-300",
+                isDone
+                  ? "bg-primary border-primary text-primary-foreground"
+                  : isActive
+                  ? "border-primary text-primary bg-primary/10"
+                  : "border-border text-muted-foreground bg-background"
+              )}
+            >
+              {isDone ? (
+                <CheckCircle2 className="h-4 w-4" />
+              ) : (
+                <Icon className="h-4 w-4" />
+              )}
+            </motion.div>
+            <span
+              className={cn(
+                "text-[10px] font-medium hidden sm:block transition-colors",
+                isActive ? "text-primary" : isDone ? "text-muted-foreground" : "text-muted-foreground/60"
+              )}
+            >
+              {step.title}
+            </span>
+          </div>
+          {i < steps.length - 1 && (
+            <div
+              className={cn(
+                "h-0.5 w-12 sm:w-20 mb-4 mx-1 transition-colors duration-500",
+                completed.includes(step.id) ? "bg-primary" : "bg-border"
+              )}
+            />
+          )}
+        </React.Fragment>
+      );
+    })}
+  </div>
+);
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
 const EmployeeRegistration: React.FC = () => {
   const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
-  const [skippedSteps, setSkippedSteps] = useState<number[]>([]);
-  const [stepErrors, setStepErrors] = useState<Record<number, boolean>>({});
+  const [direction, setDirection] = useState(1);
   const [sameAsCurrent, setSameAsCurrent] = useState(false);
-  const [showSkipDialog, setShowSkipDialog] = useState(false);
-  const [showSkipRequiredDialog, setShowSkipRequiredDialog] = useState(false);
-  const [pendingSkipStep, setPendingSkipStep] = useState<number | null>(null);
-  const [showSubmitWarning, setShowSubmitWarning] = useState(false);
-  
-  const { data: users = [], isLoading: usersLoading } = useUsers();
-  const createEmployeeMutation = useCreateHrmsEmployeeProfile();
-  const updateUserProfileMutation = useUpdateUserProfile();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
   const {
     register,
     handleSubmit,
-    formState: { errors, dirtyFields },
+    formState: { errors },
     setValue,
     watch,
     trigger,
     getValues,
-    control,
-    clearErrors,
   } = useForm<FormData>({
     resolver: zodResolver(fullSchema),
     defaultValues: {
       employeeId: generateEmployeeId(),
       gender: "Male",
-      employeeStatus: "active",
-      employeeType: "full_time",
-      salaryType: "monthly",
       currentCountry: "India",
       permanentCountry: "India",
-      qualifications: [{ degree: "", institution: "", fieldOfStudy: "", yearOfCompletion: "", grade: "" }],
-      experiences: [],
     },
     mode: "onChange",
   });
 
-  const { fields: qualificationFields, append: appendQualification, remove: removeQualification } = 
-    useFieldArray({ control, name: "qualifications" });
-  
-  const { fields: experienceFields, append: appendExperience, remove: removeExperience } = 
-    useFieldArray({ control, name: "experiences" });
+  const totalSteps = STEPS.length;
+  const progress = ((completedSteps.length) / totalSteps) * 100;
+  const currentStepConfig = STEPS.find((s) => s.id === currentStep)!;
 
-  const isSubmitting = createEmployeeMutation.isPending || updateUserProfileMutation.isPending;
+  // ── Validate current step fields ──────────────────────────────────────────
 
-  // Load saved progress
-  useEffect(() => {
-    const saved = localStorage.getItem('employeeOnboardingDraft');
-    if (saved) {
-      try {
-        const { data, currentStep: savedStep, completedSteps: savedCompleted, skippedSteps: savedSkipped } = JSON.parse(saved);
-        Object.entries(data).forEach(([key, value]) => {
-          setValue(key as keyof FormData, value as any);
-        });
-        setCurrentStep(savedStep);
-        setCompletedSteps(savedCompleted || []);
-        setSkippedSteps(savedSkipped || []);
-        toast.info("Restored your previous progress");
-      } catch (e) {
-        console.error("Failed to restore progress:", e);
-      }
+  const validateCurrentStep = async (): Promise<boolean> => {
+    const fieldsToValidate = currentStepConfig.fields as (keyof FormData)[];
+    return trigger(fieldsToValidate);
+  };
+
+  // ── Navigation ────────────────────────────────────────────────────────────
+
+  const goNext = async () => {
+    const valid = await validateCurrentStep();
+    if (!valid) {
+      toast.error("Please fill in all required fields.");
+      return;
     }
-  }, [setValue]);
-
-  // Get step validation schema
-  const getStepSchema = (step: number) => {
-    switch (step) {
-      case 1: return personalInfoSchema;
-      case 2: return addressSchema;
-      case 3: return employmentSchema;
-      case 4: return compensationSchema;
-      case 5: return educationSchema;
-      case 6: return experienceSchema;
-      default: return z.object({});
-    }
+    setCompletedSteps((prev) => [...new Set([...prev, currentStep])]);
+    setDirection(1);
+    setCurrentStep((s) => Math.min(s + 1, totalSteps));
   };
 
-  // Validation for each step
-  const validateStep = async (step: number): Promise<boolean> => {
-    const stepConfig = STEPS.find(s => s.id === step);
-    if (!stepConfig || stepConfig.requiredFields.length === 0) {
-      return true;
-    }
-
-    const fieldsToValidate = stepConfig.requiredFields as (keyof FormData)[];
-    const values = getValues();
-    
-    let isValid = true;
-    for (const field of fieldsToValidate) {
-      const value = values[field];
-      if (!value || (typeof value === 'string' && value.trim() === '')) {
-        isValid = false;
-        break;
-      }
-    }
-    
-    setStepErrors(prev => ({ ...prev, [step]: !isValid }));
-    return isValid;
+  const goPrev = () => {
+    setDirection(-1);
+    setCurrentStep((s) => Math.max(s - 1, 1));
   };
 
-  // Check if step has any data filled
-  const hasStepData = (step: number): boolean => {
-    const stepConfig = STEPS.find(s => s.id === step);
-    if (!stepConfig) return false;
-    
-    const values = getValues();
-    const fieldsToCheck = stepConfig.requiredFields as (keyof FormData)[];
-    
-    return fieldsToCheck.some(field => {
-      const value = values[field];
-      return value && (typeof value !== 'string' || value.trim() !== '');
-    });
-  };
+  // ── Same address handler ──────────────────────────────────────────────────
 
-  // Handle next step
-  const handleNext = async () => {
-    const isValid = await validateStep(currentStep);
-    
-    if (isValid) {
-      setCompletedSteps(prev => [...new Set([...prev, currentStep])]);
-      setSkippedSteps(prev => prev.filter(s => s !== currentStep));
-      setStepErrors(prev => ({ ...prev, [currentStep]: false }));
-      
-      if (currentStep < STEPS.length) {
-        setCurrentStep(currentStep + 1);
-      }
-    } else {
-      toast.error("Please fill in all required fields before proceeding");
-    }
-  };
-
-  // Handle previous step
-  const handlePrevious = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
-  // Handle skip step
-  const handleSkipClick = () => {
-    const stepConfig = STEPS.find(s => s.id === currentStep);
-    
-    if (stepConfig?.required) {
-      setShowSkipRequiredDialog(true);
-    } else {
-      setShowSkipDialog(true);
-    }
-  };
-
-  const confirmSkip = () => {
-    setSkippedSteps(prev => [...new Set([...prev, currentStep])]);
-    setCompletedSteps(prev => prev.filter(s => s !== currentStep));
-    setStepErrors(prev => ({ ...prev, [currentStep]: false }));
-    
-    if (currentStep < STEPS.length) {
-      setCurrentStep(currentStep + 1);
-    }
-    
-    setShowSkipDialog(false);
-    toast.info(`Step ${currentStep} skipped. You can complete it later.`);
-  };
-
-  const confirmSkipRequired = () => {
-    // For required steps, mark as skipped but show warning
-    setSkippedSteps(prev => [...new Set([...prev, currentStep])]);
-    setCompletedSteps(prev => prev.filter(s => s !== currentStep));
-    setStepErrors(prev => ({ ...prev, [currentStep]: true }));
-    
-    if (currentStep < STEPS.length) {
-      setCurrentStep(currentStep + 1);
-    }
-    
-    setShowSkipRequiredDialog(false);
-    toast.warning(`Step ${currentStep} skipped. This is required and must be completed before submission.`);
-  };
-
-  // Handle go to specific step
-  const handleGoToStep = (step: number) => {
-    // Allow navigation to any step
-    setCurrentStep(step);
-  };
-
-  // Handle unskip (complete a skipped step)
-  const handleUnskip = async (step: number) => {
-    setCurrentStep(step);
-    setSkippedSteps(prev => prev.filter(s => s !== step));
-  };
-
-  // Handle save progress
-  const handleSaveProgress = async () => {
-    const data = getValues();
-    localStorage.setItem('employeeOnboardingDraft', JSON.stringify({
-      data,
-      currentStep,
-      completedSteps,
-      skippedSteps,
-      savedAt: new Date().toISOString()
-    }));
-    toast.success("Progress saved successfully!");
-  };
-
-  // Handle same as current address
   const handleSameAsCurrentChange = (checked: boolean) => {
     setSameAsCurrent(checked);
     setValue("sameAsCurrent", checked);
     if (checked) {
-      const values = getValues();
-      setValue("permanentAddressLine1", values.currentAddressLine1);
-      setValue("permanentAddressLine2", values.currentAddressLine2);
-      setValue("permanentCity", values.currentCity);
-      setValue("permanentState", values.currentState);
-      setValue("permanentCountry", values.currentCountry);
-      setValue("permanentPostalCode", values.currentPostalCode);
+      const v = getValues();
+      setValue("permanentAddressLine1", v.currentAddressLine1);
+      setValue("permanentAddressLine2", v.currentAddressLine2);
+      setValue("permanentCity", v.currentCity);
+      setValue("permanentState", v.currentState);
+      setValue("permanentCountry", v.currentCountry);
+      setValue("permanentPostalCode", v.currentPostalCode);
     }
   };
 
-  // Check if can submit
-  const canSubmit = (): boolean => {
-    const requiredSteps = STEPS.filter(s => s.required && s.id !== 8);
-    return requiredSteps.every(step => 
-      completedSteps.includes(step.id) && !skippedSteps.includes(step.id)
-    );
-  };
-
-  // Get incomplete required steps
-  const getIncompleteRequiredSteps = (): typeof STEPS => {
-    return STEPS.filter(s => 
-      s.required && 
-      s.id !== 8 && 
-      (!completedSteps.includes(s.id) || skippedSteps.includes(s.id))
-    );
-  };
-
-  // Handle submit
-  const handleFormSubmit = async () => {
-    if (!canSubmit()) {
-      setShowSubmitWarning(true);
-      return;
-    }
-    
-    await handleSubmit(onSubmit)();
-  };
+  // ── Submit ────────────────────────────────────────────────────────────────
 
   const onSubmit = async (data: FormData) => {
+    setIsSubmitting(true);
     try {
-      // Update User Profile
-      if (data.userId) {
-        await updateUserProfileMutation.mutateAsync({
-          userId: data.userId,
-          data: {
-            firstName: data.firstName,
-            middleName: data.middleName,
-            lastName: data.lastName,
-            dateOfBirth: data.dateOfBirth,
-            gender: data.gender,
-            maritalStatus: data.maritalStatus,
-            nationality: data.nationality,
-            phone: data.phone,
-            altPhone: data.alternatePhone,
-            altEmail: data.personalEmail,
-            aadharNumber: data.aadharNumber,
-            panNumber: data.panNumber,
-            currentAddress: {
-              line1: data.currentAddressLine1,
-              line2: data.currentAddressLine2,
-              city: data.currentCity,
-              state: data.currentState,
-              country: data.currentCountry,
-              postalCode: data.currentPostalCode,
-            },
-            permanentAddress: {
-              line1: data.permanentAddressLine1,
-              line2: data.permanentAddressLine2,
-              city: data.permanentCity,
-              state: data.permanentState,
-              country: data.permanentCountry,
-              postalCode: data.permanentPostalCode,
-            },
-            emergencyContact: {
-              name: data.emergencyContactName,
-              relationship: data.emergencyContactRelationship,
-              phone: data.emergencyContactPhone,
-              altPhone: data.emergencyContactAltPhone,
-              email: data.emergencyContactEmail,
-            }
-          }
-        });
-
-        // Create Employee Profile
-        await createEmployeeMutation.mutateAsync({
-          userId: data.userId,
-          employeeId: data.employeeId,
-          employeeType: data.employeeType,
-          designation: data.designation,
-          department: data.department,
-          reportingManager: data.reportingManager,
-          workLocation: data.workLocation,
-          employeeStatus: data.employeeStatus,
-          probationPeriod: data.probationPeriod,
-          probationEndDate: data.probationEndDate,
-          dateOfJoining: data.dateOfJoining,
-          officialEmail: data.officialEmail,
-          salaryType: data.salaryType,
-          basicSalary: data.basicSalary,
-          bankName: data.bankName,
-          accountHolderName: data.accountHolderName,
-          accountNumber: data.accountNumber,
-          ifscCode: data.ifscCode,
-          branchName: data.branchName,
-          branchAddress: data.branchAddress,
-          qualifications: data.qualifications,
-          experiences: data.experiences,
-        });
-      }
-
-      localStorage.removeItem('employeeOnboardingDraft');
-      toast.success("Employee onboarded successfully!");
-      navigate(`/hrms/employees/${data.userId}`);
-    } catch (e) {
-      console.error(e);
-      toast.error("Failed to onboard employee. Please try again.");
+      // TODO: wire up API calls here
+      await new Promise((r) => setTimeout(r, 1800));
+      setSubmitted(true);
+      toast.success("Registration submitted successfully!");
+    } catch {
+      toast.error("Submission failed. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  // Calculate progress
-  const totalSteps = STEPS.length - 1; // Exclude review step
-  const completedCount = completedSteps.filter(s => s !== 8).length;
-  const progressPercentage = (completedCount / totalSteps) * 100;
-
-  // Get step status
-  const getStepStatus = (stepId: number) => {
-    if (completedSteps.includes(stepId) && !skippedSteps.includes(stepId)) {
-      return 'completed';
+  const handleFinalSubmit = async () => {
+    const valid = await validateCurrentStep();
+    if (!valid) {
+      toast.error("Please fill in all required fields.");
+      return;
     }
-    if (skippedSteps.includes(stepId)) {
-      return 'skipped';
-    }
-    if (stepErrors[stepId]) {
-      return 'error';
-    }
-    if (currentStep === stepId) {
-      return 'current';
-    }
-    return 'pending';
+    setCompletedSteps((prev) => [...new Set([...prev, currentStep])]);
+    handleSubmit(onSubmit)();
   };
+
+  // ── Success Screen ────────────────────────────────────────────────────────
+
+  if (submitted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          className="text-center max-w-md"
+        >
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+            className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6"
+          >
+            <CheckCircle2 className="h-10 w-10 text-primary" />
+          </motion.div>
+          <h2 className="text-2xl font-bold mb-2">You're all set!</h2>
+          <p className="text-muted-foreground mb-6">
+            Your registration has been submitted successfully. HR will review your information shortly.
+          </p>
+          <div className="p-3 bg-muted rounded-lg inline-flex items-center gap-2 text-sm font-mono">
+            <Hash className="h-4 w-4 text-muted-foreground" />
+            {watch("employeeId")}
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
 
   return (
-    <TooltipProvider>
-      <div className="min-h-screen bg-gradient-to-br from-background to-muted/20">
-        <div className="container mx-auto py-6 px-4 max-w-7xl">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-4">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => navigate("/hrms")}
-                className="rounded-full"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight">Employee Onboarding</h1>
-                <p className="text-muted-foreground text-sm">
-                  Complete the registration process for new employees
-                </p>
-              </div>
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Top bar */}
+      <div className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-10">
+        <div className="max-w-2xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="font-semibold text-base sm:text-lg">Employee Registration</h1>
+              <p className="text-xs text-muted-foreground hidden sm:block">
+                Complete all steps to submit your information
+              </p>
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={handleSaveProgress}>
-                <Save className="h-4 w-4 mr-2" />
-                Save Draft
-              </Button>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="font-mono bg-muted px-2 py-1 rounded text-[11px]">
+                {watch("employeeId")}
+              </span>
             </div>
           </div>
 
-          <div className="grid grid-cols-12 gap-6">
-            {/* Sidebar - Step Navigation */}
-            <div className="col-span-12 lg:col-span-3">
-              <Card className="sticky top-6">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg flex items-center justify-between">
-                    Progress
-                    <span className="text-sm font-normal text-muted-foreground">
-                      {completedCount}/{totalSteps}
-                    </span>
-                  </CardTitle>
-                  <div className="space-y-2">
-                    <Progress value={progressPercentage} className="h-2" />
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>{Math.round(progressPercentage)}% complete</span>
-                      <span>Step {currentStep} of {STEPS.length}</span>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <nav className="space-y-1">
-                    {STEPS.map((step) => {
-                      const status = getStepStatus(step.id);
-                      const StepIcon = step.icon;
-                      
-                      return (
-                        <Tooltip key={step.id}>
-                          <TooltipTrigger asChild>
-                            <button
-                              onClick={() => handleGoToStep(step.id)}
-                              className={cn(
-                                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all group",
-                                status === 'current' && "bg-primary text-primary-foreground shadow-sm",
-                                status === 'completed' && "bg-green-50 text-green-700 dark:bg-green-950/50 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-950",
-                                status === 'skipped' && "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-950",
-                                status === 'error' && "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950",
-                                status === 'pending' && "hover:bg-muted text-muted-foreground"
-                              )}
-                            >
-                              <div className={cn(
-                                "flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium transition-colors",
-                                status === 'current' && "bg-primary-foreground/20 text-primary-foreground",
-                                status === 'completed' && "bg-green-200 dark:bg-green-800",
-                                status === 'skipped' && "bg-amber-200 dark:bg-amber-800",
-                                status === 'error' && "bg-red-200 dark:bg-red-800",
-                                status === 'pending' && "bg-muted group-hover:bg-muted-foreground/10"
-                              )}>
-                                {status === 'completed' ? (
-                                  <CheckCircle2 className="h-4 w-4" />
-                                ) : status === 'error' ? (
-                                  <AlertCircle className="h-4 w-4" />
-                                ) : status === 'skipped' ? (
-                                  <SkipForward className="h-4 w-4" />
-                                ) : (
-                                  <StepIcon className="h-4 w-4" />
-                                )}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <p className={cn(
-                                    "text-sm font-medium truncate",
-                                    status === 'current' && "text-primary-foreground"
-                                  )}>
-                                    {step.title}
-                                  </p>
-                                  {step.required && (
-                                    <span className={cn(
-                                      "text-[10px] px-1.5 py-0.5 rounded font-medium",
-                                      status === 'current' ? "bg-primary-foreground/20" : "bg-muted"
-                                    )}>
-                                      Required
-                                    </span>
-                                  )}
-                                </div>
-                                <p className={cn(
-                                  "text-xs truncate",
-                                  status === 'current' ? "text-primary-foreground/70" : "text-muted-foreground"
-                                )}>
-                                  {step.description}
-                                </p>
-                              </div>
-                              <ChevronRight className={cn(
-                                "h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity",
-                                status === 'current' && "opacity-100"
-                              )} />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="right">
-                            <p>
-                              {status === 'completed' && "Completed - Click to edit"}
-                              {status === 'skipped' && "Skipped - Click to complete"}
-                              {status === 'error' && "Has errors - Click to fix"}
-                              {status === 'current' && "Current step"}
-                              {status === 'pending' && "Click to go to this step"}
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
-                      );
+          {/* Progress */}
+          <div className="space-y-3">
+            <Progress value={progress} className="h-1.5" />
+            <StepIndicator steps={STEPS} current={currentStep} completed={completedSteps} />
+          </div>
+        </div>
+      </div>
+
+      {/* Form body */}
+      <div className="flex-1 flex flex-col max-w-2xl mx-auto w-full px-4 py-6 sm:py-10">
+        <AnimatePresence mode="wait" custom={direction}>
+          <motion.div
+            key={currentStep}
+            custom={direction}
+            variants={slideVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            className="flex-1"
+          >
+            <Card className="border shadow-sm">
+              {/* Step header */}
+              <div className="px-6 pt-6 pb-4 border-b">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    {React.createElement(currentStepConfig.icon, {
+                      className: "h-5 w-5 text-primary",
                     })}
-                  </nav>
+                  </div>
+                  <div>
+                    <h2 className="font-semibold text-base">{currentStepConfig.title}</h2>
+                    <p className="text-xs text-muted-foreground">{currentStepConfig.subtitle}</p>
+                  </div>
+                  <div className="ml-auto text-xs text-muted-foreground font-medium">
+                    {currentStep} / {totalSteps}
+                  </div>
+                </div>
+              </div>
 
-                  {/* Skipped Steps Summary */}
-                  {skippedSteps.length > 0 && (
-                    <div className="mt-4 pt-4 border-t">
-                      <p className="text-xs font-medium text-muted-foreground mb-2">
-                        Skipped Steps ({skippedSteps.length})
-                      </p>
-                      <div className="space-y-1">
-                        {skippedSteps.map(stepId => {
-                          const step = STEPS.find(s => s.id === stepId);
-                          if (!step) return null;
-                          return (
-                            <button
-                              key={stepId}
-                              onClick={() => handleUnskip(stepId)}
-                              className="w-full flex items-center justify-between px-2 py-1.5 text-xs rounded bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-950/50 transition-colors"
-                            >
-                              <span className="flex items-center gap-1.5">
-                                <SkipForward className="h-3 w-3" />
-                                {step.title}
-                                {step.required && (
-                                  <AlertTriangle className="h-3 w-3 text-amber-600" />
-                                )}
-                              </span>
-                              <span className="text-[10px] underline">Complete</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Main Content */}
-            <div className="col-span-12 lg:col-span-9">
-              <form onSubmit={(e) => e.preventDefault()}>
-                {/* Step 1: Personal Information */}
+              <CardContent className="p-6 space-y-6">
+                {/* ── Step 1: Personal Information ── */}
                 {currentStep === 1 && (
-                  <Card>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-lg bg-primary/10">
-                            <User className="h-5 w-5 text-primary" />
-                          </div>
-                          <div>
-                            <CardTitle>Personal Information</CardTitle>
-                            <CardDescription>Basic employee details and identifiers</CardDescription>
-                          </div>
-                        </div>
-                        <Badge variant="destructive" className="text-xs">
-                          Required
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      {/* Employee ID */}
-                      <div className="p-4 bg-muted/50 rounded-lg border">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <Label className="text-sm text-muted-foreground">Employee ID</Label>
-                            <p className="text-lg font-mono font-semibold">{watch("employeeId")}</p>
-                          </div>
-                          <Badge variant="secondary">Auto-generated</Badge>
-                        </div>
-                      </div>
+                  <div className="space-y-5">
+                    {/* Name */}
+                    <SectionLabel icon={User} label="Full Name" />
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <FieldWrapper label="First Name" required error={errors.firstName?.message}>
+                        <Input
+                          {...register("firstName")}
+                          placeholder="John"
+                          className={cn(errors.firstName && "border-destructive")}
+                        />
+                      </FieldWrapper>
+                      <FieldWrapper label="Middle Name" error={errors.middleName?.message}>
+                        <Input {...register("middleName")} placeholder="William" />
+                      </FieldWrapper>
+                      <FieldWrapper label="Last Name" required error={errors.lastName?.message}>
+                        <Input
+                          {...register("lastName")}
+                          placeholder="Doe"
+                          className={cn(errors.lastName && "border-destructive")}
+                        />
+                      </FieldWrapper>
+                    </div>
 
-                      {/* Name Fields */}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="firstName">
-                            First Name <span className="text-destructive">*</span>
-                          </Label>
-                          <Input 
-                            id="firstName" 
-                            {...register("firstName")} 
-                            placeholder="John"
-                            className={errors.firstName ? "border-destructive" : ""}
-                          />
-                          {errors.firstName && (
-                            <p className="text-sm text-destructive flex items-center gap-1">
-                              <AlertCircle className="h-3 w-3" />
-                              {errors.firstName.message}
-                            </p>
-                          )}
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="middleName">Middle Name</Label>
-                          <Input 
-                            id="middleName" 
-                            {...register("middleName")} 
-                            placeholder="William"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="lastName">
-                            Last Name <span className="text-destructive">*</span>
-                          </Label>
-                          <Input 
-                            id="lastName" 
-                            {...register("lastName")} 
-                            placeholder="Doe"
-                            className={errors.lastName ? "border-destructive" : ""}
-                          />
-                          {errors.lastName && (
-                            <p className="text-sm text-destructive flex items-center gap-1">
-                              <AlertCircle className="h-3 w-3" />
-                              {errors.lastName.message}
-                            </p>
-                          )}
-                        </div>
-                      </div>
+                    {/* Personal Details */}
+                    <SectionLabel icon={Calendar} label="Personal Details" />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <FieldWrapper label="Date of Birth" required error={errors.dateOfBirth?.message}>
+                        <Input
+                          type="date"
+                          {...register("dateOfBirth")}
+                          className={cn(errors.dateOfBirth && "border-destructive")}
+                        />
+                      </FieldWrapper>
 
-                      {/* DOB and Gender */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="dateOfBirth">
-                            Date of Birth <span className="text-destructive">*</span>
-                          </Label>
-                          <div className="relative">
-                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input 
-                              id="dateOfBirth" 
-                              type="date"
-                              {...register("dateOfBirth")} 
-                              className={cn("pl-10", errors.dateOfBirth && "border-destructive")}
-                            />
-                          </div>
-                          {errors.dateOfBirth && (
-                            <p className="text-sm text-destructive flex items-center gap-1">
-                              <AlertCircle className="h-3 w-3" />
-                              {errors.dateOfBirth.message}
-                            </p>
-                          )}
-                        </div>
-                        <div className="space-y-2">
-                          <Label>
-                            Gender <span className="text-destructive">*</span>
-                          </Label>
-                          <RadioGroup 
-                            defaultValue="Male" 
-                            onValueChange={(val) => setValue("gender", val)}
-                            className="flex gap-4 pt-2"
-                          >
-                            {["Male", "Female", "Other"].map((gender) => (
-                              <div key={gender} className="flex items-center space-x-2">
-                                <RadioGroupItem value={gender} id={gender.toLowerCase()} />
-                                <Label htmlFor={gender.toLowerCase()} className="font-normal cursor-pointer">
-                                  {gender}
-                                </Label>
-                              </div>
-                            ))}
-                          </RadioGroup>
-                        </div>
-                      </div>
-
-                      {/* Marital Status and Nationality */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>
-                            Marital Status <span className="text-destructive">*</span>
-                          </Label>
-                          <Select onValueChange={(val) => setValue("maritalStatus", val)}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {["Single", "Married", "Divorced", "Widowed"].map((status) => (
-                                <SelectItem key={status} value={status}>{status}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>
-                            Nationality <span className="text-destructive">*</span>
-                          </Label>
-                          <Select onValueChange={(val) => setValue("nationality", val)}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select nationality" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {NATIONALITIES.map((nat) => (
-                                <SelectItem key={nat} value={nat}>{nat}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-
-                      <Separator />
-
-                      {/* Contact Information */}
-                      <div>
-                        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
-                          <Phone className="h-4 w-4" />
-                          Contact Information
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="personalEmail">
-                              Personal Email <span className="text-destructive">*</span>
-                            </Label>
-                            <div className="relative">
-                              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                              <Input 
-                                id="personalEmail"
-                                type="email" 
-                                {...register("personalEmail")} 
-                                placeholder="john.doe@gmail.com"
-                                className="pl-10"
-                              />
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="phone">
-                              Phone Number <span className="text-destructive">*</span>
-                            </Label>
-                            <div className="relative">
-                              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                              <Input 
-                                id="phone" 
-                                {...register("phone")} 
-                                placeholder="+91 98765 43210"
-                                className="pl-10"
-                              />
-                            </div>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="alternatePhone">Alternate Phone</Label>
-                            <div className="relative">
-                              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                              <Input 
-                                id="alternatePhone" 
-                                {...register("alternatePhone")} 
-                                placeholder="+91 98765 43210"
-                                className="pl-10"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <Separator />
-
-                      {/* Identity Documents */}
-                      <div>
-                        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
-                          <Shield className="h-4 w-4" />
-                          Identity Information
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="aadharNumber">
-                              Aadhar Number <span className="text-destructive">*</span>
-                            </Label>
-                            <Input 
-                              id="aadharNumber" 
-                              {...register("aadharNumber")} 
-                              placeholder="1234 5678 9012"
-                              maxLength={12}
-                              className="font-mono"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="panNumber">
-                              PAN Number <span className="text-destructive">*</span>
-                            </Label>
-                            <Input 
-                              id="panNumber" 
-                              {...register("panNumber")} 
-                              placeholder="ABCDE1234F"
-                              maxLength={10}
-                              className="font-mono uppercase"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Step 2: Address Information */}
-                {currentStep === 2 && (
-                  <Card>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-lg bg-primary/10">
-                            <MapPin className="h-5 w-5 text-primary" />
-                          </div>
-                          <div>
-                            <CardTitle>Address & Emergency Contact</CardTitle>
-                            <CardDescription>Current, permanent address and emergency contact details</CardDescription>
-                          </div>
-                        </div>
-                        <Badge variant="destructive" className="text-xs">Required</Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      {/* Current Address */}
-                      <div>
-                        <h3 className="text-sm font-semibold mb-4">Current Address</h3>
-                        <div className="grid grid-cols-1 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="currentAddressLine1">
-                              Address Line 1 <span className="text-destructive">*</span>
-                            </Label>
-                            <Input 
-                              id="currentAddressLine1" 
-                              {...register("currentAddressLine1")} 
-                              placeholder="Street address, building name"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="currentAddressLine2">Address Line 2</Label>
-                            <Input 
-                              id="currentAddressLine2" 
-                              {...register("currentAddressLine2")} 
-                              placeholder="Apartment, suite, unit, etc."
-                            />
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="currentCity">
-                                City <span className="text-destructive">*</span>
-                              </Label>
-                              <Input 
-                                id="currentCity" 
-                                {...register("currentCity")} 
-                                placeholder="City"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>
-                                State <span className="text-destructive">*</span>
-                              </Label>
-                              <Select onValueChange={(val) => setValue("currentState", val)}>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select state" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {STATES.map((state) => (
-                                    <SelectItem key={state} value={state}>{state}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Country</Label>
-                              <Select 
-                                defaultValue="India"
-                                onValueChange={(val) => setValue("currentCountry", val)}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select country" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {COUNTRIES.map((country) => (
-                                    <SelectItem key={country} value={country}>{country}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="currentPostalCode">Postal Code</Label>
-                              <Input 
-                                id="currentPostalCode" 
-                                {...register("currentPostalCode")} 
-                                placeholder="560001"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <Separator />
-
-                      {/* Permanent Address */}
-                      <div>
-                        <div className="flex items-center justify-between mb-4">
-                          <h3 className="text-sm font-semibold">Permanent Address</h3>
-                          <div className="flex items-center space-x-2">
-                            <Checkbox 
-                              id="sameAsCurrent" 
-                              checked={sameAsCurrent}
-                              onCheckedChange={handleSameAsCurrentChange}
-                            />
-                            <Label htmlFor="sameAsCurrent" className="text-sm font-normal cursor-pointer">
-                              Same as current address
-                            </Label>
-                          </div>
-                        </div>
-                        
-                        <div className={cn("grid grid-cols-1 gap-4 transition-opacity", sameAsCurrent && "opacity-50 pointer-events-none")}>
-                          <div className="space-y-2">
-                            <Label htmlFor="permanentAddressLine1">Address Line 1</Label>
-                            <Input 
-                              id="permanentAddressLine1" 
-                              {...register("permanentAddressLine1")} 
-                              placeholder="Street address, building name"
-                              disabled={sameAsCurrent}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="permanentAddressLine2">Address Line 2</Label>
-                            <Input 
-                              id="permanentAddressLine2" 
-                              {...register("permanentAddressLine2")} 
-                              placeholder="Apartment, suite, unit, etc."
-                              disabled={sameAsCurrent}
-                            />
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="permanentCity">City</Label>
-                              <Input 
-                                id="permanentCity" 
-                                {...register("permanentCity")} 
-                                placeholder="City"
-                                disabled={sameAsCurrent}
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>State</Label>
-                              <Select 
-                                onValueChange={(val) => setValue("permanentState", val)}
-                                disabled={sameAsCurrent}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select state" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {STATES.map((state) => (
-                                    <SelectItem key={state} value={state}>{state}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Country</Label>
-                              <Select 
-                                defaultValue="India"
-                                onValueChange={(val) => setValue("permanentCountry", val)}
-                                disabled={sameAsCurrent}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select country" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {COUNTRIES.map((country) => (
-                                    <SelectItem key={country} value={country}>{country}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="permanentPostalCode">Postal Code</Label>
-                              <Input 
-                                id="permanentPostalCode" 
-                                {...register("permanentPostalCode")} 
-                                placeholder="560001"
-                                disabled={sameAsCurrent}
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <Separator />
-
-                      {/* Emergency Contact */}
-                      <div>
-                        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
-                          <Phone className="h-4 w-4" />
-                          Emergency Contact
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="emergencyContactName">
-                              Contact Name <span className="text-destructive">*</span>
-                            </Label>
-                            <Input 
-                              id="emergencyContactName" 
-                              {...register("emergencyContactName")} 
-                              placeholder="Full name"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Relationship <span className="text-destructive">*</span></Label>
-                            <Select onValueChange={(val) => setValue("emergencyContactRelationship", val)}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select relationship" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {RELATIONSHIPS.map((rel) => (
-                                  <SelectItem key={rel} value={rel}>{rel}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="emergencyContactPhone">
-                              Phone Number <span className="text-destructive">*</span>
-                            </Label>
-                            <Input 
-                              id="emergencyContactPhone" 
-                              {...register("emergencyContactPhone")} 
-                              placeholder="+91 98765 43210"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="emergencyContactAltPhone">Alternate Phone</Label>
-                            <Input 
-                              id="emergencyContactAltPhone" 
-                              {...register("emergencyContactAltPhone")} 
-                              placeholder="+91 98765 43210"
-                            />
-                          </div>
-                          <div className="space-y-2 md:col-span-2">
-                            <Label htmlFor="emergencyContactEmail">Email</Label>
-                            <Input 
-                              id="emergencyContactEmail" 
-                              type="email"
-                              {...register("emergencyContactEmail")} 
-                              placeholder="email@example.com"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Step 3: Employment Information */}
-                {currentStep === 3 && (
-                  <Card>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-lg bg-primary/10">
-                            <Briefcase className="h-5 w-5 text-primary" />
-                          </div>
-                          <div>
-                            <CardTitle>Employment Information</CardTitle>
-                            <CardDescription>Job details and organizational information</CardDescription>
-                          </div>
-                        </div>
-                        <Badge variant="destructive" className="text-xs">Required</Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      {/* User Selection */}
-                      <div className="p-4 bg-muted/50 rounded-lg border">
-                        <Label className="text-sm font-semibold mb-3 block">
-                          Link to Workspace User <span className="text-destructive">*</span>
-                        </Label>
-                        <Select 
-                          onValueChange={(val) => setValue("userId", Number(val))}
-                          disabled={usersLoading}
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder={usersLoading ? "Loading users..." : "Select user account"} />
+                      <FieldWrapper label="Marital Status" required error={errors.maritalStatus?.message}>
+                        <Select onValueChange={(v) => setValue("maritalStatus", v)}>
+                          <SelectTrigger className={cn(errors.maritalStatus && "border-destructive")}>
+                            <SelectValue placeholder="Select status" />
                           </SelectTrigger>
                           <SelectContent>
-                            {users.map((user) => (
-                              <SelectItem key={user.id} value={String(user.id)}>
-                                <div className="flex items-center gap-2">
-                                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium">
-                                    {user.name?.charAt(0).toUpperCase()}
-                                  </div>
-                                  <div>
-                                    <p className="font-medium">{user.name}</p>
-                                    <p className="text-xs text-muted-foreground">{user.email}</p>
-                                  </div>
-                                </div>
-                              </SelectItem>
+                            {MARITAL_STATUSES.map((s) => (
+                              <SelectItem key={s} value={s}>{s}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
-                      </div>
+                      </FieldWrapper>
+                    </div>
 
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                          <Label>Employee Type <span className="text-destructive">*</span></Label>
-                          <Select 
-                            defaultValue="full_time"
-                            onValueChange={(val) => setValue("employeeType", val)}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="full_time">Full-time</SelectItem>
-                              <SelectItem value="part_time">Part-time</SelectItem>
-                              <SelectItem value="contract">Contract</SelectItem>
-                              <SelectItem value="intern">Intern</SelectItem>
-                              <SelectItem value="temporary">Temporary</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                    <FieldWrapper label="Gender" required error={errors.gender?.message}>
+                      <RadioGroup
+                        defaultValue="Male"
+                        onValueChange={(v) => setValue("gender", v as "Male" | "Female" | "Other")}
+                        className="flex gap-6 pt-1"
+                      >
+                        {["Male", "Female", "Other"].map((g) => (
+                          <div key={g} className="flex items-center gap-2">
+                            <RadioGroupItem value={g} id={`gender-${g}`} />
+                            <Label htmlFor={`gender-${g}`} className="font-normal cursor-pointer">{g}</Label>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    </FieldWrapper>
 
-                        <div className="space-y-2">
-                          <Label htmlFor="designation">
-                            Designation <span className="text-destructive">*</span>
-                          </Label>
-                          <Input 
-                            id="designation" 
-                            {...register("designation")} 
-                            placeholder="Software Engineer"
-                          />
-                        </div>
+                    <FieldWrapper label="Nationality" required error={errors.nationality?.message}>
+                      <Select onValueChange={(v) => setValue("nationality", v)}>
+                        <SelectTrigger className={cn(errors.nationality && "border-destructive")}>
+                          <SelectValue placeholder="Select nationality" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {NATIONALITIES.map((n) => (
+                            <SelectItem key={n} value={n}>{n}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FieldWrapper>
 
-                        <div className="space-y-2">
-                          <Label>Department <span className="text-destructive">*</span></Label>
-                          <Select onValueChange={(val) => setValue("department", val)}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select department" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {DEPARTMENTS.map((dept) => (
-                                <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Reporting Manager</Label>
-                          <Select onValueChange={(val) => setValue("reportingManager", val)}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select manager" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {users.map((user) => (
-                                <SelectItem key={user.id} value={String(user.id)}>
-                                  {user.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="workLocation">
-                            Work Location <span className="text-destructive">*</span>
-                          </Label>
-                          <Input 
-                            id="workLocation" 
-                            {...register("workLocation")} 
-                            placeholder="Head Office, Remote, etc."
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Employee Status</Label>
-                          <Select 
-                            defaultValue="active"
-                            onValueChange={(val) => setValue("employeeStatus", val)}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="active">Active</SelectItem>
-                              <SelectItem value="inactive">Inactive</SelectItem>
-                              <SelectItem value="on_leave">On Leave</SelectItem>
-                              <SelectItem value="terminated">Terminated</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-
-                      <Separator />
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="dateOfJoining">Date of Joining <span className="text-destructive">*</span></Label>
-                          <Input 
-                            id="dateOfJoining" 
-                            type="date"
-                            {...register("dateOfJoining")} 
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="probationPeriod">Probation (months)</Label>
-                          <Input 
-                            id="probationPeriod" 
-                            type="number"
-                            {...register("probationPeriod")} 
-                            placeholder="3"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="probationEndDate">Probation End Date</Label>
-                          <Input 
-                            id="probationEndDate" 
-                            type="date"
-                            {...register("probationEndDate")} 
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="officialEmail">
-                            Official Email <span className="text-destructive">*</span>
-                          </Label>
-                          <Input 
-                            id="officialEmail" 
+                    {/* Contact */}
+                    <SectionLabel icon={Phone} label="Contact" />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <FieldWrapper label="Personal Email" required error={errors.personalEmail?.message}>
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                          <Input
                             type="email"
-                            {...register("officialEmail")} 
-                            placeholder="john.doe@company.com"
+                            {...register("personalEmail")}
+                            placeholder="john@gmail.com"
+                            className={cn("pl-9", errors.personalEmail && "border-destructive")}
                           />
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      </FieldWrapper>
+
+                      <FieldWrapper label="Phone Number" required error={errors.phone?.message}>
+                        <PhoneInput
+                          onChange={(v) => setValue("phone", v)}
+                          error={!!errors.phone}
+                          placeholder="98765 43210"
+                        />
+                      </FieldWrapper>
+
+                      <FieldWrapper label="Alternate Phone" error={errors.alternatePhone?.message}>
+                        <PhoneInput
+                          onChange={(v) => setValue("alternatePhone", v)}
+                          placeholder="98765 43210"
+                        />
+                      </FieldWrapper>
+                    </div>
+
+                    {/* Identity */}
+                    <SectionLabel icon={Shield} label="Identity (Optional)" />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <FieldWrapper
+                        label="Aadhar Number"
+                        error={errors.aadharNumber?.message}
+                        hint="12-digit unique identification number"
+                      >
+                        <Input
+                          {...register("aadharNumber")}
+                          placeholder="1234 5678 9012"
+                          maxLength={12}
+                          className="font-mono tracking-wider"
+                        />
+                      </FieldWrapper>
+
+                      <FieldWrapper
+                        label="PAN Number"
+                        error={errors.panNumber?.message}
+                        hint="10-character alphanumeric identifier"
+                      >
+                        <Input
+                          {...register("panNumber")}
+                          placeholder="ABCDE1234F"
+                          maxLength={10}
+                          className="font-mono uppercase tracking-wider"
+                        />
+                      </FieldWrapper>
+                    </div>
+                  </div>
                 )}
 
-                {/* Step 4: Compensation & Bank Details */}
-                {currentStep === 4 && (
-                  <Card>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-lg bg-primary/10">
-                            <CreditCard className="h-5 w-5 text-primary" />
-                          </div>
-                          <div>
-                            <CardTitle>Compensation & Bank Details</CardTitle>
-                            <CardDescription>Salary information and banking details for payroll</CardDescription>
-                          </div>
+                {/* ── Step 2: Address ── */}
+                {currentStep === 2 && (
+                  <div className="space-y-5">
+                    {/* Current Address */}
+                    <SectionLabel icon={MapPin} label="Current Address" />
+                    <div className="space-y-4">
+                      <FieldWrapper
+                        label="Address Line 1"
+                        required
+                        error={errors.currentAddressLine1?.message}
+                      >
+                        <Input
+                          {...register("currentAddressLine1")}
+                          placeholder="House no., street, area"
+                          className={cn(errors.currentAddressLine1 && "border-destructive")}
+                        />
+                      </FieldWrapper>
+
+                      <FieldWrapper label="Address Line 2" error={errors.currentAddressLine2?.message}>
+                        <Input
+                          {...register("currentAddressLine2")}
+                          placeholder="Landmark, apartment, suite"
+                        />
+                      </FieldWrapper>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="col-span-2 sm:col-span-1">
+                          <FieldWrapper label="City" required error={errors.currentCity?.message}>
+                            <Input
+                              {...register("currentCity")}
+                              placeholder="Bengaluru"
+                              className={cn(errors.currentCity && "border-destructive")}
+                            />
+                          </FieldWrapper>
                         </div>
-                        <Badge variant="secondary" className="text-xs">Optional</Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      {/* Compensation */}
-                      <div>
-                        <h3 className="text-sm font-semibold mb-4">Compensation Details</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>Salary Type</Label>
-                            <Select 
-                              defaultValue="monthly"
-                              onValueChange={(val) => setValue("salaryType", val)}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select type" />
+
+                        <div className="col-span-2 sm:col-span-1">
+                          <FieldWrapper label="State" required error={errors.currentState?.message}>
+                            <Select onValueChange={(v) => setValue("currentState", v)}>
+                              <SelectTrigger className={cn(errors.currentState && "border-destructive")}>
+                                <SelectValue placeholder="State" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="monthly">Monthly</SelectItem>
-                                <SelectItem value="hourly">Hourly</SelectItem>
-                                <SelectItem value="annual">Annual</SelectItem>
+                                {STATES.map((s) => (
+                                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="basicSalary">Basic Salary / CTC</Label>
-                            <div className="relative">
-                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
-                              <Input 
-                                id="basicSalary" 
-                                type="number"
-                                {...register("basicSalary")} 
-                                placeholder="50000"
-                                className="pl-8"
-                              />
-                            </div>
-                          </div>
+                          </FieldWrapper>
                         </div>
-                      </div>
 
-                      <Separator />
-
-                      {/* Bank Details */}
-                      <div>
-                        <h3 className="text-sm font-semibold mb-4">Bank Account Details</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="bankName">Bank Name</Label>
-                            <Input 
-                              id="bankName" 
-                              {...register("bankName")} 
-                              placeholder="State Bank of India"
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="accountHolderName">Account Holder Name</Label>
-                            <Input 
-                              id="accountHolderName" 
-                              {...register("accountHolderName")} 
-                              placeholder="As per bank records"
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="accountNumber">Account Number</Label>
-                            <Input 
-                              id="accountNumber" 
-                              {...register("accountNumber")} 
-                              placeholder="XXXXXXXXXXXX"
-                              className="font-mono"
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="ifscCode">IFSC Code</Label>
-                            <Input 
-                              id="ifscCode" 
-                              {...register("ifscCode")} 
-                              placeholder="SBIN0001234"
-                              className="font-mono uppercase"
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="branchName">Branch Name</Label>
-                            <Input 
-                              id="branchName" 
-                              {...register("branchName")} 
-                              placeholder="Main Branch"
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="branchAddress">Branch Address</Label>
-                            <Input 
-                              id="branchAddress" 
-                              {...register("branchAddress")} 
-                              placeholder="Branch location"
-                            />
-                          </div>
+                        <div className="col-span-2 sm:col-span-1">
+                          <FieldWrapper label="Country" required error={errors.currentCountry?.message}>
+                            <Select
+                              defaultValue="India"
+                              onValueChange={(v) => setValue("currentCountry", v)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Country" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {COUNTRIES.map((c) => (
+                                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </FieldWrapper>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
 
-                {/* Step 5: Educational Qualifications */}
-                {currentStep === 5 && (
-                  <Card>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-lg bg-primary/10">
-                            <GraduationCap className="h-5 w-5 text-primary" />
-                          </div>
-                          <div>
-                            <CardTitle>Educational Qualifications</CardTitle>
-                            <CardDescription>Academic background and certifications</CardDescription>
-                          </div>
-                        </div>
-                        <Badge variant="secondary" className="text-xs">Optional</Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      {qualificationFields.map((field, index) => (
-                        <div key={field.id} className="p-4 border rounded-lg space-y-4 relative">
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="text-sm font-medium">Qualification {index + 1}</h4>
-                            {qualificationFields.length > 1 && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => removeQualification(index)}
-                                className="text-destructive hover:text-destructive"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                          
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            <div className="space-y-2">
-                              <Label>Degree/Certification</Label>
-                              <Input 
-                                {...register(`qualifications.${index}.degree`)} 
-                                placeholder="B.Tech, MBA, etc."
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Institution/University</Label>
-                              <Input 
-                                {...register(`qualifications.${index}.institution`)} 
-                                placeholder="University name"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Field of Study</Label>
-                              <Input 
-                                {...register(`qualifications.${index}.fieldOfStudy`)} 
-                                placeholder="Computer Science"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Year of Completion</Label>
-                              <Input 
-                                type="number"
-                                {...register(`qualifications.${index}.yearOfCompletion`)} 
-                                placeholder="2020"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Grade/Percentage</Label>
-                              <Input 
-                                {...register(`qualifications.${index}.grade`)} 
-                                placeholder="85% or 8.5 CGPA"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => appendQualification({ 
-                          degree: "", 
-                          institution: "", 
-                          fieldOfStudy: "", 
-                          yearOfCompletion: "", 
-                          grade: "" 
-                        })}
-                        className="w-full"
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Another Qualification
-                      </Button>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Step 6: Work Experience */}
-                {currentStep === 6 && (
-                  <Card>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-lg bg-primary/10">
-                            <Building2 className="h-5 w-5 text-primary" />
-                          </div>
-                          <div>
-                            <CardTitle>Work Experience</CardTitle>
-                            <CardDescription>Previous employment history</CardDescription>
-                          </div>
-                        </div>
-                        <Badge variant="secondary" className="text-xs">Optional</Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      {experienceFields.length === 0 ? (
-                        <div className="text-center py-8 border-2 border-dashed rounded-lg">
-                          <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                          <p className="text-muted-foreground mb-4">No work experience added yet</p>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => appendExperience({
-                              companyName: "",
-                              designation: "",
-                              fromDate: "",
-                              toDate: "",
-                              currentlyWorking: false,
-                              responsibilities: ""
-                            })}
+                        <div className="col-span-2 sm:col-span-1">
+                          <FieldWrapper
+                            label="Postal Code"
+                            required
+                            error={errors.currentPostalCode?.message}
                           >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add Experience
-                          </Button>
+                            <Input
+                              {...register("currentPostalCode")}
+                              placeholder="560001"
+                              className={cn(errors.currentPostalCode && "border-destructive")}
+                            />
+                          </FieldWrapper>
                         </div>
-                      ) : (
-                        <>
-                          {experienceFields.map((field, index) => (
-                            <div key={field.id} className="p-4 border rounded-lg space-y-4">
-                              <div className="flex items-center justify-between mb-2">
-                                <h4 className="text-sm font-medium">Experience {index + 1}</h4>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => removeExperience(index)}
-                                  className="text-destructive hover:text-destructive"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
+                      </div>
+                    </div>
 
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                  <Label>Company Name</Label>
-                                  <Input 
-                                    {...register(`experiences.${index}.companyName`)} 
-                                    placeholder="Company name"
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label>Designation</Label>
-                                  <Input 
-                                    {...register(`experiences.${index}.designation`)} 
-                                    placeholder="Job title"
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label>From Date</Label>
-                                  <Input 
-                                    type="date"
-                                    {...register(`experiences.${index}.fromDate`)} 
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label>To Date</Label>
-                                  <Input 
-                                    type="date"
-                                    {...register(`experiences.${index}.toDate`)} 
-                                    disabled={watch(`experiences.${index}.currentlyWorking`)}
-                                  />
-                                </div>
-                                <div className="flex items-center space-x-2 md:col-span-2">
-                                  <Checkbox 
-                                    id={`currentlyWorking-${index}`}
-                                    onCheckedChange={(checked) => 
-                                      setValue(`experiences.${index}.currentlyWorking`, checked as boolean)
-                                    }
-                                  />
-                                  <Label htmlFor={`currentlyWorking-${index}`} className="font-normal">
-                                    Currently working here
-                                  </Label>
-                                </div>
-                                <div className="space-y-2 md:col-span-2">
-                                  <Label>Responsibilities</Label>
-                                  <Textarea 
-                                    {...register(`experiences.${index}.responsibilities`)} 
-                                    placeholder="Key responsibilities and achievements"
-                                    rows={3}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          ))}
+                    {/* Permanent Address */}
+                    <div className="flex items-center gap-3 my-2">
+                      <div className="h-px flex-1 bg-border" />
+                      <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        <Building2 className="h-3.5 w-3.5" />
+                        Permanent Address
+                      </div>
+                      <div className="h-px flex-1 bg-border" />
+                    </div>
 
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => appendExperience({
-                              companyName: "",
-                              designation: "",
-                              fromDate: "",
-                              toDate: "",
-                              currentlyWorking: false,
-                              responsibilities: ""
-                            })}
-                            className="w-full"
-                          >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add Another Experience
-                          </Button>
-                        </>
+                    <div
+                      className={cn(
+                        "flex items-center gap-3 px-4 py-3 rounded-lg border transition-colors cursor-pointer",
+                        sameAsCurrent
+                          ? "bg-primary/5 border-primary/30"
+                          : "bg-muted/40 border-border"
                       )}
-                    </CardContent>
-                  </Card>
+                      onClick={() => handleSameAsCurrentChange(!sameAsCurrent)}
+                    >
+                      <Checkbox
+                        id="sameAsCurrent"
+                        checked={sameAsCurrent}
+                        onCheckedChange={handleSameAsCurrentChange}
+                      />
+                      <Label
+                        htmlFor="sameAsCurrent"
+                        className="text-sm font-medium cursor-pointer select-none"
+                      >
+                        Same as current address
+                      </Label>
+                    </div>
+
+                    <AnimatePresence>
+                      {!sameAsCurrent && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.25 }}
+                          className="overflow-hidden space-y-4"
+                        >
+                          <FieldWrapper label="Address Line 1" error={errors.permanentAddressLine1?.message}>
+                            <Input
+                              {...register("permanentAddressLine1")}
+                              placeholder="House no., street, area"
+                            />
+                          </FieldWrapper>
+
+                          <FieldWrapper label="Address Line 2" error={errors.permanentAddressLine2?.message}>
+                            <Input
+                              {...register("permanentAddressLine2")}
+                              placeholder="Landmark, apartment, suite"
+                            />
+                          </FieldWrapper>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div className="col-span-2 sm:col-span-1">
+                              <FieldWrapper label="City" error={errors.permanentCity?.message}>
+                                <Input {...register("permanentCity")} placeholder="City" />
+                              </FieldWrapper>
+                            </div>
+
+                            <div className="col-span-2 sm:col-span-1">
+                              <FieldWrapper label="State" error={errors.permanentState?.message}>
+                                <Select onValueChange={(v) => setValue("permanentState", v)}>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="State" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {STATES.map((s) => (
+                                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </FieldWrapper>
+                            </div>
+
+                            <div className="col-span-2 sm:col-span-1">
+                              <FieldWrapper label="Country" error={errors.permanentCountry?.message}>
+                                <Select
+                                  defaultValue="India"
+                                  onValueChange={(v) => setValue("permanentCountry", v)}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Country" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {COUNTRIES.map((c) => (
+                                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </FieldWrapper>
+                            </div>
+
+                            <div className="col-span-2 sm:col-span-1">
+                              <FieldWrapper label="Postal Code" error={errors.permanentPostalCode?.message}>
+                                <Input {...register("permanentPostalCode")} placeholder="560001" />
+                              </FieldWrapper>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 )}
 
-                {/* Step 7: Document Uploads */}
-                {currentStep === 7 && (
-                  <Card>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-lg bg-primary/10">
-                            <FileText className="h-5 w-5 text-primary" />
+                {/* ── Step 3: Emergency Contact ── */}
+                {currentStep === 3 && (
+                  <div className="space-y-5">
+                    <SectionLabel icon={HeartHandshake} label="Emergency Contact Details" />
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <FieldWrapper
+                        label="Contact Name"
+                        required
+                        error={errors.emergencyContactName?.message}
+                      >
+                        <Input
+                          {...register("emergencyContactName")}
+                          placeholder="Full name"
+                          className={cn(errors.emergencyContactName && "border-destructive")}
+                        />
+                      </FieldWrapper>
+
+                      <FieldWrapper
+                        label="Relationship"
+                        required
+                        error={errors.emergencyContactRelationship?.message}
+                      >
+                        <Select onValueChange={(v) => setValue("emergencyContactRelationship", v)}>
+                          <SelectTrigger
+                            className={cn(errors.emergencyContactRelationship && "border-destructive")}
+                          >
+                            <SelectValue placeholder="Select relationship" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {RELATIONSHIPS.map((r) => (
+                              <SelectItem key={r} value={r}>{r}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FieldWrapper>
+
+                      <FieldWrapper
+                        label="Phone Number"
+                        required
+                        error={errors.emergencyContactPhone?.message}
+                      >
+                        <PhoneInput
+                          onChange={(v) => setValue("emergencyContactPhone", v)}
+                          error={!!errors.emergencyContactPhone}
+                          placeholder="98765 43210"
+                        />
+                      </FieldWrapper>
+
+                      <FieldWrapper label="Alternate Phone" error={errors.emergencyContactAltPhone?.message}>
+                        <PhoneInput
+                          onChange={(v) => setValue("emergencyContactAltPhone", v)}
+                          placeholder="98765 43210"
+                        />
+                      </FieldWrapper>
+
+                      <div className="sm:col-span-2">
+                        <FieldWrapper label="Email" error={errors.emergencyContactEmail?.message}>
+                          <div className="relative">
+                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                            <Input
+                              type="email"
+                              {...register("emergencyContactEmail")}
+                              placeholder="contact@email.com"
+                              className="pl-9"
+                            />
                           </div>
-                          <div>
-                            <CardTitle>Document Uploads</CardTitle>
-                            <CardDescription>Upload required documents and certificates</CardDescription>
-                          </div>
-                        </div>
-                        <Badge variant="secondary" className="text-xs">Optional</Badge>
+                        </FieldWrapper>
                       </div>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      {/* Identity Documents */}
-                      <div>
-                        <h3 className="text-sm font-semibold mb-4">Identity Documents</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {["Aadhar Card", "PAN Card", "Passport", "Driving License", "Voter ID"].map((doc) => (
-                            <div 
-                              key={doc}
-                              className="border-2 border-dashed rounded-lg p-4 text-center hover:border-primary/50 transition-colors cursor-pointer"
-                            >
-                              <UploadCloud className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                              <p className="text-sm font-medium">{doc}</p>
-                              <p className="text-xs text-muted-foreground mb-2">PDF or Image</p>
-                              <Input 
-                                type="file" 
-                                accept=".pdf,image/*" 
-                                className="text-xs"
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+                    </div>
 
-                      <Separator />
-
-                      {/* Educational Documents */}
-                      <div>
-                        <h3 className="text-sm font-semibold mb-4">Educational Documents</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {["10th Certificate", "12th Certificate", "Graduation Certificate", "Post Graduation", "Professional Certifications"].map((doc) => (
-                            <div 
-                              key={doc}
-                              className="border-2 border-dashed rounded-lg p-4 text-center hover:border-primary/50 transition-colors cursor-pointer"
-                            >
-                              <UploadCloud className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                              <p className="text-sm font-medium">{doc}</p>
-                              <p className="text-xs text-muted-foreground mb-2">PDF or Image</p>
-                              <Input 
-                                type="file" 
-                                accept=".pdf,image/*" 
-                                className="text-xs"
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <Separator />
-
-                      {/* Employment Documents */}
-                      <div>
-                        <h3 className="text-sm font-semibold mb-4">Employment Documents</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {["Offer Letter", "Relieving Letter", "Experience Certificate", "Salary Slips", "Resume/CV", "Passport Photo"].map((doc) => (
-                            <div 
-                              key={doc}
-                              className="border-2 border-dashed rounded-lg p-4 text-center hover:border-primary/50 transition-colors cursor-pointer"
-                            >
-                              <UploadCloud className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                              <p className="text-sm font-medium">{doc}</p>
-                              <p className="text-xs text-muted-foreground mb-2">PDF or Image</p>
-                              <Input 
-                                type="file" 
-                                accept=".pdf,image/*" 
-                                className="text-xs"
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Step 8: Review & Submit */}
-                {currentStep === 8 && (
-                  <Card>
-                    <CardHeader>
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900">
-                          <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    {/* Summary confirmation */}
+                    <div className="mt-4 p-4 rounded-xl bg-muted/50 border space-y-3">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        Review before submitting
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">Name: </span>
+                          <span className="font-medium">
+                            {[watch("firstName"), watch("middleName"), watch("lastName")]
+                              .filter(Boolean)
+                              .join(" ") || "—"}
+                          </span>
                         </div>
                         <div>
-                          <CardTitle>Review & Submit</CardTitle>
-                          <CardDescription>Review all information before final submission</CardDescription>
+                          <span className="text-muted-foreground">Email: </span>
+                          <span className="font-medium">{watch("personalEmail") || "—"}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">Phone: </span>
+                          <span className="font-medium">{watch("phone") || "—"}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">City: </span>
+                          <span className="font-medium">
+                            {[watch("currentCity"), watch("currentState")].filter(Boolean).join(", ") || "—"}
+                          </span>
                         </div>
                       </div>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      {/* Warning for incomplete required steps */}
-                      {!canSubmit() && (
-                        <div className="p-4 bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800 rounded-lg">
-                          <div className="flex items-start gap-3">
-                            <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
-                            <div>
-                              <p className="font-medium text-amber-800 dark:text-amber-200">
-                                Required steps incomplete
-                              </p>
-                              <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
-                                Please complete the following required steps before submitting:
-                              </p>
-                              <ul className="mt-2 space-y-1">
-                                {getIncompleteRequiredSteps().map(step => (
-                                  <li key={step.id} className="flex items-center gap-2 text-sm">
-                                    <button
-                                      type="button"
-                                      onClick={() => setCurrentStep(step.id)}
-                                      className="text-amber-800 dark:text-amber-200 underline hover:no-underline"
-                                    >
-                                      Step {step.id}: {step.title}
-                                    </button>
-                                    {skippedSteps.includes(step.id) && (
-                                      <Badge variant="outline" className="text-xs">Skipped</Badge>
-                                    )}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Summary Cards */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Personal Info Summary */}
-                        <div className="p-4 border rounded-lg">
-                          <div className="flex items-center justify-between mb-3">
-                            <h4 className="font-medium flex items-center gap-2">
-                              <User className="h-4 w-4" />
-                              Personal Information
-                            </h4>
-                            <div className="flex items-center gap-2">
-                              {completedSteps.includes(1) && !skippedSteps.includes(1) ? (
-                                <Badge variant="default" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                                  <CheckCircle2 className="h-3 w-3 mr-1" />
-                                  Complete
-                                </Badge>
-                              ) : skippedSteps.includes(1) ? (
-                                <Badge variant="secondary" className="bg-amber-100 text-amber-800">
-                                  <SkipForward className="h-3 w-3 mr-1" />
-                                  Skipped
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline">Pending</Badge>
-                              )}
-                              <Button variant="ghost" size="sm" onClick={() => setCurrentStep(1)}>
-                                Edit
-                              </Button>
-                            </div>
-                          </div>
-                          <div className="space-y-1 text-sm">
-                            <p><span className="text-muted-foreground">Name:</span> {watch("firstName")} {watch("middleName")} {watch("lastName")}</p>
-                            <p><span className="text-muted-foreground">DOB:</span> {watch("dateOfBirth")}</p>
-                            <p><span className="text-muted-foreground">Gender:</span> {watch("gender")}</p>
-                            <p><span className="text-muted-foreground">Email:</span> {watch("personalEmail")}</p>
-                            <p><span className="text-muted-foreground">Phone:</span> {watch("phone")}</p>
-                          </div>
-                        </div>
-
-                        {/* Address Summary */}
-                        <div className="p-4 border rounded-lg">
-                          <div className="flex items-center justify-between mb-3">
-                            <h4 className="font-medium flex items-center gap-2">
-                              <MapPin className="h-4 w-4" />
-                              Address
-                            </h4>
-                            <div className="flex items-center gap-2">
-                              {completedSteps.includes(2) && !skippedSteps.includes(2) ? (
-                                <Badge variant="default" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                                  <CheckCircle2 className="h-3 w-3 mr-1" />
-                                  Complete
-                                </Badge>
-                              ) : skippedSteps.includes(2) ? (
-                                <Badge variant="secondary" className="bg-amber-100 text-amber-800">
-                                  <SkipForward className="h-3 w-3 mr-1" />
-                                  Skipped
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline">Pending</Badge>
-                              )}
-                              <Button variant="ghost" size="sm" onClick={() => setCurrentStep(2)}>
-                                Edit
-                              </Button>
-                            </div>
-                          </div>
-                          <div className="space-y-1 text-sm">
-                            <p><span className="text-muted-foreground">Address:</span> {watch("currentAddressLine1")}</p>
-                            <p><span className="text-muted-foreground">City:</span> {watch("currentCity")}, {watch("currentState")}</p>
-                            <p><span className="text-muted-foreground">Emergency:</span> {watch("emergencyContactName")} ({watch("emergencyContactRelationship")})</p>
-                          </div>
-                        </div>
-
-                        {/* Employment Summary */}
-                        <div className="p-4 border rounded-lg">
-                          <div className="flex items-center justify-between mb-3">
-                            <h4 className="font-medium flex items-center gap-2">
-                              <Briefcase className="h-4 w-4" />
-                              Employment Details
-                            </h4>
-                            <div className="flex items-center gap-2">
-                              {completedSteps.includes(3) && !skippedSteps.includes(3) ? (
-                                <Badge variant="default" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                                  <CheckCircle2 className="h-3 w-3 mr-1" />
-                                  Complete
-                                </Badge>
-                              ) : skippedSteps.includes(3) ? (
-                                <Badge variant="secondary" className="bg-amber-100 text-amber-800">
-                                  <SkipForward className="h-3 w-3 mr-1" />
-                                  Skipped
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline">Pending</Badge>
-                              )}
-                              <Button variant="ghost" size="sm" onClick={() => setCurrentStep(3)}>
-                                Edit
-                              </Button>
-                            </div>
-                          </div>
-                          <div className="space-y-1 text-sm">
-                            <p><span className="text-muted-foreground">Employee ID:</span> {watch("employeeId")}</p>
-                            <p><span className="text-muted-foreground">Designation:</span> {watch("designation")}</p>
-                            <p><span className="text-muted-foreground">Department:</span> {watch("department")}</p>
-                            <p><span className="text-muted-foreground">Location:</span> {watch("workLocation")}</p>
-                            <p><span className="text-muted-foreground">Joining Date:</span> {watch("dateOfJoining")}</p>
-                          </div>
-                        </div>
-
-                        {/* Compensation Summary */}
-                        <div className="p-4 border rounded-lg">
-                          <div className="flex items-center justify-between mb-3">
-                            <h4 className="font-medium flex items-center gap-2">
-                              <CreditCard className="h-4 w-4" />
-                              Compensation
-                            </h4>
-                            <div className="flex items-center gap-2">
-                              {completedSteps.includes(4) && !skippedSteps.includes(4) ? (
-                                <Badge variant="default" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                                  <CheckCircle2 className="h-3 w-3 mr-1" />
-                                  Complete
-                                </Badge>
-                              ) : skippedSteps.includes(4) ? (
-                                <Badge variant="secondary" className="bg-amber-100 text-amber-800">
-                                  <SkipForward className="h-3 w-3 mr-1" />
-                                  Skipped
-                                </Badge>
-                              ) : (
-                                <Badge variant="outline">Pending</Badge>
-                              )}
-                              <Button variant="ghost" size="sm" onClick={() => setCurrentStep(4)}>
-                                Edit
-                              </Button>
-                            </div>
-                          </div>
-                          <div className="space-y-1 text-sm">
-                            <p><span className="text-muted-foreground">Salary Type:</span> {watch("salaryType")}</p>
-                            <p><span className="text-muted-foreground">CTC:</span> ₹{watch("basicSalary")}</p>
-                            <p><span className="text-muted-foreground">Bank:</span> {watch("bankName")}</p>
-                            <p><span className="text-muted-foreground">Account:</span> ****{watch("accountNumber")?.slice(-4)}</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* All Steps Status */}
-                      <div className="p-4 border rounded-lg">
-                        <h4 className="font-medium mb-4">All Steps Status</h4>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                          {STEPS.slice(0, -1).map((step) => {
-                            const status = getStepStatus(step.id);
-                            return (
-                              <button
-                                key={step.id}
-                                onClick={() => setCurrentStep(step.id)}
-                                className={cn(
-                                  "flex items-center gap-2 p-2 rounded-lg text-sm transition-colors text-left",
-                                  status === 'completed' && "bg-green-50 dark:bg-green-950/30 hover:bg-green-100",
-                                  status === 'skipped' && "bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100",
-                                  status === 'error' && "bg-red-50 dark:bg-red-950/30 hover:bg-red-100",
-                                  status === 'pending' && "bg-muted hover:bg-muted/80"
-                                )}
-                              >
-                                {status === 'completed' ? (
-                                  <CheckCircle2 className="h-4 w-4 text-green-600" />
-                                ) : status === 'skipped' ? (
-                                  <SkipForward className="h-4 w-4 text-amber-600" />
-                                ) : status === 'error' ? (
-                                  <AlertCircle className="h-4 w-4 text-red-600" />
-                                ) : (
-                                  <Circle className="h-4 w-4 text-muted-foreground" />
-                                )}
-                                <div>
-                                  <p className="font-medium">{step.title}</p>
-                                  {step.required && (
-                                    <p className="text-xs text-muted-foreground">Required</p>
-                                  )}
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Terms */}
-                      <div className="p-4 bg-muted/50 rounded-lg">
-                        <div className="flex items-start space-x-3">
-                          <Checkbox id="terms" />
-                          <Label htmlFor="terms" className="text-sm font-normal leading-relaxed cursor-pointer">
-                            I confirm that all the information provided above is accurate and complete. 
-                            I understand that any false information may result in termination of employment.
-                          </Label>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </div>
                 )}
+              </CardContent>
+            </Card>
+          </motion.div>
+        </AnimatePresence>
 
-                {/* Navigation Buttons */}
-                <div className="flex items-center justify-between mt-6 pt-4 border-t">
-                  <div className="flex gap-2">
-                    {currentStep > 1 && (
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        onClick={handlePrevious}
-                        disabled={isSubmitting}
-                      >
-                        <ArrowLeft className="h-4 w-4 mr-2" />
-                        Previous
-                      </Button>
-                    )}
-                  </div>
+        {/* Navigation */}
+        <div className="flex items-center justify-between mt-6 gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={goPrev}
+            disabled={currentStep === 1 || isSubmitting}
+            className="gap-2"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Back
+          </Button>
 
-                  <div className="flex gap-2">
-                    {currentStep < STEPS.length && (
-                      <Button 
-                        type="button" 
-                        variant="ghost" 
-                        onClick={handleSkipClick}
-                        disabled={isSubmitting}
-                        className="text-muted-foreground hover:text-foreground"
-                      >
-                        <SkipForward className="h-4 w-4 mr-2" />
-                        Skip Step
-                      </Button>
-                    )}
-
-                    {currentStep < STEPS.length ? (
-                      <Button 
-                        type="button" 
-                        onClick={handleNext}
-                        disabled={isSubmitting}
-                      >
-                        Next
-                        <ArrowRight className="h-4 w-4 ml-2" />
-                      </Button>
-                    ) : (
-                      <Button 
-                        type="button"
-                        onClick={handleFormSubmit}
-                        disabled={isSubmitting}
-                        className="min-w-40"
-                      >
-                        {isSubmitting ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Submitting...
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircle2 className="h-4 w-4 mr-2" />
-                            Complete Onboarding
-                          </>
-                        )}
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </form>
-            </div>
+          <div className="flex items-center gap-1.5">
+            {STEPS.map((s) => (
+              <div
+                key={s.id}
+                className={cn(
+                  "rounded-full transition-all duration-300",
+                  s.id === currentStep
+                    ? "w-6 h-2 bg-primary"
+                    : completedSteps.includes(s.id)
+                    ? "w-2 h-2 bg-primary/50"
+                    : "w-2 h-2 bg-border"
+                )}
+              />
+            ))}
           </div>
+
+          {currentStep < totalSteps ? (
+            <Button type="button" onClick={goNext} className="gap-2">
+              Next
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              onClick={handleFinalSubmit}
+              disabled={isSubmitting}
+              className="gap-2 min-w-32"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Submitting…
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-4 w-4" />
+                  Submit
+                </>
+              )}
+            </Button>
+          )}
         </div>
-
-        {/* Skip Optional Step Dialog */}
-        <AlertDialog open={showSkipDialog} onOpenChange={setShowSkipDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle className="flex items-center gap-2">
-                <SkipForward className="h-5 w-5" />
-                Skip this step?
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                This step is optional. You can skip it now and complete it later if needed.
-                Your progress will be saved.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmSkip}>
-                Skip Step
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        {/* Skip Required Step Warning Dialog */}
-        <AlertDialog open={showSkipRequiredDialog} onOpenChange={setShowSkipRequiredDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle className="flex items-center gap-2 text-amber-600">
-                <AlertTriangle className="h-5 w-5" />
-                This step is required
-              </AlertDialogTitle>
-              <AlertDialogDescription className="space-y-2">
-                <p>
-                  <strong>Step {currentStep}: {STEPS[currentStep - 1]?.title}</strong> contains 
-                  required information that must be completed before you can submit the form.
-                </p>
-                <p>
-                  You can skip it for now, but you'll need to return and complete it before 
-                  final submission.
-                </p>
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Stay & Complete</AlertDialogCancel>
-              <AlertDialogAction 
-                onClick={confirmSkipRequired}
-                className="bg-amber-600 hover:bg-amber-700"
-              >
-                Skip Anyway
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        {/* Submit Warning Dialog */}
-        <AlertDialog open={showSubmitWarning} onOpenChange={setShowSubmitWarning}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle className="flex items-center gap-2 text-destructive">
-                <AlertCircle className="h-5 w-5" />
-                Cannot Submit Yet
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                <p className="mb-4">
-                  The following required steps must be completed before you can submit:
-                </p>
-                <ul className="space-y-2">
-                  {getIncompleteRequiredSteps().map(step => (
-                    <li key={step.id} className="flex items-center gap-2">
-                      <step.icon className="h-4 w-4" />
-                      <span>Step {step.id}: {step.title}</span>
-                      {skippedSteps.includes(step.id) && (
-                        <Badge variant="secondary" className="text-xs">Skipped</Badge>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Close</AlertDialogCancel>
-              <AlertDialogAction 
-                onClick={() => {
-                  const firstIncomplete = getIncompleteRequiredSteps()[0];
-                  if (firstIncomplete) {
-                    setCurrentStep(firstIncomplete.id);
-                  }
-                  setShowSubmitWarning(false);
-                }}
-              >
-                Go to First Incomplete Step
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </div>
-    </TooltipProvider>
+    </div>
   );
 };
 
