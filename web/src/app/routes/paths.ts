@@ -355,6 +355,8 @@ export const paths = {
         assetView: (id: number) => `/hrms/admin/assets/view/${id}`,
 
         //================ onboarding  ==============================//
-        OnboardingDashboard: "hrms/onboarding",
+        onboardingDashboard: "hrms/onboarding",
+        profileDetailsDashboard: "hrms/onboarding/profile-details",
+        documentDashboard: "hrms/onboarding/documents",
     },
 };
