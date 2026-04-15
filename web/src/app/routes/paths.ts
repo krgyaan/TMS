@@ -358,5 +358,6 @@ export const paths = {
         onboardingDashboard: "hrms/onboarding",
         profileDetailsDashboard: "hrms/onboarding/profile-details",
         documentDashboard: "hrms/onboarding/documents",
+        inductionDashboard: "hrms/onboarding/induction",
     },
 };

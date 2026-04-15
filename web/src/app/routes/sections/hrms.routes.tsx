@@ -15,6 +15,7 @@ const MyAssets = lazy(() => import("@/modules/hrms/assets/my-assets"));
 const OnboardingDashboard = lazy(() => import('@/modules/hrms/onboarding/OnboardingDashboard'));
 const ProfileDetailsDashboard = lazy(() => import('@/modules/hrms/onboarding/ProfileDetailsDashboard'));
 const DocumentDashboard = lazy(() => import('@/modules/hrms/onboarding/DocumentDashboard'));
+const InductionDashboard = lazy(() => import('@/modules/hrms/onboarding/InductionDashboard'))
 
 export default function HrmsRoutes() {
     return (
@@ -25,6 +26,7 @@ export default function HrmsRoutes() {
             <Route path="onboarding" element={<OnboardingDashboard />} />
             <Route path="onboarding/profile-details" element={<ProfileDetailsDashboard />} />
             <Route path="onboarding/documents" element={<DocumentDashboard />} />
+            <Route path="onboarding/induction" element={<InductionDashboard />}/>
             
             <Route path="assets/my" element={<MyAssets />} />
             
