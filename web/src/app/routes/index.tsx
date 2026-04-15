@@ -4,6 +4,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import PublicOnlyRoute from "@/components/PublicOnlyRoute";
 import DashboardLayout from "@/app/layout/DashboardLayout";
 import Login from "@/modules/auth/login";
+import SignUp from "@/modules/auth/sign-up"
 import Dashboard from "@/modules/dashboard";
 import { RouteWrapper } from "./components/RouteWrapper";
 import { paths } from "./paths";
@@ -41,6 +42,7 @@ export default function AppRoutes() {
 
             <Route element={<PublicOnlyRoute />}>
                 <Route path="/login" element={<Login />} />
+                <Route path="/sign-up" element={<SignUp />} />
             </Route>
 
             {/* ==================== PROTECTED ROUTES ==================== */}
