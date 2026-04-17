@@ -43,142 +43,8 @@ import {
   Hash,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-type OnboardingStatus = "pending" | "approved" | "rejected";
-
-interface NewJoinee {
-  id: number;
-  employeeId: string;
-  firstName: string;
-  lastName: string;
-  middleName?: string;
-  personalEmail: string;
-  phone: string;
-  designation: string;
-  department: string;
-  workLocation: string;
-  dateOfJoining: string;
-  submittedAt: string;
-  status: OnboardingStatus;
-  gender: "Male" | "Female" | "Other";
-  nationality: string;
-  reviewedBy?: string;
-  reviewedAt?: string;
-  reviewNote?: string;
-}
-
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-
-const MOCK_JOINEES: NewJoinee[] = [
-  {
-    id: 1,
-    employeeId: "EMP24A1B2",
-    firstName: "Priya",
-    lastName: "Sharma",
-    personalEmail: "priya.sharma@gmail.com",
-    phone: "+91 98765 43210",
-    designation: "Software Engineer",
-    department: "Information Technology",
-    workLocation: "Bengaluru HQ",
-    dateOfJoining: "2024-08-01",
-    submittedAt: "2024-07-22T10:30:00Z",
-    status: "pending",
-    gender: "Female",
-    nationality: "Indian",
-  },
-  {
-    id: 2,
-    employeeId: "EMP24C3D4",
-    firstName: "Rahul",
-    lastName: "Mehta",
-    personalEmail: "rahul.mehta@gmail.com",
-    phone: "+91 87654 32109",
-    designation: "Product Manager",
-    department: "Operations",
-    workLocation: "Mumbai Office",
-    dateOfJoining: "2024-07-28",
-    submittedAt: "2024-07-20T09:15:00Z",
-    status: "approved",
-    gender: "Male",
-    nationality: "Indian",
-    reviewedBy: "Anjali Kapoor",
-    reviewedAt: "2024-07-21T14:00:00Z",
-    reviewNote: "All documents verified. Welcome aboard!",
-  },
-  {
-    id: 3,
-    employeeId: "EMP24E5F6",
-    firstName: "Sneha",
-    lastName: "Iyer",
-    personalEmail: "sneha.iyer@gmail.com",
-    phone: "+91 76543 21098",
-    designation: "UX Designer",
-    department: "Design",
-    workLocation: "Remote",
-    dateOfJoining: "2024-08-05",
-    submittedAt: "2024-07-23T11:45:00Z",
-    status: "rejected",
-    gender: "Female",
-    nationality: "Indian",
-    reviewedBy: "Vikram Singh",
-    reviewedAt: "2024-07-24T10:30:00Z",
-    reviewNote: "Incomplete documentation. Missing PAN card details.",
-  },
-  {
-    id: 4,
-    employeeId: "EMP24G7H8",
-    firstName: "Arjun",
-    lastName: "Nair",
-    personalEmail: "arjun.nair@gmail.com",
-    phone: "+91 65432 10987",
-    designation: "Data Analyst",
-    department: "Finance",
-    workLocation: "Chennai Office",
-    dateOfJoining: "2024-08-12",
-    submittedAt: "2024-07-25T08:00:00Z",
-    status: "pending",
-    gender: "Male",
-    nationality: "Indian",
-  },
-  {
-    id: 5,
-    employeeId: "EMP24I9J0",
-    firstName: "Meera",
-    lastName: "Pillai",
-    middleName: "R",
-    personalEmail: "meera.pillai@gmail.com",
-    phone: "+91 54321 09876",
-    designation: "HR Executive",
-    department: "Human Resources",
-    workLocation: "Bengaluru HQ",
-    dateOfJoining: "2024-08-03",
-    submittedAt: "2024-07-26T13:20:00Z",
-    status: "pending",
-    gender: "Female",
-    nationality: "Indian",
-  },
-  {
-    id: 6,
-    employeeId: "EMP24K1L2",
-    firstName: "Karan",
-    lastName: "Patel",
-    personalEmail: "karan.patel@gmail.com",
-    phone: "+91 43210 98765",
-    designation: "Sales Executive",
-    department: "Sales",
-    workLocation: "Delhi Office",
-    dateOfJoining: "2024-07-29",
-    submittedAt: "2024-07-18T16:00:00Z",
-    status: "approved",
-    gender: "Male",
-    nationality: "Indian",
-    reviewedBy: "Anjali Kapoor",
-    reviewedAt: "2024-07-19T11:00:00Z",
-    reviewNote: "Everything looks good. Fast-tracked due to urgent requirement.",
-  },
-];
+import { useOnboardingDashboard, useUpdateOnboardingStatus } from "./useOnboarding";
+import { type OnboardingRequest } from "@/services/api/onboarding.service";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -197,20 +63,24 @@ const timeAgo = (dateStr: string): string => {
   return `${days} days ago`;
 };
 
-const getInitials = (first: string, last: string) =>
-  `${first[0]}${last[0]}`.toUpperCase();
+const getInitials = (name: string) => {
+  if (!name) return "??";
+  const parts = name.split(" ");
+  if (parts.length >= 2) return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+  return name[0].toUpperCase();
+};
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-const StatusBadge: React.FC<{ status: OnboardingStatus }> = ({ status }) => {
-  const map: Record<OnboardingStatus, { label: string; className: string; icon: React.ElementType }> = {
+const StatusBadge: React.FC<{ status: OnboardingRequest["status"] }> = ({ status }) => {
+  const map: Record<OnboardingRequest["status"], { label: string; className: string; icon: React.ElementType }> = {
     pending: { label: "Pending", className: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border-amber-200 dark:border-amber-800", icon: Clock },
     approved: { label: "Approved", className: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300 border-green-200 dark:border-green-800", icon: CheckCircle2 },
     rejected: { label: "Rejected", className: "bg-destructive/10 text-destructive border-destructive/20", icon: XCircle },
   };
-  const { label, className, icon: Icon } = map[status];
+  const { label, className, icon: Icon } = map[status] || map.pending;
   return (
-    <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border", className)}>
+    <span className={cn("inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border uppercase tracking-widest", className)}>
       <Icon className="h-3 w-3" />
       {label}
     </span>
@@ -286,10 +156,10 @@ const IconAction: React.FC<{
 // ─── Joinee Row ───────────────────────────────────────────────────────────────
 
 interface JoineeRowProps {
-  joinee: NewJoinee;
-  onView: (j: NewJoinee) => void;
-  onApprove: (j: NewJoinee) => void;
-  onReject: (j: NewJoinee) => void;
+  joinee: OnboardingRequest;
+  onView: (j: OnboardingRequest) => void;
+  onApprove: (j: OnboardingRequest) => void;
+  onReject: (j: OnboardingRequest) => void;
 }
 
 const JoineeRow: React.FC<JoineeRowProps> = ({ joinee, onView, onApprove, onReject }) => {
@@ -303,7 +173,7 @@ const JoineeRow: React.FC<JoineeRowProps> = ({ joinee, onView, onApprove, onReje
       {/* Avatar */}
       <Avatar className="h-9 w-9 flex-shrink-0">
         <AvatarFallback className="text-xs font-semibold bg-primary/10 text-primary">
-          {getInitials(joinee.firstName, joinee.lastName)}
+          {getInitials(joinee.name)}
         </AvatarFallback>
       </Avatar>
 
@@ -311,30 +181,35 @@ const JoineeRow: React.FC<JoineeRowProps> = ({ joinee, onView, onApprove, onReje
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
           <p className="text-sm font-semibold leading-none">
-            {joinee.firstName} {joinee.middleName ? `${joinee.middleName} ` : ""}{joinee.lastName}
+            {joinee.name}
           </p>
           <span className="text-[10px] font-mono text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-            {joinee.employeeId}
+             #{joinee.id}
           </span>
         </div>
-        <p className="text-xs text-muted-foreground mt-1 truncate">{joinee.designation} · {joinee.department}</p>
+        <p className="text-xs text-muted-foreground mt-1 truncate">{joinee.email}</p>
       </div>
 
-      {/* Location */}
+      {/* Contact */}
       <div className="hidden md:flex items-center gap-1.5 text-xs text-muted-foreground min-w-0 w-36">
-        <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
-        <span className="truncate">{joinee.workLocation}</span>
+        <Phone className="h-3.5 w-3.5 flex-shrink-0" />
+        <span className="truncate">{joinee.phone}</span>
       </div>
 
-      {/* Joining Date */}
-      <div className="hidden lg:flex items-center gap-1.5 text-xs text-muted-foreground w-28">
-        <CalendarDays className="h-3.5 w-3.5 flex-shrink-0" />
-        <span>{formatDate(joinee.dateOfJoining)}</span>
+      {/* Progress */}
+      <div className="hidden lg:flex flex-col gap-1 w-28">
+         <div className="flex justify-between text-[10px] font-bold uppercase text-muted-foreground/60">
+            <span>Progress</span>
+            <span>{joinee.progress}%</span>
+         </div>
+         <div className="h-1 bg-muted rounded-full overflow-hidden">
+            <div className="h-full bg-primary transition-all" style={{ width: `${joinee.progress}%` }} />
+         </div>
       </div>
 
       {/* Submitted */}
-      <div className="hidden lg:block text-xs text-muted-foreground w-20 text-right">
-        {timeAgo(joinee.submittedAt)}
+      <div className="hidden lg:block text-xs text-muted-foreground w-24 text-right">
+        {timeAgo(joinee.createdAt)}
       </div>
 
       {/* Status */}
@@ -358,7 +233,7 @@ const JoineeRow: React.FC<JoineeRowProps> = ({ joinee, onView, onApprove, onReje
 
 // ─── Empty State ──────────────────────────────────────────────────────────────
 
-const EmptyState: React.FC<{ tab: OnboardingStatus | "all"; search: string }> = ({ tab, search }) => {
+const EmptyState: React.FC<{ tab: "all" | OnboardingRequest["status"]; search: string }> = ({ tab, search }) => {
   const messages: Record<string, { icon: React.ElementType; title: string; sub: string }> = {
     all: { icon: Users, title: "No registrations yet", sub: "New joinee registrations will appear here." },
     pending: { icon: Clock, title: "No pending reviews", sub: "All registrations have been reviewed." },
@@ -382,11 +257,11 @@ const EmptyState: React.FC<{ tab: OnboardingStatus | "all"; search: string }> = 
 // ─── View Modal ───────────────────────────────────────────────────────────────
 
 const ViewModal: React.FC<{
-  joinee: NewJoinee | null;
+  joinee: OnboardingRequest | null;
   open: boolean;
   onClose: () => void;
-  onApprove: (j: NewJoinee) => void;
-  onReject: (j: NewJoinee) => void;
+  onApprove: (j: OnboardingRequest) => void;
+  onReject: (j: OnboardingRequest) => void;
 }> = ({ joinee, open, onClose, onApprove, onReject }) => {
   if (!joinee) return null;
   const isPending = joinee.status === "pending";
@@ -394,119 +269,112 @@ const ViewModal: React.FC<{
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-lg p-0 gap-0 overflow-hidden">
-        {/* Header */}
         <DialogHeader className="px-6 py-4 border-b bg-muted/30">
           <div className="flex items-center gap-4">
             <Avatar className="h-12 w-12">
               <AvatarFallback className="text-sm font-bold bg-primary/10 text-primary">
-                {getInitials(joinee.firstName, joinee.lastName)}
+                {getInitials(joinee.name)}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <DialogTitle className="text-base">
-                  {joinee.firstName} {joinee.middleName ? `${joinee.middleName} ` : ""}{joinee.lastName}
-                </DialogTitle>
+                <DialogTitle className="text-base">{joinee.name}</DialogTitle>
                 <StatusBadge status={joinee.status} />
               </div>
               <DialogDescription className="mt-0.5 flex items-center gap-1.5 text-xs">
                 <Hash className="h-3 w-3" />
-                {joinee.employeeId} · Submitted {timeAgo(joinee.submittedAt)}
+                ID: {joinee.id} · Submitted {timeAgo(joinee.createdAt)}
               </DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
-        {/* Body */}
         <div className="px-6 py-5 space-y-5 max-h-[60vh] overflow-y-auto">
-          {/* Job Info */}
           <div className="grid grid-cols-2 gap-3">
-            {[
-              { icon: Briefcase, label: "Designation", value: joinee.designation },
-              { icon: Building2, label: "Department", value: joinee.department },
-              { icon: MapPin, label: "Work Location", value: joinee.workLocation },
-              { icon: CalendarDays, label: "Date of Joining", value: formatDate(joinee.dateOfJoining) },
-            ].map(({ icon: Icon, label, value }) => (
-              <div key={label} className="p-3 rounded-lg bg-muted/50 border space-y-1">
+             <div className="p-3 rounded-lg bg-muted/50 border space-y-1">
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
-                  <Icon className="h-3.5 w-3.5" />
-                  {label}
+                   <Mail className="h-3.5 w-3.5" /> Email
                 </div>
-                <p className="text-sm font-semibold">{value}</p>
-              </div>
-            ))}
+                <p className="text-sm font-semibold truncate">{joinee.email}</p>
+             </div>
+             <div className="p-3 rounded-lg bg-muted/50 border space-y-1">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
+                   <Phone className="h-3.5 w-3.5" /> Phone
+                </div>
+                <p className="text-sm font-semibold">{joinee.phone}</p>
+             </div>
           </div>
 
           <Separator />
 
-          {/* Contact Info */}
-          <div className="space-y-2">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Contact</p>
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm">
-                <Mail className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                <span>{joinee.personalEmail}</span>
+          <div className="space-y-4">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Onboarding Progress</p>
+              <div className="flex items-center gap-4">
+                 <ProgressStage label="Profile" status={joinee.profileStatus} />
+                 <ProgressStage label="Documents" status={joinee.documentStatus} />
+                 <ProgressStage label="Induction" status={joinee.inductionStatus} />
               </div>
-              <div className="flex items-center gap-2 text-sm">
-                <Phone className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                <span>{joinee.phone}</span>
-              </div>
-            </div>
           </div>
 
-          {/* Review Info */}
           {joinee.reviewedBy && (
             <>
               <Separator />
               <div className="space-y-2">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Review</p>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Review History</p>
                 <div className="p-3 rounded-lg border bg-muted/40 space-y-2">
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span className="flex items-center gap-1.5">
                       <UserCheck className="h-3.5 w-3.5" />
-                      {joinee.reviewedBy}
+                      Reviewed By: {joinee.reviewedBy}
                     </span>
-                    <span>{joinee.reviewedAt ? formatDate(joinee.reviewedAt) : "—"}</span>
+                    <span>{joinee.approvedAt ? formatDate(joinee.approvedAt) : "—"}</span>
                   </div>
-                  {joinee.reviewNote && (
-                    <p className="text-sm text-foreground/80 italic">"{joinee.reviewNote}"</p>
-                  )}
                 </div>
               </div>
             </>
           )}
         </div>
 
-        {/* Footer */}
-        {isPending && (
-          <DialogFooter className="px-6 py-4 border-t bg-muted/30">
-            <div className="flex items-center gap-2 w-full justify-end">
-              <Button variant="outline" onClick={onClose}>Close</Button>
-              <Button
-                variant="outline"
-                className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                onClick={() => { onClose(); onReject(joinee); }}
-              >
-                <XCircle className="h-4 w-4 mr-1.5" />
-                Reject
-              </Button>
-              <Button
-                onClick={() => { onClose(); onApprove(joinee); }}
-                className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-600"
-              >
-                <CheckCircle2 className="h-4 w-4 mr-1.5" />
-                Approve
-              </Button>
-            </div>
-          </DialogFooter>
-        )}
-        {!isPending && (
-          <DialogFooter className="px-6 py-4 border-t bg-muted/30">
+        <DialogFooter className="px-6 py-4 border-t bg-muted/30">
+          <div className="flex items-center gap-2 w-full justify-end">
             <Button variant="outline" onClick={onClose}>Close</Button>
-          </DialogFooter>
-        )}
+            {isPending && (
+              <>
+                <Button
+                  variant="outline"
+                  className="border-destructive/40 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => { onClose(); onReject(joinee); }}
+                >
+                  <XCircle className="h-4 w-4 mr-1.5" /> Reject
+                </Button>
+                <Button
+                  onClick={() => { onClose(); onApprove(joinee); }}
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                >
+                  <CheckCircle2 className="h-4 w-4 mr-1.5" /> Approve
+                </Button>
+              </>
+            )}
+          </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+};
+
+const ProgressStage: React.FC<{ label: string; status: string }> = ({ label, status }) => {
+  const isDone = status === "completed";
+  return (
+    <div className="flex flex-col items-center gap-1 flex-1">
+       <div className={cn(
+         "h-1.5 w-full rounded-full",
+         isDone ? "bg-green-500" : "bg-muted"
+       )} />
+       <span className={cn(
+         "text-[9px] font-black uppercase",
+         isDone ? "text-green-600" : "text-muted-foreground"
+       )}>{label}</span>
+    </div>
   );
 };
 
@@ -515,7 +383,7 @@ const ViewModal: React.FC<{
 interface ActionModalProps {
   open: boolean;
   type: "approve" | "reject" | null;
-  joinee: NewJoinee | null;
+  joinee: OnboardingRequest | null;
   onClose: () => void;
   onConfirm: (note: string) => void;
   isLoading?: boolean;
@@ -525,7 +393,6 @@ const ActionModal: React.FC<ActionModalProps> = ({
   open, type, joinee, onClose, onConfirm, isLoading,
 }) => {
   const [note, setNote] = useState("");
-
   const isApprove = type === "approve";
 
   return (
@@ -535,33 +402,21 @@ const ActionModal: React.FC<ActionModalProps> = ({
           <div className="flex items-center gap-3">
             <div className={cn(
               "h-10 w-10 rounded-full flex items-center justify-center",
-              isApprove
-                ? "bg-green-100 dark:bg-green-900/40"
-                : "bg-destructive/10"
+              isApprove ? "bg-green-100 dark:bg-green-900/40" : "bg-destructive/10"
             )}>
-              {isApprove
-                ? <CheckCircle2 className="h-5 w-5 text-green-700 dark:text-green-400" />
-                : <XCircle className="h-5 w-5 text-destructive" />
-              }
+              {isApprove ? <CheckCircle2 className="h-5 w-5 text-green-700 dark:text-green-400" /> : <XCircle className="h-5 w-5 text-destructive" />}
             </div>
             <div>
-              <DialogTitle>
-                {isApprove ? "Approve Onboarding" : "Reject Onboarding"}
-              </DialogTitle>
+              <DialogTitle>{isApprove ? "Approve" : "Reject"} Registration</DialogTitle>
               <DialogDescription className="mt-0.5 text-xs">
-                {joinee?.firstName} {joinee?.lastName} · {joinee?.designation}
+                {joinee?.name} · {joinee?.email}
               </DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
         <div className="px-6 py-5 space-y-4">
-          <p className="text-sm text-muted-foreground">
-            {isApprove
-              ? "This will mark the employee as onboarded. An approval note will be recorded."
-              : "This will reject the registration. Please provide a reason so the applicant can make corrections."}
-          </p>
-
+          <p className="text-sm text-muted-foreground">{isApprove ? "This will approve the registration. An approval note can be added below." : "Reason for rejection is required to inform the applicant."}</p>
           <div className="space-y-1.5">
             <label className="text-sm font-medium flex items-center gap-1.5">
               <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
@@ -571,11 +426,7 @@ const ActionModal: React.FC<ActionModalProps> = ({
             <Textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder={
-                isApprove
-                  ? "Optional — e.g. All documents verified."
-                  : "e.g. Missing Aadhar card, incomplete address details."
-              }
+              placeholder={isApprove ? "Optional — e.g. Everything looks good." : "e.g. Incomplete documentation."}
               rows={3}
               className="resize-none"
             />
@@ -583,20 +434,14 @@ const ActionModal: React.FC<ActionModalProps> = ({
         </div>
 
         <DialogFooter className="px-6 py-4 border-t bg-muted/30">
-          <Button variant="outline" onClick={() => { onClose(); setNote(""); }} disabled={isLoading}>
-            Cancel
-          </Button>
+          <Button variant="outline" onClick={() => { onClose(); setNote(""); }} disabled={isLoading}>Cancel</Button>
           <Button
             disabled={(!isApprove && !note.trim()) || isLoading}
             onClick={() => { onConfirm(note); setNote(""); }}
-            className={cn(
-              isApprove
-                ? "bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-600"
-                : "bg-destructive hover:bg-destructive/90 text-destructive-foreground"
-            )}
+            variant={isApprove ? "default" : "destructive"}
           >
             {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            {isApprove ? "Confirm Approval" : "Confirm Rejection"}
+            Confirm {isApprove ? "Approval" : "Rejection"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -606,23 +451,23 @@ const ActionModal: React.FC<ActionModalProps> = ({
 
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
-type TabValue = "all" | OnboardingStatus;
+type TabValue = "all" | OnboardingRequest["status"];
 
 const OnboardingDashboard: React.FC = () => {
   const navigate = useNavigate();
+  const { data: joinees = [], isLoading, isError } = useOnboardingDashboard();
+  const updateStatus = useUpdateOnboardingStatus();
 
   // State
-  const [joinees, setJoinees] = useState<NewJoinee[]>(MOCK_JOINEES);
   const [activeTab, setActiveTab] = useState<TabValue>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const deferredSearch = useDeferredValue(searchQuery);
 
   // Modals
-  const [viewJoinee, setViewJoinee] = useState<NewJoinee | null>(null);
+  const [viewJoinee, setViewJoinee] = useState<OnboardingRequest | null>(null);
   const [viewOpen, setViewOpen] = useState(false);
-  const [actionType, setActionType] = useState<"approve" | "reject" | null>(null);
-  const [actionJoinee, setActionJoinee] = useState<NewJoinee | null>(null);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [actionType, setActionType] = useState<"approved" | "rejected" | null>(null);
+  const [actionJoinee, setActionJoinee] = useState<OnboardingRequest | null>(null);
 
   // Stats
   const stats = useMemo(() => ({
@@ -637,47 +482,31 @@ const OnboardingDashboard: React.FC = () => {
     return joinees.filter((j) => {
       const matchesTab = activeTab === "all" || j.status === activeTab;
       const q = deferredSearch.toLowerCase();
-      const matchesSearch =
-        !q ||
-        `${j.firstName} ${j.lastName}`.toLowerCase().includes(q) ||
-        j.employeeId.toLowerCase().includes(q) ||
-        j.designation.toLowerCase().includes(q) ||
-        j.department.toLowerCase().includes(q) ||
-        j.personalEmail.toLowerCase().includes(q);
+      const matchesSearch = !q || j.name.toLowerCase().includes(q) || j.email.toLowerCase().includes(q);
       return matchesTab && matchesSearch;
     });
   }, [joinees, activeTab, deferredSearch]);
 
   // Handlers
-  const openView = (j: NewJoinee) => { setViewJoinee(j); setViewOpen(true); };
-  const openApprove = (j: NewJoinee) => { setActionJoinee(j); setActionType("approve"); };
-  const openReject = (j: NewJoinee) => { setActionJoinee(j); setActionType("reject"); };
+  const openView = (j: OnboardingRequest) => { setViewJoinee(j); setViewOpen(true); };
+  const openApprove = (j: OnboardingRequest) => { setActionJoinee(j); setActionType("approved"); };
+  const openReject = (j: OnboardingRequest) => { setActionJoinee(j); setActionType("rejected"); };
 
   const handleConfirmAction = async (note: string) => {
     if (!actionJoinee || !actionType) return;
-    setActionLoading(true);
-
-    // Simulate API delay
-    await new Promise((r) => setTimeout(r, 1000));
-
-    setJoinees((prev) =>
-      prev.map((j) =>
-        j.id === actionJoinee.id
-          ? {
-              ...j,
-              status: actionType === "approve" ? "approved" : "rejected",
-              reviewedBy: "You",
-              reviewedAt: new Date().toISOString(),
-              reviewNote: note || undefined,
-            }
-          : j
-      )
-    );
-
-    setActionLoading(false);
-    setActionType(null);
-    setActionJoinee(null);
+    updateStatus.mutate({ 
+      id: actionJoinee.id, 
+      dto: { status: actionType, note } 
+    }, {
+      onSuccess: () => {
+        setActionType(null);
+        setActionJoinee(null);
+      }
+    });
   };
+
+  if (isLoading) return <div className="flex-1 flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  if (isError) return <div className="p-8 text-center text-destructive">Failed to load onboarding data.</div>;
 
   const tabs: { value: TabValue; label: string; icon: React.ElementType; count: number }[] = [
     { value: "all", label: "All", icon: Users, count: stats.total },
@@ -688,53 +517,36 @@ const OnboardingDashboard: React.FC = () => {
 
   return (
     <TooltipProvider>
-      <Card className="flex flex-col h-full min-h-0">
-        {/* ── Header ── */}
-        <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0 pb-4 flex-wrap">
+      <Card className="flex flex-col h-full min-h-0 border-none shadow-none bg-transparent">
+        <CardHeader className="flex flex-row items-center justify-between pb-6">
           <div className="space-y-1">
-            <CardTitle className="flex items-center gap-2">
-              <UserPlus className="h-5 w-5 text-primary" />
-              Employee Onboarding
+            <CardTitle className="flex items-center gap-2 text-2xl font-bold">
+              <UserPlus className="h-6 w-6 text-primary" />
+              Onboarding
             </CardTitle>
-            <CardDescription>
-              Review and manage new employee registrations
-            </CardDescription>
+            <CardDescription>Review and manage new hire registrations</CardDescription>
           </div>
-          <Button size="sm" onClick={() => navigate("/hrms/onboarding/new")}>
-            <Plus className="h-4 w-4 mr-2" />
-            New Registration
+          <Button onClick={() => navigate("/hrms/onboarding/signup")} size="sm" className="gap-2">
+            <Plus className="h-4 w-4" /> New Hire
           </Button>
         </CardHeader>
 
-        <CardContent className="flex-1 min-h-0 flex flex-col gap-5">
-          {/* ── Stats Row ── */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <CardContent className="flex-1 min-h-0 flex flex-col gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <StatCard label="Total Joiners" value={stats.total} icon={Users} />
             <StatCard label="Pending Review" value={stats.pending} icon={Clock} highlight={stats.pending > 0} />
             <StatCard label="Approved" value={stats.approved} icon={TrendingUp} />
             <StatCard label="Rejected" value={stats.rejected} icon={XCircle} />
           </div>
 
-          {/* ── Toolbar ── */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabValue)}>
-              <TabsList className="h-9">
+              <TabsList className="h-10 bg-muted/50 p-1 rounded-xl">
                 {tabs.map((tab) => (
-                  <TabsTrigger
-                    key={tab.value}
-                    value={tab.value}
-                    className="gap-1.5 text-xs px-3"
-                  >
+                  <TabsTrigger key={tab.value} value={tab.value} className="gap-2 text-[10px] font-black uppercase px-4 rounded-lg">
                     <tab.icon className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">{tab.label}</span>
-                    <span className={cn(
-                      "ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium",
-                      activeTab === tab.value
-                        ? "bg-background text-foreground"
-                        : "bg-muted text-muted-foreground"
-                    )}>
-                      {tab.count}
-                    </span>
+                    {tab.label}
+                    <Badge variant="secondary" className="ml-1 h-4 px-1 text-[9px] bg-background">{tab.count}</Badge>
                   </TabsTrigger>
                 ))}
               </TabsList>
@@ -743,38 +555,25 @@ const OnboardingDashboard: React.FC = () => {
             <div className="relative w-full sm:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <Input
-                className="pl-9 h-9 text-sm"
-                placeholder="Search name, ID, role…"
+                className="pl-9 h-10 text-xs rounded-xl border-muted-foreground/20"
+                placeholder="Search candidates…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
           </div>
 
-          {/* ── Count line ── */}
           <div className="flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">
-              Showing <span className="font-medium text-foreground">{filtered.length}</span>{" "}
-              {filtered.length === 1 ? "record" : "records"}
-              {activeTab !== "all" && ` · ${activeTab}`}
+            <p className="text-xs text-muted-foreground font-bold uppercase tracking-tighter">
+              Showing <span className="text-foreground">{filtered.length}</span> records
             </p>
-            {stats.pending > 0 && activeTab !== "pending" && (
-              <button
-                onClick={() => setActiveTab("pending")}
-                className="text-xs text-amber-600 dark:text-amber-400 font-medium hover:underline flex items-center gap-1"
-              >
-                <Clock className="h-3 w-3" />
-                {stats.pending} awaiting review
-              </button>
-            )}
           </div>
 
-          {/* ── List ── */}
-          <div className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1">
+          <div className="flex-1 min-h-0 overflow-y-auto pr-1">
             {filtered.length === 0 ? (
-              <EmptyState tab={activeTab === "all" ? "all" : activeTab} search={deferredSearch} />
+              <EmptyState tab={activeTab} search={deferredSearch} />
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {filtered.map((joinee) => (
                   <JoineeRow
                     key={joinee.id}
@@ -789,7 +588,6 @@ const OnboardingDashboard: React.FC = () => {
           </div>
         </CardContent>
 
-        {/* ── View Modal ── */}
         <ViewModal
           joinee={viewJoinee}
           open={viewOpen}
@@ -798,18 +596,16 @@ const OnboardingDashboard: React.FC = () => {
           onReject={openReject}
         />
 
-        {/* ── Action Modal ── */}
         <ActionModal
           open={!!actionType}
           type={actionType}
           joinee={actionJoinee}
           onClose={() => { setActionType(null); setActionJoinee(null); }}
           onConfirm={handleConfirmAction}
-          isLoading={actionLoading}
+          isLoading={updateStatus.isPending}
         />
       </Card>
     </TooltipProvider>
   );
 };
-
 export default OnboardingDashboard;
