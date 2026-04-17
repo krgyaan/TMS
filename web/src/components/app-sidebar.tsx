@@ -141,8 +141,13 @@ const navMain: NavGroup[] = [
         title: "HR Administration",
         icon: Shield,
         items: [
-            { title: "Asset Administration", url: "/hrms/admin/assets", permission: "hrms.admin" },
-            { title: "Register Employee", url: paths.hrms.employeeRegistration, permission: "hrms.admin" },
+            { title: "Assets", url: "/hrms/admin/assets", permission: "hrms.admin" },
+            // { title: "Recruitment", url: "", permission: "hrms.admin" },
+            { title: "Onboarding", url: paths.hrms.onboardingDashboard, permission: "hrms.admin" },
+            { title: "Profile Details", url: paths.hrms.profileDetailsDashboard, permission: "hrms.admin" },
+            { title: "Documents", url: paths.hrms.documentDashboard, permission: "hrms.admin" },
+            { title: "Induction", url: paths.hrms.inductionDashboard, permission: "hrms.admin" },
+            // { title: "Probation", url: "", permission: "hrms.admin" },
         ],
     },
     {

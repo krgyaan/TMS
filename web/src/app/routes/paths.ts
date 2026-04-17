@@ -1,4 +1,5 @@
 import AssetAdminDashboard from "@/modules/hrms/assets/dashboard";
+import OnboardingDashboard from "@/modules/hrms/onboarding/OnboardingDashboard";
 
 export const paths = {
     // ==================== AUTH ====================
@@ -352,5 +353,11 @@ export const paths = {
         assetEdit: (id: number) => `/hrms/admin/assets/edit/${id}`,
         assetStatus: (id: number) => `/hrms/admin/assets/status/${id}`,
         assetView: (id: number) => `/hrms/admin/assets/view/${id}`,
+
+        //================ onboarding  ==============================//
+        onboardingDashboard: "hrms/onboarding",
+        profileDetailsDashboard: "hrms/onboarding/profile-details",
+        documentDashboard: "hrms/onboarding/documents",
+        inductionDashboard: "hrms/onboarding/induction",
     },
 };
