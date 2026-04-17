@@ -78,7 +78,7 @@ const UpdateProfileSchema = z.object({
   probationEndDate: z.string().optional(),
   // Compensation
   salaryType: z.string().optional(),
-  basicSalary: z.string().optional(),
+  basicSalary: z.coerce.string().optional(),
   // Bank
   bankName: z.string().optional(),
   accountNumber: z.string().optional(),
