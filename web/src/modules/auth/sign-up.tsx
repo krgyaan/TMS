@@ -29,7 +29,9 @@ import {
   HeartHandshake,
   Building2,
 } from "lucide-react";
+import { useSubmitSignup } from "@/hooks/api/useSignUp";
 import { cn } from "@/lib/utils";
+
 
 // ─── Schemas ────────────────────────────────────────────────────────────────
 
@@ -315,6 +317,8 @@ const SignUp: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
+  const submitSignupMutation = useSubmitSignup();
+
   const {
     register,
     handleSubmit,
@@ -382,17 +386,55 @@ const SignUp: React.FC = () => {
   // ── Submit ────────────────────────────────────────────────────────────────
 
   const onSubmit = async (data: FormData) => {
-    setIsSubmitting(true);
-    try {
-      // TODO: wire up API calls here
-      await new Promise((r) => setTimeout(r, 1800));
-      setSubmitted(true);
-      toast.success("Registration submitted successfully!");
-    } catch {
-      toast.error("Submission failed. Please try again.");
-    } finally {
-      setIsSubmitting(false);
-    }
+      setIsSubmitting(true);
+      try {
+          await submitSignupMutation.mutateAsync({
+              // Personal
+              firstName: data.firstName,
+              middleName: data.middleName,
+              lastName: data.lastName,
+              dateOfBirth: data.dateOfBirth,
+              gender: data.gender as "Male" | "Female" | "Other",
+              maritalStatus: data.maritalStatus!,
+              nationality: data.nationality!,
+              personalEmail: data.personalEmail,
+              phone: data.phone,
+              alternatePhone: data.alternatePhone,
+              aadharNumber: data.aadharNumber,
+              panNumber: data.panNumber,
+
+              // Current Address
+              currentAddressLine1: data.currentAddressLine1,
+              currentAddressLine2: data.currentAddressLine2,
+              currentCity: data.currentCity,
+              currentState: data.currentState,
+              currentCountry: data.currentCountry,
+              currentPostalCode: data.currentPostalCode,
+
+              // Permanent Address
+              sameAsCurrent: data.sameAsCurrent,
+              permanentAddressLine1: data.permanentAddressLine1,
+              permanentAddressLine2: data.permanentAddressLine2,
+              permanentCity: data.permanentCity,
+              permanentState: data.permanentState,
+              permanentCountry: data.permanentCountry,
+              permanentPostalCode: data.permanentPostalCode,
+
+              // Emergency Contact
+              emergencyContactName: data.emergencyContactName,
+              emergencyContactRelationship: data.emergencyContactRelationship,
+              emergencyContactPhone: data.emergencyContactPhone,
+              emergencyContactAltPhone: data.emergencyContactAltPhone,
+              emergencyContactEmail: data.emergencyContactEmail,
+          });
+          
+          // Show success screen
+          setSubmitted(true);
+      } catch (e) {
+          // Error toast is handled automatically by the hook's onError callback
+      } finally {
+          setIsSubmitting(false);
+      }
   };
 
   const handleFinalSubmit = async () => {

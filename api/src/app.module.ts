@@ -103,6 +103,7 @@ import { EmployeeProfilesModule } from "@/modules/hrms/employee-profiles/employe
 import { AssetsModule } from "@/modules/hrms/assets/assets.module";
 import { AccountChecklistModule } from './modules/accounts/account-checklist/account-checklist.module';
 import { AccountChecklistSchedulerModule } from "./modules/accounts/account-checklist/account-checklist-scheduler.module";
+import { OnboardingModule } from './modules/hrms/onboarding/onboarding.module';
 @Module({
     imports: [
         ServeStaticModule.forRoot({
@@ -215,6 +216,7 @@ import { AccountChecklistSchedulerModule } from "./modules/accounts/account-chec
         AssetsModule,
         AccountChecklistModule,
         AccountChecklistSchedulerModule,
+        OnboardingModule,
     ],
     controllers: [AppController,],
     providers: [
