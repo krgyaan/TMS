@@ -9,7 +9,7 @@ export class ImprestCategoriesService {
     constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
 
     async findAll(): Promise<ImprestCategory[]> {
-        return this.db.select().from(imprestCategories);
+        return this.db.select().from(imprestCategories).where(eq(imprestCategories.status, true));
     }
 
     async findById(id: number): Promise<ImprestCategory | null> {

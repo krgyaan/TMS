@@ -45,6 +45,7 @@ import { TenderApprovalModule } from "@/modules/tendering/tender-approval/tender
 import { EmployeeImprestModule } from "@/modules/employee-imprest/employee-imprest.module";
 import { PhysicalDocsModule } from "@/modules/tendering/physical-docs/physical-docs.module";
 import { RfqsModule } from "@/modules/tendering/rfqs/rfq.module";
+import { RfqResponseModule } from "@/modules/tendering/rfq-response/rfq-response.module";
 import { CourierModule } from "@/modules/courier/courier.module";
 import { ServeStaticModule } from "@nestjs/serve-static";
 import { join } from "path";
@@ -64,9 +65,11 @@ import { ImprestAdminModule } from "@/modules/imprest-admin/imprest-admin.module
 import { TenderFilesModule } from "@/modules/tendering/tender-files/tender-files.module";
 import { EmailModule } from "@/modules/email/email.module";
 import { EmdResponsibilitiesModule } from "@/modules/master/emd-responsibilities/emd-responsibilities.module";
+import { FinancialYearModule } from "@/modules/master/financial-year/financial-year.module";
+import { FinanceDocTypeModule } from "@/modules/master/finance-doc-type/finance-doc-type.module";
 import { TenderExecutivePerformanceModule } from "./modules/performance/tender-executive-performance/tender-executive-performance.module";
 import { TeamLeaderPerformanceModule } from "./modules/performance/team-leader-performance/team-leader-performance.module";
-import { OemDashboardModule } from "./modules/performance/oem-performance/oem-performance.module";
+import { OemPerformanceModule } from "./modules/performance/oem-performance/oem-performance.module";
 import { PayOnPortalModule } from "@/modules/bi-dashboard/pay-on-portal/pay-on-portal.module";
 import { BankGuaranteeModule } from "@/modules/bi-dashboard/bank-guarantee/bank-guarantee.module";
 import { DemandDraftModule } from "@/modules/bi-dashboard/demand-draft/demand-draft.module";
@@ -74,7 +77,33 @@ import { FdrModule } from "@/modules/bi-dashboard/fdr/fdr.module";
 import { BankTransferModule } from "@/modules/bi-dashboard/bank-transfer/bank-transfer.module";
 import { ChequeModule } from "@/modules/bi-dashboard/cheque/cheque.module";
 import { TimersModule } from "@/modules/timers/timers.module";
-
+import { BusinessPerformanceModule } from "./modules/performance/business-performance/business-performance.module";
+import { WoBasicDetailsModule } from "@/modules/operations/wo-basic-details/wo-basic-details.module";
+import { KickOffMeetingModule } from "./modules/operations/kick-off-meeting/kick-off-meeting.module";
+import { ProjectsModule } from "./modules/operations/projects/projects.module";
+import { FollowupSchedulerModule } from "@/modules/follow-up/follow-up-scheduler.module";
+import { PqrModule } from "@/modules/shared/pqr/pqr.module";
+import { FinanceDocumentsModule } from "@/modules/shared/finance-documents/finance-documents.module";
+import { ProjectsMasterrModule } from "@/modules/shared/projects-master/projects-master.module";
+import { AllExceptionsFilter } from "./logger/all-exception.filter";
+import { LoggerModule } from "@/logger/logger.module";
+import { ProjectsMasterModule } from "./modules/master/projects-master/projects-master.module";
+import { RequestExtensionsModule } from "./modules/tendering/request_extensions/request-extension.module";
+import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-queries.module";
+import { LoanAdvanceModule } from "./modules/accounts/loan-advance/loan-advance.module";
+import { WoDetailsModule } from "./modules/operations/wo-details/wo-details.module";
+import { WoContactsModule } from "./modules/operations/wo-contacts/wo-contacts.module";
+import { WoAmendmentsModule } from "./modules/operations/wo-amendments/wo-amendments.module";
+import { WoDocumentsModule } from "./modules/operations/wo-documents/wo-documents.module";
+import { WoQueriesModule } from "./modules/operations/wo-queries/wo-queries.module";
+import { CustomerPerformanceModule } from "./modules/performance/customer-performance/customer-performance.module";
+import { LocationPerformanceModule } from "./modules/performance/location-performance/location-performance.module";
+import { ContractAgreementModule } from "./modules/operations/contract-agreement/contract-agreement.module";
+import { EmployeeProfilesModule } from "@/modules/hrms/employee-profiles/employee-profiles.module";
+import { AssetsModule } from "@/modules/hrms/assets/assets.module";
+import { AccountChecklistModule } from './modules/accounts/account-checklist/account-checklist.module';
+import { AccountChecklistSchedulerModule } from "./modules/accounts/account-checklist/account-checklist-scheduler.module";
+import { OnboardingModule } from './modules/hrms/onboarding/onboarding.module';
 @Module({
     imports: [
         ServeStaticModule.forRoot({
@@ -96,6 +125,7 @@ import { TimersModule } from "@/modules/timers/timers.module";
                 ...validateAuthEnv(env),
             }),
         }),
+        LoggerModule,
         DatabaseModule,
         UsersModule,
         RolesModule,
@@ -133,6 +163,7 @@ import { TimersModule } from "@/modules/timers/timers.module";
         TenderInfoSheetsModule,
         TenderApprovalModule,
         PhysicalDocsModule,
+        RfqResponseModule,
         RfqsModule,
         CourierModule,
         MailerModule,
@@ -149,9 +180,11 @@ import { TimersModule } from "@/modules/timers/timers.module";
         TenderFilesModule,
         EmailModule,
         EmdResponsibilitiesModule,
+        FinancialYearModule,
+        FinanceDocTypeModule,
         TenderExecutivePerformanceModule,
         TeamLeaderPerformanceModule,
-        OemDashboardModule,
+        OemPerformanceModule,
         PayOnPortalModule,
         BankGuaranteeModule,
         DemandDraftModule,
@@ -159,14 +192,40 @@ import { TimersModule } from "@/modules/timers/timers.module";
         BankTransferModule,
         ChequeModule,
         TimersModule,
+        WoBasicDetailsModule,
+        WoDetailsModule,
+        WoContactsModule,
+        WoAmendmentsModule,
+        WoDocumentsModule,
+        WoQueriesModule,
+        KickOffMeetingModule,
+        ProjectsModule,
+        FollowupSchedulerModule,
+        PqrModule,
+        FinanceDocumentsModule,
+        ProjectsMasterModule,
+        ProjectsMasterrModule,
+        BusinessPerformanceModule,
+        RequestExtensionsModule,
+        SubmitQueriesModule,
+        LoanAdvanceModule,
+        CustomerPerformanceModule,
+        LocationPerformanceModule,
+        ContractAgreementModule,
+        EmployeeProfilesModule,
+        AssetsModule,
+        AccountChecklistModule,
+        AccountChecklistSchedulerModule,
+        OnboardingModule,
     ],
-    controllers: [AppController],
+    controllers: [AppController,],
     providers: [
         AppService,
         {
             provide: APP_GUARD,
             useClass: JwtAuthGuard,
         },
+        AllExceptionsFilter
     ],
 })
-export class AppModule { }
+export class AppModule {}

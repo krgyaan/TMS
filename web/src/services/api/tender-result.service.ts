@@ -12,9 +12,6 @@ class TenderResultService extends BaseApiService {
 
     async getAll(params?: ResultDashboardFilters): Promise<PaginatedResult<ResultDashboardRow>> {
         const search = new URLSearchParams();
-        console.log('=== tenderResultService.getAll ===');
-        console.log('params:', params);
-
         if (params) {
             if (params.tab) {
                 search.set('tab', params.tab);
@@ -34,6 +31,9 @@ class TenderResultService extends BaseApiService {
             if (params.search) {
                 search.set('search', params.search);
             }
+            if (params.teamId !== undefined && params.teamId !== null) {
+                search.set('teamId', params.teamId.toString());
+            }
         }
 
         const queryString = search.toString();
@@ -43,7 +43,6 @@ class TenderResultService extends BaseApiService {
             const result = await this.get<PaginatedResult<ResultDashboardRow>>(url);
             return result;
         } catch (error) {
-            console.error('=== tenderResultService.getAll Error ===');
             console.error('error:', error);
             throw error;
         }
@@ -65,12 +64,20 @@ class TenderResultService extends BaseApiService {
         return this.post<TenderResult>(`/${id}/upload-result`, data);
     }
 
-    async getCounts(): Promise<ResultDashboardCounts> {
+    async uploadResultByTenderId(tenderId: number, data: any): Promise<TenderResult> {
+        return this.post<TenderResult>(`/upload/${tenderId}`, data);
+    }
+
+    async getCounts(teamId?: number): Promise<ResultDashboardCounts> {
         try {
-            const result = await this.get<ResultDashboardCounts>('/dashboard/counts');
+            const params = new URLSearchParams();
+            if (teamId !== undefined && teamId !== null) {
+                params.append('teamId', teamId.toString());
+            }
+            const query = params.toString();
+            const result = await this.get<ResultDashboardCounts>(query ? `/dashboard/counts?${query}` : '/dashboard/counts');
             return result;
         } catch (error) {
-            console.error('=== tenderResultService.getCounts Error ===');
             console.error('error:', error);
             throw error;
         }

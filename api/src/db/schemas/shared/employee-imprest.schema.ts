@@ -15,7 +15,6 @@ export const employeeImprests = pgTable("employee_imprests", {
 
     // amounts / numeric
     amount: integer("amount"),
-    strtotime: integer("strtotime"),
 
     // text fields
     remark: text("remark"),
@@ -28,6 +27,8 @@ export const employeeImprests = pgTable("employee_imprests", {
     tallyStatus: integer("tally_status").notNull().default(0),
     proofStatus: integer("proof_status").notNull().default(0),
     status: integer("status").notNull().default(1),
+
+    accRemark : text('acc_remark'),
 
     // timestamps
     approvedDate: timestamp("approved_date", { withTimezone: true }),

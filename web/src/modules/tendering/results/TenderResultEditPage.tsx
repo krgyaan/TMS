@@ -6,33 +6,15 @@ import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { paths } from '@/app/routes/paths';
 
 export default function TenderResultEditPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const resultId = id ? Number(id) : null;
-    const { data: result, isLoading, error } = useTenderResult(resultId!);
+    const { data: result, isLoading: isResultLoading, error: resultError } = useTenderResult(resultId);
 
-    if (!resultId) {
-        return (
-            <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                    Invalid Result ID.
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="ml-4"
-                        onClick={() => navigate('/tendering/results')}
-                    >
-                        Back to List
-                    </Button>
-                </AlertDescription>
-            </Alert>
-        );
-    }
-
-    if (isLoading) {
+    if (isResultLoading) {
         return (
             <Card>
                 <CardHeader>
@@ -49,18 +31,16 @@ export default function TenderResultEditPage() {
         );
     }
 
-    if (error || !result) {
+    if (resultError || !result) {
         return (
             <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
                     Result not found or failed to load.
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="ml-4"
-                        onClick={() => navigate('/tendering/results')}
-                    >
+                    <br />
+                    {resultError?.message}
+                    <br />
+                    <Button variant="outline" size="sm" className="ml-4" onClick={() => navigate(paths.tendering.results)}>
                         Back to List
                     </Button>
                 </AlertDescription>
@@ -88,17 +68,20 @@ export default function TenderResultEditPage() {
         );
     }
 
-    const tenderDetails = {
+    const resultDetails = {
         tenderNo: (result as any).tenderNo || '',
         tenderName: (result as any).tenderName || '',
+        partiesCount: result.qualifiedPartiesCount || '',
+        partiesNames: result.qualifiedPartiesNames || [],
+
     };
 
     return (
         <UploadResultFormPage
-            resultId={resultId}
-            tenderDetails={tenderDetails}
+            tenderId={result.tenderId}
+            tenderDetails={resultDetails}
             isEditMode={true}
-            onSuccess={() => navigate(`/tendering/results/${resultId}`)}
+            onSuccess={() => navigate(paths.tendering.results)}
         />
     );
 }

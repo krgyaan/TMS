@@ -54,6 +54,8 @@ export type BidSubmissionListParams = {
     limit?: number;
     sortBy?: string;
     sortOrder?: "asc" | "desc";
+    search?: string;
+    teamId?: number;
 };
 
 export type SubmitBidDto = {

@@ -64,6 +64,7 @@ export const CreateFollowUpSchema = z.object({
     comment: z.string().optional(),
 
     contacts: z.array(ContactPersonSchema),
+    followupFor: z.string().optional(),
 
     startFrom: z.string().optional(), // YYYY-MM-DD
     emdId: z.number().nullable().optional(),

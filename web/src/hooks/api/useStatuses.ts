@@ -1,4 +1,5 @@
-﻿import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { statusesService } from "@/services/api";
 import type { Status } from "@/types/api.types";
 import { handleQueryError } from "@/lib/react-query";
@@ -17,6 +18,15 @@ export const useStatuses = () => {
         queryKey: statusKey.lists(),
         queryFn: () => statusesService.getAll(),
     });
+};
+
+export const useFilteredStatuses = () => {
+    const { data: statuses = [] } = useStatuses();
+
+    return useMemo(
+        () => statuses.filter((s) => s.status === true),
+        [statuses]
+    );
 };
 
 export const useStatus = (id: number) => {

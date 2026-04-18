@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useCurrentUser } from '@/hooks/api/useAuth'
-import { useUserProfile, useUpdateUserProfile } from '@/hooks/api/useUserProfiles'
+import { useUserProfile } from '@/hooks/api/useUserProfiles'
+import { useHrmsEmployeeProfile } from '@/hooks/api/useHrmsEmployeeProfiles'
 import { ProfileForm } from './components/ProfileForm'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -12,10 +13,10 @@ export default function ProfilePage() {
     const { data: currentUser, isLoading: userLoading } = useCurrentUser()
     const userId = currentUser?.id
     const { data: profile, isLoading: profileLoading, refetch } = useUserProfile(userId)
-    const updateProfile = useUpdateUserProfile()
+    const { data: employeeProfile, isLoading: hrmsLoading } = useHrmsEmployeeProfile(userId)
     const [isEditing, setIsEditing] = useState(false)
 
-    if (userLoading || profileLoading) {
+    if (userLoading || profileLoading || hrmsLoading) {
         return (
             <Card>
                 <CardHeader>
@@ -66,7 +67,7 @@ export default function ProfilePage() {
             <CardContent>
                 {isEditing ? (
                     <ProfileForm
-                        user={currentUser}
+                        user={currentUser as any}
                         profile={profile}
                         onCancel={() => setIsEditing(false)}
                         onSuccess={() => {
@@ -120,6 +121,41 @@ export default function ProfilePage() {
                                         <div>
                                             <label className="text-sm font-medium text-muted-foreground">Alternate Email</label>
                                             <p className="text-sm">{profile.altEmail}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                        {employeeProfile && (
+                            <div className="border-t pt-6">
+                                <h3 className="text-lg font-semibold mb-4">HR & Employment Details</h3>
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    {employeeProfile.employeeType && (
+                                        <div>
+                                            <label className="text-sm font-medium text-muted-foreground">Employment Type</label>
+                                            <p className="text-sm">{employeeProfile.employeeType}</p>
+                                        </div>
+                                    )}
+                                    {employeeProfile.employeeStatus && (
+                                        <div>
+                                            <label className="text-sm font-medium text-muted-foreground">Status</label>
+                                            <p className="text-sm">
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                                    {employeeProfile.employeeStatus}
+                                                </span>
+                                            </p>
+                                        </div>
+                                    )}
+                                    {employeeProfile.workLocation && (
+                                        <div>
+                                            <label className="text-sm font-medium text-muted-foreground">Work Location</label>
+                                            <p className="text-sm">{employeeProfile.workLocation}</p>
+                                        </div>
+                                    )}
+                                    {employeeProfile.officialEmail && (
+                                        <div>
+                                            <label className="text-sm font-medium text-muted-foreground">Official Email</label>
+                                            <p className="text-sm">{employeeProfile.officialEmail}</p>
                                         </div>
                                     )}
                                 </div>

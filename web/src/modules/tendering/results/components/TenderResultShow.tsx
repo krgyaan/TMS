@@ -1,12 +1,13 @@
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { Pencil, ArrowLeft, Trophy, XCircle, Clock, Gavel, CheckCircle2 } from 'lucide-react';
+import { Trophy, XCircle, Clock, Gavel, CheckCircle2, FileText, ExternalLink, Download } from 'lucide-react';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import type { ResultDashboardRow } from '../helpers/tenderResult.types';
+import { Button } from '@/components/ui/button';
+import { tenderFilesService } from '@/services/api/tender-files.service';
 
 interface TenderResultShowProps {
     result: ResultDashboardRow & {
@@ -22,13 +23,25 @@ interface TenderResultShowProps {
         reverseAuctionId?: number | null;
     };
     isLoading?: boolean;
-    showEditButton?: boolean;
-    showBackButton?: boolean;
-    onEdit?: () => void;
-    onBack?: () => void;
     onViewRa?: (raId: number) => void;
     className?: string;
 }
+
+// Helper function to get file URL from stored path
+const getFileUrl = (filePath: string): string => {
+    // File paths are stored as "context/filename.ext" (e.g., "bid-submitted-docs/file.pdf")
+    // API expects: /tender-files/serve/:context/:fileName
+    const parts = filePath.split('/');
+    if (parts.length >= 2) {
+        const context = parts[0];
+        const fileName = parts.slice(1).join('/');
+        // Get base URL from axios instance
+        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+        return `${baseUrl}/tender-files/serve/${context}/${encodeURIComponent(fileName)}`;
+    }
+    // Fallback: try to use as-is (shouldn't happen with proper paths)
+    return tenderFilesService.getFileUrl(filePath);
+};
 
 const getStatusVariant = (status: string): string => {
     switch (status) {
@@ -60,23 +73,19 @@ const getEmdStatusVariant = (status: string | null): string => {
 export function TenderResultShow({
     result,
     isLoading = false,
-    showEditButton = true,
-    showBackButton = true,
-    onEdit,
-    onBack,
     onViewRa,
     className = '',
 }: TenderResultShowProps) {
     if (isLoading) {
         return (
             <Card className={className}>
-                <CardHeader>
-                    <Skeleton className="h-8 w-48" />
+                <CardHeader className="pb-3">
+                    <Skeleton className="h-5 w-40" />
                 </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
-                        {Array.from({ length: 8 }).map((_, i) => (
-                            <Skeleton key={i} className="h-12 w-full" />
+                <CardContent className="pt-0">
+                    <div className="space-y-2">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                            <Skeleton key={i} className="h-10 w-full" />
                         ))}
                     </div>
                 </CardContent>
@@ -84,8 +93,8 @@ export function TenderResultShow({
         );
     }
 
-    const isQualified = result.technicallyQualified === 'Yes';
-    const isDisqualified = result.technicallyQualified === 'No';
+    const isQualified = result?.technicallyQualified === 'Yes';
+    const isDisqualified = result?.technicallyQualified === 'No';
     const hasResult = !!result.result;
 
     return (
@@ -95,20 +104,6 @@ export function TenderResultShow({
                     <Trophy className="h-5 w-5" />
                     Tender Result Details
                 </CardTitle>
-                <CardAction className="flex gap-2">
-                    {showEditButton && onEdit && (
-                        <Button variant="default" size="sm" onClick={onEdit}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit
-                        </Button>
-                    )}
-                    {showBackButton && onBack && (
-                        <Button variant="outline" size="sm" onClick={onBack}>
-                            <ArrowLeft className="h-4 w-4 mr-2" />
-                            Back
-                        </Button>
-                    )}
-                </CardAction>
             </CardHeader>
             <CardContent>
                 <Table>
@@ -307,7 +302,7 @@ export function TenderResultShow({
                                         <TableCell className="text-sm font-medium text-muted-foreground">
                                             Disqualification Reason
                                         </TableCell>
-                                        <TableCell className="text-sm" colSpan={3}>
+                                        <TableCell className="text-sm break-words" colSpan={3}>
                                             {result.disqualificationReason}
                                         </TableCell>
                                     </TableRow>
@@ -326,7 +321,7 @@ export function TenderResultShow({
                                             </TableCell>
                                             <TableCell className="text-sm">
                                                 {result.qualifiedPartiesNames &&
-                                                result.qualifiedPartiesNames.length > 0 ? (
+                                                    result.qualifiedPartiesNames.length > 0 ? (
                                                     <div className="flex flex-wrap gap-1">
                                                         {result.qualifiedPartiesNames.map((name, idx) => (
                                                             <Badge key={idx} variant="outline" className="text-xs">
@@ -362,8 +357,8 @@ export function TenderResultShow({
                                                 result.result === 'Won'
                                                     ? 'success'
                                                     : result.result === 'Lost'
-                                                    ? 'destructive'
-                                                    : 'secondary'
+                                                        ? 'destructive'
+                                                        : 'secondary'
                                             }
                                         >
                                             {result.result}
@@ -402,52 +397,89 @@ export function TenderResultShow({
                             </>
                         )}
 
-                        {/* Screenshots */}
-                        {(result.qualifiedPartiesScreenshot || result.finalResultScreenshot) && (
-                            <>
-                                <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={4} className="font-semibold text-sm">
-                                        Screenshots
-                                    </TableCell>
-                                </TableRow>
-                                {result.qualifiedPartiesScreenshot && (
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Qualified Parties Screenshot
-                                        </TableCell>
-                                        <TableCell className="text-sm" colSpan={3}>
-                                            <a
-                                                href={result.qualifiedPartiesScreenshot}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-primary hover:underline"
-                                            >
-                                                View Screenshot
-                                            </a>
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                                {result.finalResultScreenshot && (
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Final Result Screenshot
-                                        </TableCell>
-                                        <TableCell className="text-sm" colSpan={3}>
-                                            <a
-                                                href={result.finalResultScreenshot}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-primary hover:underline"
-                                            >
-                                                View Screenshot
-                                            </a>
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </>
-                        )}
                     </TableBody>
                 </Table>
+                {/* Screenshots */}
+                {(result.qualifiedPartiesScreenshot || result.finalResultScreenshot) && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {result.qualifiedPartiesScreenshot && (
+                            <div className="flex flex-col border rounded-md p-3 bg-card shadow-sm gap-2">
+                                <div className="flex items-start gap-2 overflow-hidden">
+                                    <FileText className="h-6 w-6 text-muted-foreground shrink-0" />
+                                    <div className="flex flex-col overflow-hidden">
+                                        <span className="font-medium text-sm truncate" title={result.qualifiedPartiesScreenshot.split('/').pop() || result.qualifiedPartiesScreenshot}>
+                                            {result.qualifiedPartiesScreenshot.split('/').pop() || result.qualifiedPartiesScreenshot}
+                                        </span>
+                                        <span className="text-xs text-muted-foreground truncate" title="Qualified Parties Screenshot">
+                                            Qualified Parties Screenshot
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 mt-auto">
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="flex-1 h-8 text-xs gap-1"
+                                        onClick={() => window.open(getFileUrl(result.qualifiedPartiesScreenshot!), '_blank')}
+                                    >
+                                        <ExternalLink className="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="flex-1 h-8 text-xs gap-1"
+                                        onClick={() => {
+                                            const a = document.createElement('a');
+                                            a.href = getFileUrl(result.qualifiedPartiesScreenshot!);
+                                            a.download = result.qualifiedPartiesScreenshot!.split('/').pop() || result.qualifiedPartiesScreenshot!;
+                                            a.click();
+                                        }}
+                                    >
+                                        <Download className="h-3 w-3" />
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                        {result.finalResultScreenshot && (
+                            <div className="flex flex-col border rounded-md p-3 bg-card shadow-sm gap-2">
+                                <div className="flex items-start gap-2 overflow-hidden">
+                                    <FileText className="h-6 w-6 text-muted-foreground shrink-0" />
+                                    <div className="flex flex-col overflow-hidden">
+                                        <span className="font-medium text-sm truncate" title={result.finalResultScreenshot.split('/').pop() || result.finalResultScreenshot}>
+                                            {result.finalResultScreenshot.split('/').pop() || result.finalResultScreenshot}
+                                        </span>
+                                        <span className="text-xs text-muted-foreground truncate" title="Final Price Screenshot">
+                                            Final Price Screenshot
+                                        </span>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 mt-auto">
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="flex-1 h-8 text-xs gap-1"
+                                        onClick={() => window.open(getFileUrl(result.finalResultScreenshot!), '_blank')}
+                                    >
+                                        <ExternalLink className="h-3 w-3" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="flex-1 h-8 text-xs gap-1"
+                                        onClick={() => {
+                                            const a = document.createElement('a');
+                                            a.href = getFileUrl(result.finalResultScreenshot!);
+                                            a.download = result.finalResultScreenshot!.split('/').pop() || result.finalResultScreenshot!;
+                                            a.click();
+                                        }}
+                                    >
+                                        <Download className="h-3 w-3" />
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
             </CardContent>
         </Card>
     );
