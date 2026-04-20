@@ -1,169 +1,162 @@
-import { useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { useCurrentUser } from '@/hooks/api/useAuth'
-import { useUserProfile } from '@/hooks/api/useUserProfiles'
-import { useHrmsEmployeeProfile } from '@/hooks/api/useHrmsEmployeeProfiles'
-import { ProfileForm } from './components/ProfileForm'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertCircle } from 'lucide-react'
+import React, { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { 
+  User, 
+  FileText, 
+  Bell, 
+  Laptop, 
+  MessageSquare 
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+
+import { ProfileProvider, useProfileContext } from "./contexts/ProfileContext";
+import { Loader2 } from "lucide-react";
+
+import { staggerContainer } from "./animations";
+
+// Components
+import { ProfileHeader } from "./components/ProfileHeader";
+import { OverviewTab } from "./components/OverviewTab";
+import { DocumentsSection } from "./components/DocumentsSection";
+import { NotificationsSection } from "./components/NotificationsSection";
+import { AssetsSection } from "./components/AssetsSection";
+import { ComplaintsSection } from "./components/ComplaintsSection";
+
+function ProfilePageContent() {
+  const { data, isLoading, error } = useProfileContext();
+  const [activeTab, setActiveTab] = useState("overview");
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background text-destructive text-center p-6">
+        <div className="max-w-md">
+          <h2 className="text-xl font-bold mb-2">Error Loading Profile</h2>
+          <p className="text-muted-foreground">{error?.message || "Failed to load profile data"}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const unreadNotifCount = data?.notifications?.filter((n) => !n.read).length || 0;
+
+  return (
+    <div className="min-h-screen bg-background text-foreground selection:bg-primary/10">
+      {/* Decorative Background Elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-[15%] -right-[10%] w-[45%] h-[45%] rounded-full bg-primary/[0.04] blur-[120px]" />
+        <div className="absolute top-[30%] -left-[8%] w-[35%] h-[35%] rounded-full bg-primary/[0.03] blur-[100px]" />
+        <div className="absolute bottom-[10%] right-[15%] w-[25%] h-[25%] rounded-full bg-primary/[0.02] blur-[80px]" />
+      </div>
+
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 relative">
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          animate="show"
+          className="space-y-8"
+        >
+          {/* Header Card */}
+          <ProfileHeader />
+
+          {/* Tabs Navigation */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <Tabs
+              value={activeTab}
+              onValueChange={setActiveTab}
+              className="w-full"
+            >
+              <TabsList className="w-full justify-start h-auto p-1.5 bg-muted/20 rounded-2xl overflow-x-auto flex-nowrap backdrop-blur-lg border border-border/30 shadow-sm">
+                {[
+                  { value: "overview", label: "Overview", icon: User },
+                  { value: "documents", label: "Documents", icon: FileText },
+                  {
+                    value: "notifications",
+                    label: "Activity",
+                    icon: Bell,
+                    badge: unreadNotifCount,
+                  },
+                  { value: "assets", label: "Assets", icon: Laptop },
+                  { value: "complaints", label: "Support", icon: MessageSquare },
+                ].map((tab) => (
+                  <TabsTrigger
+                    key={tab.value}
+                    value={tab.value}
+                    className={cn(
+                      "relative gap-2 rounded-xl text-xs sm:text-sm px-4 sm:px-6 py-2.5 flex-shrink-0 font-semibold transition-all duration-300",
+                      "data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-md data-[state=active]:shadow-black/[0.04]"
+                    )}
+                  >
+                    <tab.icon className="h-4 w-4" />
+                    <span className="hidden sm:inline">{tab.label}</span>
+                    <span className="sm:hidden">{tab.label.slice(0, 3)}</span>
+                    {tab.badge ? (
+                      <span className="ml-0.5 min-w-[20px] h-5 rounded-full bg-primary text-primary-foreground text-[10px] flex items-center justify-center font-bold px-1.5">
+                        {tab.badge}
+                      </span>
+                    ) : null}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+
+              {/* Tab Contents */}
+              <div className="mt-8">
+                <AnimatePresence mode="wait">
+                  {activeTab === "overview" && (
+                    <TabsContent value="overview" className="outline-none m-0" key="overview" forceMount>
+                      <OverviewTab setActiveTab={setActiveTab} />
+                    </TabsContent>
+                  )}
+
+                  {activeTab === "documents" && (
+                    <TabsContent value="documents" className="outline-none m-0" key="documents" forceMount>
+                      <DocumentsSection />
+                    </TabsContent>
+                  )}
+
+                  {activeTab === "notifications" && (
+                    <TabsContent value="notifications" className="outline-none m-0" key="notifications" forceMount>
+                      <NotificationsSection />
+                    </TabsContent>
+                  )}
+
+                  {activeTab === "assets" && (
+                    <TabsContent value="assets" className="outline-none m-0" key="assets" forceMount>
+                      <AssetsSection />
+                    </TabsContent>
+                  )}
+
+                  {activeTab === "complaints" && (
+                    <TabsContent value="complaints" className="outline-none m-0" key="complaints" forceMount>
+                      <ComplaintsSection />
+                    </TabsContent>
+                  )}
+                </AnimatePresence>
+              </div>
+            </Tabs>
+          </motion.div>
+        </motion.div>
+      </div>
+    </div>
+  );
+}
 
 export default function ProfilePage() {
-    const { data: currentUser, isLoading: userLoading } = useCurrentUser()
-    const userId = currentUser?.id
-    const { data: profile, isLoading: profileLoading, refetch } = useUserProfile(userId)
-    const { data: employeeProfile, isLoading: hrmsLoading } = useHrmsEmployeeProfile(userId)
-    const [isEditing, setIsEditing] = useState(false)
-
-    if (userLoading || profileLoading || hrmsLoading) {
-        return (
-            <Card>
-                <CardHeader>
-                    <Skeleton className="h-8 w-48" />
-                    <Skeleton className="h-4 w-64 mt-2" />
-                </CardHeader>
-                <CardContent>
-                    <Skeleton className="h-96 w-full" />
-                </CardContent>
-            </Card>
-        )
-    }
-
-    if (!currentUser) {
-        return (
-            <Card>
-                <CardHeader>
-                    <CardTitle>Error</CardTitle>
-                    <CardDescription>User not found</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Alert variant="destructive">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>
-                            Unable to load user information. Please try again.
-                        </AlertDescription>
-                    </Alert>
-                </CardContent>
-            </Card>
-        )
-    }
-
-    return (
-        <Card>
-            <CardHeader>
-                <div className="flex items-center justify-between">
-                    <div>
-                        <CardTitle>My Profile</CardTitle>
-                        <CardDescription>Manage your profile information</CardDescription>
-                    </div>
-                    {!isEditing && (
-                        <Button onClick={() => setIsEditing(true)}>
-                            Edit Profile
-                        </Button>
-                    )}
-                </div>
-            </CardHeader>
-            <CardContent>
-                {isEditing ? (
-                    <ProfileForm
-                        user={currentUser as any}
-                        profile={profile}
-                        onCancel={() => setIsEditing(false)}
-                        onSuccess={() => {
-                            setIsEditing(false)
-                            refetch()
-                        }}
-                    />
-                ) : (
-                    <div className="space-y-6">
-                        <div className="grid gap-4 md:grid-cols-2">
-                            <div>
-                                <label className="text-sm font-medium text-muted-foreground">Full Name</label>
-                                <p className="text-sm">{currentUser.name}</p>
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium text-muted-foreground">Email</label>
-                                <p className="text-sm">{currentUser.email}</p>
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium text-muted-foreground">Username</label>
-                                <p className="text-sm">{currentUser.username || '—'}</p>
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium text-muted-foreground">Mobile</label>
-                                <p className="text-sm">{currentUser.mobile || '—'}</p>
-                            </div>
-                        </div>
-                        {profile && (
-                            <div className="border-t pt-6">
-                                <h3 className="text-lg font-semibold mb-4">Additional Information</h3>
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    {profile.firstName && (
-                                        <div>
-                                            <label className="text-sm font-medium text-muted-foreground">First Name</label>
-                                            <p className="text-sm">{profile.firstName}</p>
-                                        </div>
-                                    )}
-                                    {profile.lastName && (
-                                        <div>
-                                            <label className="text-sm font-medium text-muted-foreground">Last Name</label>
-                                            <p className="text-sm">{profile.lastName}</p>
-                                        </div>
-                                    )}
-                                    {profile.employeeCode && (
-                                        <div>
-                                            <label className="text-sm font-medium text-muted-foreground">Employee Code</label>
-                                            <p className="text-sm">{profile.employeeCode}</p>
-                                        </div>
-                                    )}
-                                    {profile.altEmail && (
-                                        <div>
-                                            <label className="text-sm font-medium text-muted-foreground">Alternate Email</label>
-                                            <p className="text-sm">{profile.altEmail}</p>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                        {employeeProfile && (
-                            <div className="border-t pt-6">
-                                <h3 className="text-lg font-semibold mb-4">HR & Employment Details</h3>
-                                <div className="grid gap-4 md:grid-cols-2">
-                                    {employeeProfile.employeeType && (
-                                        <div>
-                                            <label className="text-sm font-medium text-muted-foreground">Employment Type</label>
-                                            <p className="text-sm">{employeeProfile.employeeType}</p>
-                                        </div>
-                                    )}
-                                    {employeeProfile.employeeStatus && (
-                                        <div>
-                                            <label className="text-sm font-medium text-muted-foreground">Status</label>
-                                            <p className="text-sm">
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                                                    {employeeProfile.employeeStatus}
-                                                </span>
-                                            </p>
-                                        </div>
-                                    )}
-                                    {employeeProfile.workLocation && (
-                                        <div>
-                                            <label className="text-sm font-medium text-muted-foreground">Work Location</label>
-                                            <p className="text-sm">{employeeProfile.workLocation}</p>
-                                        </div>
-                                    )}
-                                    {employeeProfile.officialEmail && (
-                                        <div>
-                                            <label className="text-sm font-medium text-muted-foreground">Official Email</label>
-                                            <p className="text-sm">{employeeProfile.officialEmail}</p>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </CardContent>
-        </Card>
-    )
+  return (
+    <ProfileProvider>
+      <ProfilePageContent />
+    </ProfileProvider>
+  );
 }
