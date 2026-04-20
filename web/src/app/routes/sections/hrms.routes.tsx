@@ -23,7 +23,7 @@ export default function HrmsRoutes() {
             <Route path="employees/register" element={<EmployeeRegistration />} />
             <Route path="employees/:id" element={<EmployeeProfileView />} />
 
-            <Route path="onboarding" element={<OnboardingDashboard />} />
+            <Route path="onboarding/dashboard" element={<OnboardingDashboard />} />
             <Route path="onboarding/profile-details" element={<ProfileDetailsDashboard />} />
             <Route path="onboarding/documents" element={<DocumentDashboard />} />
             <Route path="onboarding/induction" element={<InductionDashboard />}/>

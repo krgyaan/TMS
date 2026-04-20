@@ -11,10 +11,11 @@ import {
   Post,
   Req,
   UseGuards,
+  BadRequestException,
 } from '@nestjs/common';
 import { z } from 'zod';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
-import { OnboardingService } from './onboarding.service';
+import { OnboardingService, type UpdateProfileDto } from './onboarding.service';
 import { Public } from '@/modules/auth/decorators';
 
 // ─── Validation Schemas ───────────────────────────────────────────────────────
@@ -68,6 +69,24 @@ const UpdateStatusSchema = z.object({
   note: z.string().optional(),
 });
 
+const UpdateProfileSchema = z.object({
+  // Employment
+  employeeType: z.string().optional(),
+  workLocation: z.string().optional(),
+  dateOfJoining: z.string().optional(),
+  probationMonths: z.number().optional(),
+  probationEndDate: z.string().optional(),
+  // Compensation
+  salaryType: z.string().optional(),
+  basicSalary: z.coerce.string().optional(),
+  // Bank
+  bankName: z.string().optional(),
+  accountNumber: z.string().optional(),
+  ifscCode: z.string().optional(),
+  // Flags
+  hrCompleted: z.boolean().optional(),
+});
+
 // ─── Controller ───────────────────────────────────────────────────────────────
 
 @Controller('hrms/onboarding')
@@ -81,6 +100,110 @@ export class OnboardingController {
   @UseGuards(JwtAuthGuard)
   async listAll() {
     return this.onboardingService.findAll();
+  }
+
+  /**
+   * GET /hrms/onboarding/profiles  — Protected: HR only
+   * Returns all approved employees joined with profile completion data.
+   */
+  @Get('profiles')
+  @UseGuards(JwtAuthGuard)
+  async listProfiles() {
+    return this.onboardingService.getProfileList();
+  }
+
+  /**
+   * GET /hrms/onboarding/:id/profile  — Protected: HR only
+   * Returns a single employee's full profile.
+   */
+  @Get(':id/profile')
+  @UseGuards(JwtAuthGuard)
+  async getProfile(@Param('id', ParseIntPipe) id: number) {
+    return this.onboardingService.getProfile(id);
+  }
+
+  /**
+   * PATCH /hrms/onboarding/:id/profile  — Protected: HR only
+   * HR fills employment, compensation, and bank details.
+   */
+  @Patch(':id/profile')
+  @UseGuards(JwtAuthGuard)
+  async updateProfile(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: unknown,
+    @Req() req: any,
+  ) {
+    const parsed = UpdateProfileSchema.parse(body) as UpdateProfileDto;
+    return this.onboardingService.updateProfile(id, parsed, req.user.id);
+  }
+
+  /**
+   * GET /hrms/onboarding/documents-tracker  — Protected: HR only
+   */
+  @Get('documents-tracker')
+  @UseGuards(JwtAuthGuard)
+  async listDocumentsTracker() {
+    return this.onboardingService.getDocumentTrackerList();
+  }
+
+  /**
+   * GET /hrms/onboarding/:id/documents  — Protected: HR only
+   */
+  @Get(':id/documents')
+  @UseGuards(JwtAuthGuard)
+  async getEmployeeDocuments(@Param('id', ParseIntPipe) id: number) {
+    return this.onboardingService.getEmployeeDocuments(id);
+  }
+
+  /**
+   * PATCH /hrms/onboarding/:id/documents/:docId/verify  — Protected: HR only
+   */
+  @Patch(':id/documents/:docId/verify')
+  @UseGuards(JwtAuthGuard)
+  async verifyDocument(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('docId', ParseIntPipe) docId: number,
+    @Body() body: { status: string; reason?: string },
+    @Req() req: any,
+  ) {
+    if (!['verified', 'rejected'].includes(body.status)) {
+      throw new BadRequestException('Invalid status');
+    }
+    return this.onboardingService.verifyDocument(id, docId, body.status, body.reason, req.user.id);
+  }
+
+  // ─── Induction Endpoints ────────────────────────────────────────────────────
+
+  /**
+   * GET /hrms/onboarding/induction-tracker
+   */
+  @Get('induction-tracker')
+  @UseGuards(JwtAuthGuard)
+  async listInductionTracker() {
+    return this.onboardingService.getInductionTrackerList();
+  }
+
+  /**
+   * GET /hrms/onboarding/:id/induction
+   */
+  @Get(':id/induction')
+  @UseGuards(JwtAuthGuard)
+  async getEmployeeInduction(@Param('id', ParseIntPipe) id: number) {
+    return this.onboardingService.getEmployeeInduction(id);
+  }
+
+  /**
+   * PATCH /hrms/onboarding/:id/induction/:taskId
+   */
+  @Patch(':id/induction/:taskId')
+  @UseGuards(JwtAuthGuard)
+  async updateInductionTask(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('taskId', ParseIntPipe) taskId: number,
+    @Body() body: { status?: string; remarks?: string },
+    @Req() req: any,
+  ) {
+    return this.onboardingService.updateInductionTask(id, taskId, body, req.user.id);
   }
 
   /**

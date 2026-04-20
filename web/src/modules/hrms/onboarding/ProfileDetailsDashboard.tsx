@@ -12,6 +12,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useProfileList, useProfile, useUpdateProfile } from "./useOnboarding";
+import type { ProfileListItem, FullProfile, UpdateProfileDto } from "../../../services/api/onboarding.service";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -117,177 +119,47 @@ interface EmployeeProfile {
   hrFilledBy?: string;
 }
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const MOCK_PROFILES: EmployeeProfile[] = [
-  {
-    id: 1,
-    employeeId: "EMP24A1B2",
-    firstName: "Priya",
-    lastName: "Sharma",
-    email: "priya.sharma@gmail.com",
-    phone: "+91 98765 43210",
-    designation: "Software Engineer",
-    department: "Information Technology",
-    dateOfJoining: "2024-08-01",
-    approvedAt: "2024-07-22T10:30:00Z",
-    lastUpdated: "2024-07-23T14:20:00Z",
-    hrFilledBy: "Anjali Kapoor",
-    hrTimer: 120,
+const mapToEmployeeProfile = (item: ProfileListItem): EmployeeProfile => {
+  const hrFieldsCount = {
+    employment: [item.employeeType, item.workLocation, item.dateOfJoining].filter(Boolean).length,
+    compensation: [item.salaryType, item.basicSalary].filter(Boolean).length,
+    bankDetails: [item.bankName, item.accountNumber, item.ifscCode].filter(Boolean).length,
+  };
+
+  const hrStatus = (done: number, total: number): SectionStatus =>
+    done === total ? "completed" : done > 0 ? "in_progress" : "not_started";
+
+  return {
+    id: item.id,
+    employeeId: `EMP-${item.id.toString().padStart(4, '0')}`,
+    firstName: item.firstName || item.name.split(" ")[0] || "Unknown",
+    lastName: item.lastName || item.name.split(" ").slice(1).join(" ") || "—",
+    email: item.email,
+    phone: item.phone || "—",
+    designation: item.employeeType || "Pending",
+    department: "TBD", // To be filled if we add department to list
+    dateOfJoining: item.dateOfJoining || new Date().toISOString(),
+    approvedAt: item.approvedAt || new Date().toISOString(),
+    hrTimer: item.approvedAt ? Math.floor((Date.now() - new Date(item.approvedAt).getTime()) / 60000) : 0,
+    lastUpdated: item.updatedAt,
+    hrFilledBy: item.reviewedBy || undefined,
     hrSections: {
-      employment: { status: "completed", completedFields: 9, totalFields: 9 },
-      compensation: { status: "completed", completedFields: 7, totalFields: 7 },
-      bankDetails: { status: "completed", completedFields: 6, totalFields: 6 },
+      employment: { status: hrStatus(hrFieldsCount.employment, 3), completedFields: hrFieldsCount.employment, totalFields: 3 },
+      compensation: { status: hrStatus(hrFieldsCount.compensation, 2), completedFields: hrFieldsCount.compensation, totalFields: 2 },
+      bankDetails: { status: hrStatus(hrFieldsCount.bankDetails, 3), completedFields: hrFieldsCount.bankDetails, totalFields: 3 },
     },
     employeeSections: {
-      personalInfo: { status: "completed", completedFields: 14, totalFields: 14 },
-      currentAddress: { status: "completed", completedFields: 6, totalFields: 6 },
-      permanentAddress: { status: "completed", completedFields: 6, totalFields: 6 },
-      emergencyContact: { status: "completed", completedFields: 5, totalFields: 5 },
-      education: { status: "in_progress", completedFields: 3, totalFields: 6 },
-      experience: { status: "not_started", completedFields: 0, totalFields: 6 },
-    },
-  },
-  {
-    id: 2,
-    employeeId: "EMP24C3D4",
-    firstName: "Rahul",
-    lastName: "Mehta",
-    email: "rahul.mehta@gmail.com",
-    phone: "+91 87654 32109",
-    designation: "Product Manager",
-    department: "Operations",
-    dateOfJoining: "2024-07-28",
-    approvedAt: "2024-07-20T09:00:00Z",
-    lastUpdated: "2024-07-20T11:00:00Z",
-    hrFilledBy: "Anjali Kapoor",
-    hrTimer: 45,
-    hrSections: {
-      employment: { status: "completed", completedFields: 9, totalFields: 9 },
-      compensation: { status: "in_progress", completedFields: 4, totalFields: 7 },
-      bankDetails: { status: "not_started", completedFields: 0, totalFields: 6 },
-    },
-    employeeSections: {
-      personalInfo: { status: "completed", completedFields: 14, totalFields: 14 },
-      currentAddress: { status: "completed", completedFields: 6, totalFields: 6 },
-      permanentAddress: { status: "not_started", completedFields: 0, totalFields: 6 },
-      emergencyContact: { status: "not_started", completedFields: 0, totalFields: 5 },
-      education: { status: "not_started", completedFields: 0, totalFields: 6 },
-      experience: { status: "not_started", completedFields: 0, totalFields: 6 },
-    },
-  },
-  {
-    id: 3,
-    employeeId: "EMP24E5F6",
-    firstName: "Sneha",
-    lastName: "Iyer",
-    email: "sneha.iyer@gmail.com",
-    phone: "+91 76543 21098",
-    designation: "UX Designer",
-    department: "Design",
-    dateOfJoining: "2024-08-05",
-    approvedAt: "2024-07-23T11:00:00Z",
-    lastUpdated: "2024-07-23T11:05:00Z",
-    hrTimer: 480,
-    hrSections: {
-      employment: { status: "not_started", completedFields: 0, totalFields: 9 },
-      compensation: { status: "not_started", completedFields: 0, totalFields: 7 },
-      bankDetails: { status: "not_started", completedFields: 0, totalFields: 6 },
-    },
-    employeeSections: {
-      personalInfo: { status: "not_started", completedFields: 0, totalFields: 14 },
-      currentAddress: { status: "not_started", completedFields: 0, totalFields: 6 },
-      permanentAddress: { status: "not_started", completedFields: 0, totalFields: 6 },
-      emergencyContact: { status: "not_started", completedFields: 0, totalFields: 5 },
-      education: { status: "not_started", completedFields: 0, totalFields: 6 },
-      experience: { status: "not_started", completedFields: 0, totalFields: 6 },
-    },
-  },
-  {
-    id: 4,
-    employeeId: "EMP24G7H8",
-    firstName: "Arjun",
-    lastName: "Nair",
-    email: "arjun.nair@gmail.com",
-    phone: "+91 65432 10987",
-    designation: "Data Analyst",
-    department: "Finance",
-    dateOfJoining: "2024-08-12",
-    approvedAt: "2024-07-25T08:00:00Z",
-    lastUpdated: "2024-07-26T16:30:00Z",
-    hrFilledBy: "Vikram Singh",
-    hrTimer: 95,
-    hrSections: {
-      employment: { status: "completed", completedFields: 9, totalFields: 9 },
-      compensation: { status: "completed", completedFields: 7, totalFields: 7 },
-      bankDetails: { status: "in_progress", completedFields: 3, totalFields: 6 },
-    },
-    employeeSections: {
-      personalInfo: { status: "in_progress", completedFields: 8, totalFields: 14 },
-      currentAddress: { status: "in_progress", completedFields: 4, totalFields: 6 },
-      permanentAddress: { status: "not_started", completedFields: 0, totalFields: 6 },
-      emergencyContact: { status: "completed", completedFields: 5, totalFields: 5 },
-      education: { status: "completed", completedFields: 6, totalFields: 6 },
-      experience: { status: "in_progress", completedFields: 3, totalFields: 6 },
-    },
-  },
-  {
-    id: 5,
-    employeeId: "EMP24I9J0",
-    firstName: "Meera",
-    lastName: "Pillai",
-    middleName: "R",
-    email: "meera.pillai@gmail.com",
-    phone: "+91 54321 09876",
-    designation: "HR Executive",
-    department: "Human Resources",
-    dateOfJoining: "2024-08-03",
-    approvedAt: "2024-07-26T13:00:00Z",
-    lastUpdated: "2024-07-27T10:00:00Z",
-    hrFilledBy: "Anjali Kapoor",
-    hrTimer: 60,
-    hrSections: {
-      employment: { status: "completed", completedFields: 9, totalFields: 9 },
-      compensation: { status: "completed", completedFields: 7, totalFields: 7 },
-      bankDetails: { status: "completed", completedFields: 6, totalFields: 6 },
-    },
-    employeeSections: {
-      personalInfo: { status: "completed", completedFields: 14, totalFields: 14 },
-      currentAddress: { status: "completed", completedFields: 6, totalFields: 6 },
-      permanentAddress: { status: "completed", completedFields: 6, totalFields: 6 },
-      emergencyContact: { status: "completed", completedFields: 5, totalFields: 5 },
-      education: { status: "completed", completedFields: 6, totalFields: 6 },
-      experience: { status: "completed", completedFields: 6, totalFields: 6 },
-    },
-  },
-  {
-    id: 6,
-    employeeId: "EMP24K1L2",
-    firstName: "Karan",
-    lastName: "Patel",
-    email: "karan.patel@gmail.com",
-    phone: "+91 43210 98765",
-    designation: "Sales Executive",
-    department: "Sales",
-    dateOfJoining: "2024-07-29",
-    approvedAt: "2024-07-18T16:00:00Z",
-    lastUpdated: "2024-07-19T09:00:00Z",
-    hrTimer: 320,
-    hrSections: {
-      employment: { status: "in_progress", completedFields: 5, totalFields: 9 },
-      compensation: { status: "not_started", completedFields: 0, totalFields: 7 },
-      bankDetails: { status: "not_started", completedFields: 0, totalFields: 6 },
-    },
-    employeeSections: {
-      personalInfo: { status: "completed", completedFields: 14, totalFields: 14 },
-      currentAddress: { status: "completed", completedFields: 6, totalFields: 6 },
-      permanentAddress: { status: "in_progress", completedFields: 3, totalFields: 6 },
-      emergencyContact: { status: "not_started", completedFields: 0, totalFields: 5 },
-      education: { status: "not_started", completedFields: 0, totalFields: 6 },
-      experience: { status: "not_started", completedFields: 0, totalFields: 6 },
-    },
-  },
-];
+      personalInfo: { status: item.employeeCompleted ? "completed" : "in_progress", completedFields: item.employeeCompleted ? 14 : 7, totalFields: 14 },
+      currentAddress: { status: item.employeeCompleted ? "completed" : "in_progress", completedFields: item.employeeCompleted ? 6 : 3, totalFields: 6 },
+      permanentAddress: { status: item.employeeCompleted ? "completed" : "in_progress", completedFields: item.employeeCompleted ? 6 : 3, totalFields: 6 },
+      emergencyContact: { status: item.employeeCompleted ? "completed" : "not_started", completedFields: item.employeeCompleted ? 5 : 0, totalFields: 5 },
+      education: { status: item.employeeCompleted ? "completed" : "not_started", completedFields: item.employeeCompleted ? 6 : 0, totalFields: 6 },
+      experience: { status: item.employeeCompleted ? "completed" : "not_started", completedFields: item.employeeCompleted ? 6 : 0, totalFields: 6 },
+    }
+  };
+};
 
 const DEPARTMENTS = [
   "Information Technology", "Operations", "Design",
@@ -813,7 +685,7 @@ const DetailModal: React.FC<{
   );
 };
 
-// ─── HR Fill Modal (simplified form shell) ────────────────────────────────────
+// ─── HR Fill Modal (functional) ────────────────────────────────────────────────
 
 const HRFillModal: React.FC<{
   profile: EmployeeProfile | null;
@@ -821,6 +693,9 @@ const HRFillModal: React.FC<{
   onClose: () => void;
 }> = ({ profile, open, onClose }) => {
   const [activeSection, setActiveSection] = useState<keyof HRSections>("employment");
+  
+  const { data: fullProfile, isLoading } = useProfile(profile?.id || null);
+  const updateMutation = useUpdateProfile(profile?.id || 0);
 
   if (!profile) return null;
 
@@ -830,37 +705,23 @@ const HRFillModal: React.FC<{
     bankDetails: profile.hrSections.bankDetails,
   };
 
-  // Employment field placeholders
   const EMPLOYMENT_FIELDS = [
-    { label: "Employee Type", type: "select", options: ["Full-time", "Part-time", "Contract", "Intern", "Temporary"], required: true },
-    { label: "Designation / Job Title", type: "text", placeholder: "e.g. Software Engineer", required: true },
-    { label: "Department", type: "select", options: DEPARTMENTS, required: true },
-    { label: "Reporting Manager", type: "text", placeholder: "Manager name", required: true },
-    { label: "Work Location / Branch", type: "text", placeholder: "e.g. Bengaluru HQ", required: true },
-    { label: "Employee Status", type: "select", options: ["Active", "Inactive"], required: true },
-    { label: "Date of Joining", type: "date", required: true },
-    { label: "Probation Period (months)", type: "number", placeholder: "e.g. 3" },
-    { label: "Probation End Date", type: "date" },
+    { name: "employeeType", label: "Employee Type", type: "select", options: ["Full-Time", "Part-Time", "Contract", "Intern"], required: true },
+    { name: "workLocation", label: "Work Location / Branch", type: "text", placeholder: "e.g. Bengaluru HQ", required: true },
+    { name: "dateOfJoining", label: "Date of Joining", type: "date", required: true },
+    { name: "probationMonths", label: "Probation Period (months)", type: "number", placeholder: "e.g. 3" },
+    { name: "probationEndDate", label: "Probation End Date", type: "date" },
   ];
 
   const COMPENSATION_FIELDS = [
-    { label: "Salary Type", type: "select", options: ["Monthly", "Hourly", "Annual"], required: true },
-    { label: "Basic Salary / CTC", type: "number", placeholder: "e.g. 50000", required: true },
-    { label: "HRA", type: "number", placeholder: "e.g. 10000" },
-    { label: "Allowances", type: "number", placeholder: "e.g. 5000" },
-    { label: "Bonus", type: "number", placeholder: "e.g. 5000" },
-    { label: "PF Applicable", type: "select", options: ["Yes", "No"] },
-    { label: "ESIC Applicable", type: "select", options: ["Yes", "No"] },
+    { name: "salaryType", label: "Salary Type", type: "select", options: ["Monthly", "Hourly", "Annual"], required: true },
+    { name: "basicSalary", label: "Basic Salary / CTC", type: "number", placeholder: "e.g. 50000", required: true },
   ];
 
   const BANK_FIELDS = [
-    { label: "Bank Name", type: "text", placeholder: "e.g. State Bank of India", required: true },
-    { label: "Account Holder Name", type: "text", placeholder: "As per bank records", required: true },
-    { label: "Account Number", type: "text", placeholder: "XXXXXXXXXXXX", required: true },
-    { label: "IFSC Code", type: "text", placeholder: "e.g. SBIN0001234", required: true },
-    { label: "Branch Name", type: "text", placeholder: "e.g. Main Branch" },
-    { label: "Branch Address", type: "text", placeholder: "Branch location" },
-    { label: "UPI ID", type: "text", placeholder: "e.g. name@upi" },
+    { name: "bankName", label: "Bank Name", type: "text", placeholder: "e.g. State Bank of India", required: true },
+    { name: "accountNumber", label: "Account Number", type: "text", placeholder: "XXXXXXXXXXXX", required: true },
+    { name: "ifscCode", label: "IFSC Code", type: "text", placeholder: "e.g. SBIN0001234", required: true },
   ];
 
   const SECTION_FIELDS: Record<keyof HRSections, typeof EMPLOYMENT_FIELDS> = {
@@ -870,6 +731,29 @@ const HRFillModal: React.FC<{
   };
 
   const currentFields = SECTION_FIELDS[activeSection];
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const dto: UpdateProfileDto = {};
+    
+    currentFields.forEach(f => {
+      const val = formData.get(f.name);
+      if (val) {
+        if (f.type === "number") {
+          (dto as any)[f.name] = Number(val);
+        } else {
+          (dto as any)[f.name] = val.toString();
+        }
+      }
+    });
+
+    updateMutation.mutate(dto, {
+      onSuccess: () => {
+        // Optionally close or stay open. We stay open to let them fill next section.
+      }
+    });
+  };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -889,7 +773,7 @@ const HRFillModal: React.FC<{
           </div>
         </DialogHeader>
 
-        <div className="flex flex-col sm:flex-row flex-1 overflow-hidden min-h-0">
+        <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row flex-1 overflow-hidden min-h-0">
           {/* Section Sidebar */}
           <div className="sm:w-44 border-b sm:border-b-0 sm:border-r bg-muted/20 flex sm:flex-col flex-row overflow-x-auto sm:overflow-y-auto flex-shrink-0">
             {HR_SECTION_CONFIG.map(({ key, label, icon: Icon }) => {
@@ -899,6 +783,7 @@ const HRFillModal: React.FC<{
               const SIcon = cfg.icon;
               return (
                 <button
+                  type="button"
                   key={key}
                   onClick={() => setActiveSection(key)}
                   className={cn(
@@ -943,56 +828,66 @@ const HRFillModal: React.FC<{
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {currentFields.map((field) => (
-                <div key={field.label} className={cn(
-                  "space-y-1.5",
-                  field.type === "text" && field.label.includes("Address") && "sm:col-span-2",
-                )}>
-                  <label className="text-xs font-medium text-foreground flex items-center gap-1">
-                    {field.label}
-                    {field.required && <span className="text-destructive">*</span>}
-                  </label>
-                  {field.type === "select" ? (
-                    <Select>
-                      <SelectTrigger className="h-9 text-sm">
-                        <SelectValue placeholder={`Select ${field.label.toLowerCase()}`} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {field.options?.map((o) => (
-                          <SelectItem key={o} value={o.toLowerCase().replace(/\s+/g, "_")}>{o}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <Input
-                      type={field.type}
-                      placeholder={"placeholder" in field ? field.placeholder : undefined}
-                      className="h-9 text-sm"
-                    />
-                  )}
-                </div>
-              ))}
+            {isLoading ? (
+              <div className="py-10 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {currentFields.map((field) => {
+                  const defaultValue = fullProfile ? (fullProfile as any)[field.name] : "";
+                  
+                  return (
+                    <div key={field.name} className={cn(
+                      "space-y-1.5",
+                      field.type === "text" && field.label.includes("Address") && "sm:col-span-2",
+                    )}>
+                      <label htmlFor={field.name} className="text-xs font-medium text-foreground flex items-center gap-1">
+                        {field.label}
+                        {field.required && <span className="text-destructive">*</span>}
+                      </label>
+                      {field.type === "select" ? (
+                        <Select name={field.name} defaultValue={defaultValue || undefined}>
+                          <SelectTrigger className="h-9 text-sm">
+                            <SelectValue placeholder={`Select ${field.label.toLowerCase()}`} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {field.options?.map((o) => (
+                              <SelectItem key={o} value={o}>{o}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          id={field.name}
+                          name={field.name}
+                          type={field.type}
+                          placeholder={"placeholder" in field ? field.placeholder : undefined}
+                          defaultValue={defaultValue || ""}
+                          required={field.required}
+                          className="h-9 text-sm"
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            
+            {/* Footer embedded in Form to have submit logic */}
+            <div className="mt-8 pt-4 border-t flex flex-col sm:flex-row items-center justify-between gap-3">
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <Info className="h-3 w-3" />
+                Saves automatically to {activeSection} section
+              </p>
+              <div className="flex gap-2 w-full sm:w-auto">
+                <Button type="button" variant="outline" size="sm" onClick={onClose} className="flex-1 sm:flex-none">Cancel</Button>
+                <Button type="submit" size="sm" disabled={updateMutation.isPending} className="flex-1 sm:flex-none">
+                  {updateMutation.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <CheckCheck className="h-3.5 w-3.5 mr-1.5" />}
+                  Save Section
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-
-        {/* Footer */}
-        <DialogFooter className="px-6 py-4 border-t bg-muted/30 flex-shrink-0">
-          <div className="flex items-center justify-between w-full gap-3">
-            <p className="text-xs text-muted-foreground flex items-center gap-1">
-              <Info className="h-3 w-3" />
-              Changes are saved per section
-            </p>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={onClose}>Cancel</Button>
-              <Button size="sm">
-                <CheckCheck className="h-3.5 w-3.5 mr-1.5" />
-                Save Section
-              </Button>
-            </div>
-          </div>
-        </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
@@ -1039,7 +934,9 @@ const Legend: React.FC = () => (
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
 const ProfileDetailsDashboard: React.FC = () => {
-  const [profiles] = useState<EmployeeProfile[]>(MOCK_PROFILES);
+  const { data: rawProfiles = [], isLoading, isError } = useProfileList();
+  
+  const profiles = useMemo(() => rawProfiles.map(mapToEmployeeProfile), [rawProfiles]);
   const [activeTab, setActiveTab] = useState<ProfileTab>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [deptFilter, setDeptFilter] = useState<FilterDept>("all");
@@ -1095,6 +992,9 @@ const ProfileDetailsDashboard: React.FC = () => {
 
   const openView = (p: EmployeeProfile) => { setViewProfile(p); setViewOpen(true); };
   const openEdit = (p: EmployeeProfile) => { setEditProfile(p); setEditOpen(true); };
+
+  if (isLoading) return <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  if (isError) return <div className="p-8 text-center text-destructive">Failed to load profiles.</div>;
 
   return (
     <TooltipProvider>
