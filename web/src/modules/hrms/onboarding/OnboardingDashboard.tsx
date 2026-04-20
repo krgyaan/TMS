@@ -41,9 +41,14 @@ import {
   UserPlus,
   MessageSquare,
   Hash,
+  Shield,
+  HeartHandshake,
+  Globe,
+  User,
+  Calendar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useOnboardingDashboard, useUpdateOnboardingStatus } from "./useOnboarding";
+import { useOnboardingDashboard, useUpdateOnboardingStatus, useProfile } from "./useOnboarding";
 import { type OnboardingRequest } from "@/services/api/onboarding.service";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -254,6 +259,20 @@ const EmptyState: React.FC<{ tab: "all" | OnboardingRequest["status"]; search: s
   );
 };
 
+// ─── Data Item ───────────────────────────────────────────────────────────────
+
+const DataItem: React.FC<{ icon: any; label: string; value: React.ReactNode }> = ({ icon: Icon, label, value }) => (
+  <div className="p-2.5 rounded-lg bg-muted/40 border border-border/50 space-y-1 transition-colors hover:bg-muted/80">
+    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-bold uppercase tracking-wider">
+      <Icon className="h-3 w-3" />
+      {label}
+    </div>
+    <div className="text-xs font-bold text-foreground">
+      {value || <span className="text-muted-foreground/30 font-normal italic">Not provided</span>}
+    </div>
+  </div>
+);
+
 // ─── View Modal ───────────────────────────────────────────────────────────────
 
 const ViewModal: React.FC<{
@@ -263,75 +282,157 @@ const ViewModal: React.FC<{
   onApprove: (j: OnboardingRequest) => void;
   onReject: (j: OnboardingRequest) => void;
 }> = ({ joinee, open, onClose, onApprove, onReject }) => {
+  const { data: profile, isLoading: profileLoading } = useProfile(joinee?.id || null);
+
   if (!joinee) return null;
   const isPending = joinee.status === "pending";
 
+  const renderAddress = (addr: any) => {
+    if (!addr || Object.keys(addr).length === 0) return null;
+    const parts = [
+      addr.line1,
+      addr.line2,
+      addr.city,
+      addr.state,
+      addr.country,
+      addr.postalCode ? `PIN: ${addr.postalCode}` : "",
+    ].filter(Boolean);
+    return parts.join(", ");
+  };
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-lg p-0 gap-0 overflow-hidden">
+      <DialogContent className="sm:max-w-2xl p-0 gap-0 overflow-hidden">
         <DialogHeader className="px-6 py-4 border-b bg-muted/30">
           <div className="flex items-center gap-4">
-            <Avatar className="h-12 w-12">
+            <Avatar className="h-12 w-12 border-2 border-background shadow-sm">
               <AvatarFallback className="text-sm font-bold bg-primary/10 text-primary">
                 {getInitials(joinee.name)}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <DialogTitle className="text-base">{joinee.name}</DialogTitle>
+                <DialogTitle className="text-base font-bold">{joinee.name}</DialogTitle>
                 <StatusBadge status={joinee.status} />
               </div>
-              <DialogDescription className="mt-0.5 flex items-center gap-1.5 text-xs">
+              <DialogDescription className="mt-0.5 flex items-center gap-1.5 text-xs font-medium">
                 <Hash className="h-3 w-3" />
-                ID: {joinee.id} · Submitted {timeAgo(joinee.createdAt)}
+                ID: {joinee.id} · Registered {timeAgo(joinee.createdAt)}
               </DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
-        <div className="px-6 py-5 space-y-5 max-h-[60vh] overflow-y-auto">
-          <div className="grid grid-cols-2 gap-3">
-             <div className="p-3 rounded-lg bg-muted/50 border space-y-1">
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
-                   <Mail className="h-3.5 w-3.5" /> Email
-                </div>
-                <p className="text-sm font-semibold truncate">{joinee.email}</p>
-             </div>
-             <div className="p-3 rounded-lg bg-muted/50 border space-y-1">
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
-                   <Phone className="h-3.5 w-3.5" /> Phone
-                </div>
-                <p className="text-sm font-semibold">{joinee.phone}</p>
-             </div>
+        <div className="px-6 py-5 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
+          {/* Progress Section */}
+          <div className="space-y-3">
+            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">Live Onboarding Progress</p>
+            <div className="flex items-center gap-4 bg-muted/30 p-4 rounded-xl border border-dashed">
+              <ProgressStage label="Profile" status={joinee.profileStatus} />
+              <ProgressStage label="Documents" status={joinee.documentStatus} />
+              <ProgressStage label="Induction" status={joinee.inductionStatus} />
+            </div>
           </div>
 
           <Separator />
 
-          <div className="space-y-4">
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Onboarding Progress</p>
-              <div className="flex items-center gap-4">
-                 <ProgressStage label="Profile" status={joinee.profileStatus} />
-                 <ProgressStage label="Documents" status={joinee.documentStatus} />
-                 <ProgressStage label="Induction" status={joinee.inductionStatus} />
+          {profileLoading ? (
+            <div className="py-12 flex flex-col items-center justify-center gap-3">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <p className="text-xs text-muted-foreground font-medium">Fetching complete profile details...</p>
+            </div>
+          ) : (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+              {/* Personal Details */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+                  <h3 className="text-xs font-black uppercase tracking-widest text-foreground/80">Personal Information</h3>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <DataItem icon={User} label="First Name" value={profile?.firstName} />
+                  <DataItem icon={User} label="Middle Name" value={profile?.middleName} />
+                  <DataItem icon={User} label="Last Name" value={profile?.lastName} />
+                  <DataItem icon={Calendar} label="Date of Birth" value={profile?.dob ? formatDate(profile.dob) : null} />
+                  <DataItem icon={Users} label="Gender" value={profile?.gender} />
+                  <DataItem icon={Users} label="Marital Status" value={profile?.maritalStatus} />
+                  <DataItem icon={Globe} label="Nationality" value={profile?.nationality} />
+                  <DataItem icon={Mail} label="Personal Email" value={profile?.email} />
+                  <DataItem icon={Phone} label="Phone Number" value={profile?.phone} />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <DataItem icon={Shield} label="Aadhar Number" value={profile?.aadharNumber} />
+                  <DataItem icon={Shield} label="PAN Number" value={profile?.panNumber} />
+                </div>
               </div>
-          </div>
 
-          {joinee.reviewedBy && (
-            <>
               <Separator />
-              <div className="space-y-2">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Review History</p>
-                <div className="p-3 rounded-lg border bg-muted/40 space-y-2">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1.5">
-                      <UserCheck className="h-3.5 w-3.5" />
-                      Reviewed By: {joinee.reviewedBy}
-                    </span>
-                    <span>{joinee.approvedAt ? formatDate(joinee.approvedAt) : "—"}</span>
+
+              {/* Address Details */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+                  <h3 className="text-xs font-black uppercase tracking-widest text-foreground/80">Address Details</h3>
+                </div>
+                <div className="space-y-3">
+                  <div className="p-3 rounded-lg bg-primary/5 border border-primary/10 transition-colors hover:bg-primary/10">
+                    <div className="flex items-center gap-2 mb-2">
+                       <MapPin className="h-3.5 w-3.5 text-primary" />
+                       <p className="text-[9px] font-black text-primary uppercase tracking-widest">Current Address</p>
+                    </div>
+                    <p className="text-sm font-semibold leading-relaxed">
+                      {renderAddress(profile?.currentAddress) || <span className="text-muted-foreground/30 font-normal italic">Not provided</span>}
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-muted/40 border border-border/50 transition-colors hover:bg-muted/60">
+                    <div className="flex items-center gap-2 mb-2">
+                       <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                       <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Permanent Address</p>
+                    </div>
+                    <p className="text-sm font-semibold leading-relaxed">
+                      {renderAddress(profile?.permanentAddress) || <span className="text-muted-foreground/30 font-normal italic">Same as current</span>}
+                    </p>
                   </div>
                 </div>
               </div>
-            </>
+
+              <Separator />
+
+              {/* Emergency Contact */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+                  <h3 className="text-xs font-black uppercase tracking-widest text-foreground/80">Emergency Contact</h3>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <DataItem icon={User} label="Contact Name" value={profile?.emergencyContact?.name} />
+                  <DataItem icon={Users} label="Relationship" value={profile?.emergencyContact?.relationship} />
+                  <DataItem icon={Phone} label="Primary Phone" value={profile?.emergencyContact?.phone} />
+                  <DataItem icon={Phone} label="Alternate Phone" value={profile?.emergencyContact?.altPhone} />
+                  <div className="sm:col-span-2">
+                    <DataItem icon={Mail} label="Email Address" value={profile?.emergencyContact?.email} />
+                  </div>
+                </div>
+              </div>
+
+              {joinee.reviewedBy && (
+                <>
+                  <Separator />
+                  <div className="space-y-2">
+                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Review History</p>
+                    <div className="p-4 rounded-xl border bg-muted/20 space-y-2 border-dashed">
+                      <div className="flex items-center justify-between text-xs font-medium">
+                        <span className="flex items-center gap-1.5 text-muted-foreground">
+                          <UserCheck className="h-3.5 w-3.5" />
+                          Reviewed By: <span className="text-foreground">{joinee.reviewedBy}</span>
+                        </span>
+                        <span className="text-muted-foreground">{joinee.approvedAt ? formatDate(joinee.approvedAt) : "—"}</span>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           )}
         </div>
 
@@ -349,7 +450,7 @@ const ViewModal: React.FC<{
                 </Button>
                 <Button
                   onClick={() => { onClose(); onApprove(joinee); }}
-                  className="bg-green-600 hover:bg-green-700 text-white"
+                  className="bg-green-600 hover:bg-green-700 text-white shadow-sm shadow-green-900/20"
                 >
                   <CheckCircle2 className="h-4 w-4 mr-1.5" /> Approve
                 </Button>
@@ -382,7 +483,7 @@ const ProgressStage: React.FC<{ label: string; status: string }> = ({ label, sta
 
 interface ActionModalProps {
   open: boolean;
-  type: "approve" | "reject" | null;
+  type: "approved" | "rejected" | null;
   joinee: OnboardingRequest | null;
   onClose: () => void;
   onConfirm: (note: string) => void;
@@ -393,7 +494,7 @@ const ActionModal: React.FC<ActionModalProps> = ({
   open, type, joinee, onClose, onConfirm, isLoading,
 }) => {
   const [note, setNote] = useState("");
-  const isApprove = type === "approve";
+  const isApprove = type === "approved";
 
   return (
     <Dialog open={open} onOpenChange={() => { onClose(); setNote(""); }}>
