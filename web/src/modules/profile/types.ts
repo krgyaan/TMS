@@ -84,11 +84,16 @@ export type DocumentData = {
   docType: string;
   docNumber: string | null;
   fileUrl: string;
+  fileName: string | null;
   issueDate: string | null;
   expiryDate: string | null;
   verificationStatus: string;
+  verifiedBy: string | null;
+  verificationDate: string | null;
   remarks: string | null;
+  uploadedAt: string | null;
 };
+
 
 export type AssetData = {
   id: number;
