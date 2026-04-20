@@ -272,7 +272,12 @@ export class FollowUpService {
             if(currentUser.roleId != "1" && currentUser.roleId != "2"){
                 this.logger.debug({message: "Is not admin"});
 
-                conditions.push(eq(followUps.assignedToId, currentUser.id))
+                    conditions.push(
+                        or(
+                            eq(followUps.assignedToId, currentUser.id),
+                            eq(followUps.createdById, currentUser.id)
+                        )!
+                    );
             }
 
             if (search) {
