@@ -566,8 +566,7 @@ export const AssetsSection: React.FC = () => {
                       </div>
                       <p className="text-xs text-muted-foreground text-left">
                         If you believe an asset should be assigned to you,
-                        please contact your reporting manager or raise a support
-                        ticket.
+                        please contact the reception or raise a complaint regarding the same.
                       </p>
                     </div>
                   </motion.div>
