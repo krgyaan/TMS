@@ -888,14 +888,21 @@ export class AccountChecklistService {
      * Enqueue EOD checklist reports (called by cron job)
      */
     async enqueueEodMails(queue: import("bullmq").Queue) {
-        this.logger.info("Starting enqueue EOD checklist reports");
+        this.logger.info("[MAIL-ENQUEUE] ▶ Starting EOD checklist mail enqueue", {
+            date: new Date().toDateString(),
+        });
 
         try {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
-            
+
             const tomorrow = new Date(today);
             tomorrow.setDate(tomorrow.getDate() + 1);
+
+            this.logger.info("[MAIL-ENQUEUE] Querying today's checklist reports", {
+                from: today.toISOString(),
+                to: tomorrow.toISOString(),
+            });
 
             const todayReports = await this.db
                 .select()
@@ -911,6 +918,8 @@ export class AccountChecklistService {
                     )
                 );
 
+            this.logger.info(`[MAIL-ENQUEUE] Found ${todayReports.length} report row(s) for today`);
+
             // Group by accountable user
             const grouped: {
                 [accountableId: string]: {
@@ -918,8 +927,12 @@ export class AccountChecklistService {
                 };
             } = {};
 
+            let skippedRows = 0;
             todayReports.forEach(({ account_checklist_report, account_checklist }) => {
-                if (!account_checklist) return;
+                if (!account_checklist) {
+                    skippedRows++;
+                    return;
+                }
 
                 const accountableId = account_checklist_report.accountableUserId!.toString();
                 const responsibleId = account_checklist_report.responsibleUserId!.toString();
@@ -931,7 +944,6 @@ export class AccountChecklistService {
                     grouped[accountableId][responsibleId] = [];
                 }
 
-                // Push serializable data to avoid Date issues with BullMQ
                 grouped[accountableId][responsibleId].push({
                     task_name: account_checklist.taskName,
                     completed_at: account_checklist_report.respCompletedAt || account_checklist_report.accCompletedAt,
@@ -939,38 +951,74 @@ export class AccountChecklistService {
                 });
             });
 
-            // Enqueue
+            if (skippedRows > 0) {
+                this.logger.warn(`[MAIL-ENQUEUE] Skipped ${skippedRows} report row(s) with no associated checklist`);
+            }
+
+            const accountableUserCount = Object.keys(grouped).length;
+            this.logger.info(`[MAIL-ENQUEUE] Grouped into ${accountableUserCount} accountable-user bucket(s)`);
+
+            if (accountableUserCount === 0) {
+                this.logger.warn("[MAIL-ENQUEUE] No reports to enqueue — skipping individual and admin mails");
+                return;
+            }
+
+            // Enqueue individual accountable-user mails
+            let enqueuedCount = 0;
             for (const [accountableId, responsibleGroups] of Object.entries(grouped)) {
+                const responsibleCount = Object.keys(responsibleGroups).length;
+                const totalTasks = Object.values(responsibleGroups).reduce((sum, tasks) => sum + tasks.length, 0);
+
                 await queue.add(
                     "send-checklist-mail",
                     {
                         accountableId: parseInt(accountableId),
                         responsibleGroups,
-                        date: new Date().toDateString() // Pass date string
+                        date: new Date().toDateString(),
                     },
                     {
                         attempts: 3,
                         backoff: { type: "exponential", delay: 10000 },
                     }
                 );
+                enqueuedCount++;
+
+                this.logger.info(
+                    `[MAIL-ENQUEUE] ✉ Queued 'send-checklist-mail' for accountableId=${accountableId}`,
+                    {
+                        accountableId,
+                        responsibleUserCount: responsibleCount,
+                        totalTaskCount: totalTasks,
+                    }
+                );
             }
 
-            // Also enqueue the admin compilation mail
+            // Enqueue admin consolidated mail
+            const totalTasksAll = Object.values(grouped).reduce(
+                (sum, rg) => sum + Object.values(rg).reduce((s, tasks) => s + tasks.length, 0),
+                0
+            );
             await queue.add(
                 "send-checklist-admin-mail",
                 {
                     grouped,
-                    date: new Date().toDateString()
+                    date: new Date().toDateString(),
                 },
                 {
                     attempts: 3,
                     backoff: { type: "exponential", delay: 10000 },
                 }
             );
+            this.logger.info("[MAIL-ENQUEUE] ✉ Queued 'send-checklist-admin-mail' (consolidated)", {
+                totalTaskCount: totalTasksAll,
+            });
 
-            this.logger.info("EOD checklist reports enqueued successfully");
+            this.logger.info(
+                `[MAIL-ENQUEUE] ✅ Done — enqueued ${enqueuedCount} individual job(s) + 1 admin job`,
+                { date: new Date().toDateString() }
+            );
         } catch (error: any) {
-            this.logger.error("Failed to enqueue EOD checklist reports", {
+            this.logger.error("[MAIL-ENQUEUE] ❌ Failed to enqueue EOD checklist reports", {
                 error: error.message,
                 stack: error.stack,
             });
@@ -982,11 +1030,18 @@ export class AccountChecklistService {
      * Process Job from Queue
      */
     async processChecklistMail(jobData: any, jobName: string) {
-        this.logger.info(`Processing Checklist Mail: ${jobName}`, { jobData });
-        
+        this.logger.info(`[MAIL-WORKER] ▶ Processing job: '${jobName}'`);
+
         if (jobName === "send-checklist-mail") {
             const { accountableId, responsibleGroups, date } = jobData;
-            
+            const responsibleCount = Object.keys(responsibleGroups).length;
+
+            this.logger.info("[MAIL-WORKER] Resolving accountable user", {
+                accountableId,
+                date,
+                responsibleGroupCount: responsibleCount,
+            });
+
             const [accountableUser] = await this.db
                 .select()
                 .from(users)
@@ -994,21 +1049,42 @@ export class AccountChecklistService {
                 .limit(1);
 
             if (!accountableUser || !accountableUser.email) {
-                this.logger.warn("Accountable user not found or email missing", { accountableId });
+                this.logger.warn(
+                    "[MAIL-WORKER] ⚠ Accountable user not found or has no email — skipping job",
+                    { accountableId }
+                );
                 return;
             }
+
+            this.logger.info(
+                `[MAIL-WORKER] Accountable user resolved: ${accountableUser.name} <${accountableUser.email}>`,
+                { accountableId }
+            );
 
             const adminEmails = ['goyal@volksenergie.in', 'arathi@volksenergie.in', 'imran@volksenergie.in', 'accounts@jsa.net.in'];
 
             for (const [responsibleIdStr, tasks] of Object.entries(responsibleGroups)) {
                 const responsibleId = parseInt(responsibleIdStr);
+
+                this.logger.info(`[MAIL-WORKER] Resolving responsible user id=${responsibleId}`);
+
                 const [responsibleUser] = await this.db
                     .select()
                     .from(users)
                     .where(eq(users.id, responsibleId))
                     .limit(1);
 
-                if (!responsibleUser) continue;
+                if (!responsibleUser) {
+                    this.logger.warn(
+                        `[MAIL-WORKER] ⚠ Responsible user id=${responsibleId} not found — skipping this group`
+                    );
+                    continue;
+                }
+
+                const taskCount = (tasks as any[]).length;
+                this.logger.info(
+                    `[MAIL-WORKER] Processing ${taskCount} task(s) for responsible=${responsibleUser.name} → accountable=${accountableUser.name}`
+                );
 
                 // Format tasks for the template
                 const formattedTasks = (tasks as any[]).map(t => ({
@@ -1027,18 +1103,50 @@ export class AccountChecklistService {
                     ? ['md@comfortinnkarnal.com', 'kainaat@volksenergie.in', 'accounts@jsa.net.in']
                     : adminEmails;
 
-                this.logger.info(`Sending ${responsibleUser.name}'s report to accountable user: ${accountableUser.email}`);
-
+                // Resolve Google OAuth connection
+                this.logger.info(
+                    `[MAIL-WORKER] Looking up Google connection for responsible user id=${responsibleId}`
+                );
                 let googleConnection = await this.googleService.getSanitizedGoogleConnection(responsibleId);
 
                 if (!googleConnection) {
+                    this.logger.warn(
+                        `[MAIL-WORKER] No Google connection for id=${responsibleId} — attempting fallback`
+                    );
                     const fallbackUserId = process.env.FALLBACK_MAIL_USER_ID;
                     if (fallbackUserId) {
                         googleConnection = await this.googleService.getSanitizedGoogleConnection(parseInt(fallbackUserId));
+                        if (googleConnection) {
+                            this.logger.info(
+                                `[MAIL-WORKER] Fallback Google connection resolved (FALLBACK_MAIL_USER_ID=${fallbackUserId})`
+                            );
+                        } else {
+                            this.logger.warn(
+                                `[MAIL-WORKER] Fallback Google connection also not found (FALLBACK_MAIL_USER_ID=${fallbackUserId})`
+                            );
+                        }
+                    } else {
+                        this.logger.warn(
+                            "[MAIL-WORKER] FALLBACK_MAIL_USER_ID env var is not set — cannot fallback"
+                        );
                     }
+                } else {
+                    this.logger.info(
+                        `[MAIL-WORKER] Google connection resolved for responsible user id=${responsibleId}`
+                    );
                 }
 
                 if (googleConnection) {
+                    this.logger.info(
+                        `[MAIL-WORKER] ✉ Sending checklist report email`,
+                        {
+                            to: accountableUser.email,
+                            cc,
+                            subject: `Account Checklist Report - ${date}`,
+                            responsibleUser: responsibleUser.name,
+                            taskCount,
+                        }
+                    );
                     try {
                         await this.mailerService.sendMail(
                             {
@@ -1052,22 +1160,50 @@ export class AccountChecklistService {
                             {
                                 to: [accountableUser.email],
                                 cc,
-                                bcc:["abhigaur.test@gmail.com"],
+                                bcc: ["abhigaur.test@gmail.com"],
                                 subject: `Account Checklist Report - ${date}`,
                             },
                             googleConnection
                         );
-                        this.logger.info("Email sent for single checklist report");
-                    } catch(e: any) {
-                        this.logger.error("Error sending mail inside loop", { error: e.message });
+                        this.logger.info(
+                            `[MAIL-WORKER] ✅ Email sent successfully`,
+                            {
+                                to: accountableUser.email,
+                                responsibleUser: responsibleUser.name,
+                                date,
+                            }
+                        );
+                    } catch (e: any) {
+                        this.logger.error(
+                            `[MAIL-WORKER] ❌ Failed to send email for responsible=${responsibleUser.name} → accountable=${accountableUser.email}`,
+                            {
+                                error: e.message,
+                                stack: e.stack,
+                                responsibleId,
+                                accountableId,
+                            }
+                        );
                     }
                 } else {
-                    this.logger.warn(`No Google Connection found for user ${responsibleId} and no fallback`);
+                    this.logger.warn(
+                        `[MAIL-WORKER] ⚠ Skipping email — no Google connection available`,
+                        { responsibleId, accountableId }
+                    );
                 }
             }
+
+            this.logger.info(
+                `[MAIL-WORKER] ✅ Finished processing 'send-checklist-mail' for accountableId=${accountableId}`
+            );
+
         } else if (jobName === "send-checklist-admin-mail") {
             const { grouped, date } = jobData;
             const adminEmails = ['goyal@volksenergie.in', 'arathi@volksenergie.in', 'imran@volksenergie.in', 'accounts@jsa.net.in'];
+
+            this.logger.info("[MAIL-WORKER] Building consolidated admin task list", {
+                accountableBuckets: Object.keys(grouped).length,
+                date,
+            });
 
             const allTasks: any[] = [];
 
@@ -1075,13 +1211,21 @@ export class AccountChecklistService {
                 let accName = "";
                 const accId = parseInt(accIdStr);
                 const [accUser] = await this.db.select().from(users).where(eq(users.id, accId)).limit(1);
-                if (accUser) accName = accUser.name;
+                if (accUser) {
+                    accName = accUser.name;
+                } else {
+                    this.logger.warn(`[MAIL-WORKER] Accountable user id=${accId} not found — using empty name`);
+                }
 
                 for (const [respIdStr, tasks] of Object.entries(respGroups as any)) {
                     let respName = "";
                     const respId = parseInt(respIdStr);
                     const [respUser] = await this.db.select().from(users).where(eq(users.id, respId)).limit(1);
-                    if (respUser) respName = respUser.name;
+                    if (respUser) {
+                        respName = respUser.name;
+                    } else {
+                        this.logger.warn(`[MAIL-WORKER] Responsible user id=${respId} not found — using empty name`);
+                    }
 
                     for (const t of (tasks as any[])) {
                         allTasks.push({
@@ -1095,41 +1239,76 @@ export class AccountChecklistService {
                 }
             }
 
-            if (allTasks.length > 0) {
-                const fallbackUserId = process.env.FALLBACK_MAIL_USER_ID;
-                if (!fallbackUserId) {
-                    this.logger.warn("No fallback user ID to send admin consolidated mail");
-                    return;
-                }
-                
-                const googleConnection = await this.googleService.getSanitizedGoogleConnection(parseInt(fallbackUserId));
-                
-                if (googleConnection) {
-                    try {
-                        await this.mailerService.sendMail(
-                            {
-                                name: "checklist-report",
-                                basePath: "modules/accounts/account-checklist/mails",
-                            },
-                            {
-                                date,
-                                tables: [{ responsible_user: 'All', tasks: allTasks }],
-                            },
-                            {
-                                to: adminEmails,
-                                bcc:["abhigaur.test@gmail.com"],
-                                subject: `Account Checklist Consolidated Report - ${date}`,
-                            },
-                            googleConnection
-                        );
-                        this.logger.info("Admin consolidated email sent");
-                    } catch(e: any) {
-                        this.logger.error("Error sending admin consolidated mail", { error: e.message });
-                    }
-                } else {
-                    this.logger.warn("No Google Connection fallback found for admin email");
-                }
+            this.logger.info(`[MAIL-WORKER] Admin consolidated task list built: ${allTasks.length} task(s)`);
+
+            if (allTasks.length === 0) {
+                this.logger.warn("[MAIL-WORKER] ⚠ No tasks in consolidated list — skipping admin mail");
+                return;
             }
+
+            const fallbackUserId = process.env.FALLBACK_MAIL_USER_ID;
+            if (!fallbackUserId) {
+                this.logger.warn(
+                    "[MAIL-WORKER] ⚠ FALLBACK_MAIL_USER_ID env var is not set — cannot send admin consolidated mail"
+                );
+                return;
+            }
+
+            this.logger.info(
+                `[MAIL-WORKER] Looking up Google connection for admin mail (FALLBACK_MAIL_USER_ID=${fallbackUserId})`
+            );
+            const googleConnection = await this.googleService.getSanitizedGoogleConnection(parseInt(fallbackUserId));
+
+            if (googleConnection) {
+                this.logger.info(
+                    `[MAIL-WORKER] ✉ Sending admin consolidated checklist report`,
+                    {
+                        to: adminEmails,
+                        subject: `Account Checklist Consolidated Report - ${date}`,
+                        totalTaskCount: allTasks.length,
+                    }
+                );
+                try {
+                    await this.mailerService.sendMail(
+                        {
+                            name: "checklist-report",
+                            basePath: "modules/accounts/account-checklist/mails",
+                        },
+                        {
+                            date,
+                            tables: [{ responsible_user: 'All', tasks: allTasks }],
+                        },
+                        {
+                            to: adminEmails,
+                            bcc: ["abhigaur.test@gmail.com"],
+                            subject: `Account Checklist Consolidated Report - ${date}`,
+                        },
+                        googleConnection
+                    );
+                    this.logger.info(
+                        "[MAIL-WORKER] ✅ Admin consolidated email sent successfully",
+                        { to: adminEmails, date, totalTaskCount: allTasks.length }
+                    );
+                } catch (e: any) {
+                    this.logger.error(
+                        "[MAIL-WORKER] ❌ Failed to send admin consolidated mail",
+                        {
+                            error: e.message,
+                            stack: e.stack,
+                            to: adminEmails,
+                            date,
+                        }
+                    );
+                }
+            } else {
+                this.logger.warn(
+                    `[MAIL-WORKER] ⚠ No Google connection found for fallback user id=${fallbackUserId} — admin mail skipped`
+                );
+            }
+
+            this.logger.info("[MAIL-WORKER] ✅ Finished processing 'send-checklist-admin-mail'");
+        } else {
+            this.logger.warn(`[MAIL-WORKER] ⚠ Unknown job name received: '${jobName}' — no handler matched`);
         }
     }
 }
