@@ -9,7 +9,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Progress } from "@/components/ui/progress";
@@ -32,8 +38,7 @@ import {
 import { useSubmitSignup } from "@/hooks/api/useSignUp";
 import { cn } from "@/lib/utils";
 
-
-// ─── Schemas ────────────────────────────────────────────────────────────────
+// ─── Schemas ─────────────────────────────────────────────────────────────────
 
 const personalSchema = z.object({
   employeeId: z.string().optional(),
@@ -41,7 +46,9 @@ const personalSchema = z.object({
   middleName: z.string().optional(),
   lastName: z.string().min(1, "Last name is required"),
   dateOfBirth: z.string().min(1, "Date of birth is required"),
-  gender: z.enum(["Male", "Female", "Other"], { required_error: "Gender is required" }),
+  gender: z.enum(["Male", "Female", "Other"], {
+    required_error: "Gender is required",
+  }),
   maritalStatus: z.string().min(1, "Marital status is required"),
   nationality: z.string().min(1, "Nationality is required"),
   personalEmail: z.string().email("Enter a valid email"),
@@ -66,55 +73,60 @@ const addressSchema = z.object({
   permanentCountry: z.string().optional(),
   permanentPostalCode: z.string().optional(),
   emergencyContactName: z.string().min(1, "Contact name is required"),
-  emergencyContactRelationship: z.string().min(1, "Relationship is required"),
+  emergencyContactRelationship: z
+    .string()
+    .min(1, "Relationship is required"),
   emergencyContactPhone: z.string().min(7, "Valid phone required"),
   emergencyContactAltPhone: z.string().optional(),
-  emergencyContactEmail: z.string().email().optional().or(z.literal("")),
+  emergencyContactEmail: z
+    .string()
+    .email()
+    .optional()
+    .or(z.literal("")),
 });
 
 const fullSchema = personalSchema.merge(addressSchema);
 type FormData = z.infer<typeof fullSchema>;
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const NATIONALITIES = [
-  "Indian", "American", "British", "Canadian", "Australian",
-  "German", "French", "Singaporean", "Other",
+  "Indian","American","British","Canadian","Australian",
+  "German","French","Singaporean","Other",
 ];
 
 const STATES = [
-  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
-  "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka",
-  "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram",
-  "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu",
-  "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal",
-  "Delhi", "Other",
+  "Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh",
+  "Goa","Gujarat","Haryana","Himachal Pradesh","Jharkhand","Karnataka",
+  "Kerala","Madhya Pradesh","Maharashtra","Manipur","Meghalaya","Mizoram",
+  "Nagaland","Odisha","Punjab","Rajasthan","Sikkim","Tamil Nadu",
+  "Telangana","Tripura","Uttar Pradesh","Uttarakhand","West Bengal",
+  "Delhi","Other",
 ];
 
 const COUNTRIES = [
-  "India", "United States", "United Kingdom", "Canada",
-  "Australia", "Singapore", "Germany", "France", "Other",
+  "India","United States","United Kingdom","Canada",
+  "Australia","Singapore","Germany","France","Other",
 ];
 
-const RELATIONSHIPS = ["Spouse", "Parent", "Sibling", "Child", "Friend", "Other"];
-
-const MARITAL_STATUSES = ["Single", "Married", "Divorced", "Widowed"];
+const RELATIONSHIPS = ["Spouse","Parent","Sibling","Child","Friend","Other"];
+const MARITAL_STATUSES = ["Single","Married","Divorced","Widowed"];
 
 const COUNTRY_CODES = [
   { code: "+91", label: "IN +91" },
-  { code: "+1", label: "US +1" },
+  { code: "+1",  label: "US +1"  },
   { code: "+44", label: "UK +44" },
   { code: "+61", label: "AU +61" },
   { code: "+65", label: "SG +65" },
 ];
 
 const generateEmployeeId = () => {
-  const year = new Date().getFullYear().toString().slice(-2);
+  const year   = new Date().getFullYear().toString().slice(-2);
   const random = Math.random().toString(36).substring(2, 6).toUpperCase();
   return `EMP${year}${random}`;
 };
 
-// ─── Step Config ─────────────────────────────────────────────────────────────
+// ─── Step Config ──────────────────────────────────────────────────────────────
 
 const STEPS = [
   {
@@ -123,7 +135,11 @@ const STEPS = [
     title: "Personal Info",
     subtitle: "Tell us about yourself",
     icon: User,
-    fields: ["firstName", "lastName", "dateOfBirth", "gender", "personalEmail", "phone"],
+    // Every field that lives on step 1 — used for per-step validation
+    fields: [
+      "firstName","lastName","dateOfBirth","gender",
+      "maritalStatus","nationality","personalEmail","phone",
+    ] as (keyof FormData)[],
   },
   {
     id: 2,
@@ -131,7 +147,10 @@ const STEPS = [
     title: "Address",
     subtitle: "Where do you live?",
     icon: MapPin,
-    fields: ["currentAddressLine1", "currentCity", "currentState", "currentPostalCode"],
+    fields: [
+      "currentAddressLine1","currentCity","currentState",
+      "currentCountry","currentPostalCode",
+    ] as (keyof FormData)[],
   },
   {
     id: 3,
@@ -139,30 +158,26 @@ const STEPS = [
     title: "Emergency Contact",
     subtitle: "Who should we contact?",
     icon: HeartHandshake,
-    fields: ["emergencyContactName", "emergencyContactRelationship", "emergencyContactPhone"],
+    fields: [
+      "emergencyContactName","emergencyContactRelationship",
+      "emergencyContactPhone",
+    ] as (keyof FormData)[],
   },
 ];
 
-// ─── Animated Wrapper ────────────────────────────────────────────────────────
+// ─── Slide variants ───────────────────────────────────────────────────────────
 
 const slideVariants = {
-  enter: (dir: number) => ({
-    x: dir > 0 ? 60 : -60,
-    opacity: 0,
-  }),
-  center: {
-    x: 0,
-    opacity: 1,
-    transition: { duration: 0.3, ease: "easeOut" },
-  },
-  exit: (dir: number) => ({
+  enter: (dir: number) => ({ x: dir > 0 ? 60 : -60, opacity: 0 }),
+  center: { x: 0, opacity: 1, transition: { duration: 0.3, ease: "easeOut" } },
+  exit:  (dir: number) => ({
     x: dir > 0 ? -60 : 60,
     opacity: 0,
     transition: { duration: 0.2, ease: "easeIn" },
   }),
 };
 
-// ─── Field Components ────────────────────────────────────────────────────────
+// ─── FieldWrapper ─────────────────────────────────────────────────────────────
 
 interface FieldWrapperProps {
   label: string;
@@ -172,14 +187,18 @@ interface FieldWrapperProps {
   hint?: string;
 }
 
-const FieldWrapper: React.FC<FieldWrapperProps> = ({ label, required, error, children, hint }) => (
+const FieldWrapper: React.FC<FieldWrapperProps> = ({
+  label, required, error, children, hint,
+}) => (
   <div className="space-y-1.5">
     <Label className="text-sm font-medium text-foreground">
       {label}
       {required && <span className="text-destructive ml-1">*</span>}
     </Label>
     {children}
-    {hint && !error && <p className="text-xs text-muted-foreground">{hint}</p>}
+    {hint && !error && (
+      <p className="text-xs text-muted-foreground">{hint}</p>
+    )}
     {error && (
       <motion.p
         initial={{ opacity: 0, y: -4 }}
@@ -193,9 +212,11 @@ const FieldWrapper: React.FC<FieldWrapperProps> = ({ label, required, error, chi
   </div>
 );
 
-// ─── Section Header ───────────────────────────────────────────────────────────
+// ─── SectionLabel ─────────────────────────────────────────────────────────────
 
-const SectionLabel: React.FC<{ icon: React.ElementType; label: string }> = ({ icon: Icon, label }) => (
+const SectionLabel: React.FC<{ icon: React.ElementType; label: string }> = ({
+  icon: Icon, label,
+}) => (
   <div className="flex items-center gap-2 mb-4">
     <div className="h-px flex-1 bg-border" />
     <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2">
@@ -206,46 +227,68 @@ const SectionLabel: React.FC<{ icon: React.ElementType; label: string }> = ({ ic
   </div>
 );
 
-// ─── Phone Input ─────────────────────────────────────────────────────────────
+// ─── PhoneInput — fully controlled ───────────────────────────────────────────
+// Accepts `codeValue` + `numberValue` so the parent can persist the pieces
+// across step changes via RHF's `watch` / `setValue`.
 
 interface PhoneInputProps {
-  value?: string;
-  onChange: (val: string) => void;
+  codeValue: string;
+  numberValue: string;
+  onCodeChange: (code: string) => void;
+  onNumberChange: (digits: string) => void;
+  onCombinedChange: (val: string) => void;
   placeholder?: string;
   error?: boolean;
 }
 
-const PhoneInput: React.FC<PhoneInputProps> = ({ value = "", onChange, placeholder, error }) => {
-  const [code, setCode] = useState("+91");
-  const [number, setNumber] = useState("");
+const PhoneInput: React.FC<PhoneInputProps> = ({
+  codeValue,
+  numberValue,
+  onCodeChange,
+  onNumberChange,
+  onCombinedChange,
+  placeholder,
+  error,
+}) => {
+  // Whenever either piece changes, bubble the combined value up
+  const handleCodeChange = (code: string) => {
+    onCodeChange(code);
+    onCombinedChange(`${code} ${numberValue}`);
+  };
 
-  useEffect(() => {
-    onChange(`${code} ${number}`);
-  }, [code, number]);
+  const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digits = e.target.value.replace(/\D/g, "");
+    onNumberChange(digits);
+    onCombinedChange(`${codeValue} ${digits}`);
+  };
 
   return (
     <div className="flex gap-2">
-      <Select value={code} onValueChange={setCode}>
-        <SelectTrigger className={cn("w-28 shrink-0", error && "border-destructive")}>
+      <Select value={codeValue} onValueChange={handleCodeChange}>
+        <SelectTrigger
+          className={cn("w-28 shrink-0", error && "border-destructive")}
+        >
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
           {COUNTRY_CODES.map((c) => (
-            <SelectItem key={c.code} value={c.code}>{c.label}</SelectItem>
+            <SelectItem key={c.code} value={c.code}>
+              {c.label}
+            </SelectItem>
           ))}
         </SelectContent>
       </Select>
       <Input
-        value={number}
-        onChange={(e) => setNumber(e.target.value.replace(/\D/g, ""))}
-        placeholder={placeholder || "Phone number"}
+        value={numberValue}
+        onChange={handleNumberChange}
+        placeholder={placeholder ?? "Phone number"}
         className={cn("flex-1", error && "border-destructive")}
       />
     </div>
   );
 };
 
-// ─── Step Indicators ─────────────────────────────────────────────────────────
+// ─── StepIndicator ────────────────────────────────────────────────────────────
 
 interface StepIndicatorProps {
   steps: typeof STEPS;
@@ -253,20 +296,20 @@ interface StepIndicatorProps {
   completed: number[];
 }
 
-const StepIndicator: React.FC<StepIndicatorProps> = ({ steps, current, completed }) => (
+const StepIndicator: React.FC<StepIndicatorProps> = ({
+  steps, current, completed,
+}) => (
   <div className="flex items-center justify-center gap-0">
     {steps.map((step, i) => {
-      const isDone = completed.includes(step.id);
+      const isDone   = completed.includes(step.id);
       const isActive = step.id === current;
-      const Icon = step.icon;
+      const Icon     = step.icon;
 
       return (
         <React.Fragment key={step.id}>
           <div className="flex flex-col items-center gap-1">
             <motion.div
-              animate={{
-                scale: isActive ? 1.1 : 1,
-              }}
+              animate={{ scale: isActive ? 1.1 : 1 }}
               transition={{ duration: 0.2 }}
               className={cn(
                 "flex items-center justify-center w-9 h-9 rounded-full border-2 transition-colors duration-300",
@@ -286,12 +329,17 @@ const StepIndicator: React.FC<StepIndicatorProps> = ({ steps, current, completed
             <span
               className={cn(
                 "text-[10px] font-medium hidden sm:block transition-colors",
-                isActive ? "text-primary" : isDone ? "text-muted-foreground" : "text-muted-foreground/60"
+                isActive
+                  ? "text-primary"
+                  : isDone
+                  ? "text-muted-foreground"
+                  : "text-muted-foreground/60"
               )}
             >
               {step.title}
             </span>
           </div>
+
           {i < steps.length - 1 && (
             <div
               className={cn(
@@ -309,13 +357,24 @@ const StepIndicator: React.FC<StepIndicatorProps> = ({ steps, current, completed
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 const SignUp: React.FC = () => {
-  const navigate = useNavigate();
-  const [currentStep, setCurrentStep] = useState(1);
+  const navigate  = useNavigate();
+  const [currentStep,    setCurrentStep]    = useState(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
-  const [direction, setDirection] = useState(1);
-  const [sameAsCurrent, setSameAsCurrent] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [direction,      setDirection]      = useState(1);
+  const [sameAsCurrent,  setSameAsCurrent]  = useState(false);
+  const [isSubmitting,   setIsSubmitting]   = useState(false);
+  const [submitted,      setSubmitted]      = useState(false);
+
+  // ── Phone field state (code + raw digits kept separately so they survive
+  //    step changes; the combined string goes into RHF via setValue) ──────────
+  const [phoneCode,        setPhoneCode]        = useState("+91");
+  const [phoneNumber,      setPhoneNumber]      = useState("");
+  const [altPhoneCode,     setAltPhoneCode]     = useState("+91");
+  const [altPhoneNumber,   setAltPhoneNumber]   = useState("");
+  const [ecPhoneCode,      setEcPhoneCode]      = useState("+91");
+  const [ecPhoneNumber,    setEcPhoneNumber]    = useState("");
+  const [ecAltPhoneCode,   setEcAltPhoneCode]   = useState("+91");
+  const [ecAltPhoneNumber, setEcAltPhoneNumber] = useState("");
 
   const submitSignupMutation = useSubmitSignup();
 
@@ -330,26 +389,24 @@ const SignUp: React.FC = () => {
   } = useForm<FormData>({
     resolver: zodResolver(fullSchema),
     defaultValues: {
-      employeeId: generateEmployeeId(),
-      gender: "Male",
+      employeeId:     generateEmployeeId(),
+      gender:         "Male",
       currentCountry: "India",
       permanentCountry: "India",
     },
     mode: "onChange",
   });
 
-  const totalSteps = STEPS.length;
-  const progress = ((completedSteps.length) / totalSteps) * 100;
+  const totalSteps        = STEPS.length;
+  const progress          = (completedSteps.length / totalSteps) * 100;
   const currentStepConfig = STEPS.find((s) => s.id === currentStep)!;
 
-  // ── Validate current step fields ──────────────────────────────────────────
+  // ── Validate only the fields that belong to the current step ─────────────
 
-  const validateCurrentStep = async (): Promise<boolean> => {
-    const fieldsToValidate = currentStepConfig.fields as (keyof FormData)[];
-    return trigger(fieldsToValidate);
-  };
+  const validateCurrentStep = async (): Promise<boolean> =>
+    trigger(currentStepConfig.fields);
 
-  // ── Navigation ────────────────────────────────────────────────────────────
+  // ── On Next: validate → mark complete → advance ───────────────────────────
 
   const goNext = async () => {
     const valid = await validateCurrentStep();
@@ -367,7 +424,7 @@ const SignUp: React.FC = () => {
     setCurrentStep((s) => Math.max(s - 1, 1));
   };
 
-  // ── Same address handler ──────────────────────────────────────────────────
+  // ── Same-address toggle ───────────────────────────────────────────────────
 
   const handleSameAsCurrentChange = (checked: boolean) => {
     setSameAsCurrent(checked);
@@ -376,78 +433,110 @@ const SignUp: React.FC = () => {
       const v = getValues();
       setValue("permanentAddressLine1", v.currentAddressLine1);
       setValue("permanentAddressLine2", v.currentAddressLine2);
-      setValue("permanentCity", v.currentCity);
-      setValue("permanentState", v.currentState);
-      setValue("permanentCountry", v.currentCountry);
-      setValue("permanentPostalCode", v.currentPostalCode);
+      setValue("permanentCity",         v.currentCity);
+      setValue("permanentState",        v.currentState);
+      setValue("permanentCountry",      v.currentCountry);
+      setValue("permanentPostalCode",   v.currentPostalCode);
     }
+  };
+
+  // ── FIX 1 — Navigate to the first step that contains an error ────────────
+  //
+  // After `handleSubmit` runs Zod on the full schema we inspect `errors` and
+  // jump to the earliest step whose field list intersects with the error keys.
+
+  const navigateToFirstErrorStep = (
+    errorKeys: (keyof FormData)[]
+  ): number | null => {
+    for (const step of STEPS) {
+      const hasError = step.fields.some((f) => errorKeys.includes(f));
+      if (hasError) return step.id;
+    }
+    return null;
   };
 
   // ── Submit ────────────────────────────────────────────────────────────────
 
   const onSubmit = async (data: FormData) => {
-      setIsSubmitting(true);
-      try {
-          await submitSignupMutation.mutateAsync({
-              // Personal
-              firstName: data.firstName,
-              middleName: data.middleName,
-              lastName: data.lastName,
-              dateOfBirth: data.dateOfBirth,
-              gender: data.gender as "Male" | "Female" | "Other",
-              maritalStatus: data.maritalStatus!,
-              nationality: data.nationality!,
-              personalEmail: data.personalEmail,
-              phone: data.phone,
-              alternatePhone: data.alternatePhone,
-              aadharNumber: data.aadharNumber,
-              panNumber: data.panNumber,
+    setIsSubmitting(true);
+    try {
+      await submitSignupMutation.mutateAsync({
+        firstName:    data.firstName,
+        middleName:   data.middleName,
+        lastName:     data.lastName,
+        dateOfBirth:  data.dateOfBirth,
+        gender:       data.gender as "Male" | "Female" | "Other",
+        maritalStatus: data.maritalStatus!,
+        nationality:   data.nationality!,
+        personalEmail: data.personalEmail,
+        phone:         data.phone,
+        alternatePhone: data.alternatePhone,
+        aadharNumber:   data.aadharNumber,
+        panNumber:      data.panNumber,
 
-              // Current Address
-              currentAddressLine1: data.currentAddressLine1,
-              currentAddressLine2: data.currentAddressLine2,
-              currentCity: data.currentCity,
-              currentState: data.currentState,
-              currentCountry: data.currentCountry,
-              currentPostalCode: data.currentPostalCode,
+        currentAddressLine1: data.currentAddressLine1,
+        currentAddressLine2: data.currentAddressLine2,
+        currentCity:         data.currentCity,
+        currentState:        data.currentState,
+        currentCountry:      data.currentCountry,
+        currentPostalCode:   data.currentPostalCode,
 
-              // Permanent Address
-              sameAsCurrent: data.sameAsCurrent,
-              permanentAddressLine1: data.permanentAddressLine1,
-              permanentAddressLine2: data.permanentAddressLine2,
-              permanentCity: data.permanentCity,
-              permanentState: data.permanentState,
-              permanentCountry: data.permanentCountry,
-              permanentPostalCode: data.permanentPostalCode,
+        sameAsCurrent:          data.sameAsCurrent,
+        permanentAddressLine1:  data.permanentAddressLine1,
+        permanentAddressLine2:  data.permanentAddressLine2,
+        permanentCity:          data.permanentCity,
+        permanentState:         data.permanentState,
+        permanentCountry:       data.permanentCountry,
+        permanentPostalCode:    data.permanentPostalCode,
 
-              // Emergency Contact
-              emergencyContactName: data.emergencyContactName,
-              emergencyContactRelationship: data.emergencyContactRelationship,
-              emergencyContactPhone: data.emergencyContactPhone,
-              emergencyContactAltPhone: data.emergencyContactAltPhone,
-              emergencyContactEmail: data.emergencyContactEmail,
-          });
-          
-          // Show success screen
-          setSubmitted(true);
-      } catch (e) {
-          // Error toast is handled automatically by the hook's onError callback
-      } finally {
-          setIsSubmitting(false);
-      }
+        emergencyContactName:         data.emergencyContactName,
+        emergencyContactRelationship: data.emergencyContactRelationship,
+        emergencyContactPhone:        data.emergencyContactPhone,
+        emergencyContactAltPhone:     data.emergencyContactAltPhone,
+        emergencyContactEmail:        data.emergencyContactEmail,
+      });
+
+      setSubmitted(true);
+    } catch {
+      // onError in the hook shows the toast
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
+  // Called when the user clicks "Submit" on the last step
   const handleFinalSubmit = async () => {
-    const valid = await validateCurrentStep();
-    if (!valid) {
+    // 1. Validate the visible (last) step first for instant feedback
+    const lastStepValid = await validateCurrentStep();
+    if (!lastStepValid) {
       toast.error("Please fill in all required fields.");
       return;
     }
+
+    // 2. Trigger full-schema validation so we catch anything missed earlier
+    const allValid = await trigger(); // trigger with no args = all fields
+    if (!allValid) {
+      // Find the earliest step with an error and jump there
+      const errorKeys = Object.keys(errors) as (keyof FormData)[];
+      const targetStep = navigateToFirstErrorStep(errorKeys);
+      if (targetStep !== null && targetStep !== currentStep) {
+        toast.error(
+          "Some earlier fields need attention. Taking you back to fix them."
+        );
+        setDirection(-1);
+        setCurrentStep(targetStep);
+        // Remove the target step from completed so the user sees it as "pending"
+        setCompletedSteps((prev) => prev.filter((s) => s !== targetStep));
+      }
+      return;
+    }
+
+    // 3. Mark last step complete and submit
     setCompletedSteps((prev) => [...new Set([...prev, currentStep])]);
     handleSubmit(onSubmit)();
   };
 
-  // ── Success Screen ────────────────────────────────────────────────────────
+  // ── Success screen ────────────────────────────────────────────────────────
 
   if (submitted) {
     return (
@@ -468,7 +557,8 @@ const SignUp: React.FC = () => {
           </motion.div>
           <h2 className="text-2xl font-bold mb-2">You're all set!</h2>
           <p className="text-muted-foreground mb-6">
-            Your registration has been submitted successfully. HR will review your information shortly.
+            Your registration has been submitted successfully. HR will review
+            your information shortly.
           </p>
           <div className="p-3 bg-muted rounded-lg inline-flex items-center gap-2 text-sm font-mono">
             <Hash className="h-4 w-4 text-muted-foreground" />
@@ -483,12 +573,14 @@ const SignUp: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Top bar */}
+      {/* ── Top bar ────────────────────────────────────────────────────────── */}
       <div className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h1 className="font-semibold text-base sm:text-lg">Employee Registration</h1>
+              <h1 className="font-semibold text-base sm:text-lg">
+                Employee Registration
+              </h1>
               <p className="text-xs text-muted-foreground hidden sm:block">
                 Complete all steps to submit your information
               </p>
@@ -500,15 +592,18 @@ const SignUp: React.FC = () => {
             </div>
           </div>
 
-          {/* Progress */}
           <div className="space-y-3">
             <Progress value={progress} className="h-1.5" />
-            <StepIndicator steps={STEPS} current={currentStep} completed={completedSteps} />
+            <StepIndicator
+              steps={STEPS}
+              current={currentStep}
+              completed={completedSteps}
+            />
           </div>
         </div>
       </div>
 
-      {/* Form body */}
+      {/* ── Form body ──────────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col max-w-2xl mx-auto w-full px-4 py-6 sm:py-10">
         <AnimatePresence mode="wait" custom={direction}>
           <motion.div
@@ -530,8 +625,12 @@ const SignUp: React.FC = () => {
                     })}
                   </div>
                   <div>
-                    <h2 className="font-semibold text-base">{currentStepConfig.title}</h2>
-                    <p className="text-xs text-muted-foreground">{currentStepConfig.subtitle}</p>
+                    <h2 className="font-semibold text-base">
+                      {currentStepConfig.title}
+                    </h2>
+                    <p className="text-xs text-muted-foreground">
+                      {currentStepConfig.subtitle}
+                    </p>
                   </div>
                   <div className="ml-auto text-xs text-muted-foreground font-medium">
                     {currentStep} / {totalSteps}
@@ -540,23 +639,40 @@ const SignUp: React.FC = () => {
               </div>
 
               <CardContent className="p-6 space-y-6">
-                {/* ── Step 1: Personal Information ── */}
+
+                {/* ════════════════════════════════════════════════════════
+                    STEP 1 — Personal Information
+                ════════════════════════════════════════════════════════ */}
                 {currentStep === 1 && (
                   <div className="space-y-5">
                     {/* Name */}
                     <SectionLabel icon={User} label="Full Name" />
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <FieldWrapper label="First Name" required error={errors.firstName?.message}>
+                      <FieldWrapper
+                        label="First Name"
+                        required
+                        error={errors.firstName?.message}
+                      >
                         <Input
                           {...register("firstName")}
                           placeholder="John"
                           className={cn(errors.firstName && "border-destructive")}
                         />
                       </FieldWrapper>
-                      <FieldWrapper label="Middle Name" error={errors.middleName?.message}>
-                        <Input {...register("middleName")} placeholder="William" />
+                      <FieldWrapper
+                        label="Middle Name"
+                        error={errors.middleName?.message}
+                      >
+                        <Input
+                          {...register("middleName")}
+                          placeholder="William"
+                        />
                       </FieldWrapper>
-                      <FieldWrapper label="Last Name" required error={errors.lastName?.message}>
+                      <FieldWrapper
+                        label="Last Name"
+                        required
+                        error={errors.lastName?.message}
+                      >
                         <Input
                           {...register("lastName")}
                           placeholder="Doe"
@@ -568,51 +684,98 @@ const SignUp: React.FC = () => {
                     {/* Personal Details */}
                     <SectionLabel icon={Calendar} label="Personal Details" />
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <FieldWrapper label="Date of Birth" required error={errors.dateOfBirth?.message}>
+                      <FieldWrapper
+                        label="Date of Birth"
+                        required
+                        error={errors.dateOfBirth?.message}
+                      >
                         <Input
                           type="date"
                           {...register("dateOfBirth")}
-                          className={cn(errors.dateOfBirth && "border-destructive")}
+                          className={cn(
+                            errors.dateOfBirth && "border-destructive"
+                          )}
                         />
                       </FieldWrapper>
 
-                      <FieldWrapper label="Marital Status" required error={errors.maritalStatus?.message}>
-                        <Select onValueChange={(v) => setValue("maritalStatus", v)}>
-                          <SelectTrigger className={cn(errors.maritalStatus && "border-destructive")}>
+                      {/* FIX 2a — Marital Status: use `value` from watch so
+                          it re-renders correctly when we jump back to step 1 */}
+                      <FieldWrapper
+                        label="Marital Status"
+                        required
+                        error={errors.maritalStatus?.message}
+                      >
+                        <Select
+                          value={watch("maritalStatus") ?? ""}
+                          onValueChange={(v) => setValue("maritalStatus", v)}
+                        >
+                          <SelectTrigger
+                            className={cn(
+                              errors.maritalStatus && "border-destructive"
+                            )}
+                          >
                             <SelectValue placeholder="Select status" />
                           </SelectTrigger>
                           <SelectContent>
                             {MARITAL_STATUSES.map((s) => (
-                              <SelectItem key={s} value={s}>{s}</SelectItem>
+                              <SelectItem key={s} value={s}>
+                                {s}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </FieldWrapper>
                     </div>
 
-                    <FieldWrapper label="Gender" required error={errors.gender?.message}>
+                    {/* FIX 2b — Gender: controlled via watch */}
+                    <FieldWrapper
+                      label="Gender"
+                      required
+                      error={errors.gender?.message}
+                    >
                       <RadioGroup
-                        defaultValue="Male"
-                        onValueChange={(v) => setValue("gender", v as "Male" | "Female" | "Other")}
+                        value={watch("gender")}
+                        onValueChange={(v) =>
+                          setValue("gender", v as "Male" | "Female" | "Other")
+                        }
                         className="flex gap-6 pt-1"
                       >
                         {["Male", "Female", "Other"].map((g) => (
                           <div key={g} className="flex items-center gap-2">
                             <RadioGroupItem value={g} id={`gender-${g}`} />
-                            <Label htmlFor={`gender-${g}`} className="font-normal cursor-pointer">{g}</Label>
+                            <Label
+                              htmlFor={`gender-${g}`}
+                              className="font-normal cursor-pointer"
+                            >
+                              {g}
+                            </Label>
                           </div>
                         ))}
                       </RadioGroup>
                     </FieldWrapper>
 
-                    <FieldWrapper label="Nationality" required error={errors.nationality?.message}>
-                      <Select onValueChange={(v) => setValue("nationality", v)}>
-                        <SelectTrigger className={cn(errors.nationality && "border-destructive")}>
+                    {/* FIX 2c — Nationality: controlled via watch */}
+                    <FieldWrapper
+                      label="Nationality"
+                      required
+                      error={errors.nationality?.message}
+                    >
+                      <Select
+                        value={watch("nationality") ?? ""}
+                        onValueChange={(v) => setValue("nationality", v)}
+                      >
+                        <SelectTrigger
+                          className={cn(
+                            errors.nationality && "border-destructive"
+                          )}
+                        >
                           <SelectValue placeholder="Select nationality" />
                         </SelectTrigger>
                         <SelectContent>
                           {NATIONALITIES.map((n) => (
-                            <SelectItem key={n} value={n}>{n}</SelectItem>
+                            <SelectItem key={n} value={n}>
+                              {n}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -621,29 +784,52 @@ const SignUp: React.FC = () => {
                     {/* Contact */}
                     <SectionLabel icon={Phone} label="Contact" />
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <FieldWrapper label="Personal Email" required error={errors.personalEmail?.message}>
+                      <FieldWrapper
+                        label="Personal Email"
+                        required
+                        error={errors.personalEmail?.message}
+                      >
                         <div className="relative">
                           <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                           <Input
                             type="email"
                             {...register("personalEmail")}
                             placeholder="john@gmail.com"
-                            className={cn("pl-9", errors.personalEmail && "border-destructive")}
+                            className={cn(
+                              "pl-9",
+                              errors.personalEmail && "border-destructive"
+                            )}
                           />
                         </div>
                       </FieldWrapper>
 
-                      <FieldWrapper label="Phone Number" required error={errors.phone?.message}>
+                      {/* FIX 2d — PhoneInput: fully controlled with lifted state */}
+                      <FieldWrapper
+                        label="Phone Number"
+                        required
+                        error={errors.phone?.message}
+                      >
                         <PhoneInput
-                          onChange={(v) => setValue("phone", v)}
+                          codeValue={phoneCode}
+                          numberValue={phoneNumber}
+                          onCodeChange={setPhoneCode}
+                          onNumberChange={setPhoneNumber}
+                          onCombinedChange={(v) => setValue("phone", v)}
                           error={!!errors.phone}
                           placeholder="98765 43210"
                         />
                       </FieldWrapper>
 
-                      <FieldWrapper label="Alternate Phone" error={errors.alternatePhone?.message}>
+                      <FieldWrapper
+                        label="Alternate Phone"
+                        error={errors.alternatePhone?.message}
+                      >
                         <PhoneInput
-                          onChange={(v) => setValue("alternatePhone", v)}
+                          codeValue={altPhoneCode}
+                          numberValue={altPhoneNumber}
+                          onCodeChange={setAltPhoneCode}
+                          onNumberChange={setAltPhoneNumber}
+                          onCombinedChange={(v) => setValue("alternatePhone", v)}
                           placeholder="98765 43210"
                         />
                       </FieldWrapper>
@@ -681,10 +867,11 @@ const SignUp: React.FC = () => {
                   </div>
                 )}
 
-                {/* ── Step 2: Address ── */}
+                {/* ════════════════════════════════════════════════════════
+                    STEP 2 — Address
+                ════════════════════════════════════════════════════════ */}
                 {currentStep === 2 && (
                   <div className="space-y-5">
-                    {/* Current Address */}
                     <SectionLabel icon={MapPin} label="Current Address" />
                     <div className="space-y-4">
                       <FieldWrapper
@@ -695,11 +882,16 @@ const SignUp: React.FC = () => {
                         <Input
                           {...register("currentAddressLine1")}
                           placeholder="House no., street, area"
-                          className={cn(errors.currentAddressLine1 && "border-destructive")}
+                          className={cn(
+                            errors.currentAddressLine1 && "border-destructive"
+                          )}
                         />
                       </FieldWrapper>
 
-                      <FieldWrapper label="Address Line 2" error={errors.currentAddressLine2?.message}>
+                      <FieldWrapper
+                        label="Address Line 2"
+                        error={errors.currentAddressLine2?.message}
+                      >
                         <Input
                           {...register("currentAddressLine2")}
                           placeholder="Landmark, apartment, suite"
@@ -708,42 +900,73 @@ const SignUp: React.FC = () => {
 
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                         <div className="col-span-2 sm:col-span-1">
-                          <FieldWrapper label="City" required error={errors.currentCity?.message}>
+                          <FieldWrapper
+                            label="City"
+                            required
+                            error={errors.currentCity?.message}
+                          >
                             <Input
                               {...register("currentCity")}
                               placeholder="Bengaluru"
-                              className={cn(errors.currentCity && "border-destructive")}
+                              className={cn(
+                                errors.currentCity && "border-destructive"
+                              )}
                             />
                           </FieldWrapper>
                         </div>
 
+                        {/* FIX 2e — currentState controlled */}
                         <div className="col-span-2 sm:col-span-1">
-                          <FieldWrapper label="State" required error={errors.currentState?.message}>
-                            <Select onValueChange={(v) => setValue("currentState", v)}>
-                              <SelectTrigger className={cn(errors.currentState && "border-destructive")}>
+                          <FieldWrapper
+                            label="State"
+                            required
+                            error={errors.currentState?.message}
+                          >
+                            <Select
+                              value={watch("currentState") ?? ""}
+                              onValueChange={(v) =>
+                                setValue("currentState", v)
+                              }
+                            >
+                              <SelectTrigger
+                                className={cn(
+                                  errors.currentState && "border-destructive"
+                                )}
+                              >
                                 <SelectValue placeholder="State" />
                               </SelectTrigger>
                               <SelectContent>
                                 {STATES.map((s) => (
-                                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                                  <SelectItem key={s} value={s}>
+                                    {s}
+                                  </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
                           </FieldWrapper>
                         </div>
 
+                        {/* FIX 2f — currentCountry controlled */}
                         <div className="col-span-2 sm:col-span-1">
-                          <FieldWrapper label="Country" required error={errors.currentCountry?.message}>
+                          <FieldWrapper
+                            label="Country"
+                            required
+                            error={errors.currentCountry?.message}
+                          >
                             <Select
-                              defaultValue="India"
-                              onValueChange={(v) => setValue("currentCountry", v)}
+                              value={watch("currentCountry") ?? "India"}
+                              onValueChange={(v) =>
+                                setValue("currentCountry", v)
+                              }
                             >
                               <SelectTrigger>
                                 <SelectValue placeholder="Country" />
                               </SelectTrigger>
                               <SelectContent>
                                 {COUNTRIES.map((c) => (
-                                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                                  <SelectItem key={c} value={c}>
+                                    {c}
+                                  </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
@@ -759,7 +982,10 @@ const SignUp: React.FC = () => {
                             <Input
                               {...register("currentPostalCode")}
                               placeholder="560001"
-                              className={cn(errors.currentPostalCode && "border-destructive")}
+                              className={cn(
+                                errors.currentPostalCode &&
+                                  "border-destructive"
+                              )}
                             />
                           </FieldWrapper>
                         </div>
@@ -783,7 +1009,9 @@ const SignUp: React.FC = () => {
                           ? "bg-primary/5 border-primary/30"
                           : "bg-muted/40 border-border"
                       )}
-                      onClick={() => handleSameAsCurrentChange(!sameAsCurrent)}
+                      onClick={() =>
+                        handleSameAsCurrentChange(!sameAsCurrent)
+                      }
                     >
                       <Checkbox
                         id="sameAsCurrent"
@@ -807,14 +1035,20 @@ const SignUp: React.FC = () => {
                           transition={{ duration: 0.25 }}
                           className="overflow-hidden space-y-4"
                         >
-                          <FieldWrapper label="Address Line 1" error={errors.permanentAddressLine1?.message}>
+                          <FieldWrapper
+                            label="Address Line 1"
+                            error={errors.permanentAddressLine1?.message}
+                          >
                             <Input
                               {...register("permanentAddressLine1")}
                               placeholder="House no., street, area"
                             />
                           </FieldWrapper>
 
-                          <FieldWrapper label="Address Line 2" error={errors.permanentAddressLine2?.message}>
+                          <FieldWrapper
+                            label="Address Line 2"
+                            error={errors.permanentAddressLine2?.message}
+                          >
                             <Input
                               {...register("permanentAddressLine2")}
                               placeholder="Landmark, apartment, suite"
@@ -823,38 +1057,63 @@ const SignUp: React.FC = () => {
 
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                             <div className="col-span-2 sm:col-span-1">
-                              <FieldWrapper label="City" error={errors.permanentCity?.message}>
-                                <Input {...register("permanentCity")} placeholder="City" />
+                              <FieldWrapper
+                                label="City"
+                                error={errors.permanentCity?.message}
+                              >
+                                <Input
+                                  {...register("permanentCity")}
+                                  placeholder="City"
+                                />
                               </FieldWrapper>
                             </div>
 
+                            {/* FIX 2g — permanentState controlled */}
                             <div className="col-span-2 sm:col-span-1">
-                              <FieldWrapper label="State" error={errors.permanentState?.message}>
-                                <Select onValueChange={(v) => setValue("permanentState", v)}>
+                              <FieldWrapper
+                                label="State"
+                                error={errors.permanentState?.message}
+                              >
+                                <Select
+                                  value={watch("permanentState") ?? ""}
+                                  onValueChange={(v) =>
+                                    setValue("permanentState", v)
+                                  }
+                                >
                                   <SelectTrigger>
                                     <SelectValue placeholder="State" />
                                   </SelectTrigger>
                                   <SelectContent>
                                     {STATES.map((s) => (
-                                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                                      <SelectItem key={s} value={s}>
+                                        {s}
+                                      </SelectItem>
                                     ))}
                                   </SelectContent>
                                 </Select>
                               </FieldWrapper>
                             </div>
 
+                            {/* FIX 2h — permanentCountry controlled */}
                             <div className="col-span-2 sm:col-span-1">
-                              <FieldWrapper label="Country" error={errors.permanentCountry?.message}>
+                              <FieldWrapper
+                                label="Country"
+                                error={errors.permanentCountry?.message}
+                              >
                                 <Select
-                                  defaultValue="India"
-                                  onValueChange={(v) => setValue("permanentCountry", v)}
+                                  value={watch("permanentCountry") ?? "India"}
+                                  onValueChange={(v) =>
+                                    setValue("permanentCountry", v)
+                                  }
                                 >
                                   <SelectTrigger>
                                     <SelectValue placeholder="Country" />
                                   </SelectTrigger>
                                   <SelectContent>
                                     {COUNTRIES.map((c) => (
-                                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                                      <SelectItem key={c} value={c}>
+                                        {c}
+                                      </SelectItem>
                                     ))}
                                   </SelectContent>
                                 </Select>
@@ -862,8 +1121,14 @@ const SignUp: React.FC = () => {
                             </div>
 
                             <div className="col-span-2 sm:col-span-1">
-                              <FieldWrapper label="Postal Code" error={errors.permanentPostalCode?.message}>
-                                <Input {...register("permanentPostalCode")} placeholder="560001" />
+                              <FieldWrapper
+                                label="Postal Code"
+                                error={errors.permanentPostalCode?.message}
+                              >
+                                <Input
+                                  {...register("permanentPostalCode")}
+                                  placeholder="560001"
+                                />
                               </FieldWrapper>
                             </div>
                           </div>
@@ -873,10 +1138,15 @@ const SignUp: React.FC = () => {
                   </div>
                 )}
 
-                {/* ── Step 3: Emergency Contact ── */}
+                {/* ════════════════════════════════════════════════════════
+                    STEP 3 — Emergency Contact
+                ════════════════════════════════════════════════════════ */}
                 {currentStep === 3 && (
                   <div className="space-y-5">
-                    <SectionLabel icon={HeartHandshake} label="Emergency Contact Details" />
+                    <SectionLabel
+                      icon={HeartHandshake}
+                      label="Emergency Contact Details"
+                    />
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <FieldWrapper
@@ -887,50 +1157,82 @@ const SignUp: React.FC = () => {
                         <Input
                           {...register("emergencyContactName")}
                           placeholder="Full name"
-                          className={cn(errors.emergencyContactName && "border-destructive")}
+                          className={cn(
+                            errors.emergencyContactName && "border-destructive"
+                          )}
                         />
                       </FieldWrapper>
 
+                      {/* FIX 2i — relationship controlled */}
                       <FieldWrapper
                         label="Relationship"
                         required
                         error={errors.emergencyContactRelationship?.message}
                       >
-                        <Select onValueChange={(v) => setValue("emergencyContactRelationship", v)}>
+                        <Select
+                          value={watch("emergencyContactRelationship") ?? ""}
+                          onValueChange={(v) =>
+                            setValue("emergencyContactRelationship", v)
+                          }
+                        >
                           <SelectTrigger
-                            className={cn(errors.emergencyContactRelationship && "border-destructive")}
+                            className={cn(
+                              errors.emergencyContactRelationship &&
+                                "border-destructive"
+                            )}
                           >
                             <SelectValue placeholder="Select relationship" />
                           </SelectTrigger>
                           <SelectContent>
                             {RELATIONSHIPS.map((r) => (
-                              <SelectItem key={r} value={r}>{r}</SelectItem>
+                              <SelectItem key={r} value={r}>
+                                {r}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </FieldWrapper>
 
+                      {/* FIX 2j — EC phone lifted state */}
                       <FieldWrapper
                         label="Phone Number"
                         required
                         error={errors.emergencyContactPhone?.message}
                       >
                         <PhoneInput
-                          onChange={(v) => setValue("emergencyContactPhone", v)}
+                          codeValue={ecPhoneCode}
+                          numberValue={ecPhoneNumber}
+                          onCodeChange={setEcPhoneCode}
+                          onNumberChange={setEcPhoneNumber}
+                          onCombinedChange={(v) =>
+                            setValue("emergencyContactPhone", v)
+                          }
                           error={!!errors.emergencyContactPhone}
                           placeholder="98765 43210"
                         />
                       </FieldWrapper>
 
-                      <FieldWrapper label="Alternate Phone" error={errors.emergencyContactAltPhone?.message}>
+                      <FieldWrapper
+                        label="Alternate Phone"
+                        error={errors.emergencyContactAltPhone?.message}
+                      >
                         <PhoneInput
-                          onChange={(v) => setValue("emergencyContactAltPhone", v)}
+                          codeValue={ecAltPhoneCode}
+                          numberValue={ecAltPhoneNumber}
+                          onCodeChange={setEcAltPhoneCode}
+                          onNumberChange={setEcAltPhoneNumber}
+                          onCombinedChange={(v) =>
+                            setValue("emergencyContactAltPhone", v)
+                          }
                           placeholder="98765 43210"
                         />
                       </FieldWrapper>
 
                       <div className="sm:col-span-2">
-                        <FieldWrapper label="Email" error={errors.emergencyContactEmail?.message}>
+                        <FieldWrapper
+                          label="Email"
+                          error={errors.emergencyContactEmail?.message}
+                        >
                           <div className="relative">
                             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                             <Input
@@ -944,7 +1246,7 @@ const SignUp: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Summary confirmation */}
+                    {/* Summary */}
                     <div className="mt-4 p-4 rounded-xl bg-muted/50 border space-y-3">
                       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                         Review before submitting
@@ -953,23 +1255,39 @@ const SignUp: React.FC = () => {
                         <div>
                           <span className="text-muted-foreground">Name: </span>
                           <span className="font-medium">
-                            {[watch("firstName"), watch("middleName"), watch("lastName")]
+                            {[
+                              watch("firstName"),
+                              watch("middleName"),
+                              watch("lastName"),
+                            ]
                               .filter(Boolean)
                               .join(" ") || "—"}
                           </span>
                         </div>
                         <div>
-                          <span className="text-muted-foreground">Email: </span>
-                          <span className="font-medium">{watch("personalEmail") || "—"}</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Phone: </span>
-                          <span className="font-medium">{watch("phone") || "—"}</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">City: </span>
+                          <span className="text-muted-foreground">
+                            Email:{" "}
+                          </span>
                           <span className="font-medium">
-                            {[watch("currentCity"), watch("currentState")].filter(Boolean).join(", ") || "—"}
+                            {watch("personalEmail") || "—"}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">
+                            Phone:{" "}
+                          </span>
+                          <span className="font-medium">
+                            {watch("phone") || "—"}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">
+                            City:{" "}
+                          </span>
+                          <span className="font-medium">
+                            {[watch("currentCity"), watch("currentState")]
+                              .filter(Boolean)
+                              .join(", ") || "—"}
                           </span>
                         </div>
                       </div>
@@ -981,7 +1299,7 @@ const SignUp: React.FC = () => {
           </motion.div>
         </AnimatePresence>
 
-        {/* Navigation */}
+        {/* ── Navigation ──────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between mt-6 gap-3">
           <Button
             type="button"
