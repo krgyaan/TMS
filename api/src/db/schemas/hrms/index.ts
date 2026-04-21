@@ -6,3 +6,6 @@ export * from './training-videos.schema';
 export * from './training-watch-history.schema';
 export * from './training-comments.schema';
 export * from './exit-workflows.schema';
+export * from './employee-education.schema';
+export * from './employee-experience.schema';
+export * from './onboarding';
