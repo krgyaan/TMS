@@ -1,5 +1,5 @@
-import { Injectable, Inject, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { Injectable, Inject, NotFoundException, ConflictException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { eq, desc, aliasedTable } from 'drizzle-orm';
 import { DRIZZLE } from '@/db/database.module';
 import type { DbInstance } from '@/db';
 import * as fs from 'fs';
@@ -12,11 +12,18 @@ import { userProfiles } from '@/db/schemas/auth/user-profiles.schema';
 import { employeeProfiles } from '@/db/schemas/hrms/employee-profiles.schema';
 import { employeeDocuments } from '@/db/schemas/hrms/employee-documents.schema';
 import { employeeAssets } from '@/db/schemas/hrms/employee-assets.schema';
-import { onboardingRequests, onboardingDocuments, onboardingProfiles } from '@/db/schemas/hrms/onboarding';
+import { employeeEducation } from '@/db/schemas/hrms/employee-education.schema';
+import { employeeExperience } from '@/db/schemas/hrms/employee-experience.schema';
+import { 
+  onboardingRequests, 
+  onboardingDocuments, 
+  onboardingProfiles,
+  onboardingEducation,
+  onboardingExperience
+} from '@/db/schemas/hrms/onboarding';
 import { complaints } from '@/db/schemas/hrms/complaints.schema';
 import { teams } from '@/db/schemas/master/teams.schema';
 import { designations } from '@/db/schemas/master/designations.schema';
-import {aliasedTable, desc } from 'drizzle-orm';
 
 @Injectable()
 export class ProfileService {
@@ -73,6 +80,8 @@ export class ProfileService {
     let emergencyContact: any = null;
     let employeeProfile: any = null;
     let documents: any[] = [];
+    let education: any[] = [];
+    let experience: any[] = [];
 
     if (isOnboarding) {
       // 2 & 3. Fetch Onboarding Profile Data
@@ -159,6 +168,18 @@ export class ProfileService {
         remarks: d.remarks || null,
         uploadedAt: d.createdAt?.toISOString() || null,
       }));
+
+      // 5. Fetch Onboarding Education
+      education = await this.db
+        .select()
+        .from(onboardingEducation)
+        .where(eq(onboardingEducation.onboardingId, onboardingId!));
+
+      // 6. Fetch Onboarding Experience
+      experience = await this.db
+        .select()
+        .from(onboardingExperience)
+        .where(eq(onboardingExperience.onboardingId, onboardingId!));
     } else {
       // 2. Fetch User Profile Data (PERMANENT)
       const [userProfileRow] = await this.db
@@ -278,6 +299,18 @@ export class ProfileService {
         remarks: d.remarks || null,
         uploadedAt: d.createdAt?.toISOString() || null,
       }));
+
+      // 5. Fetch Permanent Education
+      education = await this.db
+        .select()
+        .from(employeeEducation)
+        .where(eq(employeeEducation.userId, userId));
+
+      // 6. Fetch Permanent Experience
+      experience = await this.db
+        .select()
+        .from(employeeExperience)
+        .where(eq(employeeExperience.userId, userId));
     }
 
     // 5. Fetch Assets
@@ -319,11 +352,229 @@ export class ProfileService {
       employeeProfile,
       address,
       emergencyContact,
+      education,
+      experience,
       documents,
       assets,
       complaints: mappedComplaints,
       notifications: [],
     };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Data Input Methods (Education & Experience)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  async updateMyProfile(userId: number, dto: any) {
+    const activeReqs = await this.db
+      .select({ id: onboardingRequests.id, status: onboardingRequests.status })
+      .from(onboardingRequests)
+      .where(eq(onboardingRequests.userId, userId))
+      .orderBy(desc(onboardingRequests.createdAt))
+      .limit(1);
+    
+    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
+
+    if (isOnboarding) {
+      const [updated] = await this.db.update(onboardingProfiles).set({
+        firstName: dto.firstName,
+        middleName: dto.middleName,
+        lastName: dto.lastName,
+        dob: dto.dateOfBirth,
+        gender: dto.gender,
+        maritalStatus: dto.maritalStatus,
+        nationality: dto.nationality,
+        aadharNumber: dto.aadharNumber,
+        panNumber: dto.panNumber,
+        phone: dto.phone,
+        email: dto.personalEmail,
+        currentAddress: dto.address ? {
+          line1: dto.address.currentAddressLine1,
+          line2: dto.address.currentAddressLine2,
+          city: dto.address.currentCity,
+          state: dto.address.currentState,
+          country: dto.address.currentCountry,
+          postalCode: dto.address.currentPostalCode,
+        } : undefined,
+        permanentAddress: dto.address ? {
+          line1: dto.address.permanentAddressLine1,
+          line2: dto.address.permanentAddressLine2,
+          city: dto.address.permanentCity,
+          state: dto.address.permanentState,
+          country: dto.address.permanentCountry,
+          postalCode: dto.address.permanentPostalCode,
+        } : undefined,
+        emergencyContact: dto.emergencyContact ? {
+          name: dto.emergencyContact.name,
+          relationship: dto.emergencyContact.relationship,
+          phone: dto.emergencyContact.phone,
+          altPhone: dto.emergencyContact.altPhone,
+          email: dto.emergencyContact.email,
+        } : undefined,
+        updatedAt: new Date(),
+      }).where(eq(onboardingProfiles.onboardingId, activeReqs[0].id)).returning();
+
+      return { success: true, profile: updated };
+    }
+
+    // TODO: Fallback to update userProfiles for permanent employees if needed.
+    throw new BadRequestException('Updating permanent profile from this endpoint is not yet configured.');
+  }
+
+  // --- Education ---
+
+  async addEducation(userId: number, dto: any) {
+    const activeReqs = await this.db.select({ id: onboardingRequests.id, status: onboardingRequests.status })
+      .from(onboardingRequests).where(eq(onboardingRequests.userId, userId)).orderBy(desc(onboardingRequests.createdAt)).limit(1);
+    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
+
+    if (isOnboarding) {
+      const [inserted] = await this.db.insert(onboardingEducation).values({
+        onboardingId: activeReqs[0].id,
+        degree: dto.degree,
+        institution: dto.institution,
+        fieldOfStudy: dto.fieldOfStudy,
+        yearOfCompletion: dto.yearOfCompletion,
+        grade: dto.grade,
+      }).returning();
+      return inserted;
+    }
+
+    const [inserted] = await this.db.insert(employeeEducation).values({
+      userId,
+      degree: dto.degree,
+      institution: dto.institution,
+      fieldOfStudy: dto.fieldOfStudy,
+      yearOfCompletion: dto.yearOfCompletion,
+      grade: dto.grade,
+    }).returning();
+    return inserted;
+  }
+
+  async updateEducation(userId: number, eduId: number, dto: any) {
+    const activeReqs = await this.db.select({ id: onboardingRequests.id, status: onboardingRequests.status })
+      .from(onboardingRequests).where(eq(onboardingRequests.userId, userId)).orderBy(desc(onboardingRequests.createdAt)).limit(1);
+    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
+
+    if (isOnboarding) {
+      const [updated] = await this.db.update(onboardingEducation).set({
+        degree: dto.degree,
+        institution: dto.institution,
+        fieldOfStudy: dto.fieldOfStudy,
+        yearOfCompletion: dto.yearOfCompletion,
+        grade: dto.grade,
+        updatedAt: new Date(),
+      }).where(eq(onboardingEducation.id, eduId)).returning();
+      return updated;
+    }
+
+    const [updated] = await this.db.update(employeeEducation).set({
+      degree: dto.degree,
+      institution: dto.institution,
+      fieldOfStudy: dto.fieldOfStudy,
+      yearOfCompletion: dto.yearOfCompletion,
+      grade: dto.grade,
+      updatedAt: new Date(),
+    }).where(eq(employeeEducation.id, eduId)).returning();
+    return updated;
+  }
+
+  async deleteEducation(userId: number, eduId: number) {
+    const activeReqs = await this.db.select({ id: onboardingRequests.id, status: onboardingRequests.status })
+      .from(onboardingRequests).where(eq(onboardingRequests.userId, userId)).orderBy(desc(onboardingRequests.createdAt)).limit(1);
+    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
+
+    if (isOnboarding) {
+      const [existing] = await this.db.select().from(onboardingEducation).where(eq(onboardingEducation.id, eduId)).limit(1);
+      if (existing && existing.onboardingId === activeReqs[0].id) {
+        await this.db.delete(onboardingEducation).where(eq(onboardingEducation.id, eduId));
+      }
+      return;
+    }
+
+    const [existing] = await this.db.select().from(employeeEducation).where(eq(employeeEducation.id, eduId)).limit(1);
+    if (existing && existing.userId === userId) {
+      await this.db.delete(employeeEducation).where(eq(employeeEducation.id, eduId));
+    }
+  }
+
+  // --- Experience ---
+
+  async addExperience(userId: number, dto: any) {
+    const activeReqs = await this.db.select({ id: onboardingRequests.id, status: onboardingRequests.status })
+      .from(onboardingRequests).where(eq(onboardingRequests.userId, userId)).orderBy(desc(onboardingRequests.createdAt)).limit(1);
+    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
+
+    const parseDate = (d: any) => d ? new Date(d).toISOString().split('T')[0] : null;
+
+    if (isOnboarding) {
+      const [inserted] = await this.db.insert(onboardingExperience).values({
+        onboardingId: activeReqs[0].id,
+        companyName: dto.companyName,
+        designation: dto.designation,
+        fromDate: parseDate(dto.fromDate),
+        toDate: parseDate(dto.toDate),
+        currentlyWorking: dto.currentlyWorking,
+        responsibilities: dto.responsibilities,
+      }).returning();
+      return inserted;
+    }
+
+    const [inserted] = await this.db.insert(employeeExperience).values({
+      userId,
+      companyName: dto.companyName,
+      designation: dto.designation,
+      fromDate: parseDate(dto.fromDate),
+      toDate: parseDate(dto.toDate),
+      currentlyWorking: dto.currentlyWorking,
+      responsibilities: dto.responsibilities,
+    }).returning();
+    return inserted;
+  }
+
+  async updateExperience(userId: number, expId: number, dto: any) {
+    const activeReqs = await this.db.select({ id: onboardingRequests.id, status: onboardingRequests.status })
+      .from(onboardingRequests).where(eq(onboardingRequests.userId, userId)).orderBy(desc(onboardingRequests.createdAt)).limit(1);
+    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
+
+    const parseDate = (d: any) => d ? new Date(d).toISOString().split('T')[0] : undefined;
+
+    const payload = {
+      companyName: dto.companyName,
+      designation: dto.designation,
+      fromDate: dto.fromDate !== undefined ? parseDate(dto.fromDate) : undefined,
+      toDate: dto.toDate !== undefined ? parseDate(dto.toDate) : undefined,
+      currentlyWorking: dto.currentlyWorking,
+      responsibilities: dto.responsibilities,
+      updatedAt: new Date(),
+    };
+
+    if (isOnboarding) {
+      const [updated] = await this.db.update(onboardingExperience).set(payload).where(eq(onboardingExperience.id, expId)).returning();
+      return updated;
+    }
+
+    const [updated] = await this.db.update(employeeExperience).set(payload as any).where(eq(employeeExperience.id, expId)).returning();
+    return updated;
+  }
+
+  async deleteExperience(userId: number, expId: number) {
+    const activeReqs = await this.db.select({ id: onboardingRequests.id, status: onboardingRequests.status })
+      .from(onboardingRequests).where(eq(onboardingRequests.userId, userId)).orderBy(desc(onboardingRequests.createdAt)).limit(1);
+    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
+
+    if (isOnboarding) {
+      const [existing] = await this.db.select().from(onboardingExperience).where(eq(onboardingExperience.id, expId)).limit(1);
+      if (existing && existing.onboardingId === activeReqs[0].id) {
+        await this.db.delete(onboardingExperience).where(eq(onboardingExperience.id, expId));
+      }
+      return;
+    }
+
+    const [existing] = await this.db.select().from(employeeExperience).where(eq(employeeExperience.id, expId)).limit(1);
+    if (existing && existing.userId === userId) {
+      await this.db.delete(employeeExperience).where(eq(employeeExperience.id, expId));
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
