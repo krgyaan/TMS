@@ -129,7 +129,8 @@ export class FollowUpController {
     // ========================
     @Delete(":id")
     async remove(@Param("id", ParseIntPipe) id: number, @CurrentUser() user) {
-        return this.service.delete(id, user.sub);
+        // return this.service.delete(id, user.sub);
+        return;
     }
 
     // ========================
