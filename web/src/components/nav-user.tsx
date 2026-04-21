@@ -1,8 +1,9 @@
-﻿import { useCallback } from "react";
+import { useCallback } from "react";
 import {
     Bell,
     ChevronsUpDown,
     LogOut,
+    User,
 } from "lucide-react";
 
 import {
@@ -26,7 +27,8 @@ import {
     useSidebar,
 } from "@/components/ui/sidebar";
 import type { AuthUser } from "@/types/auth.types";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { paths } from "@/app/routes/paths";
 const getInitials = (name?: string | null) => {
     if (!name) return "U";
     const segments = name.trim().split(/\s+/).slice(0, 2);
@@ -39,6 +41,7 @@ type NavUserProps = {
 };
 
 export function NavUser({ user, onLogout }: NavUserProps) {
+    const navigate = useNavigate();
     const { isMobile } = useSidebar();
 
     const handleLogout = useCallback(() => {
@@ -94,8 +97,14 @@ export function NavUser({ user, onLogout }: NavUserProps) {
                                 Notifications
                             </DropdownMenuItem>
                         </DropdownMenuGroup>
+                        <DropdownMenuGroup>
+                            <DropdownMenuItem className="cursor-pointer" onClick={() => navigate(paths.profile)}>
+                                <User />
+                                Profile
+                            </DropdownMenuItem>
+                        </DropdownMenuGroup>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem variant="destructive" onClick={handleLogout}>
+                        <DropdownMenuItem className="cursor-pointer" variant="destructive" onClick={handleLogout}>
                             <LogOut />
                             Log out
                         </DropdownMenuItem>
