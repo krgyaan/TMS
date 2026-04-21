@@ -20,6 +20,7 @@ import {
 
 export const onboardingRequests = pgTable('hrms_onboarding_requests', {
   id: bigserial('id', { mode: 'number' }).primaryKey(),
+  userId: bigint('user_id', { mode: 'number' }),
 
   name: varchar('name', { length: 255 }).notNull(),
   email: varchar('email', { length: 255 }).notNull(),
@@ -68,6 +69,8 @@ export const onboardingProfiles = pgTable('hrms_onboarding_profiles', {
 
   aadharNumber: varchar('aadhar_number', { length: 20 }),
   panNumber: varchar('pan_number', { length: 20 }),
+  bloodGroup: varchar('blood_group', { length: 10 }),
+  linkedinProfile: varchar('linkedin_profile', { length: 255 }),
 
   currentAddress: jsonb('current_address').default({}),
   permanentAddress: jsonb('permanent_address').default({}),
@@ -75,6 +78,7 @@ export const onboardingProfiles = pgTable('hrms_onboarding_profiles', {
 
   // HR DETAILS
   employeeType: varchar('employee_type', { length: 50 }),
+  employeeStatus: varchar('employee_status', { length: 50 }).default('Active'),
   designationId: bigint('designation_id', { mode: 'number' }),
   departmentId: bigint('department_id', { mode: 'number' }),
   reportingManagerId: bigint('reporting_manager_id', { mode: 'number' }),
@@ -88,11 +92,20 @@ export const onboardingProfiles = pgTable('hrms_onboarding_profiles', {
   // COMPENSATION
   salaryType: varchar('salary_type', { length: 20 }),
   basicSalary: numeric('basic_salary', { precision: 12, scale: 2 }),
+  hra: numeric('hra', { precision: 12, scale: 2 }),
+  allowances: numeric('allowances', { precision: 12, scale: 2 }),
+  bonus: numeric('bonus', { precision: 12, scale: 2 }),
+  pfApplicable: boolean('pf_applicable').default(false),
+  esicApplicable: boolean('esic_applicable').default(false),
 
   // BANK DETAILS
   bankName: varchar('bank_name', { length: 255 }),
+  accountHolderName: varchar('account_holder_name', { length: 255 }),
   accountNumber: varchar('account_number', { length: 50 }),
   ifscCode: varchar('ifsc_code', { length: 20 }),
+  branchName: varchar('branch_name', { length: 255 }),
+  branchAddress: text('branch_address'),
+  upiId: varchar('upi_id', { length: 100 }),
 
   // COMPLETION FLAGS
   hrCompleted: boolean('hr_completed').default(false),
@@ -187,3 +200,54 @@ export const onboardingActivityLogs = pgTable('hrms_onboarding_logs', {
 
 export type OnboardingActivityLog = typeof onboardingActivityLogs.$inferSelect;
 export type NewOnboardingActivityLog = typeof onboardingActivityLogs.$inferInsert;
+
+//
+// ==============================
+// 6. ONBOARDING EDUCATION
+// ==============================
+//
+
+export const onboardingEducation = pgTable('hrms_onboarding_education', {
+  id: bigserial('id', { mode: 'number' }).primaryKey(),
+  onboardingId: bigint('onboarding_id', { mode: 'number' }).notNull(),
+
+  degree: varchar('degree', { length: 255 }).notNull(),
+  institution: varchar('institution', { length: 255 }).notNull(),
+  fieldOfStudy: varchar('field_of_study', { length: 255 }),
+  yearOfCompletion: integer('year_of_completion').notNull(),
+  grade: varchar('grade', { length: 50 }),
+  
+  status: varchar('status', { length: 50 }).default('pending'),
+
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type OnboardingEducation = typeof onboardingEducation.$inferSelect;
+export type NewOnboardingEducation = typeof onboardingEducation.$inferInsert;
+
+//
+// ==============================
+// 7. ONBOARDING EXPERIENCE
+// ==============================
+//
+
+export const onboardingExperience = pgTable('hrms_onboarding_experience', {
+  id: bigserial('id', { mode: 'number' }).primaryKey(),
+  onboardingId: bigint('onboarding_id', { mode: 'number' }).notNull(),
+
+  companyName: varchar('company_name', { length: 255 }),
+  designation: varchar('designation', { length: 255 }),
+  fromDate: date('from_date'),
+  toDate: date('to_date'),
+  currentlyWorking: boolean('currently_working').default(false),
+  responsibilities: text('responsibilities'),
+
+  status: varchar('status', { length: 50 }).default('pending'),
+
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type OnboardingExperience = typeof onboardingExperience.$inferSelect;
+export type NewOnboardingExperience = typeof onboardingExperience.$inferInsert;
