@@ -12,10 +12,11 @@ import { userProfiles } from '@/db/schemas/auth/user-profiles.schema';
 import { employeeProfiles } from '@/db/schemas/hrms/employee-profiles.schema';
 import { employeeDocuments } from '@/db/schemas/hrms/employee-documents.schema';
 import { employeeAssets } from '@/db/schemas/hrms/employee-assets.schema';
+import { onboardingRequests, onboardingDocuments, onboardingProfiles } from '@/db/schemas/hrms/onboarding';
 import { complaints } from '@/db/schemas/hrms/complaints.schema';
 import { teams } from '@/db/schemas/master/teams.schema';
 import { designations } from '@/db/schemas/master/designations.schema';
-import { aliasedTable } from 'drizzle-orm';
+import {aliasedTable, desc } from 'drizzle-orm';
 
 @Injectable()
 export class ProfileService {
@@ -56,125 +57,228 @@ export class ProfileService {
       team: userRow.teamName || 'Unassigned',
     };
 
-    // 2. Fetch User Profile Data
-    const [userProfileRow] = await this.db
-      .select({
-        profile: userProfiles,
-        designationName: designations.name,
-        departmentName: teams.name,
-      })
-      .from(userProfiles)
-      .leftJoin(designations, eq(userProfiles.designationId, designations.id))
-      .leftJoin(teams, eq(userProfiles.primaryTeamId, teams.id))
-      .where(eq(userProfiles.userId, userId))
+    // CHECK ONBOARDING STATUS
+    const activeReqs = await this.db
+      .select({ id: onboardingRequests.id, status: onboardingRequests.status })
+      .from(onboardingRequests)
+      .where(eq(onboardingRequests.userId, userId))
+      .orderBy(desc(onboardingRequests.createdAt))
       .limit(1);
-
-    const upr = userProfileRow?.profile;
     
-    const profile = upr ? {
-      firstName: upr.firstName || '',
-      middleName: upr.middleName || null,
-      lastName: upr.lastName || null,
-      dateOfBirth: upr.dateOfBirth || null,
-      gender: upr.gender || null,
-      maritalStatus: upr.maritalStatus || null,
-      nationality: upr.nationality || null,
-      personalEmail: upr.altEmail || userRow.email || null,
-      phone: upr.phone || userRow.mobile || null,
-      alternatePhone: null,
-      aadharNumber: upr.aadharNumber || null,
-      panNumber: upr.panNumber || null,
-      employeeCode: upr.employeeCode || null,
-      altEmail: upr.altEmail || null,
-    } : null;
+    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
+    const onboardingId = isOnboarding ? activeReqs[0].id : null;
 
-    const address = upr ? {
-      currentAddressLine1: (upr.currentAddress as any)?.line1 || null,
-      currentAddressLine2: (upr.currentAddress as any)?.line2 || null,
-      currentCity: (upr.currentAddress as any)?.city || null,
-      currentState: (upr.currentAddress as any)?.state || null,
-      currentCountry: (upr.currentAddress as any)?.country || null,
-      currentPostalCode: (upr.currentAddress as any)?.postalCode || null,
-      permanentAddressLine1: (upr.permanentAddress as any)?.line1 || null,
-      permanentAddressLine2: (upr.permanentAddress as any)?.line2 || null,
-      permanentCity: (upr.permanentAddress as any)?.city || null,
-      permanentState: (upr.permanentAddress as any)?.state || null,
-      permanentCountry: (upr.permanentAddress as any)?.country || null,
-      permanentPostalCode: (upr.permanentAddress as any)?.postalCode || null,
-    } : null;
+    let profile: any = null;
+    let address: any = null;
+    let emergencyContact: any = null;
+    let employeeProfile: any = null;
+    let documents: any[] = [];
 
-    const emergencyContact = upr ? {
-      name: (upr.emergencyContact as any)?.name || null,
-      relationship: (upr.emergencyContact as any)?.relationship || null,
-      phone: (upr.emergencyContact as any)?.phone || null,
-      altPhone: (upr.emergencyContact as any)?.altPhone || null,
-      email: (upr.emergencyContact as any)?.email || null,
-    } : null;
+    if (isOnboarding) {
+      // 2 & 3. Fetch Onboarding Profile Data
+      const [obProfile] = await this.db
+        .select()
+        .from(onboardingProfiles)
+        .where(eq(onboardingProfiles.onboardingId, onboardingId!))
+        .limit(1);
 
-    // 3. Fetch HR Employee Profile
-    const managerUsers = aliasedTable(users, 'manager');
-    const [empProfileRow] = await this.db
-      .select({
-        employeeType: employeeProfiles.employeeType,
-        employeeStatus: employeeProfiles.employeeStatus,
-        workLocation: employeeProfiles.workLocation,
-        officialEmail: employeeProfiles.officialEmail,
-        reportingManager: managerUsers.name,
-        probationMonths: employeeProfiles.probationMonths,
-        probationEndDate: employeeProfiles.probationEndDate,
-        salaryType: employeeProfiles.salaryType,
-        bankName: employeeProfiles.bankName,
-        accountHolderName: employeeProfiles.accountHolderName,
-        accountNumber: employeeProfiles.accountNumber,
-        ifscCode: employeeProfiles.ifscCode,
-        branchName: employeeProfiles.branchName,
-        uanNumber: employeeProfiles.uanNumber,
-        pfNumber: employeeProfiles.pfNumber,
-        esicNumber: employeeProfiles.esicNumber,
-        offerLetterDate: employeeProfiles.offerLetterDate,
-        joiningLetterIssued: employeeProfiles.joiningLetterIssued,
-        inductionCompleted: employeeProfiles.inductionCompleted,
-        inductionDate: employeeProfiles.inductionDate,
-        idCardIssued: employeeProfiles.idCardIssued,
-        idCardIssuedDate: employeeProfiles.idCardIssuedDate,
-      })
-      .from(employeeProfiles)
-      .leftJoin(managerUsers, eq(employeeProfiles.reportingManagerId, managerUsers.id))
-      .where(eq(employeeProfiles.userId, userId))
-      .limit(1);
+      if (obProfile) {
+        profile = {
+          firstName: obProfile.firstName || '',
+          middleName: obProfile.middleName || null,
+          lastName: obProfile.lastName || null,
+          dateOfBirth: obProfile.dob || null,
+          gender: obProfile.gender || null,
+          maritalStatus: obProfile.maritalStatus || null,
+          nationality: obProfile.nationality || null,
+          personalEmail: obProfile.email || userRow.email || null,
+          phone: obProfile.phone || userRow.mobile || null,
+          alternatePhone: null,
+          aadharNumber: obProfile.aadharNumber || null,
+          panNumber: obProfile.panNumber || null,
+          employeeCode: null,
+          altEmail: null,
+        };
+        address = {
+          currentAddressLine1: (obProfile.currentAddress as any)?.line1 || null,
+          currentAddressLine2: (obProfile.currentAddress as any)?.line2 || null,
+          currentCity: (obProfile.currentAddress as any)?.city || null,
+          currentState: (obProfile.currentAddress as any)?.state || null,
+          currentCountry: (obProfile.currentAddress as any)?.country || null,
+          currentPostalCode: (obProfile.currentAddress as any)?.postalCode || null,
+          permanentAddressLine1: (obProfile.permanentAddress as any)?.line1 || null,
+          permanentAddressLine2: (obProfile.permanentAddress as any)?.line2 || null,
+          permanentCity: (obProfile.permanentAddress as any)?.city || null,
+          permanentState: (obProfile.permanentAddress as any)?.state || null,
+          permanentCountry: (obProfile.permanentAddress as any)?.country || null,
+          permanentPostalCode: (obProfile.permanentAddress as any)?.postalCode || null,
+        };
+        emergencyContact = obProfile.emergencyContact ? {
+          name: (obProfile.emergencyContact as any)?.name || null,
+          relationship: (obProfile.emergencyContact as any)?.relationship || null,
+          phone: (obProfile.emergencyContact as any)?.phone || null,
+          altPhone: (obProfile.emergencyContact as any)?.altPhone || null,
+          email: (obProfile.emergencyContact as any)?.email || null,
+        } : null;
+        employeeProfile = {
+          employeeType: obProfile.employeeType,
+          employeeStatus: obProfile.employeeStatus,
+          workLocation: obProfile.workLocation,
+          probationMonths: obProfile.probationMonths,
+          probationEndDate: obProfile.probationEndDate ? String(obProfile.probationEndDate).split('T')[0] : null,
+          salaryType: obProfile.salaryType,
+          bankName: obProfile.bankName,
+          accountHolderName: obProfile.accountHolderName,
+          accountNumber: obProfile.accountNumber,
+          ifscCode: obProfile.ifscCode,
+          branchName: obProfile.branchName,
+          joiningDate: obProfile.dateOfJoining ? String(obProfile.dateOfJoining).split('T')[0] : null,
+          designation: obProfile.designationId ? `ID ${obProfile.designationId}` : null,
+          department: obProfile.departmentId ? `ID ${obProfile.departmentId}` : null,
+        };
+      }
 
-    const employeeProfile = empProfileRow ? {
-      ...empProfileRow,
-      probationEndDate: empProfileRow.probationEndDate || null,
-      offerLetterDate: empProfileRow.offerLetterDate || null,
-      inductionDate: empProfileRow.inductionDate || null,
-      idCardIssuedDate: empProfileRow.idCardIssuedDate || null,
-      joiningDate: upr?.dateOfJoining || null,
-      designation: userProfileRow?.designationName || null,
-      department: userProfileRow?.departmentName || null,
-    } : null;
+      // 4. Fetch Onboarding Documents
+      const obDocsRows = await this.db
+        .select()
+        .from(onboardingDocuments)
+        .where(eq(onboardingDocuments.onboardingId, onboardingId!));
 
-    // 4. Fetch Documents
-    const documentsRows = await this.db
-      .select()
-      .from(employeeDocuments)
-      .where(eq(employeeDocuments.userId, userId));
+      documents = obDocsRows.map(d => ({
+        id: d.id,
+        docCategory: d.docCategory,
+        docType: d.docType,
+        docNumber: d.docNumber,
+        fileUrl: d.fileUrl,
+        fileName: d.fileUrl ? d.fileUrl.split('/').pop() : null,
+        issueDate: d.issueDate || null,
+        expiryDate: d.expiryDate || null,
+        verificationStatus: d.status,
+        verifiedBy: d.verifiedBy ? String(d.verifiedBy) : null,
+        verificationDate: d.verificationDate || null,
+        remarks: d.remarks || null,
+        uploadedAt: d.createdAt?.toISOString() || null,
+      }));
+    } else {
+      // 2. Fetch User Profile Data (PERMANENT)
+      const [userProfileRow] = await this.db
+        .select({
+          profile: userProfiles,
+          designationName: designations.name,
+          departmentName: teams.name,
+        })
+        .from(userProfiles)
+        .leftJoin(designations, eq(userProfiles.designationId, designations.id))
+        .leftJoin(teams, eq(userProfiles.primaryTeamId, teams.id))
+        .where(eq(userProfiles.userId, userId))
+        .limit(1);
 
-    const documents = documentsRows.map(d => ({
-      id: d.id,
-      docCategory: d.docCategory,
-      docType: d.docType,
-      docNumber: d.docNumber,
-      fileUrl: d.fileUrl,
-      fileName: d.fileUrl ? d.fileUrl.split('/').pop() : null,
-      issueDate: d.issueDate || null,
-      expiryDate: d.expiryDate || null,
-      verificationStatus: d.verificationStatus,
-      verifiedBy: d.verifiedBy ? String(d.verifiedBy) : null,
-      verificationDate: d.verificationDate || null,
-      remarks: d.remarks || null,
-      uploadedAt: d.createdAt?.toISOString() || null,
-    }));
+      const upr = userProfileRow?.profile;
+      profile = upr ? {
+        firstName: upr.firstName || '',
+        middleName: upr.middleName || null,
+        lastName: upr.lastName || null,
+        dateOfBirth: upr.dateOfBirth || null,
+        gender: upr.gender || null,
+        maritalStatus: upr.maritalStatus || null,
+        nationality: upr.nationality || null,
+        personalEmail: upr.altEmail || userRow.email || null,
+        phone: upr.phone || userRow.mobile || null,
+        alternatePhone: null,
+        aadharNumber: upr.aadharNumber || null,
+        panNumber: upr.panNumber || null,
+        employeeCode: upr.employeeCode || null,
+        altEmail: upr.altEmail || null,
+      } : null;
+
+      address = upr ? {
+        currentAddressLine1: (upr.currentAddress as any)?.line1 || null,
+        currentAddressLine2: (upr.currentAddress as any)?.line2 || null,
+        currentCity: (upr.currentAddress as any)?.city || null,
+        currentState: (upr.currentAddress as any)?.state || null,
+        currentCountry: (upr.currentAddress as any)?.country || null,
+        currentPostalCode: (upr.currentAddress as any)?.postalCode || null,
+        permanentAddressLine1: (upr.permanentAddress as any)?.line1 || null,
+        permanentAddressLine2: (upr.permanentAddress as any)?.line2 || null,
+        permanentCity: (upr.permanentAddress as any)?.city || null,
+        permanentState: (upr.permanentAddress as any)?.state || null,
+        permanentCountry: (upr.permanentAddress as any)?.country || null,
+        permanentPostalCode: (upr.permanentAddress as any)?.postalCode || null,
+      } : null;
+
+      emergencyContact = upr ? {
+        name: (upr.emergencyContact as any)?.name || null,
+        relationship: (upr.emergencyContact as any)?.relationship || null,
+        phone: (upr.emergencyContact as any)?.phone || null,
+        altPhone: (upr.emergencyContact as any)?.altPhone || null,
+        email: (upr.emergencyContact as any)?.email || null,
+      } : null;
+
+      // 3. Fetch HR Employee Profile (PERMANENT)
+      const managerUsers = aliasedTable(users, 'manager');
+      const [empProfileRow] = await this.db
+        .select({
+          employeeType: employeeProfiles.employeeType,
+          employeeStatus: employeeProfiles.employeeStatus,
+          workLocation: employeeProfiles.workLocation,
+          officialEmail: employeeProfiles.officialEmail,
+          reportingManager: managerUsers.name,
+          probationMonths: employeeProfiles.probationMonths,
+          probationEndDate: employeeProfiles.probationEndDate,
+          salaryType: employeeProfiles.salaryType,
+          bankName: employeeProfiles.bankName,
+          accountHolderName: employeeProfiles.accountHolderName,
+          accountNumber: employeeProfiles.accountNumber,
+          ifscCode: employeeProfiles.ifscCode,
+          branchName: employeeProfiles.branchName,
+          uanNumber: employeeProfiles.uanNumber,
+          pfNumber: employeeProfiles.pfNumber,
+          esicNumber: employeeProfiles.esicNumber,
+          offerLetterDate: employeeProfiles.offerLetterDate,
+          joiningLetterIssued: employeeProfiles.joiningLetterIssued,
+          inductionCompleted: employeeProfiles.inductionCompleted,
+          inductionDate: employeeProfiles.inductionDate,
+          idCardIssued: employeeProfiles.idCardIssued,
+          idCardIssuedDate: employeeProfiles.idCardIssuedDate,
+        })
+        .from(employeeProfiles)
+        .leftJoin(managerUsers, eq(employeeProfiles.reportingManagerId, managerUsers.id))
+        .where(eq(employeeProfiles.userId, userId))
+        .limit(1);
+
+      employeeProfile = empProfileRow ? {
+        ...empProfileRow,
+        probationEndDate: empProfileRow.probationEndDate || null,
+        offerLetterDate: empProfileRow.offerLetterDate || null,
+        inductionDate: empProfileRow.inductionDate || null,
+        idCardIssuedDate: empProfileRow.idCardIssuedDate || null,
+        joiningDate: upr?.dateOfJoining || null,
+        designation: userProfileRow?.designationName || null,
+        department: userProfileRow?.departmentName || null,
+      } : null;
+
+      // 4. Fetch Permanent Documents
+      const documentsRows = await this.db
+        .select()
+        .from(employeeDocuments)
+        .where(eq(employeeDocuments.userId, userId));
+
+      documents = documentsRows.map(d => ({
+        id: d.id,
+        docCategory: d.docCategory,
+        docType: d.docType,
+        docNumber: d.docNumber,
+        fileUrl: d.fileUrl,
+        fileName: d.fileUrl ? d.fileUrl.split('/').pop() : null,
+        issueDate: d.issueDate || null,
+        expiryDate: d.expiryDate || null,
+        verificationStatus: d.verificationStatus,
+        verifiedBy: d.verifiedBy ? String(d.verifiedBy) : null,
+        verificationDate: d.verificationDate || null,
+        remarks: d.remarks || null,
+        uploadedAt: d.createdAt?.toISOString() || null,
+      }));
+    }
 
     // 5. Fetch Assets
     const assetsRows = await this.db
@@ -240,31 +344,63 @@ export class ProfileService {
       expiryDate: string | null;
     },
   ) {
-    // Check for duplicate docType
-    const existing = await this.db
-      .select({ id: employeeDocuments.id })
-      .from(employeeDocuments)
-      .where(eq(employeeDocuments.userId, userId))
-      .then(rows => rows.find(r => r.id)); // just checking if any exist first
+    const activeReqs = await this.db
+      .select({ id: onboardingRequests.id, status: onboardingRequests.status })
+      .from(onboardingRequests)
+      .where(eq(onboardingRequests.userId, userId))
+      .orderBy(desc(onboardingRequests.createdAt))
+      .limit(1);
+    
+    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
+    const onboardingId = isOnboarding ? activeReqs[0].id : null;
 
-    const existingDocs = await this.db
-      .select({ docType: employeeDocuments.docType })
-      .from(employeeDocuments)
-      .where(eq(employeeDocuments.userId, userId));
+    if (isOnboarding) {
+      const existingDocs = await this.db
+        .select({ docType: onboardingDocuments.docType })
+        .from(onboardingDocuments)
+        .where(eq(onboardingDocuments.onboardingId, onboardingId!));
 
-    const duplicate = existingDocs.find(
-      d => d.docType?.toLowerCase() === dto.docType.toLowerCase(),
-    );
-
-    if (duplicate) {
-      // Delete the just-uploaded file since we won't use it
-      try {
-        fs.unlinkSync(file.path);
-      } catch (_) {}
-      throw new ConflictException(
-        `A document of type "${dto.docType}" already exists. Use re-upload instead.`,
+      const duplicate = existingDocs.find(
+        d => d.docType?.toLowerCase() === dto.docType.toLowerCase(),
       );
+
+      if (duplicate) {
+        try { fs.unlinkSync(file.path); } catch (_) {}
+        throw new ConflictException(`A document of type "${dto.docType}" already exists. Use re-upload instead.`);
+      }
+
+      const fileUrl = `/uploads/hrms/employee-documents/${file.filename}`;
+
+      const [inserted] = await this.db
+        .insert(onboardingDocuments)
+        .values({
+          onboardingId: onboardingId!,
+          docType: dto.docType,
+          docCategory: dto.docCategory,
+          fileUrl,
+          issueDate: dto.issueDate || null,
+          expiryDate: dto.expiryDate || null,
+          status: 'pending',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        } as any)
+        .returning();
+
+      return {
+        id: inserted.id,
+        docType: inserted.docType,
+        docCategory: inserted.docCategory,
+        fileUrl: inserted.fileUrl,
+        fileName: file.filename,
+        issueDate: inserted.issueDate || null,
+        expiryDate: inserted.expiryDate || null,
+        verificationStatus: inserted.status,
+        uploadedAt: inserted.createdAt?.toISOString() || null,
+        remarks: null,
+      };
     }
+
+    // Check for duplicate docType
 
     const fileUrl = `/uploads/hrms/employee-documents/${file.filename}`;
 
@@ -310,32 +446,73 @@ export class ProfileService {
       expiryDate: string | null;
     },
   ) {
-    const [existing] = await this.db
-      .select()
-      .from(employeeDocuments)
-      .where(eq(employeeDocuments.id, docId))
+    const activeReqs = await this.db
+      .select({ id: onboardingRequests.id, status: onboardingRequests.status })
+      .from(onboardingRequests)
+      .where(eq(onboardingRequests.userId, userId))
+      .orderBy(desc(onboardingRequests.createdAt))
       .limit(1);
+    
+    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
 
-    if (!existing) {
-      try { fs.unlinkSync(file.path); } catch (_) {}
-      throw new NotFoundException('Document not found');
-    }
+    if (isOnboarding) {
+      const [existing] = await this.db
+        .select()
+        .from(onboardingDocuments)
+        .where(eq(onboardingDocuments.id, docId))
+        .limit(1);
 
-    if (existing.userId !== userId) {
-      try { fs.unlinkSync(file.path); } catch (_) {}
-      throw new ForbiddenException('You do not own this document');
-    }
-
-    // Delete old file from disk
-    if (existing.fileUrl) {
-      const oldFilename = existing.fileUrl.split('/').pop();
-      if (oldFilename) {
-        const oldPath = path.join(EMPLOYEE_DOCS_UPLOAD_DIR, oldFilename);
-        try {
-          if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-        } catch (_) {}
+      if (!existing) {
+        try { fs.unlinkSync(file.path); } catch (_) {}
+        throw new NotFoundException('Document not found');
       }
+
+      // Check ownership (in onboarding, doc belongs to onboardingId)
+      if (existing.onboardingId !== activeReqs[0].id) {
+        try { fs.unlinkSync(file.path); } catch (_) {}
+        throw new ForbiddenException('You do not own this document');
+      }
+
+      // Delete old file from disk
+      if (existing.fileUrl) {
+        const oldFilename = existing.fileUrl.split('/').pop();
+        if (oldFilename) {
+          const oldPath = path.join(EMPLOYEE_DOCS_UPLOAD_DIR, oldFilename);
+          try { if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath); } catch (_) {}
+        }
+      }
+
+      const newFileUrl = `/uploads/hrms/employee-documents/${file.filename}`;
+
+      const [updated] = await this.db
+        .update(onboardingDocuments)
+        .set({
+          fileUrl: newFileUrl,
+          issueDate: dto.issueDate || null,
+          expiryDate: dto.expiryDate || null,
+          status: 'pending',
+          verifiedBy: null,
+          verificationDate: null,
+          remarks: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(onboardingDocuments.id, docId))
+        .returning();
+
+      return {
+        id: updated.id,
+        docType: updated.docType,
+        docCategory: updated.docCategory,
+        fileUrl: updated.fileUrl,
+        fileName: file.filename,
+        issueDate: updated.issueDate || null,
+        expiryDate: updated.expiryDate || null,
+        verificationStatus: updated.status,
+        uploadedAt: updated.createdAt?.toISOString() || null,
+        remarks: null,
+      };
     }
+
 
     const newFileUrl = `/uploads/hrms/employee-documents/${file.filename}`;
 
@@ -373,7 +550,37 @@ export class ProfileService {
    * Verifies ownership, removes file from disk and DB.
    */
   async deleteDocument(userId: number, docId: number): Promise<void> {
-    const [existing] = await this.db
+    const activeReqs = await this.db
+      .select({ id: onboardingRequests.id, status: onboardingRequests.status })
+      .from(onboardingRequests)
+      .where(eq(onboardingRequests.userId, userId))
+      .orderBy(desc(onboardingRequests.createdAt))
+      .limit(1);
+    
+    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
+
+    if (isOnboarding) {
+      const [existing] = await this.db
+        .select()
+        .from(onboardingDocuments)
+        .where(eq(onboardingDocuments.id, docId))
+        .limit(1);
+
+      if (!existing) throw new NotFoundException('Document not found');
+      if (existing.onboardingId !== activeReqs[0].id) throw new ForbiddenException('You do not own this document');
+
+      if (existing.fileUrl) {
+        const filename = existing.fileUrl.split('/').pop();
+        if (filename) {
+          const diskPath = path.join(EMPLOYEE_DOCS_UPLOAD_DIR, filename);
+          try { if (fs.existsSync(diskPath)) fs.unlinkSync(diskPath); } catch (_) {}
+        }
+      }
+
+      await this.db.delete(onboardingDocuments).where(eq(onboardingDocuments.id, docId));
+      return;
+    }
+        const [existing] = await this.db
       .select()
       .from(employeeDocuments)
       .where(eq(employeeDocuments.id, docId))
