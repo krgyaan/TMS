@@ -58,6 +58,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useQueryClient } from "@tanstack/react-query";
+import api from "@/lib/axios";
 import { useProfileContext } from "../contexts/ProfileContext";
 import { formatDate } from "../utils";
 import { getStatusConfig } from "./ui-helpers";
@@ -151,6 +153,7 @@ interface UploadDialogProps {
   documentType?: DocumentType | null;
   isReupload?: boolean;
   existingDoc?: UploadedDocument | null;
+  onSuccess: () => void;
 }
 
 const UploadDialog: React.FC<UploadDialogProps> = ({
@@ -159,6 +162,7 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
   documentType,
   isReupload = false,
   existingDoc,
+  onSuccess,
 }) => {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -193,14 +197,40 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
   const handleUpload = async () => {
     if (!selectedFile) return;
     setUploading(true);
-    // Simulate upload
-    await new Promise((r) => setTimeout(r, 2000));
-    setUploading(false);
-    setSelectedFile(null);
-    setDocNumber("");
-    setIssueDate("");
-    setExpiryDate("");
-    onOpenChange(false);
+    try {
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      if (issueDate) formData.append("issueDate", issueDate);
+      if (expiryDate) formData.append("expiryDate", expiryDate);
+
+      if (isReupload && existingDoc) {
+        // PATCH /profile/documents/:id
+        formData.append("docType", existingDoc.docType);
+        formData.append("docCategory", existingDoc.docCategory);
+        await api.patch(`/profile/documents/${existingDoc.id}`, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      } else if (documentType) {
+        // POST /profile/documents
+        formData.append("docType", documentType.docType);
+        formData.append("docCategory", documentType.docCategory);
+        await api.post("/profile/documents", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      }
+
+      onSuccess();
+      setSelectedFile(null);
+      setDocNumber("");
+      setIssueDate("");
+      setExpiryDate("");
+      onOpenChange(false);
+    } catch (err: any) {
+      const message = err?.response?.data?.message || "Upload failed. Please try again.";
+      alert(message);
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleReset = () => {
@@ -596,9 +626,10 @@ interface UploadedDocCardProps {
   index: number;
   onView: (doc: UploadedDocument) => void;
   onReupload: (doc: UploadedDocument) => void;
+  onDelete: (doc: UploadedDocument) => void;
 }
 
-const UploadedDocCard: React.FC<UploadedDocCardProps> = ({ doc, index, onView, onReupload }) => {
+const UploadedDocCard: React.FC<UploadedDocCardProps> = ({ doc, index, onView, onReupload, onDelete }) => {
   const status = getStatusConfig(doc.verificationStatus);
   const StatusIcon = status.icon;
   const catConfig = CATEGORY_CONFIG[doc.docCategory] || CATEGORY_CONFIG["Other Documents"];
@@ -705,7 +736,13 @@ const UploadedDocCard: React.FC<UploadedDocCardProps> = ({ doc, index, onView, o
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="outline" size="icon" className="shrink-0 rounded-xl h-9 w-9">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0 rounded-xl h-9 w-9"
+                    onClick={() => doc.fileUrl && window.open(doc.fileUrl, "_blank")}
+                    disabled={!doc.fileUrl}
+                  >
                     <Download className="h-3.5 w-3.5" />
                   </Button>
                 </TooltipTrigger>
@@ -724,6 +761,25 @@ const UploadedDocCard: React.FC<UploadedDocCardProps> = ({ doc, index, onView, o
                 Re-upload
               </Button>
             )}
+            {doc.verificationStatus !== "verified" && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 rounded-xl h-9 w-9 hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() => onDelete(doc)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-xs">Delete</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -734,7 +790,8 @@ const UploadedDocCard: React.FC<UploadedDocCardProps> = ({ doc, index, onView, o
 // ─── MAIN DOCUMENTS SECTION ─────────────────────────────────────────────────
 
 export const DocumentsSection: React.FC = () => {
-  const { data } = useProfileContext();
+  const { data, refetch } = useProfileContext();
+  const queryClient = useQueryClient();
 
   const [activeCategory, setActiveCategory] = useState<string>("all");
   const [activeView, setActiveView] = useState<"uploaded" | "pending">("uploaded");
@@ -744,6 +801,10 @@ export const DocumentsSection: React.FC = () => {
   const [selectedDocType, setSelectedDocType] = useState<DocumentType | null>(null);
   const [selectedUploadedDoc, setSelectedUploadedDoc] = useState<UploadedDocument | null>(null);
   const [isReupload, setIsReupload] = useState(false);
+
+  const handleUploadSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['my-profile'] });
+  };
 
   if (!data) return null;
 
@@ -802,6 +863,16 @@ export const DocumentsSection: React.FC = () => {
   const handleView = (doc: UploadedDocument) => {
     setSelectedUploadedDoc(doc);
     setPreviewDialogOpen(true);
+  };
+
+  const handleDelete = async (doc: UploadedDocument) => {
+    if (!window.confirm(`Delete "${doc.docType}"? This cannot be undone.`)) return;
+    try {
+      await api.delete(`/profile/documents/${doc.id}`);
+      queryClient.invalidateQueries({ queryKey: ['my-profile'] });
+    } catch (err: any) {
+      alert(err?.response?.data?.message || "Failed to delete document.");
+    }
   };
 
   return (
@@ -1037,6 +1108,7 @@ export const DocumentsSection: React.FC = () => {
                           index={index}
                           onView={handleView}
                           onReupload={handleReupload}
+                          onDelete={handleDelete}
                         />
                       ))}
                     </AnimatePresence>
@@ -1201,6 +1273,7 @@ export const DocumentsSection: React.FC = () => {
         documentType={selectedDocType}
         isReupload={isReupload}
         existingDoc={selectedUploadedDoc}
+        onSuccess={handleUploadSuccess}
       />
 
       <PreviewDialog
