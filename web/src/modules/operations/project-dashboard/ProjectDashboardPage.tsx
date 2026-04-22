@@ -545,11 +545,37 @@ export default function ProjectDashboardPage() {
                         </Card>
                     )}
 
-                    {!projectDetails?.tender && 
-                        <Card>
-                            <CardDescription className="text-center font-bold text-lg color-yellow-400">Tender Not Linked</CardDescription>
-                        </Card>
-                            }
+                    {!projectDetails?.tender && (
+                        <div className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 transition-all hover:shadow-sm animate-in fade-in slide-in-from-top-2 duration-500">
+                            <div className="flex items-center gap-5">
+                                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-sm group-hover:scale-105 transition-transform">
+                                    <AlertCircle className="h-6 w-6" />
+                                </div>
+                                <div className="flex-1 space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-lg font-bold">Tender Not Linked</h3>
+                                        <Badge variant="outline" className="text-[10px] uppercase tracking-wider font-bold h-5 px-1.5 border-primary/20 text-primary bg-primary/5">
+                                            Action Required
+                                        </Badge>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">
+                                        This project does not have a linked tender record. Linking a tender is essential for accurate budget tracking, compliance monitoring, and automated work order generation.
+                                    </p>
+                                </div>
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="hidden md:flex gap-2 border-primary/20 hover:bg-primary/5 hover:text-primary transition-colors"
+                                >
+                                    <Edit className="h-4 w-4" />
+                                    Link Tender
+                                </Button>
+                            </div>
+                            <div className="absolute -right-10 -bottom-6 opacity-[0.03] text-foreground pointer-events-none">
+                                <AlertCircle size={120} />
+                            </div>
+                        </div>
+                    )}
 
                     {projectId && projectDetails && (
                         <>
