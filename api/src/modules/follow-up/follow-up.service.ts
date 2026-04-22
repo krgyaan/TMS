@@ -263,7 +263,6 @@ export class FollowUpService {
 
     async findAll(query: FollowUpQueryDto, currentUser: any) {
         const { tab, search, page, limit, sortBy, sortOrder } = query;
-        this.logger.debug({message: "Printing the current user", currentUser});
 
         try {
             const offset = (page - 1) * limit;
@@ -304,7 +303,7 @@ export class FollowUpService {
                 conditions.push(eq(followUps.stopReason, 2));
             } else if (tab === "angry") {
                 conditions.push(eq(followUps.frequency, 6));
-                conditions.push(eq(followUps.stopReason, 1));
+                conditions.push(inArray(followUps.stopReason, [1, 3, 4]));
             } else if (tab === "future") {
                 conditions.push(sql`${followUps.startFrom} > ${today}`);
             }

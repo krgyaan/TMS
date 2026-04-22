@@ -1,6 +1,7 @@
 // src/modules/accounts/checklist/checklist.service.ts
 import { Inject, Injectable, NotFoundException, ForbiddenException, BadRequestException } from "@nestjs/common";
 import { eq, and, desc, or, gte, lte, isNull, inArray, sql } from "drizzle-orm";
+import { format } from "date-fns";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 
@@ -801,7 +802,7 @@ export class AccountChecklistService {
         const dayOfWeek = today.getDay(); // 0=Sunday, 6=Saturday
         const dayOfMonth = today.getDate();
 
-        this.logger.info(`📆 Today: ${today.toDateString()}, Day of week: ${dayOfWeek}, Day of month: ${dayOfMonth}`);
+        this.logger.info(`📆 Today: ${format(today, "dd/MM/yy")}, Day of week: ${dayOfWeek}, Day of month: ${dayOfMonth}`);
 
         // Only run on Mon-Sat (skip Sunday)
         if (dayOfWeek === 0) {
@@ -888,8 +889,9 @@ export class AccountChecklistService {
      * Enqueue EOD checklist reports (called by cron job)
      */
     async enqueueEodMails(queue: import("bullmq").Queue) {
+        const dateStr = format(new Date(), "dd/MM/yy");
         this.logger.info("[MAIL-ENQUEUE] ▶ Starting EOD checklist mail enqueue", {
-            date: new Date().toDateString(),
+            date: dateStr,
         });
 
         try {
@@ -974,7 +976,7 @@ export class AccountChecklistService {
                     {
                         accountableId: parseInt(accountableId),
                         responsibleGroups,
-                        date: new Date().toDateString(),
+                        date: dateStr,
                     },
                     {
                         attempts: 3,
@@ -1002,7 +1004,7 @@ export class AccountChecklistService {
                 "send-checklist-admin-mail",
                 {
                     grouped,
-                    date: new Date().toDateString(),
+                    date: dateStr,
                 },
                 {
                     attempts: 3,
@@ -1015,7 +1017,7 @@ export class AccountChecklistService {
 
             this.logger.info(
                 `[MAIL-ENQUEUE] ✅ Done — enqueued ${enqueuedCount} individual job(s) + 1 admin job`,
-                { date: new Date().toDateString() }
+                { date: dateStr }
             );
         } catch (error: any) {
             this.logger.error("[MAIL-ENQUEUE] ❌ Failed to enqueue EOD checklist reports", {
@@ -1113,21 +1115,21 @@ export class AccountChecklistService {
                     this.logger.warn(
                         `[MAIL-WORKER] No Google connection for id=${responsibleId} — attempting fallback`
                     );
-                    const fallbackUserId = process.env.FALLBACK_MAIL_USER_ID;
+                    const fallbackUserId = process.env.FALLBACK_MAIL_USER_ID_GYAN;
                     if (fallbackUserId) {
                         googleConnection = await this.googleService.getSanitizedGoogleConnection(parseInt(fallbackUserId));
                         if (googleConnection) {
                             this.logger.info(
-                                `[MAIL-WORKER] Fallback Google connection resolved (FALLBACK_MAIL_USER_ID=${fallbackUserId})`
+                                `[MAIL-WORKER] Fallback Google connection resolved (FALLBACK_MAIL_USER_ID_GYAN=${fallbackUserId})`
                             );
                         } else {
                             this.logger.warn(
-                                `[MAIL-WORKER] Fallback Google connection also not found (FALLBACK_MAIL_USER_ID=${fallbackUserId})`
+                                `[MAIL-WORKER] Fallback Google connection also not found (FALLBACK_MAIL_USER_ID_GYAN=${fallbackUserId})`
                             );
                         }
                     } else {
                         this.logger.warn(
-                            "[MAIL-WORKER] FALLBACK_MAIL_USER_ID env var is not set — cannot fallback"
+                            "[MAIL-WORKER] FALLBACK_MAIL_USER_ID_GYAN env var is not set — cannot fallback"
                         );
                     }
                 } else {
@@ -1161,7 +1163,7 @@ export class AccountChecklistService {
                                 to: [accountableUser.email],
                                 cc,
                                 bcc: ["abhigaur.test@gmail.com"],
-                                subject: `Account Checklist Report - ${date}`,
+                                subject: `Account Checklist - ${date} - ${responsibleUser.name}`,
                             },
                             googleConnection
                         );
@@ -1246,16 +1248,16 @@ export class AccountChecklistService {
                 return;
             }
 
-            const fallbackUserId = process.env.FALLBACK_MAIL_USER_ID;
+            const fallbackUserId = process.env.FALLBACK_MAIL_USER_ID_GYAN;
             if (!fallbackUserId) {
                 this.logger.warn(
-                    "[MAIL-WORKER] ⚠ FALLBACK_MAIL_USER_ID env var is not set — cannot send admin consolidated mail"
+                    "[MAIL-WORKER] ⚠ FALLBACK_MAIL_USER_ID_GYAN env var is not set — cannot send admin consolidated mail"
                 );
                 return;
             }
 
             this.logger.info(
-                `[MAIL-WORKER] Looking up Google connection for admin mail (FALLBACK_MAIL_USER_ID=${fallbackUserId})`
+                `[MAIL-WORKER] Looking up Google connection for admin mail (FALLBACK_MAIL_USER_ID_GYAN=${fallbackUserId})`
             );
             const googleConnection = await this.googleService.getSanitizedGoogleConnection(parseInt(fallbackUserId));
 

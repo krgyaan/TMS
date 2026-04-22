@@ -1,7 +1,6 @@
 <div>
-    <p style="font-weight: bold; text-align: center;">Account Checklist Report for {{ date }}</p>
+    <p style="font-weight: bold; text-align: center;">Account Checklist - {{ date }} - {{ this.responsible_user }}</p>
     {{#each tables}}
-        <p style="font-weight: bold; text-align: center;">Responsible: {{ this.responsible_user }}</p>
         <table style="width:100%; border-collapse: collapse; margin-bottom: 20px; border: 1px solid #ddd;">
             <thead>
                 <tr>
