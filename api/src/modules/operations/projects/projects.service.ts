@@ -50,6 +50,7 @@ export class ProjectsService {
             partyName: employeeImprests.partyName,
             category: imprestCategories.name,
             status: employeeImprests.status,
+            approvalStatus: employeeImprests.status,
             approvalDate: employeeImprests.approvedDate,
             proof: employeeImprests.invoiceProof,
             remark: employeeImprests.remark,
