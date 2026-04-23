@@ -131,4 +131,29 @@ export const TenderInformationFormSchema = z.object({
     // Address & Remarks
     courierAddress: z.string().max(1000).optional(),
     teRemark: z.string().max(1000).optional(),
+    teRejectionProof: z.array(z.string()).default([]),
+}).superRefine((data, ctx) => {
+    if (data.teRecommendation === 'NO') {
+        if (!data.teRejectionReason) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'Rejection reason is required',
+                path: ['teRejectionReason'],
+            });
+        }
+        if (!data.teRejectionRemarks || data.teRejectionRemarks.trim() === '') {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'Rejection remarks are required',
+                path: ['teRejectionRemarks'],
+            });
+        }
+        if (!data.teRejectionProof || data.teRejectionProof.length === 0) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'Proof of rejection is required',
+                path: ['teRejectionProof'],
+            });
+        }
+    }
 });

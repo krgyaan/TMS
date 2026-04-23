@@ -134,6 +134,7 @@ export const TenderInfoSheetPayloadSchema = z.object({
 
     // Final Remark
     teFinalRemark: optionalString,
+    teRejectionProof: optionalStringArray,
 });
 
 export type TenderInfoSheetPayload = z.infer<typeof TenderInfoSheetPayloadSchema>;

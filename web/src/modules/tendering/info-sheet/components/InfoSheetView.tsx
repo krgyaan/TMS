@@ -149,6 +149,24 @@ export const InfoSheetView = ({
                                 {formatValue(infoSheet.teRejectionRemarks)}
                             </TableCell>
                         </TableRow>
+                        {infoSheet.teRejectionProof && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Rejection Proof
+                                </TableCell>
+                                <TableCell className="text-sm" colSpan={3}>
+                                    <div className="flex flex-wrap gap-1">
+                                        {infoSheet.teRejectionProof.map((path, idx) => (
+                                            <Badge key={idx} variant="outline" className="text-xs hover:bg-primary/10">
+                                                <a href={tenderFilesService.getFileUrl(path)} target="_blank" rel="noopener noreferrer">
+                                                    View Proof {infoSheet.teRejectionProof.length > 1 ? idx + 1 : ''}
+                                                </a>
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        )}
 
                         {/* Processing Fee */}
                         {(infoSheet.processingFeeRequired || infoSheet.processingFeeAmount) && (
