@@ -85,13 +85,23 @@ export class ProfileService {
 
     if (isOnboarding) {
       // 2 & 3. Fetch Onboarding Profile Data
-      const [obProfile] = await this.db
-        .select()
+      const managerUsers = aliasedTable(users, 'manager');
+      const [obProfileRow] = await this.db
+        .select({
+          profile: onboardingProfiles,
+          designationName: designations.name,
+          departmentName: teams.name,
+          managerName: managerUsers.name,
+        })
         .from(onboardingProfiles)
+        .leftJoin(designations, eq(onboardingProfiles.designationId, designations.id))
+        .leftJoin(teams, eq(onboardingProfiles.departmentId, teams.id))
+        .leftJoin(managerUsers, eq(onboardingProfiles.reportingManagerId, managerUsers.id))
         .where(eq(onboardingProfiles.onboardingId, onboardingId!))
         .limit(1);
 
-      if (obProfile) {
+      if (obProfileRow) {
+        const obProfile = obProfileRow.profile;
         profile = {
           firstName: obProfile.firstName || '',
           middleName: obProfile.middleName || null,
@@ -105,6 +115,8 @@ export class ProfileService {
           alternatePhone: null,
           aadharNumber: obProfile.aadharNumber || null,
           panNumber: obProfile.panNumber || null,
+          bloodGroup: obProfile.bloodGroup || null,
+          linkedinProfile: obProfile.linkedinProfile || null,
           employeeCode: null,
           altEmail: null,
         };
@@ -133,6 +145,7 @@ export class ProfileService {
           employeeType: obProfile.employeeType,
           employeeStatus: obProfile.employeeStatus,
           workLocation: obProfile.workLocation,
+          reportingManager: obProfileRow.managerName,
           probationMonths: obProfile.probationMonths,
           probationEndDate: obProfile.probationEndDate ? String(obProfile.probationEndDate).split('T')[0] : null,
           salaryType: obProfile.salaryType,
@@ -142,8 +155,8 @@ export class ProfileService {
           ifscCode: obProfile.ifscCode,
           branchName: obProfile.branchName,
           joiningDate: obProfile.dateOfJoining ? String(obProfile.dateOfJoining).split('T')[0] : null,
-          designation: obProfile.designationId ? `ID ${obProfile.designationId}` : null,
-          department: obProfile.departmentId ? `ID ${obProfile.departmentId}` : null,
+          designation: obProfileRow.designationName || (obProfile.designationId ? `ID ${obProfile.designationId}` : null),
+          department: obProfileRow.departmentName || (obProfile.departmentId ? `ID ${obProfile.departmentId}` : null),
         };
       }
 
@@ -208,6 +221,8 @@ export class ProfileService {
         alternatePhone: null,
         aadharNumber: upr.aadharNumber || null,
         panNumber: upr.panNumber || null,
+        bloodGroup: (upr as any).bloodGroup || null,
+        linkedinProfile: (upr as any).linkedinProfile || null,
         employeeCode: upr.employeeCode || null,
         altEmail: upr.altEmail || null,
       } : null;
@@ -388,6 +403,8 @@ export class ProfileService {
         panNumber: dto.panNumber,
         phone: dto.phone,
         email: dto.personalEmail,
+        bloodGroup: dto.bloodGroup,
+        linkedinProfile: dto.linkedinProfile,
         currentAddress: dto.address ? {
           line1: dto.address.currentAddressLine1,
           line2: dto.address.currentAddressLine2,
