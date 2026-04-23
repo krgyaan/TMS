@@ -25,6 +25,8 @@ export type ProfileData = {
   panNumber: string;
   employeeCode: string;
   altEmail: string;
+  bloodGroup: string;
+  linkedinProfile: string;
 };
 
 export type EmployeeProfileData = {
