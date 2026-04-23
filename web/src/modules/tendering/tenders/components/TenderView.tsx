@@ -104,7 +104,7 @@ export function TenderView({
                                 Organization
                             </TableCell>
                             <TableCell className="text-sm">
-                                {tender.organizationName || '—'}
+                                {tender.organizationName || tender.organizationAcronym || '—'}
                             </TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Item
