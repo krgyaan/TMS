@@ -66,6 +66,52 @@ export class ProfileController {
   }
 
   /**
+   * PATCH /profile/me
+   * Allows the employee to update their own basic details 
+   * (writes to onboardingProfiles if onboarding is active)
+   */
+  @Patch('me')
+  async updateMyProfile(@Req() req: any, @Body() body: any) {
+    return this.profileService.updateMyProfile(req.user.id, body);
+  }
+
+  // ─── Education Endpoints ──────────────────────────────────────────────────
+
+  @Post('education')
+  async addEducation(@Req() req: any, @Body() body: any) {
+    return this.profileService.addEducation(req.user.id, body);
+  }
+
+  @Patch('education/:id')
+  async updateEducation(@Req() req: any, @Param('id', ParseIntPipe) eduId: number, @Body() body: any) {
+    return this.profileService.updateEducation(req.user.id, eduId, body);
+  }
+
+  @Delete('education/:id')
+  async deleteEducation(@Req() req: any, @Param('id', ParseIntPipe) eduId: number) {
+    await this.profileService.deleteEducation(req.user.id, eduId);
+    return { success: true };
+  }
+
+  // ─── Work Experience Endpoints ────────────────────────────────────────────
+
+  @Post('experience')
+  async addExperience(@Req() req: any, @Body() body: any) {
+    return this.profileService.addExperience(req.user.id, body);
+  }
+
+  @Patch('experience/:id')
+  async updateExperience(@Req() req: any, @Param('id', ParseIntPipe) expId: number, @Body() body: any) {
+    return this.profileService.updateExperience(req.user.id, expId, body);
+  }
+
+  @Delete('experience/:id')
+  async deleteExperience(@Req() req: any, @Param('id', ParseIntPipe) expId: number) {
+    await this.profileService.deleteExperience(req.user.id, expId);
+    return { success: true };
+  }
+
+  /**
    * POST /profile/documents
    * Upload a new employee document (multipart/form-data)
    * Fields: file, docType, docCategory, issueDate?, expiryDate?

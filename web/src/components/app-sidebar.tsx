@@ -132,13 +132,13 @@ const navMain: NavGroup[] = [
             { title: "Account Team", url: paths.performance.accountTeam, permission: "performance.account-team" },
         ],
     },
+    // {
+    //     title: "HRMS",
+    //     icon: Briefcase,
+    //     items: [{ title: "My Assets", url: paths.hrms.myAssets, permission: "hrms" }],
+    // },
     {
         title: "HRMS",
-        icon: Briefcase,
-        items: [{ title: "My Assets", url: paths.hrms.myAssets, permission: "hrms" }],
-    },
-    {
-        title: "HR Administration",
         icon: Shield,
         items: [
             { title: "Assets", url: "/hrms/admin/assets", permission: "hrms.admin" },

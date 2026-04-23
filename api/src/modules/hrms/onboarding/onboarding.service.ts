@@ -11,17 +11,19 @@ import type { DbInstance } from '@/db';
 import { DRIZZLE } from '@/db/database.module';
 import {
   onboardingRequests,
-  onboardingProfiles,
   onboardingDocuments,
   onboardingInduction,
   onboardingActivityLogs,
   type NewOnboardingRequest,
   type NewOnboardingProfile,
+  onboardingProfiles,
 } from '@/db/schemas/hrms/onboarding';
 import { users } from '@/db/schemas/auth/users.schema';
 import { eq, desc } from 'drizzle-orm';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import { Logger } from 'winston';
+import * as crypto from 'crypto';
+import * as argon2 from 'argon2';
 
 // ─── DTOs ─────────────────────────────────────────────────────────────────────
 
@@ -98,6 +100,60 @@ export class OnboardingService {
   ) {}
 
   // ── Helpers ──────────────────────────────────────────────────────────────
+
+  /**
+   * Helper to recalculate the progress of an onboarding request across all three stages.
+   * Auto-flips statuses to 'completed' when conditions are met.
+   */
+  private async recalculateProgress(tx: any, onboardingId: number): Promise<void> {
+    // 1. Profile
+    const [profile] = await tx
+      .select()
+      .from(onboardingProfiles)
+      .where(eq(onboardingProfiles.onboardingId, onboardingId))
+      .limit(1);
+    
+    // Employee side done at signup. HR side done when hrCompleted flag is true.
+    const profileCompleted = profile?.employeeCompleted && profile?.hrCompleted;
+    const newProfileStatus = profileCompleted ? 'completed' : 'in_progress';
+
+    // 2. Documents
+    const docs = await tx
+      .select()
+      .from(onboardingDocuments)
+      .where(eq(onboardingDocuments.onboardingId, onboardingId));
+    
+    // Assuming docs are completed if there is at least one doc and NO docs are pending/rejected
+    const docsCompleted = docs.length > 0 && docs.every((d: any) => d.status === 'verified');
+    const newDocumentStatus = docsCompleted ? 'completed' : (docs.length > 0 ? 'in_progress' : 'pending');
+
+    // 3. Induction
+    const tasks = await tx
+      .select()
+      .from(onboardingInduction)
+      .where(eq(onboardingInduction.onboardingId, onboardingId));
+      
+    // Induction completed if there are tasks and ALL tasks are completed
+    const inductionCompleted = tasks.length > 0 && tasks.every((t: any) => t.status === 'completed');
+    const newInductionStatus = inductionCompleted ? 'completed' : (tasks.length > 0 ? 'in_progress' : 'pending');
+
+    // 4. Progress %
+    let progress = 0;
+    if (profileCompleted) progress += 33.33;
+    if (docsCompleted) progress += 33.33;
+    if (inductionCompleted) progress += 33.34;
+    
+    await tx
+      .update(onboardingRequests)
+      .set({
+        profileStatus: newProfileStatus,
+        documentStatus: newDocumentStatus,
+        inductionStatus: newInductionStatus,
+        progress: Math.floor(progress),
+        updatedAt: new Date(),
+      })
+      .where(eq(onboardingRequests.id, onboardingId));
+  }
 
   /**
    * Build the permanent address object.
@@ -249,22 +305,8 @@ export class OnboardingService {
 
       if (!updated) throw new NotFoundException(`Profile not found for onboarding #${id}`);
 
-      // Determine new profileStatus
-      const hasEmployment = !!(updated.employeeType && updated.workLocation && updated.dateOfJoining);
-      const hasCompensation = !!(updated.salaryType && updated.basicSalary);
-      const hasBank = !!(updated.bankName && updated.accountNumber && updated.ifscCode);
-      const hrFilled = hasEmployment && hasCompensation && hasBank;
-
-      const newProfileStatus = dto.hrCompleted
-        ? 'completed'
-        : hrFilled
-        ? 'in_progress'
-        : 'pending';
-
-      await tx
-        .update(onboardingRequests)
-        .set({ profileStatus: newProfileStatus, updatedAt: new Date() })
-        .where(eq(onboardingRequests.id, id));
+      // We rely on recalculateProgress to handle the progress % and status changes
+      await this.recalculateProgress(tx, id);
 
       // Log the action
       await tx.insert(onboardingActivityLogs).values({
@@ -394,12 +436,7 @@ export class OnboardingService {
         metadata: { docId, reason },
       });
       
-      // We could also dynamically update 'documentStatus' on onboardingRequests here
-      // if all documents are verified, etc. We'll skip for brevity or just set to 'in_progress'. 
-      await tx
-        .update(onboardingRequests)
-        .set({ documentStatus: 'in_progress', updatedAt: new Date() })
-        .where(eq(onboardingRequests.id, onboardingId));
+      await this.recalculateProgress(tx, onboardingId);
     });
   }
 
@@ -521,11 +558,7 @@ export class OnboardingService {
         metadata: { taskId, updates },
       });
       
-      // Update overall inductionStatus if needed
-      await tx
-        .update(onboardingRequests)
-        .set({ inductionStatus: 'in_progress', updatedAt: new Date() })
-        .where(eq(onboardingRequests.id, onboardingId));
+      await this.recalculateProgress(tx, onboardingId);
     });
   }
 
@@ -666,19 +699,87 @@ export class OnboardingService {
         );
       }
 
-      // Update request status
+      // ── 1. Create User and Seed Tasks if Approved ────────────────────────
+      let newUserId: number | null = null;
+      
+      if (dto.status === 'approved') {
+        const [onProf] = await tx
+          .select()
+          .from(onboardingProfiles)
+          .where(eq(onboardingProfiles.onboardingId, id))
+          .limit(1);
+
+        if (onProf) {
+          // Generate a temporary password
+          const tempPassword = crypto.randomBytes(8).toString('hex');
+
+        // Hash using Argon2
+        const hashedPassword = await argon2.hash(tempPassword, {
+          type: argon2.argon2id, // recommended variant
+          memoryCost: 2 ** 16,   // 64 MB
+          timeCost: 3,           // iterations
+          parallelism: 1,        // threads
+        });
+
+          
+        const fullName = [onProf.firstName, onProf.middleName, onProf.lastName].filter(Boolean).join(' ');
+        const baseUsername = onProf.email?.split('@')[0] || `user${Date.now()}`;
+        const username = `${baseUsername}_${Math.floor(Math.random() * 1000)}`;
+
+        this.logger.info(`Generated temporary password for ${onProf.email}: ${tempPassword}`);
+
+        // Insert into Users schema
+        const [newUser] = await tx
+          .insert(users)
+          .values({
+            name: fullName,
+            username: username,
+            email: onProf.email as string,
+            mobile: onProf.phone,
+            password: hashedPassword,
+            isActive: true, // Login enabled immediately per requirements
+            createdAt: new Date(),
+          })
+          .returning({ id: users.id });
+          
+        newUserId = newUser.id;
+
+        // Seed default induction tasks
+        const defaultTasks = [
+          ...['Documents collection form completed', 'DISC form completed', 'Workstation identified', 
+            'Email ID created', 'Employee added to systems', 'Visiting card ordered', 'ID card ordered']
+            .map(t => ({ onboardingId: id, taskName: t, taskType: 'BEFORE', status: 'pending' })),
+          ...['HR policy training completed', 'Leave policy training completed', 'Attendance training completed', 
+            'Laptop allotted', 'Office tour completed', 'Reporting manager introduction completed', 
+            'PF initiation (if applicable)', 'Candidate profile shared', 'Buddy assigned', 'Training needs identified', 
+            'Welcome session completed', 'Employee database updated', 'PF office updated', 'ID / Visiting card provided', 
+            'Welcome kit arranged']
+            .map(t => ({ onboardingId: id, taskName: t, taskType: 'AFTER', status: 'pending' }))
+        ];
+
+        await tx.insert(onboardingInduction).values(defaultTasks as any);
+        }
+      }
+
+      // ── 2. Update Request Status ─────────────────────────────────────────
+      const updateData: any = {
+        status: dto.status,
+        approvedBy: adminId,
+        approvedAt: new Date(),
+        updatedAt: new Date(),
+      };
+      
+      if (newUserId) {
+        updateData.userId = newUserId;
+      }
+
       const [updated] = await tx
         .update(onboardingRequests)
-        .set({
-          status: dto.status,
-          approvedBy: adminId,
-          approvedAt: new Date(),
-          updatedAt: new Date(),
-        })
+        .set(updateData)
         .where(eq(onboardingRequests.id, id))
         .returning();
 
-      // Log the HR action
+      // ── 3. Log the HR action ─────────────────────────────────────────────
       await tx.insert(onboardingActivityLogs).values({
         onboardingId: id,
         action: dto.status === 'approved' ? 'APPROVED' : 'REJECTED',
