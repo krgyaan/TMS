@@ -73,6 +73,7 @@ export const tenderInformation = pgTable("tender_information", {
     courierAddress: text("courier_address"),
 
     teFinalRemark: text("te_final_remark"),
+    teRejectionProof: text("te_rejection_proof").array(),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull()
