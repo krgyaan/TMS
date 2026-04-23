@@ -57,12 +57,12 @@ function ProfilePageContent() {
         <div className="absolute bottom-[10%] right-[15%] w-[25%] h-[25%] rounded-full bg-primary/[0.02] blur-[80px]" />
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 relative">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 relative">
         <motion.div
           variants={staggerContainer}
           initial="hidden"
-          animate="show"
-          className="space-y-8"
+          animate="visible"
+          className="space-y-6"
         >
           {/* Header Card */}
           <ProfileHeader />
@@ -78,7 +78,7 @@ function ProfilePageContent() {
               onValueChange={setActiveTab}
               className="w-full"
             >
-              <TabsList className="w-full justify-start h-auto p-1.5 bg-muted/20 rounded-2xl overflow-x-auto flex-nowrap backdrop-blur-lg border border-border/30 shadow-sm">
+              <TabsList className="w-full justify-start h-auto p-1.5 bg-background/60 rounded-2xl overflow-x-auto flex-nowrap backdrop-blur-xl border border-border/40 shadow-lg">
                 {[
                   { value: "overview", label: "Overview", icon: User },
                   { value: "documents", label: "Documents", icon: FileText },
@@ -112,7 +112,7 @@ function ProfilePageContent() {
               </TabsList>
 
               {/* Tab Contents */}
-              <div className="mt-8">
+              <div className="mt-6">
                 <AnimatePresence mode="wait">
                   {activeTab === "overview" && (
                     <TabsContent value="overview" className="outline-none m-0" key="overview" forceMount>
