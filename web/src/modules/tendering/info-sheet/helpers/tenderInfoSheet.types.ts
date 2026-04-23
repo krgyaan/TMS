@@ -94,6 +94,7 @@ export interface SaveTenderInfoSheetDto {
     clients: TenderClientDto[];
 
     teFinalRemark: string | null;
+    teRejectionProof: string[] | null;
 }
 
 // Response from API - what we receive
@@ -179,6 +180,7 @@ export interface TenderInfoSheetResponse {
     }>;
 
     teFinalRemark: string | null;
+    teRejectionProof: string[] | null;
 
     createdAt: string;
     updatedAt: string;
@@ -216,13 +218,13 @@ export const emdRequiredOptions = [
 ];
 
 export const processingFeeOptions = [
-    { vlaue: "DD", label: "Demand Draft" },
+    { value: "DD", label: "Demand Draft" },
     { value: 'POP', label: 'Pay on Portal' },
     { value: 'BT', label: 'Bank Transfer' },
 ];
 
 export const tenderFeeOptions = [
-    { vlaue: "DD", label: "Demand Draft" },
+    { value: "DD", label: "Demand Draft" },
     { value: 'POP', label: 'Pay on Portal' },
     { value: 'BT', label: 'Bank Transfer' },
 ];
