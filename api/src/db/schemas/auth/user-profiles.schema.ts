@@ -31,6 +31,8 @@ export const userProfiles = pgTable("user_profiles", {
     currentAddress: jsonb("current_address").default({}),
     permanentAddress: jsonb("permanent_address").default({}),
     emergencyContact: jsonb("emergency_contact").default({}),
+    bloodGroup: varchar("blood_group", { length: 10 }),
+    linkedinProfile: varchar("linkedin_profile", { length: 255 }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
