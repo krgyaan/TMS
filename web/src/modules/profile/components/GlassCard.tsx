@@ -15,16 +15,14 @@ export const GlassCard: React.FC<GlassCardProps> = ({
   className,
   hover = true,
 }) => (
-  <motion.div variants={fadeInUp}>
-    <Card
-      className={cn(
-        "border-border/40 bg-muted/20 backdrop-blur-xl overflow-hidden",
-        hover &&
-          "hover:shadow-2xl hover:shadow-primary/[0.06] hover:border-primary/15 hover:bg-muted/30 transition-all duration-500 ease-out",
-        className
-      )}
-    >
-      {children}
-    </Card>
-  </motion.div>
+  <Card
+    className={cn(
+      "border-border/40 bg-muted/20 backdrop-blur-xl overflow-hidden",
+      hover &&
+        "hover:shadow-2xl hover:shadow-primary/[0.06] hover:border-primary/15 hover:bg-muted/30 transition-all duration-500 ease-out",
+      className
+    )}
+  >
+    {children}
+  </Card>
 );
