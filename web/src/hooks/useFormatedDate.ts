@@ -1,19 +1,28 @@
 function parseLocalDate(date: string | Date) {
   if (date instanceof Date) return date;
+  if (!date) return new Date();
 
-  // Handle both ISO 'T' and SQL space separators
-  const parts = date.split(/[T ]/);
-  const d = parts[0];
-  const t = parts[1] || "";
+  const trimmed = String(date).trim();
 
-  const [year, month, day] = d.split("-").map(Number);
+  // 1. Handle date-only format "YYYY-MM-DD"
+  // We parse this manually to ensure it's treated as local midnight, 
+  // avoiding the default browser behavior of treating it as UTC midnight.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const [year, month, day] = trimmed.split("-").map(Number);
+    return new Date(year, month - 1, day);
+  }
+
+  // 2. For everything else (ISO, space-separated, etc.), use the native Date constructor.
+  // We normalize by replacing spaces with 'T' and removing extra spaces to ensure
+  // the browser can correctly identify and respect any timezone offsets (+HH:mm or Z).
+  const normalized = trimmed
+    .replace(/^(\d{4}-\d{2}-\d{2}) /, '$1T') // Replace space between date and time
+    .replace(/ ([+-]\d{2}:?\d{2})$/, '$1');  // Remove space before timezone offset
+
+  const d = new Date(normalized);
   
-  // Extract hour and minute, ignoring seconds/milliseconds/offsets
-  const timeParts = t.split(":");
-  const hour = Number(timeParts[0]) || 0;
-  const minute = Number(timeParts[1]) || 0;
-
-  return new Date(year, month - 1, day, hour, minute);
+  // Fallback to original string if normalization failed
+  return isNaN(d.getTime()) ? new Date(date) : d;
 }
 
 export const formatDateTime = (date: string | Date | null | undefined) => {
