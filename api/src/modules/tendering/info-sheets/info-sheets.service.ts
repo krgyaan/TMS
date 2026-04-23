@@ -367,6 +367,7 @@ export class TenderInfoSheetsService {
                         netWorthValue: payload.netWorthValue?.toString() ?? null,
                         courierAddress: payload.courierAddress ?? null,
                         teFinalRemark: payload.teFinalRemark ?? null,
+                        teRejectionProof: filterArray(payload.teRejectionProof),
                         oemExperience: payload.oemExperience ?? null,
                     })
                     .returning();
@@ -653,6 +654,7 @@ export class TenderInfoSheetsService {
                         netWorthValue: payload.netWorthValue?.toString() ?? null,
                         courierAddress: payload.courierAddress ?? null,
                         teFinalRemark: payload.teFinalRemark ?? null,
+                        teRejectionProof: filterArray(payload.teRejectionProof),
                         oemExperience: payload.oemExperience ?? null,
                         updatedAt: new Date(),
                     })
