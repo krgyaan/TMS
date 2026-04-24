@@ -183,6 +183,11 @@ export const paths = {
         taskChecklistsEdit: (id: number) => `/accounts/task-checklists/${id}/edit`,
         taskChecklistsView: (id: number) => `/accounts/task-checklists/${id}`,
         taskChecklistsReport:(id: number) => `/accounts/task-checklists/${id}/report`,
+
+        delegation: "/accounts/delegation",
+        delegationAdd: "/accounts/delegation/add",
+        delegationView: (id: string) => `/accounts/delegation/${id}`,
+        delegationUpdate: (id: string) => `/accounts/delegation/${id}/update`,
     },
 
     // ==================== CRM ====================

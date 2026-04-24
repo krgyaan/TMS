@@ -22,6 +22,11 @@ const TaskChecklistReport = lazy(() => import("@/modules/accounts/task-checklist
 
 const Imprest_Admin_UserView = lazy(() => import("@/modules/accounts/imprest/ImprestAdminUserView"));
 
+const TaskDashboard = lazy(() => import("@/modules/accounts/delegation/TaskDashboard"));
+const AddTask = lazy(() => import("@/modules/accounts/delegation/AddTask"));
+const TaskDetail = lazy(() => import("@/modules/accounts/delegation/TaskDetail"));
+const TaskStatusUpdate = lazy(() => import("@/modules/accounts/delegation/TaskStatusUpdate"));
+
 export default function AccountsRoutes() {
     return (
         <Routes>
@@ -46,6 +51,11 @@ export default function AccountsRoutes() {
             <Route path="task-checklists/:id/edit" element={<RouteWrapper><TaskChecklistEdit /></RouteWrapper>} />
             <Route path="task-checklists/:id/view" element={<RouteWrapper><TaskChecklistView /></RouteWrapper>} />
             <Route path="task-checklists/:id/report" element={<RouteWrapper><TaskChecklistReport /></RouteWrapper>} />
+
+            <Route path="delegation" element={<RouteWrapper><TaskDashboard /></RouteWrapper>} />
+            <Route path="delegation/add" element={<RouteWrapper><AddTask /></RouteWrapper>} />
+            <Route path="delegation/:id" element={<RouteWrapper><TaskDetail /></RouteWrapper>} />
+            <Route path="delegation/:id/update" element={<RouteWrapper><TaskStatusUpdate /></RouteWrapper>} />
         </Routes>
     );
 }
