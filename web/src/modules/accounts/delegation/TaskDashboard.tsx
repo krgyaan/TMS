@@ -23,7 +23,7 @@ import {
 import type { ColDef } from "ag-grid-community";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
-type TaskStatus = "Not Started" | "In Progress" | "Completed" | "Blocked";
+type TaskStatus = "Not Started" | "Pending" | "Completed" | "Shifted";
 type TaskPriority = "High" | "Medium" | "Low";
 type TaskScore = "Green" | "Yellow" | "Red";
 
@@ -50,7 +50,7 @@ const dummyTasks: Task[] = [
     description: "Compile and format the quarterly financial report",
     assignedDate: "2025-06-01",
     dueDate: "2025-06-20",
-    status: "In Progress",
+    status: "Pending",
     score: "Green",
     priority: "High",
     assignedBy: "David Lee",
@@ -62,7 +62,7 @@ const dummyTasks: Task[] = [
     description: "Prepare documentation package for new client",
     assignedDate: "2025-06-03",
     dueDate: "2025-06-10",
-    status: "Blocked",
+    status: "Shifted",
     score: "Red",
     priority: "High",
     assignedBy: "Sarah Kim",
@@ -112,7 +112,7 @@ const dummyTasks: Task[] = [
     description: "Update product pages with new specifications",
     assignedDate: "2025-06-04",
     dueDate: "2025-06-25",
-    status: "In Progress",
+    status: "Pending",
     score: "Green",
     priority: "Medium",
     assignedBy: "David Lee",
@@ -124,7 +124,7 @@ const dummyTasks: Task[] = [
     description: "Gather documents needed for upcoming compliance audit",
     assignedDate: "2025-05-30",
     dueDate: "2025-06-05",
-    status: "Blocked",
+    status: "Shifted",
     score: "Red",
     priority: "High",
     assignedBy: "Sarah Kim",
@@ -234,9 +234,9 @@ const SummaryCards: React.FC<{ tasks: Task[] }> = ({ tasks }) => {
     return new Date(t.dueDate) < new Date();
   }).length;
   const inProgress = tasks.filter(
-    (t) => t.status === "In Progress"
+    (t) => t.status === "Pending"
   ).length;
-  const blocked = tasks.filter((t) => t.status === "Blocked").length;
+  const blocked = tasks.filter((t) => t.status === "Shifted").length;
 
   const cards = [
     {
@@ -304,12 +304,12 @@ const TaskDashboard: React.FC = () => {
   const tabCounts = useMemo(
     () => ({
       all: dummyTasks.length,
-      active: dummyTasks.filter((t) =>
-        ["Not Started", "In Progress"].includes(t.status)
+      pending: dummyTasks.filter((t) =>
+        ["Not Started", "Pending"].includes(t.status)
       ).length,
       completed: dummyTasks.filter((t) => t.status === "Completed")
         .length,
-      blocked: dummyTasks.filter((t) => t.status === "Blocked").length,
+      shifted: dummyTasks.filter((t) => t.status === "Shifted").length,
     }),
     []
   );
@@ -325,7 +325,7 @@ const TaskDashboard: React.FC = () => {
     else if (activeTab === "completed")
       data = data.filter((t) => t.status === "Completed");
     else if (activeTab === "blocked")
-      data = data.filter((t) => t.status === "Blocked");
+      data = data.filter((t) => t.status === "Shifted");
 
     // Member filter
     if (filterMember !== "all")
@@ -522,24 +522,29 @@ const TaskDashboard: React.FC = () => {
                 {tabCounts.all}
               </Badge>
             </TabsTrigger>
-            <TabsTrigger value="active">
-              Active
+
+            <TabsTrigger value="pending">
+              Pending
               <Badge variant="secondary" className="ml-2">
-                {tabCounts.active}
+                {tabCounts.pending}
               </Badge>
             </TabsTrigger>
+
             <TabsTrigger value="completed">
               Completed
               <Badge variant="secondary" className="ml-2">
                 {tabCounts.completed}
               </Badge>
             </TabsTrigger>
-            <TabsTrigger value="blocked">
-              Blocked
+              
+            <TabsTrigger value="shifted">
+              Shifted
               <Badge variant="secondary" className="ml-2">
-                {tabCounts.blocked}
+                {tabCounts.shifted}
               </Badge>
             </TabsTrigger>
+
+
           </TabsList>
 
           {["all", "active", "completed", "blocked"].map((tab) => (
