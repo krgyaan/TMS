@@ -23,9 +23,9 @@ import { QuickFilter } from '@/components/ui/quick-filter';
 import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
 
 type TenderApprovalTab = 'pending' | 'accepted' | 'rejected' | 'tender-dnb';
-type TenderApprovalTabName = 'Pending' | 'Accepted' | 'Rejected' | 'Tender DNB';
+type TenderApprovalTabName = 'Pending' | 'Approved' | 'Rejected' | 'Tender DNB';
 const TABS_NAMES: Record<TenderApprovalTab, TenderApprovalTabName> = {
-    'pending': 'Pending', 'accepted': 'Accepted', 'rejected': 'Rejected', 'tender-dnb': 'Tender DNB'
+    'pending': 'Pending', 'accepted': 'Approved', 'rejected': 'Rejected', 'tender-dnb': 'Tender DNB'
 };
 
 const TL_STATUS_NAMES: Record<number, string> = { 0: 'Pending', 1: 'Accepted', 2: 'Rejected', 3: 'Tender DNB' };
