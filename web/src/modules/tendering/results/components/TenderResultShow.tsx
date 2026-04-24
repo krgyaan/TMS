@@ -21,6 +21,7 @@ interface TenderResultShowProps {
         qualifiedPartiesScreenshot?: string | null;
         finalResultScreenshot?: string | null;
         reverseAuctionId?: number | null;
+        resultReason?: string | null;
     };
     isLoading?: boolean;
     onViewRa?: (raId: number) => void;
@@ -392,6 +393,16 @@ export function TenderResultShow({
                                                 {result.ourPrice ? formatINR(parseFloat(result.ourPrice)) : '—'}
                                             </TableCell>
                                         </TableRow>
+                                        {result.resultReason && (
+                                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                                    Reason for Win/Loss
+                                                </TableCell>
+                                                <TableCell className="text-sm break-words" colSpan={3}>
+                                                    {result.resultReason}
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
                                     </>
                                 )}
                             </>

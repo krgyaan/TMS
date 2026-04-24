@@ -24,6 +24,7 @@ const UploadResultSchema = z.object({
     qualifiedPartiesCount: z.string().optional(),
     qualifiedPartiesNames: z.array(z.string()).optional(),
     result: z.enum(['Won', 'Lost']).optional(),
+    resultReason: z.string().optional(),
     l1Price: z.string().optional(),
     l2Price: z.string().optional(),
     ourPrice: z.string().optional(),
@@ -85,6 +86,7 @@ export default function UploadResultFormPage({
             qualifiedPartiesCount: existingResult?.qualifiedPartiesCount || '',
             qualifiedPartiesNames: existingResult?.qualifiedPartiesNames || [],
             result: existingResult?.result as 'Won' | 'Lost' || 'Won',
+            resultReason: existingResult?.resultReason || '',
             l1Price: existingResult?.l1Price || '',
             l2Price: existingResult?.l2Price || '',
             ourPrice: existingResult?.ourPrice || '',
@@ -112,6 +114,7 @@ export default function UploadResultFormPage({
                 qualifiedPartiesCount: result.qualifiedPartiesCount ?? '',
                 qualifiedPartiesNames: result.qualifiedPartiesNames ?? [],
                 result: (result.result === 'Won' || result.result === 'Lost') ? result.result : undefined,
+                resultReason: result.resultReason ?? '',
                 l1Price: result.l1Price ?? '',
                 l2Price: result.l2Price ?? '',
                 ourPrice: result.ourPrice ?? '',
@@ -171,6 +174,7 @@ export default function UploadResultFormPage({
                 const shouldIncludeResultDetails = showResultDetails || (isEditMode && data.result);
                 if (shouldIncludeResultDetails && data.result) {
                     submitData.result = data.result;
+                    submitData.resultReason = data.resultReason;
                     submitData.l1Price = data.l1Price;
                     submitData.l2Price = data.l2Price;
                     submitData.ourPrice = data.ourPrice;
@@ -363,6 +367,22 @@ export default function UploadResultFormPage({
                                                             placeholder="Enter L2 price"
                                                         />
                                                     </div>
+                                                )}
+                                            </FieldWrapper>
+
+                                            {/* Reason for Win/Loss */}
+                                            <FieldWrapper
+                                                control={form.control}
+                                                name="resultReason"
+                                                label="Reason for Win/Loss"
+                                                className="md:col-span-3"
+                                            >
+                                                {(field) => (
+                                                    <Textarea
+                                                        {...field}
+                                                        placeholder="Enter the reason for winning or losing this tender"
+                                                        rows={3}
+                                                    />
                                                 )}
                                             </FieldWrapper>
 

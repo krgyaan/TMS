@@ -680,6 +680,7 @@ export class TenderResultService {
             if (dto.result) {
                 updateData.status = dto.result === 'Won' ? RESULT_STATUS.WON : RESULT_STATUS.LOST;
                 updateData.result = dto.result;
+                updateData.resultReason = dto.resultReason;
                 updateData.l1Price = dto.l1Price;
                 updateData.l2Price = dto.l2Price;
                 updateData.ourPrice = dto.ourPrice;
@@ -818,6 +819,7 @@ export class TenderResultService {
             l1_price_formatted: formatCurrency(dto.l1Price?.toString() ?? null),
             l2_price_formatted: formatCurrency(dto.l2Price?.toString() ?? null),
             our_price_formatted: formatCurrency(dto.ourPrice?.toString() ?? null),
+            result_reason: dto.resultReason || 'Not specified',
             costing_receipt_formatted: formatCurrency(costingSheet[0]?.submittedReceiptPrice || null),
             costing_budget_formatted: formatCurrency(costingSheet[0]?.submittedBudgetPrice || null),
             costing_gross_margin: costingSheet[0]?.submittedGrossMargin ? `${costingSheet[0].submittedGrossMargin}%` : '0%',

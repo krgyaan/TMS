@@ -38,6 +38,7 @@ export const tenderResults = pgTable(
 
         // Result
         result: varchar("result", { length: 50 }),
+        resultReason: text("result_reason"),
 
         // Pricing
         l1Price: decimal("l1_price", { precision: 15, scale: 2 }),
