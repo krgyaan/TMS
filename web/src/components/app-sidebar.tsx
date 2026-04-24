@@ -97,6 +97,7 @@ const navMain: NavGroup[] = [
             { title: "TDS Checklists", url: paths.accounts.tdsChecklists, permission: "accounts.tds-checklists" },
             { title: "GST Checklists", url: paths.accounts.gstChecklists, permission: "accounts.gst-checklists" },
             { title: "Fixed Expenses", url: paths.accounts.fixedExpenses, permission: "accounts.fixed-expenses" },
+            { title: "Delegation Dashboard", url: paths.accounts.delegation, permission: "accounts.delegation" },
         ],
     },
     {
