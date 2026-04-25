@@ -36,7 +36,7 @@ export default function PhysicalDocsShowPage() {
     // ── Data fetching ──
     const { data: tender, isLoading: tenderLoading } = useTender(tenderId);
     const { data: approval, isLoading: approvalLoading } = useTenderApproval(tenderId);
-    const { data: infoSheet, isLoading: infoSheetLoading } = useInfoSheet(tenderId);
+    const { data: infoSheet, isLoading: infoSheetLoading, error: infoSheetError } = useInfoSheet(tenderId);
     const { data: physicalDoc, isLoading: physicalDocLoading } = usePhysicalDocByTenderId(tenderId);
     const { data: rfq, isLoading: rfqLoading } = useRfqByTenderId(tenderId);
     const { data: paymentRequests, isLoading: requestsLoading } = usePaymentRequestsByTender(tenderId);
@@ -202,10 +202,14 @@ export default function PhysicalDocsShowPage() {
                 );
 
             case "physical-docs":
+                const isPhysLoading = physicalDocLoading || infoSheetLoading || tenderLoading || approvalLoading;
                 return (
                     <PhysicalDocsView
-                        physicalDoc={physicalDoc || null}
-                        isLoading={physicalDocLoading}
+                        physicalDoc={physicalDoc ?? null}
+                        tenderWithRelations={tenderWithRelations}
+                        infoSheet={infoSheet ?? null}
+                        infoSheetError={infoSheetError}
+                        isLoading={isPhysLoading}
                     />
                 );
 
