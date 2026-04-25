@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table";
 import { FileText } from "lucide-react";
 import type { TenderInfoWithNames } from "@/modules/tendering/tenders/helpers/tenderInfo.types";
-import { formatDateTime } from "@/hooks/useFormatedDate";
+import { formatDateTime, formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { BI_STATUSES, formatValue, getReadableStatusName, getStatusBadgeVariant } from "../constants";
 
@@ -30,6 +30,13 @@ interface PaymentRequest {
         status: string;
         details?: any;
         action?: string;
+        generatedPdf?: string | null;
+        cancelPdf?: string | null;
+        docketSlip?: string | null;
+        coveringLetter?: string | null;
+        extraPdfPaths?: string | null;
+        extensionRequestPdf?: string | null;
+        cancellationRequestPdf?: string | null;
     }>;
 }
 
@@ -41,6 +48,105 @@ interface EmdTenderFeeShowProps {
 
 const hasValue = (value?: string | Date | number | null) => {
     return value !== null && value !== undefined && value !== "";
+};
+
+const formatKey = (key: string) => {
+    const k = key.toLowerCase();
+    if (k.endsWith("neededin") || k.endsWith("needs") || k === "needs") return "Instrument Needs";
+    if (k.endsWith("purpose") || k.endsWith("reason") || k === "reason") return "Instrument Purpose";
+    
+    return key
+        .replace(/([A-Z])/g, " $1")
+        .trim()
+        .replace(/\bdd\b/gi, "DD")
+        .replace(/\bfdr\b/gi, "FDR")
+        .replace(/\bbg\b/gi, "BG")
+        .replace(/\bid\b/gi, "ID")
+};
+
+const formatSmartDate = (date: string | Date | null | undefined) => {
+    if (!date) return "—";
+    
+    // If it's a string that matches YYYY-MM-DD exactly, it's definitely date-only
+    if (typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date.trim())) {
+        return formatDate(date);
+    }
+
+    const d = typeof date === "string" 
+        ? new Date(date.includes(" ") && !date.includes("T") ? date.replace(" ", "T") : date) 
+        : date;
+    
+    if (isNaN(d.getTime())) return "—";
+
+    // If time is exactly midnight in Asia/Kolkata (12:00 am) 
+    // OR exactly UTC midnight (which appears as 05:30 am in IST), we treat it as date-only
+    const timeStr = d.toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour12: true, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    if (timeStr === "12:00:00 am" || timeStr === "05:30:00 am") {
+        return formatDate(date);
+    }
+    
+    return formatDateTime(date);
+};
+
+const renderFileLink = (path: string, label?: string) => {
+    if (!path) return null;
+    const url = path.startsWith("http") ? path : `/api/${path.replace(/^\/+/, "")}`;
+    return (
+        <a 
+            href={url} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-primary hover:underline inline-flex items-center gap-1 font-medium"
+        >
+            <FileText className="h-3 w-3" />
+            {label || "View Document"}
+        </a>
+    );
+};
+
+const renderValue = (value: any) => {
+    if (value === null || value === undefined || value === "") return "—";
+
+    // Handle File Paths
+    if (typeof value === "string") {
+        const lower = value.toLowerCase();
+        
+        // Attempt to parse if it looks like a JSON array
+        if (lower.startsWith("[") && lower.endsWith("]")) {
+            try {
+                const parsed = JSON.parse(value);
+                if (Array.isArray(parsed)) return renderValue(parsed);
+            } catch (e) {
+                // Not a valid JSON array, continue
+            }
+        }
+
+        const isPath = /\.(pdf|jpg|jpeg|png|doc|docx|xls|xlsx|csv)$/i.test(lower.trim());
+        
+        if (isPath) {
+            return renderFileLink(value);
+        }
+    }
+
+    // Handle Arrays
+    if (Array.isArray(value)) {
+        return (
+            <div className="flex flex-col gap-1">
+                {value.map((v, i) => (
+                    <div key={i} className="flex items-center gap-1">
+                        {renderValue(v)}
+                    </div>
+                ))}
+            </div>
+        );
+    }
+
+    // Handle Dates
+    if (value instanceof Date || (typeof value === "string" && !isNaN(Date.parse(value)) && /^\d{4}-\d{2}-\d{2}/.test(value))) {
+        return formatSmartDate(value);
+    }
+
+    return String(value);
 };
 
 export const EmdTenderFeeShow = ({ paymentRequests, isLoading }: EmdTenderFeeShowProps) => {
@@ -135,14 +241,14 @@ export const EmdTenderFeeShow = ({ paymentRequests, isLoading }: EmdTenderFeeSho
                                     <>
                                         <TableCell className="text-sm font-medium text-muted-foreground">Issue Date</TableCell>
                                         <TableCell className="text-sm" colSpan={3}>
-                                            {formatDateTime(instrument.issueDate)}
+                                            {formatSmartDate(instrument.issueDate)}
                                         </TableCell>
                                     </>
                                 )}
                                 {hasValue(instrument.payableAt) && hasValue(instrument.issueDate) && (
                                     <>
                                         <TableCell className="text-sm font-medium text-muted-foreground">Issue Date</TableCell>
-                                        <TableCell className="text-sm">{formatDateTime(instrument.issueDate)}</TableCell>
+                                        <TableCell className="text-sm">{formatSmartDate(instrument.issueDate)}</TableCell>
                                     </>
                                 )}
                             </TableRow>
@@ -155,21 +261,21 @@ export const EmdTenderFeeShow = ({ paymentRequests, isLoading }: EmdTenderFeeSho
                                     <>
                                         <TableCell className="text-sm font-medium text-muted-foreground">Expiry Date</TableCell>
                                         <TableCell className="text-sm" colSpan={hasValue(instrument.claimExpiryDate) ? 1 : 3}>
-                                            {formatDateTime(instrument.expiryDate)}
+                                            {formatSmartDate(instrument.expiryDate)}
                                         </TableCell>
                                     </>
                                 ) : (
                                     <>
                                         <TableCell className="text-sm font-medium text-muted-foreground">Claim Expiry Date</TableCell>
                                         <TableCell className="text-sm" colSpan={3}>
-                                            {formatDateTime(instrument.claimExpiryDate)}
+                                            {formatSmartDate(instrument.claimExpiryDate)}
                                         </TableCell>
                                     </>
                                 )}
                                 {hasValue(instrument.expiryDate) && hasValue(instrument.claimExpiryDate) && (
                                     <>
                                         <TableCell className="text-sm font-medium text-muted-foreground">Claim Expiry Date</TableCell>
-                                        <TableCell className="text-sm">{formatDateTime(instrument.claimExpiryDate)}</TableCell>
+                                        <TableCell className="text-sm">{formatSmartDate(instrument.claimExpiryDate)}</TableCell>
                                     </>
                                 )}
                             </TableRow>
@@ -179,9 +285,25 @@ export const EmdTenderFeeShow = ({ paymentRequests, isLoading }: EmdTenderFeeSho
                         {(instrument.courierAddress || instrument.courierDeadline) && (
                             <TableRow key={`${instrument.id || idx}-courier`} className="hover:bg-muted/30 transition-colors border-l-4 border-l-primary/30">
                                 <TableCell className="text-sm font-medium text-muted-foreground">Courier Address</TableCell>
-                                <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">{formatValue(instrument.courierAddress)}</TableCell>
+                                <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">{renderValue(instrument.courierAddress)}</TableCell>
                                 <TableCell className="text-sm font-medium text-muted-foreground">Courier Deadline</TableCell>
                                 <TableCell className="text-sm">{instrument.courierDeadline ? `${instrument.courierDeadline} days` : "—"}</TableCell>
+                            </TableRow>
+                        )}
+
+                        {/* Instrument Documents Row */}
+                        {(instrument.generatedPdf || instrument.docketSlip || instrument.cancelPdf || instrument.coveringLetter || instrument.extraPdfPaths) && (
+                            <TableRow key={`${instrument.id || idx}-docs`} className="hover:bg-muted/30 transition-colors border-l-4 border-l-primary/30">
+                                <TableCell className="text-sm font-medium text-muted-foreground">Documents</TableCell>
+                                <TableCell className="text-sm" colSpan={3}>
+                                    <div className="flex flex-wrap gap-4">
+                                        {instrument.generatedPdf && renderFileLink(instrument.generatedPdf, "Generated Instrument")}
+                                        {instrument.docketSlip && renderFileLink(instrument.docketSlip, "Docket Slip")}
+                                        {instrument.cancelPdf && renderFileLink(instrument.cancelPdf, "Cancellation PDF")}
+                                        {instrument.coveringLetter && renderFileLink(instrument.coveringLetter, "Covering Letter")}
+                                        {instrument.extraPdfPaths && renderValue(instrument.extraPdfPaths)}
+                                    </div>
+                                </TableCell>
                             </TableRow>
                         )}
 
@@ -189,26 +311,24 @@ export const EmdTenderFeeShow = ({ paymentRequests, isLoading }: EmdTenderFeeSho
                         {instrument.details && Object.entries(instrument.details).length > 0 && (
                             <>
                                 {(() => {
-                                    const entries = Object.entries(instrument.details).filter(([, value]) => value);
+                                    const entries = Object.entries(instrument.details).filter(([key, value]) => value && !["updatedAt", "updated_at", "createdAt", "created_at"].includes(key));
                                     const rows = [];
                                     for (let i = 0; i < entries.length; i += 2) {
                                         const [key1, value1] = entries[i];
                                         const [key2, value2] = entries[i + 1] || [null, null];
                                         rows.push(
                                             <TableRow key={`${instrument.id || idx}-details-${i}`} className="hover:bg-muted/30 transition-colors border-l-4 border-l-primary/30">
-                                                <TableCell className="text-sm font-medium text-muted-foreground capitalize">{key1.replace(/([A-Z])/g, " $1").trim()}</TableCell>
+                                                <TableCell className="text-sm font-medium text-muted-foreground capitalize">{formatKey(key1)}</TableCell>
                                                 <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
-                                                    {value1 instanceof Date || (typeof value1 === "string" && !isNaN(Date.parse(value1))) ? formatDateTime(value1) : String(value1)}
+                                                    {renderValue(value1)}
                                                 </TableCell>
                                                 {key2 ? (
                                                     <>
                                                         <TableCell className="text-sm font-medium text-muted-foreground capitalize">
-                                                            {key2.replace(/([A-Z])/g, " $1").trim()}
+                                                            {formatKey(key2)}
                                                         </TableCell>
                                                         <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
-                                                            {value2 instanceof Date || (typeof value2 === "string" && !isNaN(Date.parse(value2)))
-                                                                ? formatDateTime(value2)
-                                                                : String(value2)}
+                                                            {renderValue(value2)}
                                                         </TableCell>
                                                     </>
                                                 ) : (
@@ -236,12 +356,12 @@ export const EmdTenderFeeShow = ({ paymentRequests, isLoading }: EmdTenderFeeSho
 
     return (
         <Card>
-            <CardHeader>
+            {/* <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <FileText className="h-5 w-5" />
                     Payment Requests Details
                 </CardTitle>
-            </CardHeader>
+            </CardHeader> */}
             <CardContent>
                 <Table>
                     <TableBody>
@@ -257,11 +377,11 @@ export const EmdTenderFeeShow = ({ paymentRequests, isLoading }: EmdTenderFeeSho
                                     <TableCell className="text-sm font-medium text-muted-foreground">Amount Required</TableCell>
                                     <TableCell className="text-sm font-semibold">{formatINR(emdRequest.amountRequired)}</TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground">Request On</TableCell>
-                                    <TableCell className="text-sm font-semibold">{formatDateTime(emdRequest.createdAt)}</TableCell>
+                                    <TableCell className="text-sm font-semibold">{formatSmartDate(emdRequest.createdAt)}</TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">Due Date</TableCell>
-                                    <TableCell className="text-sm">{formatDateTime(emdRequest.dueDate)}</TableCell>
+                                    <TableCell className="text-sm">{formatSmartDate(emdRequest.dueDate)}</TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground">Requested By</TableCell>
                                     <TableCell className="text-sm">{emdRequest.requestedBy}</TableCell>
                                 </TableRow>
@@ -281,11 +401,11 @@ export const EmdTenderFeeShow = ({ paymentRequests, isLoading }: EmdTenderFeeSho
                                     <TableCell className="text-sm font-medium text-muted-foreground">Amount Required</TableCell>
                                     <TableCell className="text-sm font-semibold">{formatINR(tenderFeeRequest.amountRequired)}</TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground">Request On</TableCell>
-                                    <TableCell className="text-sm font-semibold">{formatDateTime(tenderFeeRequest.createdAt)}</TableCell>
+                                    <TableCell className="text-sm font-semibold">{formatSmartDate(tenderFeeRequest.createdAt)}</TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">Due Date</TableCell>
-                                    <TableCell className="text-sm">{formatDateTime(tenderFeeRequest.dueDate)}</TableCell>
+                                    <TableCell className="text-sm">{formatSmartDate(tenderFeeRequest.dueDate)}</TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground">Requested By</TableCell>
                                     <TableCell className="text-sm">{tenderFeeRequest.requestedBy}</TableCell>
                                 </TableRow>
@@ -305,11 +425,11 @@ export const EmdTenderFeeShow = ({ paymentRequests, isLoading }: EmdTenderFeeSho
                                     <TableCell className="text-sm font-medium text-muted-foreground">Amount Required</TableCell>
                                     <TableCell className="text-sm font-semibold">{formatINR(processingFeeRequest.amountRequired)}</TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground">Request On</TableCell>
-                                    <TableCell className="text-sm font-semibold">{formatDateTime(processingFeeRequest.createdAt)}</TableCell>
+                                    <TableCell className="text-sm font-semibold">{formatSmartDate(processingFeeRequest.createdAt)}</TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">Due Date</TableCell>
-                                    <TableCell className="text-sm">{formatDateTime(processingFeeRequest.dueDate)}</TableCell>
+                                    <TableCell className="text-sm">{formatSmartDate(processingFeeRequest.dueDate)}</TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground">Requested By</TableCell>
                                     <TableCell className="text-sm">{processingFeeRequest.requestedBy}</TableCell>
                                 </TableRow>
