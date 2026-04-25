@@ -94,11 +94,11 @@ const CostingApprovalListPage = () => {
             },
             icon: <Eye className="h-4 w-4" />,
         },
-        {
-            label: "Change Status",
-            onClick: (row: CostingApprovalDashboardRow) => setChangeStatusModal({ open: true, tenderId: row.tenderId, currentStatus: undefined }),
-            icon: <RefreshCw className="h-4 w-4" />,
-        },
+        // {
+        //     label: "Change Status",
+        //     onClick: (row: CostingApprovalDashboardRow) => setChangeStatusModal({ open: true, tenderId: row.tenderId, currentStatus: undefined }),
+        //     icon: <RefreshCw className="h-4 w-4" />,
+        // },
     ], [navigate]);
 
     const tabsConfig = useMemo(() => {

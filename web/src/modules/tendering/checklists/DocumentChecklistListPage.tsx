@@ -81,11 +81,11 @@ const Checklists = () => {
             },
             icon: <Eye className="h-4 w-4" />,
         },
-        {
-            label: "Change Status",
-            onClick: (row: TenderDocumentChecklistDashboardRow) => setChangeStatusModal({ open: true, tenderId: row.tenderId, currentStatus: undefined }),
-            icon: <RefreshCw className="h-4 w-4" />,
-        },
+        // {
+        //     label: "Change Status",
+        //     onClick: (row: TenderDocumentChecklistDashboardRow) => setChangeStatusModal({ open: true, tenderId: row.tenderId, currentStatus: undefined }),
+        //     icon: <RefreshCw className="h-4 w-4" />,
+        // },
     ];
 
     const tabsConfig = useMemo(() => {

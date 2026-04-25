@@ -129,11 +129,11 @@ const TenderListPage = () => {
             onClick: (row: TenderWithRelations) => (row.infoSheet ? navigate(paths.tendering.infoSheetEdit(row.id)) : navigate(paths.tendering.infoSheetCreate(row.id))),
             icon: <FilePlus className="h-4 w-4" />,
         },
-        {
-            label: "Change Status",
-            onClick: (row: TenderInfoWithNames) => setChangeStatusModal({ open: true, tenderId: row.id, currentStatus: row.status }),
-            icon: <RefreshCw className="h-4 w-4" />,
-        },
+        // {
+        //     label: "Change Status",
+        //     onClick: (row: TenderInfoWithNames) => setChangeStatusModal({ open: true, tenderId: row.id, currentStatus: row.status }),
+        //     icon: <RefreshCw className="h-4 w-4" />,
+        // },
         {
             label: "View Details",
             onClick: (row: TenderInfoWithNames) => navigate(paths.tendering.tenderView(row.id)),
