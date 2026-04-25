@@ -1478,8 +1478,24 @@ export class EmdsService {
         await this.tenderInfosService.validateExists(tenderId);
 
         const requests = await this.db
-            .select()
+            .select({
+                id: paymentRequests.id,
+                tenderId: paymentRequests.tenderId,
+                type: paymentRequests.type,
+                tenderNo: paymentRequests.tenderNo,
+                projectName: paymentRequests.projectName,
+                dueDate: paymentRequests.dueDate,
+                requestedBy: users.name,
+                purpose: paymentRequests.purpose,
+                amountRequired: paymentRequests.amountRequired,
+                status: paymentRequests.status,
+                remarks: paymentRequests.remarks,
+                legacyEmdId: paymentRequests.legacyEmdId,
+                createdAt: paymentRequests.createdAt,
+                updatedAt: paymentRequests.updatedAt,
+            })
             .from(paymentRequests)
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
             .where(eq(paymentRequests.tenderId, tenderId))
             .orderBy(paymentRequests.createdAt);
 
@@ -1529,8 +1545,24 @@ export class EmdsService {
 
     async findById(requestId: number) {
         const [request] = await this.db
-            .select()
+            .select({
+                id: paymentRequests.id,
+                tenderId: paymentRequests.tenderId,
+                type: paymentRequests.type,
+                tenderNo: paymentRequests.tenderNo,
+                projectName: paymentRequests.projectName,
+                dueDate: paymentRequests.dueDate,
+                requestedBy: users.name,
+                purpose: paymentRequests.purpose,
+                amountRequired: paymentRequests.amountRequired,
+                status: paymentRequests.status,
+                remarks: paymentRequests.remarks,
+                legacyEmdId: paymentRequests.legacyEmdId,
+                createdAt: paymentRequests.createdAt,
+                updatedAt: paymentRequests.updatedAt,
+            })
             .from(paymentRequests)
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
             .where(eq(paymentRequests.id, requestId))
             .limit(1);
 
