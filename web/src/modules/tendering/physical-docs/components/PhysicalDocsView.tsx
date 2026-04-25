@@ -41,65 +41,65 @@ export function PhysicalDocsView({
         );
     }
 
-    console.log("tenderInfo" , infoSheet);
-    console.log("tender" , tenderWithRelations);
+//     console.log("tenderInfo" , infoSheet);
+//     console.log("tender" , tenderWithRelations);
     
-    if (!infoSheet && infoSheetError) {
-    return <Card>...Error loading info sheet...</Card>;
-}
+//     if (!infoSheet && infoSheetError) {
+//     return <Card>...Error loading info sheet...</Card>;
+// }
 
 
-    if (!infoSheet) {
+//     if (!infoSheet) {
+//         return (
+//             <Card className={className}>
+//                 <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+//                     <Package className="h-8 w-8 mb-2 opacity-50" />
+//                     <p className="text-sm">Tender Info Sheet Not Filled</p>
+//                 </div>
+//             </Card>
+//         );
+//     }
+
+//     else if (infoSheet && infoSheet.physicalDocsRequired == 'NO' ) {
+//         return (
+//             <Card className={className}>
+//                 <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+//                     <Package className="h-8 w-8 mb-2 opacity-50" />
+//                     <p className="text-sm">Physical Docs Not Required</p>
+//                 </div>
+//             </Card>
+//         );
+//     }
+
+//     else if (infoSheet &&  (infoSheet.physicalDocsRequired == 'YES' || infoSheet.physicalDocsRequired == null)  && !physicalDoc) {
+//         return (
+//             <Card className={className}>
+//                 <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+//                     <Package className="h-8 w-8 mb-2 opacity-50" />
+//                     <p className="text-sm">No Physical Docs Submitted</p>
+//                 </div>
+//             </Card>
+//         );
+//     }
+
+    if (!physicalDoc) {
         return (
             <Card className={className}>
-                <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-                    <Package className="h-8 w-8 mb-2 opacity-50" />
-                    <p className="text-sm">Tender Info Sheet Not Filled</p>
-                </div>
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                        <Package className="h-4 w-4" />
+                        Physical Documents
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
+                    <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                        <Package className="h-8 w-8 mb-2 opacity-50" />
+                        <p className="text-sm">No physical documents information available yet.</p>
+                    </div>
+                </CardContent>
             </Card>
         );
     }
-
-    else if (infoSheet && infoSheet.physicalDocsRequired == 'NO' ) {
-        return (
-            <Card className={className}>
-                <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-                    <Package className="h-8 w-8 mb-2 opacity-50" />
-                    <p className="text-sm">Physical Docs Not Required</p>
-                </div>
-            </Card>
-        );
-    }
-
-    else if (infoSheet &&  (infoSheet.physicalDocsRequired == 'YES' || infoSheet.physicalDocsRequired == null)  && !physicalDoc) {
-        return (
-            <Card className={className}>
-                <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-                    <Package className="h-8 w-8 mb-2 opacity-50" />
-                    <p className="text-sm">No Physical Docs Submitted</p>
-                </div>
-            </Card>
-        );
-    }
-
-    // else if (physicalDoc.staris ) {
-    //     return (
-    //         <Card className={className}>
-    //             <CardHeader className="pb-3">
-    //                 <CardTitle className="text-base flex items-center gap-2">
-    //                     <Package className="h-4 w-4" />
-    //                     Physical Documents
-    //                 </CardTitle>
-    //             </CardHeader>
-    //             <CardContent className="pt-0">
-    //                 <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-    //                     <Package className="h-8 w-8 mb-2 opacity-50" />
-    //                     <p className="text-sm">No physical documents information available yet.</p>
-    //                 </div>
-    //             </CardContent>
-    //         </Card>
-    //     );
-    // }
 
     return (
         <Card className={className}>
