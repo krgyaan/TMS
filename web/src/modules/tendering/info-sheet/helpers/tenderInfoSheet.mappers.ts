@@ -13,6 +13,37 @@ const toNumber = (val: string | number | null | undefined, defaultValue = 0): nu
     return isNaN(num) ? defaultValue : num;
 };
 
+// Helper to extract document names from objects or return strings as-is
+const extractDocumentNames = (val: (string | { id?: number; documentName: string } | { id?: string | number; value?: string | number;[key: string]: any })[] | null | undefined): string[] => {
+    if (!val || !Array.isArray(val)) return [];
+    return val
+        .map(item => {
+            if (typeof item === 'string') return item;
+            if (typeof item === 'object' && item !== null) {
+                // Prioritize ID as the value to match dropdown option values
+                if ('id' in item && item.id != null) {
+                    return String(item.id);
+                }
+                // Fallback to names if ID is missing (for legacy or unusual data)
+                if ('projectName' in item && item.projectName != null) {
+                    return String(item.projectName);
+                }
+                if ('documentName' in item && item.documentName != null) {
+                    return String(item.documentName);
+                }
+                if ('value' in item && item.value != null) return String(item.value);
+                // Fallback: try to find first string/number property
+                for (const [, value] of Object.entries(item)) {
+                    if (typeof value === 'string' || typeof value === 'number') {
+                        return String(value);
+                    }
+                }
+            }
+            return item != null ? String(item) : null;
+        })
+        .filter((item): item is string => item !== null && item !== undefined && item !== 'undefined' && String(item).trim().length > 0);
+};
+
 const toStringArray = (val: (string | { id?: string | number; value?: string | number;[key: string]: any })[] | null | undefined): string[] => {
     if (!val || !Array.isArray(val)) return [];
     return val
@@ -105,9 +136,11 @@ export const buildDefaultValues = (tender?: TenderInfoWithNames | null): TenderI
     netWorthValue: 0,
 
     courierAddress: '',
-    clients: [{ clientName: '', clientDesignation: '', clientMobile: '', clientEmail: '' }],
+    // Allow zero clients by default; user can add as needed
+    clients: [],
 
     teRemark: '',
+    teRejectionProof: [],
 });
 
 // Map API response to form values
@@ -120,26 +153,27 @@ export const mapResponseToForm = (
     }
 
     return {
-        teRecommendation: data.teRecommendation ?? 'YES',
-        teRejectionReason: data.teRejectionReason ?? null,
+        teRecommendation: (data.teRecommendation?.trim().toUpperCase() as 'YES' | 'NO') ?? 'YES',
+        teRejectionReason: data.teRejectionReason ? toNumber(data.teRejectionReason) : null,
         teRejectionRemarks: data.teRejectionRemarks ?? '',
 
-        processingFeeRequired: data.processingFeeRequired ?? undefined,
+        processingFeeRequired: (data.processingFeeRequired?.trim().toUpperCase() as 'YES' | 'NO') ?? undefined,
         processingFeeModes: data.processingFeeMode ?? [],
         processingFeeAmount: toNumber(data.processingFeeAmount),
 
-        tenderFeeRequired: data.tenderFeeRequired ?? undefined,
+        tenderFeeRequired: (data.tenderFeeRequired?.trim().toUpperCase() as 'YES' | 'NO') ?? undefined,
         tenderFeeModes: data.tenderFeeMode ?? [],
         tenderFeeAmount: toNumber(data.tenderFeeAmount),
 
-        emdRequired: data.emdRequired ?? undefined,
+        emdRequired: (data.emdRequired?.trim().toUpperCase() as 'YES' | 'NO' | 'EXEMPT') ?? undefined,
         emdModes: data.emdMode ?? [],
         emdAmount: toNumber(data.emdAmount),
+        tenderValue: toNumber(data.tenderValue),
 
-        bidValidityDays: toNumber(data.bidValidityDays),
-        commercialEvaluation: data.commercialEvaluation as TenderInfoSheetFormValues['commercialEvaluation'],
-        mafRequired: data.mafRequired as TenderInfoSheetFormValues['mafRequired'],
-        reverseAuctionApplicable: data.reverseAuctionApplicable ?? undefined,
+        bidValidityDays: data.bidValidityDays != null ? toNumber(data.bidValidityDays) : undefined,
+        commercialEvaluation: (data.commercialEvaluation?.trim() ?? undefined) as TenderInfoSheetFormValues['commercialEvaluation'],
+        mafRequired: (data.mafRequired?.trim() ?? undefined) as TenderInfoSheetFormValues['mafRequired'],
+        reverseAuctionApplicable: (data.reverseAuctionApplicable?.trim().toUpperCase() as 'YES' | 'NO') ?? undefined,
 
         paymentTermsSupply: toNumber(data.paymentTermsSupply),
         paymentTermsInstallation: toNumber(data.paymentTermsInstallation),
@@ -190,6 +224,7 @@ export const mapResponseToForm = (
             : '',
 
         techEligibilityAgeYears: toNumber(data.techEligibilityAge),
+        oemExperience: data.oemExperience as 'YES' | 'NO' | null,
 
         workValueType: data.workValueType ?? undefined,
         orderValue1: toNumber(data.orderValue1),
@@ -197,20 +232,21 @@ export const mapResponseToForm = (
         orderValue3: toNumber(data.orderValue3),
         customEligibilityCriteria: data.customEligibilityCriteria ?? '',
 
-        technicalWorkOrders: toStringArray(data.technicalWorkOrders),
-        commercialDocuments: toStringArray(data.commercialDocuments),
+        technicalWorkOrders: extractDocumentNames(data.technicalWorkOrders),
+        commercialDocuments: extractDocumentNames(data.commercialDocuments),
 
-        avgAnnualTurnoverCriteria: data.avgAnnualTurnoverType as TenderInfoSheetFormValues['avgAnnualTurnoverCriteria'],
+        avgAnnualTurnoverCriteria: (data.avgAnnualTurnoverType?.trim() ?? undefined) as TenderInfoSheetFormValues['avgAnnualTurnoverCriteria'],
         avgAnnualTurnoverValue: toNumber(data.avgAnnualTurnoverValue),
-        workingCapitalCriteria: data.workingCapitalType as TenderInfoSheetFormValues['workingCapitalCriteria'],
+        workingCapitalCriteria: (data.workingCapitalType?.trim() ?? undefined) as TenderInfoSheetFormValues['workingCapitalCriteria'],
         workingCapitalValue: toNumber(data.workingCapitalValue),
-        solvencyCertificateCriteria: data.solvencyCertificateType as TenderInfoSheetFormValues['solvencyCertificateCriteria'],
+        solvencyCertificateCriteria: (data.solvencyCertificateType?.trim() ?? undefined) as TenderInfoSheetFormValues['solvencyCertificateCriteria'],
         solvencyCertificateValue: toNumber(data.solvencyCertificateValue),
-        netWorthCriteria: data.netWorthType as TenderInfoSheetFormValues['netWorthCriteria'],
+        netWorthCriteria: (data.netWorthType?.trim() ?? undefined) as TenderInfoSheetFormValues['netWorthCriteria'],
         netWorthValue: toNumber(data.netWorthValue),
 
         courierAddress: data.courierAddress ?? '',
 
+        // Map existing clients, otherwise use an empty array (0 or more)
         clients: data.clients && data.clients.length > 0
             ? data.clients.map(client => ({
                 clientName: client.clientName ?? '',
@@ -218,9 +254,10 @@ export const mapResponseToForm = (
                 clientMobile: client.clientMobile ?? '',
                 clientEmail: client.clientEmail ?? '',
             }))
-            : [{ clientName: '', clientDesignation: '', clientMobile: '', clientEmail: '' }],
+            : [],
 
         teRemark: data.teFinalRemark ?? '',
+        teRejectionProof: toStringArray(data.teRejectionProof)
     };
 };
 
@@ -294,6 +331,7 @@ export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderI
         teRecommendation: values.teRecommendation,
         teRejectionReason: values.teRecommendation === 'NO' ? (values.teRejectionReason ?? null) : null,
         teRejectionRemarks: values.teRecommendation === 'NO' ? (values.teRejectionRemarks || null) : null,
+        teRejectionProof: values.teRecommendation === 'NO' && values.teRejectionProof?.length ? toStringArray(values.teRejectionProof) : null,
 
         processingFeeRequired: safeYesNoValue(values.processingFeeRequired),
         processingFeeModes: (() => {
@@ -403,7 +441,7 @@ export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderI
             clientEmail: client.clientEmail || null,
         })),
 
-        teFinalRemark: values.teRemark || null,
+        teFinalRemark: values.teRemark || null
     };
 
     // Clean and return payload

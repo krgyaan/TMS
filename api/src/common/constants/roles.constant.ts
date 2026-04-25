@@ -9,7 +9,7 @@ export enum RoleName {
 }
 
 // Roles that can switch teams in UI
-export const TEAM_SWITCH_ALLOWED_ROLES: RoleName[] = [RoleName.SUPER_USER, RoleName.ADMIN];
+export const TEAM_SWITCH_ALLOWED_ROLES: RoleName[] = [RoleName.SUPER_USER, RoleName.ADMIN, RoleName.COORDINATOR];
 
 // Role hierarchy (higher = more permissions)
 export const ROLE_HIERARCHY: Record<RoleName, number> = {

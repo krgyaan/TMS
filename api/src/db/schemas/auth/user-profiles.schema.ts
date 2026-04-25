@@ -1,4 +1,4 @@
-import { pgTable, bigserial, bigint, varchar, date, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, bigserial, bigint, varchar, date, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { users } from "@db/schemas/auth/users.schema";
 import { designations } from "@db/schemas/master/designations.schema";
 import { teams } from "@db/schemas/master/teams.schema";
@@ -22,6 +22,17 @@ export const userProfiles = pgTable("user_profiles", {
     dateOfExit: date("date_of_exit"),
     timezone: varchar("timezone", { length: 50 }).notNull().default("Asia/Kolkata"),
     locale: varchar("locale", { length: 10 }).notNull().default("en"),
+    middleName: varchar("middle_name", { length: 255 }),
+    phone: varchar("phone", { length: 20 }),
+    maritalStatus: varchar("marital_status", { length: 20 }),
+    nationality: varchar("nationality", { length: 100 }),
+    aadharNumber: varchar("aadhar_number", { length: 20 }),
+    panNumber: varchar("pan_number", { length: 20 }),
+    currentAddress: jsonb("current_address").default({}),
+    permanentAddress: jsonb("permanent_address").default({}),
+    emergencyContact: jsonb("emergency_contact").default({}),
+    bloodGroup: varchar("blood_group", { length: 10 }),
+    linkedinProfile: varchar("linkedin_profile", { length: 255 }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

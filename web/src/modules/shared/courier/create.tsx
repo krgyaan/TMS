@@ -1,10 +1,11 @@
 // pages/courier/CourierForm.tsx
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
+import axios from "axios";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -89,21 +90,44 @@ const CourierForm = () => {
         },
     });
 
+    // Guard against duplicate submissions:
+    // Once the request is fired, we lock the form — even if the network times out
+    // after the backend has already written the record (which causes phantom errors).
+    const hasSubmittedRef = useRef(false);
+
     // Check if form is submitting
-    const isSubmitting = createMutation.isPending;
+    const isSubmitting = createMutation.isPending || hasSubmittedRef.current;
 
     // Form submit handler
     const onSubmit = async (data: CourierFormData) => {
+        // Hard lock — prevents duplicate submission on retry after a timeout error
+        if (hasSubmittedRef.current) return;
+        hasSubmittedRef.current = true;
+
         try {
-            // Step 1: Create courier
             const created = await createMutation.mutateAsync({ data, files });
             console.log("Courier created:", created);
-
-            // Step 3: Navigate back
             navigate(paths.shared.couriers ?? "/courier");
         } catch (error) {
-            // Error handled by mutation
-            console.error("Create failed:", error);
+            if (axios.isAxiosError(error) && error.response) {
+                // Server responded with a real error (4xx/5xx).
+                // The backend rejected the request — no entry was created.
+                // Unlock the form so the user can fix and retry.
+                hasSubmittedRef.current = false;
+                console.error("Server returned error:", error.response.data);
+                // Toast is already shown by the mutation's onError handler.
+            } else {
+                // No response: timeout or network drop AFTER the request was sent.
+                // The backend may have already created the entry.
+                // Navigate away with a warning instead of letting them retry.
+                console.error("Network/timeout error (backend may have succeeded):", error);
+                toast.warning("Request status unknown", {
+                    description:
+                        "The request timed out. Your courier may have been submitted — please check the courier list before trying again.",
+                    duration: 8000,
+                });
+                navigate(paths.shared.couriers ?? "/courier");
+            }
         }
     };
 

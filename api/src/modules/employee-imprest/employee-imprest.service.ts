@@ -1,39 +1,274 @@
 // employee-imprest.service.ts
 import { Inject, Injectable, ForbiddenException, NotFoundException, InternalServerErrorException, BadRequestException } from "@nestjs/common";
-import { eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
+
+import { WINSTON_MODULE_PROVIDER } from "nest-winston";
+import { Logger } from "winston";
 
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@db";
 
-import { employeeImprests } from "@db/schemas/shared";
+import { employeeImprests, employeeImprestTransactions } from "@db/schemas/shared";
 
-import { CreateEmployeeImprestDto } from "@/modules/employee-imprest/zod/create-employee-imprest.schema";
-import { UpdateEmployeeImprestDto } from "@/modules/employee-imprest/zod/update-employee-imprest.schema";
+import type { CreateEmployeeImprestDto } from "@/modules/employee-imprest/zod/create-employee-imprest.schema";
+import type { UpdateEmployeeImprestDto } from "@/modules/employee-imprest/zod/update-employee-imprest.schema";
+import { CreateEmployeeImprestCreditDto } from "../imprest-admin/zod/create-employee-imprest-credit.schema";
+import { employeeImprestVouchers } from "@/db/schemas/accounts/employee-imprest-voucher";
+import { imprestCategories, users } from "@/db/schemas";
 
+const TRANSFER_CATEGORY_ID = 22;
 @Injectable()
 export class EmployeeImprestService {
     constructor(
         @Inject(DRIZZLE)
-        private readonly db: DbInstance
+        private readonly db: DbInstance,
+
+        @Inject(WINSTON_MODULE_PROVIDER)
+        private readonly logger: Logger
     ) {}
 
     /* ----------------------------- CREATE ----------------------------- */
-    async create(data: CreateEmployeeImprestDto, files: Express.Multer.File[], userId: number) {
-        const result = await this.db
+    async createWithTransfer(data: CreateEmployeeImprestDto, files: Express.Multer.File[]) {
+        const isTransfer = Number(data.categoryId) === TRANSFER_CATEGORY_ID;
+
+        this.logger.debug("Logging the dto", {
+            dto: data,
+        });
+
+        if (!data.userId) {
+            throw new Error("No sender user found. Kindly login again");
+        }
+
+        if (isTransfer) {
+            if (!data.transferToId) {
+                throw new BadRequestException("Team member is required for transfer");
+            }
+
+            // Fetch sender name from DB — never trust client for this
+            const [sender] = await this.db.select({ name: users.name }).from(users).where(eq(users.id, data.userId)).limit(1);
+
+            // Fetch receiver name from DB — never trust client for this
+            const [receiver] = await this.db.select({ name: users.name }).from(users).where(eq(users.id, data.transferToId)).limit(1);
+
+            if (!receiver) {
+                throw new BadRequestException("Selected team member not found");
+            }
+
+            const senderName = sender?.name ?? "Unknown";
+            const receiverName = receiver.name;
+
+            // Both inserts wrapped in a transaction — if one fails, both roll back
+            return await this.db.transaction(async tx => {
+
+                // Record 1: Imprest expense for the sender
+                const [imprest] = await tx
+                    .insert(employeeImprests)
+                    .values({
+                        userId: data.userId,
+                        categoryId: data.categoryId,
+                        teamId: isTransfer ? Number(data.transferToId) : null,
+                        partyName: null, // always null for cat 22
+                        projectName: null, // always null for cat 22
+                        amount: data.amount,
+                        remark: data.remark,
+                        invoiceProof: files.map(f => f.filename),
+                        createdAt: new Date(),
+                        updatedAt: new Date(),
+                    })
+                    .returning();
+
+                // Record 2: Credit the receiver in employee_imprest_transactions
+                await tx.insert(employeeImprestTransactions).values({
+                    userId: data.transferToId!,
+                    txnDate: new Date().toISOString().split("T")[0],
+                    teamMemberName: receiverName,
+                    amount: data.amount,
+                    projectName: `Transfered from ${senderName}`,
+                    imprestId: imprest.id,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                });
+
+                return imprest;
+            });
+        }
+
+        // Normal flow — any other category
+        const [imprest] = await this.db
             .insert(employeeImprests)
             .values({
                 ...data,
-                userId, // override client input
-                invoiceProof: files.map(f => f.filename), // store filenames of uploaded files
+                invoiceProof: files.map(f => f.filename),
             })
             .returning();
 
-        return result[0];
+        return imprest;
     }
 
     /* ----------------------------- READ ------------------------------ */
-    async findAllByUser(userId: number) {
-        return this.db.select().from(employeeImprests).where(eq(employeeImprests.userId, userId)).orderBy(employeeImprests.createdAt);
+    async getEmployeeDashboard(userId: number) {
+        this.logger.info("Fetching employee dashboard", { userId });
+
+        try {
+            // ==============================
+            // 1️⃣ Summary (reuse logic pattern)
+            // ==============================
+            const [imprestAgg] = await this.db
+                .select({
+                    amountSpent: sql<number>`
+          COALESCE(SUM(${employeeImprests.amount}), 0)
+        `.as("amountSpent"),
+
+                    amountApproved: sql<number>`
+          COALESCE(
+            SUM(
+              CASE 
+                WHEN ${employeeImprests.approvalStatus} = 1
+                THEN ${employeeImprests.amount}
+                ELSE 0
+              END
+            ),
+          0)
+        `.as("amountApproved"),
+                })
+                .from(employeeImprests)
+                .where(eq(employeeImprests.userId, userId));
+
+            const [txnAgg] = await this.db
+                .select({
+                    amountReceived: sql<number>`
+          COALESCE(SUM(${employeeImprestTransactions.amount}), 0)
+        `.as("amountReceived"),
+                })
+                .from(employeeImprestTransactions)
+                .where(eq(employeeImprestTransactions.userId, userId));
+
+            const [voucherAgg] = await this.db
+                .select({
+                    totalVouchers: sql<number>`
+          COUNT(${employeeImprestVouchers.id})
+        `.as("totalVouchers"),
+
+                    accountsApproved: sql<number>`
+          SUM(
+            CASE 
+              WHEN ${employeeImprestVouchers.accountsSignedBy} IS NOT NULL 
+              THEN 1 ELSE 0
+            END
+          )
+        `.as("accountsApproved"),
+
+                    adminApproved: sql<number>`
+          SUM(
+            CASE 
+              WHEN ${employeeImprestVouchers.adminSignedBy} IS NOT NULL 
+              THEN 1 ELSE 0
+            END
+          )
+        `.as("adminApproved"),
+                })
+                .from(employeeImprestVouchers)
+                .where(eq(employeeImprestVouchers.beneficiaryName, String(userId)));
+
+            const amountSpent = Number(imprestAgg.amountSpent);
+            const amountApproved = Number(imprestAgg.amountApproved);
+            const amountReceived = Number(txnAgg.amountReceived);
+
+            // ==============================
+            // 2️⃣ Detailed Lists
+            // ==============================
+            const imprests = await this.db
+                .select({
+                    id: employeeImprests.id,
+                    userId: employeeImprests.userId,
+
+                    categoryId: employeeImprests.categoryId,
+                    categoryName: imprestCategories.name,
+
+                    teamId: employeeImprests.teamId,
+                    teamName: users.name, // ✅
+
+                    formattedCategory: sql<string>`
+                    CASE 
+                        WHEN ${employeeImprests.categoryId} = 22 
+                        THEN 'Transfer To Team Member - ' || ${users.name}
+                        ELSE ${imprestCategories.name}
+                    END
+                    `.as("formattedCategory"),
+
+                    partyName: employeeImprests.partyName,
+                    projectName: employeeImprests.projectName,
+
+                    amount: employeeImprests.amount,
+                    remark: employeeImprests.remark,
+
+                    invoiceProof: employeeImprests.invoiceProof,
+                    approvalStatus: employeeImprests.approvalStatus,
+                    accRemark : employeeImprests.accRemark,
+                    tallyStatus: employeeImprests.tallyStatus,
+                    proofStatus: employeeImprests.proofStatus,
+
+                    createdAt: employeeImprests.createdAt,
+                })
+                .from(employeeImprests)
+                .leftJoin(imprestCategories, eq(imprestCategories.id, employeeImprests.categoryId))
+                .leftJoin(users, eq(users.id, employeeImprests.teamId)) // ✅ IMPORTANT
+                .where(eq(employeeImprests.userId, userId))
+                .orderBy(desc(employeeImprests.createdAt));
+
+            const transactions = await this.db
+                .select({
+                    id: employeeImprestTransactions.id,
+                    userId: employeeImprestTransactions.userId,
+                    txnDate: employeeImprestTransactions.txnDate,
+                    teamMemberName: employeeImprestTransactions.teamMemberName,
+                    projectName: employeeImprestTransactions.projectName,
+                    amount: employeeImprestTransactions.amount,
+                    createdAt: employeeImprestTransactions.createdAt,
+                    updatedAt: employeeImprestTransactions.updatedAt,
+
+                    categoryName: imprestCategories.name,
+                })
+                .from(employeeImprestTransactions)
+                .leftJoin(
+                    employeeImprests,
+                    and(eq(employeeImprests.userId, employeeImprestTransactions.userId), eq(employeeImprests.projectName, employeeImprestTransactions.projectName))
+                )
+                .leftJoin(imprestCategories, eq(imprestCategories.id, employeeImprests.categoryId))
+                .where(eq(employeeImprestTransactions.userId, userId))
+                .orderBy(desc(employeeImprestTransactions.txnDate));
+
+            this.logger.info("Employee dashboard fetched", {
+                userId,
+                imprestCount: imprests.length,
+                transactionCount: transactions.length,
+            });
+
+            return {
+                summary: {
+                    amountSpent,
+                    amountApproved,
+                    amountReceived,
+                    amountLeft: amountApproved - amountReceived,
+
+                    voucherInfo: {
+                        totalVouchers: Number(voucherAgg.totalVouchers),
+                        accountsApproved: Number(voucherAgg.accountsApproved),
+                        adminApproved: Number(voucherAgg.adminApproved),
+                    },
+                },
+                imprests,
+                transactions,
+            };
+        } catch (error: any) {
+            this.logger.error("Failed to fetch employee dashboard", {
+                userId,
+                message: error?.message,
+                stack: error?.stack,
+            });
+
+            throw error;
+        }
     }
 
     async findOne(id: number) {
@@ -43,29 +278,192 @@ export class EmployeeImprestService {
     }
 
     /* ----------------------------- UPDATE ----------------------------- */
-    async update(id: number, data: UpdateEmployeeImprestDto, userId: number) {
+    async update(id: number, data: UpdateEmployeeImprestDto) {
         const existing = await this.findOne(id);
 
         if (!existing) {
             throw new NotFoundException("Employee imprest not found");
         }
 
-        if (existing.userId !== userId) {
-            throw new ForbiddenException("Not authorized");
-        }
+        const oldIsTransfer = Number(existing.categoryId) === TRANSFER_CATEGORY_ID;
+        const newIsTransfer = Number(data.categoryId ?? existing.categoryId) === TRANSFER_CATEGORY_ID;
 
-        const result = await this.db
-            .update(employeeImprests)
-            .set({
-                ...data,
+        return await this.db.transaction(async tx => {
+
+            // =========================
+            // 1️⃣ CHECK LINKED TRANSACTION
+            // =========================
+            const existingTxn = await tx.query.employeeImprestTransactions.findFirst({
+                where: eq(employeeImprestTransactions.imprestId, id),
+            });
+
+            const hasLinkedTxn = !!existingTxn;
+
+            if (oldIsTransfer && !hasLinkedTxn) {
+                throw new BadRequestException(
+                    "This transfer cannot be edited because it was created before system upgrade. Please delete and recreate it."
+                );
+            }
+
+            // =========================
+            // 2️⃣ DETERMINE ACTIONS
+            // =========================
+            const isReceiverChanged = data.teamId !== undefined && data.teamId !== existing.teamId;
+            const isAmountChanged = data.amount !== undefined && data.amount !== existing.amount;
+
+            const shouldDeleteOld =
+                oldIsTransfer &&
+                (
+                    !newIsTransfer ||      // transfer → non-transfer
+                    isReceiverChanged      // receiver changed
+                );
+
+            // =========================
+            // 3️⃣ DELETE OLD TRANSFER (if needed)
+            // =========================
+            if (shouldDeleteOld) {
+                const deleted = await tx
+                    .delete(employeeImprestTransactions)
+                    .where(eq(employeeImprestTransactions.imprestId, id))
+                    .returning();
+
+                if (deleted.length === 0) {
+                    throw new BadRequestException(
+                        "Unable to update transfer: linked transaction not found."
+                    );
+                }
+            }
+
+            // =========================
+            // 4️⃣ UPDATE IMPREST
+            // =========================
+            const updateData: Record<string, any> = {
                 updatedAt: new Date(),
-            })
-            .where(eq(employeeImprests.id, id))
-            .returning();
+            };
 
-        return result[0];
+            if (data.userId !== undefined) updateData.userId = data.userId;
+            if (data.partyName !== undefined) updateData.partyName = data.partyName;
+            if (data.projectName !== undefined) updateData.projectName = data.projectName;
+            if (data.categoryId !== undefined) updateData.categoryId = data.categoryId;
+            if (data.teamId !== undefined) updateData.teamId = data.teamId;
+            if (data.amount !== undefined) updateData.amount = data.amount;
+            if (data.remark !== undefined) updateData.remark = data.remark;
+
+            if (data.approvalStatus !== undefined) updateData.approvalStatus = data.approvalStatus;
+            if (data.proofStatus !== undefined) updateData.proofStatus = data.proofStatus;
+            if (data.tallyStatus !== undefined) updateData.tallyStatus = data.tallyStatus;
+            if (data.status !== undefined) updateData.status = data.status;
+            if (data.approvedDate !== undefined) updateData.approvedDate = data.approvedDate;
+
+            const [updated] = await tx
+                .update(employeeImprests)
+                .set(updateData)
+                .where(eq(employeeImprests.id, id))
+                .returning();
+
+            // =========================
+            // 5️⃣ HANDLE TRANSFER LOGIC
+            // =========================
+
+            // ➕ CREATE (non-transfer → transfer)
+            if (!oldIsTransfer && newIsTransfer) {
+                const receiverId = data.teamId;
+                
+                if(!updated.userId){
+                    throw new BadRequestException("User ID missing for transfer");
+                }
+                
+                if (!receiverId) {
+                    throw new BadRequestException("Transfer requires a team member");
+                }
+
+                const [sender] = await tx
+                    .select({ name: users.name })
+                    .from(users)
+                    .where(eq(users.id, updated.userId))
+                    .limit(1);
+
+                const [receiver] = await tx
+                    .select({ name: users.name })
+                    .from(users)
+                    .where(eq(users.id, receiverId))
+                    .limit(1);
+
+                await tx.insert(employeeImprestTransactions).values({
+                    imprestId: updated.id,
+                    userId: receiverId,
+                    txnDate: new Date().toISOString().split("T")[0],
+                    teamMemberName: receiver?.name ?? "Unknown",
+                    amount: updated.amount,
+                    projectName: `Transfered from ${sender?.name ?? "Unknown"}`,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                });
+            }
+
+            // ✏️ UPDATE AMOUNT ONLY
+            else if (oldIsTransfer && newIsTransfer && isAmountChanged && !isReceiverChanged) {
+                await tx
+                    .update(employeeImprestTransactions)
+                    .set({
+                        amount: data.amount,
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(employeeImprestTransactions.imprestId, id));
+            }
+
+            // 🔁 RECREATE (receiver changed)
+            else if (oldIsTransfer && newIsTransfer && isReceiverChanged) {
+                const receiverId = data.teamId!;
+                const amount = data.amount ?? existing.amount;
+
+                if(!updated.userId){
+                    throw new BadRequestException("User ID not found for the imprest.")
+                }
+
+                const [sender] = await tx
+                    .select({ name: users.name })
+                    .from(users)
+                    .where(eq(users.id, updated.userId))
+                    .limit(1);
+
+                const [receiver] = await tx
+                    .select({ name: users.name })
+                    .from(users)
+                    .where(eq(users.id, receiverId))
+                    .limit(1);
+
+                await tx.insert(employeeImprestTransactions).values({
+                    imprestId: updated.id,
+                    userId: receiverId,
+                    txnDate: new Date().toISOString().split("T")[0],
+                    teamMemberName: receiver?.name ?? "Unknown",
+                    amount,
+                    projectName: `Transfered from ${sender?.name ?? "Unknown"}`,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                });
+            }
+
+            // (transfer → non-transfer already handled by delete)
+
+            return updated;
+        });
     }
 
+    private async deleteExistingTransfer(tx: any, existing: any) {
+        const deleted = await tx
+            .delete(employeeImprestTransactions)
+            .where(eq(employeeImprestTransactions.imprestId, existing.id))
+            .returning();
+
+        if (deleted.length === 0) {
+            throw new BadRequestException(
+                "Unable to delete transfer: linked transaction not found. This record may be legacy or inconsistent."
+            );
+        }
+    }
+    
     /* ------------------------- UPLOAD DOCUMENTS ------------------------ */
     async uploadDocs(id: number, files: Express.Multer.File[], userId: number) {
         const existing = await this.findOne(id);
@@ -105,16 +503,18 @@ export class EmployeeImprestService {
             throw new NotFoundException("Imprest not found");
         }
 
+        const newStatus = imprest.proofStatus === 1 ? 0 : 1;
+
         await this.db
             .update(employeeImprests)
             .set({
-                proofStatus: 1,
+                proofStatus: newStatus,
             })
             .where(eq(employeeImprests.id, imprestId));
 
         return {
             success: true,
-            message: "Proof approved successfully",
+            message: newStatus === 1 ? "Proof approved successfully" : "Proof approval removed",
         };
     }
 
@@ -127,16 +527,19 @@ export class EmployeeImprestService {
             throw new NotFoundException("Imprest not found");
         }
 
+        const newStatus = imprest.approvalStatus === 1 ? 0 : 1;
+
         await this.db
             .update(employeeImprests)
             .set({
-                approvalStatus: 1,
+                approvalStatus: newStatus,
+                approvedDate: newStatus === 1 ? new Date() : null,
             })
             .where(eq(employeeImprests.id, imprestId));
 
         return {
             success: true,
-            message: "Imprest approved successfully",
+            message: newStatus === 1 ? "Imprest approved successfully" : "Imprest approval removed",
         };
     }
 
@@ -149,16 +552,18 @@ export class EmployeeImprestService {
             throw new NotFoundException("Imprest not found");
         }
 
+        const newStatus = imprest.tallyStatus === 1 ? 0 : 1;
+
         await this.db
             .update(employeeImprests)
             .set({
-                tallyStatus: 1,
+                tallyStatus: newStatus,
             })
             .where(eq(employeeImprests.id, imprestId));
 
         return {
             success: true,
-            message: "Tally Entry added successfully",
+            message: newStatus === 1 ? "Tally Entry added successfully" : "Tally Entry removed",
         };
     }
 
@@ -170,12 +575,81 @@ export class EmployeeImprestService {
             throw new NotFoundException("Employee imprest not found");
         }
 
-        if (existing.userId !== userId) {
-            throw new ForbiddenException("Not authorized");
-        }
-
         await this.db.delete(employeeImprests).where(eq(employeeImprests.id, id));
 
         return { success: true };
     }
+
+
+    async deleteProof(id: number, filename: string, userId: number) {
+        const existing = await this.findOne(id);
+        
+        if (!existing) {
+            throw new NotFoundException("Employee imprest not found");
+        }
+
+        if (!Array.isArray(existing.invoiceProof)) {
+            throw new InternalServerErrorException("invoiceProof is corrupted");
+        }
+
+        const updatedProofs = existing.invoiceProof.filter(f => f !== filename);
+
+        const [updated] = await this.db
+            .update(employeeImprests)
+            .set({
+                invoiceProof: updatedProofs,
+                updatedAt: new Date(),
+            })
+            .where(eq(employeeImprests.id, id))
+            .returning();
+
+        // Optionally: delete file from disk
+        // const filePath = join('./uploads/employeeimprest', filename);
+        // if (existsSync(filePath)) unlinkSync(filePath);
+
+        return updated;
+    }
+
+    async addAccountRemark(id, remark){
+        const imprest = await this.db.query.employeeImprests.findFirst(
+            {
+                where: eq(employeeImprests.id , id),
+            });
+
+        if(!imprest){
+            throw new BadRequestException(`Imprest #${id} not Found `);
+        }
+
+        //updating the imprest
+        try {
+            const [updated] = await this.db
+                .update(employeeImprests)
+                .set({
+                    accRemark: remark.trim(),
+                    updatedAt: new Date(),
+                })
+                .where(eq(employeeImprests.id, id))
+                .returning();
+
+            this.logger.info("Account remark added", {
+                id,
+            });
+
+            return {
+                success: true,
+                message: "Remark added successfully",
+                data: updated,
+            };
+        } catch (error: any) {
+            this.logger.error("Failed to add account remark", {
+                id,
+                message: error?.message,
+            });
+
+            throw new InternalServerErrorException("Failed to add remark");
+        }
+
+    }
+
+    
 }

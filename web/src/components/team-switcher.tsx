@@ -29,7 +29,9 @@ export function TeamSwitcher() {
         setActiveTeamId,
     } = useAuth();
 
-    const { data: teams = [], isLoading: isLoadingTeams } = useTeams();
+    const { data: allTeams = [], isLoading: isLoadingTeams } = useTeams();
+    // show few teams
+    const teams = allTeams.slice(0, 5);
 
     if (isLoadingTeams) {
         return (

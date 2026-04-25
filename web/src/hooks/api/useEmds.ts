@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { emdsService } from '@/services/api';
 import { handleQueryError } from '@/lib/react-query';
 import { toast } from 'sonner';
+import { useTeamFilter } from '@/hooks/useTeamFilter';
 
 export const paymentRequestsKey = {
     all: ['payment-requests'] as const,
@@ -20,12 +21,18 @@ export const paymentRequestsKey = {
 export const usePaymentDashboard = (
     tab: string = 'pending',
     pagination?: { page: number; limit: number },
-    sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
+    sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' },
+    search?: string
 ) => {
+    const { teamId, dataScope } = useTeamFilter();
+    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+
     const queryKeyFilters = {
         tab,
         ...pagination,
         ...sort,
+        ...(search && { search }),
+        teamId: teamIdParam,
     };
 
     return useQuery({
@@ -35,6 +42,8 @@ export const usePaymentDashboard = (
             ...(pagination && { page: pagination.page, limit: pagination.limit }),
             ...(sort?.sortBy && { sortBy: sort.sortBy }),
             ...(sort?.sortOrder && { sortOrder: sort.sortOrder }),
+            ...(search && { search }),
+            ...(teamIdParam !== undefined && { teamId: teamIdParam }),
         }),
         placeholderData: (previousData) => {
             if (previousData && typeof previousData === 'object' && 'data' in previousData && 'counts' in previousData) {
@@ -47,10 +56,14 @@ export const usePaymentDashboard = (
 
 // Counts only hook (for initial tab badge rendering)
 export const usePaymentDashboardCounts = () => {
+    const { teamId, userId, dataScope } = useTeamFilter();
+    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const queryKey = [...paymentRequestsKey.dashboardCounts(), dataScope, teamId ?? null, userId ?? null];
+
     return useQuery({
-        queryKey: paymentRequestsKey.dashboardCounts(),
-        queryFn: () => emdsService.getDashboardCounts(),
-        staleTime: 30000, // Cache for 30 seconds
+        queryKey,
+        queryFn: () => emdsService.getDashboardCounts(teamIdParam),
+        staleTime: 0,
     });
 };
 

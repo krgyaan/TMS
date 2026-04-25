@@ -23,8 +23,8 @@ export const TenderInformationFormSchema = z.object({
 
     // Tender Value
     tenderValue: z.coerce.number().nonnegative().optional().refine(
-        (val) => val === undefined || val === null || val > 0,
-        { message: 'Tender value must be greater than 0' }
+        (val) => val === undefined || val === null || val >= 0,
+        { message: 'Tender value must be positive' }
     ),
 
     // OEM Experience
@@ -120,15 +120,40 @@ export const TenderInformationFormSchema = z.object({
     netWorthCriteria: z.enum(['NOT_APPLICABLE', 'POSITIVE', 'AMOUNT']).optional(),
     netWorthValue: z.coerce.number().nonnegative().optional(),
 
-    // Client Details
+    // Client Details (zero or more)
     clients: z.array(z.object({
         clientName: z.string().min(1, 'Client name is required'),
         clientDesignation: z.string().optional(),
-        clientMobile: z.string().max(50).optional(),
+        clientMobile: z.string().max(200).optional(),
         clientEmail: z.string().email('Invalid email').optional().or(z.literal('')),
-    })).min(1, 'At least one client is required'),
+    })),
 
     // Address & Remarks
     courierAddress: z.string().max(1000).optional(),
     teRemark: z.string().max(1000).optional(),
+    teRejectionProof: z.array(z.string()).default([]),
+}).superRefine((data, ctx) => {
+    if (data.teRecommendation === 'NO') {
+        if (!data.teRejectionReason) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'Rejection reason is required',
+                path: ['teRejectionReason'],
+            });
+        }
+        if (!data.teRejectionRemarks || data.teRejectionRemarks.trim() === '') {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'Rejection remarks are required',
+                path: ['teRejectionRemarks'],
+            });
+        }
+        if (!data.teRejectionProof || data.teRejectionProof.length === 0) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'Proof of rejection is required',
+                path: ['teRejectionProof'],
+            });
+        }
+    }
 });

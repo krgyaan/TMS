@@ -73,6 +73,7 @@ export const tenderInformation = pgTable("tender_information", {
     courierAddress: text("courier_address"),
 
     teFinalRemark: text("te_final_remark"),
+    teRejectionProof: text("te_rejection_proof").array(),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull()
@@ -85,7 +86,7 @@ export const tenderClients = pgTable("tender_clients", {
     tenderId: bigint("tender_id", { mode: "number" }).notNull(),
     clientName: varchar("client_name", { length: 255 }),
     clientDesignation: varchar("client_designation", { length: 255 }),
-    clientMobile: varchar("client_mobile", { length: 50 }),
+    clientMobile: varchar("client_mobile", { length: 200 }),
     clientEmail: varchar("client_email", { length: 255 }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull()

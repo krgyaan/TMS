@@ -49,10 +49,17 @@ export const useCreateVendor = () => {
 
     return useMutation({
         mutationFn: (data: CreateVendorDto) => vendorsService.create(data),
-        onSuccess: () => {
+
+        onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: vendorsKey.lists() });
+
+            queryClient.invalidateQueries({
+                queryKey: ["vendors", "organization", variables.organizationId],
+            });
+
             toast.success("Vendor created successfully");
         },
+
         onError: error => {
             toast.error(handleQueryError(error));
         },
@@ -66,7 +73,11 @@ export const useUpdateVendor = () => {
         mutationFn: ({ id, data }: { id: number; data: UpdateVendorDto }) => vendorsService.update(id, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: vendorsKey.lists() });
-            queryClient.invalidateQueries({ queryKey: vendorsKey.detail(variables.id) });
+
+            queryClient.invalidateQueries({
+                queryKey: vendorsKey.detail(variables.id),
+            });
+
             toast.success("Vendor updated successfully");
         },
         onError: error => {
@@ -75,17 +86,20 @@ export const useUpdateVendor = () => {
     });
 };
 
-// export const useDeleteVendor = () => {
-//     const queryClient = useQueryClient();
+export const useDeleteVendor = () => {
+    const queryClient = useQueryClient();
 
-//     return useMutation({
-//         mutationFn: (id: number) => vendorsService.delete(id),
-//         onSuccess: () => {
-//             queryClient.invalidateQueries({ queryKey: vendorsKey.lists() });
-//             toast.success('Vendor deleted successfully');
-//         },
-//         onError: (error) => {
-//             toast.error(handleQueryError(error));
-//         },
-//     });
-// };
+    return useMutation({
+        mutationFn: (id: number) => vendorsService.deleteVendor(id),
+
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: vendorsKey.all });
+
+            toast.success("Vendor deleted successfully");
+        },
+
+        onError: error => {
+            toast.error(handleQueryError(error));
+        },
+    });
+};

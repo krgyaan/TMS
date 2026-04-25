@@ -1,3 +1,6 @@
+import AssetAdminDashboard from "@/modules/hrms/assets/dashboard";
+import OnboardingDashboard from "@/modules/hrms/onboarding/OnboardingDashboard";
+
 export const paths = {
     // ==================== AUTH ====================
     auth: {
@@ -35,10 +38,17 @@ export const paths = {
         rfqsCreate: (tenderId: number | string) => `/tendering/rfqs/create/${tenderId}`,
         rfqsEdit: (tenderId: number | string) => `/tendering/rfqs/${tenderId}/edit`,
         rfqsView: (tenderId: number | string) => `/tendering/rfqs/${tenderId}`,
+        rfqsResponseNew: (rfqId: number | string) => `/tendering/rfqs/response/new/${rfqId}`,
+        rfqsResponses: "/tendering/rfqs/responses",
+        rfqsResponseList: (rfqId: number | string) => `/tendering/rfqs/${rfqId}/responses`,
+        rfqResponseView: (responseId: number | string) => `/tendering/rfqs/response/${responseId}`,
         emdsTenderFees: "/tendering/emds-tenderfees",
         emdsTenderFeesCreate: (tenderId: number | string) => `/tendering/emds-tenderfees/create/${tenderId}`,
-        emdsTenderFeesEdit: (tenderId: number | string) => `/tendering/emds-tenderfees/${tenderId}/edit`,
+        oldEmdsTenderFeesCreate: () => `/tendering/emds-tenderfees/old-entries/create`,
+        biOtherThanEmdsCreate: () => `/tendering/emds-tenderfees/bi-other-than-emds/create`,
+        emdsTenderFeesEdit: (id: number | string) => `/tendering/emds-tenderfees/${id}/edit`,
         emdsTenderFeesView: (tenderId: number | string) => `/tendering/emds-tenderfees/${tenderId}`,
+        emdsTenderFeesFollowUp: (id: number | string) => `/tendering/emds-tenderfees/follow-up/${id}`,
         checklists: "/tendering/document-checklists",
         documentChecklistCreate: (tenderId: number | string) => `/tendering/document-checklists/create/${tenderId}`,
         documentChecklistEdit: (tenderId: number | string) => `/tendering/document-checklists/edit/${tenderId}`,
@@ -53,13 +63,13 @@ export const paths = {
         costingApprove: (costingSheetId: number) => `/tendering/costing-approvals/approve/${costingSheetId}`,
         costingReject: (costingSheetId: number) => `/tendering/costing-approvals/reject/${costingSheetId}`,
         costingEditApproval: (costingSheetId: number) => `/tendering/costing-approvals/edit/${costingSheetId}`,
-        costingApprovalView: (costingSheetId: number) => `/tendering/costing-approvals/view/${costingSheetId}`,
+        costingApprovalView: (tenderId: number) => `/tendering/costing-approvals/view/${tenderId}`,
         bidSubmissions: "/tendering/bid-submissions",
         bidSubmit: (tenderId: number) => `/tendering/bid-submissions/submit/${tenderId}`,
         bidEdit: (bidSubmissionId: number) => `/tendering/bid-submissions/edit/${bidSubmissionId}`,
         bidMarkMissed: (tenderId: number) => `/tendering/bid-submissions/mark-missed/${tenderId}`,
         bidEditMissed: (bidSubmissionId: number) => `/tendering/bid-submissions/edit-missed/${bidSubmissionId}`,
-        bidView: (bidSubmissionId: number) => `/tendering/bid-submissions/view/${bidSubmissionId}`,
+        bidView: (tenderId: number) => `/tendering/bid-submissions/view/${tenderId}`,
         tqManagement: "/tendering/tq-management",
         tqReceived: (tenderId: number) => `/tendering/tq-management/received/${tenderId}`,
         tqEditReceived: (tqId: number) => `/tendering/tq-management/edit-received/${tqId}`,
@@ -72,19 +82,50 @@ export const paths = {
         ras: "/tendering/reverse-auctions",
         rasSchedule: (tenderId: number) => `/tendering/reverse-auctions/schedule/${tenderId}`,
         rasUploadResult: (raId: number) => `/tendering/reverse-auctions/upload-result/${raId}`,
-        rasShow: (id: number) => `/tendering/reverse-auctions/${id}`,
+        rasShow: (tenderId: number) => `/tendering/reverse-auctions/${tenderId}`,
         rasEdit: (id: number) => `/tendering/reverse-auctions/${id}/edit`,
         results: "/tendering/results",
         resultsUpload: (tenderId: number) => `/tendering/results/upload/${tenderId}`,
-        resultsShow: (id: number) => `/tendering/results/${id}`,
+        resultsShow: (tenderId: number) => `/tendering/results/${tenderId}`,
         resultsEdit: (id: number) => `/tendering/results/${id}/edit`,
+        requestExtension: "/tendering/request-extension",
+        requestExtensionCreate: (tenderId: number) => `/tendering/request-extension/${tenderId}/create`,
+        requestExtensionEdit: (tenderId: number, id: number) => `/tendering/request-extension/${tenderId}/edit/${id}`,
+        requestExtensionView: (tenderId: number, id: number) => `/tendering/request-extension/${tenderId}/view/${id}`,
+        submitQuery: "/tendering/submit-queries",
+        submitQueryCreate: (tenderId: number) => `/tendering/submit-queries/${tenderId}/create`,
+        submitQueryEdit: (tenderId: number, id: number) => `/tendering/submit-queries/${tenderId}/edit/${id}`,
+        submitQueryView: (tenderId: number, id: number) => `/tendering/submit-queries/${tenderId}/view/${id}`,
     },
 
     // ==================== OPERATIONS ====================
     operations: {
-        workOrder: "/operations/work-order",
-        kickOff: "/operations/kick-off",
-        contractAgreement: "/operations/contract-agreement",
+        woBasicDetailListPage: "/operations/work-order/details/basic",
+        woBasicDetailCreatePage: "/operations/work-order/details/basic/create",
+        woBasicDetailEditPage: (id: number) => `/operations/work-order/details/basic/${id}/edit`,
+        woBasicDetailShowPage: (id: number) => `/operations/work-order/details/basic/${id}`,
+        woAssignOePage: (id: number) => `/operations/work-order/details/assign-oe/${id}`,
+        woDetailCreatePage: (woBasicDetailId: number) => `/operations/work-order/details/full/create/${woBasicDetailId}`,
+        woDetailEditPage: (id: number) => `/operations/work-order/details/full/${id}/edit`,
+        woDetailShowPage: (id: number) => `/operations/work-order/details/full/${id}`,
+        woDetailAcceptanceListPage: "/operations/work-order/acceptance",
+        woAcceptancePage: (id: number) => `/operations/work-order/acceptance/${id}`,
+        woAcceptanceEditPage: (id: number) => `/operations/work-order/acceptance/${id}/edit`,
+        woRaiseQueryPage: (id: number) => `/operations/work-order/acceptance/raise-query/${id}`,
+        woRaiseQueryEditPage: (id: number) => `/operations/work-order/acceptance/raise-query/${id}/edit`,
+        woUploadPage: (id: number) => `/operations/work-order/acceptance/upload/${id}`,
+
+        woKickOffListPage: "/operations/work-order/kick-off",
+        woKickOffCreatePage: (id: number) => `/operations/work-order/kick-off/create/${id}`,
+        woKickOffShowPage: (id: number) => `/operations/work-order/kick-off/${id}`,
+
+        contractAgreementListPage: "/operations/work-order/contract-agreement",
+        contractAgreementShowPage: (id: number) => `/operations/work-order/contract-agreement/${id}`,
+
+        projectDashboard: (id?: number) => id ? `/operations/project-dashboard?id=${id}` : "/operations/project-dashboard",
+        raisePoForm:(id: number) => `/operations/project-dashboard/purchase-order/create/${id}`,
+        viewPoPage: (id: number) => `/operations/project-dashboard/purchase-order/${id}`,
+        editPoPage: (id: number) => `/operations/project-dashboard/purchase-order/${id}/edit`,
     },
 
     // ==================== SERVICES ====================
@@ -98,25 +139,55 @@ export const paths = {
     // ==================== BI DASHBOARD ====================
     bi: {
         demandDraft: "/bi-dashboard/demand-draft",
+        demandDraftView: (requestId: number) => `/bi-dashboard/demand-draft/details/${requestId}`,
+        demandDraftAction: (id: number) => `/bi-dashboard/demand-draft/action/${id}`,
         fdr: "/bi-dashboard/fdr",
+        fdrView: (requestId: number) => `/bi-dashboard/fdr/details/${requestId}`,
+        fdrAction: (id: number) => `/bi-dashboard/fdr/action/${id}`,
         cheque: "/bi-dashboard/cheque",
+        chequeView: (requestId: number) => `/bi-dashboard/cheque/details/${requestId}`,
+        chequeAction: (id: number) => `/bi-dashboard/cheque/action/${id}`,
         bankGuarantee: "/bi-dashboard/bank-guarantee",
+        bankGuaranteeView: (requestId: number) => `/bi-dashboard/bank-guarantee/details/${requestId}`,
+        bankGuaranteeAction: (id: number) => `/bi-dashboard/bank-guarantee/action/${id}`,
+        bankGuaranteeEdit: (id: number) => `/bi-dashboard/bank-guarantee/edit/${id}`,
         bankTransfer: "/bi-dashboard/bank-transfer",
+        bankTransferView: (requestId: number) => `/bi-dashboard/bank-transfer/details/${requestId}`,
+        bankTransferAction: (id: number) => `/bi-dashboard/bank-transfer/action/${id}`,
         payOnPortal: "/bi-dashboard/pay-on-portal",
+        payOnPortalView: (requestId: number) => `/bi-dashboard/pay-on-portal/details/${requestId}`,
+        payOnPortalAction: (id: number) => `/bi-dashboard/pay-on-portal/action/${id}`,
     },
 
     // ==================== ACCOUNTS ====================
     accounts: {
         imprests: "/accounts/imprests",
         imprestsUserView: (id: number) => `/accounts/imprests/user/${id}`,
-        imprestPaymentHistory: (id: number) => `/accounts/imprests/payment-history/${id}`,
         financialDocs: "/accounts/financial-docs",
         loanAdvances: "/accounts/loan-advances",
+        loanAdvancesCreate: "/accounts/loan-advances/create",
+        loanAdvancesEdit: (id: number) => `/accounts/loan-advances/${id}/edit`,
+        loanAdvancesView: (id: number) => `/accounts/loan-advances/${id}`,
+        loanEmiPayment: (id: number) => `/accounts/loan-advances/emis/${id}`,
+        loanTdsRecovery: (id: number) =>`/accounts/loan-advances/tds/${id}`,
+        loanClosure: (id: number) =>`/accounts/loan-advances/closure/${id}`,
         accountChecklists: "/accounts/account-checklists",
         gstChecklists: "/accounts/gst-checklists",
         fixedExpenses: "/accounts/fixed-expenses",
         projects: "/projects",
         tdsChecklists: "/accounts/tds-checklists",
+
+        taskChecklists: "/accounts/task-checklists",
+        taskChecklistsCreate: "/accounts/task-checklists/create",
+
+        taskChecklistsEdit: (id: number) => `/accounts/task-checklists/${id}/edit`,
+        taskChecklistsView: (id: number) => `/accounts/task-checklists/${id}`,
+        taskChecklistsReport:(id: number) => `/accounts/task-checklists/${id}/report`,
+
+        delegation: "/accounts/delegation",
+        delegationAdd: "/accounts/delegation/add",
+        delegationView: (id: string) => `/accounts/delegation/${id}`,
+        delegationUpdate: (id: string) => `/accounts/delegation/${id}/update`,
     },
 
     // ==================== CRM ====================
@@ -217,10 +288,6 @@ export const paths = {
         loanParties_create: "/master/loan-parties/create",
         loanParties_edit: (id: number | string) => `/master/loan-parties/${id}/edit`,
 
-        projects: "/master/projects",
-        projects_create: "/master/projects/create",
-        projects_edit: (id: number | string) => `/master/projects/${id}/edit`,
-
         states: "/master/states",
         states_create: "/master/states/create",
         states_edit: (id: number | string) => `/master/states/${id}/edit`,
@@ -250,7 +317,52 @@ export const paths = {
         imprest: "/shared/imprests",
         imprestUser: (id: number) => `/shared/imprests/user/${id}`,
         imprestCreate: "/shared/imprests/create",
-        imprestVoucher: (id: number) => `/shared/imprests/voucher/${id}`,
-        imprestVoucherView: (id: number) => `/shared/imprests/voucher/view/${id}`,
+        imprestEdit: (id: number) => `/shared/imprests/${id}/edit`,
+        imprestPaymentHistory: "/shared/imprests/payment-history",
+        imprestPaymentHistoryByUser: (id: number) => `/shared/imprests/payment-history?userId=${id}`,
+
+        imprestVoucher: "/shared/imprests/voucher",
+        imprestVoucherByUser: (id: number) => `/shared/imprests/voucher?userId=${id}`,
+
+        imprestVoucherView: (params: { userId: number; from: string; to: string }) =>
+            `/shared/imprests/voucher/view?userId=${params.userId}&from=${encodeURIComponent(params.from)}&to=${encodeURIComponent(params.to)}`,
+    },
+
+    // ==================== DOCUMENT DASHBOARD ====================
+    documentDashboard: {
+        pqr: "/document-dashboard/pqr",
+        pqrCreate: "/document-dashboard/pqr/create",
+        pqrEdit: (id: number | string) => `/document-dashboard/pqr/${id}/edit`,
+        pqrView: (id: number | string) => `/document-dashboard/pqr/${id}`,
+        financeDocument: "/document-dashboard/finance-document",
+        financeDocumentCreate: "/document-dashboard/finance-document/create",
+        financeDocumentEdit: (id: number | string) => `/document-dashboard/finance-document/${id}/edit`,
+        financeDocumentView: (id: number | string) => `/document-dashboard/finance-document/${id}`,
+        projects: "/document-dashboard/projects",
+        projectsCreate: "/document-dashboard/projects/create",
+        projectsEdit: (id: number | string) => `/document-dashboard/projects/${id}/edit`,
+        projectsView: (id: number | string) => `/document-dashboard/projects/${id}`,
+    },
+
+    // ==================== HRMS ====================
+    hrms: {
+        employeeRegistration: "/hrms/employees/register",
+        employeeProfile: (id: number | string) => `/hrms/employees/${id}`,
+        
+        myAssets: "/hrms/assets/my",
+        
+        dashboard: "/hrms/admin",
+
+        assetAdminDashboard: "/hrms/admin/assets",
+        assignAsset: "/hrms/admin/assets/assign",
+        assetEdit: (id: number) => `/hrms/admin/assets/edit/${id}`,
+        assetStatus: (id: number) => `/hrms/admin/assets/status/${id}`,
+        assetView: (id: number) => `/hrms/admin/assets/view/${id}`,
+
+        //================ onboarding  ==============================//
+        onboardingDashboard: "/hrms/onboarding/dashboard",
+        profileDetailsDashboard: "/hrms/onboarding/profile-details",
+        documentDashboard: "/hrms/onboarding/documents",
+        inductionDashboard: "/hrms/onboarding/induction",
     },
 };

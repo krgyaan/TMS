@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { Inject, Injectable, UnauthorizedException, BadRequestException } from "@nestjs/common";
+import { Inject, Injectable, UnauthorizedException, BadRequestException, NotFoundException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import authConfig, { type AuthConfig } from "@config/auth.config";
 import { UsersService, type UserWithRelations } from "@/modules/master/users/users.service";
@@ -13,8 +13,8 @@ type SessionWithToken = {
 };
 
 export type JwtPayload = {
-    sub: number;
     id: number;
+    sub: number;
     email: string;
     role: string | null;
     roleId: number | null;
@@ -23,6 +23,7 @@ export type JwtPayload = {
     canSwitchTeams: boolean;
     iat?: number;
     exp?: number;
+    permissions : string[];
 };
 
 const GoogleLoginStateSchema = z.object({ purpose: z.literal("google-login") });
@@ -62,6 +63,19 @@ export class AuthService {
         }
 
         const permissions = await this.permissionService.getUserPermissions(userId, user.role?.id ?? null);
+
+        return { ...user, permissions };
+    }
+
+    async getPermissionsWithId(id: number): Promise<UserWithRelations & { permissions: string[] }> {
+        const user = await this.usersService.findDetailById(id);
+        console.log("User fetched in getPermissionsWithId:", user);
+        
+        if (!user) {
+            throw new NotFoundException("User not found");
+        }
+
+        const permissions = await this.permissionService.getUserPermissionsWithId(id);
 
         return { ...user, permissions };
     }
@@ -157,21 +171,22 @@ export class AuthService {
 
         const authInfo = await this.usersService.getUserAuthInfo(userId);
 
+        // Get all permissions (role + user overrides)
+        const permissions = await this.permissionService.getUserPermissions(userId, authInfo?.roleId ?? null);
+
         const payload: JwtPayload = {
-            sub: userId,
             id: userId,
+            sub: userId,
             email: userWithRelations.email,
             role: authInfo?.roleName ?? null,
             roleId: authInfo?.roleId ?? null,
             teamId: authInfo?.primaryTeamId ?? null,
             dataScope: authInfo?.dataScope ?? DataScope.SELF,
             canSwitchTeams: authInfo?.canSwitchTeams ?? false,
+            permissions: permissions,
         };
 
         const accessToken = await this.jwtService.signAsync(payload);
-
-        // Get permissions for frontend
-        const permissions = await this.permissionService.getUserPermissions(userId, authInfo?.roleId ?? null);
 
         return {
             accessToken,

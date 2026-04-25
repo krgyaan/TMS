@@ -1,7 +1,7 @@
-﻿"use client";
+"use client";
 
 import * as React from "react";
-import { FileSearch, Wrench, Headset, BarChart3, Banknote, Users, Gauge, Settings, Share2, LayoutDashboard } from "lucide-react";
+import { FileSearch, Wrench, Headset, BarChart3, Banknote, Users, Gauge, Settings, Share2, LayoutDashboard, Briefcase, Shield } from "lucide-react";
 
 import { NavMain } from "@/components/nav-main";
 import { NavUser } from "@/components/nav-user";
@@ -10,16 +10,11 @@ import { paths } from "@/app/routes/paths";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarRail } from "@/components/ui/sidebar";
 
 import { getStoredUser } from "@/lib/auth";
-import { useCurrentUser } from "@/hooks/api/useAuth";
-import api from "@/lib/axios";
+import { useCurrentUser, useLogout } from "@/hooks/api/useAuth";
 
 import type { AuthUser } from "@/types/auth.types";
 import { canRead } from "@/types/auth.types";
 import type { LucideIcon } from "lucide-react";
-
-/* -------------------------------------------------------------------------- */
-/*                                   TYPES                                    */
-/* -------------------------------------------------------------------------- */
 
 type NavItem = {
     title: string;
@@ -33,10 +28,6 @@ type NavGroup = {
     icon?: LucideIcon;
     items?: NavItem[];
 };
-
-/* -------------------------------------------------------------------------- */
-/*                             MENU CONFIGURATION                              */
-/* -------------------------------------------------------------------------- */
 
 const navMain: NavGroup[] = [
     {
@@ -57,8 +48,8 @@ const navMain: NavGroup[] = [
             { title: "Costing Sheets", url: paths.tendering.costingSheets, permission: "costing-sheets" },
             { title: "Costing Approval", url: paths.tendering.costingApprovals, permission: "costing-approvals" },
             { title: "Bid Submissions", url: paths.tendering.bidSubmissions, permission: "bid-submissions" },
-            { title: "TQs", url: paths.tendering.tqManagement, permission: "tq-management" },
-            { title: "RA", url: paths.tendering.ras, permission: "reverse-auction" },
+            { title: "TQ Management", url: paths.tendering.tqManagement, permission: "tq-management" },
+            { title: "RA Management", url: paths.tendering.ras, permission: "reverse-auction" },
             { title: "Results", url: paths.tendering.results, permission: "tender-result" },
         ],
     },
@@ -66,19 +57,21 @@ const navMain: NavGroup[] = [
         title: "Operations",
         icon: Wrench,
         items: [
-            { title: "Work Order", url: paths.operations.workOrder, permission: "work-orders" },
-            { title: "Kick Off", url: paths.operations.kickOff, permission: "kick-off" },
-            { title: "Contract Agreement", url: paths.operations.contractAgreement, permission: "contract-agreement" },
+            { title: "Work Order", url: paths.operations.woBasicDetailListPage, permission: "ops.work-order" },
+            { title: "WO Approval", url: paths.operations.woDetailAcceptanceListPage, permission: "ops.wo-approval" },
+            { title: "Kick Off", url: paths.operations.woKickOffListPage, permission: "ops.kick-off" },
+            { title: "Contract Agreement", url: paths.operations.contractAgreementListPage, permission: "ops.contract-agreement" },
+            { title: "Project Dashboard", url: paths.operations.projectDashboard(), permission: "project-dashboard" },
         ],
     },
     {
         title: "Services",
         icon: Headset,
         items: [
-            { title: "Customer", url: paths.services.customer, permission: "customers" },
-            { title: "Conference", url: paths.services.conference, permission: "conferences" },
-            { title: "Visit", url: paths.services.visit, permission: "visits" },
-            { title: "AMC", url: paths.services.amc, permission: "amc" },
+            { title: "Customer", url: paths.services.customer, permission: "services.customers" },
+            { title: "Conference", url: paths.services.conference, permission: "services.conferences" },
+            { title: "Visit", url: paths.services.visit, permission: "services.visits" },
+            { title: "AMC", url: paths.services.amc, permission: "services.amc" },
         ],
     },
     {
@@ -98,13 +91,22 @@ const navMain: NavGroup[] = [
         icon: Banknote,
         items: [
             { title: "Imprests", url: paths.accounts.imprests, permission: "accounts.imprests" },
-            { title: "Financial Docs", url: paths.accounts.financialDocs, permission: "accounts.financial-docs" },
+            // { title: "Financial Docs", url: paths.accounts.financialDocs, permission: "accounts.financial-docs" },
             { title: "Loan & Advances", url: paths.accounts.loanAdvances, permission: "accounts.loan-advances" },
-            { title: "Projects", url: paths.accounts.projects, permission: "accounts.projects" },
-            { title: "Accounts Checklists", url: paths.accounts.accountChecklists, permission: "accounts.checklists" },
+            { title: "Accounts Checklists", url: paths.accounts.taskChecklists, permission: "accounts.checklists" },
             { title: "TDS Checklists", url: paths.accounts.tdsChecklists, permission: "accounts.tds-checklists" },
             { title: "GST Checklists", url: paths.accounts.gstChecklists, permission: "accounts.gst-checklists" },
             { title: "Fixed Expenses", url: paths.accounts.fixedExpenses, permission: "accounts.fixed-expenses" },
+            { title: "Delegation Dashboard", url: paths.accounts.delegation, permission: "accounts.delegation" },
+        ],
+    },
+    {
+        title: "Document Dashboard",
+        icon: FileSearch,
+        items: [
+            { title: "Projects", url: paths.documentDashboard.projects, permission: "document-dashboard.projects" },
+            { title: "PQR Documents", url: paths.documentDashboard.pqr, permission: "document-dashboard.pqr" },
+            { title: "Finance Document", url: paths.documentDashboard.financeDocument, permission: "document-dashboard.finance-document" },
         ],
     },
     {
@@ -123,12 +125,30 @@ const navMain: NavGroup[] = [
         items: [
             { title: "Tender Executive", url: paths.performance.tenderExecutive, permission: "performance.tender-executive" },
             { title: "Team Leader", url: paths.performance.teamLeader, permission: "performance.team-leader" },
-            { title: "Operation Team", url: paths.performance.operationTeam, permission: "performance.operation-team" },
-            { title: "Account Team", url: paths.performance.accountTeam, permission: "performance.account-team" },
             { title: "OEM Dashboard", url: paths.performance.oemDashboard, permission: "performance.oem-dashboard" },
             { title: "Business Dashboard", url: paths.performance.businessDashboard, permission: "performance.business-dashboard" },
             { title: "Customer Dashboard", url: paths.performance.customerDashboard, permission: "performance.customer-dashboard" },
             { title: "Location Dashboard", url: paths.performance.locationDashboard, permission: "performance.location-dashboard" },
+            { title: "Operation Team", url: paths.performance.operationTeam, permission: "performance.operation-team" },
+            { title: "Account Team", url: paths.performance.accountTeam, permission: "performance.account-team" },
+        ],
+    },
+    // {
+    //     title: "HRMS",
+    //     icon: Briefcase,
+    //     items: [{ title: "My Assets", url: paths.hrms.myAssets, permission: "hrms" }],
+    // },
+    {
+        title: "HRMS",
+        icon: Shield,
+        items: [
+            { title: "Assets", url: "/hrms/admin/assets", permission: "hrms.admin" },
+            // { title: "Recruitment", url: "", permission: "hrms.admin" },
+            { title: "Onboarding", url: paths.hrms.onboardingDashboard, permission: "hrms.admin" },
+            { title: "Profile Details", url: paths.hrms.profileDetailsDashboard, permission: "hrms.admin" },
+            { title: "Documents", url: paths.hrms.documentDashboard, permission: "hrms.admin" },
+            { title: "Induction", url: paths.hrms.inductionDashboard, permission: "hrms.admin" },
+            // { title: "Probation", url: "", permission: "hrms.admin" },
         ],
     },
     {
@@ -182,36 +202,28 @@ function filterMenu(user: AuthUser | null, menu: NavGroup[]): NavGroup[] {
         .filter(Boolean) as NavGroup[];
 }
 
-/* -------------------------------------------------------------------------- */
-/*                               SIDEBAR COMPONENT                             */
-/* -------------------------------------------------------------------------- */
-
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
     const { data: currentUser } = useCurrentUser();
     const storedUser = getStoredUser();
 
+    console.log("Rendering the sidebar");
+
     const displayUser = currentUser ??
         storedUser ?? {
             id: 0,
-            name: "Gyan",
-            email: "gyan@volkenergie.in",
+            name: "-",
+            email: "-",
             username: null,
             mobile: null,
         };
 
     const filteredMenuItems = React.useMemo(() => filterMenu(currentUser, navMain), [currentUser]);
 
-    const handleLogout = React.useCallback(async () => {
-        const currentPath = window.location.pathname + window.location.search;
-        if (currentPath !== "/") {
-            sessionStorage.setItem("auth_redirect", currentPath);
-        }
+    const logoutMutation = useLogout();
 
-        try {
-            await api.post("/auth/logout", undefined, { withCredentials: true });
-            window.location.replace("/login");
-        } catch {}
-    }, []);
+    const handleLogout = React.useCallback(() => {
+        logoutMutation.mutate();
+    }, [logoutMutation]);
 
     return (
         <Sidebar collapsible="icon" {...props}>
