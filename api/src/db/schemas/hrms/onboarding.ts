@@ -21,6 +21,7 @@ import {
 export const onboardingRequests = pgTable('hrms_onboarding_requests', {
   id: bigserial('id', { mode: 'number' }).primaryKey(),
   userId: bigint('user_id', { mode: 'number' }),
+  requestType: varchar('request_type', { length: 50 }).notNull().default('new_hire'),
 
   name: varchar('name', { length: 255 }).notNull(),
   email: varchar('email', { length: 255 }).notNull(),
