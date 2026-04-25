@@ -388,6 +388,7 @@ export class ProfileService {
 
     return {
       currentUser,
+      isOnboarding,
       profile,
       employeeProfile,
       address,
@@ -464,8 +465,10 @@ export class ProfileService {
 
   async updateMyProfileEditMode(userId: number, dto: any) {
     const sanitized: Record<string, any> = {};
-    if (dto.image !== undefined)           sanitized.image = dto.image;
     if (dto.linkedinProfile !== undefined) sanitized.linkedinProfile = dto.linkedinProfile;
+    // Note: Profile image update is handled via a separate upload endpoint, 
+    // but we can whitelist the field here if it's ever sent in a basic PATCH.
+    if (dto.image !== undefined) sanitized.image = dto.image;
 
     if (Object.keys(sanitized).length === 0) {
       return { success: true, message: 'No editable fields provided.' };
@@ -501,15 +504,7 @@ export class ProfileService {
       return inserted;
     }
 
-    const [inserted] = await this.db.insert(employeeEducation).values({
-      userId,
-      degree: dto.degree,
-      institution: dto.institution,
-      fieldOfStudy: dto.fieldOfStudy,
-      yearOfCompletion: dto.yearOfCompletion,
-      grade: dto.grade,
-    }).returning();
-    return inserted;
+    throw new BadRequestException('Education details can only be modified during onboarding.');
   }
 
   async updateEducation(userId: number, eduId: number, dto: any) {
@@ -529,15 +524,7 @@ export class ProfileService {
       return updated;
     }
 
-    const [updated] = await this.db.update(employeeEducation).set({
-      degree: dto.degree,
-      institution: dto.institution,
-      fieldOfStudy: dto.fieldOfStudy,
-      yearOfCompletion: dto.yearOfCompletion,
-      grade: dto.grade,
-      updatedAt: new Date(),
-    }).where(eq(employeeEducation.id, eduId)).returning();
-    return updated;
+    throw new BadRequestException('Education details can only be modified during onboarding.');
   }
 
   async deleteEducation(userId: number, eduId: number) {
@@ -553,10 +540,7 @@ export class ProfileService {
       return;
     }
 
-    const [existing] = await this.db.select().from(employeeEducation).where(eq(employeeEducation.id, eduId)).limit(1);
-    if (existing && existing.userId === userId) {
-      await this.db.delete(employeeEducation).where(eq(employeeEducation.id, eduId));
-    }
+    throw new BadRequestException('Education details can only be modified during onboarding.');
   }
 
   // --- Experience ---
@@ -581,16 +565,7 @@ export class ProfileService {
       return inserted;
     }
 
-    const [inserted] = await this.db.insert(employeeExperience).values({
-      userId,
-      companyName: dto.companyName,
-      designation: dto.designation,
-      fromDate: parseDate(dto.fromDate),
-      toDate: parseDate(dto.toDate),
-      currentlyWorking: dto.currentlyWorking,
-      responsibilities: dto.responsibilities,
-    }).returning();
-    return inserted;
+    throw new BadRequestException('Experience details can only be modified during onboarding.');
   }
 
   async updateExperience(userId: number, expId: number, dto: any) {
@@ -615,8 +590,7 @@ export class ProfileService {
       return updated;
     }
 
-    const [updated] = await this.db.update(employeeExperience).set(payload as any).where(eq(employeeExperience.id, expId)).returning();
-    return updated;
+    throw new BadRequestException('Experience details can only be modified during onboarding.');
   }
 
   async deleteExperience(userId: number, expId: number) {
@@ -632,10 +606,7 @@ export class ProfileService {
       return;
     }
 
-    const [existing] = await this.db.select().from(employeeExperience).where(eq(employeeExperience.id, expId)).limit(1);
-    if (existing && existing.userId === userId) {
-      await this.db.delete(employeeExperience).where(eq(employeeExperience.id, expId));
-    }
+    throw new BadRequestException('Experience details can only be modified during onboarding.');
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -712,7 +683,11 @@ export class ProfileService {
       };
     }
 
-    // Check for duplicate docType
+    // Edit mode: only allow Profile Photo
+    if (dto.docType !== 'Profile Photo') {
+      try { fs.unlinkSync(file.path); } catch (_) {}
+      throw new BadRequestException('Documents can only be modified during onboarding.');
+    }
 
     const fileUrl = `/uploads/hrms/employee-documents/${file.filename}`;
 
@@ -825,6 +800,22 @@ export class ProfileService {
       };
     }
 
+    // Edit mode: only allow Profile Photo
+    const [existing] = await this.db
+      .select()
+      .from(employeeDocuments)
+      .where(eq(employeeDocuments.id, docId))
+      .limit(1);
+
+    if (!existing || existing.userId !== userId) {
+      try { fs.unlinkSync(file.path); } catch (_) {}
+      throw new NotFoundException('Document not found');
+    }
+
+    if (existing.docType !== 'Profile Photo') {
+      try { fs.unlinkSync(file.path); } catch (_) {}
+      throw new BadRequestException('Documents can only be modified during onboarding.');
+    }
 
     const newFileUrl = `/uploads/hrms/employee-documents/${file.filename}`;
 
@@ -900,6 +891,10 @@ export class ProfileService {
 
     if (!existing) throw new NotFoundException('Document not found');
     if (existing.userId !== userId) throw new ForbiddenException('You do not own this document');
+
+    if (existing.docType !== 'Profile Photo') {
+      throw new BadRequestException('Documents can only be modified during onboarding.');
+    }
 
     // Delete file from disk
     if (existing.fileUrl) {
