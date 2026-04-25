@@ -545,9 +545,10 @@ interface PendingUploadCardProps {
   doc: DocumentType;
   index: number;
   onUpload: (doc: DocumentType) => void;
+  isOnboarding?: boolean;
 }
 
-const PendingUploadCard: React.FC<PendingUploadCardProps> = ({ doc, index, onUpload }) => {
+const PendingUploadCard: React.FC<PendingUploadCardProps> = ({ doc, index, onUpload, isOnboarding = true }) => {
   const catConfig = CATEGORY_CONFIG[doc.docCategory] || CATEGORY_CONFIG["Other Documents"];
   const CatIcon = catConfig.icon;
 
@@ -565,10 +566,11 @@ const PendingUploadCard: React.FC<PendingUploadCardProps> = ({ doc, index, onUpl
     >
       <Card
         className={cn(
-          "border-dashed border-2 shadow-none hover:shadow-lg hover:shadow-primary/[0.04] transition-all duration-400 group bg-muted/10 hover:bg-muted/20 backdrop-blur-sm overflow-hidden cursor-pointer",
+          "border-dashed border-2 shadow-none hover:shadow-lg hover:shadow-primary/[0.04] transition-all duration-400 group bg-muted/10 backdrop-blur-sm overflow-hidden",
+          (isOnboarding || doc.docType === "Passport Size Photo") ? "hover:bg-muted/20 cursor-pointer" : "cursor-default",
           catConfig.borderColor
         )}
-        onClick={() => onUpload(doc)}
+        onClick={() => (isOnboarding || doc.docType === "Passport Size Photo") && onUpload(doc)}
       >
         <CardContent className="p-5">
           <div className="flex items-start justify-between mb-4">
@@ -600,19 +602,21 @@ const PendingUploadCard: React.FC<PendingUploadCardProps> = ({ doc, index, onUpl
             {doc.docCategory}
           </p>
 
-          <div className="mt-5 pt-4 border-t border-dashed border-border/30">
-            <Button
-              size="sm"
-              variant="outline"
-              className={cn(
-                "w-full rounded-xl h-9 text-xs font-bold gap-2 transition-all duration-300",
-                "group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary group-hover:shadow-lg group-hover:shadow-primary/20"
-              )}
-            >
-              <Plus className="h-3.5 w-3.5" />
-              Upload Document
-            </Button>
-          </div>
+          {(isOnboarding || doc.docType === "Passport Size Photo") && (
+            <div className="mt-5 pt-4 border-t border-dashed border-border/30">
+              <Button
+                size="sm"
+                variant="outline"
+                className={cn(
+                  "w-full rounded-xl h-9 text-xs font-bold gap-2 transition-all duration-300",
+                  "group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary group-hover:shadow-lg group-hover:shadow-primary/20"
+                )}
+              >
+                <Plus className="h-3.5 w-3.5" />
+                Upload Document
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </motion.div>
@@ -627,9 +631,10 @@ interface UploadedDocCardProps {
   onView: (doc: UploadedDocument) => void;
   onReupload: (doc: UploadedDocument) => void;
   onDelete: (doc: UploadedDocument) => void;
+  isOnboarding?: boolean;
 }
 
-const UploadedDocCard: React.FC<UploadedDocCardProps> = ({ doc, index, onView, onReupload, onDelete }) => {
+const UploadedDocCard: React.FC<UploadedDocCardProps> = ({ doc, index, onView, onReupload, onDelete, isOnboarding = true }) => {
   const status = getStatusConfig(doc.verificationStatus);
   const StatusIcon = status.icon;
   const catConfig = CATEGORY_CONFIG[doc.docCategory] || CATEGORY_CONFIG["Other Documents"];
@@ -751,7 +756,7 @@ const UploadedDocCard: React.FC<UploadedDocCardProps> = ({ doc, index, onView, o
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            {doc.verificationStatus === "rejected" && (
+            {(isOnboarding || doc.docType === "Passport Size Photo") && doc.verificationStatus === "rejected" && (
               <Button
                 size="sm"
                 className="rounded-xl h-9 text-xs font-bold gap-1.5 shadow-md shadow-primary/20"
@@ -761,7 +766,7 @@ const UploadedDocCard: React.FC<UploadedDocCardProps> = ({ doc, index, onView, o
                 Re-upload
               </Button>
             )}
-            {doc.verificationStatus !== "verified" && (
+            {(isOnboarding || doc.docType === "Passport Size Photo") && doc.verificationStatus !== "verified" && (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -1109,6 +1114,7 @@ export const DocumentsSection: React.FC = () => {
                           onView={handleView}
                           onReupload={handleReupload}
                           onDelete={handleDelete}
+                          isOnboarding={data.isOnboarding}
                         />
                       ))}
                     </AnimatePresence>
@@ -1176,6 +1182,7 @@ export const DocumentsSection: React.FC = () => {
                             doc={doc}
                             index={index}
                             onUpload={handleUploadClick}
+                            isOnboarding={data.isOnboarding}
                           />
                         ))}
                     </AnimatePresence>

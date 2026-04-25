@@ -129,6 +129,7 @@ export type ComplaintData = {
 
 export type ProfileResponse = {
   currentUser: UserData;
+  isOnboarding: boolean;
   profile: ProfileData | null;
   employeeProfile: EmployeeProfileData | null;
   address: AddressData | null;
