@@ -244,9 +244,9 @@ export function AccordionSection({
                     </h3>
                 </div>
                 <div className="flex items-center gap-2 ml-3 shrink-0">
-                    <div className="hidden sm:block">
+                    {/* <div className="hidden sm:block">
                         <StepStatusBadge status={step.status} />
-                    </div>
+                    </div> */}
                     <ChevronDown
                         className={cn(
                             "h-4 w-4 text-muted-foreground transition-transform duration-200",

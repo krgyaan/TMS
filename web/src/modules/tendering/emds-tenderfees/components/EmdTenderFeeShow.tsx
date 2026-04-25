@@ -90,7 +90,36 @@ const formatSmartDate = (date: string | Date | null | undefined) => {
 
 const renderFileLink = (path: string, label?: string) => {
     if (!path) return null;
-    const url = path.startsWith("http") ? path : `/api/${path.replace(/^\/+/, "")}`;
+    
+    if (path.startsWith("http")) {
+        return (
+            <a 
+                href={path} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-primary hover:underline inline-flex items-center gap-1 font-medium"
+            >
+                <FileText className="h-3 w-3" />
+                {label || "View Document"}
+            </a>
+        );
+    }
+
+    const baseUrl = "https://tmsv2.volksenergie.in/uploads/";
+    let cleanPath = path.replace(/^\/+/, "").replace(/^uploads\//, "");
+
+    // Intelligent folder prefixing
+    if (cleanPath.includes("prefilled-signed") || cleanPath.includes("covering-letter") || cleanPath.includes("extension-letter")) {
+        if (!cleanPath.startsWith("tendering/")) {
+            cleanPath = `tendering/${cleanPath}`;
+        }
+    } else if (!cleanPath.includes("/") || cleanPath.startsWith("whatsapp") || cleanPath.includes("cheque")) {
+        if (!cleanPath.startsWith("accounts/")) {
+            cleanPath = `accounts/${cleanPath}`;
+        }
+    }
+    
+    const url = `${baseUrl}${cleanPath}`;
     return (
         <a 
             href={url} 
