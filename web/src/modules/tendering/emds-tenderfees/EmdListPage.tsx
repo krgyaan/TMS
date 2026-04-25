@@ -247,11 +247,11 @@ const EmdsAndTenderFeesPage = () => {
             cellRenderer: (params: any) => {
                 const row = params.data!;
                 const actions: ActionItem<PaymentRequestRowWithTimer>[] = [
-                    {
-                        label: 'Change Status',
-                        icon: <RefreshCw className="w-4 h-4" />,
-                        onClick: (r) => setChangeStatusModal({ open: true, tenderId: r.tenderId }),
-                    },
+                // {
+                //     label: 'Change Status',
+                //     icon: <RefreshCw className="w-4 h-4" />,
+                //     onClick: (r) => setChangeStatusModal({ open: true, tenderId: r.tenderId }),
+                // },
                     {
                         label: 'View Details',
                         icon: <EyeIcon className="w-4 h-4" />,

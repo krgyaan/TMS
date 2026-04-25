@@ -78,11 +78,11 @@ const BidSubmissionListPage = () => {
     };
 
     const bidSubmissionActions: ActionItem<BidSubmissionDashboardRowWithTimer>[] = useMemo(() => [
-        {
-            label: 'Change Status',
-            onClick: (row: BidSubmissionDashboardRow) => setChangeStatusModal({ open: true, tenderId: row.tenderId }),
-            icon: <RefreshCw className="h-4 w-4" />,
-        },
+        // {
+        //     label: 'Change Status',
+        //     onClick: (row: BidSubmissionDashboardRow) => setChangeStatusModal({ open: true, tenderId: row.tenderId }),
+        //     icon: <RefreshCw className="h-4 w-4" />,
+        // },
         {
             label: 'Submit Bid',
             onClick: (row: BidSubmissionDashboardRow) => {

@@ -78,11 +78,11 @@ const Rfqs = () => {
             icon: <ClipboardList className="h-4 w-4" />,
             visible: (row: RfqDashboardRowWithTimer) => (activeTab === 'sent' || activeTab === 'responses') && row.rfqId != null,
         },
-        {
-            label: 'Change Status',
-            onClick: (row: RfqDashboardRowWithTimer) => setChangeStatusModal({ open: true, tenderId: row.tenderId }),
-            icon: <RefreshCw className="h-4 w-4" />,
-        },
+        // {
+        //     label: 'Change Status',
+        //     onClick: (row: RfqDashboardRowWithTimer) => setChangeStatusModal({ open: true, tenderId: row.tenderId }),
+        //     icon: <RefreshCw className="h-4 w-4" />,
+        // },
         {
             label: 'Send',
             onClick: (row: RfqDashboardRowWithTimer) => navigate(paths.tendering.rfqsCreate(row.tenderId)),
