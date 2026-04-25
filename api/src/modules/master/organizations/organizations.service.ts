@@ -1,5 +1,5 @@
-﻿import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { eq, like } from "drizzle-orm";
+import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { eq, ilike, like } from "drizzle-orm";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
 import { organizations, type Organization, type NewOrganization } from "@db/schemas/master/organizations.schema";
@@ -111,7 +111,7 @@ export class OrganizationsService {
 
     async search(query: string) {
         const searchPattern = `%${query}%`;
-        return this.getQueryWithJoins().where(like(organizations.name, searchPattern));
+        return this.getQueryWithJoins().where(ilike(organizations.name, searchPattern));
     }
 
     async findByIndustry(industryId: number) {

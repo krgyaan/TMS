@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { and, count, desc, eq, gte, like, lte, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, ilike, like, lte, or, sql } from "drizzle-orm";
 
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
@@ -122,16 +122,16 @@ export class ProjectsMasterService {
             const pattern = `%${filters.search}%`;
             whereConditions.push(
                 or(
-                    like(projects.projectName, pattern),
-                    like(projects.projectCode, pattern),
-                    like(projects.teamName, pattern),
-                    like(projects.poNo, pattern),
+                    ilike(projects.projectName, pattern),
+                    ilike(projects.projectCode, pattern),
+                    ilike(projects.teamName, pattern),
+                    ilike(projects.poNo, pattern),
                 ),
             );
         }
 
         if (filters.teamName) {
-            whereConditions.push(like(projects.teamName, `%${filters.teamName}%`));
+            whereConditions.push(ilike(projects.teamName, `%${filters.teamName}%`));
         }
         if (filters.organisationId) {
             whereConditions.push(eq(projects.organisationId, filters.organisationId));

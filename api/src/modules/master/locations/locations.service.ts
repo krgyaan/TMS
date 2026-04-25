@@ -1,5 +1,5 @@
-﻿import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { eq, like, and } from "drizzle-orm";
+import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { eq, ilike, like, and } from "drizzle-orm";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
 import { locations, type Location, type NewLocation } from "@db/schemas/master/locations.schema";
@@ -60,7 +60,7 @@ export class LocationsService {
                 and(
                     eq(locations.status, true),
                     // Search in name OR city
-                    like(locations.name, searchPattern)
+                    ilike(locations.name, searchPattern)
                 )
             );
     }

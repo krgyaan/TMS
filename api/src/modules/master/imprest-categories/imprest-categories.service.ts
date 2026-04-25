@@ -1,5 +1,5 @@
-﻿import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { eq, like } from "drizzle-orm";
+import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { eq, ilike, like } from "drizzle-orm";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@db";
 import { imprestCategories, type ImprestCategory, type NewImprestCategory } from "@db/schemas/accounts/imprest-categories.schema";
@@ -45,6 +45,6 @@ export class ImprestCategoriesService {
 
     async search(query: string): Promise<ImprestCategory[]> {
         const searchPattern = `%${query}%`;
-        return this.db.select().from(imprestCategories).where(like(imprestCategories.name, searchPattern));
+        return this.db.select().from(imprestCategories).where(ilike(imprestCategories.name, searchPattern));
     }
 }
