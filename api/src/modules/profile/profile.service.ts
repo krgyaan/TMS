@@ -24,10 +24,14 @@ import {
 import { complaints } from '@/db/schemas/hrms/complaints.schema';
 import { teams } from '@/db/schemas/master/teams.schema';
 import { designations } from '@/db/schemas/master/designations.schema';
+import { OnboardingService } from '../hrms/onboarding/onboarding.service';
 
 @Injectable()
 export class ProfileService {
-  constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: DbInstance,
+    private readonly onboardingService: OnboardingService,
+  ) {}
 
   async getMyProfile(userId: number) {
     // 1. Fetch User Data
@@ -65,15 +69,36 @@ export class ProfileService {
     };
 
     // CHECK ONBOARDING STATUS
-    const activeReqs = await this.db
+    let activeReqs = await this.db
       .select({ id: onboardingRequests.id, status: onboardingRequests.status })
       .from(onboardingRequests)
       .where(eq(onboardingRequests.userId, userId))
       .orderBy(desc(onboardingRequests.createdAt))
       .limit(1);
     
-    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
-    const onboardingId = isOnboarding ? activeReqs[0].id : null;
+    let isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
+    let onboardingId = isOnboarding ? activeReqs[0].id : null;
+
+    if (!isOnboarding) {
+      const [userProfileRow] = await this.db.select({ profileCompleted: userProfiles.profileCompleted })
+        .from(userProfiles).where(eq(userProfiles.userId, userId)).limit(1);
+      
+      const isComplete = userProfileRow?.profileCompleted === true;
+      if (!isComplete) {
+        await this.onboardingService.initializeEmployeeOnboarding(userId, 0); // 0 for system trigger
+        
+        // Re-fetch
+        activeReqs = await this.db
+          .select({ id: onboardingRequests.id, status: onboardingRequests.status })
+          .from(onboardingRequests)
+          .where(eq(onboardingRequests.userId, userId))
+          .orderBy(desc(onboardingRequests.createdAt))
+          .limit(1);
+        
+        isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
+        onboardingId = isOnboarding ? activeReqs[0].id : null;
+      }
+    }
 
     let profile: any = null;
     let address: any = null;
@@ -434,8 +459,27 @@ export class ProfileService {
       return { success: true, profile: updated };
     }
 
-    // TODO: Fallback to update userProfiles for permanent employees if needed.
-    throw new BadRequestException('Updating permanent profile from this endpoint is not yet configured.');
+    return this.updateMyProfileEditMode(userId, dto);
+  }
+
+  async updateMyProfileEditMode(userId: number, dto: any) {
+    const sanitized: Record<string, any> = {};
+    if (dto.image !== undefined)           sanitized.image = dto.image;
+    if (dto.linkedinProfile !== undefined) sanitized.linkedinProfile = dto.linkedinProfile;
+
+    if (Object.keys(sanitized).length === 0) {
+      return { success: true, message: 'No editable fields provided.' };
+    }
+
+    sanitized.updatedAt = new Date();
+
+    const [updated] = await this.db
+      .update(userProfiles)
+      .set(sanitized)
+      .where(eq(userProfiles.userId, userId))
+      .returning();
+
+    return { success: true, profile: updated };
   }
 
   // --- Education ---
