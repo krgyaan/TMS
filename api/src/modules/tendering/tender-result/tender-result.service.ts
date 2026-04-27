@@ -143,7 +143,7 @@ export class TenderResultService {
                 inArray(latestTenderResultSq.status, ['Under Evaluation', 'Result Awaited'])
             )!
         );
-        conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
+        // conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
     } else if (activeTab === 'won') {
         conditions.push(
             isNotNull(latestTenderResultSq.id),
@@ -243,7 +243,7 @@ export class TenderResultService {
             woBasicDetailId: woBasicDetails.id,
         })
         .from(tenderInfos)
-        .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+        .leftJoin(users, eq(users.id, tenderInfos.teamMember))
         .leftJoin(
             latestBidSubmissionSq,
             eq(latestBidSubmissionSq.tenderId, tenderInfos.id)
@@ -295,7 +295,7 @@ export class TenderResultService {
     const countQuery = this.db
         .select({ count: sql<number>`count(*)` })
         .from(tenderInfos)
-        .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+        .leftJoin(users, eq(users.id, tenderInfos.teamMember))
         .leftJoin(
             latestBidSubmissionSq,
             eq(latestBidSubmissionSq.tenderId, tenderInfos.id)
@@ -398,7 +398,7 @@ export class TenderResultService {
                     amount: sql<number>`sum(${amountSql})`
                 })
                 .from(tenderInfos)
-                .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+                .leftJoin(users, eq(users.id, tenderInfos.teamMember))
                 .leftJoin(latestBidSubmissionSq, eq(latestBidSubmissionSq.tenderId, tenderInfos.id))
                 .leftJoin(latestTenderResultSq, eq(latestTenderResultSq.tenderId, tenderInfos.id))
                 .leftJoin(latestCostingSheetSq, eq(latestCostingSheetSq.tenderId, tenderInfos.id))
