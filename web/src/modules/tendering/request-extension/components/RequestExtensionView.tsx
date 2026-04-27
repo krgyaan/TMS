@@ -1,14 +1,12 @@
-import { useParams, useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, Calendar, Clock, FileText, Users, Building2, Mail, Phone, User } from 'lucide-react';
+import { Calendar, FileText, Users, Building2, Mail, Phone, User, Clock } from 'lucide-react';
 import { useRequestExtension } from '@/hooks/api/useRequestExtension';
 import { useTender } from '@/hooks/api/useTenders';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import type { Client } from '../helpers/requestExtension.types';
+import { Separator } from '@/components/ui/separator';
 
 // Client Card Component
 const ClientCard = ({ client, index }: { client: Client; index: number }) => (
@@ -80,15 +78,12 @@ const InfoRow = ({ icon: Icon, label, value, className = '' }: {
     </div>
 );
 
-const RequestExtensionView = () => {
-    const { id } = useParams<{ id: string }>();
-    const navigate = useNavigate();
-
+const RequestExtensionView = ({ requestId }: { requestId: number }) => {
     const {
         data: requestExtension,
         isLoading,
         error
-    } = useRequestExtension(Number(id));
+    } = useRequestExtension(requestId);
 
     const {
         data: tender,
@@ -125,7 +120,7 @@ const RequestExtensionView = () => {
             <Alert variant="destructive">
                 <AlertTitle>Not Found</AlertTitle>
                 <AlertDescription>
-                    Request extension with ID {id} was not found.
+                    Request extension with ID {requestId} was not found.
                 </AlertDescription>
             </Alert>
         );
@@ -134,28 +129,6 @@ const RequestExtensionView = () => {
 
     return (
         <div className="space-y-6">
-            {/* Header Card */}
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <CardTitle className="flex items-center gap-3">
-                                Request Extension #{requestExtension.id}
-                            </CardTitle>
-                            <CardDescription className="mt-2">
-                                Submitted on {formatDateTime(requestExtension.createdAt)}
-                            </CardDescription>
-                        </div>
-                        <CardAction className="flex gap-2">
-                            <Button variant="outline" onClick={() => navigate(-1)}>
-                                <ArrowLeft className="mr-2 h-4 w-4" />
-                                Back
-                            </Button>
-                        </CardAction>
-                    </div>
-                </CardHeader>
-            </Card>
-
             {/* Tender Info */}
             <Card>
                 <CardHeader>
@@ -276,5 +249,9 @@ const RequestExtensionView = () => {
         </div>
     );
 };
+
+export function RequestExtensionSection({ requestId }: { requestId: number }) {
+    return <RequestExtensionView requestId={requestId} />;
+}
 
 export default RequestExtensionView;
