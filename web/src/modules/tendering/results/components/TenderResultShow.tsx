@@ -7,6 +7,12 @@ import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import type { ResultDashboardRow } from '../helpers/tenderResult.types';
 import { Button } from '@/components/ui/button';
+
+import { useTenderResultByTenderId } from '@/hooks/api/useTenderResults';
+import { usePaymentRequestsByTender } from '@/hooks/api/useEmds';
+import { useTender } from '@/hooks/api/useTenders';
+import { useBidSubmissionByTender } from '@/hooks/api/useBidSubmissions';
+import { useMemo } from 'react';
 import { tenderFilesService } from '@/services/api/tender-files.service';
 
 interface TenderResultShowProps {
@@ -22,6 +28,16 @@ interface TenderResultShowProps {
         finalResultScreenshot?: string | null;
         reverseAuctionId?: number | null;
         resultReason?: string | null;
+        // Derived fields
+        bidSubmissionDate?: string | Date | null;
+        finalPrice?: string | null;
+        resultStatus?: string;
+        emdDetails?: {
+            amount: string;
+            instrumentType: string | null;
+            instrumentStatus: string | null;
+            displayText: string;
+        } | null;
     };
     isLoading?: boolean;
     onViewRa?: (raId: number) => void;
@@ -40,7 +56,6 @@ const getFileUrl = (filePath: string): string => {
         const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
         return `${baseUrl}/tender-files/serve/${context}/${encodeURIComponent(fileName)}`;
     }
-    // Fallback: try to use as-is (shouldn't happen with proper paths)
     return tenderFilesService.getFileUrl(filePath);
 };
 
@@ -70,7 +85,6 @@ const getEmdStatusVariant = (status: string | null): string => {
     if (upperStatus.includes('PENDING')) return 'warning';
     return 'secondary';
 };
-
 export function TenderResultShow({
     result,
     isLoading = false,
@@ -88,6 +102,18 @@ export function TenderResultShow({
                         {Array.from({ length: 4 }).map((_, i) => (
                             <Skeleton key={i} className="h-10 w-full" />
                         ))}
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (!result) {
+        return (
+            <Card className={className}>
+                <CardContent className="p-8">
+                    <div className="flex items-center justify-center text-muted-foreground">
+                        No Tender Result data found.
                     </div>
                 </CardContent>
             </Card>
@@ -176,8 +202,8 @@ export function TenderResultShow({
                                 Result Status
                             </TableCell>
                             <TableCell colSpan={3}>
-                                <Badge variant={getStatusVariant(result.resultStatus) as any}>
-                                    {result.resultStatus}
+                                <Badge variant={getStatusVariant(result.resultStatus || '') as any}>
+                                    {result.resultStatus || '—'}
                                 </Badge>
                             </TableCell>
                         </TableRow>
@@ -496,10 +522,37 @@ export function TenderResultShow({
     );
 }
 
-import { useTenderResultByTenderId } from '@/hooks/api/useTenderResults';
-
 /** Self-fetching section for Tender Result */
 export function TenderResultSection({ tenderId }: { tenderId: number | null }) {
-    const { data: result, isLoading } = useTenderResultByTenderId(tenderId);
-    return <TenderResultShow result={result as any} isLoading={isLoading} />;
+    const { data: result, isLoading: resultLoading } = useTenderResultByTenderId(tenderId);
+    const { data: paymentRequests, isLoading: requestsLoading } = usePaymentRequestsByTender(tenderId);
+    const { data: tender, isLoading: tenderLoading } = useTender(tenderId);
+    const { data: bidSubmission, isLoading: bidSubmissionLoading } = useBidSubmissionByTender(tenderId ?? 0);
+
+    const isLoading = resultLoading || requestsLoading || tenderLoading || bidSubmissionLoading;
+
+    const resultDataForShow = useMemo(() => {
+        if (!result && !tender) return null;
+
+        const emdRequest = paymentRequests?.find(req => req.purpose === 'EMD');
+        const emdInstrument = emdRequest?.instruments?.find((inst: any) => inst.isActive);
+        const emdDetails = tender?.emd ? {
+            amount: tender.emd.toString(),
+            instrumentType: emdInstrument?.instrumentType || null,
+            instrumentStatus: emdInstrument?.status || null,
+            displayText: emdInstrument
+                ? `${emdInstrument.instrumentType} (${emdInstrument.status})`
+                : tender.emd ? 'Not Requested' : 'Not Applicable',
+        } : null;
+
+        return {
+            ...result,
+            bidSubmissionDate: bidSubmission?.submissionDatetime || null,
+            finalPrice: result?.tenderValue || tender?.gstValues || null,
+            resultStatus: result?.status || '',
+            emdDetails,
+        } as any;
+    }, [result, paymentRequests, tender, bidSubmission]);
+
+    return <TenderResultShow result={resultDataForShow} isLoading={isLoading} />;
 }
