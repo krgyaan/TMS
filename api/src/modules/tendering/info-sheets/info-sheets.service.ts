@@ -1016,7 +1016,8 @@ export class TenderInfoSheetsService {
             max_ld: formatPercent(infoSheet.maxLdPercentage),
             // Physical Docs
             phydocs_submission_required: infoSheet.physicalDocsRequired || 'No',
-            phydocsRequired: infoSheet.physicalDocsRequired === 'Yes',
+            phydocs_doc_type: infoSheet.physicalDocType?.replaceAll('_', ' ') || 'N/A',
+            phydocsRequired: infoSheet.physicalDocsRequired === 'YES',
             phydocs_submission_deadline: formatPhysicalDocsDeadline(infoSheet.physicalDocsDeadline),
             // Technical Eligibility
             eligibility_criterion: infoSheet.techEligibilityAge?.toString() || 'Not specified',

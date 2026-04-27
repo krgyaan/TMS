@@ -150,9 +150,10 @@
             <tr>
                 <th style="border: 1px solid black; text-align: left;">Physical Docs Submission Required</th>
                 <td style="border: 1px solid black; text-align: left;">{{data.phydocs_submission_required}}</td>
-                <td style="border: 1px solid black; text-align: left;"></td>
-                <th style="border: 1px solid black; text-align: left;">Physical Docs Submission Deadline</th>
-                <td style="border: 1px solid black; text-align: left;" colspan="3">
+                <th style="border: 1px solid black; text-align: left;">Physical Document Type</th>
+                <td style="border: 1px solid black; text-align: left;">{{data.phydocs_doc_type}}</td>
+                <th style="border: 1px solid black; text-align: left;">Deadline</th>
+                <td style="border: 1px solid black; text-align: left;" colspan="2">
                     {{#if data.phydocsRequired}}
                         {{data.phydocs_submission_deadline}}
                     {{else}}

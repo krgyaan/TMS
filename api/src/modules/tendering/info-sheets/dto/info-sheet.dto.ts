@@ -93,6 +93,7 @@ export const TenderInfoSheetPayloadSchema = z.object({
 
     // Physical Docs
     physicalDocsRequired: z.enum(['YES', 'NO']).optional().nullable(),
+    physicalDocType: z.enum(['ONLY_EMD', 'ONLY_OTHER_DOCUMENT', 'EMD_AND_OTHER_DOCUMENTS']).optional().nullable(),
     physicalDocsDeadline: z
         .union([z.string(), z.date(), z.undefined(), z.null()])
         .transform((v) => {
