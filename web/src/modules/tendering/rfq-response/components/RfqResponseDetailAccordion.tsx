@@ -31,14 +31,14 @@ export function RfqResponseDetailAccordion({ responseSummary }: RfqResponseDetai
             onValueChange={(val) => setIsExpanded(val === 'item-1')}
         >
             <AccordionItem value="item-1" className="border-b-0">
-                <AccordionTrigger className="px-6 hover:no-underline hover:bg-muted/50 transition-colors">
+                <AccordionTrigger className="px-4 py-2 hover:no-underline hover:bg-muted/50 transition-colors">
                     <div className="flex items-center justify-between w-full pr-4 text-left">
-                        <div className="flex flex-col gap-1">
-                            <span className="font-semibold text-base">
-                                Response Details
+                        <div className="flex flex-col gap-0.5">
+                            <span className="font-semibold text-sm">
+                                {responseSummary.organizationName ?? '—'}
                             </span>
-                            <span className="text-sm text-muted-foreground">
-                                Receipt: {formatDateTime(responseSummary.receiptDatetime)}
+                            <span className="text-xs text-muted-foreground">
+                                {responseSummary.vendorName ?? '—'} · {formatDateTime(responseSummary.receiptDatetime)}
                             </span>
                         </div>
                         <div className="flex items-center gap-3">
@@ -49,7 +49,7 @@ export function RfqResponseDetailAccordion({ responseSummary }: RfqResponseDetai
                     </div>
                 </AccordionTrigger>
 
-                <AccordionContent className="px-6 pb-6 pt-2 border-t">
+                <AccordionContent className="px-4 pb-3 pt-1 border-t">
                     {!isExpanded ? null : isLoading ? (
                         <div className="space-y-4">
                             <Skeleton className="h-24 w-full" />
@@ -65,22 +65,30 @@ export function RfqResponseDetailAccordion({ responseSummary }: RfqResponseDetai
                     ) : (
                         <div className="space-y-6">
                             {/* Vendor & Conditions Summary */}
-                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 bg-muted/30 p-4 rounded-md">
+                            <div className="grid grid-cols-2 lg:grid-cols-6 gap-2 bg-muted/30 p-2 rounded-md">
                                 <div>
-                                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Delivery Time</p>
-                                    <p className="text-sm font-medium mt-1">{response.deliveryTime ? `${response.deliveryTime} days` : '—'}</p>
+                                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">Org</p>
+                                    <p className="text-xs font-semibold">{response.organizationName ?? '—'}</p>
                                 </div>
                                 <div>
-                                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Freight Type</p>
-                                    <p className="text-sm font-medium mt-1">{response.freightType ?? '—'}</p>
+                                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">Contact</p>
+                                    <p className="text-xs font-medium">{response.vendorName ?? '—'}</p>
                                 </div>
                                 <div>
-                                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">GST Type</p>
-                                    <p className="text-sm font-medium mt-1">{response.gstType ?? '—'}</p>
+                                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">Delivery</p>
+                                    <p className="text-xs font-medium">{response.deliveryTime ? `${response.deliveryTime}d` : '—'}</p>
                                 </div>
                                 <div>
-                                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">GST %</p>
-                                    <p className="text-sm font-medium mt-1">{response.gstPercentage ? `${response.gstPercentage}%` : '—'}</p>
+                                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">Freight</p>
+                                    <p className="text-xs font-medium">{response.freightType ?? '—'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">GST Type</p>
+                                    <p className="text-xs font-medium">{response.gstType ?? '—'}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">GST %</p>
+                                    <p className="text-xs font-medium">{response.gstPercentage ? `${response.gstPercentage}%` : '—'}</p>
                                 </div>
                             </div>
 
@@ -144,33 +152,28 @@ export function RfqResponseDetailAccordion({ responseSummary }: RfqResponseDetai
                                         <FileText className="h-4 w-4" />
                                         Attached Documents ({response.documents.length})
                                     </p>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                                         {response.documents.map((doc) => (
-                                            <div key={doc.id} className="flex flex-col border rounded-md p-3 bg-card shadow-sm gap-2">
-                                                <div className="flex items-start gap-2 overflow-hidden">
-                                                    <FileText className="h-6 w-6 text-muted-foreground shrink-0" />
-                                                    <div className="flex flex-col overflow-hidden">
-                                                        <span className="font-medium text-sm truncate" title={doc.docType.replace(/_/g, ' ')}>
-                                                            {doc.docType.replace(/_/g, ' ')}
-                                                        </span>
-                                                        <span className="text-xs text-muted-foreground truncate" title={doc.path.split("\\").pop() || doc.path}>
-                                                            {doc.path.split("\\").pop() || doc.path}
-                                                        </span>
-                                                    </div>
+                                            <div key={doc.id} className="flex items-center justify-between border rounded p-1.5 bg-card hover:bg-muted/50 transition-colors shadow-sm">
+                                                <div className="flex items-center gap-2 overflow-hidden mr-2">
+                                                    <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                                                    <span className="text-xs font-medium truncate" title={doc.docType.replace(/_/g, ' ')}>
+                                                        {doc.docType.replace(/_/g, ' ')}
+                                                    </span>
                                                 </div>
-                                                <div className="flex items-center gap-2 mt-auto">
+                                                <div className="flex items-center gap-1 shrink-0">
                                                     <Button
                                                         variant="ghost"
-                                                        size="sm"
-                                                        className="flex-1 h-8 text-xs gap-1"
+                                                        size="icon"
+                                                        className="h-6 w-6"
                                                         onClick={() => window.open("/uploads/tendering/" + doc.path, '_blank')}
                                                     >
                                                         <ExternalLink className="h-3 w-3" />
                                                     </Button>
                                                     <Button
                                                         variant="ghost"
-                                                        size="sm"
-                                                        className="flex-1 h-8 text-xs gap-1"
+                                                        size="icon"
+                                                        className="h-6 w-6"
                                                         onClick={() => {
                                                             const a = document.createElement('a');
                                                             a.href = "/uploads/tendering/" + doc.path;

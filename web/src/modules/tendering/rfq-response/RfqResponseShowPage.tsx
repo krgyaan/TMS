@@ -245,17 +245,22 @@ export default function RfqResponseShowPage() {
                         <Card>
                             <CardHeader>
                                 <CardTitle>RFQ Response Details</CardTitle>
-                                <p className="text-sm text-muted-foreground mt-1">
-                                    Vendor: {response.vendorName ?? '—'} · Receipt:{' '}
-                                    {response.receiptDatetime
-                                        ? formatDateTime(response.receiptDatetime)
-                                        : '—'}
-                                </p>
+                                <div className="text-sm text-muted-foreground mt-1 space-x-2">
+                                    <span className="font-semibold text-foreground">{response.organizationName ?? '—'}</span>
+                                    <span>·</span>
+                                    <span>{response.vendorName ?? '—'}</span>
+                                    <span>·</span>
+                                    <span>Receipt: {response.receiptDatetime ? formatDateTime(response.receiptDatetime) : '—'}</span>
+                                </div>
                             </CardHeader>
                             <CardContent className="space-y-6">
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                     <div>
-                                        <p className="text-sm font-medium text-muted-foreground">Vendor</p>
+                                        <p className="text-sm font-medium text-muted-foreground">Organization</p>
+                                        <p className="text-sm font-semibold">{response.organizationName ?? '—'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-medium text-muted-foreground">Vendor contact</p>
                                         <p className="text-sm">{response.vendorName ?? '—'}</p>
                                     </div>
                                     <div>

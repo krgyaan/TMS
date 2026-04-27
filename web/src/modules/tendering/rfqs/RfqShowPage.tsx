@@ -26,6 +26,13 @@ import type { Rfq } from '@/modules/tendering/rfqs/helpers/rfq.types';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, List, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+} from "@/components/ui/accordion";
 import {
     ShowPageLayout,
     type StepConfig,
@@ -33,53 +40,103 @@ import {
 } from "@/modules/tendering/components/ShowPageLayout";
 
 // Local component for RFQ item with its responses
-function RfqItemWithResponses({ rfq, tender }: { rfq: Rfq; tender?: TenderInfoWithNames }) {
+function RfqItemWithResponses({ rfq, tender, index }: { rfq: Rfq; tender?: TenderInfoWithNames; index: number }) {
     const navigate = useNavigate();
     const { data: rfqResponses = [], isLoading: rfqResponsesLoading } = useRfqResponses(rfq.id);
 
-    return (
-        <div className="space-y-3 mb-8 last:mb-0">
-            <RfqView
-                rfq={rfq}
-                tender={tender}
-                isLoading={false}
-            />
-            <div className="flex items-center justify-between mt-6">
-                <h3 className="text-lg font-semibold">RFQ Responses</h3>
-                {rfq.id != null && (
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => navigate(paths.tendering.rfqsResponseList(rfq.id))}
-                    >
-                        <List className="h-4 w-4 mr-2" />
-                        View all
-                    </Button>
-                )}
-            </div>
+    const groupedResponses = useMemo(() => {
+        const groups: Record<string, typeof rfqResponses> = {};
+        rfqResponses.forEach(res => {
+            const org = res.organizationName || 'Other';
+            if (!groups[org]) groups[org] = [];
+            groups[org].push(res);
+        });
+        return groups;
+    }, [rfqResponses]);
 
-            <div className="space-y-4">
-                {rfqResponsesLoading ? (
-                    <div className="flex items-center justify-center py-6 text-muted-foreground text-sm">
-                        Loading responses…
+    return (
+        <Accordion type="single" collapsible defaultValue="request" className="w-full border rounded-lg bg-card overflow-hidden shadow-sm">
+            <AccordionItem value="request" className="border-b-0">
+                <AccordionTrigger className="px-4 py-2 hover:no-underline hover:bg-muted/30 transition-colors">
+                    <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="rounded-sm font-bold text-[10px]">
+                            RFQ REQUEST #{index}
+                        </Badge>
+                        <span className="text-xs font-semibold">
+                           {rfq.itemName || 'RFQ Details'}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground italic">
+                            (ID: #{rfq.id})
+                        </span>
+                        {rfqResponses.length > 0 && (
+                             <Badge variant="secondary" className="text-[10px] ml-2 px-1.5 h-4">
+                                {rfqResponses.length} {rfqResponses.length === 1 ? 'Response' : 'Responses'}
+                             </Badge>
+                        )}
                     </div>
-                ) : rfqResponses.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center p-8 bg-muted/10 border border-dashed rounded-lg text-muted-foreground w-full">
-                        <FileText className="h-10 w-10 mb-3 opacity-20" />
-                        <p className="font-medium">No responses yet</p>
-                    </div>
-                ) : (
-                    rfqResponses.map((res) => (
-                        <RfqResponseDetailAccordion
-                            key={res.id}
-                            responseSummary={res}
+                </AccordionTrigger>
+                <AccordionContent className="px-4 pb-4 pt-2 border-t">
+                    <div className="space-y-4 mt-2">
+                        <RfqView
+                            rfq={rfq}
+                            tender={tender}
+                            isLoading={false}
                         />
-                    ))
-                )}
-            </div>
-        </div>
+                        <div className="flex items-center justify-between mt-4">
+                            <h3 className="text-[11px] font-bold uppercase tracking-tight text-muted-foreground">Responses</h3>
+                            {/* {rfq.id != null && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 text-xs"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigate(paths.tendering.rfqsResponseList(rfq.id));
+                                    }}
+                                >
+                                    <List className="h-3 w-3 mr-1" />
+                                    View all
+                                </Button>
+                            )} */}
+                        </div>
+
+                        <div className="space-y-2">
+                            {rfqResponsesLoading ? (
+                                <div className="flex items-center justify-center py-4 text-muted-foreground text-xs">
+                                    Loading responses…
+                                </div>
+                            ) : rfqResponses.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center p-2 bg-muted/10 border border-dashed rounded-lg text-muted-foreground w-full">
+                                    <p className="text-xs">No responses yet</p>
+                                </div>
+                            ) : (
+                                Object.entries(groupedResponses).map(([orgName, responses]) => (
+                                    <div key={orgName} className="space-y-1">
+                                        <div className="flex items-center gap-2 px-1">
+                                            <Badge variant="secondary" className="px-2 py-0.5 text-[10px] font-semibold">
+                                                {orgName}
+                                            </Badge>
+                                            <div className="h-[1px] flex-1 bg-border/60" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            {responses.map((res) => (
+                                                <RfqResponseDetailAccordion
+                                                    key={res.id}
+                                                    responseSummary={res}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </AccordionContent>
+            </AccordionItem>
+        </Accordion>
     );
 }
+
 
 export default function RfqShowPage() {
     const navigate = useNavigate();
@@ -260,12 +317,13 @@ export default function RfqShowPage() {
                 ) : !rfqData || rfqData.length === 0 ? (
                     <RfqView rfq={null} tender={tender || undefined} isLoading={false} />
                 ) : (
-                    <div className="space-y-8">
-                        {rfqData.map((rfq) => (
+                    <div className="space-y-4">
+                        {rfqData.map((rfq, index) => (
                             <RfqItemWithResponses
                                 key={rfq.id}
                                 rfq={rfq}
                                 tender={tender || undefined}
+                                index={index + 1}
                             />
                         ))}
                     </div>

@@ -5,6 +5,7 @@ export interface RfqResponseListItem {
     id: number;
     rfqId: number;
     vendorId: number;
+    organizationName: string | null;
     vendorName: string | null;
     receiptDatetime: string;
     tenderNo?: string | null;
@@ -53,6 +54,7 @@ export interface RfqResponseDetail {
     id: number;
     rfqId: number;
     vendorId: number;
+    organizationName: string | null;
     vendorName: string | null;
     receiptDatetime: string;
     gstPercentage: string | null;
