@@ -96,6 +96,47 @@ export type DocumentData = {
   uploadedAt: string | null;
 };
 
+export type InductionTaskData = {
+  id: number;
+  taskName: string;
+  taskType: string;
+  status: string;
+  completedAt: string | null;
+  remarks: string | null;
+};
+
+export type ProfileResponse = {
+  currentUser: UserData;
+  isOnboarding: boolean;
+  profile: ProfileData | null;
+  employeeProfile: EmployeeProfileData | null;
+  address: AddressData | null;
+  emergencyContact: EmergencyContactData | null;
+  documents: DocumentData[];
+  inductionTasks: InductionTaskData[];
+  assets: AssetData[];
+  complaints: ComplaintData[];
+  notifications: NotificationData[];
+  onboardingStatus: OnboardingStatus | null;
+};
+
+
+export type OnboardingStatus = {
+  id: number;
+  requestType: "new_hire" | "re_onboarding";
+  status: "pending" | "approved" | "rejected" | "fully_completed";
+  profileStatus: "pending" | "in_progress" | "completed";
+  documentStatus: "pending" | "in_progress" | "completed";
+  bankStatus: "pending" | "in_progress" | "completed";
+  inductionStatus: "pending" | "in_progress" | "completed";
+  progress: number;
+  employeeCompleted: boolean;
+  hrCompleted: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+
 
 export type AssetData = {
   id: number;
@@ -125,17 +166,4 @@ export type ComplaintData = {
   status: string;
   priority: string;
   createdAt: string;
-};
-
-export type ProfileResponse = {
-  currentUser: UserData;
-  isOnboarding: boolean;
-  profile: ProfileData | null;
-  employeeProfile: EmployeeProfileData | null;
-  address: AddressData | null;
-  emergencyContact: EmergencyContactData | null;
-  documents: DocumentData[];
-  assets: AssetData[];
-  complaints: ComplaintData[];
-  notifications: NotificationData[];
 };
