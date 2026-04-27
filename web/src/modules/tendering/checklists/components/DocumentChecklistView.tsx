@@ -176,3 +176,11 @@ export function DocumentChecklistView({
         </Card>
     );
 }
+
+import { useDocumentChecklistByTender } from '@/hooks/api/useDocumentChecklists';
+
+/** Self-fetching section for Document Checklist */
+export function DocumentChecklistSection({ tenderId }: { tenderId: number | null }) {
+    const { data: checklist, isLoading } = useDocumentChecklistByTender(tenderId ?? 0);
+    return <DocumentChecklistView checklist={checklist ?? null} isLoading={isLoading} />;
+}
