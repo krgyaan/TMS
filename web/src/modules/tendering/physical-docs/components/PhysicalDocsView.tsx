@@ -6,21 +6,16 @@ import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Package } from 'lucide-react';
 import type { PhysicalDocs } from '../helpers/physicalDocs.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
+import { usePhysicalDocByTenderId } from '@/hooks/api/usePhysicalDocs';
 
 interface PhysicalDocsViewProps {
-    physicalDoc: PhysicalDocs | null;
-    tenderWithRelations: any | null;
-    infoSheet: any | null;
-    infoSheetError?: Error | null;
+    physicalDoc?: PhysicalDocs | null;
     isLoading?: boolean;
     className?: string;
 }
 
 export function PhysicalDocsView({
     physicalDoc,
-    tenderWithRelations,
-    infoSheet,
-    infoSheetError,
     isLoading = false,
     className = '',
 }: PhysicalDocsViewProps) {
@@ -217,3 +212,9 @@ export function PhysicalDocsView({
 }
 
 export default PhysicalDocsView;
+
+/** Self-fetching section for PhysicalDocs */
+export function PhysicalDocsSection({ tenderId }: { tenderId: number | null }) {
+    const { data: physicalDoc, isLoading } = usePhysicalDocByTenderId(tenderId);
+    return <PhysicalDocsView physicalDoc={physicalDoc ?? null} isLoading={isLoading} />;
+}
