@@ -7,8 +7,10 @@ import { formatDateTime } from '@/hooks/useFormatedDate';
 import type { RaDashboardRow } from '../helpers/reverseAuction.types';
 import { tenderFilesService } from '@/services/api/tender-files.service';
 
+import { useReverseAuctionByTender } from '@/hooks/api/useReverseAuctions';
+
 interface RaShowProps {
-    ra: RaDashboardRow & {
+    ra?: RaDashboardRow & {
         disqualificationReason?: string | null;
         qualifiedPartiesCount?: string | null;
         qualifiedPartiesNames?: string[] | null;
@@ -21,6 +23,7 @@ interface RaShowProps {
         screenshotDecrements?: string | null;
         finalResultScreenshot?: string | null;
     };
+    tenderId?: number;
     isLoading?: boolean;
     className?: string;
 }
@@ -47,10 +50,16 @@ const getStatusVariant = (status: string): string => {
 };
 
 export function RaShow({
-    ra,
-    isLoading = false,
+    ra: initialRa,
+    tenderId,
+    isLoading: initialLoading = false,
     className = '',
 }: RaShowProps) {
+    const { data: fetchedRa, isLoading: fetchLoading } = useReverseAuctionByTender(tenderId ?? 0);
+
+    const ra = initialRa || fetchedRa;
+    const isLoading = initialLoading || (tenderId ? fetchLoading : false);
+
     if (isLoading) {
         return (
             <Card className={className}>
@@ -62,6 +71,18 @@ export function RaShow({
                         {Array.from({ length: 4 }).map((_, i) => (
                             <Skeleton key={i} className="h-10 w-full" />
                         ))}
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (!ra) {
+        return (
+            <Card className={className}>
+                <CardContent className="p-8">
+                    <div className="flex items-center justify-center text-muted-foreground">
+                        No Reverse Auction data found.
                     </div>
                 </CardContent>
             </Card>
@@ -379,4 +400,8 @@ export function RaShow({
             </CardContent>
         </Card>
     );
+}
+
+export function RaSection({ tenderId }: { tenderId: number }) {
+    return <RaShow tenderId={tenderId} />;
 }
