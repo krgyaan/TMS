@@ -58,49 +58,66 @@ export function RfqView({
 
     return (
         <Card className={className}>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    RFQ Details
-                </CardTitle>
-            </CardHeader>
-            <CardContent>
+
+            <CardContent className="p-2">
                 <Table>
                     <TableBody>
                         {/* RFQ Information */}
-                        <TableRow className="bg-muted/50">
-                            <TableCell colSpan={4} className="font-semibold text-sm">
+                        <TableRow className="bg-muted/40 h-8">
+                            <TableCell colSpan={4} className="font-bold text-[11px] uppercase tracking-wider py-1 px-3">
                                 RFQ Information
                             </TableCell>
                         </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                        <TableRow className="hover:bg-muted/30 transition-colors h-8">
+                            <TableCell className="text-xs font-medium text-muted-foreground w-1/4 py-1 px-3">
                                 RFQ ID
                             </TableCell>
-                            <TableCell className="text-sm font-semibold w-1/4">
+                            <TableCell className="text-xs font-semibold w-1/4 py-1 px-3">
                                 #{rfq.id}
                             </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                            <TableCell className="text-xs font-medium text-muted-foreground w-1/4 py-1 px-3">
                                 Due Date & Time
                             </TableCell>
-                            <TableCell className="text-sm w-1/4">
+                            <TableCell className="text-xs w-1/4 py-1 px-3">
                                 {rfq.dueDate ? formatDateTime(rfq.dueDate) : '—'}
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground align-top w-1/4">
-                                Requested Organisation
+                            <TableCell className="text-xs font-medium text-muted-foreground align-top w-1/4 py-1 px-3">
+                                Requested Details
                             </TableCell>
                             <TableCell className="text-sm" colSpan={3}>
-                                {rfq.requestedOrganizationNames.join(', ') || '—'}
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground align-top w-1/4">
-                                Requested Vendor
-                            </TableCell>
-                            <TableCell className="text-sm" colSpan={3}>
-                                {rfq.requestedVendorNames.join(', ') || '—'}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {rfq.requestedGroups && rfq.requestedGroups.length > 0 ? (
+                                        rfq.requestedGroups.map((group) => (
+                                            <div key={group.organizationId} className="border rounded-md p-3 bg-muted/20">
+                                                <p className="font-semibold text-sm mb-2 border-b pb-1">{group.organizationName}</p>
+                                                <div className="space-y-1.5">
+                                                    {group.vendors.map(v => (
+                                                        <div key={v.id} className="flex flex-col">
+                                                            <span className="text-sm font-medium">{v.name}</span>
+                                                            <span className="text-xs text-muted-foreground">{v.email}</span>
+                                                        </div>
+                                                    ))}
+                                                    {group.vendors.length === 0 && (
+                                                        <span className="text-xs text-muted-foreground italic">No specific vendors requested</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <div className="flex flex-col gap-2">
+                                            <div>
+                                                <p className="text-xs font-medium text-muted-foreground">Organisations</p>
+                                                <p>{rfq.requestedOrganizationNames.join(', ') || '—'}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-xs font-medium text-muted-foreground">Vendors</p>
+                                                <p>{rfq.requestedVendorNames.join(', ') || '—'}</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -121,8 +138,8 @@ export function RfqView({
                         {/* Requirements */}
                         {rfq.items && rfq.items.length > 0 && (
                             <>
-                                <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                <TableRow className="bg-muted/40 h-8">
+                                    <TableCell colSpan={4} className="font-bold text-[11px] uppercase tracking-wider py-1 px-3">
                                         Requirements ({rfq.items.length} {rfq.items.length === 1 ? 'Item' : 'Items'})
                                     </TableCell>
                                 </TableRow>
@@ -136,9 +153,9 @@ export function RfqView({
                                         <TableCell className="text-sm" colSpan={2}>
                                             {item.requirement}
                                         </TableCell>
-                                        <TableCell className="text-sm text-right">
-                                            <span className="font-medium">{item.qty || '—'}</span>
-                                            {item.unit && <span className="text-muted-foreground ml-1">{item.unit}</span>}
+                                        <TableCell className="text-right py-1 px-3">
+                                            <span className="font-medium text-xs">{item.qty || '—'}</span>
+                                            {item.unit && <span className="text-[10px] text-muted-foreground ml-1">{item.unit}</span>}
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -154,34 +171,29 @@ export function RfqView({
                                     </TableCell>
                                 </TableRow>
                                 <TableRow>
-                                    <TableCell colSpan={4} className="p-4">
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+                                    <TableCell colSpan={4} className="p-2">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                                             {rfq.documents.map((doc) => (
-                                                <div key={doc.id} className="flex flex-col border rounded-md p-3 bg-card shadow-sm gap-2">
-                                                    <div className="flex items-start gap-2 overflow-hidden">
-                                                        <FileText className="h-6 w-6 text-muted-foreground shrink-0" />
-                                                        <div className="flex flex-col overflow-hidden">
-                                                            <span className="font-medium text-sm truncate" title={doc.docType.replace(/_/g, ' ')}>
-                                                                {doc.docType.replace(/_/g, ' ')}
-                                                            </span>
-                                                            <span className="text-xs text-muted-foreground truncate" title={doc.path.split("\\").pop() || doc.path}>
-                                                                {doc.path.split("\\").pop() || doc.path}
-                                                            </span>
-                                                        </div>
+                                                <div key={doc.id} className="flex items-center justify-between border rounded p-1.5 bg-card hover:bg-muted/50 transition-colors">
+                                                    <div className="flex items-center gap-2 overflow-hidden mr-2">
+                                                        <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                                                        <span className="text-xs font-medium truncate" title={doc.docType.replace(/_/g, ' ')}>
+                                                            {doc.docType.replace(/_/g, ' ')}
+                                                        </span>
                                                     </div>
-                                                    <div className="flex items-center gap-2 mt-auto">
+                                                    <div className="flex items-center gap-1 shrink-0">
                                                         <Button
                                                             variant="ghost"
-                                                            size="sm"
-                                                            className="flex-1 h-8 text-xs gap-1"
+                                                            size="icon"
+                                                            className="h-6 w-6"
                                                             onClick={() => window.open("/uploads/tendering/" + doc.path, '_blank')}
                                                         >
                                                             <ExternalLink className="h-3 w-3" />
                                                         </Button>
                                                         <Button
                                                             variant="ghost"
-                                                            size="sm"
-                                                            className="flex-1 h-8 text-xs gap-1"
+                                                            size="icon"
+                                                            className="h-6 w-6"
                                                             onClick={() => {
                                                                 const a = document.createElement('a');
                                                                 a.href = "/uploads/tendering/" + doc.path;
