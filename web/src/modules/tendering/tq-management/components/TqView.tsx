@@ -5,6 +5,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { FileText, Download, ExternalLink, AlertCircle } from 'lucide-react';
 import type { TenderQuery, TenderQueryItem, TenderQueryStatus } from '../helpers/tqManagement.types';
 import type { TqType } from '@/types/api.types';
+import { useTqById, useTqItems } from '@/hooks/api/useTqManagement';
+import { useTqTypes } from '@/hooks/api/useTqTypes';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 
 interface TqViewProps {
@@ -318,5 +320,20 @@ export function TqView({
                 </div>
             </CardContent>
         </Card>
+    );
+}
+
+export function TqSection({ tqId }: { tqId: number }) {
+    const { data: tqData, isLoading: tqLoading } = useTqById(tqId);
+    const { data: tqItems, isLoading: itemsLoading } = useTqItems(tqId);
+    const { data: tqTypes } = useTqTypes();
+
+    return (
+        <TqView
+            tqData={tqData!}
+            tqItems={tqItems || null}
+            tqTypes={tqTypes || null}
+            isLoading={tqLoading || itemsLoading}
+        />
     );
 }
