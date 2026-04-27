@@ -495,3 +495,11 @@ export function TenderResultShow({
         </Card>
     );
 }
+
+import { useTenderResultByTenderId } from '@/hooks/api/useTenderResults';
+
+/** Self-fetching section for Tender Result */
+export function TenderResultSection({ tenderId }: { tenderId: number | null }) {
+    const { data: result, isLoading } = useTenderResultByTenderId(tenderId);
+    return <TenderResultShow result={result as any} isLoading={isLoading} />;
+}
