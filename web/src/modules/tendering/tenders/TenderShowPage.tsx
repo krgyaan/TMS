@@ -10,7 +10,7 @@ import { CostingSheetSection } from "@/modules/tendering/costing-sheets/componen
 import { BidSubmissionSection } from "@/modules/tendering/bid-submissions/components/BidSubmissionView";
 import { TenderResultSection } from "@/modules/tendering/results/components/TenderResultShow";
 import { paths } from "@/app/routes/paths";
-import { ShowPageLayout } from "@/modules/tendering/components/ShowPageLayout";
+import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
 
 export default function TenderShowPage() {
     const { id } = useParams<{ id: string }>();
@@ -22,7 +22,6 @@ export default function TenderShowPage() {
 
     // ── View state ──
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["tender-details"]));
-    const [activeSection, setActiveSection] = useState("tender-details");
 
     const toggleSection = useCallback((id: string) => {
         setExpandedSections((prev) => {
@@ -33,10 +32,6 @@ export default function TenderShowPage() {
     }, []);
     const expandAll   = useCallback(() => setExpandedSections(new Set(steps.map((s) => s.id))), [steps]);
     const collapseAll = useCallback(() => setExpandedSections(new Set()), []);
-    const jumpToSection = useCallback((id: string) => {
-        setActiveSection(id);
-        document.getElementById(`section-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, []);
 
     const renderSectionContent = useCallback((stepId: string) => {
         switch (stepId) {
@@ -55,9 +50,6 @@ export default function TenderShowPage() {
     return (
         <ShowPageLayout
             steps={steps}
-            activeSection={activeSection}
-            onJump={jumpToSection}
-            onSectionVisible={setActiveSection}
             expandedSections={expandedSections}
             onToggleSection={toggleSection}
             onExpandAll={expandAll}

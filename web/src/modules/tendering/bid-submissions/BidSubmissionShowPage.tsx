@@ -8,7 +8,7 @@ import { DocumentChecklistSection } from "@/modules/tendering/checklists/compone
 import { CostingSheetSection } from "@/modules/tendering/costing-sheets/components/CostingSheetView";
 import { BidSubmissionSection } from "./components/BidSubmissionView";
 import { paths } from "@/app/routes/paths";
-import { ShowPageLayout } from "@/modules/tendering/components/ShowPageLayout";
+import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
 
 // BidSubmission page shows steps relevant to bid workflow (no RFQ, no Result)
 const STEP_IDS = ["tender-details", "physical-docs", "emd-fees", "checklist", "costing", "bid"];
@@ -22,7 +22,6 @@ export default function BidSubmissionShowPage() {
     const steps = allSteps.filter((s) => STEP_IDS.includes(s.id));
 
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["bid"]));
-    const [activeSection, setActiveSection] = useState("bid");
 
     const toggleSection = useCallback((id: string) => {
         setExpandedSections((prev) => {
@@ -33,10 +32,6 @@ export default function BidSubmissionShowPage() {
     }, []);
     const expandAll   = useCallback(() => setExpandedSections(new Set(steps.map((s) => s.id))), [steps]);
     const collapseAll = useCallback(() => setExpandedSections(new Set()), []);
-    const jumpToSection = useCallback((id: string) => {
-        setActiveSection(id);
-        document.getElementById(`section-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, []);
 
     const renderSectionContent = useCallback((stepId: string) => {
         switch (stepId) {
@@ -53,9 +48,6 @@ export default function BidSubmissionShowPage() {
     return (
         <ShowPageLayout
             steps={steps}
-            activeSection={activeSection}
-            onJump={jumpToSection}
-            onSectionVisible={setActiveSection}
             expandedSections={expandedSections}
             onToggleSection={toggleSection}
             onExpandAll={expandAll}
