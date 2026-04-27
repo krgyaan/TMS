@@ -8,6 +8,7 @@ import { users } from '@db/schemas/auth/users.schema';
 import type { CreateWoBasicDetailDto, UpdateWoBasicDetailDto, AssignOeDto, BulkAssignOeDto, RemoveOeAssignmentDto, WoBasicDetailsQueryDto } from './dto/wo-basic-details.dto';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { projects, teams, tenderInfos } from '@/db/schemas';
+import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 
 const oeFirstUser = alias(users, 'oeFirstUser');
 const oeSiteVisitUser = alias(users, 'oeSiteVisitUser');
@@ -19,7 +20,10 @@ export type WoBasicDetailRow = typeof woBasicDetails.$inferSelect;
 export class WoBasicDetailsService {
     private readonly logger = new Logger(WoBasicDetailsService.name);
 
-    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
+    constructor(
+        @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly tenderStatusHistoryService: TenderStatusHistoryService,
+    ) {}
 
     private mapCreateToDb(data: CreateWoBasicDetailDto) {
         const now = new Date();
@@ -331,10 +335,14 @@ export class WoBasicDetailsService {
         }
 
         let teamId: number | null = null;
+        let prevStatus: number | null = null;
 
         if (data.tenderId) {
             const [tender] = await this.db
-                .select({teamId: tenderInfos.team})
+                .select({
+                    teamId: tenderInfos.team,
+                    status: tenderInfos.status
+                })
                 .from(tenderInfos)
                 .where(eq(tenderInfos.id, data.tenderId))
                 .limit(1);
@@ -345,6 +353,7 @@ export class WoBasicDetailsService {
             }
 
             teamId = tender.teamId;
+            prevStatus = tender.status;
         }
 
         const insertValues = this.mapCreateToDb(data);
@@ -359,6 +368,24 @@ export class WoBasicDetailsService {
             .insert(woBasicDetails)
             .values(insertValues)
             .returning();
+
+        // Update tender status to 26 (Wo Basic detail filled) after successful creation
+        if (data.tenderId && userId) {
+            const newStatus = 26;
+            await this.db
+                .update(tenderInfos)
+                .set({ status: newStatus, updatedAt: new Date() })
+                .where(eq(tenderInfos.id, data.tenderId));
+
+            // Track status change
+            await this.tenderStatusHistoryService.trackStatusChange(
+                data.tenderId,
+                newStatus,
+                userId,
+                prevStatus,
+                "WO Basic Details created"
+            );
+        }
 
         // Create Project asynchronously (non-blocking)
         this.safeCreateProject(data, row?.id);
@@ -716,7 +743,9 @@ export class WoBasicDetailsService {
         const conditions: any[] = [];
 
         // Role ID 1 = Super User, 2 = Admin: Show all, respect teamId filter if provided
-        if (user.roleId === 1 || user.roleId === 2) {
+        const hasAdminViewPermission = user?.permissions.includes("ops.admin:read");
+
+        if (user.roleId === 1 || user.roleId === 2 || hasAdminViewPermission) {
             if (teamId !== undefined && teamId !== null) {
                 conditions.push(eq(woBasicDetails.team, teamId));
             }

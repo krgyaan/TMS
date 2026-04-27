@@ -1,14 +1,19 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
+import { Inject, Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import { WoBasicDetailsService } from './wo-basic-details.service';
 import { CreateWoBasicDetailSchema, UpdateWoBasicDetailSchema, AssignOeSchema, BulkAssignOeSchema, RemoveOeAssignmentSchema,  WoBasicDetailsQuerySchema } from './dto/wo-basic-details.dto';
 import type { CreateWoBasicDetailDto, UpdateWoBasicDetailDto, AssignOeDto, BulkAssignOeDto, RemoveOeAssignmentDto, WoBasicDetailsQueryDto } from './dto/wo-basic-details.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
+import { Logger } from "winston";
 
 @Controller('wo-basic-details')
 export class WoBasicDetailsController {
     constructor(
         private readonly woBasicDetailsService: WoBasicDetailsService,
+
+        @Inject(WINSTON_MODULE_PROVIDER)
+        private readonly logger: Logger,    
     ) {}
 
     // CRUD OPERATIONS
@@ -50,6 +55,8 @@ export class WoBasicDetailsController {
         @Body() body: unknown,
         @CurrentUser() user: ValidatedUser,
     ) {
+        this.logger.info(`Creating WO basic detail for tender. User: ${user.sub}`);
+        this.logger.debug(`Request Body: ${JSON.stringify(body, null, 2)}`);
         const parsed = CreateWoBasicDetailSchema.parse(body) as CreateWoBasicDetailDto;
         return this.woBasicDetailsService.create(parsed, user.sub);
     }
