@@ -345,7 +345,8 @@ const PersonalInfoDialog: React.FC<{
   data: any;
   onSave: (data: any) => Promise<void>;
   saving: boolean;
-}> = ({ open, onClose, data, onSave, saving }) => {
+  isOnboarding?: boolean;
+}> = ({ open, onClose, data, onSave, saving, isOnboarding = true }) => {
   const [form, setForm] = useState({
     firstName: data?.firstName || "",
     middleName: data?.middleName || "",
@@ -379,7 +380,9 @@ const PersonalInfoDialog: React.FC<{
               Personal Information
             </DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground/60">
-              Update your personal details. Fields marked with * are required.
+              {isOnboarding 
+                ? "Update your personal details. Fields marked with * are required."
+                : "Your profile is verified. Only LinkedIn profile can be updated."}
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -399,6 +402,7 @@ const PersonalInfoDialog: React.FC<{
                   onChange={(e) => handleChange("firstName", e.target.value)}
                   className="rounded-xl h-10 border-border/50 focus:border-primary/50 bg-muted/20"
                   placeholder="John"
+                  disabled={!isOnboarding}
                 />
               </div>
               <div className="space-y-1.5">
@@ -410,6 +414,7 @@ const PersonalInfoDialog: React.FC<{
                   onChange={(e) => handleChange("middleName", e.target.value)}
                   className="rounded-xl h-10 border-border/50 focus:border-primary/50 bg-muted/20"
                   placeholder="—"
+                  disabled={!isOnboarding}
                 />
               </div>
               <div className="space-y-1.5">
@@ -421,6 +426,7 @@ const PersonalInfoDialog: React.FC<{
                   onChange={(e) => handleChange("lastName", e.target.value)}
                   className="rounded-xl h-10 border-border/50 focus:border-primary/50 bg-muted/20"
                   placeholder="Doe"
+                  disabled={!isOnboarding}
                 />
               </div>
             </div>
@@ -440,13 +446,14 @@ const PersonalInfoDialog: React.FC<{
                   value={form.dateOfBirth}
                   onChange={(e) => handleChange("dateOfBirth", e.target.value)}
                   className="rounded-xl h-10 border-border/50 focus:border-primary/50 bg-muted/20"
+                  disabled={!isOnboarding}
                 />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-muted-foreground">
                   Gender <span className="text-destructive">*</span>
                 </Label>
-                <Select value={form.gender} onValueChange={(v) => handleChange("gender", v)}>
+                <Select disabled={!isOnboarding} value={form.gender} onValueChange={(v) => handleChange("gender", v)}>
                   <SelectTrigger className="rounded-xl h-10 border-border/50 bg-muted/20">
                     <SelectValue placeholder="Select gender" />
                   </SelectTrigger>
@@ -461,7 +468,7 @@ const PersonalInfoDialog: React.FC<{
                 <Label className="text-xs font-medium text-muted-foreground">
                   Marital Status <span className="text-destructive">*</span>
                 </Label>
-                <Select value={form.maritalStatus} onValueChange={(v) => handleChange("maritalStatus", v)}>
+                <Select disabled={!isOnboarding} value={form.maritalStatus} onValueChange={(v) => handleChange("maritalStatus", v)}>
                   <SelectTrigger className="rounded-xl h-10 border-border/50 bg-muted/20">
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
@@ -482,11 +489,12 @@ const PersonalInfoDialog: React.FC<{
                   onChange={(e) => handleChange("nationality", e.target.value)}
                   className="rounded-xl h-10 border-border/50 focus:border-primary/50 bg-muted/20"
                   placeholder="Indian"
+                  disabled={!isOnboarding}
                 />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-muted-foreground">Blood Group</Label>
-                <Select value={form.bloodGroup} onValueChange={(v) => handleChange("bloodGroup", v)}>
+                <Select disabled={!isOnboarding} value={form.bloodGroup} onValueChange={(v) => handleChange("bloodGroup", v)}>
                   <SelectTrigger className="rounded-xl h-10 border-border/50 bg-muted/20">
                     <SelectValue placeholder="Select" />
                   </SelectTrigger>
@@ -523,6 +531,7 @@ const PersonalInfoDialog: React.FC<{
                   value={form.personalEmail}
                   onChange={(e) => handleChange("personalEmail", e.target.value)}
                   className="rounded-xl h-10 border-border/50 focus:border-primary/50 bg-muted/20"
+                  disabled={!isOnboarding}
                 />
               </div>
               <div className="space-y-1.5">
@@ -533,6 +542,7 @@ const PersonalInfoDialog: React.FC<{
                   value={form.phone}
                   onChange={(e) => handleChange("phone", e.target.value)}
                   className="rounded-xl h-10 border-border/50 focus:border-primary/50 bg-muted/20"
+                  disabled={!isOnboarding}
                 />
               </div>
               <div className="space-y-1.5">
@@ -541,6 +551,7 @@ const PersonalInfoDialog: React.FC<{
                   value={form.alternatePhone}
                   onChange={(e) => handleChange("alternatePhone", e.target.value)}
                   className="rounded-xl h-10 border-border/50 focus:border-primary/50 bg-muted/20"
+                  disabled={!isOnboarding}
                 />
               </div>
             </div>
@@ -558,6 +569,7 @@ const PersonalInfoDialog: React.FC<{
                   onChange={(e) => handleChange("aadharNumber", e.target.value)}
                   className="rounded-xl h-10 border-border/50 focus:border-primary/50 bg-muted/20 font-mono"
                   placeholder="XXXX XXXX XXXX"
+                  disabled={!isOnboarding}
                 />
               </div>
               <div className="space-y-1.5">
@@ -567,6 +579,7 @@ const PersonalInfoDialog: React.FC<{
                   onChange={(e) => handleChange("panNumber", e.target.value.toUpperCase())}
                   className="rounded-xl h-10 border-border/50 focus:border-primary/50 bg-muted/20 font-mono"
                   placeholder="ABCDE1234F"
+                  disabled={!isOnboarding}
                 />
               </div>
             </div>
@@ -1160,7 +1173,11 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ setActiveTab }) => {
 
   const profileMutation = useMutation({
     mutationFn: async (payload: any) => {
-      await api.patch("/profile/me", payload);
+      if (!data.isOnboarding) {
+        await api.patch("/profile/me/basic", payload);
+      } else {
+        await api.patch("/profile/me", payload);
+      }
     },
     onSuccess: () => {
       toast.success("Profile updated successfully");
@@ -1462,12 +1479,14 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ setActiveTab }) => {
                   title="Emergency"
                   compact
                   action={
-                    <button
-                      onClick={() => setEditEmergency(true)}
-                      className="p-1.5 rounded-lg hover:bg-muted/50 transition-colors"
-                    >
-                      <Pencil className="h-3 w-3 text-muted-foreground/50" />
-                    </button>
+                    data.isOnboarding ? (
+                      <button
+                        onClick={() => setEditEmergency(true)}
+                        className="p-1.5 rounded-lg hover:bg-muted/50 transition-colors"
+                      >
+                        <Pencil className="h-3 w-3 text-muted-foreground/50" />
+                      </button>
+                    ) : undefined
                   }
                 />
                 {EMERGENCY_CONTACT.name ? (
@@ -1493,14 +1512,18 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ setActiveTab }) => {
                   </div>
                 ) : (
                   <button
-                    onClick={() => setEditEmergency(true)}
-                    className="w-full py-8 rounded-2xl border-2 border-dashed border-border/30 hover:border-primary/20 transition-colors flex flex-col items-center gap-2 group"
+                    onClick={() => data.isOnboarding && setEditEmergency(true)}
+                    className={cn(
+                      "w-full py-8 rounded-2xl border-2 border-dashed flex flex-col items-center gap-2 group transition-colors",
+                      data.isOnboarding ? "border-border/30 hover:border-primary/20 cursor-pointer" : "border-border/10 cursor-default"
+                    )}
                   >
-                    <div className="h-10 w-10 rounded-2xl bg-destructive/8 flex items-center justify-center group-hover:bg-destructive/15 transition-colors">
+                    <div className={cn("h-10 w-10 rounded-2xl flex items-center justify-center transition-colors", 
+                      data.isOnboarding ? "bg-destructive/8 group-hover:bg-destructive/15" : "bg-muted/30")}>
                       <Plus className="h-4 w-4 text-destructive/50" />
                     </div>
                     <p className="text-[11px] font-semibold text-muted-foreground/50 group-hover:text-foreground transition-colors">
-                      Add contact
+                      {data.isOnboarding ? "Add contact" : "No contact added"}
                     </p>
                   </button>
                 )}
@@ -1572,7 +1595,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ setActiveTab }) => {
                   icon={MapPin}
                   title="Address"
                   subtitle="Residential information"
-                  action={<EditButton onClick={() => setEditAddress(true)} />}
+                  action={data.isOnboarding ? <EditButton onClick={() => setEditAddress(true)} /> : undefined}
                 />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 relative z-10">
                   {/* Current */}
@@ -1696,15 +1719,17 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ setActiveTab }) => {
                   badge={EDUCATION.length > 0 ? `${EDUCATION.length}` : undefined}
                   badgeVariant="info"
                   action={
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setEditEducation({})}
-                      className="rounded-xl text-primary font-semibold h-8 text-xs hover:bg-primary/8 gap-1.5"
-                    >
-                      <Plus className="h-3 w-3" />
-                      Add
-                    </Button>
+                    data.isOnboarding ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setEditEducation({})}
+                        className="rounded-xl text-primary font-semibold h-8 text-xs hover:bg-primary/8 gap-1.5"
+                      >
+                        <Plus className="h-3 w-3" />
+                        Add
+                      </Button>
+                    ) : undefined
                   }
                 />
                 {EDUCATION.length > 0 ? (
@@ -1740,34 +1765,36 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ setActiveTab }) => {
                             )}
                           </div>
                         </div>
-                        <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button
-                                  onClick={() => setEditEducation(edu)}
-                                  className="p-1.5 rounded-lg hover:bg-muted/50 transition-colors"
-                                >
-                                  <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent className="text-xs rounded-lg">Edit</TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button
-                                  onClick={() => educationDeleteMutation.mutate(edu.id)}
-                                  className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5 text-destructive/60" />
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent className="text-xs rounded-lg">Delete</TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </div>
+                        {data.isOnboarding && (
+                          <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    onClick={() => setEditEducation(edu)}
+                                    className="p-1.5 rounded-lg hover:bg-muted/50 transition-colors"
+                                  >
+                                    <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent className="text-xs rounded-lg">Edit</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    onClick={() => educationDeleteMutation.mutate(edu.id)}
+                                    className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5 text-destructive/60" />
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent className="text-xs rounded-lg">Delete</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1804,15 +1831,17 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ setActiveTab }) => {
                   badge={EXPERIENCE.length > 0 ? `${EXPERIENCE.length}` : undefined}
                   badgeVariant="info"
                   action={
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setEditExperience({})}
-                      className="rounded-xl text-primary font-semibold h-8 text-xs hover:bg-primary/8 gap-1.5"
-                    >
-                      <Plus className="h-3 w-3" />
-                      Add
-                    </Button>
+                    data.isOnboarding ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setEditExperience({})}
+                        className="rounded-xl text-primary font-semibold h-8 text-xs hover:bg-primary/8 gap-1.5"
+                      >
+                        <Plus className="h-3 w-3" />
+                        Add
+                      </Button>
+                    ) : undefined
                   }
                 />
                 {EXPERIENCE.length > 0 ? (
@@ -1847,20 +1876,22 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ setActiveTab }) => {
                                   {exp.companyName || "Company not specified"}
                                 </p>
                               </div>
-                              <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                                <button
-                                  onClick={() => setEditExperience(exp)}
-                                  className="p-1.5 rounded-lg hover:bg-muted/50 transition-colors"
-                                >
-                                  <Pencil className="h-3 w-3 text-muted-foreground" />
-                                </button>
-                                <button
-                                  onClick={() => experienceDeleteMutation.mutate(exp.id)}
-                                  className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors"
-                                >
-                                  <Trash2 className="h-3 w-3 text-destructive/60" />
-                                </button>
-                              </div>
+                              {data.isOnboarding && (
+                                <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                                  <button
+                                    onClick={() => setEditExperience(exp)}
+                                    className="p-1.5 rounded-lg hover:bg-muted/50 transition-colors"
+                                  >
+                                    <Pencil className="h-3 w-3 text-muted-foreground" />
+                                  </button>
+                                  <button
+                                    onClick={() => experienceDeleteMutation.mutate(exp.id)}
+                                    className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors"
+                                  >
+                                    <Trash2 className="h-3 w-3 text-destructive/60" />
+                                  </button>
+                                </div>
+                              )}
                             </div>
                             <div className="flex flex-wrap gap-1.5 mt-2">
                               {(exp.fromDate || exp.toDate) && (
@@ -1888,19 +1919,26 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ setActiveTab }) => {
                   </div>
                 ) : (
                   <button
-                    onClick={() => setEditExperience({})}
-                    className="w-full p-8 rounded-2xl border-2 border-dashed border-border/30 hover:border-primary/20 transition-all duration-300 flex flex-col items-center gap-3 group"
+                    onClick={() => data.isOnboarding && setEditExperience({})}
+                    className={cn(
+                      "w-full p-8 rounded-2xl border-2 border-dashed flex flex-col items-center gap-3 group transition-all duration-300",
+                      data.isOnboarding ? "border-border/30 hover:border-primary/20 cursor-pointer" : "border-border/10 cursor-default"
+                    )}
                   >
-                    <div className="h-12 w-12 rounded-2xl bg-primary/8 flex items-center justify-center group-hover:bg-primary/15 transition-colors">
-                      <Briefcase className="h-5 w-5 text-primary" />
+                    <div className={cn("h-12 w-12 rounded-2xl flex items-center justify-center transition-colors",
+                      data.isOnboarding ? "bg-primary/8 group-hover:bg-primary/15" : "bg-muted/30"
+                    )}>
+                      <Briefcase className={cn("h-5 w-5", data.isOnboarding ? "text-primary" : "text-muted-foreground/40")} />
                     </div>
                     <div className="text-center">
                       <p className="text-sm font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
-                        Add work experience
+                        {data.isOnboarding ? "Add work experience" : "No work experience added"}
                       </p>
-                      <p className="text-xs text-muted-foreground/50 mt-0.5">
-                        Previous employment & roles
-                      </p>
+                      {data.isOnboarding && (
+                        <p className="text-xs text-muted-foreground/50 mt-0.5">
+                          Previous employment & roles
+                        </p>
+                      )}
                     </div>
                   </button>
                 )}
@@ -2011,6 +2049,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ setActiveTab }) => {
           data={PROFILE}
           onSave={handleSavePersonal}
           saving={profileMutation.isPending}
+          isOnboarding={data.isOnboarding}
         />
       )}
 
