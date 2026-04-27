@@ -1,15 +1,14 @@
-import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, FileQuestion, Users, Mail, Phone, Building2 } from 'lucide-react';
+import { FileQuestion, Users, Mail, Phone, Building2 } from 'lucide-react';
 import type { SubmitQueryResponse } from '../helpers/submitQueries.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 
 interface SubmitQueryViewProps {
-    data: SubmitQueryResponse;
+    data?: SubmitQueryResponse;
+    queryId?: number;
     isLoading?: boolean;
     error?: Error | null;
 }
@@ -31,8 +30,6 @@ const queryTypeLabels: Record<string, string> = {
 };
 
 export function SubmitQueryView({ data, isLoading, error }: SubmitQueryViewProps) {
-    const navigate = useNavigate();
-
     if (error) {
         return (
             <Alert variant="destructive">
@@ -66,25 +63,15 @@ export function SubmitQueryView({ data, isLoading, error }: SubmitQueryViewProps
 
     return (
         <div className="space-y-6">
-            {/* Header Card */}
+            {/* Tender Info */}
             <Card>
                 <CardHeader>
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <CardTitle>Submit Query Details</CardTitle>
-                            <CardDescription className="mt-2">
-                                Query ID: #{data.id}
-                            </CardDescription>
-                        </div>
-                        <CardAction className="flex gap-2">
-                            <Button variant="outline" onClick={() => navigate(-1)}>
-                                <ArrowLeft className="mr-2 h-4 w-4" /> Back
-                            </Button>
-                        </CardAction>
-                    </div>
+                    <CardTitle>Submit Query Details</CardTitle>
+                    <CardDescription className="mt-2">
+                        Query ID: #{data.id}
+                    </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {/* Tender Info */}
                     <div className="p-4 bg-muted rounded-lg">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                             <div>
@@ -278,4 +265,7 @@ export function SubmitQueryView({ data, isLoading, error }: SubmitQueryViewProps
     );
 }
 
-export default SubmitQueryView;
+export function SubmitQuerySection({ queryId }: { queryId: number }) {
+    return <SubmitQueryView queryId={queryId} />;
+}
+;
