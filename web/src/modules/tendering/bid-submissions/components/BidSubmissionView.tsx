@@ -328,3 +328,11 @@ export function BidSubmissionView({
         </Card>
     );
 }
+
+import { useBidSubmissionByTender } from '@/hooks/api/useBidSubmissions';
+
+/** Self-fetching section for Bid Submission */
+export function BidSubmissionSection({ tenderId }: { tenderId: number | null }) {
+    const { data: bidSubmission, isLoading } = useBidSubmissionByTender(tenderId ?? 0);
+    return <BidSubmissionView bidSubmission={bidSubmission ?? null} isLoading={isLoading} />;
+}
