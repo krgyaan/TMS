@@ -19,7 +19,9 @@ import {
   onboardingDocuments, 
   onboardingProfiles,
   onboardingEducation,
-  onboardingExperience
+  onboardingExperience,
+  onboardingActivityLogs,
+  onboardingInduction
 } from '@/db/schemas/hrms/onboarding';
 import { complaints } from '@/db/schemas/hrms/complaints.schema';
 import { teams } from '@/db/schemas/master/teams.schema';
@@ -70,7 +72,17 @@ export class ProfileService {
 
     // CHECK ONBOARDING STATUS
     let activeReqs = await this.db
-      .select({ id: onboardingRequests.id, status: onboardingRequests.status })
+      .select({
+        id: onboardingRequests.id,
+        status: onboardingRequests.status,
+        requestType: onboardingRequests.requestType,
+        profileStatus: onboardingRequests.profileStatus,
+        documentStatus: onboardingRequests.documentStatus,
+        inductionStatus: onboardingRequests.inductionStatus,
+        progress: onboardingRequests.progress,
+        createdAt: onboardingRequests.createdAt,
+        updatedAt: onboardingRequests.updatedAt,
+      })
       .from(onboardingRequests)
       .where(eq(onboardingRequests.userId, userId))
       .orderBy(desc(onboardingRequests.createdAt))
@@ -89,7 +101,17 @@ export class ProfileService {
         
         // Re-fetch
         activeReqs = await this.db
-          .select({ id: onboardingRequests.id, status: onboardingRequests.status })
+          .select({
+            id: onboardingRequests.id,
+            status: onboardingRequests.status,
+            requestType: onboardingRequests.requestType,
+            profileStatus: onboardingRequests.profileStatus,
+            documentStatus: onboardingRequests.documentStatus,
+            inductionStatus: onboardingRequests.inductionStatus,
+            progress: onboardingRequests.progress,
+            createdAt: onboardingRequests.createdAt,
+            updatedAt: onboardingRequests.updatedAt,
+          })
           .from(onboardingRequests)
           .where(eq(onboardingRequests.userId, userId))
           .orderBy(desc(onboardingRequests.createdAt))
@@ -107,6 +129,8 @@ export class ProfileService {
     let documents: any[] = [];
     let education: any[] = [];
     let experience: any[] = [];
+    let onboardingStatus: any = null;
+    let inductionTasks: any = null;
 
     if (isOnboarding) {
       // 2 & 3. Fetch Onboarding Profile Data
@@ -218,6 +242,37 @@ export class ProfileService {
         .select()
         .from(onboardingExperience)
         .where(eq(onboardingExperience.onboardingId, onboardingId!));
+
+      // 7. Fetch Induction Tasks
+      inductionTasks = await this.db
+        .select()
+        .from(onboardingInduction)
+        .where(eq(onboardingInduction.onboardingId, onboardingId!));
+
+      // 8. Build onboarding status for frontend
+      const obReq = activeReqs[0];
+      const obProfile = obProfileRow?.profile;
+      
+      const bankStatus = (obProfile?.bankName && obProfile?.accountNumber && obProfile?.ifscCode) 
+        ? 'completed' 
+        : (obProfile?.bankName || obProfile?.accountNumber) 
+          ? 'in_progress' 
+          : 'pending';
+
+      onboardingStatus = {
+        id: obReq.id,
+        requestType: obReq.requestType,
+        status: obReq.status,
+        profileStatus: obReq.profileStatus || 'pending',
+        documentStatus: obReq.documentStatus || 'pending',
+        bankStatus,
+        inductionStatus: obReq.inductionStatus || 'pending',
+        progress: obReq.progress || 0,
+        employeeCompleted: obProfile?.employeeCompleted ?? false,
+        hrCompleted: obProfile?.hrCompleted ?? false,
+        createdAt: obReq.createdAt?.toISOString() || null,
+        updatedAt: obReq.updatedAt?.toISOString() || null,
+      };
     } else {
       // 2. Fetch User Profile Data (PERMANENT)
       const [userProfileRow] = await this.db
@@ -389,6 +444,7 @@ export class ProfileService {
     return {
       currentUser,
       isOnboarding,
+      onboardingStatus,
       profile,
       employeeProfile,
       address,
@@ -396,6 +452,7 @@ export class ProfileService {
       education,
       experience,
       documents,
+      inductionTasks,
       assets,
       complaints: mappedComplaints,
       notifications: [],
@@ -454,6 +511,13 @@ export class ProfileService {
           altPhone: dto.emergencyContact.altPhone,
           email: dto.emergencyContact.email,
         } : undefined,
+        bankName: dto.bankName,
+        accountHolderName: dto.accountHolderName,
+        accountNumber: dto.accountNumber,
+        ifscCode: dto.ifscCode,
+        branchName: dto.branchName,
+        branchAddress: dto.branchAddress,
+        upiId: dto.upiId,
         updatedAt: new Date(),
       }).where(eq(onboardingProfiles.onboardingId, activeReqs[0].id)).returning();
 
@@ -483,6 +547,49 @@ export class ProfileService {
       .returning();
 
     return { success: true, profile: updated };
+  }
+
+  // --- Submit Onboarding ---
+
+  async submitOnboarding(userId: number) {
+    const activeReqs = await this.db
+      .select({ id: onboardingRequests.id, status: onboardingRequests.status })
+      .from(onboardingRequests)
+      .where(eq(onboardingRequests.userId, userId))
+      .orderBy(desc(onboardingRequests.createdAt))
+      .limit(1);
+
+    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
+
+    if (!isOnboarding) {
+      throw new BadRequestException('No active onboarding found.');
+    }
+
+    // Check if already submitted
+    const [obProfile] = await this.db
+      .select({ employeeCompleted: onboardingProfiles.employeeCompleted })
+      .from(onboardingProfiles)
+      .where(eq(onboardingProfiles.onboardingId, activeReqs[0].id))
+      .limit(1);
+
+    if (obProfile?.employeeCompleted) {
+      return { success: true, message: 'Already submitted for review.' };
+    }
+
+    // Mark employee side as completed
+    await this.db.update(onboardingProfiles).set({
+      employeeCompleted: true,
+      updatedAt: new Date(),
+    }).where(eq(onboardingProfiles.onboardingId, activeReqs[0].id));
+
+    // Log the activity
+    await this.db.insert(onboardingActivityLogs).values({
+      onboardingId: activeReqs[0].id,
+      action: 'EMPLOYEE_SUBMITTED',
+      performedBy: userId,
+    });
+
+    return { success: true, message: 'Onboarding details submitted for review.' };
   }
 
   // --- Education ---

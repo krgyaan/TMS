@@ -84,6 +84,15 @@ export class ProfileController {
     return this.profileService.updateMyProfileEditMode(req.user.id, body);
   }
 
+  /**
+   * POST /profile/me/submit-onboarding
+   * Employee marks their onboarding details as complete and submits for HR review.
+   */
+  @Post('me/submit-onboarding')
+  async submitOnboarding(@Req() req: any) {
+    return this.profileService.submitOnboarding(req.user.id);
+  }
+
   // ─── Education Endpoints ──────────────────────────────────────────────────
 
   @Post('education')
