@@ -56,6 +56,11 @@ export interface Rfq {
     rfqId: number | null;
     requestedOrganizationNames: string[];
     requestedVendorNames: string[];
+    requestedGroups: Array<{
+        organizationId: number;
+        organizationName: string;
+        vendors: Array<{ id: number; name: string; email: string }>;
+    }>;
     items: RfqItem[];
     documents: RfqDocument[];
     docList: string | null;
@@ -112,6 +117,7 @@ export interface RfqResponseListItem {
     id: number;
     rfqId: number;
     vendorId: number;
+    organizationName: string | null;
     vendorName: string | null;
     receiptDatetime: string;
     tenderNo?: string | null;
@@ -161,6 +167,7 @@ export interface RfqResponseDetail {
     id: number;
     rfqId: number;
     vendorId: number;
+    organizationName: string | null;
     vendorName: string | null;
     receiptDatetime: string;
     gstPercentage: string | null;
