@@ -743,9 +743,9 @@ export class WoBasicDetailsService {
         const conditions: any[] = [];
 
         // Role ID 1 = Super User, 2 = Admin: Show all, respect teamId filter if provided
-        const hasAdminViewPermission = user?.permissions.includes("ops.admin:read");
+        // const hasAdminViewPermission = user?.permissions.includes("ops.admin:read");
 
-        if (user.roleId === 1 || user.roleId === 2 || hasAdminViewPermission) {
+        if (user.roleId === 1 || user.roleId === 2 ) {
             if (teamId !== undefined && teamId !== null) {
                 conditions.push(eq(woBasicDetails.team, teamId));
             }
