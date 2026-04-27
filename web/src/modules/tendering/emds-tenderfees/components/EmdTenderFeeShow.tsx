@@ -485,3 +485,11 @@ export const EmdTenderFeeShow = ({ paymentRequests, isLoading }: EmdTenderFeeSho
         </Card>
     );
 };
+
+import { usePaymentRequestsByTender } from '@/hooks/api/useEmds';
+
+/** Self-fetching section for EMD & Tender Fees */
+export function EmdTenderFeeSection({ tenderId }: { tenderId: number | null }) {
+    const { data: paymentRequests, isLoading } = usePaymentRequestsByTender(tenderId);
+    return <EmdTenderFeeShow paymentRequests={paymentRequests ?? null} isLoading={isLoading} />;
+}
