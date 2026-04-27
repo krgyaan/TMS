@@ -373,7 +373,7 @@ export class TenderResultService {
                         inArray(latestTenderResultSq.status, ['Under Evaluation', 'Result Awaited'])
                     )!
                 );
-                conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
+                // conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
             } else if (tab === 'won') {
                 conditions.push(
                     isNotNull(latestTenderResultSq.id),
