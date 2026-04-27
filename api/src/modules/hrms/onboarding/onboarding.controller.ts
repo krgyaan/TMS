@@ -103,6 +103,26 @@ export class OnboardingController {
   }
 
   /**
+   * POST /hrms/onboarding/initialize-employees
+   * Bulk init for all existing users without completed profiles
+   */
+  @Post('initialize-employees')
+  @UseGuards(JwtAuthGuard)
+  async bulkInitialize(@Req() req: any) {
+    return this.onboardingService.bulkInitializeOnboarding(req.user.id);
+  }
+
+  /**
+   * POST /hrms/onboarding/initialize-employees/:userId
+   * Init for a single specific user
+   */
+  @Post('initialize-employees/:userId')
+  @UseGuards(JwtAuthGuard)
+  async initializeSingle(@Param('userId', ParseIntPipe) userId: number, @Req() req: any) {
+    return this.onboardingService.initializeEmployeeOnboarding(userId, req.user.id);
+  }
+
+  /**
    * GET /hrms/onboarding/profiles  — Protected: HR only
    * Returns all approved employees joined with profile completion data.
    */

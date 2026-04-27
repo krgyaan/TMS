@@ -1,4 +1,4 @@
-import { pgTable, bigserial, bigint, varchar, date, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, bigserial, bigint, varchar, date, timestamp, jsonb, boolean } from "drizzle-orm/pg-core";
 import { users } from "@db/schemas/auth/users.schema";
 import { designations } from "@db/schemas/master/designations.schema";
 import { teams } from "@db/schemas/master/teams.schema";
@@ -33,6 +33,7 @@ export const userProfiles = pgTable("user_profiles", {
     emergencyContact: jsonb("emergency_contact").default({}),
     bloodGroup: varchar("blood_group", { length: 10 }),
     linkedinProfile: varchar("linkedin_profile", { length: 255 }),
+    profileCompleted: boolean("profile_completed").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

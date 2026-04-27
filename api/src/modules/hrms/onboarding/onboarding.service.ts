@@ -17,8 +17,15 @@ import {
   type NewOnboardingRequest,
   type NewOnboardingProfile,
   onboardingProfiles,
+  onboardingEducation,
+  onboardingExperience,
 } from '@/db/schemas/hrms/onboarding';
 import { users } from '@/db/schemas/auth/users.schema';
+import { userProfiles } from '@/db/schemas/auth/user-profiles.schema';
+import { employeeProfiles } from '@/db/schemas/hrms/employee-profiles.schema';
+import { employeeEducation } from '@/db/schemas/hrms/employee-education.schema';
+import { employeeExperience } from '@/db/schemas/hrms/employee-experience.schema';
+import { employeeDocuments } from '@/db/schemas/hrms/employee-documents.schema';
 import { eq, desc } from 'drizzle-orm';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import { Logger } from 'winston';
@@ -153,6 +160,35 @@ export class OnboardingService {
         updatedAt: new Date(),
       })
       .where(eq(onboardingRequests.id, onboardingId));
+
+    const allDone = profileCompleted && docsCompleted && inductionCompleted;
+    if (allDone) {
+      const [req] = await tx.select({ requestType: onboardingRequests.requestType, userId: onboardingRequests.userId })
+        .from(onboardingRequests).where(eq(onboardingRequests.id, onboardingId)).limit(1);
+      
+      if (req?.requestType === 're_onboarding' && req.userId) {
+        await this.completeReOnboarding(onboardingId, 0, tx); // 0 = system-triggered
+      }
+    }
+  }
+
+  /**
+   * Helper to seed default induction tasks for an onboarding request.
+   */
+  private async seedInductionTasks(tx: any, onboardingId: number): Promise<void> {
+    const defaultTasks = [
+      ...['Documents collection form completed', 'DISC form completed', 'Workstation identified', 
+        'Email ID created', 'Employee added to systems', 'Visiting card ordered', 'ID card ordered']
+        .map(t => ({ onboardingId, taskName: t, taskType: 'BEFORE', status: 'pending' })),
+      ...['HR policy training completed', 'Leave policy training completed', 'Attendance training completed', 
+        'Laptop allotted', 'Office tour completed', 'Reporting manager introduction completed', 
+        'PF initiation (if applicable)', 'Candidate profile shared', 'Buddy assigned', 'Training needs identified', 
+        'Welcome session completed', 'Employee database updated', 'PF office updated', 'ID / Visiting card provided', 
+        'Welcome kit arranged']
+        .map(t => ({ onboardingId, taskName: t, taskType: 'AFTER', status: 'pending' }))
+    ];
+
+    await tx.insert(onboardingInduction).values(defaultTasks as any);
   }
 
   /**
@@ -181,6 +217,305 @@ export class OnboardingService {
   }
 
   // ── Public API ────────────────────────────────────────────────────────────
+
+  async initializeEmployeeOnboarding(userId: number, adminId: number): Promise<{ onboardingId: number }> {
+    return this.db.transaction(async (tx) => {
+      // 1. Fetch user
+      const [user] = await tx.select().from(users).where(eq(users.id, userId)).limit(1);
+      if (!user) throw new NotFoundException('User not found');
+
+      // Guard condition
+      const [userProfile] = await tx.select().from(userProfiles).where(eq(userProfiles.userId, userId)).limit(1);
+      if (userProfile?.profileCompleted) {
+        throw new ConflictException('Profile already completed');
+      }
+
+      // Check for active re_onboarding requests to avoid duplicates
+      const existingReqs = await tx.select()
+        .from(onboardingRequests)
+        .where(eq(onboardingRequests.userId, userId))
+        .orderBy(desc(onboardingRequests.createdAt))
+        .limit(1);
+        
+      if (existingReqs.length > 0 && existingReqs[0].status !== 'fully_completed') {
+        return { onboardingId: existingReqs[0].id };
+      }
+
+      const [employeeProfile] = await tx.select().from(employeeProfiles).where(eq(employeeProfiles.userId, userId)).limit(1);
+
+      // INSERT onboardingRequests
+      const [request] = await tx.insert(onboardingRequests).values({
+        userId,
+        name: user.name,
+        email: user.email as string,
+        phone: user.mobile || null,
+        status: 'approved',
+        requestType: 're_onboarding',
+        approvedBy: adminId,
+        approvedAt: new Date(),
+        profileStatus: 'in_progress',
+        documentStatus: 'pending',
+        inductionStatus: 'pending',
+      } as any).returning();
+
+      // INSERT onboardingProfiles
+      const currentAddress = (userProfile?.currentAddress as any) || {};
+      const permanentAddress = (userProfile?.permanentAddress as any) || {};
+      const emergencyContact = (userProfile?.emergencyContact as any) || {};
+
+      await tx.insert(onboardingProfiles).values({
+        onboardingId: request.id,
+        firstName: userProfile?.firstName || user.name.split(' ')[0],
+        middleName: userProfile?.middleName || null,
+        lastName: userProfile?.lastName || user.name.split(' ').slice(1).join(' ') || null,
+        dob: userProfile?.dateOfBirth || null,
+        gender: userProfile?.gender || null,
+        maritalStatus: userProfile?.maritalStatus || null,
+        nationality: userProfile?.nationality || null,
+        email: userProfile?.altEmail || user.email,
+        phone: userProfile?.phone || user.mobile || null,
+        aadharNumber: userProfile?.aadharNumber || null,
+        panNumber: userProfile?.panNumber || null,
+        bloodGroup: userProfile?.bloodGroup || null,
+        linkedinProfile: userProfile?.linkedinProfile || null,
+        currentAddress,
+        permanentAddress,
+        emergencyContact,
+
+        employeeType: employeeProfile?.employeeType || null,
+        workLocation: employeeProfile?.workLocation || null,
+        designationId: userProfile?.designationId || null,
+        departmentId: userProfile?.primaryTeamId || null,
+        reportingManagerId: employeeProfile?.reportingManagerId || null,
+        probationMonths: employeeProfile?.probationMonths || null,
+        probationEndDate: employeeProfile?.probationEndDate || null,
+        salaryType: employeeProfile?.salaryType || null,
+        basicSalary: employeeProfile?.basicSalary || null,
+        bankName: employeeProfile?.bankName || null,
+        accountHolderName: employeeProfile?.accountHolderName || null,
+        accountNumber: employeeProfile?.accountNumber || null,
+        ifscCode: employeeProfile?.ifscCode || null,
+        branchName: employeeProfile?.branchName || null,
+
+        employeeCompleted: false,
+        hrCompleted: false,
+      } as any);
+
+      // Education
+      const eduRows = await tx.select().from(employeeEducation).where(eq(employeeEducation.userId, userId));
+      if (eduRows.length > 0) {
+        await tx.insert(onboardingEducation).values(
+          eduRows.map(e => ({
+            onboardingId: request.id,
+            degree: e.degree,
+            institution: e.institution,
+            fieldOfStudy: e.fieldOfStudy,
+            yearOfCompletion: e.yearOfCompletion,
+            grade: e.grade,
+            status: 'pending',
+          })) as any
+        );
+      }
+
+      // Experience
+      const expRows = await tx.select().from(employeeExperience).where(eq(employeeExperience.userId, userId));
+      if (expRows.length > 0) {
+        await tx.insert(onboardingExperience).values(
+          expRows.map(e => ({
+            onboardingId: request.id,
+            companyName: e.companyName,
+            designation: e.designation,
+            fromDate: e.fromDate,
+            toDate: e.toDate,
+            currentlyWorking: e.currentlyWorking,
+            responsibilities: e.responsibilities,
+            status: 'pending',
+          })) as any
+        );
+      }
+
+      // Documents
+      const docRows = await tx.select().from(employeeDocuments).where(eq(employeeDocuments.userId, userId));
+      if (docRows.length > 0) {
+        await tx.insert(onboardingDocuments).values(
+          docRows.map(d => ({
+            onboardingId: request.id,
+            docCategory: d.docCategory,
+            docType: d.docType,
+            docNumber: d.docNumber,
+            fileUrl: d.fileUrl,
+            issueDate: d.issueDate,
+            expiryDate: d.expiryDate,
+            status: d.verificationStatus,
+            verifiedBy: d.verifiedBy,
+            verificationDate: d.verificationDate,
+            remarks: d.remarks,
+          })) as any
+        );
+      }
+
+      await this.seedInductionTasks(tx, request.id);
+
+      await tx.insert(onboardingActivityLogs).values({
+        onboardingId: request.id,
+        action: 'RE_ONBOARDING_INITIATED',
+        performedBy: adminId,
+      });
+
+      return { onboardingId: request.id };
+    });
+  }
+
+  async bulkInitializeOnboarding(adminId: number) {
+    const allUsers = await this.db.select({ id: users.id }).from(users);
+    
+    let created = 0;
+    let skipped = 0;
+    const errors: any[] = [];
+
+    for (const u of allUsers) {
+      try {
+        await this.initializeEmployeeOnboarding(u.id, adminId);
+        created++;
+      } catch (err: any) {
+        if (err instanceof ConflictException) {
+          skipped++;
+        } else {
+          errors.push({ userId: u.id, error: err.message });
+        }
+      }
+    }
+
+    return { total: allUsers.length, created, skipped, errors };
+  }
+
+  async completeReOnboarding(onboardingId: number, adminId: number, existingTx?: any) {
+    const doWork = async (tx: any) => {
+      const [req] = await tx.select().from(onboardingRequests).where(eq(onboardingRequests.id, onboardingId)).limit(1);
+      if (!req || req.requestType !== 're_onboarding' || !req.userId) {
+        throw new BadRequestException('Invalid re-onboarding request');
+      }
+      const userId = req.userId;
+
+      const [obProfile] = await tx.select().from(onboardingProfiles).where(eq(onboardingProfiles.onboardingId, onboardingId)).limit(1);
+      if (!obProfile) throw new BadRequestException('Profile missing');
+
+      const obEdu = await tx.select().from(onboardingEducation).where(eq(onboardingEducation.onboardingId, onboardingId));
+      const obExp = await tx.select().from(onboardingExperience).where(eq(onboardingExperience.onboardingId, onboardingId));
+      const obDocs = await tx.select().from(onboardingDocuments).where(eq(onboardingDocuments.onboardingId, onboardingId));
+
+      // UPSERT user_profiles
+      const [existingProfile] = await tx.select().from(userProfiles).where(eq(userProfiles.userId, userId)).limit(1);
+      const profileData = {
+        firstName: obProfile.firstName,
+        middleName: obProfile.middleName,
+        lastName: obProfile.lastName,
+        dateOfBirth: obProfile.dob,
+        gender: obProfile.gender,
+        maritalStatus: obProfile.maritalStatus,
+        nationality: obProfile.nationality,
+        phone: obProfile.phone,
+        aadharNumber: obProfile.aadharNumber,
+        panNumber: obProfile.panNumber,
+        bloodGroup: obProfile.bloodGroup,
+        linkedinProfile: obProfile.linkedinProfile,
+        currentAddress: obProfile.currentAddress,
+        permanentAddress: obProfile.permanentAddress,
+        emergencyContact: obProfile.emergencyContact,
+        profileCompleted: true,
+        updatedAt: new Date(),
+      };
+
+      if (existingProfile) {
+        await tx.update(userProfiles).set(profileData).where(eq(userProfiles.userId, userId));
+      } else {
+        await tx.insert(userProfiles).values({ userId, ...profileData } as any);
+      }
+
+      // UPDATE employee_profiles
+      const [existingEmp] = await tx.select().from(employeeProfiles).where(eq(employeeProfiles.userId, userId)).limit(1);
+      const empData = {
+        employeeType: obProfile.employeeType,
+        workLocation: obProfile.workLocation,
+        probationMonths: obProfile.probationMonths,
+        probationEndDate: obProfile.probationEndDate,
+        salaryType: obProfile.salaryType,
+        basicSalary: obProfile.basicSalary,
+        bankName: obProfile.bankName,
+        accountHolderName: obProfile.accountHolderName,
+        accountNumber: obProfile.accountNumber,
+        ifscCode: obProfile.ifscCode,
+        branchName: obProfile.branchName,
+      };
+
+      if (existingEmp) {
+        await tx.update(employeeProfiles).set(empData).where(eq(employeeProfiles.userId, userId));
+      } else {
+        await tx.insert(employeeProfiles).values({ userId, ...empData } as any);
+      }
+
+      // Education Full Replace
+      await tx.delete(employeeEducation).where(eq(employeeEducation.userId, userId));
+      if (obEdu.length > 0) {
+        await tx.insert(employeeEducation).values(obEdu.map(e => ({
+          userId,
+          degree: e.degree,
+          institution: e.institution,
+          fieldOfStudy: e.fieldOfStudy,
+          yearOfCompletion: e.yearOfCompletion,
+          grade: e.grade,
+        })) as any);
+      }
+
+      // Experience Full Replace
+      await tx.delete(employeeExperience).where(eq(employeeExperience.userId, userId));
+      if (obExp.length > 0) {
+        await tx.insert(employeeExperience).values(obExp.map(e => ({
+          userId,
+          companyName: e.companyName,
+          designation: e.designation,
+          fromDate: e.fromDate,
+          toDate: e.toDate,
+          currentlyWorking: e.currentlyWorking,
+          responsibilities: e.responsibilities,
+        })) as any);
+      }
+
+      // Documents Full Replace
+      await tx.delete(employeeDocuments).where(eq(employeeDocuments.userId, userId));
+      if (obDocs.length > 0) {
+        await tx.insert(employeeDocuments).values(obDocs.map(d => ({
+          userId,
+          docCategory: d.docCategory,
+          docType: d.docType,
+          docNumber: d.docNumber,
+          fileUrl: d.fileUrl,
+          issueDate: d.issueDate,
+          expiryDate: d.expiryDate,
+          verificationStatus: d.status,
+          verifiedBy: d.verifiedBy,
+          verificationDate: d.verificationDate,
+          remarks: d.remarks,
+        })) as any);
+      }
+
+      await tx.update(onboardingRequests)
+        .set({ status: 'fully_completed', updatedAt: new Date() })
+        .where(eq(onboardingRequests.id, onboardingId));
+
+      await tx.insert(onboardingActivityLogs).values({
+        onboardingId,
+        action: 'RE_ONBOARDING_COMPLETED',
+        performedBy: adminId,
+      });
+    };
+
+    if (existingTx) {
+      await doWork(existingTx);
+    } else {
+      await this.db.transaction(doWork);
+    }
+  }
 
   /**
    * GET /hrms/onboarding/dashboard
@@ -703,61 +1038,54 @@ export class OnboardingService {
       let newUserId: number | null = null;
       
       if (dto.status === 'approved') {
-        const [onProf] = await tx
-          .select()
-          .from(onboardingProfiles)
-          .where(eq(onboardingProfiles.onboardingId, id))
-          .limit(1);
+        if ((request as any).requestType === 're_onboarding') {
+          // User already exists — just seed tasks
+          await this.seedInductionTasks(tx, id);
+          // userId is already set on the request — no need to update it
+        } else {
+          const [onProf] = await tx
+            .select()
+            .from(onboardingProfiles)
+            .where(eq(onboardingProfiles.onboardingId, id))
+            .limit(1);
 
-        if (onProf) {
-          // Generate a temporary password
-          const tempPassword = crypto.randomBytes(8).toString('hex');
+          if (onProf) {
+            // Generate a temporary password
+            const tempPassword = crypto.randomBytes(8).toString('hex');
 
-        // Hash using Argon2
-        const hashedPassword = await argon2.hash(tempPassword, {
-          type: argon2.argon2id, // recommended variant
-          memoryCost: 2 ** 16,   // 64 MB
-          timeCost: 3,           // iterations
-          parallelism: 1,        // threads
-        });
+            // Hash using Argon2
+            const hashedPassword = await argon2.hash(tempPassword, {
+              type: argon2.argon2id, // recommended variant
+              memoryCost: 2 ** 16,   // 64 MB
+              timeCost: 3,           // iterations
+              parallelism: 1,        // threads
+            });
 
-          
-        const fullName = [onProf.firstName, onProf.middleName, onProf.lastName].filter(Boolean).join(' ');
-        const baseUsername = onProf.email?.split('@')[0] || `user${Date.now()}`;
-        const username = `${baseUsername}_${Math.floor(Math.random() * 1000)}`;
+            const fullName = [onProf.firstName, onProf.middleName, onProf.lastName].filter(Boolean).join(' ');
+            const baseUsername = onProf.email?.split('@')[0] || `user${Date.now()}`;
+            const username = `${baseUsername}_${Math.floor(Math.random() * 1000)}`;
 
-        this.logger.info(`Generated temporary password for ${onProf.email}: ${tempPassword}`);
+            this.logger.info(`Generated temporary password for ${onProf.email}: ${tempPassword}`);
 
-        // Insert into Users schema
-        const [newUser] = await tx
-          .insert(users)
-          .values({
-            name: fullName,
-            username: username,
-            email: onProf.email as string,
-            mobile: onProf.phone,
-            password: hashedPassword,
-            isActive: true, // Login enabled immediately per requirements
-            createdAt: new Date(),
-          })
-          .returning({ id: users.id });
-          
-        newUserId = newUser.id;
+            // Insert into Users schema
+            const [newUser] = await tx
+              .insert(users)
+              .values({
+                name: fullName,
+                username: username,
+                email: onProf.email as string,
+                mobile: onProf.phone,
+                password: hashedPassword,
+                isActive: true, // Login enabled immediately per requirements
+                createdAt: new Date(),
+              })
+              .returning({ id: users.id });
+              
+            newUserId = newUser.id;
 
-        // Seed default induction tasks
-        const defaultTasks = [
-          ...['Documents collection form completed', 'DISC form completed', 'Workstation identified', 
-            'Email ID created', 'Employee added to systems', 'Visiting card ordered', 'ID card ordered']
-            .map(t => ({ onboardingId: id, taskName: t, taskType: 'BEFORE', status: 'pending' })),
-          ...['HR policy training completed', 'Leave policy training completed', 'Attendance training completed', 
-            'Laptop allotted', 'Office tour completed', 'Reporting manager introduction completed', 
-            'PF initiation (if applicable)', 'Candidate profile shared', 'Buddy assigned', 'Training needs identified', 
-            'Welcome session completed', 'Employee database updated', 'PF office updated', 'ID / Visiting card provided', 
-            'Welcome kit arranged']
-            .map(t => ({ onboardingId: id, taskName: t, taskType: 'AFTER', status: 'pending' }))
-        ];
-
-        await tx.insert(onboardingInduction).values(defaultTasks as any);
+            // Seed default induction tasks
+            await this.seedInductionTasks(tx, id);
+          }
         }
       }
 
