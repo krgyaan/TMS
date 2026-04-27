@@ -313,3 +313,11 @@ export function CostingSheetView({
         </Card>
     );
 }
+
+import { useCostingSheetByTender } from '@/hooks/api/useCostingSheets';
+
+/** Self-fetching section for Costing Sheet */
+export function CostingSheetSection({ tenderId }: { tenderId: number | null }) {
+    const { data: costingSheet, isLoading } = useCostingSheetByTender(tenderId ?? 0);
+    return <CostingSheetView costingSheet={costingSheet ?? null} isLoading={isLoading} />;
+}
