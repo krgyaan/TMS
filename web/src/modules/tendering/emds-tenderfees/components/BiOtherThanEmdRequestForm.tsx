@@ -110,12 +110,7 @@ export function BiOtherThanEmdRequestForm({ tenderId, requestIds, initialData, m
         }
     };
 
-    if (tenderId === 0 || !tenderId) {
-        <Alert variant="warning">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>Be Sure! The Request you are raising is not associated with any tender on TMS</AlertDescription>
-        </Alert>
-    }
+
 
     const allowedEmdModes = ['DD', 'FDR', 'CHEQUE', 'BG'];
     const hasEmd = true;
@@ -141,6 +136,12 @@ export function BiOtherThanEmdRequestForm({ tenderId, requestIds, initialData, m
             </CardHeader>
 
             <CardContent>
+                {(tenderId === 0 || !tenderId) && (
+                    <Alert variant="warning" className="mb-6">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription>Be Sure! The Request you are raising is not associated with any tender on TMS</AlertDescription>
+                    </Alert>
+                )}
                 <FormProvider {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
                         {/* Tender Details */}

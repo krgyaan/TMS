@@ -397,9 +397,9 @@ export const EmdRequestSchema = z.object({
  * Schema for Old EMD Request Form (includes tender details)
  */
 export const OldEmdRequestSchema = z.object({
-    tenderName: z.string().min(1, 'Tender/Project Name is required'),
-    tenderNo: z.string().min(1, 'Tender/Work Order No. is required'),
-    tenderDueDate: z.string().min(1, 'Tender/Work Order Due Date is required'),
+    tenderName: z.string().optional(),
+    tenderNo: z.string().optional(),
+    tenderDueDate: z.string().optional(),
     // EMD
     emd: z.object({
         mode: z.enum(['DD', 'FDR', 'BG', 'CHEQUE', 'BT', 'POP', 'SURETY_BOND', 'NA']).optional(),
@@ -435,9 +435,9 @@ export const OldEmdRequestSchema = z.object({
  * Schema for BI Other Than EMD Request Form (includes tender details, only EMD)
  */
 export const BiOtherThanEmdRequestSchema = z.object({
-    tenderName: z.string().min(1, 'Tender/Project Name is required'),
-    tenderNo: z.string().min(1, 'Tender/Work Order No. is required'),
-    tenderDueDate: z.string().min(1, 'Tender/Work Order Due Date is required'),
+    tenderName: z.string().optional(),
+    tenderNo: z.string().optional(),
+    tenderDueDate: z.string().optional(),
     // EMD only
     emd: z.object({
         mode: z.enum(['DD', 'FDR', 'BG', 'CHEQUE']).optional(),
