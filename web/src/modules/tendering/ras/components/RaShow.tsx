@@ -93,6 +93,9 @@ export function RaShow({
     const isDisqualified = ra.technicallyQualified === 'No';
     const hasResult = !!ra.raResult;
 
+    const raStatus = 'raStatus' in ra ? ra.raStatus : ra.status;
+    const tenderStatus = 'tenderStatus' in ra ? ra.tenderStatus : ra.status;
+
     return (
         <Card className={className}>
             <CardHeader>
@@ -158,14 +161,14 @@ export function RaShow({
                                     Tender Status
                                 </td>
                                 <td className="px-4 py-3 text-sm">
-                                    {ra.tenderStatus || '—'}
+                                    {tenderStatus || '—'}
                                 </td>
                                 <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
                                     RA Status
                                 </td>
                                 <td className="px-4 py-3">
-                                    <Badge variant={getStatusVariant(ra.raStatus) as any}>
-                                        {ra.raStatus}
+                                    <Badge variant={getStatusVariant(raStatus) as any}>
+                                        {raStatus}
                                     </Badge>
                                 </td>
                             </tr>

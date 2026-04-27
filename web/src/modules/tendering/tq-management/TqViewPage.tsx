@@ -18,14 +18,8 @@ export default function TqViewPage() {
     const navigate = useNavigate();
     const tqId = id ? parseInt(id, 10) : null;
 
-    const { steps, tqData } = useTenderStepStatuses(null, { tqId: tqId ?? undefined });
-    
-    // Correction: TqViewPage actually has a TQ ID. I need to get the tenderId FROM the TQ data first.
-    // This is a special case where we don't have tenderId in the URL.
-    // I'll keep the TQ fetching here for now to get the tenderId.
-    
-    const tenderId = tqData?.tenderId || null;
-    const { steps: tenderSteps } = useTenderStepStatuses(tenderId);
+    const { steps: tenderSteps, tender } = useTenderStepStatuses(null, { tqId: tqId ?? undefined });
+    const tenderId = tender?.id || null;
 
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["tq-management"]));
 

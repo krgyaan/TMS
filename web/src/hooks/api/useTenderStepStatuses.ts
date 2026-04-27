@@ -40,21 +40,29 @@ export interface UseTenderStepStatusesOptions {
 export function useTenderStepStatuses(tenderId: number | null, options: UseTenderStepStatusesOptions = {}) {
     const { rfqResponseId, requestExtensionId, submitQueryId, tqId } = options;
 
-    const { data: tender, isLoading: l1 } = useTender(tenderId);
-    const { data: approval, isLoading: l2 } = useTenderApproval(tenderId);
-    const { data: physicalDoc, isLoading: l3 } = usePhysicalDocByTenderId(tenderId);
-    const { data: rfq, isLoading: l4 } = useRfqByTenderId(tenderId);
-    const { data: paymentReqs, isLoading: l5 } = usePaymentRequestsByTender(tenderId);
-    const { data: checklist, isLoading: l6 } = useDocumentChecklistByTender(tenderId ?? 0);
-    const { data: costingSheet, isLoading: l7 } = useCostingSheetByTender(tenderId ?? 0);
-    const { data: bidSubmission, isLoading: l8 } = useBidSubmissionByTender(tenderId ?? 0);
-    const { data: tenderResult, isLoading: l9 } = useTenderResultByTenderId(tenderId);
-    const { data: tqByTender, isLoading: l10a } = useTqByTender(tenderId ?? 0);
-    const { data: tqById, isLoading: l10b } = useTqById(tqId ?? 0);
-    const { data: raData, isLoading: l11 } = useReverseAuctionByTender(tenderId ?? 0);
     const { data: rfqResponse, isLoading: l12 } = useRfqResponse(rfqResponseId ?? null);
     const { data: requestExt, isLoading: l13 } = useRequestExtension(requestExtensionId ?? null);
     const { data: submitQuery, isLoading: l14 } = useSubmitQuery(submitQueryId ?? null);
+    const { data: tqById, isLoading: l10b } = useTqById(tqId ?? 0);
+
+    const resolvedTenderId = tenderId || 
+        (Array.isArray(tqById) ? tqById[0]?.tenderId : tqById?.tenderId) || 
+        requestExt?.tenderId || 
+        submitQuery?.tenderId || 
+        rfqResponse?.rfq?.tenderId || 
+        null;
+
+    const { data: tender, isLoading: l1 } = useTender(resolvedTenderId);
+    const { data: approval, isLoading: l2 } = useTenderApproval(resolvedTenderId);
+    const { data: physicalDoc, isLoading: l3 } = usePhysicalDocByTenderId(resolvedTenderId);
+    const { data: rfq, isLoading: l4 } = useRfqByTenderId(resolvedTenderId);
+    const { data: paymentReqs, isLoading: l5 } = usePaymentRequestsByTender(resolvedTenderId);
+    const { data: checklist, isLoading: l6 } = useDocumentChecklistByTender(resolvedTenderId ?? 0);
+    const { data: costingSheet, isLoading: l7 } = useCostingSheetByTender(resolvedTenderId ?? 0);
+    const { data: bidSubmission, isLoading: l8 } = useBidSubmissionByTender(resolvedTenderId ?? 0);
+    const { data: tenderResult, isLoading: l9 } = useTenderResultByTenderId(resolvedTenderId);
+    const { data: tqByTender, isLoading: l10a } = useTqByTender(resolvedTenderId ?? 0);
+    const { data: raData, isLoading: l11 } = useReverseAuctionByTender(resolvedTenderId ?? 0);
 
     const steps: TenderStepStatus[] = [
         {
