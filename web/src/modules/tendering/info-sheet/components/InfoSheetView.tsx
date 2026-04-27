@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table"
 import { FileText } from "lucide-react"
 import type { TenderInfoSheet } from "@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types"
+import { physicalDocTypeOptions } from "@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types"
 import { formatDateTime } from "@/hooks/useFormatedDate"
 import { formatINR } from "@/hooks/useINRFormatter"
 import { useDnbStatusOptions } from "@/hooks/useSelectOptions"
@@ -264,13 +265,20 @@ export const InfoSheetView = ({
                             <TableCell className="text-sm">
                                 {formatYesNo(infoSheet.reverseAuctionApplicable)}
                             </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Physical Docs Required
-                            </TableCell>
                             <TableCell className="text-sm">
                                 {formatYesNo(infoSheet.physicalDocsRequired)}
                             </TableCell>
                         </TableRow>
+                        {infoSheet.physicalDocsRequired === 'YES' && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Physical Document Type
+                                </TableCell>
+                                <TableCell className="text-sm" colSpan={3}>
+                                    {getOptionLabel(physicalDocTypeOptions, infoSheet.physicalDocType)}
+                                </TableCell>
+                            </TableRow>
+                        )}
                         {infoSheet.physicalDocsDeadline && infoSheet.physicalDocsRequired === 'YES' && (
                             <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">

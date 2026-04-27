@@ -44,6 +44,7 @@ import {
     scOptions,
     wcOptions,
     nwOptions,
+    physicalDocTypeOptions,
 } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types';
 import { useDnbStatusOptions, usePqrOptions, useFinanceDocumentOptions } from '@/hooks/useSelectOptions';
 import type { TenderInfoSheetFormValues, TenderInfoSheetResponse } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types';
@@ -872,9 +873,21 @@ export function TenderInformationForm({
                                                 <IncompleteFieldAlert comment={getIncompleteFieldComment('physicalDocsRequired')!} />
                                             )}
                                         </div>
-                                        {physicalDocsRequired === 'YES' && (
-                                            <>
-                                                <FieldWrapper
+                                         {physicalDocsRequired === 'YES' && (
+                                             <>
+                                                 <div>
+                                                     <SelectField
+                                                         control={form.control}
+                                                         name="physicalDocType"
+                                                         label="Physical Document Type"
+                                                         options={physicalDocTypeOptions}
+                                                         placeholder="Select type"
+                                                     />
+                                                     {getIncompleteFieldComment('physicalDocType') && (
+                                                         <IncompleteFieldAlert comment={getIncompleteFieldComment('physicalDocType')!} />
+                                                     )}
+                                                 </div>
+                                                 <FieldWrapper
                                                     control={form.control}
                                                     name="physicalDocsDeadline"
                                                     label="Physical Docs Submission Deadline"

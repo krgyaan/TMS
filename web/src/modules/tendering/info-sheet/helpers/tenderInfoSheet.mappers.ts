@@ -113,6 +113,7 @@ export const buildDefaultValues = (tender?: TenderInfoWithNames | null): TenderI
     maxLdPercentage: 0,
 
     physicalDocsRequired: undefined,
+    physicalDocType: undefined,
     physicalDocsDeadline: '',
 
     techEligibilityAgeYears: 0,
@@ -217,6 +218,7 @@ export const mapResponseToForm = (
         maxLdPercentage: toNumber(data.maxLdPercentage),
 
         physicalDocsRequired: data.physicalDocsRequired ?? undefined,
+        physicalDocType: (data.physicalDocType?.trim() ?? undefined) as TenderInfoSheetFormValues['physicalDocType'],
         physicalDocsDeadline: data.physicalDocsDeadline
             ? (typeof data.physicalDocsDeadline === 'string'
                 ? data.physicalDocsDeadline
@@ -398,6 +400,9 @@ export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderI
         maxLdPercentage: safeNumber(values.maxLdPercentage),
 
         physicalDocsRequired: safeYesNoValue(values.physicalDocsRequired),
+        physicalDocType: values.physicalDocsRequired === 'YES'
+            ? (values.physicalDocType || null)
+            : null,
         physicalDocsDeadline: values.physicalDocsRequired === 'YES'
             ? (values.physicalDocsDeadline || null)
             : null,

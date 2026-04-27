@@ -69,6 +69,7 @@ export interface SaveTenderInfoSheetDto {
     maxLdPercentage: number | null;
 
     physicalDocsRequired: 'YES' | 'NO' | null;
+    physicalDocType: string | null;
     physicalDocsDeadline: string | null;
 
     techEligibilityAge: number | null;
@@ -147,6 +148,7 @@ export interface TenderInfoSheetResponse {
     maxLdPercentage: string | number | null;
 
     physicalDocsRequired: 'YES' | 'NO' | null;
+    physicalDocType: string | null | undefined;
     physicalDocsDeadline: string | Date | null;
 
     techEligibilityAge: number | null;
@@ -289,6 +291,12 @@ export const maxLdOptions = Array.from({ length: 21 }, (_, i) => ({
     value: i,
     label: `${i}%`,
 }));
+
+export const physicalDocTypeOptions = [
+    { value: 'ONLY_EMD', label: 'Only EMD' },
+    { value: 'ONLY_OTHER_DOCUMENT', label: 'Only Other Document' },
+    { value: 'EMD_AND_OTHER_DOCUMENTS', label: 'EMD + Other Documents' },
+];
 
 export const aatOptions = [
     { value: 'NOT_APPLICABLE', label: 'Not Applicable' },

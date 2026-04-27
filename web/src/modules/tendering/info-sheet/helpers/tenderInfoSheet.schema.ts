@@ -94,6 +94,7 @@ export const TenderInformationFormSchema = z.object({
 
     // Physical Docs
     physicalDocsRequired: z.enum(['YES', 'NO']).optional(),
+    physicalDocType: z.enum(['ONLY_EMD', 'ONLY_OTHER_DOCUMENT', 'EMD_AND_OTHER_DOCUMENTS']).optional(),
     physicalDocsDeadline: z.string().optional(),
 
     // Technical Eligibility

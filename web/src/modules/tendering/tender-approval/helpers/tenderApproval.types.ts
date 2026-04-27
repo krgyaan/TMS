@@ -171,6 +171,7 @@ export const infoSheetFieldOptions = [
 
     // Physical Docs
     { value: 'physicalDocsRequired', label: 'Physical Docs Required' },
+    { value: 'physicalDocType', label: 'Physical Document Type' },
     { value: 'physicalDocsDeadline', label: 'Physical Docs Deadline' },
 
     // Technical Eligibility
