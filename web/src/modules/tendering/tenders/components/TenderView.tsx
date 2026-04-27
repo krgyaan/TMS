@@ -9,8 +9,17 @@ import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { tenderFilesService } from '@/services/api/tender-files.service';
 
+import { useTender } from '@/hooks/api/useTenders';
+import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
+import { useInfoSheet } from '@/hooks/api/useInfoSheets';
+import { InfoSheetView } from '@/modules/tendering/info-sheet/components/InfoSheetView';
+import { TenderApprovalView } from '@/modules/tendering/tender-approval/components/TenderApprovalView';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
+
 interface TenderViewProps {
-    tender: TenderInfoWithNames;
+    tender?: TenderInfoWithNames | null;
+    tenderId?: number | null;
     isLoading?: boolean;
     className?: string;
 }
@@ -38,11 +47,17 @@ const getFileName = (filePath: string): string => {
 };
 
 export function TenderView({
-    tender,
-    isLoading = false,
+    tender: manualTender,
+    tenderId,
+    isLoading: manualLoading = false,
     className = '',
 }: TenderViewProps) {
-    const documents = parseDocuments(tender?.documents);
+    const { data: tenderData, isLoading: queryLoading } = useTender(Number(tenderId));
+
+    const tender = manualTender || tenderData;
+    const isLoading = manualLoading || queryLoading;
+
+    const documents = parseDocuments(tender?.documents || "");
     if (isLoading) {
         return (
             <Card className={className}>
@@ -82,13 +97,13 @@ export function TenderView({
                                 Tender No
                             </TableCell>
                             <TableCell className="text-sm font-semibold w-1/4">
-                                {tender.tenderNo || '—'}
+                                {tender?.tenderNo || '—'}
                             </TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
                                 Status
                             </TableCell>
                             <TableCell className="w-1/4">
-                                <Badge variant="outline">{tender.statusName || '—'}</Badge>
+                                <Badge variant="outline">{tender?.statusName || '—'}</Badge>
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -96,7 +111,7 @@ export function TenderView({
                                 Tender Name
                             </TableCell>
                             <TableCell className="text-sm" colSpan={3}>
-                                {tender.tenderName || '—'}
+                                {tender?.tenderName || '—'}
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -104,13 +119,13 @@ export function TenderView({
                                 Organization
                             </TableCell>
                             <TableCell className="text-sm">
-                                {tender.organizationName || tender.organizationAcronym || '—'}
+                                {tender?.organizationName || tender?.organizationAcronym || '—'}
                             </TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Item
                             </TableCell>
                             <TableCell className="text-sm">
-                                {tender.itemName || '—'}
+                                {tender?.itemName || '—'}
                             </TableCell>
                         </TableRow>
 
@@ -125,13 +140,13 @@ export function TenderView({
                                 Tender Value (GST Inclusive)
                             </TableCell>
                             <TableCell className="text-sm font-semibold">
-                                {formatINR(tender.gstValues ?? 0)}
+                                {formatINR(tender?.gstValues ?? 0)}
                             </TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Tender Fee
                             </TableCell>
                             <TableCell className="text-sm font-semibold">
-                                {formatINR(tender.tenderFees ?? 0)}
+                                {formatINR(tender?.tenderFees ?? 0)}
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -139,13 +154,13 @@ export function TenderView({
                                 EMD
                             </TableCell>
                             <TableCell className="text-sm font-semibold">
-                                {formatINR(tender.emd ?? 0)}
+                                {formatINR(tender?.emd ?? 0)}
                             </TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Due Date & Time
                             </TableCell>
                             <TableCell className="text-sm">
-                                {formatDateTime(tender.dueDate)}
+                                {formatDateTime(tender?.dueDate)}
                             </TableCell>
                         </TableRow>
 
@@ -160,7 +175,7 @@ export function TenderView({
                                 Team Member
                             </TableCell>
                             <TableCell className="text-sm">
-                                {tender.teamMemberName || (
+                                {tender?.teamMemberName || (
                                     <span className="text-muted-foreground italic">Unassigned</span>
                                 )}
                             </TableCell>
@@ -168,7 +183,7 @@ export function TenderView({
                                 Location
                             </TableCell>
                             <TableCell className="text-sm">
-                                {tender.locationName || '—'} <span className='text-gray-400'>({tender.locationState})</span>
+                                {tender?.locationName || '—'} <span className='text-gray-400'>({tender?.locationState})</span>
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -176,10 +191,10 @@ export function TenderView({
                                 Website
                             </TableCell>
                             <TableCell className="text-sm" colSpan={3}>
-                                {tender.websiteLink ? (() => {
-                                    const url = tender.websiteLink.startsWith('http://') || tender.websiteLink.startsWith('https://')
-                                        ? tender.websiteLink
-                                        : `https://${tender.websiteLink}`;
+                                {tender?.websiteLink ? (() => {
+                                    const url = tender?.websiteLink.startsWith('http://') || tender?.websiteLink.startsWith('https://')
+                                        ? tender?.websiteLink
+                                        : `https://${tender?.websiteLink}`;
                                     return (
                                         <a
                                             href={url}
@@ -187,7 +202,7 @@ export function TenderView({
                                             rel='noopener noreferrer'
                                             className='hover:text-primary underline'
                                         >
-                                            {tender.websiteName || tender.websiteLink.replace(/^https?:\/\//i, "")}
+                                            {tender?.websiteName || tender?.websiteLink.replace(/^https?:\/\//i, "")}
                                         </a>
                                     );
                                 })() : (
@@ -197,7 +212,7 @@ export function TenderView({
                         </TableRow>
 
                         {/* Additional Information */}
-                        {tender.remarks && (
+                        {tender?.remarks && (
                             <>
                                 <TableRow className="bg-muted/50">
                                     <TableCell colSpan={4} className="font-semibold text-sm">
@@ -209,7 +224,7 @@ export function TenderView({
                                         Remarks
                                     </TableCell>
                                     <TableCell className="text-sm break-words" colSpan={3}>
-                                        {tender.remarks}
+                                        {tender?.remarks}
                                     </TableCell>
                                 </TableRow>
                             </>
@@ -277,5 +292,59 @@ export function TenderView({
                 </Table>
             </CardContent>
         </Card>
+    );
+}
+
+/**
+ * Smart Section component for Tender Details (Tender + Info Sheet + Approval)
+ */
+export function TenderDetailsSection({ tenderId }: { tenderId: number | null }) {
+    const { data: tender, isLoading: tenderLoading } = useTender(tenderId);
+    const { data: approval, isLoading: approvalLoading } = useTenderApproval(tenderId);
+    const { data: infoSheet, isLoading: infoSheetLoading, error: infoSheetError } = useInfoSheet(tenderId);
+
+    const tenderWithRelations = tender ? { ...tender, approval: approval || null } : null;
+
+    return (
+        <div className="space-y-6">
+            {tenderWithRelations ? (
+                <TenderView
+                    tender={tenderWithRelations}
+                    isLoading={tenderLoading || approvalLoading}
+                />
+            ) : tenderLoading ? (
+                <TenderView tender={null} isLoading />
+            ) : (
+                <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>Tender information not available.</AlertDescription>
+                </Alert>
+            )}
+
+            {infoSheetLoading ? (
+                <InfoSheetView isLoading />
+            ) : infoSheet ? (
+                <InfoSheetView infoSheet={infoSheet} />
+            ) : infoSheetError ? (
+                <Alert variant="destructive">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                        Failed to load info sheet details. Please try again later.
+                    </AlertDescription>
+                </Alert>
+            ) : (
+                <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>No info sheet exists for this tender yet.</AlertDescription>
+                </Alert>
+            )}
+
+            {tenderWithRelations && (
+                <TenderApprovalView
+                    tender={tenderWithRelations}
+                    isLoading={tenderLoading || approvalLoading}
+                />
+            )}
+        </div>
     );
 }
