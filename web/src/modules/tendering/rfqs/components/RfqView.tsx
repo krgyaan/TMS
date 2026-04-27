@@ -236,3 +236,53 @@ export function RfqView({
         </Card>
     );
 }
+
+import { useRfqByTenderId } from '@/hooks/api/useRfqs';
+import { useRfqResponses } from '@/hooks/api/useRfqResponses';
+import { RfqResponsesTable } from '@/modules/tendering/rfq-response/components/RfqResponsesTable';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle, List } from 'lucide-react';
+import { paths } from '@/app/routes/paths';
+import { useNavigate } from 'react-router-dom';
+
+/** Self-fetching section that renders RFQ + Responses */
+export function RfqSection({ tenderId }: { tenderId: number | null }) {
+    const navigate = useNavigate();
+    const { data: rfq, isLoading: rfqLoading } = useRfqByTenderId(tenderId);
+    const rfqId = Array.isArray(rfq) && rfq.length > 0 ? rfq[0].id : null;
+    const { data: rfqResponses = [], isLoading: rfqResponsesLoading } = useRfqResponses(rfqId);
+
+    if (rfqLoading) return <RfqView rfq={null} isLoading />;
+
+    if (!Array.isArray(rfq) || rfq.length === 0) {
+        return (
+            <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                    No RFQ exists for this tender yet.
+                    <Button className="mt-4" onClick={() => navigate(paths.tendering.rfqsCreate(tenderId!))}>
+                        Create RFQ
+                    </Button>
+                </AlertDescription>
+            </Alert>
+        );
+    }
+
+    return (
+        <div className="space-y-6">
+            <RfqView rfq={rfq[0]} />
+            <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold">RFQ Responses</h3>
+                    {rfqId != null && (
+                        <Button variant="outline" size="sm" onClick={() => navigate(paths.tendering.rfqsResponseList(rfqId))}>
+                            <List className="h-4 w-4 mr-2" />
+                            View all
+                        </Button>
+                    )}
+                </div>
+                <RfqResponsesTable responses={rfqResponses} isLoading={rfqResponsesLoading} rfqId={rfqId} />
+            </div>
+        </div>
+    );
+}
