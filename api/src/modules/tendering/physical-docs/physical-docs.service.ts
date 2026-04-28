@@ -559,7 +559,7 @@ export class PhysicalDocsService {
             };
         }).then(async (result) => {
             // Send email notification after transaction
-            await this.sendPhysicalDocsSentEmail(data.tenderId, result, changedBy);
+            // await this.sendPhysicalDocsSentEmail(data.tenderId, result, changedBy);
 
             // TIMER TRANSITION: Stop physical_docs timer
             try {
