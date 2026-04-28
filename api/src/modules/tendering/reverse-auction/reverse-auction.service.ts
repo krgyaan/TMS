@@ -148,7 +148,6 @@ export class ReverseAuctionService {
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
-            eq(bidSubmissions.status, 'Bid Submitted'),
             inArray(tenderInformation.reverseAuctionApplicable, ['Yes', 'YES']),
         ];
 
@@ -170,7 +169,10 @@ export class ReverseAuctionService {
                     )!
                 )!
             );
-            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
+            conditions.push(
+                eq(bidSubmissions.status, 'Bid Submitted'),
+                TenderInfosService.getExcludeStatusCondition(['dnb', 'lost'])
+            );
         } else if (activeTab === 'scheduled') {
             // Scheduled: RA exists, result is null, and has start/end times
             conditions.push(
@@ -181,14 +183,18 @@ export class ReverseAuctionService {
                     isNotNull(reverseAuctions.raEndTime)
                 )!
             );
-            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
+            conditions.push(
+                eq(bidSubmissions.status, 'Bid Submitted'),
+                TenderInfosService.getExcludeStatusCondition(['dnb', 'lost'])
+            );
         } else if (activeTab === 'completed') {
             // Laravel: RA exists AND result IS NOT NULL
             conditions.push(
                 isNotNull(reverseAuctions.id),
                 isNotNull(reverseAuctions.raResult)
             );
-            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
+            // Completed RA should show results even if tender status is 'lost' (e.g. RA was lost)
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb']));
         } else {
             throw new BadRequestException(`Invalid tab: ${activeTab}`);
         }
@@ -390,7 +396,8 @@ export class ReverseAuctionService {
             ...baseConditions,
             isNotNull(reverseAuctions.id),
             isNotNull(reverseAuctions.raResult),
-            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+            // Completed RA should show results even if tender status is 'lost' (e.g. RA was lost)
+            TenderInfosService.getExcludeStatusCondition(['dnb']),
         ];
 
         const counts = await Promise.all([
