@@ -747,7 +747,7 @@ export class ReverseAuctionService {
                 .returning();
 
             // Sync to tender_results
-            await this.syncToTenderResult(tenderId, inserted?.id ?? 0, inserted.status);
+            await this.syncToTenderResult(tenderId, inserted?.id ?? 0, inserted.status, tx);
 
             // Update tender status if RA was scheduled
             if (newStatus !== null) {
@@ -795,9 +795,13 @@ export class ReverseAuctionService {
         switch (dto.raResult) {
             case 'Won':
                 status = RA_STATUS.WON;
+                newTenderStatus = 25; // Status ID for "Won"
+                statusComment = 'RA Won';
                 break;
             case 'Lost':
                 status = RA_STATUS.LOST;
+                newTenderStatus = 24; // Status ID for "Lost"
+                statusComment = 'RA Lost';
                 break;
             case 'H1 Elimination':
                 status = RA_STATUS.LOST_H1;
@@ -818,7 +822,10 @@ export class ReverseAuctionService {
                     veL1AtStart: dto.veL1AtStart,
                     raStartPrice: dto.raStartPrice?.toString() ?? null,
                     raClosePrice: dto.raClosePrice?.toString() ?? null,
+                    raClosePriceL2: dto.raClosePriceL2?.toString() ?? null,
+                    raOurPrice: dto.raOurPrice?.toString() ?? null,
                     raCloseTime: dto.raCloseTime ? new Date(dto.raCloseTime) : null,
+                    resultReason: dto.resultReason ?? null,
                     screenshotQualifiedParties: dto.screenshotQualifiedParties,
                     screenshotDecrements: dto.screenshotDecrements,
                     finalResultScreenshot: dto.finalResultScreenshot,
@@ -829,7 +836,7 @@ export class ReverseAuctionService {
                 .returning();
 
             // Sync to tender_results
-            await this.syncToTenderResult(existing.tenderId, raId, status);
+            await this.syncToTenderResult(existing.tenderId, raId, status, tx);
 
             // Update tender status if H1 Elimination
             if (newTenderStatus !== null) {
@@ -911,7 +918,14 @@ export class ReverseAuctionService {
         return updated.length;
     }
 
-    private async syncToTenderResult(tenderId: number, raId: number, status: string) {
+    private async syncToTenderResult(tenderId: number, raId: number, status: string, dbClient: any = this.db) {
+        // Fetch RA Record to sync fields
+        const [raRecord] = await dbClient
+            .select()
+            .from(reverseAuctions)
+            .where(eq(reverseAuctions.id, raId))
+            .limit(1);
+
         // Map RA status to tender_result status
         const statusMapping: Record<string, string> = {
             [RA_STATUS.UNDER_EVALUATION]: 'Under Evaluation',
@@ -926,29 +940,44 @@ export class ReverseAuctionService {
 
         const resultStatus = statusMapping[status] || 'Under Evaluation';
 
+        const updatePayload: any = {
+            status: resultStatus,
+            reverseAuctionId: raId,
+            updatedAt: new Date(),
+        };
+
+        if (raRecord) {
+            updatePayload.l1Price = raRecord.raClosePrice;
+            updatePayload.l2Price = raRecord.raClosePriceL2;
+            updatePayload.ourPrice = raRecord.raOurPrice;
+            updatePayload.resultReason = raRecord.resultReason;
+            updatePayload.result = raRecord.raResult;
+            updatePayload.qualifiedPartiesScreenshot = raRecord.screenshotQualifiedParties;
+            updatePayload.finalResultScreenshot = raRecord.finalResultScreenshot;
+            updatePayload.qualifiedPartiesCount = raRecord.qualifiedPartiesCount;
+            updatePayload.qualifiedPartiesNames = raRecord.qualifiedPartiesNames;
+            updatePayload.technicallyQualified = raRecord.technicallyQualified;
+            updatePayload.disqualificationReason = raRecord.disqualificationReason;
+        }
+
         // Check if tender_result exists
-        const [existing] = await this.db
+        const [existing] = await dbClient
             .select()
             .from(tenderResults)
             .where(eq(tenderResults.tenderId, tenderId))
             .limit(1);
 
         if (existing) {
-            await this.db
+            await dbClient
                 .update(tenderResults)
-                .set({
-                    status: resultStatus,
-                    reverseAuctionId: raId,
-                    updatedAt: new Date(),
-                })
+                .set(updatePayload)
                 .where(eq(tenderResults.id, existing.id));
         } else {
-            await this.db
+            await dbClient
                 .insert(tenderResults)
                 .values({
                     tenderId,
-                    status: resultStatus,
-                    reverseAuctionId: raId,
+                    ...updatePayload,
                 });
         }
     }
