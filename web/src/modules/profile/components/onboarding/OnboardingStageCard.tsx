@@ -54,6 +54,26 @@ export type InductionTask = {
   status: "pending" | "completed";
 };
 
+export type EducationInfo = {
+  id: number;
+  degree: string;
+  institution: string;
+  fieldOfStudy?: string | null;
+  startDate: string;
+  endDate?: string | null;
+  grade?: string | null;
+};
+
+export type ExperienceInfo = {
+  id: number;
+  companyName: string;
+  designation: string;
+  fromDate: string;
+  toDate?: string | null;
+  currentlyWorking: boolean;
+  responsibilities?: string | null;
+};
+
 export type StageCardProps = {
   /** Unique key for the stage */
   stageKey: string;
@@ -93,6 +113,10 @@ export type StageCardProps = {
   documents?: DocumentDetail[];
   /** Induction tasks for induction stage */
   inductionTasks?: InductionTask[];
+  /** Education info for education stage */
+  education?: EducationInfo[];
+  /** Experience info for experience stage */
+  experience?: ExperienceInfo[];
   /** Custom expanded content (overrides default) */
   children?: React.ReactNode;
 };
@@ -555,6 +579,123 @@ function InductionContent({ tasks }: { tasks: InductionTask[] }) {
   );
 }
 
+function EducationContent({ education }: { education: EducationInfo[] }) {
+  if (education.length === 0) {
+    return (
+      <div className="flex flex-col items-center py-8 text-center">
+        <div className="rounded-xl bg-muted/40 p-3 mb-3">
+          <AlertCircle className="h-5 w-5 text-muted-foreground/50" />
+        </div>
+        <p className="text-sm text-muted-foreground font-medium mb-1">
+          No education history added
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {education.map((edu, i) => (
+        <motion.div
+          key={edu.id || i}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: i * 0.05 }}
+          className="rounded-xl border border-border/30 bg-muted/10 p-4"
+        >
+          <div className="flex items-start justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-foreground truncate">
+                {edu.degree}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {edu.institution}
+              </p>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
+                <div className="flex items-center gap-1.5">
+                  <Clock className="h-3 w-3 text-muted-foreground/50" />
+                  <span className="text-[10px] text-muted-foreground">
+                    {edu.startDate ? new Date(edu.startDate).toLocaleDateString("en-IN", { month: "short", year: "numeric" }) : "Start"} - 
+                    {edu.endDate && new Date(edu.endDate) > new Date()
+                      ? " Present" 
+                      : edu.endDate 
+                        ? ` ${new Date(edu.endDate).toLocaleDateString("en-IN", { month: "short", year: "numeric" })}` 
+                        : " End"
+                    }
+                  </span>
+                </div>
+                {edu.grade && (
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle2 className="h-3 w-3 text-muted-foreground/50" />
+                    <span className="text-[10px] text-muted-foreground">{edu.grade}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      ))}
+    </div>
+  );
+}
+
+function ExperienceContent({ experience }: { experience: ExperienceInfo[] }) {
+  if (experience.length === 0) {
+    return (
+      <div className="flex flex-col items-center py-8 text-center">
+        <div className="rounded-xl bg-muted/40 p-3 mb-3">
+          <AlertCircle className="h-5 w-5 text-muted-foreground/50" />
+        </div>
+        <p className="text-sm text-muted-foreground font-medium mb-1">
+          No work history added
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {experience.map((exp, i) => (
+        <motion.div
+          key={exp.id || i}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: i * 0.05 }}
+          className="rounded-xl border border-border/30 bg-muted/10 p-4"
+        >
+          <div className="flex items-start justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-foreground truncate">
+                {exp.designation}
+              </p>
+              <p className="text-xs text-primary font-medium mt-0.5">
+                {exp.companyName}
+              </p>
+              <div className="flex items-center gap-1.5 mt-2">
+                <Clock className="h-3 w-3 text-muted-foreground/50" />
+                <span className="text-[10px] text-muted-foreground">
+                  {new Date(exp.fromDate).toLocaleDateString("en-IN", { month: "short", year: "numeric" })} - 
+                  {exp.currentlyWorking 
+                    ? " Present" 
+                    : exp.toDate 
+                      ? ` ${new Date(exp.toDate).toLocaleDateString("en-IN", { month: "short", year: "numeric" })}` 
+                      : ""
+                  }
+                </span>
+              </div>
+              {exp.responsibilities && (
+                <p className="text-[11px] text-muted-foreground/70 mt-2 line-clamp-2 italic">
+                  "{exp.responsibilities}"
+                </p>
+              )}
+            </div>
+          </div>
+        </motion.div>
+      ))}
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
@@ -578,6 +719,8 @@ export function OnboardingStageCard({
   details,
   documents,
   inductionTasks,
+  education,
+  experience,
   children,
 }: StageCardProps) {
   const meta = getStageStatusMeta(status);
@@ -589,7 +732,7 @@ export function OnboardingStageCard({
   const showPulse = hasRejection || (status === "in_progress" && !isSubmitted);
 
   // ── Determine what to render in expanded section ─────────────────────
-  const hasExpandedContent = Boolean(children || details || documents || inductionTasks);
+  const hasExpandedContent = Boolean(children || details || documents || inductionTasks || education || experience);
 
   return (
     <motion.div
@@ -760,6 +903,10 @@ export function OnboardingStageCard({
                     onEdit={onEdit}
                     isSubmitted={isSubmitted}
                   />
+                ) : education ? (
+                  <EducationContent education={education} />
+                ) : experience ? (
+                  <ExperienceContent experience={experience} />
                 ) : inductionTasks ? (
                   <InductionContent tasks={inductionTasks} />
                 ) : null}

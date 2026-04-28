@@ -110,7 +110,6 @@ const SectionHeader = ({ icon: Icon, title, description }: { icon: any, title: s
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Component
 // ─────────────────────────────────────────────────────────────────────────────
-
 interface OnboardingProfileFormProps {
   onCancel: () => void;
   onSuccess: () => void;
@@ -120,7 +119,7 @@ interface OnboardingProfileFormProps {
 export function OnboardingProfileForm({ onCancel, onSuccess, initialTab = "personal" }: OnboardingProfileFormProps) {
   const { data } = useProfileContext();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState<"personal" | "address" | "emergency" | "bank">(initialTab);
+  const [activeTab, setActiveTab] = useState<"personal" | "address" | "emergency" | "bank">(initialTab as any);
   const [sameAsCurrent, setSameAsCurrent] = useState(false);
 
   const P = data?.profile || {};

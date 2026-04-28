@@ -1,7 +1,3 @@
-// web/src/modules/profile/components/onboarding/OnboardingView.tsx
-// 
-// UPDATED — uses extracted OnboardingStageCard and OnboardingProgressBar
-
 import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -17,6 +13,8 @@ import {
   Shield,
   Loader2,
   CreditCard,
+  GraduationCap,
+  Briefcase,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -36,13 +34,15 @@ import type { OnboardingStatus, ProfileResponse } from "../../types";
 import { OnboardingStageCard, type StageDetail, type DocumentDetail, type InductionTask } from "./OnboardingStageCard";
 import { OnboardingProgressBar, type ProgressStage } from "./OnboardingProgressBar";
 import { OnboardingProfileForm } from "./OnboardingProfileForm";
+import { OnboardingEducationForm } from "./OnboardingEducationForm";
+import { OnboardingExperienceForm } from "./OnboardingExperienceForm";
 import { DocumentsSection } from "../DocumentsSection";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types & Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
-type StageKey = "profile" | "documents" | "bank" | "induction";
+type StageKey = "profile" | "documents" | "bank" | "induction" | "education" | "experience";
 
 const STAGES_CONFIG = [
   {
@@ -59,6 +59,22 @@ const STAGES_CONFIG = [
     description: "Account info for salary processing",
     icon: CreditCard,
     statusField: "bankStatus" as const,
+    readOnly: false,
+  },
+  {
+    key: "education" as StageKey,
+    label: "Education",
+    description: "Academic qualifications and certifications",
+    icon: GraduationCap,
+    statusField: "educationStatus" as const,
+    readOnly: false,
+  },
+  {
+    key: "experience" as StageKey,
+    label: "Experience",
+    description: "Work history and professional background",
+    icon: Briefcase,
+    statusField: "experienceStatus" as const,
     readOnly: false,
   },
   {
@@ -379,6 +395,8 @@ export function OnboardingView() {
     profile: (onboardingStatus?.profileStatus as StageStatusValue) || "pending",
     documents: (onboardingStatus?.documentStatus as StageStatusValue) || "pending",
     bank: (onboardingStatus?.bankStatus as StageStatusValue) || "pending",
+    education: (onboardingStatus?.educationStatus as StageStatusValue) || "pending",
+    experience: (onboardingStatus?.experienceStatus as StageStatusValue) || "pending",
     induction: (onboardingStatus?.inductionStatus as StageStatusValue) || "pending",
   }), [onboardingStatus]);
 
@@ -475,6 +493,54 @@ export function OnboardingView() {
            
            <OnboardingProfileForm 
              initialTab="bank"
+             onCancel={() => setEditingStage(null)} 
+             onSuccess={handleCloseForm} 
+           />
+        </div>
+      </div>
+    );
+  }
+
+  if (editingStage === "education") {
+    return (
+      <div className="space-y-6">
+        <OnboardingHeader />
+        <div className="rounded-3xl border border-border/40 bg-background/50 backdrop-blur-xl p-6 sm:p-8 shadow-2xl">
+           <div className="flex items-center justify-between mb-8">
+             <div>
+               <h2 className="text-2xl font-bold text-foreground">Education Details</h2>
+               <p className="text-muted-foreground mt-1 text-sm">Please provide your academic details</p>
+             </div>
+             <Button variant="ghost" onClick={() => setEditingStage(null)} className="rounded-xl">
+               Back to Dashboard
+             </Button>
+           </div>
+           
+           <OnboardingEducationForm 
+             onCancel={() => setEditingStage(null)} 
+             onSuccess={handleCloseForm} 
+           />
+        </div>
+      </div>
+    );
+  }
+
+  if (editingStage === "experience") {
+    return (
+      <div className="space-y-6">
+        <OnboardingHeader />
+        <div className="rounded-3xl border border-border/40 bg-background/50 backdrop-blur-xl p-6 sm:p-8 shadow-2xl">
+           <div className="flex items-center justify-between mb-8">
+             <div>
+               <h2 className="text-2xl font-bold text-foreground">Work Experience</h2>
+               <p className="text-muted-foreground mt-1 text-sm">Please provide your previous employment history</p>
+             </div>
+             <Button variant="ghost" onClick={() => setEditingStage(null)} className="rounded-xl">
+               Back to Dashboard
+             </Button>
+           </div>
+           
+           <OnboardingExperienceForm 
              onCancel={() => setEditingStage(null)} 
              onSuccess={handleCloseForm} 
            />
@@ -584,6 +650,8 @@ export function OnboardingView() {
                     : undefined
               }
               documents={stage.key === "documents" ? documentDetails : undefined}
+              education={stage.key === "education" ? data?.education || [] : undefined}
+              experience={stage.key === "experience" ? data?.experience || [] : undefined}
               inductionTasks={stage.key === "induction" ? data?.inductionTasks || [] : undefined}
             />
           );
