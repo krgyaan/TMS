@@ -5,7 +5,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { FileText, Download, ExternalLink, AlertCircle } from 'lucide-react';
 import type { TenderQuery, TenderQueryItem, TenderQueryStatus } from '../helpers/tqManagement.types';
 import type { TqType } from '@/types/api.types';
-import { useTqById, useTqByTender, useTqItems } from '@/hooks/api/useTqManagement';
+import { useTqById, useTqItems } from '@/hooks/api/useTqManagement';
 import { useTqTypes } from '@/hooks/api/useTqTypes';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 
@@ -335,34 +335,5 @@ export function TqSection({ tqId }: { tqId: number }) {
             tqTypes={tqTypes || null}
             isLoading={tqLoading || itemsLoading}
         />
-    );
-}
-
-export function TqTenderSection({ tenderId }: { tenderId: number | null }) {
-    const { data: tqListData, isLoading: tqLoading } = useTqByTender(tenderId ?? 0);
-    const { data: tqTypes } = useTqTypes();
-
-    if (tqLoading) return <Skeleton className="h-20 w-full" />;
-
-    if (!Array.isArray(tqListData) || tqListData.length === 0) {
-        return (
-            <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>No TQ exists for this tender yet.</AlertDescription>
-            </Alert>
-        );
-    }
-
-    return (
-        <div className="space-y-4">
-            {tqListData.map((tq) => (
-                <TqView
-                    key={tq.id}
-                    tqData={tq}
-                    tqTypes={tqTypes || null}
-                    isLoading={false}
-                />
-            ))}
-        </div>
     );
 }

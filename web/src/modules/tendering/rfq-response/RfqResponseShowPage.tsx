@@ -9,9 +9,6 @@ import { EmdTenderFeeSection } from '@/modules/tendering/emds-tenderfees/compone
 import { DocumentChecklistSection } from '@/modules/tendering/checklists/components/DocumentChecklistView';
 import { CostingSheetSection } from '@/modules/tendering/costing-sheets/components/CostingSheetView';
 import { BidSubmissionSection } from '@/modules/tendering/bid-submissions/components/BidSubmissionView';
-import { RaSection } from "@/modules/tendering/ras/components/RaShow";
-import { TqTenderSection } from "@/modules/tendering/tq-management/components/TqView";
-import { TenderResultSection } from "@/modules/tendering/results/components/TenderResultShow";
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
@@ -49,9 +46,6 @@ export default function RfqResponseShowPage() {
             case "checklist":      return tenderId ? <DocumentChecklistSection tenderId={tenderId} /> : null;
             case "costing":        return tenderId ? <CostingSheetSection tenderId={tenderId} /> : null;
             case "bid":            return tenderId ? <BidSubmissionSection tenderId={tenderId} /> : null;
-            case "tq-management":  return tenderId ? <TqTenderSection tenderId={tenderId} /> : null;
-            case "ra-management":  return tenderId ? <RaSection tenderId={tenderId} /> : null;
-            case "result":         return tenderId ? <TenderResultSection tenderId={tenderId} /> : null;
             default: return null;
         }
     };
@@ -67,7 +61,7 @@ export default function RfqResponseShowPage() {
 
     return (
         <ShowPageLayout
-            steps={tenderSteps.filter(s => ["tender-details", "physical-docs", "rfq", "rfq-response", "emd-fees", "checklist", "costing", "bid", "tq-management", "ra-management", "result"].includes(s.id))}
+            steps={tenderSteps.filter(s => ["tender-details", "physical-docs", "rfq", "rfq-response", "emd-fees", "checklist", "costing", "bid"].includes(s.id))}
             expandedSections={expandedSections}
             onToggleSection={toggleSection}
             onExpandAll={expandAll}
