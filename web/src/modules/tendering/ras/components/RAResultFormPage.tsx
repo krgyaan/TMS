@@ -13,13 +13,17 @@ import { paths } from '@/app/routes/paths';
 import { SelectField } from '@/components/form/SelectField';
 import { TenderFileUploader } from '@/components/tender-file-upload';
 import DateTimeInput from '@/components/form/DateTimeInput';
+import { Textarea } from '@/components/ui/textarea';
 
 const UploadRaResultSchema = z.object({
     raResult: z.enum(['Won', 'Lost', 'H1 Elimination']),
     veL1AtStart: z.enum(['Yes', 'No']),
     raStartPrice: z.string().optional(),
     raClosePrice: z.string().optional(),
+    raClosePriceL2: z.string().optional(),
+    raOurPrice: z.string().optional(),
     raCloseTime: z.string().optional(),
+    resultReason: z.string().optional(),
     screenshotQualifiedParties: z.array(z.string()).default([]),
     screenshotDecrements: z.array(z.string()).default([]),
     finalResultScreenshot: z.array(z.string()).default([]),
@@ -50,7 +54,10 @@ export default function RAResultFormPage({
             veL1AtStart: 'Yes',
             raStartPrice: '',
             raClosePrice: '',
+            raClosePriceL2: '',
+            raOurPrice: '',
             raCloseTime: '',
+            resultReason: '',
             screenshotQualifiedParties: [],
             screenshotDecrements: [],
             finalResultScreenshot: [],
@@ -76,7 +83,10 @@ export default function RAResultFormPage({
                     veL1AtStart: data.veL1AtStart,
                     raStartPrice: normalizeOptionalString(data.raStartPrice),
                     raClosePrice: normalizeOptionalString(data.raClosePrice),
+                    raClosePriceL2: normalizeOptionalString(data.raClosePriceL2),
+                    raOurPrice: normalizeOptionalString(data.raOurPrice),
                     raCloseTime: normalizeOptionalString(data.raCloseTime),
+                    resultReason: normalizeOptionalString(data.resultReason),
                     screenshotQualifiedParties: data.screenshotQualifiedParties[0] || undefined,
                     screenshotDecrements: data.screenshotDecrements[0] || undefined,
                     finalResultScreenshot: data.finalResultScreenshot[0] || undefined,
@@ -175,6 +185,24 @@ export default function RAResultFormPage({
                             </FieldWrapper>
                             <FieldWrapper
                                 control={form.control}
+                                name="raClosePriceL2"
+                                label="L2 Price at RA Close"
+                            >
+                                {(field) => (
+                                    <div className="relative">
+                                        <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            {...field}
+                                            type="number"
+                                            step="0.01"
+                                            className="pl-10"
+                                            placeholder="Enter L2 close price at RA Close"
+                                        />
+                                    </div>
+                                )}
+                            </FieldWrapper>
+                            <FieldWrapper
+                                control={form.control}
                                 name="raCloseTime"
                                 label="RA Close Time"
                             >
@@ -182,8 +210,43 @@ export default function RAResultFormPage({
                                     <DateTimeInput {...field} placeholder="Select close time" />
                                 )}
                             </FieldWrapper>
+                            <FieldWrapper
+                                control={form.control}
+                                name="raOurPrice"
+                                label="Our Price at the End of RA"
+                            >
+                                {(field) => (
+                                    <div className="relative">
+                                        <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            {...field}
+                                            type="number"
+                                            step="0.01"
+                                            className="pl-10"
+                                            placeholder="Enter Our Price at the End of RA"
+                                        />
+                                    </div>
+                                )}
+                            </FieldWrapper>
                         </div>
 
+                        <div>
+                            {/* Reason for Win/Loss */}
+                            <FieldWrapper
+                                control={form.control}
+                                name="resultReason"
+                                label="Reason for Win/Loss"
+                                className="md:col-span-3"
+                            >
+                                {(field) => (
+                                    <Textarea
+                                        {...field}
+                                        placeholder="Enter the reason for winning or losing this tender"
+                                        rows={3}
+                                    />
+                                )}
+                            </FieldWrapper>
+                        </div>
 
                         {/* Screenshots */}
                         <div className="space-y-4">

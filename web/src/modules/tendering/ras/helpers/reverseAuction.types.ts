@@ -44,7 +44,10 @@ export type ReverseAuction = {
     veL1AtStart: string | null;
     raStartPrice: string | null;
     raClosePrice: string | null;
+    raClosePriceL2: string | null;
+    raOurPrice: string | null;
     raCloseTime: Date | null;
+    resultReason: string | null;
     screenshotQualifiedParties: string | null;
     screenshotDecrements: string | null;
     finalResultScreenshot: string | null;
@@ -67,7 +70,10 @@ export type UploadRaResultDto = {
     veL1AtStart: 'Yes' | 'No';
     raStartPrice?: string;
     raClosePrice?: string;
+    raClosePriceL2?: string;
+    raOurPrice?: string;
     raCloseTime?: string;
+    resultReason?: string;
     screenshotQualifiedParties?: string;
     screenshotDecrements?: string;
     finalResultScreenshot?: string;

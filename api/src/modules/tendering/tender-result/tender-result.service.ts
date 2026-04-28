@@ -782,7 +782,7 @@ export class TenderResultService {
     /**
      * Send tender result email
      */
-    private async sendTenderResultEmail(
+    async sendTenderResultEmail(
         tenderId: number,
         resultRecord: {
             qualifiedPartiesScreenshot: string | null;
