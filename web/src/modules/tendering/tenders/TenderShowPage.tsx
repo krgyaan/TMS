@@ -8,6 +8,8 @@ import { EmdTenderFeeSection } from "@/modules/tendering/emds-tenderfees/compone
 import { DocumentChecklistSection } from "@/modules/tendering/checklists/components/DocumentChecklistView";
 import { CostingSheetSection } from "@/modules/tendering/costing-sheets/components/CostingSheetView";
 import { BidSubmissionSection } from "@/modules/tendering/bid-submissions/components/BidSubmissionView";
+import { RaSection } from "@/modules/tendering/ras/components/RaShow";
+import { TqTenderSection } from "@/modules/tendering/tq-management/components/TqView";
 import { TenderResultSection } from "@/modules/tendering/results/components/TenderResultShow";
 import { paths } from "@/app/routes/paths";
 import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
@@ -17,10 +19,8 @@ export default function TenderShowPage() {
     const navigate = useNavigate();
     const tenderId = id ? Number(id) : null;
 
-    // ── All step statuses from one hook (React Query deduplicates with Sections) ──
     const { steps } = useTenderStepStatuses(tenderId);
 
-    // ── View state ──
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["tender-details"]));
 
     const toggleSection = useCallback((id: string) => {
@@ -36,13 +36,15 @@ export default function TenderShowPage() {
     const renderSectionContent = useCallback((stepId: string) => {
         switch (stepId) {
             case "tender-details": return <TenderDetailsSection tenderId={tenderId} />;
-            case "physical-docs":  return <PhysicalDocsSection  tenderId={tenderId} />;
-            case "rfq":            return <RfqSection           tenderId={tenderId} />;
-            case "emd-fees":       return <EmdTenderFeeSection  tenderId={tenderId} />;
+            case "physical-docs":  return <PhysicalDocsSection tenderId={tenderId} />;
+            case "rfq":            return <RfqSection tenderId={tenderId} />;
+            case "emd-fees":       return <EmdTenderFeeSection tenderId={tenderId} />;
             case "checklist":      return <DocumentChecklistSection tenderId={tenderId} />;
-            case "costing":        return <CostingSheetSection  tenderId={tenderId} />;
-            case "bid":            return <BidSubmissionSection  tenderId={tenderId} />;
-            case "result":         return <TenderResultSection   tenderId={tenderId} />;
+            case "costing":        return <CostingSheetSection tenderId={tenderId} />;
+            case "bid":            return <BidSubmissionSection tenderId={tenderId} />;
+            case "tq-management":  return <TqTenderSection tenderId={tenderId} />;
+            case "ra-management":  return <RaSection tenderId={tenderId!} />;
+            case "result":         return <TenderResultSection tenderId={tenderId} />;
             default:               return null;
         }
     }, [tenderId]);
