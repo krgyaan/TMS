@@ -341,6 +341,7 @@ export class TenderApprovalService {
                 tenderStatus: tenderInfos.status,
                 oemNotAllowed: tenderInfos.oemNotAllowed,
                 tlRejectionRemarks: tenderInfos.tlRejectionRemarks,
+                tlIncompleteRemarks: tenderInfos.tlIncompleteRemarks,
             })
             .from(tenderInfos)
             .where(eq(tenderInfos.id, tenderId))
@@ -442,6 +443,7 @@ export class TenderApprovalService {
             updateData.approveFinanceDocSelection = payload.approveFinanceDocSelection ?? null;
 
             updateData.tlRejectionRemarks = null;
+            updateData.tlIncompleteRemarks = null;
             updateData.oemNotAllowed = null;
             updateData.status = 3; // Tender Info approved
             newStatus = 3;
@@ -464,6 +466,7 @@ export class TenderApprovalService {
         } else if (payload.tlStatus === "2") {
             // Rejected - Use tenderStatus from payload (contains rejection reason status ID)
             updateData.tlRejectionRemarks = payload.tlRejectionRemarks;
+            updateData.tlIncompleteRemarks = null;
             updateData.oemNotAllowed = payload.oemNotAllowed;
 
             if (payload.tenderStatus) {
@@ -492,6 +495,7 @@ export class TenderApprovalService {
             updateData.approvePqrSelection = null;
             updateData.approveFinanceDocSelection = null;
             updateData.tlRejectionRemarks = null;
+            updateData.tlIncompleteRemarks = payload.tlIncompleteRemarks;
             updateData.oemNotAllowed = null;
             updateData.status = 29; // Tender Info sheet Incomplete
             newStatus = 29;
