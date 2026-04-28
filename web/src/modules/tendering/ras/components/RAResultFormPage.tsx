@@ -223,7 +223,7 @@ export default function RAResultFormPage({
                                             type="number"
                                             step="0.01"
                                             className="pl-10"
-                                            placeholder="Enter L2 close price at RA Close"
+                                            placeholder="Enter Our Price at the End of RA"
                                         />
                                     </div>
                                 )}
