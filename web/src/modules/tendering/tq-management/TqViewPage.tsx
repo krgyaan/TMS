@@ -12,6 +12,7 @@ import { BidSubmissionSection } from '@/modules/tendering/bid-submissions/compon
 import { TqSection } from './components/TqView';
 import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
 import { useTenderStepStatuses } from "@/hooks/api/useTenderStepStatuses";
+import { RfqSection } from '../rfqs/components/RfqView';
 
 export default function TqViewPage() {
     const { id } = useParams<{ id: string }>();
@@ -41,6 +42,7 @@ export default function TqViewPage() {
             case "tender-details":   return <TenderDetailsSection tenderId={tenderId} />;
             case "physical-docs":    return <PhysicalDocsSection tenderId={tenderId} />;
             case "emd-fees":         return <EmdTenderFeeSection tenderId={tenderId} />;
+            case "rfq":              return <RfqSection tenderId={tenderId} />;
             case "checklist":        return <DocumentChecklistSection tenderId={tenderId} />;
             case "costing":          return <CostingSheetSection tenderId={tenderId} />;
             case "bid":              return <BidSubmissionSection tenderId={tenderId} />;
@@ -60,7 +62,7 @@ export default function TqViewPage() {
 
     return (
         <ShowPageLayout
-            steps={tenderSteps.filter(s => ["tender-details", "physical-docs", "emd-fees", "checklist", "costing", "bid", "tq-management"].includes(s.id))}
+            steps={tenderSteps.filter(s => ["tender-details", "physical-docs", "emd-fees", "rfq", "checklist", "costing", "bid", "tq-management"].includes(s.id))}
             expandedSections={expandedSections}
             onToggleSection={toggleSection}
             onExpandAll={expandAll}
