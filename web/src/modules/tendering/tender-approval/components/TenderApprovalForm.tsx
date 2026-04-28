@@ -342,7 +342,11 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
             const mutation = mode === 'create' ? createApproval : updateApproval;
             await mutation.mutateAsync({ tenderId, data: payload });
             toast.success(mode === 'create' ? 'Approval submitted successfully' : 'Approval updated successfully');
-            navigate(paths.tendering.tenderApproval);
+            if(window.history.length > 0){
+                navigate(-1);
+            } else {
+                navigate(paths.tendering.tenderApproval);
+            }
         } catch (error: any) {
             console.error('❌ Submission error', error);
             if (error?.response?.data?.message) {
