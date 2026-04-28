@@ -20,6 +20,8 @@ import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { TenderResultService } from '@/modules/tendering/tender-result/tender-result.service';
+import type { UploadResultDto } from '@/modules/tendering/tender-result/dto/tender-result.dto';
 
 export type RaDashboardFilters = {
     type?: RaDashboardType;
@@ -89,6 +91,7 @@ export class ReverseAuctionService {
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
+        private readonly tenderResultService: TenderResultService,
     ) { }
 
     /**
@@ -860,7 +863,33 @@ export class ReverseAuctionService {
         });
 
         // Send email notification
-        await this.sendRaResultEmail(existing.tenderId, result, changedBy, dto);
+        if (dto.raResult === 'Won' || dto.raResult === 'Lost') {
+            const mappedDto: UploadResultDto = {
+                technicallyQualified: 'Yes',
+                disqualificationReason: null,
+                qualifiedPartiesCount: existing.qualifiedPartiesCount ?? null,
+                qualifiedPartiesNames: existing.qualifiedPartiesNames ?? [],
+                result: dto.raResult as 'Won' | 'Lost',
+                resultReason: dto.resultReason ?? null,
+                l1Price: dto.raClosePrice ?? null,
+                l2Price: dto.raClosePriceL2 ?? null,
+                ourPrice: dto.raOurPrice ?? null,
+                qualifiedPartiesScreenshot: dto.screenshotQualifiedParties ?? null,
+                finalResultScreenshot: dto.finalResultScreenshot ?? null,
+            };
+
+            await this.tenderResultService.sendTenderResultEmail(
+                existing.tenderId,
+                {
+                    qualifiedPartiesScreenshot: dto.screenshotQualifiedParties ?? null,
+                    finalResultScreenshot: dto.finalResultScreenshot ?? null,
+                },
+                changedBy,
+                mappedDto
+            );
+        } else {
+            await this.sendRaResultEmail(existing.tenderId, result, changedBy, dto);
+        }
 
         return result;
     }
