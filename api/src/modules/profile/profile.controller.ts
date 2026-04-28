@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Put,
   Delete,
   Req,
   Param,
@@ -111,6 +112,11 @@ export class ProfileController {
     return { success: true };
   }
 
+  @Put('me/educations')
+  async updateMyEducations(@Req() req: any, @Body() body: any) {
+    return this.profileService.updateMyEducations(req.user.id, body);
+  }
+
   // ─── Work Experience Endpoints ────────────────────────────────────────────
 
   @Post('experience')
@@ -127,6 +133,11 @@ export class ProfileController {
   async deleteExperience(@Req() req: any, @Param('id', ParseIntPipe) expId: number) {
     await this.profileService.deleteExperience(req.user.id, expId);
     return { success: true };
+  }
+
+  @Put('me/experiences')
+  async updateMyExperiences(@Req() req: any, @Body() body: any) {
+    return this.profileService.updateMyExperiences(req.user.id, body);
   }
 
   /**
