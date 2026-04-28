@@ -230,21 +230,36 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
     const getFieldValueFromSheet = (fieldName: string) => {
         if (!infoSheet) return 'N/A';
 
+        const safeJoin = (val: any) => {
+            if (!val) return 'N/A';
+            if (Array.isArray(val)) return val.join(', ');
+            if (typeof val === 'string') {
+                try {
+                    const parsed = JSON.parse(val);
+                    if (Array.isArray(parsed)) return parsed.join(', ');
+                } catch (e) {
+                    return val;
+                }
+                return val;
+            }
+            return 'N/A';
+        };
+
         switch (fieldName) {
             case 'teRecommendation': return infoSheet.teRecommendation || 'N/A';
             case 'teRejectionReason': return getStatusName(infoSheet.teRejectionReason);
             case 'teRejectionRemarks': return infoSheet.teRejectionRemarks || 'N/A';
 
             case 'processingFeeRequired': return infoSheet.processingFeeRequired || 'N/A';
-            case 'processingFeeModes': return infoSheet.processingFeeMode?.join(', ') || 'N/A';
+            case 'processingFeeModes': return safeJoin(infoSheet.processingFeeMode);
             case 'processingFeeAmount': return infoSheet.processingFeeAmount ? `₹${parseFloat(String(infoSheet.processingFeeAmount)).toLocaleString('en-IN')}` : 'N/A';
 
             case 'tenderFeeRequired': return infoSheet.tenderFeeRequired || 'N/A';
-            case 'tenderFeeModes': return infoSheet.tenderFeeMode?.join(', ') || 'N/A';
+            case 'tenderFeeModes': return safeJoin(infoSheet.tenderFeeMode);
             case 'tenderFeeAmount': return infoSheet.tenderFeeAmount ? `₹${parseFloat(String(infoSheet.tenderFeeAmount)).toLocaleString('en-IN')}` : 'N/A';
 
             case 'emdRequired': return infoSheet.emdRequired || 'N/A';
-            case 'emdModes': return infoSheet.emdMode?.join(', ') || 'N/A';
+            case 'emdModes': return safeJoin(infoSheet.emdMode);
             case 'emdAmount': return infoSheet.emdAmount ? `₹${parseFloat(String(infoSheet.emdAmount)).toLocaleString('en-IN')}` : 'N/A';
 
             case 'tenderValueGstInclusive': return infoSheet.tenderValue ? `₹${parseFloat(String(infoSheet.tenderValue)).toLocaleString('en-IN')}` : 'N/A';
@@ -261,12 +276,12 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
             case 'deliveryTimeInstallationInclusive': return infoSheet.deliveryTimeInstallationInclusive ? 'Yes' : 'No';
 
             case 'pbgRequired': return infoSheet.pbgRequired || 'N/A';
-            case 'pbgForm': return infoSheet.pbgMode?.join(', ') || 'N/A';
+            case 'pbgForm': return safeJoin(infoSheet.pbgMode);
             case 'pbgPercentage': return infoSheet.pbgPercentage ? `${infoSheet.pbgPercentage}%` : 'N/A';
             case 'pbgDurationMonths': return infoSheet.pbgDurationMonths ? `${infoSheet.pbgDurationMonths} months` : 'N/A';
 
             case 'sdRequired': return infoSheet.sdRequired || 'N/A';
-            case 'sdForm': return infoSheet.sdMode?.join(', ') || 'N/A';
+            case 'sdForm': return safeJoin(infoSheet.sdMode);
             case 'securityDepositPercentage': return infoSheet.sdPercentage ? `${infoSheet.sdPercentage}%` : 'N/A';
             case 'sdDurationMonths': return infoSheet.sdDurationMonths ? `${infoSheet.sdDurationMonths} months` : 'N/A';
 
