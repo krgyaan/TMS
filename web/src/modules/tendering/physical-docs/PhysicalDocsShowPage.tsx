@@ -12,6 +12,9 @@ import { TqTenderSection } from "@/modules/tendering/tq-management/components/Tq
 import { TenderResultSection } from "@/modules/tendering/results/components/TenderResultShow";
 import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
 import { useTenderStepStatuses } from "@/hooks/api/useTenderStepStatuses";
+import { BidSubmissionSection } from "../bid-submissions/components/BidSubmissionView";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 export default function PhysicalDocsShowPage() {
     const { tenderId: tenderIdParam } = useParams<{ tenderId: string }>();
