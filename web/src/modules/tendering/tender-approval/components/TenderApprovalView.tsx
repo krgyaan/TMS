@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import type { TenderWithRelations } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 import { usePqrOptions, useFinanceDocumentOptions } from '@/hooks/useSelectOptions';
 import { paths } from '@/app/routes/paths';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Helper function to map document IDs to names
 const mapDocumentIdsToNames = (ids: string[] | null | undefined, documentList: Array<{ value: string; label: string }>): string[] => {
@@ -87,6 +88,10 @@ export function TenderApprovalView({
     className = '',
 }: TenderApprovalViewProps) {
     const navigate = useNavigate();
+    const { isAdmin, isSuperUser, canRead } = useAuth();
+
+    let canView = canRead("tender-approval");
+;    
     const approval = tender.approval;
     const pqrOptions = usePqrOptions();
     const financeDocumentOptions = useFinanceDocumentOptions();
@@ -137,6 +142,8 @@ export function TenderApprovalView({
                     <StatusIcon className={`h-5 w-5 ${statusConfig.color}`} />
                     Tender Approval Details
                 </CardTitle>
+
+                {canView &&
                 <Button 
                     variant="outline" 
                     size="sm" 
@@ -146,6 +153,7 @@ export function TenderApprovalView({
                     <Pencil className="h-3.5 w-3.5" />
                     Edit Approval
                 </Button>
+            }
             </CardHeader>
             <CardContent>
                 <Table>
