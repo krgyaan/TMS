@@ -30,6 +30,9 @@ export const onboardingRequests = pgTable('hrms_onboarding_requests', {
   status: varchar('status', { length: 50 }).notNull().default('pending'),
 
   profileStatus: varchar('profile_status', { length: 50 }).default('pending'),
+  bankStatus: varchar('bank_status', { length: 50 }).default('pending'),
+  educationStatus: varchar('education_status', { length: 50 }).default('pending'),
+  experienceStatus: varchar('experience_status', { length: 50 }).default('pending'),
   documentStatus: varchar('document_status', { length: 50 }).default('pending'),
   inductionStatus: varchar('induction_status', { length: 50 }).default('pending'),
 
@@ -215,7 +218,8 @@ export const onboardingEducation = pgTable('hrms_onboarding_education', {
   degree: varchar('degree', { length: 255 }).notNull(),
   institution: varchar('institution', { length: 255 }).notNull(),
   fieldOfStudy: varchar('field_of_study', { length: 255 }),
-  yearOfCompletion: integer('year_of_completion').notNull(),
+  startDate: date('start_date'),
+  endDate: date('end_date'),
   grade: varchar('grade', { length: 50 }),
   
   status: varchar('status', { length: 50 }).default('pending'),

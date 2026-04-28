@@ -105,6 +105,28 @@ export type InductionTaskData = {
   remarks: string | null;
 };
 
+export type EducationData = {
+  id: number;
+  degree: string;
+  institution: string;
+  fieldOfStudy: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  grade: string | null;
+  status: string;
+};
+
+export type ExperienceData = {
+  id: number;
+  companyName: string;
+  designation: string;
+  fromDate: string;
+  toDate: string | null;
+  currentlyWorking: boolean;
+  responsibilities: string | null;
+  status: string;
+};
+
 export type ProfileResponse = {
   currentUser: UserData;
   isOnboarding: boolean;
@@ -113,6 +135,8 @@ export type ProfileResponse = {
   address: AddressData | null;
   emergencyContact: EmergencyContactData | null;
   documents: DocumentData[];
+  education: EducationData[];
+  experience: ExperienceData[];
   inductionTasks: InductionTaskData[];
   assets: AssetData[];
   complaints: ComplaintData[];
@@ -128,6 +152,8 @@ export type OnboardingStatus = {
   profileStatus: "pending" | "in_progress" | "completed";
   documentStatus: "pending" | "in_progress" | "completed";
   bankStatus: "pending" | "in_progress" | "completed";
+  educationStatus: "pending" | "in_progress" | "completed";
+  experienceStatus: "pending" | "in_progress" | "completed";
   inductionStatus: "pending" | "in_progress" | "completed";
   progress: number;
   employeeCompleted: boolean;

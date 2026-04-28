@@ -232,16 +232,38 @@ export class ProfileService {
       }));
 
       // 5. Fetch Onboarding Education
-      education = await this.db
+      const obEduRows = await this.db
         .select()
         .from(onboardingEducation)
         .where(eq(onboardingEducation.onboardingId, onboardingId!));
 
+      education = obEduRows.map(e => ({
+        id: e.id,
+        degree: e.degree,
+        institution: e.institution,
+        fieldOfStudy: e.fieldOfStudy,
+        startDate: e.startDate ? String(e.startDate).split('T')[0] : null,
+        endDate: e.endDate ? String(e.endDate).split('T')[0] : null,
+        grade: e.grade,
+        status: e.status,
+      }));
+
       // 6. Fetch Onboarding Experience
-      experience = await this.db
+      const obExpRows = await this.db
         .select()
         .from(onboardingExperience)
         .where(eq(onboardingExperience.onboardingId, onboardingId!));
+
+      experience = obExpRows.map(e => ({
+        id: e.id,
+        companyName: e.companyName,
+        designation: e.designation,
+        fromDate: e.fromDate ? String(e.fromDate).split('T')[0] : null,
+        toDate: e.toDate ? String(e.toDate).split('T')[0] : null,
+        currentlyWorking: e.currentlyWorking,
+        responsibilities: e.responsibilities,
+        status: e.status,
+      }));
 
       // 7. Fetch Induction Tasks
       inductionTasks = await this.db
@@ -259,6 +281,9 @@ export class ProfileService {
           ? 'in_progress' 
           : 'pending';
 
+      const educationStatus = education.length > 0 ? 'completed' : 'pending';
+      const experienceStatus = experience.length > 0 ? 'completed' : 'pending';
+
       onboardingStatus = {
         id: obReq.id,
         requestType: obReq.requestType,
@@ -266,6 +291,8 @@ export class ProfileService {
         profileStatus: obReq.profileStatus || 'pending',
         documentStatus: obReq.documentStatus || 'pending',
         bankStatus,
+        educationStatus,
+        experienceStatus,
         inductionStatus: obReq.inductionStatus || 'pending',
         progress: obReq.progress || 0,
         employeeCompleted: obProfile?.employeeCompleted ?? false,
@@ -521,6 +548,40 @@ export class ProfileService {
         updatedAt: new Date(),
       }).where(eq(onboardingProfiles.onboardingId, activeReqs[0].id)).returning();
 
+      // Handle Education Sync
+      if (dto.education && Array.isArray(dto.education)) {
+        // Simple strategy: delete existing and re-insert (or more complex sync)
+        // For onboarding, re-inserting is often cleaner if IDs are not strictly managed on frontend
+        await this.db.delete(onboardingEducation).where(eq(onboardingEducation.onboardingId, activeReqs[0].id));
+        if (dto.education.length > 0) {
+          await this.db.insert(onboardingEducation).values(dto.education.map((e: any) => ({
+            onboardingId: activeReqs[0].id,
+            degree: e.degree,
+            institution: e.institution,
+            fieldOfStudy: e.fieldOfStudy,
+            startDate: e.startDate ? (e.startDate.length === 7 ? `${e.startDate}-01` : e.startDate) : null,
+            endDate: e.endDate ? (e.endDate.length === 7 ? `${e.endDate}-01` : e.endDate) : null,
+            grade: e.grade,
+          })));
+        }
+      }
+
+      // Handle Experience Sync
+      if (dto.experience && Array.isArray(dto.experience)) {
+        await this.db.delete(onboardingExperience).where(eq(onboardingExperience.onboardingId, activeReqs[0].id));
+        if (dto.experience.length > 0) {
+          await this.db.insert(onboardingExperience).values(dto.experience.map((e: any) => ({
+            onboardingId: activeReqs[0].id,
+            companyName: e.companyName,
+            designation: e.designation,
+            fromDate: e.fromDate || null,
+            toDate: e.currentlyWorking ? null : (e.toDate || null),
+            currentlyWorking: e.currentlyWorking === true || e.currentlyWorking === 'true',
+            responsibilities: e.responsibilities,
+          })));
+        }
+      }
+
       return { success: true, profile: updated };
     }
 
@@ -605,7 +666,8 @@ export class ProfileService {
         degree: dto.degree,
         institution: dto.institution,
         fieldOfStudy: dto.fieldOfStudy,
-        yearOfCompletion: dto.yearOfCompletion,
+        startDate: dto.startDate ? (dto.startDate.length === 7 ? `${dto.startDate}-01` : dto.startDate) : null,
+        endDate: dto.endDate ? (dto.endDate.length === 7 ? `${dto.endDate}-01` : dto.endDate) : null,
         grade: dto.grade,
       }).returning();
       return inserted;
@@ -624,7 +686,8 @@ export class ProfileService {
         degree: dto.degree,
         institution: dto.institution,
         fieldOfStudy: dto.fieldOfStudy,
-        yearOfCompletion: dto.yearOfCompletion,
+        startDate: dto.startDate ? (dto.startDate.length === 7 ? `${dto.startDate}-01` : dto.startDate) : null,
+        endDate: dto.endDate ? (dto.endDate.length === 7 ? `${dto.endDate}-01` : dto.endDate) : null,
         grade: dto.grade,
         updatedAt: new Date(),
       }).where(eq(onboardingEducation.id, eduId)).returning();
@@ -714,6 +777,80 @@ export class ProfileService {
     }
 
     throw new BadRequestException('Experience details can only be modified during onboarding.');
+  }
+
+  async updateMyEducations(userId: number, body: any) {
+    const activeReqs = await this.db
+      .select({ id: onboardingRequests.id, status: onboardingRequests.status })
+      .from(onboardingRequests)
+      .where(eq(onboardingRequests.userId, userId))
+      .orderBy(desc(onboardingRequests.createdAt))
+      .limit(1);
+
+    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
+
+    if (!isOnboarding) {
+      throw new BadRequestException('Education details can only be modified during onboarding.');
+    }
+
+    const { educations } = body;
+    if (!educations || !Array.isArray(educations)) {
+      throw new BadRequestException('Educations array is required');
+    }
+
+    // Atomic sync: delete existing and re-insert
+    await this.db.delete(onboardingEducation).where(eq(onboardingEducation.onboardingId, activeReqs[0].id));
+    
+    if (educations.length > 0) {
+      await this.db.insert(onboardingEducation).values(educations.map((e: any) => ({
+        onboardingId: activeReqs[0].id,
+        degree: e.degree,
+        institution: e.institution,
+        fieldOfStudy: e.fieldOfStudy || null,
+        startDate: e.startDate ? (e.startDate.length === 7 ? `${e.startDate}-01` : e.startDate) : null,
+        endDate: e.endDate ? (e.endDate.length === 7 ? `${e.endDate}-01` : e.endDate) : null,
+        grade: e.grade || null,
+      })));
+    }
+
+    return { success: true };
+  }
+
+  async updateMyExperiences(userId: number, body: any) {
+    const activeReqs = await this.db
+      .select({ id: onboardingRequests.id, status: onboardingRequests.status })
+      .from(onboardingRequests)
+      .where(eq(onboardingRequests.userId, userId))
+      .orderBy(desc(onboardingRequests.createdAt))
+      .limit(1);
+
+    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
+
+    if (!isOnboarding) {
+      throw new BadRequestException('Experience details can only be modified during onboarding.');
+    }
+
+    const { experiences } = body;
+    if (!experiences || !Array.isArray(experiences)) {
+      throw new BadRequestException('Experiences array is required');
+    }
+
+    // Atomic sync: delete existing and re-insert
+    await this.db.delete(onboardingExperience).where(eq(onboardingExperience.onboardingId, activeReqs[0].id));
+    
+    if (experiences.length > 0) {
+      await this.db.insert(onboardingExperience).values(experiences.map((e: any) => ({
+        onboardingId: activeReqs[0].id,
+        companyName: e.companyName,
+        designation: e.designation,
+        fromDate: e.fromDate || null,
+        toDate: e.currentlyWorking ? null : (e.toDate || null),
+        currentlyWorking: e.currentlyWorking === true || e.currentlyWorking === 'true',
+        responsibilities: e.responsibilities || null,
+      })));
+    }
+
+    return { success: true };
   }
 
   // ─────────────────────────────────────────────────────────────────────────
