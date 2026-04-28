@@ -165,7 +165,7 @@ export const infoSheetFieldOptions = [
     { value: 'sdDurationMonths', label: 'SD Duration' },
 
     // LD
-    { value: 'ldRequired', label: 'LD Required' },
+    { value: 'ldRequired', label: 'LD Applicable' },
     { value: 'ldPercentagePerWeek', label: 'LD Per Week' },
     { value: 'maxLdPercentage', label: 'Max LD Percentage' },
 

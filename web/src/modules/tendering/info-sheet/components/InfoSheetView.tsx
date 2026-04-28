@@ -453,7 +453,7 @@ export const InfoSheetView = ({
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">
-                                        LD Required
+                                        LD Applicable
                                     </TableCell>
                                     <TableCell className="text-sm">
                                         {formatYesNo(infoSheet.ldRequired)}
