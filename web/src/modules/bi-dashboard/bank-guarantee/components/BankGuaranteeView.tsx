@@ -15,10 +15,28 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 const FileLink = ({ file }: { file?: string }) => {
     if (!file) return <span className="text-muted-foreground">Not Uploaded</span>;
 
+    const getFileUrl = (filePath: string) => {
+        const fileName = filePath.split('/').pop() || '';
+
+        // If file ends with _soft_copy.pdf
+        if (filePath.endsWith('_soft_copy.pdf')) {
+            return `/uploads/courier/${fileName}`;
+        }
+
+        // If file name (without extension) ends with _te_
+        const nameParts = fileName.split('.');
+        const nameWithoutExt = nameParts.length > 1 ? nameParts.slice(0, -1).join('.') : fileName;
+        if (nameWithoutExt.endsWith('_te_')) {
+            return `/uploads/tendering/bg-po-files/${fileName}`;
+        }
+
+        return tenderFilesService.getFileUrl(filePath);
+    };
+
     return (
         <div className="flex gap-3 items-center">
             <a
-                href={tenderFilesService.getFileUrl(file)}
+                href={getFileUrl(file)}
                 target="_blank"
                 className="flex items-center gap-1 text-blue-600 hover:underline"
             >
