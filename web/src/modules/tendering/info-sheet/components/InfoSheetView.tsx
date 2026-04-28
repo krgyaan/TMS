@@ -265,30 +265,35 @@ export const InfoSheetView = ({
                             <TableCell className="text-sm">
                                 {formatYesNo(infoSheet.reverseAuctionApplicable)}
                             </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Physical Docs Required
+                            </TableCell>
                             <TableCell className="text-sm">
                                 {formatYesNo(infoSheet.physicalDocsRequired)}
                             </TableCell>
                         </TableRow>
-                        {infoSheet.physicalDocsRequired === 'YES' && (
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Physical Document Type
-                                </TableCell>
-                                <TableCell className="text-sm" colSpan={3}>
-                                    {getOptionLabel(physicalDocTypeOptions, infoSheet.physicalDocType)}
-                                </TableCell>
-                            </TableRow>
-                        )}
-                        {infoSheet.physicalDocsDeadline && infoSheet.physicalDocsRequired === 'YES' && (
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Physical Docs Deadline
-                                </TableCell>
-                                <TableCell className="text-sm" colSpan={3}>
-                                    {formatDateTime(infoSheet.physicalDocsDeadline)}
-                                </TableCell>
-                            </TableRow>
-                        )}
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            {infoSheet.physicalDocsRequired === 'YES' && (
+                                <>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Physical Document Type
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {getOptionLabel(physicalDocTypeOptions, infoSheet.physicalDocType)}
+                                    </TableCell>
+                                </>
+                            )}
+                            {infoSheet.physicalDocsDeadline && infoSheet.physicalDocsRequired === 'YES' && (
+                                <>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Physical Docs Deadline
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {formatDateTime(infoSheet.physicalDocsDeadline)}
+                                    </TableCell>
+                                </>
+                            )}
+                        </TableRow>
 
                         {/* Payment Terms */}
                         {(infoSheet.paymentTermsSupply || infoSheet.paymentTermsInstallation) && (
