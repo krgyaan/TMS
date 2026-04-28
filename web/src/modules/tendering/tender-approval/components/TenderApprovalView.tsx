@@ -2,9 +2,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { CheckCircle2, XCircle, AlertTriangle, Clock } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertTriangle, Clock, Pencil } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
 import type { TenderWithRelations } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 import { usePqrOptions, useFinanceDocumentOptions } from '@/hooks/useSelectOptions';
+import { paths } from '@/app/routes/paths';
 
 // Helper function to map document IDs to names
 const mapDocumentIdsToNames = (ids: string[] | null | undefined, documentList: Array<{ value: string; label: string }>): string[] => {
@@ -83,6 +86,7 @@ export function TenderApprovalView({
     isLoading = false,
     className = '',
 }: TenderApprovalViewProps) {
+    const navigate = useNavigate();
     const approval = tender.approval;
     const pqrOptions = usePqrOptions();
     const financeDocumentOptions = useFinanceDocumentOptions();
@@ -128,11 +132,20 @@ export function TenderApprovalView({
 
     return (
         <Card className={className}>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                 <CardTitle className="flex items-center gap-2">
                     <StatusIcon className={`h-5 w-5 ${statusConfig.color}`} />
                     Tender Approval Details
                 </CardTitle>
+                <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="gap-2"
+                    onClick={() => navigate(paths.tendering.tenderApprovalCreate(tender.id))}
+                >
+                    <Pencil className="h-3.5 w-3.5" />
+                    Edit Approval
+                </Button>
             </CardHeader>
             <CardContent>
                 <Table>
