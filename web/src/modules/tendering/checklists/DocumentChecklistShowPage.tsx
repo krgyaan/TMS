@@ -7,11 +7,14 @@ import { RfqSection } from "@/modules/tendering/rfqs/components/RfqView";
 import { EmdTenderFeeSection } from "@/modules/tendering/emds-tenderfees/components/EmdTenderFeeShow";
 import { DocumentChecklistSection } from "@/modules/tendering/checklists/components/DocumentChecklistView";
 import { CostingSheetSection } from "@/modules/tendering/costing-sheets/components/CostingSheetView";
-import { BidSubmissionSection } from "@/modules/tendering/bid-submissions/components/BidSubmissionView";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { RaSection } from "@/modules/tendering/ras/components/RaShow";
+import { TqTenderSection } from "@/modules/tendering/tq-management/components/TqView";
+import { TenderResultSection } from "@/modules/tendering/results/components/TenderResultShow";
 import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
 import { useTenderStepStatuses } from "@/hooks/api/useTenderStepStatuses";
+import { BidSubmissionSection } from "../bid-submissions/components/BidSubmissionView";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 export default function DocumentChecklistShowPage() {
     const { tenderId: tenderIdParam } = useParams<{ tenderId: string }>();
@@ -44,6 +47,9 @@ export default function DocumentChecklistShowPage() {
             case "checklist":        return <DocumentChecklistSection tenderId={tenderId} />;
             case "costing":          return <CostingSheetSection tenderId={tenderId} />;
             case "bid":              return <BidSubmissionSection tenderId={tenderId} />;
+            case "tq-management":    return <TqTenderSection tenderId={tenderId} />;
+            case "ra-management":    return <RaSection tenderId={tenderId} />;
+            case "result":           return <TenderResultSection tenderId={tenderId} />;
             default: return null;
         }
     };
@@ -59,7 +65,7 @@ export default function DocumentChecklistShowPage() {
 
     return (
         <ShowPageLayout
-            steps={tenderSteps.filter(s => ["tender-details", "physical-docs", "rfq", "emd-fees", "checklist", "costing", "bid"].includes(s.id))}
+            steps={tenderSteps.filter(s => ["tender-details", "physical-docs", "rfq", "emd-fees", "checklist", "costing", "bid", "tq-management", "ra-management", "result"].includes(s.id))}
             expandedSections={expandedSections}
             onToggleSection={toggleSection}
             onExpandAll={expandAll}
