@@ -111,7 +111,15 @@ export function Combobox({
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-[--radix-popper-anchor-width] p-0" align="start">
                 <div className="p-2 border-b">
-                    <Input ref={inputRef} autoFocus placeholder="Search..." value={query} onChange={e => setQuery(e.target.value)} className="h-8" />
+                    <Input
+                        ref={inputRef}
+                        autoFocus
+                        placeholder="Search..."
+                        value={query}
+                        onChange={e => setQuery(e.target.value)}
+                        onKeyDown={e => e.stopPropagation()}
+                        className="h-8"
+                    />
                 </div>
                 <div className="max-h-64 overflow-auto py-1">
                     {filtered.length === 0 && <div className="text-muted-foreground px-2 py-2 text-sm">No results</div>}
