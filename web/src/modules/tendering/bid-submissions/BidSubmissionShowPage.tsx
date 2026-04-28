@@ -40,15 +40,15 @@ export default function BidSubmissionShowPage() {
     const renderSectionContent = useCallback((stepId: string) => {
         switch (stepId) {
             case "tender-details": return <TenderDetailsSection tenderId={tenderId} />;
-            case "physical-docs":  return <PhysicalDocsSection  tenderId={tenderId} />;
-            case "rfq":            return <RfqSection           tenderId={tenderId} />;
-            case "emd-fees":       return <EmdTenderFeeSection  tenderId={tenderId} />;
+            case "physical-docs":  return <PhysicalDocsSection tenderId={tenderId} />;
+            case "rfq":            return <RfqSection tenderId={tenderId} />;
+            case "emd-fees":       return <EmdTenderFeeSection tenderId={tenderId} />;
             case "checklist":      return <DocumentChecklistSection tenderId={tenderId} />;
-            case "costing":        return <CostingSheetSection  tenderId={tenderId} />;
-            case "bid":            return <BidSubmissionSection  tenderId={tenderId} />;
-            case "tq-management":  return <TqTenderSection       tenderId={tenderId} />;
-            case "ra-management":  return <RaSection            tenderId={tenderId} />;
-            case "result":         return <TenderResultSection   tenderId={tenderId} />;
+            case "costing":        return <CostingSheetSection tenderId={tenderId} />;
+            case "bid":            return <BidSubmissionSection tenderId={tenderId} />;
+            case "tq-management":  return <TqTenderSection tenderId={tenderId} />;
+            case "ra-management":  return <RaSection tenderId={tenderId!} />;
+            case "result":         return <TenderResultSection tenderId={tenderId} />;
             default:               return null;
         }
     }, [tenderId]);
