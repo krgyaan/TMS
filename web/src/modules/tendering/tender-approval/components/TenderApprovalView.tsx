@@ -211,13 +211,17 @@ export function TenderApprovalView({
                                     <TableCell className="text-sm" colSpan={3}>
                                         {approval.rfqTo?.length ? (
                                             <div className="flex flex-wrap gap-2">
-                                                {approval.rfqTo.map((vendor) => (
-                                                    <Badge key={vendor.name} variant="outline">
-                                                        {vendor.name}
-                                                    </Badge>
-                                                ))}
+                                                {approval.rfqTo?.map((vendor, i) => {
+                                                    const name = typeof vendor === "string" ? vendor : vendor.name;
+
+                                                    return (
+                                                        <Badge key={i} variant="outline">
+                                                            {name}
+                                                        </Badge>
+                                                    );
+                                                })}
                                             </div>
-                                        ) : (
+                                        ) : (   
                                             '—'
                                         )}
                                     </TableCell>

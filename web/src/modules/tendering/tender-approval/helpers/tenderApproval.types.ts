@@ -34,6 +34,8 @@ export interface SaveTenderApprovalDto {
 }
 
 // Response from API
+type Vendor = { name: string };
+
 export interface TenderApproval {
     id?: number;
     tenderId?: number;
@@ -41,7 +43,8 @@ export interface TenderApproval {
     tlDecision?: "0" | "1" | "2" | "3" | number;
     rfqRequired?: "yes" | "no" | null;
     quotationFiles?: string[] | null;
-    rfqTo: string[] | null;
+    rfqTo: Vendor[] | null;
+    // rfqTo: string[] | null;
     processingFeeMode: string | null;
     tenderFeeMode: string | null;
     emdMode: string | null;
