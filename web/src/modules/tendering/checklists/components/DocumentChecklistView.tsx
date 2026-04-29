@@ -10,53 +10,13 @@ import { tenderFilesService } from '@/services/api/tender-files.service';
 
 interface DocumentChecklistViewProps {
     checklist?: TenderDocumentChecklist | null;
-    isLoading?: boolean;
-    className?: string;
 }
 
-export function DocumentChecklistView({
-    checklist,
-    isLoading = false,
-    className = '',
-}: DocumentChecklistViewProps) {
-    if (isLoading) {
-        return (
-            <Card className={className}>
-                <CardHeader className="pb-3">
-                    <Skeleton className="h-5 w-40" />
-                </CardHeader>
-                <CardContent className="pt-0">
-                    <div className="space-y-2">
-                        {Array.from({ length: 4 }).map((_, i) => (
-                            <Skeleton key={i} className="h-10 w-full" />
-                        ))}
-                    </div>
-                </CardContent>
-            </Card>
-        );
-    }
-
-    if (!checklist) {
-        return (
-            <Card className={className}>
-                <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                        <FileText className="h-4 w-4" />
-                        Document Checklist
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                    <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-                        <FileText className="h-8 w-8 mb-2 opacity-50" />
-                        <p className="text-sm">No document checklist available for this tender yet.</p>
-                    </div>
-                </CardContent>
-            </Card>
-        );
-    }
+export function DocumentChecklistView({ checklist }: DocumentChecklistViewProps) {
+    if (!checklist) return null;
 
     return (
-        <Card className={className}>
+        <Card>
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <FileText className="h-5 w-5" />
@@ -182,5 +142,36 @@ import { useDocumentChecklistByTender } from '@/hooks/api/useDocumentChecklists'
 /** Self-fetching section for Document Checklist */
 export function DocumentChecklistSection({ tenderId }: { tenderId: number | null }) {
     const { data: checklist, isLoading } = useDocumentChecklistByTender(tenderId ?? 0);
-    return <DocumentChecklistView checklist={checklist ?? null} isLoading={isLoading} />;
+
+        if (isLoading) {
+        return (
+            <Card>
+                <CardHeader className="pb-3">
+                    <Skeleton className="h-5 w-40" />
+                </CardHeader>
+                <CardContent className="pt-0">
+                    <div className="space-y-2">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                            <Skeleton key={i} className="h-10 w-full" />
+                        ))}
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (!checklist) {
+        return (
+            <Card>
+                <CardContent className="pt-0">
+                    <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                        <FileText className="h-8 w-8 mb-2 opacity-50" />
+                        <p className="text-sm">Document checklist not submitted for this tender yet.</p>
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    return <DocumentChecklistView checklist={checklist ?? null} />;
 }
