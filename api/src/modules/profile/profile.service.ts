@@ -14,6 +14,7 @@ import { employeeDocuments } from '@/db/schemas/hrms/employee-documents.schema';
 import { employeeAssets } from '@/db/schemas/hrms/employee-assets.schema';
 import { employeeEducation } from '@/db/schemas/hrms/employee-education.schema';
 import { employeeExperience } from '@/db/schemas/hrms/employee-experience.schema';
+import { employeeBankDetails } from '@/db/schemas/hrms/employee-bank-details.schema';
 import { 
   onboardingRequests, 
   onboardingDocuments, 
@@ -21,7 +22,8 @@ import {
   onboardingEducation,
   onboardingExperience,
   onboardingActivityLogs,
-  onboardingInduction
+  onboardingInduction,
+  onboardingBankDetails
 } from '@/db/schemas/hrms/onboarding';
 import { complaints } from '@/db/schemas/hrms/complaints.schema';
 import { teams } from '@/db/schemas/master/teams.schema';
@@ -131,6 +133,7 @@ export class ProfileService {
     let experience: any[] = [];
     let onboardingStatus: any = null;
     let inductionTasks: any = null;
+    let bankAccounts: any[] = [];
 
     if (isOnboarding) {
       // 2 & 3. Fetch Onboarding Profile Data
@@ -198,11 +201,6 @@ export class ProfileService {
           probationMonths: obProfile.probationMonths,
           probationEndDate: obProfile.probationEndDate ? String(obProfile.probationEndDate).split('T')[0] : null,
           salaryType: obProfile.salaryType,
-          bankName: obProfile.bankName,
-          accountHolderName: obProfile.accountHolderName,
-          accountNumber: obProfile.accountNumber,
-          ifscCode: obProfile.ifscCode,
-          branchName: obProfile.branchName,
           joiningDate: obProfile.dateOfJoining ? String(obProfile.dateOfJoining).split('T')[0] : null,
           designation: obProfileRow.designationName || (obProfile.designationId ? `ID ${obProfile.designationId}` : null),
           department: obProfileRow.departmentName || (obProfile.departmentId ? `ID ${obProfile.departmentId}` : null),
@@ -271,15 +269,30 @@ export class ProfileService {
         .from(onboardingInduction)
         .where(eq(onboardingInduction.onboardingId, onboardingId!));
 
+      // 7.5 Fetch Onboarding Bank Details
+      const obBankRows = await this.db
+        .select()
+        .from(onboardingBankDetails)
+        .where(eq(onboardingBankDetails.onboardingId, onboardingId!));
+
+      bankAccounts = obBankRows.map(b => ({
+        id: b.id,
+        bankName: b.bankName,
+        accountHolderName: b.accountHolderName,
+        accountNumber: b.accountNumber,
+        ifscCode: b.ifscCode,
+        branchName: b.branchName,
+        branchAddress: b.branchAddress,
+        upiId: b.upiId,
+        isPrimary: b.isPrimary,
+        status: b.status,
+      }));
+
       // 8. Build onboarding status for frontend
       const obReq = activeReqs[0];
       const obProfile = obProfileRow?.profile;
       
-      const bankStatus = (obProfile?.bankName && obProfile?.accountNumber && obProfile?.ifscCode) 
-        ? 'completed' 
-        : (obProfile?.bankName || obProfile?.accountNumber) 
-          ? 'in_progress' 
-          : 'pending';
+      const bankStatus = bankAccounts.length > 0 ? 'completed' : 'pending';
 
       const educationStatus = education.length > 0 ? 'completed' : 'pending';
       const experienceStatus = experience.length > 0 ? 'completed' : 'pending';
@@ -369,11 +382,6 @@ export class ProfileService {
           probationMonths: employeeProfiles.probationMonths,
           probationEndDate: employeeProfiles.probationEndDate,
           salaryType: employeeProfiles.salaryType,
-          bankName: employeeProfiles.bankName,
-          accountHolderName: employeeProfiles.accountHolderName,
-          accountNumber: employeeProfiles.accountNumber,
-          ifscCode: employeeProfiles.ifscCode,
-          branchName: employeeProfiles.branchName,
           uanNumber: employeeProfiles.uanNumber,
           pfNumber: employeeProfiles.pfNumber,
           esicNumber: employeeProfiles.esicNumber,
@@ -433,6 +441,12 @@ export class ProfileService {
         .select()
         .from(employeeExperience)
         .where(eq(employeeExperience.userId, userId));
+
+      // 7. Fetch Permanent Bank Details
+      bankAccounts = await this.db
+        .select()
+        .from(employeeBankDetails)
+        .where(eq(employeeBankDetails.userId, userId));
     }
 
     // 5. Fetch Assets
@@ -481,6 +495,7 @@ export class ProfileService {
       documents,
       inductionTasks,
       assets,
+      bankAccounts,
       complaints: mappedComplaints,
       notifications: [],
     };
@@ -538,15 +553,27 @@ export class ProfileService {
           altPhone: dto.emergencyContact.altPhone,
           email: dto.emergencyContact.email,
         } : undefined,
-        bankName: dto.bankName,
-        accountHolderName: dto.accountHolderName,
-        accountNumber: dto.accountNumber,
-        ifscCode: dto.ifscCode,
-        branchName: dto.branchName,
-        branchAddress: dto.branchAddress,
-        upiId: dto.upiId,
         updatedAt: new Date(),
       }).where(eq(onboardingProfiles.onboardingId, activeReqs[0].id)).returning();
+
+      // Handle Bank Accounts Sync
+      if (dto.bankAccounts && Array.isArray(dto.bankAccounts)) {
+        await this.db.delete(onboardingBankDetails).where(eq(onboardingBankDetails.onboardingId, activeReqs[0].id));
+        if (dto.bankAccounts.length > 0) {
+          await this.db.insert(onboardingBankDetails).values(dto.bankAccounts.map((b: any) => ({
+            onboardingId: activeReqs[0].id,
+            bankName: b.bankName,
+            accountHolderName: b.accountHolderName,
+            accountNumber: b.accountNumber,
+            ifscCode: b.ifscCode,
+            branchName: b.branchName || null,
+            branchAddress: b.branchAddress || null,
+            upiId: b.upiId || null,
+            isPrimary: b.isPrimary === true || b.isPrimary === 'true',
+            status: 'pending',
+          })));
+        }
+      }
 
       // Handle Education Sync
       if (dto.education && Array.isArray(dto.education)) {
@@ -777,6 +804,71 @@ export class ProfileService {
     }
 
     throw new BadRequestException('Experience details can only be modified during onboarding.');
+  }
+
+  // --- Bank Accounts ---
+
+  async addBankDetails(userId: number, dto: any) {
+    const activeReqs = await this.db.select({ id: onboardingRequests.id, status: onboardingRequests.status })
+      .from(onboardingRequests).where(eq(onboardingRequests.userId, userId)).orderBy(desc(onboardingRequests.createdAt)).limit(1);
+    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
+
+    if (isOnboarding) {
+      const [inserted] = await this.db.insert(onboardingBankDetails).values({
+        onboardingId: activeReqs[0].id,
+        bankName: dto.bankName,
+        accountHolderName: dto.accountHolderName,
+        accountNumber: dto.accountNumber,
+        ifscCode: dto.ifscCode,
+        branchName: dto.branchName || null,
+        branchAddress: dto.branchAddress || null,
+        upiId: dto.upiId || null,
+        isPrimary: dto.isPrimary || false,
+        status: 'pending',
+      }).returning();
+      return inserted;
+    }
+
+    throw new BadRequestException('Bank details can only be modified during onboarding.');
+  }
+
+  async updateBankDetails(userId: number, bankId: number, dto: any) {
+    const activeReqs = await this.db.select({ id: onboardingRequests.id, status: onboardingRequests.status })
+      .from(onboardingRequests).where(eq(onboardingRequests.userId, userId)).orderBy(desc(onboardingRequests.createdAt)).limit(1);
+    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
+
+    if (isOnboarding) {
+      const [updated] = await this.db.update(onboardingBankDetails).set({
+        bankName: dto.bankName,
+        accountHolderName: dto.accountHolderName,
+        accountNumber: dto.accountNumber,
+        ifscCode: dto.ifscCode,
+        branchName: dto.branchName || null,
+        branchAddress: dto.branchAddress || null,
+        upiId: dto.upiId || null,
+        isPrimary: dto.isPrimary || false,
+        updatedAt: new Date(),
+      }).where(eq(onboardingBankDetails.id, bankId)).returning();
+      return updated;
+    }
+
+    throw new BadRequestException('Bank details can only be modified during onboarding.');
+  }
+
+  async deleteBankDetails(userId: number, bankId: number) {
+    const activeReqs = await this.db.select({ id: onboardingRequests.id, status: onboardingRequests.status })
+      .from(onboardingRequests).where(eq(onboardingRequests.userId, userId)).orderBy(desc(onboardingRequests.createdAt)).limit(1);
+    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
+
+    if (isOnboarding) {
+      const [existing] = await this.db.select().from(onboardingBankDetails).where(eq(onboardingBankDetails.id, bankId)).limit(1);
+      if (existing && existing.onboardingId === activeReqs[0].id) {
+        await this.db.delete(onboardingBankDetails).where(eq(onboardingBankDetails.id, bankId));
+      }
+      return;
+    }
+
+    throw new BadRequestException('Bank details can only be modified during onboarding.');
   }
 
   async updateMyEducations(userId: number, body: any) {

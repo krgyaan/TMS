@@ -140,6 +140,24 @@ export class ProfileController {
     return this.profileService.updateMyExperiences(req.user.id, body);
   }
 
+  // ─── Bank Account Endpoints ───────────────────────────────────────────────
+
+  @Post('bank-accounts')
+  async addBankDetails(@Req() req: any, @Body() body: any) {
+    return this.profileService.addBankDetails(req.user.id, body);
+  }
+
+  @Patch('bank-accounts/:id')
+  async updateBankDetails(@Req() req: any, @Param('id', ParseIntPipe) bankId: number, @Body() body: any) {
+    return this.profileService.updateBankDetails(req.user.id, bankId, body);
+  }
+
+  @Delete('bank-accounts/:id')
+  async deleteBankDetails(@Req() req: any, @Param('id', ParseIntPipe) bankId: number) {
+    await this.profileService.deleteBankDetails(req.user.id, bankId);
+    return { success: true };
+  }
+
   /**
    * POST /profile/documents
    * Upload a new employee document (multipart/form-data)

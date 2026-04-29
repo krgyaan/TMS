@@ -13,6 +13,7 @@ import {
   Upload,
   Lock,
   ExternalLink,
+  CreditCard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -74,6 +75,15 @@ export type ExperienceInfo = {
   responsibilities?: string | null;
 };
 
+export type BankAccountInfo = {
+  id: number;
+  bankName: string;
+  accountHolderName: string;
+  accountNumber: string;
+  ifscCode: string;
+  isPrimary: boolean;
+};
+
 export type StageCardProps = {
   /** Unique key for the stage */
   stageKey: string;
@@ -117,6 +127,8 @@ export type StageCardProps = {
   education?: EducationInfo[];
   /** Experience info for experience stage */
   experience?: ExperienceInfo[];
+  /** Bank accounts for bank stage */
+  bankAccounts?: BankAccountInfo[];
   /** Custom expanded content (overrides default) */
   children?: React.ReactNode;
 };
@@ -478,6 +490,65 @@ function DocumentsContent({
   );
 }
 
+function BankAccountsContent({ accounts }: { accounts: BankAccountInfo[] }) {
+  if (accounts.length === 0) {
+    return (
+      <div className="flex flex-col items-center py-8 text-center">
+        <div className="rounded-xl bg-muted/40 p-3 mb-3">
+          <CreditCard className="h-5 w-5 text-muted-foreground/50" />
+        </div>
+        <p className="text-sm text-muted-foreground font-medium mb-1">
+          No bank accounts added
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {accounts.map((acc, i) => (
+        <motion.div
+          key={acc.id}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: i * 0.05 }}
+          className={cn(
+            "rounded-xl border p-4",
+            acc.isPrimary
+              ? "border-emerald-200/50 bg-emerald-50/20 dark:border-emerald-800/30 dark:bg-emerald-950/10"
+              : "border-border/30 bg-muted/10"
+          )}
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <p className="text-sm font-bold text-foreground truncate">
+                  {acc.bankName}
+                </p>
+                {acc.isPrimary && (
+                  <Badge variant="secondary" className="text-[10px] h-5 rounded-full px-2">
+                    Primary
+                  </Badge>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">{acc.accountHolderName}</p>
+              <div className="flex items-center gap-4 mt-2">
+                <p className="text-xs font-mono text-foreground tracking-wide">
+                  •••• {acc.accountNumber.slice(-4)}
+                </p>
+                <p className="text-xs font-mono text-muted-foreground">{acc.ifscCode}</p>
+              </div>
+            </div>
+            <div className="shrink-0 rounded-lg bg-muted p-2">
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
+            </div>
+          </div>
+        </motion.div>
+      ))}
+    </div>
+  );
+}
+
 function InductionContent({ tasks }: { tasks: InductionTask[] }) {
   const beforeTasks = tasks.filter(t => t.type === "BEFORE");
   const afterTasks = tasks.filter(t => t.type === "AFTER");
@@ -721,6 +792,7 @@ export function OnboardingStageCard({
   inductionTasks,
   education,
   experience,
+  bankAccounts,
   children,
 }: StageCardProps) {
   const meta = getStageStatusMeta(status);
@@ -732,7 +804,7 @@ export function OnboardingStageCard({
   const showPulse = hasRejection || (status === "in_progress" && !isSubmitted);
 
   // ── Determine what to render in expanded section ─────────────────────
-  const hasExpandedContent = Boolean(children || details || documents || inductionTasks || education || experience);
+  const hasExpandedContent = Boolean(children || details || documents || inductionTasks || education || experience || bankAccounts);
 
   return (
     <motion.div
@@ -907,6 +979,8 @@ export function OnboardingStageCard({
                   <EducationContent education={education} />
                 ) : experience ? (
                   <ExperienceContent experience={experience} />
+                ) : bankAccounts ? (
+                  <BankAccountsContent accounts={bankAccounts} />
                 ) : inductionTasks ? (
                   <InductionContent tasks={inductionTasks} />
                 ) : null}

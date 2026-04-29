@@ -8,4 +8,5 @@ export * from './training-comments.schema';
 export * from './exit-workflows.schema';
 export * from './employee-education.schema';
 export * from './employee-experience.schema';
+export * from './employee-bank-details.schema';
 export * from './onboarding';

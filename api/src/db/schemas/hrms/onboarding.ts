@@ -102,15 +102,6 @@ export const onboardingProfiles = pgTable('hrms_onboarding_profiles', {
   pfApplicable: boolean('pf_applicable').default(false),
   esicApplicable: boolean('esic_applicable').default(false),
 
-  // BANK DETAILS
-  bankName: varchar('bank_name', { length: 255 }),
-  accountHolderName: varchar('account_holder_name', { length: 255 }),
-  accountNumber: varchar('account_number', { length: 50 }),
-  ifscCode: varchar('ifsc_code', { length: 20 }),
-  branchName: varchar('branch_name', { length: 255 }),
-  branchAddress: text('branch_address'),
-  upiId: varchar('upi_id', { length: 100 }),
-
   // COMPLETION FLAGS
   hrCompleted: boolean('hr_completed').default(false),
   employeeCompleted: boolean('employee_completed').default(false),
@@ -256,3 +247,31 @@ export const onboardingExperience = pgTable('hrms_onboarding_experience', {
 
 export type OnboardingExperience = typeof onboardingExperience.$inferSelect;
 export type NewOnboardingExperience = typeof onboardingExperience.$inferInsert;
+
+//
+// ==============================
+// 8. ONBOARDING BANK DETAILS
+// ==============================
+//
+
+export const onboardingBankDetails = pgTable('hrms_onboarding_bank_details', {
+  id: bigserial('id', { mode: 'number' }).primaryKey(),
+  onboardingId: bigint('onboarding_id', { mode: 'number' }).notNull(),
+
+  bankName: varchar('bank_name', { length: 255 }).notNull(),
+  accountHolderName: varchar('account_holder_name', { length: 255 }).notNull(),
+  accountNumber: varchar('account_number', { length: 50 }).notNull(),
+  ifscCode: varchar('ifsc_code', { length: 20 }).notNull(),
+  branchName: varchar('branch_name', { length: 255 }),
+  branchAddress: text('branch_address'),
+  upiId: varchar('upi_id', { length: 100 }),
+  isPrimary: boolean('is_primary').default(false),
+
+  status: varchar('status', { length: 50 }).default('pending'),
+
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type OnboardingBankDetail = typeof onboardingBankDetails.$inferSelect;
+export type NewOnboardingBankDetail = typeof onboardingBankDetails.$inferInsert;

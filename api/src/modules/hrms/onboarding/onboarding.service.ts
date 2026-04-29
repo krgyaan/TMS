@@ -19,6 +19,7 @@ import {
   onboardingProfiles,
   onboardingEducation,
   onboardingExperience,
+  onboardingBankDetails,
 } from '@/db/schemas/hrms/onboarding';
 import { users } from '@/db/schemas/auth/users.schema';
 import { userProfiles } from '@/db/schemas/auth/user-profiles.schema';
@@ -26,6 +27,7 @@ import { employeeProfiles } from '@/db/schemas/hrms/employee-profiles.schema';
 import { employeeEducation } from '@/db/schemas/hrms/employee-education.schema';
 import { employeeExperience } from '@/db/schemas/hrms/employee-experience.schema';
 import { employeeDocuments } from '@/db/schemas/hrms/employee-documents.schema';
+import { employeeBankDetails } from '@/db/schemas/hrms/employee-bank-details.schema';
 import { eq, desc } from 'drizzle-orm';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import { Logger } from 'winston';
@@ -291,11 +293,6 @@ export class OnboardingService {
         probationEndDate: employeeProfile?.probationEndDate || null,
         salaryType: employeeProfile?.salaryType || null,
         basicSalary: employeeProfile?.basicSalary || null,
-        bankName: employeeProfile?.bankName || null,
-        accountHolderName: employeeProfile?.accountHolderName || null,
-        accountNumber: employeeProfile?.accountNumber || null,
-        ifscCode: employeeProfile?.ifscCode || null,
-        branchName: employeeProfile?.branchName || null,
 
         employeeCompleted: false,
         hrCompleted: false,
@@ -329,6 +326,25 @@ export class OnboardingService {
             toDate: e.toDate,
             currentlyWorking: e.currentlyWorking,
             responsibilities: e.responsibilities,
+            status: 'pending',
+          })) as any
+        );
+      }
+
+      // Bank Details
+      const bankRows = await tx.select().from(employeeBankDetails).where(eq(employeeBankDetails.userId, userId));
+      if (bankRows.length > 0) {
+        await tx.insert(onboardingBankDetails).values(
+          bankRows.map(b => ({
+            onboardingId: request.id,
+            bankName: b.bankName,
+            accountHolderName: b.accountHolderName,
+            accountNumber: b.accountNumber,
+            ifscCode: b.ifscCode,
+            branchName: b.branchName,
+            branchAddress: b.branchAddress,
+            upiId: b.upiId,
+            isPrimary: b.isPrimary,
             status: 'pending',
           })) as any
         );
@@ -402,6 +418,7 @@ export class OnboardingService {
 
       const obEdu = await tx.select().from(onboardingEducation).where(eq(onboardingEducation.onboardingId, onboardingId));
       const obExp = await tx.select().from(onboardingExperience).where(eq(onboardingExperience.onboardingId, onboardingId));
+      const obBank = await tx.select().from(onboardingBankDetails).where(eq(onboardingBankDetails.onboardingId, onboardingId));
       const obDocs = await tx.select().from(onboardingDocuments).where(eq(onboardingDocuments.onboardingId, onboardingId));
 
       // UPSERT user_profiles
@@ -441,11 +458,6 @@ export class OnboardingService {
         probationEndDate: obProfile.probationEndDate,
         salaryType: obProfile.salaryType,
         basicSalary: obProfile.basicSalary,
-        bankName: obProfile.bankName,
-        accountHolderName: obProfile.accountHolderName,
-        accountNumber: obProfile.accountNumber,
-        ifscCode: obProfile.ifscCode,
-        branchName: obProfile.branchName,
       };
 
       if (existingEmp) {
@@ -478,6 +490,22 @@ export class OnboardingService {
           toDate: e.toDate,
           currentlyWorking: e.currentlyWorking,
           responsibilities: e.responsibilities,
+        })) as any);
+      }
+
+      // Bank Details Full Replace
+      await tx.delete(employeeBankDetails).where(eq(employeeBankDetails.userId, userId));
+      if (obBank.length > 0) {
+        await tx.insert(employeeBankDetails).values(obBank.map(b => ({
+          userId,
+          bankName: b.bankName,
+          accountHolderName: b.accountHolderName,
+          accountNumber: b.accountNumber,
+          ifscCode: b.ifscCode,
+          branchName: b.branchName,
+          branchAddress: b.branchAddress,
+          upiId: b.upiId,
+          isPrimary: b.isPrimary,
         })) as any);
       }
 
@@ -572,9 +600,6 @@ export class OnboardingService {
         dateOfJoining: onboardingProfiles.dateOfJoining,
         salaryType: onboardingProfiles.salaryType,
         basicSalary: onboardingProfiles.basicSalary,
-        bankName: onboardingProfiles.bankName,
-        accountNumber: onboardingProfiles.accountNumber,
-        ifscCode: onboardingProfiles.ifscCode,
         hrCompleted: onboardingProfiles.hrCompleted,
         employeeCompleted: onboardingProfiles.employeeCompleted,
         // Employee personal fields

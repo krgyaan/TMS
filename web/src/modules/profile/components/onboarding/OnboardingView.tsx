@@ -36,6 +36,7 @@ import { OnboardingProgressBar, type ProgressStage } from "./OnboardingProgressB
 import { OnboardingProfileForm } from "./OnboardingProfileForm";
 import { OnboardingEducationForm } from "./OnboardingEducationForm";
 import { OnboardingExperienceForm } from "./OnboardingExperienceForm";
+import { OnboardingBankForm } from "./OnboardingBankForm";
 import { DocumentsSection } from "../DocumentsSection";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -199,15 +200,16 @@ function buildDocumentDetails(data: any): DocumentDetail[] {
 }
 
 const buildBankDetails = (data: any): StageDetail[] => {
-  if (!data?.employeeProfile) return [];
-  const ep = data.employeeProfile;
+  if (!data?.bankAccounts || data.bankAccounts.length === 0) return [];
+  const primaryBank = data.bankAccounts.find((b: any) => b.isPrimary) || data.bankAccounts[0];
   const details: StageDetail[] = [];
 
-  if (ep.bankName) details.push({ label: "Bank Name", value: ep.bankName });
-  if (ep.accountNumber) details.push({ label: "Account Number", value: ep.accountNumber });
-  if (ep.ifscCode) details.push({ label: "IFSC Code", value: ep.ifscCode });
-  if (ep.branchName) details.push({ label: "Branch", value: ep.branchName });
-  if (ep.upiId) details.push({ label: "UPI ID", value: ep.upiId });
+  if (primaryBank.bankName) details.push({ label: "Bank Name", value: primaryBank.bankName });
+  if (primaryBank.accountNumber) details.push({ label: "Account Number", value: `•••• ${primaryBank.accountNumber.slice(-4)}` });
+  
+  if (data.bankAccounts.length > 1) {
+    details.push({ label: "Total Accounts", value: String(data.bankAccounts.length) });
+  }
 
   return details;
 };
@@ -491,11 +493,10 @@ export function OnboardingView() {
              </Button>
            </div>
            
-           <OnboardingProfileForm 
-             initialTab="bank"
-             onCancel={() => setEditingStage(null)} 
-             onSuccess={handleCloseForm} 
-           />
+            <OnboardingBankForm 
+              onCancel={() => setEditingStage(null)} 
+              onSuccess={handleCloseForm} 
+            />
         </div>
       </div>
     );
@@ -652,6 +653,7 @@ export function OnboardingView() {
               documents={stage.key === "documents" ? documentDetails : undefined}
               education={stage.key === "education" ? data?.education || [] : undefined}
               experience={stage.key === "experience" ? data?.experience || [] : undefined}
+              bankAccounts={stage.key === "bank" ? data?.bankAccounts || [] : undefined}
               inductionTasks={stage.key === "induction" ? data?.inductionTasks || [] : undefined}
             />
           );
