@@ -10,7 +10,7 @@ import { EmdTenderFeeSection } from "@/modules/tendering/emds-tenderfees/compone
 import { DocumentChecklistSection } from "@/modules/tendering/checklists/components/DocumentChecklistView";
 import { CostingSheetSection } from "@/modules/tendering/costing-sheets/components/CostingSheetView";
 import { BidSubmissionSection } from "@/modules/tendering/bid-submissions/components/BidSubmissionView";
-import { TenderResultSection } from "@/modules/tendering/results/components/TenderResultShow";
+import { TenderResultSection } from "@/modules/tendering/results/components/TenderResultView";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { ShowPageLayout } from "@/components/layout/ShowPageLayout";

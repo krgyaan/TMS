@@ -14,7 +14,7 @@ import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
 import { useTenderStepStatuses } from "@/hooks/api/useTenderStepStatuses";
 import { RfqSection } from '../rfqs/components/RfqView';
 import { RaSection } from '../ras/components/RaShow';
-import { TenderResultSection } from '../results/components/TenderResultShow';
+import { TenderResultSection } from '../results/components/TenderResultView';
 
 export default function TqViewPage() {
     const { tenderId } = useParams();

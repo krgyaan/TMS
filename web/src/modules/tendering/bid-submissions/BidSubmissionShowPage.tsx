@@ -10,7 +10,7 @@ import { CostingSheetSection } from "@/modules/tendering/costing-sheets/componen
 import { BidSubmissionSection } from "./components/BidSubmissionView";
 import { RaSection } from "@/modules/tendering/ras/components/RaShow";
 import { TqTenderSection } from "@/modules/tendering/tq-management/components/TqView";
-import { TenderResultSection } from "@/modules/tendering/results/components/TenderResultShow";
+import { TenderResultSection } from "@/modules/tendering/results/components/TenderResultView";
 import { paths } from "@/app/routes/paths";
 import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
 

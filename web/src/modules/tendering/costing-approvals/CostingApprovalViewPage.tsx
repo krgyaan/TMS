@@ -12,7 +12,7 @@ import { useTenderStepStatuses } from "@/hooks/api/useTenderStepStatuses";
 import { CostingSheetSection } from '../costing-sheets/components/CostingSheetView';
 import { RaSection } from '../ras/components/RaShow';
 import { TqTenderSection } from '../tq-management/components/TqView';
-import { TenderResultSection } from '../results/components/TenderResultShow';
+import { TenderResultSection } from '../results/components/TenderResultView';
 
 export default function CostingApprovalViewPage() {
     const { tenderId: tenderIdParam } = useParams<{ tenderId: string }>();

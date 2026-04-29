@@ -9,7 +9,7 @@ import { DocumentChecklistSection } from "@/modules/tendering/checklists/compone
 import { CostingSheetSection } from "@/modules/tendering/costing-sheets/components/CostingSheetView";
 import { BidSubmissionSection } from "@/modules/tendering/bid-submissions/components/BidSubmissionView";
 import { RaSection } from "@/modules/tendering/ras/components/RaShow";
-import { TenderResultSection } from "./components/TenderResultShow";
+import { TenderResultSection } from "./components/TenderResultView";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { ShowPageLayout } from "@/components/layout/ShowPageLayout";

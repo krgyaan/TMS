@@ -15,7 +15,7 @@ import { useBidSubmissionByTender } from '@/hooks/api/useBidSubmissions';
 import { useMemo } from 'react';
 import { tenderFilesService } from '@/services/api/tender-files.service';
 
-interface TenderResultShowProps {
+interface TenderResultViewProps {
     result: ResultDashboardRow & {
         disqualificationReason?: string | null;
         qualifiedPartiesCount?: string | null;
@@ -85,12 +85,12 @@ const getEmdStatusVariant = (status: string | null): string => {
     if (upperStatus.includes('PENDING')) return 'warning';
     return 'secondary';
 };
-export function TenderResultShow({
+export function TenderResultView({
     result,
     isLoading = false,
     onViewRa,
     className = '',
-}: TenderResultShowProps) {
+}: TenderResultViewProps) {
     if (isLoading) {
         return (
             <Card className={className}>
@@ -554,5 +554,5 @@ export function TenderResultSection({ tenderId }: { tenderId: number | null }) {
         } as any;
     }, [result, paymentRequests, tender, bidSubmission]);
 
-    return <TenderResultShow result={resultDataForShow} isLoading={isLoading} />;
+    return <TenderResultView result={resultDataForShow} isLoading={isLoading} />;
 }
