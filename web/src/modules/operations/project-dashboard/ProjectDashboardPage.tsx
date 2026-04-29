@@ -127,7 +127,7 @@ export default function ProjectDashboardPage() {
 
     const {isTeamLeader, isAdmin, isSuperUser, teamId} = useAuth();
 
-    const isOpsTeamLeader = isTeamLeader && teamId == 2;
+    const isOpsTeamLeader = isTeamLeader && Number(teamId) == 3;
 
     const id = searchParams.get("id"); // string | null
 
