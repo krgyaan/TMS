@@ -127,12 +127,18 @@ export const InfoSheetView = ({
                             <TableCell className="text-sm font-semibold w-1/4">
                                 {formatYesNo(infoSheet.teRecommendation)}
                             </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
-                                Rejection Reason
-                            </TableCell>
-                            <TableCell className="text-sm w-1/4">
-                                {getOptionLabel(rejectionReasonOptions, infoSheet.teRejectionReason)}
-                            </TableCell>
+                            {
+                                infoSheet.teRecommendation === "NO" && (
+                                    <>
+                                        <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                            Rejection Reason
+                                        </TableCell>
+                                        <TableCell className="text-sm w-1/4">
+                                            {getOptionLabel(rejectionReasonOptions, infoSheet.teRejectionReason)}
+                                        </TableCell>
+                                    </>
+                                )
+                            }
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">
@@ -143,12 +149,18 @@ export const InfoSheetView = ({
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Rejection Remarks
-                            </TableCell>
-                            <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]" colSpan={3}>
-                                {formatValue(infoSheet.teRejectionRemarks)}
-                            </TableCell>
+                            {
+                                infoSheet.teRecommendation === "NO" && (
+                                    <>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Rejection Remarks
+                                        </TableCell>
+                                        <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]" colSpan={3}>
+                                            {formatValue(infoSheet.teRejectionRemarks)}
+                                        </TableCell>
+                                    </>
+                                )
+                            }
                         </TableRow>
                         {infoSheet.teRejectionProof && (
                             <TableRow className="hover:bg-muted/30 transition-colors">
@@ -157,11 +169,11 @@ export const InfoSheetView = ({
                                 </TableCell>
                                 <TableCell className="text-sm" colSpan={3}>
                                     <div className="flex flex-wrap gap-1">
-                                        {infoSheet.teRejectionProof.map((path, idx) => (
+                                        {(infoSheet?.teRejectionProof ?? []).map((path, idx) => (
                                             <Badge key={idx} variant="outline" className="text-xs hover:bg-primary/10">
-                                                <a href={tenderFilesService.getFileUrl(path)} target="_blank" rel="noopener noreferrer">
-                                                    View Proof {infoSheet.teRejectionProof.length > 1 ? idx + 1 : ''}
-                                                </a>
+                                            <a href={tenderFilesService.getFileUrl(path)} target="_blank" rel="noopener noreferrer">
+                                                View Proof {(infoSheet?.teRejectionProof?.length ?? 0) > 1 ? idx + 1 : ''}
+                                            </a>
                                             </Badge>
                                         ))}
                                     </div>
@@ -397,7 +409,20 @@ export const InfoSheetView = ({
                                 PBG Mode
                             </TableCell>
                             <TableCell className="text-sm">
-                                {infoSheet.pbgMode}
+                                {(() => {
+                                    if (!infoSheet.pbgMode) return "N/A";
+
+                                    if (Array.isArray(infoSheet.pbgMode)) {
+                                        return infoSheet.pbgMode.join(", ");
+                                    }
+
+                                    try {
+                                        const parsed = JSON.parse(infoSheet.pbgMode);
+                                        return Array.isArray(parsed) ? parsed.join(", ") : infoSheet.pbgMode;
+                                    } catch {
+                                        return infoSheet.pbgMode;
+                                    }
+                                })()}
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
