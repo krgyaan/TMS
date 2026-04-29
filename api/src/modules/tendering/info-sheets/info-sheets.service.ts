@@ -444,9 +444,6 @@ export class TenderInfoSheetsService {
 
             const result = await this.findByTenderId(tenderId) as TenderInfoSheetWithRelations;
 
-            // Send email notification
-            await this.sendInfoSheetFilledEmail(tenderId, result, changedBy);
-
             // TIMER TRANSITION: Stop tender_info_sheet timer and start tender_approval timer
             try {
                 this.logger.log(`Transitioning timers for tender ${tenderId}`);
@@ -488,6 +485,8 @@ export class TenderInfoSheetsService {
                 // Don't fail the entire operation if timer transition fails
             }
 
+            // Send email notification
+            await this.sendInfoSheetFilledEmail(tenderId, result, changedBy);
 
             return result;
         } catch (error: any) {
@@ -738,9 +737,6 @@ export class TenderInfoSheetsService {
 
             const result = await this.findByTenderId(tenderId) as TenderInfoSheetWithRelations;
 
-            // Send email notification
-            await this.sendInfoSheetFilledEmail(tenderId, result, changedBy);
-
             const prevStatus = tender?.status ?? null;
             let newStatus = prevStatus ?? 2;
 
@@ -763,6 +759,9 @@ export class TenderInfoSheetsService {
                     ? 'Tender info sheet re-filled (was incomplete)'
                     : 'Tender info sheet updated',
             );
+
+            // Send email notification
+            await this.sendInfoSheetFilledEmail(tenderId, result, changedBy);
 
             return result;
         } catch (error: any) {
