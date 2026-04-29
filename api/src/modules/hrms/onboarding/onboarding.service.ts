@@ -120,11 +120,18 @@ export class OnboardingService {
       .select()
       .from(onboardingProfiles)
       .where(eq(onboardingProfiles.onboardingId, onboardingId))
+      .orderBy(desc(onboardingProfiles.id))
       .limit(1);
     
-    // Employee side done at signup. HR side done when hrCompleted flag is true.
-    const profileCompleted = profile?.employeeCompleted && profile?.hrCompleted;
-    const newProfileStatus = profileCompleted ? 'completed' : 'in_progress';
+    const profileCompleted = profile?.status === 'submitted' && profile?.hrStatus === 'approved';
+    const profileRejected = profile?.hrStatus === 'rejected';
+    
+    let newProfileStatus: string;
+    if (profile?.hrStatus === 'approved') newProfileStatus = 'approved';
+    else if (profile?.hrStatus === 'rejected') newProfileStatus = 'rejected';
+    else if (profile?.status === 'submitted') newProfileStatus = 'submitted';
+    else if (profile?.firstName) newProfileStatus = 'in_progress';
+    else newProfileStatus = 'pending';
 
     // 2. Documents
     const docs = await tx
@@ -132,38 +139,92 @@ export class OnboardingService {
       .from(onboardingDocuments)
       .where(eq(onboardingDocuments.onboardingId, onboardingId));
     
-    // Assuming docs are completed if there is at least one doc and NO docs are pending/rejected
-    const docsCompleted = docs.length > 0 && docs.every((d: any) => d.status === 'verified');
-    const newDocumentStatus = docsCompleted ? 'completed' : (docs.length > 0 ? 'in_progress' : 'pending');
+    const docsApproved = docs.length > 0 && docs.every((d: any) => d.hrStatus === 'approved');
+    const docsRejected = docs.some((d: any) => d.hrStatus === 'rejected');
+    
+    let newDocumentStatus: string;
+    if (docsApproved) newDocumentStatus = 'approved';
+    else if (docsRejected) newDocumentStatus = 'rejected';
+    else if (docs.length > 0) newDocumentStatus = 'submitted';
+    else newDocumentStatus = 'pending';
 
-    // 3. Induction
+    // 3. Education
+    const education = await tx
+      .select()
+      .from(onboardingEducation)
+      .where(eq(onboardingEducation.onboardingId, onboardingId));
+    
+    const eduApproved = education.length > 0 && education.every((e: any) => e.hrStatus === 'approved');
+    const eduRejected = education.some((e: any) => e.hrStatus === 'rejected');
+    
+    let newEducationStatus: string;
+    if (eduApproved) newEducationStatus = 'approved';
+    else if (eduRejected) newEducationStatus = 'rejected';
+    else if (education.length > 0) newEducationStatus = 'submitted';
+    else newEducationStatus = 'pending';
+
+    // 4. Experience
+    const experience = await tx
+      .select()
+      .from(onboardingExperience)
+      .where(eq(onboardingExperience.onboardingId, onboardingId));
+    
+    const expApproved = experience.length > 0 && experience.every((e: any) => e.hrStatus === 'approved');
+    const expRejected = experience.some((e: any) => e.hrStatus === 'rejected');
+    
+    let newExperienceStatus: string;
+    if (expApproved) newExperienceStatus = 'approved';
+    else if (expRejected) newExperienceStatus = 'rejected';
+    else if (experience.length > 0) newExperienceStatus = 'submitted';
+    else newExperienceStatus = 'pending';
+
+    // 5. Bank Details
+    const bank = await tx
+      .select()
+      .from(onboardingBankDetails)
+      .where(eq(onboardingBankDetails.onboardingId, onboardingId));
+    
+    const bankApproved = bank.length > 0 && bank.every((b: any) => b.hrStatus === 'approved');
+    const bankRejected = bank.some((b: any) => b.hrStatus === 'rejected');
+    
+    let newBankStatus: string;
+    if (bankApproved) newBankStatus = 'approved';
+    else if (bankRejected) newBankStatus = 'rejected';
+    else if (bank.length > 0) newBankStatus = 'submitted';
+    else newBankStatus = 'pending';
+
+    // 6. Induction
     const tasks = await tx
       .select()
       .from(onboardingInduction)
       .where(eq(onboardingInduction.onboardingId, onboardingId));
       
-    // Induction completed if there are tasks and ALL tasks are completed
     const inductionCompleted = tasks.length > 0 && tasks.every((t: any) => t.status === 'completed');
     const newInductionStatus = inductionCompleted ? 'completed' : (tasks.length > 0 ? 'in_progress' : 'pending');
 
-    // 4. Progress %
+    // 7. Progress %
     let progress = 0;
-    if (profileCompleted) progress += 33.33;
-    if (docsCompleted) progress += 33.33;
-    if (inductionCompleted) progress += 33.34;
+    if (profileCompleted) progress += 20;
+    if (docsApproved) progress += 20;
+    if (eduApproved) progress += 20;
+    if (expApproved) progress += 20;
+    if (bankApproved) progress += 20;
     
     await tx
       .update(onboardingRequests)
       .set({
         profileStatus: newProfileStatus,
         documentStatus: newDocumentStatus,
+        educationStatus: newEducationStatus,
+        experienceStatus: newExperienceStatus,
+        bankStatus: newBankStatus,
         inductionStatus: newInductionStatus,
         progress: Math.floor(progress),
         updatedAt: new Date(),
       })
       .where(eq(onboardingRequests.id, onboardingId));
 
-    const allDone = profileCompleted && docsCompleted && inductionCompleted;
+    const allDone = profileCompleted && docsApproved && eduApproved && expApproved && bankApproved && inductionCompleted;
     if (allDone) {
       const [req] = await tx.select({ requestType: onboardingRequests.requestType, userId: onboardingRequests.userId })
         .from(onboardingRequests).where(eq(onboardingRequests.id, onboardingId)).limit(1);
@@ -720,7 +781,7 @@ export class OnboardingService {
         uploadedAt: doc.createdAt?.toISOString(),
         verifiedBy: doc.verifiedBy?.toString(),
         verifiedAt: doc.verificationDate,
-        rejectedReason: doc.remarks,
+        rejectedReason: doc.hrRemark,
         fileName: doc.fileUrl ? doc.fileUrl.split('/').pop() : 'document.pdf',
         fileSize: '1.2 MB', // Dummy
         fileType: 'application/pdf',
@@ -748,7 +809,7 @@ export class OnboardingService {
         createdAt: onboardingDocuments.createdAt,
         verifiedBy: users.name,
         verificationDate: onboardingDocuments.verificationDate,
-        remarks: onboardingDocuments.remarks,
+        hrRemark: onboardingDocuments.hrRemark,
         fileUrl: onboardingDocuments.fileUrl,
       })
       .from(onboardingDocuments)
@@ -765,7 +826,7 @@ export class OnboardingService {
       uploadedAt: doc.createdAt?.toISOString(),
       verifiedBy: doc.verifiedBy,
       verifiedAt: doc.verificationDate,
-      rejectedReason: doc.remarks,
+      rejectedReason: doc.hrRemark,
       fileName: doc.fileUrl ? doc.fileUrl.split('/').pop() : 'document.pdf',
       fileSize: '2.4 MB',
       fileType: 'application/pdf',
@@ -773,32 +834,6 @@ export class OnboardingService {
     }));
   }
 
-  /**
-   * PATCH /hrms/onboarding/:id/documents/:docId/verify
-   */
-  async verifyDocument(onboardingId: number, docId: number, status: string, reason: string | undefined, adminId: number): Promise<void> {
-    await this.db.transaction(async (tx) => {
-      await tx
-        .update(onboardingDocuments)
-        .set({
-          status,
-          remarks: reason || null,
-          verifiedBy: status === 'verified' ? adminId : null,
-          verificationDate: status === 'verified' ? (new Date() as any) : null,
-          updatedAt: new Date(),
-        })
-        .where(eq(onboardingDocuments.id, docId));
-
-      await tx.insert(onboardingActivityLogs).values({
-        onboardingId,
-        action: `DOCUMENT_${status.toUpperCase()}`,
-        performedBy: adminId,
-        metadata: { docId, reason },
-      });
-      
-      await this.recalculateProgress(tx, onboardingId);
-    });
-  }
 
   // ─── Induction Endpoints ──────────────────────────────────────────────────
 
@@ -1142,13 +1177,228 @@ export class OnboardingService {
           previousStatus: request.status,
         },
       });
-
       this.logger.info(`Onboarding request #${id} ${dto.status}`, {
         adminId,
         note: dto.note,
       });
 
       return updated;
+    });
+  }
+
+  // ─── Per-Section HR Approval ───────────────────────────────────────────────
+
+  async approveProfileSection(id: number, hrStatus: 'approved' | 'rejected', hrRemark: string, adminId: number) {
+    return this.db.transaction(async (tx) => {
+      const [latestProfile] = await tx.select().from(onboardingProfiles)
+        .where(eq(onboardingProfiles.onboardingId, id))
+        .orderBy(desc(onboardingProfiles.id))
+        .limit(1);
+
+      if (!latestProfile) throw new NotFoundException('Profile record not found');
+
+      await tx.update(onboardingProfiles).set({
+        hrStatus,
+        hrRemark,
+        hrCompleted: hrStatus === 'approved',
+        updatedAt: new Date(),
+      }).where(eq(onboardingProfiles.id, latestProfile.id));
+
+      if (hrStatus === 'approved') {
+        const [req] = await tx.select({ userId: onboardingRequests.userId }).from(onboardingRequests).where(eq(onboardingRequests.id, id)).limit(1);
+        if (req?.userId) {
+          await this.syncProfileToEmployee(tx, req.userId, latestProfile);
+        }
+      }
+
+      await this.recalculateProgress(tx, id);
+      return { success: true };
+    });
+  }
+
+  async approveEducationRecord(id: number, eduId: number, hrStatus: 'approved' | 'rejected', hrRemark: string, adminId: number) {
+    return this.db.transaction(async (tx) => {
+      const [edu] = await tx.select().from(onboardingEducation).where(eq(onboardingEducation.id, eduId)).limit(1);
+      if (!edu) throw new NotFoundException('Education record not found');
+
+      await tx.update(onboardingEducation).set({
+        hrStatus,
+        hrRemark,
+        updatedAt: new Date(),
+      }).where(eq(onboardingEducation.id, eduId));
+
+      if (hrStatus === 'approved') {
+        const [req] = await tx.select({ userId: onboardingRequests.userId }).from(onboardingRequests).where(eq(onboardingRequests.id, id)).limit(1);
+        if (req?.userId) {
+          await this.syncEducationToEmployee(tx, req.userId, edu);
+        }
+      }
+
+      await this.recalculateProgress(tx, id);
+      return { success: true };
+    });
+  }
+
+  async approveExperienceRecord(id: number, expId: number, hrStatus: 'approved' | 'rejected', hrRemark: string, adminId: number) {
+    return this.db.transaction(async (tx) => {
+      const [exp] = await tx.select().from(onboardingExperience).where(eq(onboardingExperience.id, expId)).limit(1);
+      if (!exp) throw new NotFoundException('Experience record not found');
+
+      await tx.update(onboardingExperience).set({
+        hrStatus,
+        hrRemark,
+        updatedAt: new Date(),
+      }).where(eq(onboardingExperience.id, expId));
+
+      if (hrStatus === 'approved') {
+        const [req] = await tx.select({ userId: onboardingRequests.userId }).from(onboardingRequests).where(eq(onboardingRequests.id, id)).limit(1);
+        if (req?.userId) {
+          await this.syncExperienceToEmployee(tx, req.userId, exp);
+        }
+      }
+
+      await this.recalculateProgress(tx, id);
+      return { success: true };
+    });
+  }
+
+  async approveBankRecord(id: number, bankId: number, hrStatus: 'approved' | 'rejected', hrRemark: string, adminId: number) {
+    return this.db.transaction(async (tx) => {
+      const [bank] = await tx.select().from(onboardingBankDetails).where(eq(onboardingBankDetails.id, bankId)).limit(1);
+      if (!bank) throw new NotFoundException('Bank record not found');
+
+      await tx.update(onboardingBankDetails).set({
+        hrStatus,
+        hrRemark,
+        updatedAt: new Date(),
+      }).where(eq(onboardingBankDetails.id, bankId));
+
+      if (hrStatus === 'approved') {
+        const [req] = await tx.select({ userId: onboardingRequests.userId }).from(onboardingRequests).where(eq(onboardingRequests.id, id)).limit(1);
+        if (req?.userId) {
+          await this.syncBankToEmployee(tx, req.userId, bank);
+        }
+      }
+
+      await this.recalculateProgress(tx, id);
+      return { success: true };
+    });
+  }
+
+  async verifyDocument(id: number, docId: number, status: string, reason: string | undefined, adminId: number) {
+    return this.db.transaction(async (tx) => {
+      await tx.update(onboardingDocuments).set({
+        status: status === 'verified' ? 'submitted' : 'pending', // map internal status
+        hrStatus: status === 'verified' ? 'approved' : 'rejected',
+        hrRemark: reason || null,
+        verifiedBy: adminId,
+        verificationDate: new Date().toISOString().split('T')[0],
+        updatedAt: new Date(),
+      }).where(eq(onboardingDocuments.id, docId));
+
+      await this.recalculateProgress(tx, id);
+      return { success: true };
+    });
+  }
+
+  // ─── Data Sync Helpers (Onboarding -> Employee) ──────────────────────────────
+
+  private async syncProfileToEmployee(tx: any, userId: number, onProf: any) {
+    const fullName = [onProf.firstName, onProf.middleName, onProf.lastName].filter(Boolean).join(' ');
+    
+    // 1. Update userProfiles
+    await tx.update(userProfiles).set({
+      firstName: onProf.firstName,
+      middleName: onProf.middleName,
+      lastName: onProf.lastName,
+      dob: onProf.dob,
+      gender: onProf.gender,
+      maritalStatus: onProf.maritalStatus,
+      nationality: onProf.nationality,
+      aadharNumber: onProf.aadharNumber,
+      panNumber: onProf.panNumber,
+      phone: onProf.phone,
+      bloodGroup: onProf.bloodGroup,
+      linkedinProfile: onProf.linkedinProfile,
+      currentAddress: onProf.currentAddress,
+      permanentAddress: onProf.permanentAddress,
+      emergencyContact: onProf.emergencyContact,
+      profileCompleted: true,
+      updatedAt: new Date(),
+    }).where(eq(userProfiles.userId, userId));
+
+    // 2. Upsert employeeProfiles
+    const [existingEmp] = await tx.select().from(employeeProfiles).where(eq(employeeProfiles.userId, userId)).limit(1);
+    const empData = {
+      userId,
+      employeeType: onProf.employeeType,
+      status: onProf.employeeStatus || 'Active',
+      designationId: onProf.designationId,
+      departmentId: onProf.departmentId,
+      reportingManagerId: onProf.reportingManagerId,
+      workLocation: onProf.workLocation,
+      dateOfJoining: onProf.dateOfJoining,
+      probationMonths: onProf.probationMonths,
+      probationEndDate: onProf.probationEndDate,
+      salaryType: onProf.salaryType,
+      basicSalary: onProf.basicSalary,
+      hra: onProf.hra,
+      allowances: onProf.allowances,
+      bonus: onProf.bonus,
+      pfApplicable: onProf.pfApplicable,
+      esicApplicable: onProf.esicApplicable,
+      updatedAt: new Date(),
+    };
+
+    if (existingEmp) {
+      await tx.update(employeeProfiles).set(empData).where(eq(employeeProfiles.userId, userId));
+    } else {
+      await tx.insert(employeeProfiles).values({ ...empData, createdAt: new Date() });
+    }
+  }
+
+  private async syncEducationToEmployee(tx: any, userId: number, edu: any) {
+    await tx.insert(employeeEducation).values({
+      userId,
+      degree: edu.degree,
+      institution: edu.institution,
+      fieldOfStudy: edu.fieldOfStudy,
+      startDate: edu.startDate,
+      endDate: edu.endDate,
+      grade: edu.grade,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }
+
+  private async syncExperienceToEmployee(tx: any, userId: number, exp: any) {
+    await tx.insert(employeeExperience).values({
+      userId,
+      companyName: exp.companyName,
+      designation: exp.designation,
+      fromDate: exp.fromDate,
+      toDate: exp.toDate,
+      currentlyWorking: exp.currentlyWorking,
+      responsibilities: exp.responsibilities,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }
+
+  private async syncBankToEmployee(tx: any, userId: number, bank: any) {
+    await tx.insert(employeeBankDetails).values({
+      userId,
+      bankName: bank.bankName,
+      accountHolderName: bank.accountHolderName,
+      accountNumber: bank.accountNumber,
+      ifscCode: bank.ifscCode,
+      branchName: bank.branchName,
+      branchAddress: bank.branchAddress,
+      upiId: bank.upiId,
+      isPrimary: bank.isPrimary,
+      status: 'active',
+      createdAt: new Date(),
+      updatedAt: new Date(),
     });
   }
 

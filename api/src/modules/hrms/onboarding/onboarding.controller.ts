@@ -261,4 +261,61 @@ export class OnboardingController {
     await this.onboardingService.delete(id);
     return { success: true };
   }
+
+  // ─── Per-Section HR Approval Endpoints ─────────────────────────────────────
+
+  /**
+   * PATCH /hrms/onboarding/:id/approve-profile
+   */
+  @Patch(':id/approve-profile')
+  @UseGuards(JwtAuthGuard)
+  async approveProfile(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { status: 'approved' | 'rejected'; remark: string },
+    @Req() req: any,
+  ) {
+    return this.onboardingService.approveProfileSection(id, body.status, body.remark, req.user.id);
+  }
+
+  /**
+   * PATCH /hrms/onboarding/:id/approve-education/:eduId
+   */
+  @Patch(':id/approve-education/:eduId')
+  @UseGuards(JwtAuthGuard)
+  async approveEducation(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('eduId', ParseIntPipe) eduId: number,
+    @Body() body: { status: 'approved' | 'rejected'; remark: string },
+    @Req() req: any,
+  ) {
+    return this.onboardingService.approveEducationRecord(id, eduId, body.status, body.remark, req.user.id);
+  }
+
+  /**
+   * PATCH /hrms/onboarding/:id/approve-experience/:expId
+   */
+  @Patch(':id/approve-experience/:expId')
+  @UseGuards(JwtAuthGuard)
+  async approveExperience(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('expId', ParseIntPipe) expId: number,
+    @Body() body: { status: 'approved' | 'rejected'; remark: string },
+    @Req() req: any,
+  ) {
+    return this.onboardingService.approveExperienceRecord(id, expId, body.status, body.remark, req.user.id);
+  }
+
+  /**
+   * PATCH /hrms/onboarding/:id/approve-bank/:bankId
+   */
+  @Patch(':id/approve-bank/:bankId')
+  @UseGuards(JwtAuthGuard)
+  async approveBank(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('bankId', ParseIntPipe) bankId: number,
+    @Body() body: { status: 'approved' | 'rejected'; remark: string },
+    @Req() req: any,
+  ) {
+    return this.onboardingService.approveBankRecord(id, bankId, body.status, body.remark, req.user.id);
+  }
 }
