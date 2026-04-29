@@ -272,29 +272,25 @@ export const InfoSheetView = ({
                         )}
 
                         {/* Payment Terms */}
-                        {(infoSheet.paymentTermsSupply || infoSheet.paymentTermsInstallation) && (
-                            <>
-                                <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={4} className="font-semibold text-sm">
-                                        Payment Terms
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Payment Terms Supply (%)
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {formatValue(infoSheet.paymentTermsSupply)}
-                                    </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Payment Terms Installation (%)
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {formatValue(infoSheet.paymentTermsInstallation)}
-                                    </TableCell>
-                                </TableRow>
-                            </>
-                        )}
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                Payment Terms
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Payment Terms Supply (%)
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatValue(infoSheet.paymentTermsSupply)}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Payment Terms Installation (%)
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatValue(infoSheet.paymentTermsInstallation)}
+                            </TableCell>
+                        </TableRow>
 
                         {/* Commercial Evaluation */}
                         {(infoSheet.commercialEvaluation || infoSheet.mafRequired) && (
@@ -433,38 +429,34 @@ export const InfoSheetView = ({
                         </TableRow>
 
                         {/* Liquidated Damages */}
-                        {infoSheet.ldRequired && (
-                            <>
-                                <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={4} className="font-semibold text-sm">
-                                        Liquidated Damages
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        LD Applicable
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {formatYesNo(infoSheet.ldRequired)}
-                                    </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        LD Percentage Per Week
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {formatPercentage(Number(infoSheet.ldPercentagePerWeek))}
-                                    </TableCell>
-                                </TableRow>
-                                {infoSheet.maxLdPercentage && (
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Max LD Percentage
-                                        </TableCell>
-                                        <TableCell className="text-sm" colSpan={3}>
-                                            {formatPercentage(Number(infoSheet.maxLdPercentage))}
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </>
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                Liquidated Damages
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                LD Applicable
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatYesNo(infoSheet.ldRequired)}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                LD Percentage Per Week
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatPercentage(Number(infoSheet.ldPercentagePerWeek))}
+                            </TableCell>
+                        </TableRow>
+                        {infoSheet.maxLdPercentage && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Max LD Percentage
+                                </TableCell>
+                                <TableCell className="text-sm" colSpan={3}>
+                                    {formatPercentage(Number(infoSheet.maxLdPercentage))}
+                                </TableCell>
+                            </TableRow>
                         )}
 
                         {/* Eligibility Summary */}
