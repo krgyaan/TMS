@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type StageProgressStatus = "pending" | "in_progress" | "completed";
+export type StageProgressStatus = "pending" | "in_progress" | "submitted" | "completed";
 
 export type ProgressStage = {
   key: string;
@@ -173,135 +173,94 @@ export function OnboardingProgressBar({
 }: OnboardingProgressBarProps) {
   const clampedProgress = Math.min(100, Math.max(0, progress));
 
-  const completedCount = stages.filter(s => s.status === "completed").length;
-  const inProgressCount = stages.filter(s => s.status === "in_progress").length;
-
-  // Determine overall status label
-  const overallLabel = useMemo(() => {
-    if (clampedProgress === 100) return "Complete!";
-    if (completedCount === 0 && inProgressCount === 0) return "Not started";
-    return "In progress";
-  }, [clampedProgress, completedCount, inProgressCount]);
-
   return (
-    <div className={cn("space-y-5", className)}>
-      {/* ── Percentage Bar ───────────────────────────────────────────────── */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold text-foreground">
-              Overall Progress
-            </span>
-            <span
+    <div className={cn("space-y-6", className)}>
+      {/* Header Section */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-bold text-foreground">Onboarding Progress</h2>
+          <p className="text-xs text-muted-foreground">
+            Complete all stages to finalize your profile
+          </p>
+        </div>
+        <div className="flex items-center gap-3 bg-muted/30 px-4 py-2 rounded-2xl border border-border/50">
+          <div className="text-right">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Overall</p>
+            <p className="text-sm font-bold text-primary tabular-nums">{clampedProgress}%</p>
+          </div>
+          <div className="h-8 w-[2px] bg-border/50" />
+          <div className="h-10 w-10 rounded-full border-4 border-primary/20 flex items-center justify-center relative">
+            <svg className="h-full w-full -rotate-90 absolute">
+              <circle
+                cx="20"
+                cy="20"
+                r="16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="4"
+                className="text-primary"
+                strokeDasharray={100}
+                strokeDashoffset={100 - clampedProgress}
+                style={{ transition: "stroke-dashoffset 1s ease-out" }}
+              />
+            </svg>
+            <span className="text-[10px] font-bold z-10">{clampedProgress}%</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Non-Linear Status Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        {stages.map((stage, idx) => {
+          const isCompleted = stage.status === "completed" || stage.status === "submitted";
+          const Icon = stage.icon || Clock;
+
+          return (
+            <motion.div
+              key={stage.key}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: idx * 0.05 }}
               className={cn(
-                "text-[10px] font-semibold px-2 py-0.5 rounded-full",
-                clampedProgress === 100
-                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
-                  : clampedProgress > 0
-                  ? "bg-primary/10 text-primary"
-                  : "bg-muted text-muted-foreground"
+                "group relative rounded-2xl border p-3 transition-all duration-300",
+                isCompleted
+                  ? "bg-emerald-50/50 border-emerald-200/60 dark:bg-emerald-950/20 dark:border-emerald-800/40"
+                  : "bg-muted/30 border-border/50 opacity-60"
               )}
             >
-              {overallLabel}
-            </span>
-          </div>
-          <span className="text-sm font-bold text-primary tabular-nums">
-            {clampedProgress}%
-          </span>
-        </div>
+              <div className="flex flex-col gap-2">
+                <div className={cn(
+                  "h-8 w-8 rounded-xl flex items-center justify-center transition-colors",
+                  isCompleted 
+                    ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-400"
+                    : "bg-muted text-muted-foreground"
+                )}>
+                  {isCompleted ? <CheckCircle2 className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
+                </div>
+                
+                <div>
+                  <p className={cn(
+                    "text-[11px] font-bold truncate",
+                    isCompleted ? "text-emerald-700 dark:text-emerald-300" : "text-foreground"
+                  )}>
+                    {stage.label}
+                  </p>
+                  <p className="text-[9px] text-muted-foreground font-medium uppercase tracking-tighter mt-0.5">
+                    {stage.status === 'submitted' ? 'Review' : isCompleted ? 'Done' : 'Pending'}
+                  </p>
+                </div>
+              </div>
 
-        {/* Track */}
-        <div className="relative h-3 w-full rounded-full bg-muted/50 overflow-hidden">
-          {/* Segmented background marks */}
-          <div className="absolute inset-0 flex">
-            {stages.map((_, i) =>
-              i < stages.length - 1 ? (
-                <div
-                  key={i}
-                  className="flex-1 border-r border-background/50 last:border-r-0"
-                />
-              ) : (
-                <div key={i} className="flex-1" />
-              )
-            )}
-          </div>
-
-          {/* Filled progress */}
-          <motion.div
-            className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-primary via-primary/90 to-primary/80"
-            initial={{ width: 0 }}
-            animate={{ width: `${clampedProgress}%` }}
-            transition={{ duration: 1, ease: "easeOut", delay: 0.2 }}
-          >
-            {/* Shimmer */}
-            <div className="absolute inset-0 overflow-hidden rounded-full">
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/15 to-transparent animate-shimmer" />
-            </div>
-
-            {/* Glow on tip */}
-            {clampedProgress > 0 && clampedProgress < 100 && (
-              <div className="absolute right-0 top-1/2 -translate-y-1/2 h-5 w-5 rounded-full bg-primary/30 blur-md" />
-            )}
-          </motion.div>
-
-          {/* Completed checkmark at 100% */}
-          {clampedProgress === 100 && (
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: "spring", delay: 1 }}
-              className="absolute right-1 top-1/2 -translate-y-1/2"
-            >
-              <CheckCircle2 className="h-2.5 w-2.5 text-primary-foreground" />
+              {/* Status Indicator Bar at bottom */}
+              <div className="absolute bottom-0 left-0 right-0 h-1 overflow-hidden rounded-b-2xl">
+                <div className={cn(
+                  "h-full w-full",
+                  isCompleted ? "bg-emerald-500" : "bg-transparent"
+                )} />
+              </div>
             </motion.div>
-          )}
-        </div>
-      </div>
-
-      {/* ── Stepped Stage Indicators ─────────────────────────────────────── */}
-      <div className="relative">
-        {/* Connector track behind all steps */}
-        <div className="absolute top-4 left-0 right-0 h-0.5 bg-muted/30 rounded-full mx-[16.67%]" />
-
-        <div className="relative flex justify-between">
-          {stages.map((stage, index) => (
-            <StepIndicator
-              key={stage.key}
-              stage={stage}
-              stepNumber={index + 1}
-              isLast={index === stages.length - 1}
-              totalSteps={stages.length}
-              index={index}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* ── Summary Stats ────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-center gap-5 pt-1">
-        <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px]">
-          <span className="h-2 w-2 rounded-full bg-emerald-500" />
-          <span className="text-muted-foreground">
-            Completed{" "}
-            <span className="font-semibold text-foreground">{completedCount}</span>
-          </span>
-        </div>
-        <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px]">
-          <span className="h-2 w-2 rounded-full bg-primary" />
-          <span className="text-muted-foreground">
-            In Progress{" "}
-            <span className="font-semibold text-foreground">{inProgressCount}</span>
-          </span>
-        </div>
-        <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px]">
-          <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
-          <span className="text-muted-foreground">
-            Pending{" "}
-            <span className="font-semibold text-foreground">
-              {stages.length - completedCount - inProgressCount}
-            </span>
-          </span>
-        </div>
+          );
+        })}
       </div>
     </div>
   );

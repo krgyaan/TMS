@@ -227,8 +227,7 @@ function OnboardingBanner({
 }) {
   const config = getBannerConfig(onboardingStatus);
   const BannerIcon = config.icon;
-  const isProfileIncomplete = onboardingStatus.profileStatus !== 'completed';
-  const canEdit = !onboardingStatus.employeeCompleted;
+  const isProfileIncomplete = onboardingStatus.profileStatus === 'pending' || onboardingStatus.profileStatus === 'in_progress';
 
   return (
     <motion.div
@@ -261,13 +260,13 @@ function OnboardingBanner({
           </div>
         </div>
 
-        {onFillProfile && isProfileIncomplete && canEdit && (
+        {onFillProfile && isProfileIncomplete && (
           <Button 
             size="sm" 
             onClick={onFillProfile}
             className="rounded-xl px-6 h-9 sm:h-10 text-xs sm:text-sm font-bold shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all shrink-0"
           >
-            Fill Profile Details
+            {onboardingStatus.profileStatus === 'rejected' ? 'Re-fill Profile Details' : 'Fill Profile Details'}
           </Button>
         )}
       </div>
@@ -375,8 +374,6 @@ export function OnboardingView() {
   const { data, refetch } = useProfileContext();
   const [expandedStage, setExpandedStage] = useState<StageKey | null>(null);
   const [editingStage, setEditingStage] = useState<StageKey | null>(null);
-  const [showSubmitDialog, setShowSubmitDialog] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const onboardingStatus = data?.onboardingStatus;
   const profileFilled = hasProfileData(data);
@@ -391,7 +388,7 @@ export function OnboardingView() {
   }, [onboardingStatus, profileFilled, employeeCompleted]);
 
   // ── Stage statuses ─────────────────────────────────────────────────────
-  type StageStatusValue = "pending" | "in_progress" | "completed";
+  type StageStatusValue = "pending" | "submitted";
 
   const stageStatuses: Record<StageKey, StageStatusValue> = useMemo(() => ({
     profile: (onboardingStatus?.profileStatus as StageStatusValue) || "pending",
@@ -418,12 +415,6 @@ export function OnboardingView() {
   const documentDetails = useMemo(() => buildDocumentDetails(data), [data]);
   const bankDetailsSummary = useMemo(() => buildBankDetails(data), [data]);
 
-  // ── Can submit ─────────────────────────────────────────────────────────
-  const canSubmit = useMemo(() => {
-    if (employeeCompleted) return false;
-    const editableStages = STAGES_CONFIG.filter(s => !s.readOnly);
-    return editableStages.every(s => stageStatuses[s.key] !== "pending");
-  }, [stageStatuses, employeeCompleted]);
 
   // ── Handlers ───────────────────────────────────────────────────────────
 
@@ -433,19 +424,6 @@ export function OnboardingView() {
 
   const handleToggleExpand = (key: StageKey) => {
     setExpandedStage(prev => (prev === key ? null : key));
-  };
-
-  const handleSubmitOnboarding = async () => {
-    setIsSubmitting(true);
-    try {
-      await api.post("/profile/me/submit-onboarding");
-      setShowSubmitDialog(false);
-      refetch?.();
-    } catch (err) {
-      console.error("Submit onboarding error:", err);
-    } finally {
-      setIsSubmitting(false);
-    }
   };
 
   const handleCloseForm = () => {
@@ -616,13 +594,24 @@ export function OnboardingView() {
         {STAGES_CONFIG.map((stage, index) => {
           const stageStatus = stageStatuses[stage.key];
           
-          // Derive HR approval status
+          // Map rejection remarks from onboardingStatus
+          let rejection: string | null = null;
+          if (stage.key === 'profile') rejection = onboardingStatus.profileHrRemark ?? null;
+          else if (stage.key === 'bank') rejection = onboardingStatus.bankHrRemark ?? null;
+          else if (stage.key === 'education') rejection = onboardingStatus.educationHrRemark ?? null;
+          else if (stage.key === 'experience') rejection = onboardingStatus.experienceHrRemark ?? null;
+          else if (stage.key === 'documents') rejection = onboardingStatus.documentHrRemark ?? null;
+          
+          // Derive HR approval status for the card UI
           let approvalStatus: "pending" | "approved" | "rejected" | null = null;
-          if (employeeCompleted) {
-            if (stageStatus === "completed") {
-              approvalStatus = "approved";
-            } else {
-              approvalStatus = "pending";
+          if (stage.key === 'profile') approvalStatus = onboardingStatus.profileHrStatus;
+          else if (stage.key === 'bank') approvalStatus = onboardingStatus.bankHrStatus;
+          else if (stage.key === 'education') approvalStatus = onboardingStatus.educationHrStatus;
+          else if (stage.key === 'experience') approvalStatus = onboardingStatus.experienceHrStatus;
+          else if (stage.key === 'documents') approvalStatus = onboardingStatus.documentHrStatus;
+          else if (stage.key === 'induction') {
+            if (onboardingStatus.inductionStatus === 'submitted') {
+              approvalStatus = 'pending';
             }
           }
 
@@ -635,8 +624,9 @@ export function OnboardingView() {
               icon={stage.icon}
               status={stageStatus}
               approvalStatus={approvalStatus}
+              rejection={rejection}
               readOnly={stage.readOnly}
-              isSubmitted={employeeCompleted}
+              isSubmitted={stageStatus === 'submitted' || stageStatus === 'approved'}
               index={index}
               isExpanded={expandedStage === stage.key}
               onToggleExpand={() => handleToggleExpand(stage.key)}
@@ -660,138 +650,6 @@ export function OnboardingView() {
         })}
       </div>
 
-      {/* Submit Action Bar */}
-      {!employeeCompleted && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="rounded-2xl border border-border/40 bg-background/70 backdrop-blur-sm p-5 sm:p-6 shadow-sm"
-        >
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <h3 className="text-sm font-semibold text-foreground mb-1">
-                Ready to submit?
-              </h3>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                {canSubmit
-                  ? "All editable stages have been started. Submit your details for HR review."
-                  : "Complete all required stages before submitting for review."}
-              </p>
-            </div>
-            <Button
-              size="default"
-              disabled={!canSubmit}
-              onClick={() => setShowSubmitDialog(true)}
-              className="gap-2 rounded-xl px-6 text-sm font-semibold shrink-0 shadow-lg shadow-primary/10 disabled:shadow-none"
-            >
-              <Send className="h-4 w-4" />
-              Submit for Review
-            </Button>
-          </div>
-        </motion.div>
-      )}
-
-      {/* Submitted info */}
-      {employeeCompleted && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="rounded-2xl border border-blue-200 dark:border-blue-800/50 bg-blue-50/50 dark:bg-blue-950/20 p-5 sm:p-6"
-        >
-          <div className="flex items-start gap-3">
-            <div className="rounded-xl bg-blue-100 dark:bg-blue-900/50 p-2 shrink-0">
-              <Shield className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-1">
-                Details Submitted
-              </h3>
-              <p className="text-xs text-blue-600/80 dark:text-blue-400/70 leading-relaxed">
-                Your onboarding details were submitted for review. HR will verify your documents
-                and complete the induction tasks.
-              </p>
-              {onboardingStatus?.updatedAt && (
-                <p className="text-[10px] text-blue-500/60 mt-2 font-medium">
-                  Submitted on{" "}
-                  {new Date(onboardingStatus.updatedAt).toLocaleDateString("en-IN", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
-                </p>
-              )}
-            </div>
-          </div>
-        </motion.div>
-      )}
-
-      {/* Submit Dialog */}
-      <Dialog open={showSubmitDialog} onOpenChange={setShowSubmitDialog}>
-        <DialogContent className="sm:max-w-md rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Send className="h-4 w-4 text-primary" />
-              Submit Onboarding Details
-            </DialogTitle>
-            <DialogDescription className="text-sm leading-relaxed pt-2">
-              Once submitted, your details will be reviewed by HR. You won't be able to
-              make changes unless HR requests corrections.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="rounded-xl bg-muted/40 p-4 space-y-2">
-            {STAGES_CONFIG.filter(s => !s.readOnly).map(stage => {
-              const st = stageStatuses[stage.key];
-              return (
-                <div key={stage.key} className="flex items-center justify-between text-sm">
-                  <span className="text-foreground font-medium">{stage.label}</span>
-                  <span className={cn(
-                    "flex items-center gap-1.5 text-xs font-semibold",
-                    st === "completed"
-                      ? "text-emerald-600 dark:text-emerald-400"
-                      : st === "in_progress"
-                      ? "text-amber-600 dark:text-amber-400"
-                      : "text-muted-foreground"
-                  )}>
-                    {st === "completed" ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}
-                    {st === "completed" ? "Completed" : st === "in_progress" ? "In Progress" : "Pending"}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-
-          <DialogFooter className="flex-col sm:flex-row gap-2 pt-2">
-            <Button
-              variant="outline"
-              onClick={() => setShowSubmitDialog(false)}
-              className="rounded-xl"
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSubmitOnboarding}
-              disabled={isSubmitting}
-              className="rounded-xl gap-2"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Submitting…
-                </>
-              ) : (
-                <>
-                  <Send className="h-4 w-4" />
-                  Confirm & Submit
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </motion.div>
   );
 }

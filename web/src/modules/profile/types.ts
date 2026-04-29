@@ -38,11 +38,6 @@ export type EmployeeProfileData = {
   probationMonths: number;
   probationEndDate: string;
   salaryType: string;
-  bankName: string;
-  accountHolderName: string;
-  accountNumber: string;
-  ifscCode: string;
-  branchName: string;
   uanNumber: string;
   pfNumber: string;
   esicNumber: string;
@@ -127,6 +122,19 @@ export type ExperienceData = {
   status: string;
 };
 
+export type BankDetailData = {
+  id: number;
+  bankName: string;
+  accountHolderName: string;
+  accountNumber: string;
+  ifscCode: string;
+  branchName: string | null;
+  branchAddress: string | null;
+  upiId: string | null;
+  isPrimary: boolean;
+  status: string;
+};
+
 export type ProfileResponse = {
   currentUser: UserData;
   isOnboarding: boolean;
@@ -137,6 +145,7 @@ export type ProfileResponse = {
   documents: DocumentData[];
   education: EducationData[];
   experience: ExperienceData[];
+  bankAccounts: BankDetailData[];
   inductionTasks: InductionTaskData[];
   assets: AssetData[];
   complaints: ComplaintData[];
@@ -145,22 +154,48 @@ export type ProfileResponse = {
 };
 
 
+export type OnboardingStageStatus = "pending" | "submitted";
+export type OnboardingApprovalStatus = "pending" | "approved" | "rejected";
+
 export type OnboardingStatus = {
   id: number;
   requestType: "new_hire" | "re_onboarding";
   status: "pending" | "approved" | "rejected" | "fully_completed";
-  profileStatus: "pending" | "in_progress" | "completed";
-  documentStatus: "pending" | "in_progress" | "completed";
-  bankStatus: "pending" | "in_progress" | "completed";
-  educationStatus: "pending" | "in_progress" | "completed";
-  experienceStatus: "pending" | "in_progress" | "completed";
-  inductionStatus: "pending" | "in_progress" | "completed";
+  
+  // Employee Progress Statuses
+  profileStatus: OnboardingStageStatus;
+  documentStatus: OnboardingStageStatus;
+  bankStatus: OnboardingStageStatus;
+  educationStatus: OnboardingStageStatus;
+  experienceStatus: OnboardingStageStatus;
+  inductionStatus: OnboardingStageStatus;
+  
+  // HR Approval Statuses
+  profileHrStatus: OnboardingApprovalStatus;
+  bankHrStatus: OnboardingApprovalStatus;
+  educationHrStatus: OnboardingApprovalStatus;
+  experienceHrStatus: OnboardingApprovalStatus;
+  documentHrStatus: OnboardingApprovalStatus;
+  
   progress: number;
+  
+  /** HR remarks shown on stage cards when rejected */
+  profileHrRemark?: string | null;
+  bankHrRemark?: string | null;
+  educationHrRemark?: string | null;
+  experienceHrRemark?: string | null;
+  documentHrRemark?: string | null;
+
   employeeCompleted: boolean;
   hrCompleted: boolean;
+  
   createdAt: string;
   updatedAt: string;
 };
+
+
+
+
 
 
 
