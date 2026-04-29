@@ -10,9 +10,10 @@ import { formatDateTime } from '@/hooks/useFormatedDate';
 
 interface CostingSheetViewProps {
     costingSheet?: TenderCostingSheet | null;
+    vendors?: VendorOrganization[];
 }
 
-export function CostingSheetView({ costingSheet }: CostingSheetViewProps) {
+export function CostingSheetView({ costingSheet, vendors }: CostingSheetViewProps) {
     if (!costingSheet) return null;
 
     const getStatusVariant = (status: string) => {
@@ -125,7 +126,7 @@ export function CostingSheetView({ costingSheet }: CostingSheetViewProps) {
                                         Gross Margin
                                     </TableCell>
                                     <TableCell className="text-sm font-semibold">
-                                        {costingSheet.submittedGrossMargin ? `${costingSheet.submittedGrossMargin}%` : '—'}
+                                        {costingSheet.submittedGrossMargin ? `${parseFloat(costingSheet.submittedGrossMargin)}%` : '—'}
                                     </TableCell>
                                 </TableRow>
                                 {costingSheet.teRemarks && (
@@ -138,23 +139,13 @@ export function CostingSheetView({ costingSheet }: CostingSheetViewProps) {
                                         </TableCell>
                                     </TableRow>
                                 )}
-                                {costingSheet.submittedAt && (
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Submitted At
-                                        </TableCell>
-                                        <TableCell className="text-sm" colSpan={3}>
-                                            {formatDateTime(costingSheet.submittedAt)}
-                                        </TableCell>
-                                    </TableRow>
-                                )}
                             </>
                         )}
 
                         {/* Approved Values */}
-                        {(costingSheet.finalPrice || costingSheet.receiptPrice || costingSheet.budgetPrice) && (
+                        {(costingSheet.status == 'Approved') && (
                             <>
-                                <TableRow className="bg-muted/50">
+                                <TableRow className='w-full bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800'>
                                     <TableCell colSpan={4} className="font-semibold text-sm">
                                         Approved Values (by Team Lead)
                                     </TableCell>
@@ -184,7 +175,7 @@ export function CostingSheetView({ costingSheet }: CostingSheetViewProps) {
                                         Gross Margin
                                     </TableCell>
                                     <TableCell className="text-sm font-semibold">
-                                        {costingSheet.grossMargin ? `${costingSheet.grossMargin}%` : '—'}
+                                        {costingSheet.grossMargin ? `${parseFloat(costingSheet.grossMargin)}%` : '—'}
                                     </TableCell>
                                 </TableRow>
                                 {costingSheet.oemVendorIds && costingSheet.oemVendorIds.length > 0 && (
@@ -193,13 +184,13 @@ export function CostingSheetView({ costingSheet }: CostingSheetViewProps) {
                                             OEM Vendor IDs
                                         </TableCell>
                                         <TableCell className="text-sm" colSpan={3}>
-                                            <div className="flex flex-wrap gap-2">
-                                                {costingSheet.oemVendorIds.map((id) => (
-                                                    <Badge key={id} variant="outline">
-                                                        Vendor ID: {id}
-                                                    </Badge>
-                                                ))}
-                                            </div>
+                                            <div className="flex flex-wrap gap-2 mt-2">
+                                                {vendors && vendors.length > 0 ? (
+                                                    vendors.map(vendorOrg => (
+                                                        <Badge key={vendorOrg.id} variant="outline" className="border-green-200 dark:border-green-800">{vendorOrg.name}</Badge>
+                                                    ))
+                                                ) : <p className="text-sm text-muted-foreground">—</p>}
+                                            </div>  
                                         </TableCell>
                                     </TableRow>
                                 )}
@@ -213,23 +204,13 @@ export function CostingSheetView({ costingSheet }: CostingSheetViewProps) {
                                         </TableCell>
                                     </TableRow>
                                 )}
-                                {costingSheet.approvedAt && (
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Approved At
-                                        </TableCell>
-                                        <TableCell className="text-sm" colSpan={3}>
-                                            {formatDateTime(costingSheet.approvedAt)}
-                                        </TableCell>
-                                    </TableRow>
-                                )}
                             </>
                         )}
 
                         {/* Rejection Reason */}
                         {costingSheet.rejectionReason && (
                             <>
-                                <TableRow className="bg-muted/50">
+                                <TableRow className='w-full bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-800'>
                                     <TableCell colSpan={4} className="font-semibold text-sm">
                                         Rejection Details
                                     </TableCell>
@@ -275,10 +256,13 @@ export function CostingSheetView({ costingSheet }: CostingSheetViewProps) {
 }
 
 import { useCostingSheetByTender } from '@/hooks/api/useCostingSheets';
+import { useVendorOrganizations } from '@/hooks/api/useVendorOrganizations';
+import type { VendorOrganization } from '@/types/api.types';
 
-/** Self-fetching section for Costing Sheet */
+/** Smart Section component for Costing Sheet and Approval Details */
 export function CostingSheetSection({ tenderId }: { tenderId: number | null }) {
     const { data: costingSheet, isLoading } = useCostingSheetByTender(tenderId ?? 0);
+    const { data: vendorOrganizations } = useVendorOrganizations();
 
     if (isLoading) {
         return (
@@ -310,5 +294,13 @@ export function CostingSheetSection({ tenderId }: { tenderId: number | null }) {
         );
     }
 
-    return <CostingSheetView costingSheet={costingSheet ?? null} />;
+    const selectedVendorOrganizations = vendorOrganizations?.filter(vo =>
+        costingSheet?.oemVendorIds?.includes(vo.id) || false
+    ) || [];
+
+    return (
+        <div className="space-y-6">
+            <CostingSheetView costingSheet={costingSheet ?? null} vendors={selectedVendorOrganizations} />
+        </div>
+    );
 }
