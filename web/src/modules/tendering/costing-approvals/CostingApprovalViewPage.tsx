@@ -10,6 +10,9 @@ import { BidSubmissionSection } from '@/modules/tendering/bid-submissions/compon
 import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
 import { useTenderStepStatuses } from "@/hooks/api/useTenderStepStatuses";
 import { CostingSheetSection } from '../costing-sheets/components/CostingSheetView';
+import { RaSection } from '../ras/components/RaShow';
+import { TqTenderSection } from '../tq-management/components/TqView';
+import { TenderResultSection } from '../results/components/TenderResultShow';
 
 export default function CostingApprovalViewPage() {
     const { tenderId: tenderIdParam } = useParams<{ tenderId: string }>();
@@ -40,15 +43,18 @@ export default function CostingApprovalViewPage() {
             case "rfq":              return <RfqSection tenderId={tenderId} />;
             case "emd-fees":         return <EmdTenderFeeSection tenderId={tenderId} />;
             case "checklist":        return <DocumentChecklistSection tenderId={tenderId} />;
-            case "bid":              return <BidSubmissionSection tenderId={tenderId} />;
             case "costing":          return <CostingSheetSection tenderId={tenderId} />;
+            case "bid":              return <BidSubmissionSection tenderId={tenderId} />;
+            case "tq-management":  return <TqTenderSection tenderId={tenderId} />;
+            case "ra-management":  return <RaSection tenderId={tenderId!} />;
+            case "result":         return <TenderResultSection tenderId={tenderId} />;
             default: return null;
         }
     };
 
     return (
         <ShowPageLayout
-            steps={tenderSteps.filter(s => ["tender-details", "physical-docs", "rfq", "emd-fees", "checklist", "bid", "costing"].includes(s.id))}
+            steps={tenderSteps.filter(s => ["tender-details", "physical-docs", "rfq", "emd-fees", "checklist", "costing", "bid", "tq-management", "ra-management", "result"].includes(s.id))}
             expandedSections={expandedSections}
             onToggleSection={toggleSection}
             onExpandAll={expandAll}
