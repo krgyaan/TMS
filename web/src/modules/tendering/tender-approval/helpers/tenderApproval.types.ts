@@ -53,7 +53,9 @@ export interface TenderApproval {
     alternativeTechnicalDocs?: string[] | null;
     alternativeFinancialDocs?: string[] | null;
     tenderStatus: number | null;
+    statusName: string | null;
     oemNotAllowed: string | null;
+    oemNotAllowedName: string | null;
     tlRejectionRemarks: string | null;
     tlIncompleteRemarks: string | null;
     incompleteFields?: IncompleteField[];
