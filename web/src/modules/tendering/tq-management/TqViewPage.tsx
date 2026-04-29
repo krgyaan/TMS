@@ -58,15 +58,15 @@ export default function TqViewPage() {
             case "costing": return <CostingSheetSection tenderId={parsedTenderId} />;
             case "bid": return <BidSubmissionSection tenderId={parsedTenderId} />;
             case "tq-management": return <TqTenderSection tenderId={parsedTenderId} />;
-            case "ra": return <RaSection tenderId={parsedTenderId} />;
-            case "tender-result": return <TenderResultSection tenderId={parsedTenderId} />;
+            case "ra-management": return <RaSection tenderId={parsedTenderId} />;
+            case "result": return <TenderResultSection tenderId={parsedTenderId} />;
             default: return null;
         }
     };
 
     return (
         <ShowPageLayout
-            steps={tenderSteps.filter(s => ["tender-details", "physical-docs", "emd-fees", "rfq", "checklist", "costing", "bid", "tq-management","ra", "tender-result"].includes(s.id))}
+            steps={tenderSteps.filter(s => ["tender-details", "physical-docs", "emd-fees", "rfq", "checklist", "costing", "bid", "tq-management", "ra-management", "result"].includes(s.id))}
             expandedSections={expandedSections}
             onToggleSection={toggleSection}
             onExpandAll={expandAll}
