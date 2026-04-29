@@ -1,3 +1,4 @@
+import { parseFileArray } from "@/lib/utils";
 import type { AssignOeFormValues, WoBasicDetailFormValues } from "./basiDetail.types";
 import type { WoBasicDetail, CreateWoBasicDetailDto, UpdateWoBasicDetailDto } from "@/modules/operations/types/wo.types";
 
@@ -27,16 +28,7 @@ export const buildDefaultValues = (): WoBasicDetailFormValues => ({
   },
 });
 
-const safeParseJsonArray = (val: string | null | undefined): string[] => {
-  if (!val) return [];
-  try {
-    const parsed = JSON.parse(val);
-    return Array.isArray(parsed) ? parsed : [String(val)];
-  } catch (e) {
-    // If it's not valid JSON, it's likely a legacy plain string path
-    return [String(val)];
-  }
-};
+
 
 export const mapResponseToForm = (data: WoBasicDetail): WoBasicDetailFormValues => {
   return {
@@ -51,7 +43,7 @@ export const mapResponseToForm = (data: WoBasicDetail): WoBasicDetailFormValues 
     grossMargin: Number(data.grossMargin) || 0,
     projectCode: data.projectCode || "",
     projectName: data.projectName || "",
-    wo_draft: safeParseJsonArray(data.woDraft),
+    woDraft: parseFileArray(data.woDraft),
     tmsDocuments: data.tmsDocuments || {
       "Complete Tender Documents": false,
       "Tender Info": false,

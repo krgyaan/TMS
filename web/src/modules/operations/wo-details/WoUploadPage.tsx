@@ -1,3 +1,4 @@
+import { parseFileArray } from '@/lib/utils';
 import { useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -109,7 +110,7 @@ const WoUploadPage = () => {
 
     // PO Amendment logic
     const isAmendmentNeeded = data?.oeWoAmendmentNeeded === true || data?.amendments;
-    const basicDraftPath = data?.woBasicDetail?.woDraft;
+    const basicDraftFiles = parseFileArray(data?.woBasicDetail?.woDraft);
 
     return (
         <Card>
@@ -169,15 +170,20 @@ const WoUploadPage = () => {
                                 <p className="text-sm text-muted-foreground">
                                     Amendment was not needed. Using pre-uploaded file from Basic Details.
                                 </p>
-                                {basicDraftPath ? (
-                                    <a
-                                        href={tenderFilesService.getFileUrl(basicDraftPath)}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-primary underline text-sm"
-                                    >
-                                        View Draft WO
-                                    </a>
+                                {basicDraftFiles.length > 0 ? (
+                                    <div className="flex flex-col gap-2">
+                                        {basicDraftFiles.map((file, idx) => (
+                                            <a
+                                                key={idx}
+                                                href={tenderFilesService.getFileUrl(file)}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-primary underline text-sm"
+                                            >
+                                                View Draft WO {basicDraftFiles.length > 1 ? idx + 1 : ''}
+                                            </a>
+                                        ))}
+                                    </div>
                                 ) : (
                                     <p className="text-sm text-destructive">No draft WO found in Basic Details.</p>
                                 )}
