@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Eye, FileX2, Search, Edit, UserPlus, Plus, FileText } from 'lucide-react';
+import { AlertCircle, Eye, FileX2, Search, Edit, UserPlus, Plus, FileText, LayoutDashboard } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -109,6 +109,12 @@ const BasicDetailListPage = () => {
             label: 'View Details',
             onClick: (row) => navigate(paths.operations.woBasicDetailShowPage((row.id))),
             icon: <Eye className="h-4 w-4" />,
+        },
+        {
+            label: 'View Project',
+            onClick: (row) => navigate(paths.operations.projectDashboard(row.projectId)),
+            icon: <LayoutDashboard className="h-4 w-4" />,
+            visible: (row) => !!row.projectId,
         },
         {
             label: 'Assign OE',
