@@ -52,6 +52,7 @@ import { createActionColumnRenderer } from "@/components/data-grid/renderers/Act
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import type { GridApi } from "ag-grid-community";
 import {ProofViewer, type ProofViewerProps} from "./components/ProofViewer"
+import { useAuth } from "@/contexts/AuthContext";
 
 /* ================================
    UTILITY FUNCTIONS
@@ -123,6 +124,10 @@ const StatCard: React.FC<StatCardProps> = ({ label, value, icon }) => (
 ================================ */
 export default function ProjectDashboardPage() {
     const [searchParams] = useSearchParams();
+
+    const {isTeamLeader, isAdmin, isSuperUser, teamId} = useAuth();
+
+    const isOpsTeamLeader = isTeamLeader && teamId == 2;
 
     const id = searchParams.get("id"); // string | null
 
@@ -511,26 +516,31 @@ export default function ProjectDashboardPage() {
                     </div>
 
                     {/* Project Selection */}
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="md:col-span-1">
-                                    <FormProvider {...form}>
-                                        <SelectField
-                                            control={form.control}
-                                            name="projectId"
-                                            label="Select Project"
-                                            placeholder="-- Select Project --"
-                                            options={projects.map((p: any) => ({
-                                                id: String(p.id),
-                                                name: p.projectName,
-                                            }))}
-                                        />
-                                    </FormProvider>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
+
+                    {(isOpsTeamLeader || isAdmin || isSuperUser) &&
+                        (
+                            <Card>
+                                <CardContent className="pt-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="md:col-span-1">
+                                            <FormProvider {...form}>
+                                                <SelectField
+                                                    control={form.control}
+                                                    name="projectId"
+                                                    label="Select Project"
+                                                    placeholder="-- Select Project --"
+                                                    options={projects.map((p: any) => ({
+                                                        id: String(p.id),
+                                                        name: p.projectName,
+                                                    }))}
+                                                />
+                                            </FormProvider>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )
+                    }
 
                     {projectId && isLoading && (
                         <Card>
