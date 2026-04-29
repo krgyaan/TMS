@@ -305,7 +305,6 @@ export class WoBasicDetailsService {
         }
 
         const response = this.mapRowToResponse(row);
-        response.projectId = await this.getProjectId(row.tenderId);
         return response;
     }
 
