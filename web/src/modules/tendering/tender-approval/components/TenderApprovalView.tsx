@@ -175,7 +175,7 @@ export function TenderApprovalView({
                                 </Badge>
                             </TableCell>
                         </TableRow>
-                        {approval.tlStatus && (
+                        {!!approval.tlStatus && (
                             <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     Tender Approval Status
