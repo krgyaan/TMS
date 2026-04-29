@@ -9,7 +9,6 @@ import { useBidSubmissionByTender } from "@/hooks/api/useBidSubmissions";
 import { useTenderResultByTenderId } from "@/hooks/api/useTenderResults";
 import { useTqById, useTqByTender } from "@/hooks/api/useTqManagement";
 import { useReverseAuctionByTender } from "@/hooks/api/useReverseAuctions";
-import { useRfqResponse } from "@/hooks/api/useRfqResponses";
 import { useRequestExtension } from "@/hooks/api/useRequestExtension";
 import { useSubmitQuery } from "@/hooks/api/useSubmitQuery";
 import type { StepStatus } from "@/modules/tendering/components/ShowPageLayout";
@@ -31,16 +30,14 @@ export interface TenderStepStatus {
 }
 
 export interface UseTenderStepStatusesOptions {
-    rfqResponseId?: number | null;
     requestExtensionId?: number | null;
     submitQueryId?: number | null;
     tqId?: number | null;
 }
 
 export function useTenderStepStatuses(tenderId: number | null, options: UseTenderStepStatusesOptions = {}) {
-    const { rfqResponseId, requestExtensionId, submitQueryId, tqId } = options;
+    const { requestExtensionId, submitQueryId, tqId } = options;
 
-    const { data: rfqResponse, isLoading: l12 } = useRfqResponse(rfqResponseId ?? null);
     const { data: requestExt, isLoading: l13 } = useRequestExtension(requestExtensionId ?? null);
     const { data: submitQuery, isLoading: l14 } = useSubmitQuery(submitQueryId ?? null);
     const { data: tqById, isLoading: l10b } = useTqById(tqId ?? 0);
@@ -49,7 +46,6 @@ export function useTenderStepStatuses(tenderId: number | null, options: UseTende
         (Array.isArray(tqById) ? tqById[0]?.tenderId : tqById?.tenderId) || 
         requestExt?.tenderId || 
         submitQuery?.tenderId || 
-        rfqResponse?.rfq?.tenderId || 
         null;
 
     const { data: tender, isLoading: l1 } = useTender(resolvedTenderId);
@@ -93,19 +89,10 @@ export function useTenderStepStatuses(tenderId: number | null, options: UseTende
             status: deriveStatus(Array.isArray(rfq) && rfq.length > 0, l4),
         },
         {
-            id: "rfq-response",
-            label: "RFQ Response",
-            shortLabel: "Response",
-            stepNumber: 4,
-            hasData: !!rfqResponse,
-            isLoading: l12,
-            status: deriveStatus(!!rfqResponse, l12),
-        },
-        {
             id: "emd-fees",
             label: "EMD & Tender Fees",
             shortLabel: "EMD / Fees",
-            stepNumber: 5,
+            stepNumber: 4,
             hasData: Array.isArray(paymentReqs) && paymentReqs.length > 0,
             isLoading: l5,
             status: deriveStatus(Array.isArray(paymentReqs) && paymentReqs.length > 0, l5),
@@ -114,7 +101,7 @@ export function useTenderStepStatuses(tenderId: number | null, options: UseTende
             id: "checklist",
             label: "Document Checklist",
             shortLabel: "Checklist",
-            stepNumber: 6,
+            stepNumber: 5,
             hasData: !!checklist,
             isLoading: l6,
             status: deriveStatus(!!checklist, l6),
@@ -123,7 +110,7 @@ export function useTenderStepStatuses(tenderId: number | null, options: UseTende
             id: "costing",
             label: "Costing Sheet",
             shortLabel: "Costing",
-            stepNumber: 7,
+            stepNumber: 6,
             hasData: !!costingSheet,
             isLoading: l7,
             status: deriveStatus(!!costingSheet, l7),
@@ -132,7 +119,7 @@ export function useTenderStepStatuses(tenderId: number | null, options: UseTende
             id: "bid",
             label: "Bid Submission",
             shortLabel: "Bid",
-            stepNumber: 8,
+            stepNumber: 7,
             hasData: !!bidSubmission,
             isLoading: l8,
             status: deriveStatus(!!bidSubmission, l8),
@@ -141,7 +128,7 @@ export function useTenderStepStatuses(tenderId: number | null, options: UseTende
             id: "tq-management",
             label: "TQ Management",
             shortLabel: "TQ",
-            stepNumber: 9,
+            stepNumber: 8,
             hasData: !!tqByTender || !!tqById,
             isLoading: l10a || l10b,
             status: deriveStatus(!!tqByTender || !!tqById, l10a || l10b),
@@ -150,7 +137,7 @@ export function useTenderStepStatuses(tenderId: number | null, options: UseTende
             id: "ra-management",
             label: "RA Management",
             shortLabel: "RA",
-            stepNumber: 10,
+            stepNumber: 9,
             hasData: !!raData,
             isLoading: l11,
             status: deriveStatus(!!raData, l11),
@@ -159,7 +146,7 @@ export function useTenderStepStatuses(tenderId: number | null, options: UseTende
             id: "request-extension",
             label: "Request Extension",
             shortLabel: "Extension",
-            stepNumber: 11,
+            stepNumber: 10,
             hasData: !!requestExt,
             isLoading: l13,
             status: deriveStatus(!!requestExt, l13),
@@ -168,7 +155,7 @@ export function useTenderStepStatuses(tenderId: number | null, options: UseTende
             id: "submit-query",
             label: "Submit Query",
             shortLabel: "Query",
-            stepNumber: 12,
+            stepNumber: 11,
             hasData: !!submitQuery,
             isLoading: l14,
             status: deriveStatus(!!submitQuery, l14),
@@ -177,12 +164,12 @@ export function useTenderStepStatuses(tenderId: number | null, options: UseTende
             id: "result",
             label: "Result",
             shortLabel: "Result",
-            stepNumber: 13,
+            stepNumber: 12,
             hasData: !!tenderResult,
             isLoading: l9,
             status: deriveStatus(!!tenderResult, l9),
         },
     ];
 
-    return { steps, tender, approval, rfqResponse, requestExt, submitQuery, tqData: tqByTender || tqById, raData };
+    return { steps, tender, approval, requestExt, submitQuery, tqData: tqByTender || tqById, raData };
 }
