@@ -1,9 +1,8 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table";
-import { FileText } from "lucide-react";
-import type { TenderInfoWithNames } from "@/modules/tendering/tenders/helpers/tenderInfo.types";
+import { AlertCircle, FileText } from "lucide-react";
 import { formatDateTime, formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { BI_STATUSES, formatValue, getReadableStatusName, getStatusBadgeVariant } from "../constants";
@@ -42,8 +41,7 @@ interface PaymentRequest {
 
 interface EmdTenderFeeShowProps {
     paymentRequests?: PaymentRequest[] | null;
-    tender?: TenderInfoWithNames | null;
-    isLoading?: boolean;
+    text: string;
 }
 
 const hasValue = (value?: string | Date | number | null) => {
@@ -178,42 +176,8 @@ const renderValue = (value: any) => {
     return String(value);
 };
 
-export const EmdTenderFeeShow = ({ paymentRequests, isLoading }: EmdTenderFeeShowProps) => {
-    if (isLoading) {
-        return (
-            <Card>
-                <CardHeader className="pb-3">
-                    <Skeleton className="h-5 w-40" />
-                </CardHeader>
-                <CardContent className="pt-0">
-                    <div className="space-y-2">
-                        {Array.from({ length: 4 }).map((_, idx) => (
-                            <Skeleton key={idx} className="h-10 w-full" />
-                        ))}
-                    </div>
-                </CardContent>
-            </Card>
-        );
-    }
-
-    if (!paymentRequests || paymentRequests.length === 0) {
-        return (
-            <Card>
-                <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                        <FileText className="h-4 w-4" />
-                        Payment Requests Details
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                    <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-                        <FileText className="h-8 w-8 mb-2 opacity-50" />
-                        <p className="text-sm">No payment requests available for this tender.</p>
-                    </div>
-                </CardContent>
-            </Card>
-        );
-    }
+export const EmdTenderFeeShow = ({ paymentRequests, text }: EmdTenderFeeShowProps) => {
+    if (!paymentRequests) return null;
 
     const emdRequest = paymentRequests.find(r => r.purpose === "EMD");
     const tenderFeeRequest = paymentRequests.find(r => r.purpose === "Tender Fee");
@@ -226,7 +190,7 @@ export const EmdTenderFeeShow = ({ paymentRequests, isLoading }: EmdTenderFeeSho
             <>
                 <TableRow className="bg-muted/30">
                     <TableCell colSpan={4} className="font-medium text-sm italic">
-                        {purposeLabel} - Instrument Details
+                        {purposeLabel} Details
                     </TableCell>
                 </TableRow>
                 {instruments.map((instrument, idx) => (
@@ -237,7 +201,9 @@ export const EmdTenderFeeShow = ({ paymentRequests, isLoading }: EmdTenderFeeSho
                             <TableCell className="text-sm font-semibold">{instrument.instrumentType}</TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">Status</TableCell>
                             <TableCell>
-                                <Badge variant={getStatusBadgeVariant(instrument.status) as any}>{getReadableStatusName(instrument.status as keyof typeof BI_STATUSES)}</Badge>
+                                <Badge variant={getStatusBadgeVariant(instrument.status) as any}>
+                                    {getReadableStatusName(instrument.status as keyof typeof BI_STATUSES)}
+                                </Badge>
                                 {/* <span>{instrument.action}</span> */}
                             </TableCell>
                         </TableRow>
@@ -384,13 +350,14 @@ export const EmdTenderFeeShow = ({ paymentRequests, isLoading }: EmdTenderFeeSho
     };
 
     return (
-        <Card>
-            {/* <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    Payment Requests Details
-                </CardTitle>
-            </CardHeader> */}
+        <div className="space-y-4">
+            {text && (
+                <Alert variant="default" className="border-amber-500/30 text-amber-950 dark:border-amber-500/30 dark:text-amber-50 bg-amber-50 dark:bg-amber-950/20">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{text} {text.split(",").length > 1 ? "are" : "is"} not applicable for this tender.</AlertDescription>
+                </Alert>
+            )}
+            <Card>
             <CardContent>
                 <Table>
                     <TableBody>
@@ -483,13 +450,61 @@ export const EmdTenderFeeShow = ({ paymentRequests, isLoading }: EmdTenderFeeSho
                 </Table>
             </CardContent>
         </Card>
+        </div>
     );
 };
 
 import { usePaymentRequestsByTender } from '@/hooks/api/useEmds';
+import { useInfoSheet } from "@/hooks/api/useInfoSheets";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 /** Self-fetching section for EMD & Tender Fees */
 export function EmdTenderFeeSection({ tenderId }: { tenderId: number | null }) {
-    const { data: paymentRequests, isLoading } = usePaymentRequestsByTender(tenderId);
-    return <EmdTenderFeeShow paymentRequests={paymentRequests ?? null} isLoading={isLoading} />;
+    const { data: paymentRequests, isLoading: isLoadingPaymentRequests } = usePaymentRequestsByTender(tenderId);
+    const { data: infoSheet, isLoading: isLoadingInfoSheet } = useInfoSheet(tenderId);
+
+    if (isLoadingPaymentRequests || isLoadingInfoSheet) {
+        return (
+            <Card>
+                <CardHeader className="pb-3">
+                    <Skeleton className="h-5 w-40" />
+                </CardHeader>
+                <CardContent className="pt-0">
+                    <div className="space-y-2">
+                        {Array.from({ length: 4 }).map((_, idx) => (
+                            <Skeleton key={idx} className="h-10 w-full" />
+                        ))}
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    let text = "";
+    if (infoSheet?.emdRequired == 'NO' || infoSheet?.emdRequired == 'EXEMPT' || infoSheet?.emdRequired == null) text += "EMD, ";
+    if (infoSheet?.tenderFeeRequired == 'NO' || infoSheet?.tenderFeeRequired == null) text += "Tender Fee, ";
+    if (infoSheet?.processingFeeRequired == 'NO' || infoSheet?.processingFeeRequired == null) text += "Processing Fee";
+
+    if (!paymentRequests || paymentRequests.length === 0) {
+        return (
+            <Card>
+                <CardContent className="pt-0">
+                    {
+                        text && (
+                            <Alert variant="default" className="border-amber-500/30 text-amber-950 dark:border-amber-500/30 dark:text-amber-50 bg-amber-50 dark:bg-amber-950/20">
+                                <AlertCircle className="h-4 w-4" />
+                                <AlertDescription>{text} {text.split(",").length > 1 ? "are" : "is"} not applicable for this tender.</AlertDescription>
+                            </Alert>
+                        )
+                    }
+                    <div className="flex flex-col items-center justify-center py-6 ">
+                        <FileText className="h-8 w-8 mb-2 opacity-50" />
+                        <p className="text-sm text-muted-foreground">No {['EMD', 'Tender Fee', 'Processing Fee'].filter((t) => !text.includes(t)).join(", ")} requests available for this tender.</p>
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    return <EmdTenderFeeShow paymentRequests={paymentRequests ?? null} text={text} />;
 }
