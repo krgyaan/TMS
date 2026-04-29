@@ -1,64 +1,20 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { FileText, ExternalLink, Download } from 'lucide-react';
 import type { Rfq } from '../helpers/rfq.types';
-import type { TenderInfoWithNames } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 
 interface RfqViewProps {
     rfq: Rfq | null;
-    tender?: TenderInfoWithNames;
-    isLoading?: boolean;
-    className?: string;
 }
 
-export function RfqView({
-    rfq,
-    isLoading = false,
-    className = '',
-}: RfqViewProps) {
-    if (isLoading) {
-        return (
-            <Card className={className}>
-                <CardHeader className="pb-3">
-                    <Skeleton className="h-5 w-40" />
-                </CardHeader>
-                <CardContent className="pt-0">
-                    <div className="space-y-2">
-                        {Array.from({ length: 4 }).map((_, i) => (
-                            <Skeleton key={i} className="h-10 w-full" />
-                        ))}
-                    </div>
-                </CardContent>
-            </Card>
-        );
-    }
-
-    if (!rfq) {
-        return (
-            <Card className={className}>
-                <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                        <FileText className="h-4 w-4" />
-                        RFQ
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                    <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-                        <FileText className="h-8 w-8 mb-2 opacity-50" />
-                        <p className="text-sm">No RFQ available for this tender yet.</p>
-                    </div>
-                </CardContent>
-            </Card>
-        );
-    }
-
+export function RfqView({ rfq }: RfqViewProps) {
+    if (!rfq) return null;
     return (
-        <Card className={className}>
-
+        <Card>
             <CardContent className="p-2">
                 <Table>
                     <TableBody>
@@ -240,14 +196,14 @@ export function RfqView({
 import { useRfqByTenderId } from '@/hooks/api/useRfqs';
 import { useRfqResponses } from '@/hooks/api/useRfqResponses';
 import { RfqResponseDetailAccordion } from '@/modules/tendering/rfq-response/components/RfqResponseDetailAccordion';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
 import { useMemo } from 'react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
 
 /** Local component for RFQ item with its responses (from RfqShowPage) */
 function RfqItemWithResponses({ rfq, index }: { rfq: Rfq; index: number }) {
     const { data: rfqResponses = [], isLoading: rfqResponsesLoading } = useRfqResponses(rfq.id);
+    if (!rfq) return null;
 
     const groupedResponses = useMemo(() => {
         const groups: Record<string, typeof rfqResponses> = {};
@@ -282,10 +238,7 @@ function RfqItemWithResponses({ rfq, index }: { rfq: Rfq; index: number }) {
                 </AccordionTrigger>
                 <AccordionContent className="px-4 pb-4 pt-2 border-t">
                     <div className="space-y-4 mt-2">
-                        <RfqView
-                            rfq={rfq}
-                            isLoading={false}
-                        />
+                        <RfqView rfq={rfq} />
                         <div className="flex items-center justify-between mt-4">
                             <h3 className="text-[11px] font-bold uppercase tracking-tight text-muted-foreground">Responses</h3>
                         </div>
@@ -329,18 +282,46 @@ function RfqItemWithResponses({ rfq, index }: { rfq: Rfq; index: number }) {
 
 /** Self-fetching section that renders multiple RFQs + Responses */
 export function RfqSection({ tenderId }: { tenderId: number | null }) {
-    const { data: rfqData, isLoading: rfqLoading } = useRfqByTenderId(tenderId);
+    const { data: approvalData } = useTenderApproval(tenderId);
+    const { data: rfqData, isLoading } = useRfqByTenderId(tenderId);
 
-    if (rfqLoading) return <div className="space-y-4">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}</div>;
-
-    if (!Array.isArray(rfqData) || rfqData.length === 0) {
+    if (!approvalData?.rfqRequired) {
         return (
-            <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                    No RFQ exists for this tender yet.
-                </AlertDescription>
-            </Alert>
+            <Card>
+                <CardContent className="pt-0">
+                    <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                        <FileText className="h-8 w-8 mb-2 opacity-50" />
+                        <p className="text-sm">RFQ not required for this tender.</p>
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (isLoading) {
+        return (
+            <Card>
+                <CardContent className="pt-0">
+                    <div className="space-y-2">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                            <Skeleton key={i} className="h-10 w-full" />
+                        ))}
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (!rfqData || rfqData.length === 0) {
+        return (
+            <Card>
+                <CardContent className="pt-0">
+                    <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                        <FileText className="h-8 w-8 mb-2 opacity-50" />
+                        <p className="text-sm">No RFQ available for this tender yet.</p>
+                    </div>
+                </CardContent>
+            </Card>
         );
     }
 
@@ -351,7 +332,7 @@ export function RfqSection({ tenderId }: { tenderId: number | null }) {
                     key={rfq.id}
                     rfq={rfq}
                     index={index + 1}
-                />
+                />  
             ))}
         </div>
     );
