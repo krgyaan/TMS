@@ -15,12 +15,17 @@ export interface PhysicalDocsPerson {
     phone: string;
 }
 
+export type SubmittedDoc = {
+    id: number;
+    name: string;
+};
+
 // Response from API - Physical Docs with Persons
 export interface PhysicalDocsResponse {
     id: number;
     tenderId: number;
     courierNo: number;
-    submittedDocs: string | null;
+    submittedDocs: SubmittedDoc[] | null;
     persons: Array<{
         id: number;
         physicalDocId: number;
@@ -54,7 +59,7 @@ export interface PhysicalDocs {
     id: number;
     tenderId: number;
     courierNo: number;
-    submittedDocs: string | null;
+    submittedDocs: SubmittedDoc[] | null;
     persons: PhysicalDocsPerson[];
     createdAt?: string;
     updatedAt?: string;
@@ -99,7 +104,7 @@ export interface PhysicalDocWithPersons {
     id: number;
     tenderId: number;
     courierNo: number;
-    submittedDocs: string | null;
+    submittedDocs: SubmittedDoc[] | null;
     persons: PhysicalDocsPerson[];
 }
 
