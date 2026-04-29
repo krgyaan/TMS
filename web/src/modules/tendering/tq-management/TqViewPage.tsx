@@ -9,18 +9,29 @@ import { EmdTenderFeeSection } from '@/modules/tendering/emds-tenderfees/compone
 import { DocumentChecklistSection } from '@/modules/tendering/checklists/components/DocumentChecklistView';
 import { CostingSheetSection } from '@/modules/tendering/costing-sheets/components/CostingSheetView';
 import { BidSubmissionSection } from '@/modules/tendering/bid-submissions/components/BidSubmissionView';
-import { TqSection } from './components/TqView';
+import { TqTenderSection } from './components/TqView';
 import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
 import { useTenderStepStatuses } from "@/hooks/api/useTenderStepStatuses";
 import { RfqSection } from '../rfqs/components/RfqView';
+import { RaSection } from '../ras/components/RaShow';
+import { TenderResultSection } from '../results/components/TenderResultShow';
 
 export default function TqViewPage() {
-    const { id } = useParams<{ id: string }>();
-    const navigate = useNavigate();
-    const tqId = id ? parseInt(id, 10) : null;
+    const { tenderId } = useParams();
 
-    const { steps: tenderSteps, tender } = useTenderStepStatuses(null, { tqId: tqId ?? undefined });
-    const tenderId = tender?.id || null;
+    if (!tenderId) {
+        return (
+            <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>Invalid TQ ID {tenderId}</AlertDescription>
+            </Alert>
+        );
+    }
+
+    const navigate = useNavigate();
+    const parsedTenderId = tenderId ? parseInt(tenderId, 10) : null;
+
+    const { steps: tenderSteps } = useTenderStepStatuses(parsedTenderId);
 
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["tq-management"]));
 
@@ -37,32 +48,25 @@ export default function TqViewPage() {
     const collapseAll = useCallback(() => setExpandedSections(new Set()), []);
 
     const renderSectionContent = (stepId: string) => {
-        if (!tenderId) return null;
+        if (!parsedTenderId) return null;
         switch (stepId) {
-            case "tender-details":   return <TenderDetailsSection tenderId={tenderId} />;
-            case "physical-docs":    return <PhysicalDocsSection tenderId={tenderId} />;
-            case "emd-fees":         return <EmdTenderFeeSection tenderId={tenderId} />;
-            case "rfq":              return <RfqSection tenderId={tenderId} />;
-            case "checklist":        return <DocumentChecklistSection tenderId={tenderId} />;
-            case "costing":          return <CostingSheetSection tenderId={tenderId} />;
-            case "bid":              return <BidSubmissionSection tenderId={tenderId} />;
-            case "tq-management":    return tqId ? <TqSection tqId={tqId} /> : null;
+            case "tender-details": return <TenderDetailsSection tenderId={parsedTenderId} />;
+            case "physical-docs": return <PhysicalDocsSection tenderId={parsedTenderId} />;
+            case "emd-fees": return <EmdTenderFeeSection tenderId={parsedTenderId} />;
+            case "rfq": return <RfqSection tenderId={parsedTenderId} />;
+            case "checklist": return <DocumentChecklistSection tenderId={parsedTenderId} />;
+            case "costing": return <CostingSheetSection tenderId={parsedTenderId} />;
+            case "bid": return <BidSubmissionSection tenderId={parsedTenderId} />;
+            case "tq-management": return <TqTenderSection tenderId={parsedTenderId} />;
+            case "ra": return <RaSection tenderId={parsedTenderId} />;
+            case "tender-result": return <TenderResultSection tenderId={parsedTenderId} />;
             default: return null;
         }
     };
 
-    if (!tqId) {
-        return (
-            <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>Invalid TQ ID</AlertDescription>
-            </Alert>
-        );
-    }
-
     return (
         <ShowPageLayout
-            steps={tenderSteps.filter(s => ["tender-details", "physical-docs", "emd-fees", "rfq", "checklist", "costing", "bid", "tq-management"].includes(s.id))}
+            steps={tenderSteps.filter(s => ["tender-details", "physical-docs", "emd-fees", "rfq", "checklist", "costing", "bid", "tq-management","ra", "tender-result"].includes(s.id))}
             expandedSections={expandedSections}
             onToggleSection={toggleSection}
             onExpandAll={expandAll}

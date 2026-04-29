@@ -1,6 +1,3 @@
-import AssetAdminDashboard from "@/modules/hrms/assets/dashboard";
-import OnboardingDashboard from "@/modules/hrms/onboarding/OnboardingDashboard";
-
 export const paths = {
     // ==================== AUTH ====================
     auth: {
@@ -77,8 +74,7 @@ export const paths = {
         tqEditReplied: (tqId: number) => `/tendering/tq-management/edit-replied/${tqId}`,
         tqMissed: (tqId: number) => `/tendering/tq-management/missed/${tqId}`,
         tqEditMissed: (tqId: number) => `/tendering/tq-management/edit-missed/${tqId}`,
-        tqView: (tqId: number) => `/tendering/tq-management/view/${tqId}`,
-        tqViewAll: (tenderId: number) => `/tendering/tq-management/view-all/${tenderId}`,
+        tqView: (tenderId: number) => `/tendering/tq-management/view/${tenderId}`,
         ras: "/tendering/reverse-auctions",
         rasSchedule: (tenderId: number) => `/tendering/reverse-auctions/schedule/${tenderId}`,
         rasUploadResult: (raId: number) => `/tendering/reverse-auctions/upload-result/${raId}`,

@@ -8,6 +8,7 @@ import type { TqType } from '@/types/api.types';
 import { useTqById, useTqItems, useTqByTender } from '@/hooks/api/useTqManagement';
 import { useTqTypes } from '@/hooks/api/useTqTypes';
 import { formatDateTime } from '@/hooks/useFormatedDate';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 interface TqViewProps {
     tqData?: TenderQuery | null;
@@ -338,6 +339,41 @@ export function TqSection({ tqId }: { tqId: number }) {
     );
 }
 
+function TqItemWithDetails({ tqData, tqTypes, index }: { tqData: TenderQuery, tqTypes: TqType[] | null, index: number }) {
+    const { data: tqItems, isLoading: itemsLoading } = useTqItems(tqData.id);
+
+    return (
+        <Accordion type="single" collapsible defaultValue="request" className="w-full border rounded-lg bg-card overflow-hidden shadow-sm">
+            <AccordionItem value="request" className="border-b-0">
+                <AccordionTrigger className="px-4 py-2 hover:no-underline hover:bg-muted/30 transition-colors">
+                    <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="rounded-sm font-bold text-[10px]">
+                            TQ #{index}
+                        </Badge>
+                        <span className="text-xs font-semibold">
+                           Status: {tqData.status}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground italic">
+                            (ID: #{tqData.id})
+                        </span>
+                    </div>
+                </AccordionTrigger>
+                <AccordionContent className="px-4 pb-4 pt-2 border-t">
+                    <div className="space-y-4 mt-2">
+                        <TqView
+                            tqData={tqData}
+                            tqItems={tqItems || null}
+                            tqTypes={tqTypes}
+                            isLoading={itemsLoading}
+                            className="border-none shadow-none p-0"
+                        />
+                    </div>
+                </AccordionContent>
+            </AccordionItem>
+        </Accordion>
+    );
+}
+
 export function TqTenderSection({ tenderId }: { tenderId: number | null }) {
     const { data: tqListData, isLoading: tqLoading } = useTqByTender(tenderId ?? 0);
     const { data: tqTypes } = useTqTypes();
@@ -355,12 +391,12 @@ export function TqTenderSection({ tenderId }: { tenderId: number | null }) {
 
     return (
         <div className="space-y-4">
-            {tqListData.map((tq) => (
-                <TqView
+            {tqListData.map((tq, index) => (
+                <TqItemWithDetails
                     key={tq.id}
                     tqData={tq}
                     tqTypes={tqTypes || null}
-                    isLoading={false}
+                    index={index + 1}
                 />
             ))}
         </div>

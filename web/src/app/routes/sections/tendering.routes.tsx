@@ -58,7 +58,6 @@ const TqEditRepliedPage = lazy(() => import('@/modules/tendering/tq-management/T
 const TqMissedPage = lazy(() => import('@/modules/tendering/tq-management/TqMissedPage'));
 const TqEditMissedPage = lazy(() => import('@/modules/tendering/tq-management/TqEditMissedPage'));
 const TqViewPage = lazy(() => import('@/modules/tendering/tq-management/TqViewPage'));
-const TqViewAllPage = lazy(() => import('@/modules/tendering/tq-management/TqViewAllPage'));
 const Tendering_RAs = lazy(() => import('@/modules/tendering/ras/RaListPage'));
 const Tendering_RA_Show = lazy(() => import('@/modules/tendering/ras/RaShowPage'));
 const Tendering_RA_Edit = lazy(() => import('@/modules/tendering/ras/RaEditPage'));
@@ -135,8 +134,7 @@ export default function TenderingRoutes() {
             <Route path="tq-management/edit-replied/:id" element={<RouteWrapper><TqEditRepliedPage /></RouteWrapper>} />
             <Route path="tq-management/missed/:id" element={<RouteWrapper><TqMissedPage /></RouteWrapper>} />
             <Route path="tq-management/edit-missed/:id" element={<RouteWrapper><TqEditMissedPage /></RouteWrapper>} />
-            <Route path="tq-management/view/:id" element={<RouteWrapper><TqViewPage /></RouteWrapper>} />
-            <Route path="tq-management/view-all/:tenderId" element={<RouteWrapper><TqViewAllPage /></RouteWrapper>} />
+            <Route path="tq-management/view/:tenderId" element={<RouteWrapper><TqViewPage /></RouteWrapper>} />
             <Route path="reverse-auctions" element={<RouteWrapper><Tendering_RAs /></RouteWrapper>} />
             <Route path="reverse-auctions/schedule/:tenderId" element={<RouteWrapper><Tendering_RA_Schedule /></RouteWrapper>} />
             <Route path="reverse-auctions/upload-result/:raId" element={<RouteWrapper><Tendering_RA_UploadResult /></RouteWrapper>} />
