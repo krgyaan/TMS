@@ -29,7 +29,7 @@ export const TenderApprovalFormSchema = z.object({
     // Incomplete Fields
     incompleteFields: z.array(z.object({
         fieldName: z.string(),
-        comment: z.string(),
+        comment: z.string().min(1, "Comment is required"),
     })).optional(),
 }).refine((data) => {
     // If incomplete status, must have at least 1 incomplete field

@@ -65,7 +65,24 @@ export class TenderInfoSheetsService {
             return null;
         }
 
-        const [infoSheet] = info;
+        const [infoSheetData] = info;
+        
+        // Safe parse for JSON fields stored in text columns
+        const parseJsonField = (field: any) => {
+            if (!field) return null;
+            if (Array.isArray(field)) return field;
+            try {
+                return JSON.parse(field);
+            } catch (e) {
+                return [field]; // Fallback to array with single value
+            }
+        };
+
+        const infoSheet = {
+            ...infoSheetData,
+            pbgMode: parseJsonField(infoSheetData.pbgMode),
+            sdMode: parseJsonField(infoSheetData.sdMode),
+        };
 
         // Fetch related data
         const [clients, technicalDocs, financialDocs] = await Promise.all([

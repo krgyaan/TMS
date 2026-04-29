@@ -154,7 +154,6 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
             form.setValue('alternativeFinancialDocs', []);
             form.setValue('tenderStatus', undefined);
             form.setValue('oemNotAllowed', undefined);
-            form.setValue('remarks', undefined);
         } else if (tlDecision === '0') {
             // Clear all conditional fields
             form.setValue('rfqRequired', undefined);
@@ -223,6 +222,105 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
         return statusName?.includes('not allowed by oem');
     }, [statuses, tenderStatus]);
 
+    const getStatusName = (id: number | null | undefined) => {
+        if (!id || !statuses) return 'N/A';
+        return statuses.find(s => s.id === id)?.name || 'N/A';
+    };
+
+    const getFieldValueFromSheet = (fieldName: string) => {
+        if (!infoSheet) return 'N/A';
+
+        const safeJoin = (val: any) => {
+            if (!val) return 'N/A';
+            if (Array.isArray(val)) return val.join(', ');
+            if (typeof val === 'string') {
+                try {
+                    const parsed = JSON.parse(val);
+                    if (Array.isArray(parsed)) return parsed.join(', ');
+                } catch (e) {
+                    return val;
+                }
+                return val;
+            }
+            return 'N/A';
+        };
+
+        switch (fieldName) {
+            case 'teRecommendation': return infoSheet.teRecommendation || 'N/A';
+            case 'teRejectionReason': return getStatusName(infoSheet.teRejectionReason);
+            case 'teRejectionRemarks': return infoSheet.teRejectionRemarks || 'N/A';
+
+            case 'processingFeeRequired': return infoSheet.processingFeeRequired || 'N/A';
+            case 'processingFeeModes': return safeJoin(infoSheet.processingFeeMode);
+            case 'processingFeeAmount': return infoSheet.processingFeeAmount ? `₹${parseFloat(String(infoSheet.processingFeeAmount)).toLocaleString('en-IN')}` : 'N/A';
+
+            case 'tenderFeeRequired': return infoSheet.tenderFeeRequired || 'N/A';
+            case 'tenderFeeModes': return safeJoin(infoSheet.tenderFeeMode);
+            case 'tenderFeeAmount': return infoSheet.tenderFeeAmount ? `₹${parseFloat(String(infoSheet.tenderFeeAmount)).toLocaleString('en-IN')}` : 'N/A';
+
+            case 'emdRequired': return infoSheet.emdRequired || 'N/A';
+            case 'emdModes': return safeJoin(infoSheet.emdMode);
+            case 'emdAmount': return infoSheet.emdAmount ? `₹${parseFloat(String(infoSheet.emdAmount)).toLocaleString('en-IN')}` : 'N/A';
+
+            case 'tenderValueGstInclusive': return infoSheet.tenderValue ? `₹${parseFloat(String(infoSheet.tenderValue)).toLocaleString('en-IN')}` : 'N/A';
+            case 'bidValidityDays': return infoSheet.bidValidityDays ? `${infoSheet.bidValidityDays} days` : 'N/A';
+            case 'mafRequired': return infoSheet.mafRequired || 'N/A';
+            case 'commercialEvaluation': return infoSheet.commercialEvaluation || 'N/A';
+            case 'reverseAuctionApplicable': return infoSheet.reverseAuctionApplicable || 'N/A';
+
+            case 'paymentTermsSupply': return infoSheet.paymentTermsSupply ? `${infoSheet.paymentTermsSupply}%` : 'N/A';
+            case 'paymentTermsInstallation': return infoSheet.paymentTermsInstallation ? `${infoSheet.paymentTermsInstallation}%` : 'N/A';
+
+            case 'deliveryTimeSupply': return infoSheet.deliveryTimeSupply ? `${infoSheet.deliveryTimeSupply} days` : 'N/A';
+            case 'deliveryTimeInstallation': return infoSheet.deliveryTimeInstallationDays ? `${infoSheet.deliveryTimeInstallationDays} days` : 'N/A';
+            case 'deliveryTimeInstallationInclusive': return infoSheet.deliveryTimeInstallationInclusive ? 'Yes' : 'No';
+
+            case 'pbgRequired': return infoSheet.pbgRequired || 'N/A';
+            case 'pbgForm': return safeJoin(infoSheet.pbgMode);
+            case 'pbgPercentage': return infoSheet.pbgPercentage ? `${infoSheet.pbgPercentage}%` : 'N/A';
+            case 'pbgDurationMonths': return infoSheet.pbgDurationMonths ? `${infoSheet.pbgDurationMonths} months` : 'N/A';
+
+            case 'sdRequired': return infoSheet.sdRequired || 'N/A';
+            case 'sdForm': return safeJoin(infoSheet.sdMode);
+            case 'securityDepositPercentage': return infoSheet.sdPercentage ? `${infoSheet.sdPercentage}%` : 'N/A';
+            case 'sdDurationMonths': return infoSheet.sdDurationMonths ? `${infoSheet.sdDurationMonths} months` : 'N/A';
+
+            case 'ldRequired': return infoSheet.ldRequired || 'N/A';
+            case 'ldPercentagePerWeek': return infoSheet.ldPercentagePerWeek ? `${infoSheet.ldPercentagePerWeek}%` : 'N/A';
+            case 'maxLdPercentage': return infoSheet.maxLdPercentage ? `${infoSheet.maxLdPercentage}%` : 'N/A';
+
+            case 'physicalDocsRequired': return infoSheet.physicalDocsRequired || 'N/A';
+            case 'physicalDocsDeadline': return infoSheet.physicalDocsDeadline ? new Date(infoSheet.physicalDocsDeadline).toLocaleDateString() : 'N/A';
+
+            case 'techEligibilityAgeYears': return infoSheet.techEligibilityAge ? `${infoSheet.techEligibilityAge} years` : 'N/A';
+            case 'workValueType': return infoSheet.workValueType || 'N/A';
+            case 'orderValue1': return infoSheet.orderValue1 ? `₹${parseFloat(String(infoSheet.orderValue1)).toLocaleString('en-IN')}` : 'N/A';
+            case 'orderValue2': return infoSheet.orderValue2 ? `₹${parseFloat(String(infoSheet.orderValue2)).toLocaleString('en-IN')}` : 'N/A';
+            case 'orderValue3': return infoSheet.orderValue3 ? `₹${parseFloat(String(infoSheet.orderValue3)).toLocaleString('en-IN')}` : 'N/A';
+            case 'customEligibilityCriteria': return infoSheet.customEligibilityCriteria || 'N/A';
+
+            case 'technicalWorkOrders': return infoSheet.technicalWorkOrders?.map(wo => wo.projectName).join(', ') || 'N/A';
+            case 'commercialDocuments': return infoSheet.commercialDocuments?.map(cd => cd.documentName).join(', ') || 'N/A';
+
+            case 'avgAnnualTurnoverCriteria': return infoSheet.avgAnnualTurnoverType || 'N/A';
+            case 'avgAnnualTurnoverValue': return infoSheet.avgAnnualTurnoverValue ? `₹${parseFloat(String(infoSheet.avgAnnualTurnoverValue)).toLocaleString('en-IN')}` : 'N/A';
+            case 'workingCapitalCriteria': return infoSheet.workingCapitalType || 'N/A';
+            case 'workingCapitalValue': return infoSheet.workingCapitalValue ? `₹${parseFloat(String(infoSheet.workingCapitalValue)).toLocaleString('en-IN')}` : 'N/A';
+            case 'solvencyCertificateCriteria': return infoSheet.solvencyCertificateType || 'N/A';
+            case 'solvencyCertificateValue': return infoSheet.solvencyCertificateValue ? `₹${parseFloat(String(infoSheet.solvencyCertificateValue)).toLocaleString('en-IN')}` : 'N/A';
+            case 'netWorthCriteria': return infoSheet.netWorthType || 'N/A';
+            case 'netWorthValue': return infoSheet.netWorthValue ? `₹${parseFloat(String(infoSheet.netWorthValue)).toLocaleString('en-IN')}` : 'N/A';
+
+            case 'clientOrganization': return safeRelationships?.organizationName || 'N/A';
+            case 'clients': return infoSheet.clients?.map(c => c.clientName).join(', ') || 'N/A';
+
+            case 'courierAddress': return infoSheet.courierAddress || 'N/A';
+            case 'teRemark': return infoSheet.teFinalRemark || 'N/A';
+
+            default: return 'N/A';
+        }
+    };
+
     const handleSubmit: SubmitHandler<TenderApprovalFormValues> = async (values) => {
         // Trigger validation
         const isValid = await form.trigger();
@@ -244,7 +342,11 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
             const mutation = mode === 'create' ? createApproval : updateApproval;
             await mutation.mutateAsync({ tenderId, data: payload });
             toast.success(mode === 'create' ? 'Approval submitted successfully' : 'Approval updated successfully');
-            navigate(paths.tendering.tenderApproval);
+            if(window.history.length > 0){
+                navigate(-1);
+            } else {
+                navigate(paths.tendering.tenderApproval);
+            }
         } catch (error: any) {
             console.error('❌ Submission error', error);
             if (error?.response?.data?.message) {
@@ -623,37 +725,65 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                         };
 
                                         return (
-                                            <div key={field.value} className="space-y-2">
-                                                <div className="flex items-center space-x-2">
+                                            <div key={field.value} className="space-y-2 border p-3 rounded-lg bg-card/50 hover:bg-card transition-all duration-200">
+                                                <div className="flex items-start space-x-3">
                                                     <Checkbox
                                                         id={field.value}
                                                         checked={isChecked}
                                                         onCheckedChange={handleCheckboxChange}
+                                                        className="mt-1"
                                                     />
-                                                    <Label
-                                                        htmlFor={field.value}
-                                                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                                                    >
-                                                        {field.label}
-                                                    </Label>
+                                                    <div className="flex-1 min-w-0">
+                                                        <Label
+                                                            htmlFor={field.value}
+                                                            className="text-sm font-semibold leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer block mb-1"
+                                                        >
+                                                            {field.label}
+                                                        </Label>
+                                                        <div className="text-[11px] text-muted-foreground flex flex-wrap items-center gap-1.5">
+                                                            <span className="font-medium px-1 bg-muted rounded text-[8px] uppercase tracking-wider shrink-0">Sheet Value</span>
+                                                            <span className="text-primary/70 font-medium break-words" title={String(getFieldValueFromSheet(field.value))}>
+                                                                {getFieldValueFromSheet(field.value)}
+                                                            </span>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                                 {isChecked && (
-                                                    <div className="space-y-1">
+                                                    <div className="space-y-1 pt-3 border-t mt-2">
                                                         <textarea
                                                             value={fieldComment}
                                                             onChange={(e) => handleCommentChange(e.target.value)}
-                                                            className={`flex min-h-[60px] w-full rounded-md border ${fieldComment.trim() === '' ? 'border-red-500' : 'border-input'
-                                                                } bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50`}
-                                                            placeholder={`What's wrong with ${field.label}?`}
+                                                            className={`flex min-h-[70px] w-full rounded-md border ${fieldComment.trim() === '' ? 'border-red-500' : 'border-input'
+                                                                } bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 transition-colors`}
+                                                            placeholder={`Comment on ${field.label}...`}
                                                         />
                                                         {fieldComment.trim() === '' && (
-                                                            <p className="text-xs text-red-500">Comment is required</p>
+                                                            <p className="text-[11px] text-red-500 font-medium px-1">Correction comment is required</p>
                                                         )}
                                                     </div>
                                                 )}
                                             </div>
                                         );
                                     })}
+                                </div>
+
+                                {/* Final Remark Box */}
+                                <div className="pt-6 border-t space-y-4">
+                                    <div className="flex items-center gap-2">
+                                        <CheckCircle className="h-4 w-4 text-primary" />
+                                        <h4 className="font-semibold text-base text-primary">Final Review Summary</h4>
+                                    </div>
+                                    <FieldWrapper control={form.control} name="remarks" label="Overall TL Remarks">
+                                        {(field) => (
+                                            <textarea
+                                                {...field}
+                                                className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 transition-all shadow-sm"
+                                                placeholder="Provide a final summary or additional instructions for the TE..."
+                                                maxLength={2000}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+
                                 </div>
                             </div>
                         )}

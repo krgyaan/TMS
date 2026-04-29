@@ -61,7 +61,7 @@ const navMain: NavGroup[] = [
             { title: "WO Approval", url: paths.operations.woDetailAcceptanceListPage, permission: "ops.wo-approval" },
             { title: "Kick Off", url: paths.operations.woKickOffListPage, permission: "ops.kick-off" },
             { title: "Contract Agreement", url: paths.operations.contractAgreementListPage, permission: "ops.contract-agreement" },
-            { title: "Project Dashboard", url: paths.operations.projectDashboard(), permission: "project-dashboard" },
+            { title: "Project Dashboard", url: paths.operations.projectDashboard(), permission: "ops.dashboard" },
         ],
     },
     {

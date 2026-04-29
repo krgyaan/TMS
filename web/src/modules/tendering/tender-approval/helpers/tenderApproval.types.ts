@@ -29,6 +29,7 @@ export interface SaveTenderApprovalDto {
     tenderStatus?: number;
     oemNotAllowed?: string;
     tlRejectionRemarks?: string;
+    tlIncompleteRemarks?: string;
     incompleteFields?: IncompleteField[];
 }
 
@@ -51,6 +52,7 @@ export interface TenderApproval {
     tenderStatus: number | null;
     oemNotAllowed: string | null;
     tlRejectionRemarks: string | null;
+    tlIncompleteRemarks: string | null;
     incompleteFields?: IncompleteField[];
     createdAt?: string;
     updatedAt?: string;
