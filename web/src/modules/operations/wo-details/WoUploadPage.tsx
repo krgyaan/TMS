@@ -62,6 +62,12 @@ const WoDocumentUploader = ({ woDetailId, type, context, label }: WoDocumentUplo
     );
 };
 
+const getFileUrl = (filePath: string): string => {
+    const fileName = filePath.split('/').pop() || filePath;
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+    return `${baseUrl}/tender-files/serve/wo-draft/${encodeURIComponent(fileName)}`;
+};
+
 const WoUploadPage = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
@@ -175,7 +181,7 @@ const WoUploadPage = () => {
                                         {basicDraftFiles.map((file, idx) => (
                                             <a
                                                 key={idx}
-                                                href={tenderFilesService.getFileUrl(file)}
+                                                href={getFileUrl(file)}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="text-primary underline text-sm"

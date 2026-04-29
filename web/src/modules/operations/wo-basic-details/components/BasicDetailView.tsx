@@ -20,14 +20,12 @@ interface BasicDetailViewProps {
 
 // Helper function to get file URL from stored path
 const getFileUrl = (filePath: string): string => {
-    const parts = filePath.split('/');
-    if (parts.length >= 2) {
-        const context = parts[0];
-        const fileName = parts.slice(1).join('/');
-        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
-        return `${baseUrl}/tender-files/serve/${context}/${encodeURIComponent(fileName)}`;
-    }
-    return filePath;
+    // Extract the filename (last part of the path)
+    const fileName = filePath.split('/').pop() || filePath;
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+    
+    // Always serve under 'wo-draft' context as requested
+    return `${baseUrl}/tender-files/serve/wo-draft/${encodeURIComponent(fileName)}`;
 };
 
 
