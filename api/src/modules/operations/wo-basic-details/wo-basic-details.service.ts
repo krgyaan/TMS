@@ -108,6 +108,7 @@ export class WoBasicDetailsService {
     private mapJoinedRowToResponseList(row: any) {
         return {
             id: row.woBasicDetails.id,
+            projectId: row.woBasicDetails.projectId,
             woNumber: row.woBasicDetails.woNumber,
             woDate: row.woBasicDetails.woDate,
             projectName: row.woBasicDetails.projectName,
@@ -126,6 +127,8 @@ export class WoBasicDetailsService {
         return {
             woBasicDetails: {
                 id: woBasicDetails.id,
+                tenderId: woBasicDetails.tenderId,
+                projectId: projects.id,
                 woNumber: woBasicDetails.woNumber,
                 woDate: woBasicDetails.woDate,
                 projectName: woBasicDetails.projectName,
@@ -151,9 +154,19 @@ export class WoBasicDetailsService {
         return this.db
             .select(this.getWoBaseSelect())
             .from(woBasicDetails)
+            .leftJoin(projects, eq(projects.tenderId, woBasicDetails.tenderId))
             .leftJoin(oeFirstUser, eq(oeFirstUser.id, woBasicDetails.oeFirst))
             .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
             .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep));
+    }
+
+    private async getProjectId(tenderId: number){
+        const [project] = await this.db.select({id : projects.id})
+        .from(projects)
+        .where(eq(projects.tenderId, tenderId))
+        .limit(1);
+
+        return project?.id ?? null;
     }
 
     async findAll(filters?: WoBasicDetailsQueryDto) {
@@ -291,7 +304,8 @@ export class WoBasicDetailsService {
             throw new NotFoundException(`WO Basic Detail with ID ${id} not found`);
         }
 
-        return this.mapRowToResponse(row);
+        const response = this.mapRowToResponse(row);
+        return response;
     }
 
     async findByIdWithRelations(id: number) {

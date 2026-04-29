@@ -1,3 +1,4 @@
+import { parseFileArray } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -19,23 +20,15 @@ interface BasicDetailViewProps {
 
 // Helper function to get file URL from stored path
 const getFileUrl = (filePath: string): string => {
-    const parts = filePath.split('/');
-    if (parts.length >= 2) {
-        const context = parts[0];
-        const fileName = parts.slice(1).join('/');
-        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
-        return `${baseUrl}/tender-files/serve/${context}/${encodeURIComponent(fileName)}`;
-    }
-    return filePath;
+    // Extract the filename (last part of the path)
+    const fileName = filePath.split('/').pop() || filePath;
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+    
+    // Always serve under 'wo-draft' context as requested
+    return `${baseUrl}/tender-files/serve/wo-draft/${encodeURIComponent(fileName)}`;
 };
 
-// Parse woDraft which can be string, array, or null
-const parseWoDraft = (woDraft: string | string[] | null | undefined): string[] => {
-    if (!woDraft) return [];
-    if (Array.isArray(woDraft)) return woDraft.filter(Boolean);
-    // Handle comma-separated string or single path
-    return woDraft.split(',').map(s => s.trim()).filter(Boolean);
-};
+
 
 // Get margin color variant
 const getMarginVariant = (margin: number): string => {
@@ -134,7 +127,7 @@ export function BasicDetailView({
     const hasWorkflowPauseInfo = data?.isWorkflowPaused || data?.workflowPausedAt || data?.workflowResumedAt;
 
     const grossMarginValue = data?.grossMargin ? parseFloat(String(data?.grossMargin)) : null;
-    const woDraftFiles = parseWoDraft(data?.woDraft);
+    const woDraftFiles = parseFileArray(data?.woDraft);
 
     // Calculate TMS documents completion stats
     const tmsDocsComplete = hasTmsDocuments
