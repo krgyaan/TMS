@@ -4,7 +4,12 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Clock, Users, FileText, GanttChart } from "lucide-react";
+import { Clock, Users, FileText, GanttChart, Plus, Wallet, Truck, Package, Receipt, Banknote, ChevronRight, Send, Briefcase } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useMemo } from "react";
+import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import { paths } from "@/app/routes/paths";
 
 // Types
 interface TenderInfo {
@@ -78,11 +83,69 @@ const mockUsers = [
     { id: "user3", name: "Mike Johnson" },
 ];
 
+const QuickActionCard = ({ icon: Icon, title, subtitle, color, bgColor, onClick }: any) => (
+    <button 
+        onClick={onClick}
+        className="group relative flex flex-col items-start p-4 bg-background border border-border/50 rounded-2xl hover:border-primary/50 hover:shadow-xl hover:shadow-primary/5 transition-all duration-300 overflow-hidden text-left w-full"
+    >
+        <div className={cn("mb-3 p-2.5 rounded-xl transition-colors duration-300", bgColor, color)}>
+            <Icon className="h-5 w-5" />
+        </div>
+        <div className="space-y-0.5">
+            <h3 className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">{title}</h3>
+            <p className="text-[10px] text-muted-foreground leading-tight">{subtitle}</p>
+        </div>
+        <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity translate-x-1 group-hover:translate-x-0 transition-transform">
+            <ChevronRight className="h-3 w-3 text-muted-foreground" />
+        </div>
+    </button>
+);
+
 const Dashboard = () => {
+    const navigate = useNavigate();
     const [dashboardData, setDashboardData] = useState<DashboardData>(mockDashboardData);
     const [selectedUser, setSelectedUser] = useState<string>("all");
     const [currentTime, setCurrentTime] = useState<string>("");
     const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+
+    const {teamId, isSuperUser, isAdmin} = useAuth();
+
+    const isTenderingTeam = teamId == 1 || teamId == 2 || isSuperUser || isAdmin;
+
+    const quickActions = [
+        {
+            title: "Add Imprest",
+            subtitle: "Create New Imprest Entry",
+            icon: Wallet,
+            color: "text-blue-600",
+            bgColor: "bg-blue-50 dark:bg-blue-950/30",
+            path: paths.shared.imprestCreate
+        },
+        {
+            title: "Add Courier",
+            subtitle: "Create New Courier Entry",
+            icon: Truck,
+            color: "text-purple-600",
+            bgColor: "bg-purple-50 dark:bg-purple-950/30",
+            path: paths.shared.courierCreate
+        },
+        {
+            title: "New Tender",
+            subtitle: "Create New Tender Entry",
+            icon: FileText,
+            color: "text-emerald-600",
+            bgColor: "bg-emerald-50 dark:bg-emerald-950/30",
+            path: paths.tendering.tenderCreate
+        },
+        {
+            title: "New Follow-up",
+            subtitle: "Create New Follow Up",
+            icon: Send,
+            color: "text-orange-600",
+            bgColor: "bg-orange-50 dark:bg-orange-950/30",
+            path: paths.shared.followUpCreate
+        },
+    ];
 
     // Update current time
     useEffect(() => {
@@ -181,9 +244,21 @@ const Dashboard = () => {
 
     return (
         <div className="space-y-6 p-8">
+            {/* Quick Actions */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {quickActions
+                    .filter(action => action.title !== "New Tender" || isTenderingTeam)
+                    .map((action) => (
+                    <QuickActionCard 
+                        key={action.title}
+                        {...action}
+                        onClick={() => navigate(action.path)}
+                    />
+                ))}
+            </div>
+
             {/* Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {/* Total Employees - Only for Admin */}
+            {/* <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {dashboardData.role === "Admin" && (
                     <Card className="relative overflow-hidden">
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -196,7 +271,6 @@ const Dashboard = () => {
                     </Card>
                 )}
 
-                {/* Current Time - For non-admin */}
                 {dashboardData.role !== "Admin" && (
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -219,7 +293,6 @@ const Dashboard = () => {
                     </Card>
                 )}
 
-                {/* Total Tenders */}
                 <Card className="relative overflow-hidden">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Total Tenders</CardTitle>
@@ -230,7 +303,6 @@ const Dashboard = () => {
                     </CardContent>
                 </Card>
 
-                {/* Total Bids */}
                 <Card className="relative overflow-hidden">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Total Bids</CardTitle>
@@ -240,7 +312,7 @@ const Dashboard = () => {
                         <div className="text-2xl font-bold text-green-600">{dashboardData.bided}</div>
                     </CardContent>
                 </Card>
-            </div>
+            </div> */}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                 {/* Calendar Section */}
@@ -385,15 +457,6 @@ const Dashboard = () => {
             </div>
         </div>
     );
-};
-
-// Helper hook for useMemo
-const useMemo = (callback: any, deps: any[]) => {
-    const [value, setValue] = useState(callback());
-    useEffect(() => {
-        setValue(callback());
-    }, deps);
-    return value;
 };
 
 export default Dashboard;
