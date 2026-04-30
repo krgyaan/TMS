@@ -1,4 +1,4 @@
-import type { CreateRequestExtensionDto, RequestExtensionListParams, RequestExtensionListRow, UpdateRequestExtensionDto } from '@/modules/tendering/request-extension/helpers/requestExtension.types';
+import type { CreateRequestExtensionDto, RequestExtensionListParams, RequestExtensionListRow, RequestExtensionResponse, UpdateRequestExtensionDto } from '@/modules/tendering/request-extension/helpers/requestExtension.types';
 import { BaseApiService } from './base.service';
 import type { PaginatedResult } from '@/types/api.types';
 
@@ -20,6 +20,10 @@ class RequestExtensionService extends BaseApiService {
 
     async getById(id: number): Promise<RequestExtensionListRow> {
         return this.get<RequestExtensionListRow>(`/${id}`);
+    }
+
+    async getByTenderId(tenderId: number): Promise<RequestExtensionResponse | null> {
+        return this.get<RequestExtensionResponse | null>(`/tender/${tenderId}`);
     }
 
     async create(data: CreateRequestExtensionDto): Promise<RequestExtensionListRow> {
