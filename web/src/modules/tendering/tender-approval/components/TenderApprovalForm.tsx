@@ -125,7 +125,6 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
             // Clear rejection and incomplete fields
             form.setValue('tenderStatus', undefined);
             form.setValue('oemNotAllowed', undefined);
-            form.setValue('remarks', undefined);
             form.setValue('incompleteFields', []);
         } else if (tlDecision === '2') {
             // Clear approval and incomplete fields
@@ -633,6 +632,23 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                             }
                                         </div>
                                     </div>
+                                </div>
+                                {/* Final Remark Box */}
+                                <div className="pt-6 border-t space-y-4">
+                                    <div className="flex items-center gap-2">
+                                        <CheckCircle className="h-4 w-4 text-primary" />
+                                        <h4 className="font-semibold text-base text-primary">Final Approval Remarks</h4>
+                                    </div>
+                                    <FieldWrapper control={form.control} name="remarks" label="Overall TL Remarks">
+                                        {(field) => (
+                                            <textarea
+                                                {...field}
+                                                className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 transition-all shadow-sm"
+                                                placeholder="Provide a final summary or additional instructions..."
+                                                maxLength={2000}
+                                            />
+                                        )}
+                                    </FieldWrapper>
                                 </div>
                             </div>
                         )}

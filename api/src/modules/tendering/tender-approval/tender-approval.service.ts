@@ -343,10 +343,12 @@ export class TenderApprovalService {
                 oemNotAllowedName: vendorOrganizations.name,
                 tlRejectionRemarks: tenderInfos.tlRejectionRemarks,
                 tlIncompleteRemarks: tenderInfos.tlIncompleteRemarks,
+                tlApprovalRemarks: tenderInformation.teFinalRemark,
             })
             .from(tenderInfos)
             .leftJoin(statuses, eq(tenderInfos.status, statuses.id))
             .leftJoin(vendorOrganizations, sql`${tenderInfos.oemNotAllowed} = ${vendorOrganizations.id}::varchar`)
+            .leftJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
             .where(eq(tenderInfos.id, tenderId))
             .limit(1);
 
@@ -464,6 +466,13 @@ export class TenderApprovalService {
                 }
                 if (infoSheet.emdAmount !== null && infoSheet.emdAmount !== undefined) {
                     updateData.emd = String(infoSheet.emdAmount);
+                }
+
+                // Update te_final_remark if provided
+                if (payload.tlApprovalRemarks) {
+                    await this.db.update(tenderInformation)
+                        .set({ teFinalRemark: payload.tlApprovalRemarks, updatedAt: new Date() })
+                        .where(eq(tenderInformation.tenderId, tenderId));
                 }
             }
         } else if (payload.tlStatus === "2") {

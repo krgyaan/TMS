@@ -42,7 +42,9 @@ export const getInitialValues = (approval?: TenderApproval | null): TenderApprov
         oemNotAllowed: approval.oemNotAllowed ? String(approval.oemNotAllowed) : undefined,
         remarks: (approval.tlStatus === '3' || approval.tlDecision === '3')
             ? (approval.tlIncompleteRemarks ?? undefined)
-            : (approval.tlRejectionRemarks ?? undefined),
+            : (approval.tlStatus === '1' || approval.tlDecision === '1')
+                ? (approval.tlApprovalRemarks ?? undefined)
+                : (approval.tlRejectionRemarks ?? undefined),
         incompleteFields: approval.incompleteFields ?? [],
     };
 };
@@ -86,6 +88,9 @@ export const mapFormToPayload = (values: TenderApprovalFormValues): SaveTenderAp
         }
         if (values.alternativeFinancialDocs && values.alternativeFinancialDocs.length > 0) {
             payload.alternativeFinancialDocs = values.alternativeFinancialDocs;
+        }
+        if (values.remarks) {
+            payload.tlApprovalRemarks = values.remarks;
         }
         return payload;
     }

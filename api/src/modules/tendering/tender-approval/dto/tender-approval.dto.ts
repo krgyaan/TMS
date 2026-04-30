@@ -38,6 +38,7 @@ export const TenderApprovalPayloadSchema = z.object({
     oemNotAllowed: optionalTextField(50),
     tlRejectionRemarks: optionalTextField(1000),
     tlIncompleteRemarks: optionalTextField(2000),
+    tlApprovalRemarks: optionalTextField(2000),
     incompleteFields: z.array(IncompleteFieldSchema).optional(),
 });
 
