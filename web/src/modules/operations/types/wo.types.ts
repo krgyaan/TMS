@@ -86,6 +86,7 @@ export interface WoBasicDetail {
   id: number;
   tenderId: number | null;
   enquiryId: number | null;
+  projectId: number | null;
   team: number | null,
   woNumber: string | null;
   woDate: string | null;
