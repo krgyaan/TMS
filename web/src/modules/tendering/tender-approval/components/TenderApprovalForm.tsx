@@ -191,10 +191,13 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
         [vendorOrganizations]
     );
 
-    const tenderStatusOptions = useMemo(() =>
-        statuses?.filter(s => s.tenderCategory === 'dnb').map(s => ({ value: String(s.id), label: s.name })) ?? [],
-        [statuses]
-    );
+    const tenderStatusOptions = useMemo(() =>{
+        if(!statuses) return [];
+
+        return statuses
+            .filter(s => s.tenderCategory === 'dnb' && Number(s.id) !== 43)
+            .map(s => ({ value: String(s.id), label: s.name }))    
+        }, [statuses]);
 
     const rfqRequiredOptions = useMemo(() => [
         { value: 'yes', label: 'Yes' },
