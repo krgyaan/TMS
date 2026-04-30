@@ -9,8 +9,6 @@ import { useBidSubmissionByTender } from "@/hooks/api/useBidSubmissions";
 import { useTenderResultByTenderId } from "@/hooks/api/useTenderResults";
 import { useTqById, useTqByTender } from "@/hooks/api/useTqManagement";
 import { useReverseAuctionByTender } from "@/hooks/api/useReverseAuctions";
-import { useRequestExtension } from "@/hooks/api/useRequestExtension";
-import { useSubmitQuery } from "@/hooks/api/useSubmitQuery";
 import type { StepStatus } from "@/modules/tendering/components/ShowPageLayout";
 
 function deriveStatus(hasData: boolean, isLoading: boolean): StepStatus {
@@ -30,23 +28,15 @@ export interface TenderStepStatus {
 }
 
 export interface UseTenderStepStatusesOptions {
-    requestExtensionId?: number | null;
-    submitQueryId?: number | null;
     tqId?: number | null;
 }
 
 export function useTenderStepStatuses(tenderId: number | null, options: UseTenderStepStatusesOptions = {}) {
-    const { requestExtensionId, submitQueryId, tqId } = options;
+    const { tqId } = options;
 
-    const { data: requestExt, isLoading: l13 } = useRequestExtension(requestExtensionId ?? null);
-    const { data: submitQuery, isLoading: l14 } = useSubmitQuery(submitQueryId ?? null);
     const { data: tqById, isLoading: l10b } = useTqById(tqId ?? 0);
 
-    const resolvedTenderId = tenderId || 
-        (Array.isArray(tqById) ? tqById[0]?.tenderId : tqById?.tenderId) || 
-        requestExt?.tenderId || 
-        submitQuery?.tenderId || 
-        null;
+    const resolvedTenderId = tenderId || (Array.isArray(tqById) ? tqById[0]?.tenderId : tqById?.tenderId) || null;
 
     const { data: tender, isLoading: l1 } = useTender(resolvedTenderId);
     const { data: approval, isLoading: l2 } = useTenderApproval(resolvedTenderId);
@@ -151,25 +141,7 @@ export function useTenderStepStatuses(tenderId: number | null, options: UseTende
             isLoading: l9,
             status: deriveStatus(!!tenderResult, l9),
         },
-        {
-            id: "request-extension",
-            label: "Request Extension",
-            shortLabel: "Extension",
-            stepNumber: 11,
-            hasData: !!requestExt,
-            isLoading: l13,
-            status: deriveStatus(!!requestExt, l13),
-        },
-        {
-            id: "submit-query",
-            label: "Submit Query",
-            shortLabel: "Query",
-            stepNumber: 12,
-            hasData: !!submitQuery,
-            isLoading: l14,
-            status: deriveStatus(!!submitQuery, l14),
-        },
     ];
 
-    return { steps, tender, approval, requestExt, submitQuery, tqData: tqByTender || tqById, raData };
+    return { steps, tender, approval, tqData: tqByTender || tqById, raData };
 }
