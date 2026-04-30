@@ -326,46 +326,138 @@ const cleanPayload = (payload: SaveTenderInfoSheetDto): SaveTenderInfoSheetDto =
 
 // Map form values to API payload
 export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderInfoSheetDto => {
+    // ─── When NO: only send rejection-related fields ───────────────────────────
+    if (values.teRecommendation === 'NO') {
+        return cleanPayload({
+            // Rejection fields
+            teRecommendation: 'NO',
+            teRejectionReason: values.teRejectionReason ?? null,
+            teRejectionRemarks: values.teRejectionRemarks || null,
+            teRejectionProof:
+                values.teRejectionProof?.length
+                    ? toStringArray(values.teRejectionProof)
+                    : null,
+
+            // Everything else → null / empty
+            tenderValue: null,
+            oemExperience: null,
+            processingFeeRequired: null,
+            processingFeeModes: null,
+            processingFeeAmount: null,
+            tenderFeeRequired: null,
+            tenderFeeModes: null,
+            tenderFeeAmount: null,
+            emdRequired: null,
+            emdModes: null,
+            emdAmount: null,
+            bidValidityDays: null,
+            commercialEvaluation: null,
+            mafRequired: null,
+            reverseAuctionApplicable: null,
+            paymentTermsSupply: null,
+            paymentTermsInstallation: null,
+            deliveryTimeSupply: null,
+            deliveryTimeInstallationInclusive: false,
+            deliveryTimeInstallationDays: null,
+            pbgRequired: null,
+            pbgMode: null,
+            pbgPercentage: null,
+            pbgDurationMonths: null,
+            sdRequired: null,
+            sdMode: null,
+            sdPercentage: null,
+            sdDurationMonths: null,
+            ldRequired: null,
+            ldPercentagePerWeek: null,
+            maxLdPercentage: null,
+            physicalDocsRequired: null,
+            physicalDocType: null,
+            physicalDocsDeadline: null,
+            techEligibilityAge: null,
+            workValueType: null,
+            orderValue1: null,
+            orderValue2: null,
+            orderValue3: null,
+            customEligibilityCriteria: null,
+            technicalWorkOrders: null,
+            commercialDocuments: null,
+            avgAnnualTurnoverType: null,
+            avgAnnualTurnoverValue: null,
+            workingCapitalType: null,
+            workingCapitalValue: null,
+            solvencyCertificateType: null,
+            solvencyCertificateValue: null,
+            netWorthType: null,
+            netWorthValue: null,
+            courierAddress: null,
+            clients: [],
+            teFinalRemark: null,
+        });
+    }
+
+    // ─── When YES: existing full mapping logic (unchanged) ─────────────────────
     const payload: SaveTenderInfoSheetDto = {
         tenderValue: values.tenderValue ?? null,
         oemExperience: safeYesNoValue(values.oemExperience),
 
-        teRecommendation: values.teRecommendation,
-        teRejectionReason: values.teRecommendation === 'NO' ? (values.teRejectionReason ?? null) : null,
-        teRejectionRemarks: values.teRecommendation === 'NO' ? (values.teRejectionRemarks || null) : null,
-        teRejectionProof: values.teRecommendation === 'NO' && values.teRejectionProof?.length ? toStringArray(values.teRejectionProof) : null,
+        teRecommendation: 'YES',
+        teRejectionReason: null,       // always null when YES
+        teRejectionRemarks: null,      // always null when YES
+        teRejectionProof: null,        // always null when YES
 
         processingFeeRequired: safeYesNoValue(values.processingFeeRequired),
         processingFeeModes: (() => {
-            if (values.processingFeeRequired !== 'YES' || !values.processingFeeModes?.length) return null;
-            const filtered = values.processingFeeModes.filter(mode => mode && mode !== 'undefined' && String(mode).trim().length > 0);
+            if (
+                values.processingFeeRequired !== 'YES' ||
+                !values.processingFeeModes?.length
+            )
+                return null;
+            const filtered = values.processingFeeModes.filter(
+                (mode) =>
+                    mode && mode !== 'undefined' && String(mode).trim().length > 0
+            );
             return filtered.length > 0 ? filtered : null;
         })(),
-        processingFeeAmount: values.processingFeeRequired === 'YES'
-            ? (values.processingFeeAmount ?? null)
-            : null,
+        processingFeeAmount:
+            values.processingFeeRequired === 'YES'
+                ? (values.processingFeeAmount ?? null)
+                : null,
 
         tenderFeeRequired: safeYesNoValue(values.tenderFeeRequired),
         tenderFeeModes: (() => {
-            if (values.tenderFeeRequired !== 'YES' || !values.tenderFeeModes?.length) return null;
-            const filtered = values.tenderFeeModes.filter(mode => mode && mode !== 'undefined' && String(mode).trim().length > 0);
+            if (
+                values.tenderFeeRequired !== 'YES' ||
+                !values.tenderFeeModes?.length
+            )
+                return null;
+            const filtered = values.tenderFeeModes.filter(
+                (mode) =>
+                    mode && mode !== 'undefined' && String(mode).trim().length > 0
+            );
             return filtered.length > 0 ? filtered : null;
         })(),
-        tenderFeeAmount: values.tenderFeeRequired === 'YES'
-            ? (values.tenderFeeAmount ?? null)
-            : null,
+        tenderFeeAmount:
+            values.tenderFeeRequired === 'YES'
+                ? (values.tenderFeeAmount ?? null)
+                : null,
 
-        emdRequired: values.emdRequired === 'YES' || values.emdRequired === 'NO' || values.emdRequired === 'EXEMPT'
-            ? values.emdRequired
-            : null,
+        emdRequired:
+            values.emdRequired === 'YES' ||
+            values.emdRequired === 'NO' ||
+            values.emdRequired === 'EXEMPT'
+                ? values.emdRequired
+                : null,
         emdModes: (() => {
-            if (values.emdRequired !== 'YES' || !values.emdModes?.length) return null;
-            const filtered = values.emdModes.filter(mode => mode && mode !== 'undefined' && String(mode).trim().length > 0);
+            if (values.emdRequired !== 'YES' || !values.emdModes?.length)
+                return null;
+            const filtered = values.emdModes.filter(
+                (mode) =>
+                    mode && mode !== 'undefined' && String(mode).trim().length > 0
+            );
             return filtered.length > 0 ? filtered : null;
         })(),
-        emdAmount: values.emdRequired === 'YES'
-            ? (values.emdAmount ?? null)
-            : null,
+        emdAmount:
+            values.emdRequired === 'YES' ? (values.emdAmount ?? null) : null,
 
         bidValidityDays: safeNumber(values.bidValidityDays),
         commercialEvaluation: values.commercialEvaluation ?? null,
@@ -376,79 +468,113 @@ export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderI
         paymentTermsInstallation: safeNumber(values.paymentTermsInstallation),
 
         deliveryTimeSupply: safeNumber(values.deliveryTimeSupply),
-        deliveryTimeInstallationInclusive: values.deliveryTimeInstallationInclusive ?? false,
+        deliveryTimeInstallationInclusive:
+            values.deliveryTimeInstallationInclusive ?? false,
         deliveryTimeInstallationDays: !values.deliveryTimeInstallationInclusive
             ? safeNumber(values.deliveryTimeInstallation)
             : null,
 
         pbgRequired: safeYesNoValue(values.pbgRequired),
-        pbgMode: values.pbgRequired === 'YES' && values.pbgForm?.length
-            ? toStringArray(values.pbgForm)
-            : null,
-        pbgPercentage: values.pbgRequired === 'YES' ? safeNumber(values.pbgPercentage) : null,
-        pbgDurationMonths: values.pbgRequired === 'YES' ? safeNumber(values.pbgDurationMonths) : null,
+        pbgMode:
+            values.pbgRequired === 'YES' && values.pbgForm?.length
+                ? toStringArray(values.pbgForm)
+                : null,
+        pbgPercentage:
+            values.pbgRequired === 'YES'
+                ? safeNumber(values.pbgPercentage)
+                : null,
+        pbgDurationMonths:
+            values.pbgRequired === 'YES'
+                ? safeNumber(values.pbgDurationMonths)
+                : null,
 
         sdRequired: safeYesNoValue(values.sdRequired),
-        sdMode: values.sdRequired === 'YES' && values.sdForm?.length
-            ? toStringArray(values.sdForm)
-            : null,
-        sdPercentage: values.sdRequired === 'YES' ? safeNumber(values.securityDepositPercentage) : null,
-        sdDurationMonths: values.sdRequired === 'YES' ? safeNumber(values.sdDurationMonths) : null,
+        sdMode:
+            values.sdRequired === 'YES' && values.sdForm?.length
+                ? toStringArray(values.sdForm)
+                : null,
+        sdPercentage:
+            values.sdRequired === 'YES'
+                ? safeNumber(values.securityDepositPercentage)
+                : null,
+        sdDurationMonths:
+            values.sdRequired === 'YES'
+                ? safeNumber(values.sdDurationMonths)
+                : null,
 
         ldRequired: safeYesNoValue(values.ldRequired),
         ldPercentagePerWeek: safeNumber(values.ldPercentagePerWeek),
         maxLdPercentage: safeNumber(values.maxLdPercentage),
 
         physicalDocsRequired: safeYesNoValue(values.physicalDocsRequired),
-        physicalDocType: values.physicalDocsRequired === 'YES'
-            ? (values.physicalDocType || null)
-            : null,
-        physicalDocsDeadline: values.physicalDocsRequired === 'YES'
-            ? (values.physicalDocsDeadline || null)
-            : null,
+        physicalDocType:
+            values.physicalDocsRequired === 'YES'
+                ? (values.physicalDocType || null)
+                : null,
+        physicalDocsDeadline:
+            values.physicalDocsRequired === 'YES'
+                ? (values.physicalDocsDeadline || null)
+                : null,
 
         techEligibilityAge: safeNumber(values.techEligibilityAgeYears),
 
         workValueType: values.workValueType ?? null,
-        orderValue1: values.workValueType === 'WORKS_VALUES' ? safeNumber(values.orderValue1) : null,
-        orderValue2: values.workValueType === 'WORKS_VALUES' ? safeNumber(values.orderValue2) : null,
-        orderValue3: values.workValueType === 'WORKS_VALUES' ? safeNumber(values.orderValue3) : null,
-        customEligibilityCriteria: values.workValueType === 'CUSTOM'
-            ? (values.customEligibilityCriteria || null)
-            : null,
+        orderValue1:
+            values.workValueType === 'WORKS_VALUES'
+                ? safeNumber(values.orderValue1)
+                : null,
+        orderValue2:
+            values.workValueType === 'WORKS_VALUES'
+                ? safeNumber(values.orderValue2)
+                : null,
+        orderValue3:
+            values.workValueType === 'WORKS_VALUES'
+                ? safeNumber(values.orderValue3)
+                : null,
+        customEligibilityCriteria:
+            values.workValueType === 'CUSTOM'
+                ? (values.customEligibilityCriteria || null)
+                : null,
 
-        technicalWorkOrders: values.technicalWorkOrders?.length ? toStringArray(values.technicalWorkOrders) : null,
-        commercialDocuments: values.commercialDocuments?.length ? toStringArray(values.commercialDocuments) : null,
+        technicalWorkOrders: values.technicalWorkOrders?.length
+            ? toStringArray(values.technicalWorkOrders)
+            : null,
+        commercialDocuments: values.commercialDocuments?.length
+            ? toStringArray(values.commercialDocuments)
+            : null,
 
         avgAnnualTurnoverType: values.avgAnnualTurnoverCriteria ?? null,
-        avgAnnualTurnoverValue: values.avgAnnualTurnoverCriteria === 'AMOUNT'
-            ? safeNumber(values.avgAnnualTurnoverValue)
-            : null,
+        avgAnnualTurnoverValue:
+            values.avgAnnualTurnoverCriteria === 'AMOUNT'
+                ? safeNumber(values.avgAnnualTurnoverValue)
+                : null,
         workingCapitalType: values.workingCapitalCriteria ?? null,
-        workingCapitalValue: values.workingCapitalCriteria === 'AMOUNT'
-            ? safeNumber(values.workingCapitalValue)
-            : null,
+        workingCapitalValue:
+            values.workingCapitalCriteria === 'AMOUNT'
+                ? safeNumber(values.workingCapitalValue)
+                : null,
         solvencyCertificateType: values.solvencyCertificateCriteria ?? null,
-        solvencyCertificateValue: values.solvencyCertificateCriteria === 'AMOUNT'
-            ? safeNumber(values.solvencyCertificateValue)
-            : null,
+        solvencyCertificateValue:
+            values.solvencyCertificateCriteria === 'AMOUNT'
+                ? safeNumber(values.solvencyCertificateValue)
+                : null,
         netWorthType: values.netWorthCriteria ?? null,
-        netWorthValue: values.netWorthCriteria === 'AMOUNT'
-            ? safeNumber(values.netWorthValue)
-            : null,
+        netWorthValue:
+            values.netWorthCriteria === 'AMOUNT'
+                ? safeNumber(values.netWorthValue)
+                : null,
 
         courierAddress: values.courierAddress || null,
 
-        clients: values.clients.map(client => ({
+        clients: values.clients.map((client) => ({
             clientName: client.clientName,
             clientDesignation: client.clientDesignation || null,
             clientMobile: client.clientMobile || null,
             clientEmail: client.clientEmail || null,
         })),
 
-        teFinalRemark: values.teRemark || null
+        teFinalRemark: values.teRemark || null,
     };
 
-    // Clean and return payload
     return cleanPayload(payload);
 };

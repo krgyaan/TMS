@@ -17,35 +17,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
 import { Badge } from '@/components/ui/badge';
-import {
-    Accordion,
-    AccordionContent,
-    AccordionItem,
-    AccordionTrigger,
-} from '@/components/ui/accordion';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { ArrowLeft, Plus, Trash2, Save, AlertCircle } from 'lucide-react';
 import { paths } from '@/app/routes/paths';
 import { useCreateInfoSheet, useUpdateInfoSheet } from '@/hooks/api/useInfoSheets';
 import { handleInfoSheetFormErrors } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.errors';
 import type { TenderInfoWithNames } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
-import {
-    yesNoOptions,
-    emdRequiredOptions,
-    processingFeeOptions,
-    tenderFeeOptions,
-    paymentModeOptions,
-    bidValidityOptions,
-    commercialEvaluationOptions,
-    mafRequiredOptions,
-    pbgFormOptions,
-    sdFormOptions,
-    pbgDurationOptions,
-    aatOptions,
-    scOptions,
-    wcOptions,
-    nwOptions,
-    physicalDocTypeOptions,
-} from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types';
+import { yesNoOptions, emdRequiredOptions, processingFeeOptions, tenderFeeOptions, paymentModeOptions, bidValidityOptions, commercialEvaluationOptions, mafRequiredOptions, pbgFormOptions, sdFormOptions, pbgDurationOptions, aatOptions, scOptions, wcOptions, nwOptions, physicalDocTypeOptions } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types';
 import { useDnbStatusOptions, usePqrOptions, useFinanceDocumentOptions } from '@/hooks/useSelectOptions';
 import type { TenderInfoSheetFormValues, TenderInfoSheetResponse } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types';
 import { TenderView } from '@/modules/tendering/tenders/components/TenderView';
@@ -87,7 +65,9 @@ export function TenderInformationForm({
 
     const initialFormValues = useMemo(() => {
         if (mode === 'create') {
-            return buildDefaultValues(tender);
+            // Set default teRecommendation to 'YES'
+            const defaults = buildDefaultValues(tender);
+            return { ...defaults, teRecommendation: defaults.teRecommendation || 'YES' };
         }
         return mapResponseToForm(initialData ?? null, tender);
     }, [initialData, tender, mode]);
@@ -129,12 +109,24 @@ export function TenderInformationForm({
     const solvencyCertificateCriteria = form.watch('solvencyCertificateCriteria');
     const netWorthCriteria = form.watch('netWorthCriteria');
 
+    // Derived: is the recommendation YES (show full form) or NO (show rejection only)
+    const isRecommended = teRecommendation !== 'NO';
+
     // Clear deliveryTimeInstallation when inclusive is true
     useEffect(() => {
         if (deliveryTimeInstallationInclusive) {
             form.setValue('deliveryTimeInstallation', undefined, { shouldValidate: false });
         }
     }, [deliveryTimeInstallationInclusive, form]);
+
+    // Clear rejection fields when switching to YES
+    useEffect(() => {
+        if (isRecommended) {
+            form.setValue('teRejectionReason', undefined, { shouldValidate: false });
+            form.setValue('teRejectionRemarks', undefined, { shouldValidate: false });
+            form.setValue('teRejectionProof', [], { shouldValidate: false });
+        }
+    }, [isRecommended, form]);
 
     const isLoading = isTenderLoading || (mode === 'edit' && isInfoSheetLoading);
     const createInfoSheet = useCreateInfoSheet();
@@ -154,8 +146,6 @@ export function TenderInformationForm({
 
             navigate(paths.tendering.tenders);
         } catch (error) {
-            // Error is already handled by the mutation's onError callback
-            // Only log for debugging
             console.error('Info sheet submission error:', error);
         }
     };
@@ -179,12 +169,16 @@ export function TenderInformationForm({
             <Card className="max-w-3xl mx-auto">
                 <CardHeader>
                     <CardTitle>Info Sheet Not Found</CardTitle>
-                    <CardDescription>The selected tender does not have an info sheet yet.</CardDescription>
+                    <CardDescription>
+                        The selected tender does not have an info sheet yet.
+                    </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Alert>
                         <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>Create a new info sheet to continue.</AlertDescription>
+                        <AlertDescription>
+                            Create a new info sheet to continue.
+                        </AlertDescription>
                     </Alert>
                     <div className="mt-6 flex gap-3">
                         <Button variant="outline" onClick={() => navigate(-1)}>
@@ -204,11 +198,14 @@ export function TenderInformationForm({
             <CardHeader>
                 <div className="flex items-center justify-between">
                     <div>
-                        <CardTitle>{mode === 'create' ? 'Create' : 'Edit'} Tender Information</CardTitle>
+                        <CardTitle>
+                            {mode === 'create' ? 'Create' : 'Edit'} Tender Information
+                        </CardTitle>
                         <CardDescription className="mt-2">
                             {tender ? (
                                 <>
-                                    <span className="font-medium">{tender.tenderName}</span> • Tender No: {tender.tenderNo}
+                                    <span className="font-medium">{tender.tenderName}</span>{' '}
+                                    • Tender No: {tender.tenderNo}
                                 </>
                             ) : (
                                 'Linked tender details'
@@ -244,14 +241,19 @@ export function TenderInformationForm({
                                     This info sheet has been marked as incomplete by the TL.
                                 </p>
                                 <p className="text-sm">
-                                    Please review and correct the following {incompleteFields.length} field(s) marked below:
+                                    Please review and correct the following{' '}
+                                    {incompleteFields.length} field(s) marked below:
                                 </p>
                                 <div className="flex flex-wrap gap-2 mt-2">
-                                    {incompleteFields.map((field: { fieldName: string; comment?: string }, idx: number) => (
-                                        <Badge key={idx} variant="outline" className="border-amber-600">
-                                            {infoSheetFieldOptions.find((opt: { value: string }) => opt.value === field.fieldName)?.label || field.fieldName}
-                                        </Badge>
-                                    ))}
+                                    {incompleteFields.map(
+                                        (field: { fieldName: string; comment?: string }, idx: number) => (
+                                            <Badge key={idx} variant="outline" className="border-amber-600">
+                                                {infoSheetFieldOptions.find(
+                                                    (opt: { value: string }) => opt.value === field.fieldName
+                                                )?.label || field.fieldName}
+                                            </Badge>
+                                        )
+                                    )}
                                 </div>
                             </div>
                         </AlertDescription>
@@ -261,7 +263,9 @@ export function TenderInformationForm({
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit, handleInfoSheetFormErrors)}>
                         <div className="space-y-6 pt-4">
-                            {/* TE Recommendation */}
+                            {/* ──────────────────────────────────────────────
+                                TE Recommendation Toggle (always visible)
+                               ────────────────────────────────────────────── */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <div>
                                     <SelectField
@@ -272,60 +276,81 @@ export function TenderInformationForm({
                                         placeholder="Select recommendation"
                                     />
                                     {getIncompleteFieldComment('teRecommendation') && (
-                                        <IncompleteFieldAlert comment={getIncompleteFieldComment('teRecommendation')!} />
+                                        <IncompleteFieldAlert
+                                            comment={getIncompleteFieldComment('teRecommendation')!}
+                                        />
                                     )}
                                 </div>
-                                {teRecommendation === 'NO' && (
-                                    <>
-                                        <div>
-                                            <SelectField
-                                                control={form.control}
-                                                name="teRejectionReason"
-                                                label="Reason of Rejection *"
-                                                options={rejectionReasonOptions}
-                                                placeholder="Select rejection reason"
-                                            />
-                                            {getIncompleteFieldComment('teRejectionReason') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('teRejectionReason')!} />
-                                            )}
-                                        </div>
-                                        <div>
-                                            <FieldWrapper
-                                                control={form.control}
-                                                name="teRejectionRemarks"
-                                                label="Rejection Remarks *"
-                                            >
-                                                {(field) => (
-                                                    <textarea
-                                                        className="border-input placeholder:text-muted-foreground h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                                        placeholder="Enter rejection remarks..."
-                                                        maxLength={1000}
-                                                        {...field}
-                                                    />
-                                                )}
-                                            </FieldWrapper>
-                                            {getIncompleteFieldComment('teRejectionRemarks') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('teRejectionRemarks')!} />
-                                            )}
-                                        </div>
-                                        <div className="space-y-4 pt-2">
-                                            <TenderFileUploader
-                                                context="tender-rejection-proof"
-                                                value={teRejectionProof}
-                                                onChange={(paths) => form.setValue("teRejectionProof", paths, { shouldValidate: true })}
-                                                label="Proof of Rejection *"
-                                                disabled={isSubmitting}
-                                            />
-                                            {getIncompleteFieldComment('teRejectionProof') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('teRejectionProof')!} />
-                                            )}
-                                        </div>
-                                    </>
-                                )}
-                            
                             </div>
 
+                            {/* ──────────────────────────────────────────────
+                                REJECTION SECTION (only when NO)
+                               ────────────────────────────────────────────── */}
+                            {!isRecommended && (
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <div>
+                                        <SelectField
+                                            control={form.control}
+                                            name="teRejectionReason"
+                                            label="Reason of Rejection *"
+                                            options={rejectionReasonOptions}
+                                            placeholder="Select rejection reason"
+                                        />
+                                        {getIncompleteFieldComment('teRejectionReason') && (
+                                            <IncompleteFieldAlert
+                                                comment={getIncompleteFieldComment('teRejectionReason')!}
+                                            />
+                                        )}
+                                    </div>
+                                    <div>
+                                        <FieldWrapper
+                                            control={form.control}
+                                            name="teRejectionRemarks"
+                                            label="Rejection Remarks *"
+                                        >
+                                            {(field) => (
+                                                <textarea
+                                                    className="border-input placeholder:text-muted-foreground h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                                    placeholder="Enter rejection remarks..."
+                                                    maxLength={1000}
+                                                    {...field}
+                                                />
+                                            )}
+                                        </FieldWrapper>
+                                        {getIncompleteFieldComment('teRejectionRemarks') && (
+                                            <IncompleteFieldAlert
+                                                comment={getIncompleteFieldComment('teRejectionRemarks')!}
+                                            />
+                                        )}
+                                    </div>
+                                    <div>
+                                        <TenderFileUploader
+                                            context="tender-rejection-proof"
+                                            value={teRejectionProof}
+                                            onChange={(paths) =>
+                                                form.setValue('teRejectionProof', paths, {
+                                                    shouldValidate: true,
+                                                })
+                                            }
+                                            label="Proof of Rejection *"
+                                            disabled={isSubmitting}
+                                        />
+                                        {getIncompleteFieldComment('teRejectionProof') && (
+                                            <IncompleteFieldAlert
+                                                comment={getIncompleteFieldComment('teRejectionProof')!}
+                                            />
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ──────────────────────────────────────────────
+                                FULL FORM SECTION (only when YES / recommended)
+                               ────────────────────────────────────────────── */}
+                            {isRecommended && (
+                                <>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        {/* Processing Fee */}
                                         <div>
                                             <SelectField
                                                 control={form.control}
@@ -335,7 +360,9 @@ export function TenderInformationForm({
                                                 placeholder="Select option"
                                             />
                                             {getIncompleteFieldComment('processingFeeRequired') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('processingFeeRequired')!} />
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('processingFeeRequired')!}
+                                                />
                                             )}
                                         </div>
                                         {processingFeeRequired === 'YES' && (
@@ -345,14 +372,16 @@ export function TenderInformationForm({
                                                         control={form.control}
                                                         name="processingFeeModes"
                                                         label="Processing Fees Mode"
-                                                        options={processingFeeOptions.map(option => ({
+                                                        options={processingFeeOptions.map((option) => ({
                                                             value: String(option.value),
-                                                            label: option.label
+                                                            label: option.label,
                                                         }))}
                                                         placeholder="Select payment modes"
                                                     />
                                                     {getIncompleteFieldComment('processingFeeModes') && (
-                                                        <IncompleteFieldAlert comment={getIncompleteFieldComment('processingFeeModes')!} />
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment('processingFeeModes')!}
+                                                        />
                                                     )}
                                                 </div>
                                                 <div>
@@ -365,17 +394,25 @@ export function TenderInformationForm({
                                                             <NumberInput
                                                                 step={0.01}
                                                                 placeholder="0.00"
-                                                                value={typeof field.value === "number" ? field.value : null}
+                                                                value={
+                                                                    typeof field.value === 'number'
+                                                                        ? field.value
+                                                                        : null
+                                                                }
                                                                 onChange={field.onChange}
                                                             />
                                                         )}
                                                     </FieldWrapper>
                                                     {getIncompleteFieldComment('processingFeeAmount') && (
-                                                        <IncompleteFieldAlert comment={getIncompleteFieldComment('processingFeeAmount')!} />
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment('processingFeeAmount')!}
+                                                        />
                                                     )}
                                                 </div>
                                             </>
                                         )}
+
+                                        {/* Tender Fee */}
                                         <div>
                                             <SelectField
                                                 control={form.control}
@@ -385,7 +422,9 @@ export function TenderInformationForm({
                                                 placeholder="Select option"
                                             />
                                             {getIncompleteFieldComment('tenderFeeRequired') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('tenderFeeRequired')!} />
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('tenderFeeRequired')!}
+                                                />
                                             )}
                                         </div>
                                         {tenderFeeRequired === 'YES' && (
@@ -395,14 +434,16 @@ export function TenderInformationForm({
                                                         control={form.control}
                                                         name="tenderFeeModes"
                                                         label="Tender Fees Mode"
-                                                        options={tenderFeeOptions.map(option => ({
+                                                        options={tenderFeeOptions.map((option) => ({
                                                             value: String(option.value),
-                                                            label: option.label
+                                                            label: option.label,
                                                         }))}
                                                         placeholder="Select payment modes"
                                                     />
                                                     {getIncompleteFieldComment('tenderFeeModes') && (
-                                                        <IncompleteFieldAlert comment={getIncompleteFieldComment('tenderFeeModes')!} />
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment('tenderFeeModes')!}
+                                                        />
                                                     )}
                                                 </div>
                                                 <div>
@@ -415,17 +456,25 @@ export function TenderInformationForm({
                                                             <NumberInput
                                                                 step={0.01}
                                                                 placeholder="0.00"
-                                                                value={typeof field.value === "number" ? field.value : null}
+                                                                value={
+                                                                    typeof field.value === 'number'
+                                                                        ? field.value
+                                                                        : null
+                                                                }
                                                                 onChange={field.onChange}
                                                             />
                                                         )}
                                                     </FieldWrapper>
                                                     {getIncompleteFieldComment('tenderFeeAmount') && (
-                                                        <IncompleteFieldAlert comment={getIncompleteFieldComment('tenderFeeAmount')!} />
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment('tenderFeeAmount')!}
+                                                        />
                                                     )}
                                                 </div>
                                             </>
                                         )}
+
+                                        {/* EMD */}
                                         <div>
                                             <SelectField
                                                 control={form.control}
@@ -435,7 +484,9 @@ export function TenderInformationForm({
                                                 placeholder="Select option"
                                             />
                                             {getIncompleteFieldComment('emdRequired') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('emdRequired')!} />
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('emdRequired')!}
+                                                />
                                             )}
                                         </div>
                                         {emdRequired === 'YES' && (
@@ -445,14 +496,16 @@ export function TenderInformationForm({
                                                         control={form.control}
                                                         name="emdModes"
                                                         label="EMD Mode"
-                                                        options={paymentModeOptions.map(option => ({
+                                                        options={paymentModeOptions.map((option) => ({
                                                             value: String(option.value),
-                                                            label: option.label
+                                                            label: option.label,
                                                         }))}
                                                         placeholder="Select payment modes"
                                                     />
                                                     {getIncompleteFieldComment('emdModes') && (
-                                                        <IncompleteFieldAlert comment={getIncompleteFieldComment('emdModes')!} />
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment('emdModes')!}
+                                                        />
                                                     )}
                                                 </div>
                                                 <div>
@@ -465,17 +518,25 @@ export function TenderInformationForm({
                                                             <NumberInput
                                                                 step={0.01}
                                                                 placeholder="0.00"
-                                                                value={typeof field.value === "number" ? field.value : null}
+                                                                value={
+                                                                    typeof field.value === 'number'
+                                                                        ? field.value
+                                                                        : null
+                                                                }
                                                                 onChange={field.onChange}
                                                             />
                                                         )}
                                                     </FieldWrapper>
                                                     {getIncompleteFieldComment('emdAmount') && (
-                                                        <IncompleteFieldAlert comment={getIncompleteFieldComment('emdAmount')!} />
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment('emdAmount')!}
+                                                        />
                                                     )}
                                                 </div>
                                             </>
                                         )}
+
+                                        {/* Tender Value */}
                                         <div>
                                             <FieldWrapper
                                                 control={form.control}
@@ -486,45 +547,59 @@ export function TenderInformationForm({
                                                     <NumberInput
                                                         step={0.01}
                                                         placeholder="0.00"
-                                                        value={typeof field.value === "number" ? field.value : null}
+                                                        value={
+                                                            typeof field.value === 'number' ? field.value : null
+                                                        }
                                                         onChange={field.onChange}
                                                     />
                                                 )}
                                             </FieldWrapper>
                                             {getIncompleteFieldComment('tenderValue') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('tenderValue')!} />
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('tenderValue')!}
+                                                />
                                             )}
                                         </div>
+
+                                        {/* Bid Validity */}
                                         <div>
                                             <SelectField
                                                 control={form.control}
                                                 name="bidValidityDays"
                                                 label="Bid Validity (Days)"
-                                                options={bidValidityOptions.map(option => ({
+                                                options={bidValidityOptions.map((option) => ({
                                                     value: String(option.value),
-                                                    label: option.label
+                                                    label: option.label,
                                                 }))}
                                                 placeholder="Select days"
                                             />
                                             {getIncompleteFieldComment('bidValidityDays') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('bidValidityDays')!} />
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('bidValidityDays')!}
+                                                />
                                             )}
                                         </div>
+
+                                        {/* MAF */}
                                         <div>
                                             <SelectField
                                                 control={form.control}
                                                 name="mafRequired"
                                                 label="MAF Required"
-                                                options={mafRequiredOptions.map(option => ({
+                                                options={mafRequiredOptions.map((option) => ({
                                                     value: String(option.value),
-                                                    label: option.label
+                                                    label: option.label,
                                                 }))}
                                                 placeholder="Select option"
                                             />
                                             {getIncompleteFieldComment('mafRequired') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('mafRequired')!} />
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('mafRequired')!}
+                                                />
                                             )}
                                         </div>
+
+                                        {/* PBG */}
                                         <div>
                                             <SelectField
                                                 control={form.control}
@@ -534,7 +609,9 @@ export function TenderInformationForm({
                                                 placeholder="Select option"
                                             />
                                             {getIncompleteFieldComment('pbgRequired') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('pbgRequired')!} />
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('pbgRequired')!}
+                                                />
                                             )}
                                         </div>
                                         {pbgRequired === 'YES' && (
@@ -544,14 +621,16 @@ export function TenderInformationForm({
                                                         control={form.control}
                                                         name="pbgForm"
                                                         label="PBG (in form of)"
-                                                        options={pbgFormOptions.map(option => ({
+                                                        options={pbgFormOptions.map((option) => ({
                                                             value: String(option.value),
-                                                            label: option.label
+                                                            label: option.label,
                                                         }))}
                                                         placeholder="Select forms"
                                                     />
                                                     {getIncompleteFieldComment('pbgForm') && (
-                                                        <IncompleteFieldAlert comment={getIncompleteFieldComment('pbgForm')!} />
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment('pbgForm')!}
+                                                        />
                                                     )}
                                                 </div>
                                                 <div>
@@ -566,13 +645,19 @@ export function TenderInformationForm({
                                                                 min={0}
                                                                 max={100}
                                                                 placeholder="Enter percentage (0-100)"
-                                                                value={typeof field.value === "number" ? field.value : null}
+                                                                value={
+                                                                    typeof field.value === 'number'
+                                                                        ? field.value
+                                                                        : null
+                                                                }
                                                                 onChange={field.onChange}
                                                             />
                                                         )}
                                                     </FieldWrapper>
                                                     {getIncompleteFieldComment('pbgPercentage') && (
-                                                        <IncompleteFieldAlert comment={getIncompleteFieldComment('pbgPercentage')!} />
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment('pbgPercentage')!}
+                                                        />
                                                     )}
                                                 </div>
                                                 <div>
@@ -580,18 +665,22 @@ export function TenderInformationForm({
                                                         control={form.control}
                                                         name="pbgDurationMonths"
                                                         label="PBG Duration (Months)"
-                                                        options={pbgDurationOptions.map(option => ({
+                                                        options={pbgDurationOptions.map((option) => ({
                                                             value: String(option.value),
-                                                            label: option.label
+                                                            label: option.label,
                                                         }))}
                                                         placeholder="Select duration"
                                                     />
                                                     {getIncompleteFieldComment('pbgDurationMonths') && (
-                                                        <IncompleteFieldAlert comment={getIncompleteFieldComment('pbgDurationMonths')!} />
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment('pbgDurationMonths')!}
+                                                        />
                                                     )}
                                                 </div>
                                             </>
                                         )}
+
+                                        {/* SD */}
                                         <div>
                                             <SelectField
                                                 control={form.control}
@@ -601,7 +690,9 @@ export function TenderInformationForm({
                                                 placeholder="Select option"
                                             />
                                             {getIncompleteFieldComment('sdRequired') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('sdRequired')!} />
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('sdRequired')!}
+                                                />
                                             )}
                                         </div>
                                         {sdRequired === 'YES' && (
@@ -611,14 +702,16 @@ export function TenderInformationForm({
                                                         control={form.control}
                                                         name="sdForm"
                                                         label="SD (in form of)"
-                                                        options={sdFormOptions.map(option => ({
+                                                        options={sdFormOptions.map((option) => ({
                                                             value: String(option.value),
-                                                            label: option.label
+                                                            label: option.label,
                                                         }))}
                                                         placeholder="Select forms"
                                                     />
                                                     {getIncompleteFieldComment('sdForm') && (
-                                                        <IncompleteFieldAlert comment={getIncompleteFieldComment('sdForm')!} />
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment('sdForm')!}
+                                                        />
                                                     )}
                                                 </div>
                                                 <div>
@@ -633,13 +726,21 @@ export function TenderInformationForm({
                                                                 min={0}
                                                                 max={100}
                                                                 placeholder="Enter percentage (0-100)"
-                                                                value={typeof field.value === "number" ? field.value : null}
+                                                                value={
+                                                                    typeof field.value === 'number'
+                                                                        ? field.value
+                                                                        : null
+                                                                }
                                                                 onChange={field.onChange}
                                                             />
                                                         )}
                                                     </FieldWrapper>
                                                     {getIncompleteFieldComment('securityDepositPercentage') && (
-                                                        <IncompleteFieldAlert comment={getIncompleteFieldComment('securityDepositPercentage')!} />
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment(
+                                                                'securityDepositPercentage'
+                                                            )!}
+                                                        />
                                                     )}
                                                 </div>
                                                 <div>
@@ -652,35 +753,46 @@ export function TenderInformationForm({
                                                             <NumberInput
                                                                 step={1}
                                                                 placeholder="Enter months"
-                                                                value={typeof field.value === "number" ? field.value : null}
+                                                                value={
+                                                                    typeof field.value === 'number'
+                                                                        ? field.value
+                                                                        : null
+                                                                }
                                                                 onChange={(value) => {
-                                                                    // Convert 0 to null before setting
                                                                     field.onChange(value === 0 ? null : value);
                                                                 }}
                                                             />
                                                         )}
                                                     </FieldWrapper>
                                                     {getIncompleteFieldComment('sdDurationMonths') && (
-                                                        <IncompleteFieldAlert comment={getIncompleteFieldComment('sdDurationMonths')!} />
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment('sdDurationMonths')!}
+                                                        />
                                                     )}
                                                 </div>
                                             </>
                                         )}
+
+                                        {/* Commercial Evaluation */}
                                         <div>
                                             <SelectField
                                                 control={form.control}
                                                 name="commercialEvaluation"
                                                 label="Commercial Evaluation"
-                                                options={commercialEvaluationOptions.map(option => ({
+                                                options={commercialEvaluationOptions.map((option) => ({
                                                     value: String(option.value),
-                                                    label: option.label
+                                                    label: option.label,
                                                 }))}
                                                 placeholder="Select evaluation type"
                                             />
                                             {getIncompleteFieldComment('commercialEvaluation') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('commercialEvaluation')!} />
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('commercialEvaluation')!}
+                                                />
                                             )}
                                         </div>
+
+                                        {/* Reverse Auction */}
                                         <div>
                                             <SelectField
                                                 control={form.control}
@@ -690,9 +802,15 @@ export function TenderInformationForm({
                                                 placeholder="Select option"
                                             />
                                             {getIncompleteFieldComment('reverseAuctionApplicable') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('reverseAuctionApplicable')!} />
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment(
+                                                        'reverseAuctionApplicable'
+                                                    )!}
+                                                />
                                             )}
                                         </div>
+
+                                        {/* Payment Terms */}
                                         <div>
                                             <FieldWrapper
                                                 control={form.control}
@@ -705,13 +823,19 @@ export function TenderInformationForm({
                                                         min={0}
                                                         max={100}
                                                         placeholder="Enter percentage (0-100)"
-                                                        value={typeof field.value === "number" ? field.value : null}
+                                                        value={
+                                                            typeof field.value === 'number'
+                                                                ? field.value
+                                                                : null
+                                                        }
                                                         onChange={field.onChange}
                                                     />
                                                 )}
                                             </FieldWrapper>
                                             {getIncompleteFieldComment('paymentTermsSupply') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('paymentTermsSupply')!} />
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('paymentTermsSupply')!}
+                                                />
                                             )}
                                         </div>
                                         <div>
@@ -726,15 +850,25 @@ export function TenderInformationForm({
                                                         min={0}
                                                         max={100}
                                                         placeholder="Enter percentage (0-100)"
-                                                        value={typeof field.value === "number" ? field.value : null}
+                                                        value={
+                                                            typeof field.value === 'number'
+                                                                ? field.value
+                                                                : null
+                                                        }
                                                         onChange={field.onChange}
                                                     />
                                                 )}
                                             </FieldWrapper>
                                             {getIncompleteFieldComment('paymentTermsInstallation') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('paymentTermsInstallation')!} />
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment(
+                                                        'paymentTermsInstallation'
+                                                    )!}
+                                                />
                                             )}
                                         </div>
+
+                                        {/* Delivery Time */}
                                         <div>
                                             <FieldWrapper
                                                 control={form.control}
@@ -745,16 +879,21 @@ export function TenderInformationForm({
                                                     <NumberInput
                                                         step={1}
                                                         placeholder="Enter number of days"
-                                                        value={typeof field.value === "number" ? field.value : null}
+                                                        value={
+                                                            typeof field.value === 'number'
+                                                                ? field.value
+                                                                : null
+                                                        }
                                                         onChange={(value) => {
-                                                            // Convert 0 to null before setting
                                                             field.onChange(value === 0 ? null : value);
                                                         }}
                                                     />
                                                 )}
                                             </FieldWrapper>
                                             {getIncompleteFieldComment('deliveryTimeSupply') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('deliveryTimeSupply')!} />
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('deliveryTimeSupply')!}
+                                                />
                                             )}
                                         </div>
                                         <div>
@@ -779,8 +918,14 @@ export function TenderInformationForm({
                                                     </div>
                                                 )}
                                             </FieldWrapper>
-                                            {getIncompleteFieldComment('deliveryTimeInstallationInclusive') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('deliveryTimeInstallationInclusive')!} />
+                                            {getIncompleteFieldComment(
+                                                'deliveryTimeInstallationInclusive'
+                                            ) && (
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment(
+                                                        'deliveryTimeInstallationInclusive'
+                                                    )!}
+                                                />
                                             )}
                                         </div>
                                         {!deliveryTimeInstallationInclusive && (
@@ -794,19 +939,28 @@ export function TenderInformationForm({
                                                         <NumberInput
                                                             step={1}
                                                             placeholder="Enter number of days"
-                                                            value={typeof field.value === "number" ? field.value : null}
+                                                            value={
+                                                                typeof field.value === 'number'
+                                                                    ? field.value
+                                                                    : null
+                                                            }
                                                             onChange={(value) => {
-                                                                // Convert 0 to null before setting
                                                                 field.onChange(value === 0 ? null : value);
                                                             }}
                                                         />
                                                     )}
                                                 </FieldWrapper>
                                                 {getIncompleteFieldComment('deliveryTimeInstallation') && (
-                                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('deliveryTimeInstallation')!} />
+                                                    <IncompleteFieldAlert
+                                                        comment={getIncompleteFieldComment(
+                                                            'deliveryTimeInstallation'
+                                                        )!}
+                                                    />
                                                 )}
                                             </>
                                         )}
+
+                                        {/* LD */}
                                         <div>
                                             <SelectField
                                                 control={form.control}
@@ -816,7 +970,9 @@ export function TenderInformationForm({
                                                 placeholder="Select option"
                                             />
                                             {getIncompleteFieldComment('ldRequired') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('ldRequired')!} />
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('ldRequired')!}
+                                                />
                                             )}
                                         </div>
                                         <div>
@@ -831,13 +987,19 @@ export function TenderInformationForm({
                                                         min={0}
                                                         max={5}
                                                         placeholder="Enter percentage (0-5)"
-                                                        value={typeof field.value === "number" ? field.value : null}
+                                                        value={
+                                                            typeof field.value === 'number'
+                                                                ? field.value
+                                                                : null
+                                                        }
                                                         onChange={field.onChange}
                                                     />
                                                 )}
                                             </FieldWrapper>
                                             {getIncompleteFieldComment('ldPercentagePerWeek') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('ldPercentagePerWeek')!} />
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('ldPercentagePerWeek')!}
+                                                />
                                             )}
                                         </div>
                                         <div>
@@ -852,15 +1014,23 @@ export function TenderInformationForm({
                                                         min={0}
                                                         max={100}
                                                         placeholder="Enter percentage (0-100)"
-                                                        value={typeof field.value === "number" ? field.value : null}
+                                                        value={
+                                                            typeof field.value === 'number'
+                                                                ? field.value
+                                                                : null
+                                                        }
                                                         onChange={field.onChange}
                                                     />
                                                 )}
                                             </FieldWrapper>
                                             {getIncompleteFieldComment('maxLdPercentage') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('maxLdPercentage')!} />
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('maxLdPercentage')!}
+                                                />
                                             )}
                                         </div>
+
+                                        {/* Physical Docs */}
                                         <div>
                                             <SelectField
                                                 control={form.control}
@@ -870,42 +1040,55 @@ export function TenderInformationForm({
                                                 placeholder="Select option"
                                             />
                                             {getIncompleteFieldComment('physicalDocsRequired') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('physicalDocsRequired')!} />
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('physicalDocsRequired')!}
+                                                />
                                             )}
                                         </div>
-                                         {physicalDocsRequired === 'YES' && (
-                                             <>
-                                                 <div>
-                                                     <SelectField
-                                                         control={form.control}
-                                                         name="physicalDocType"
-                                                         label="Physical Document Type"
-                                                         options={physicalDocTypeOptions}
-                                                         placeholder="Select type"
-                                                     />
-                                                     {getIncompleteFieldComment('physicalDocType') && (
-                                                         <IncompleteFieldAlert comment={getIncompleteFieldComment('physicalDocType')!} />
-                                                     )}
-                                                 </div>
-                                                 <FieldWrapper
+                                        {physicalDocsRequired === 'YES' && (
+                                            <>
+                                                <div>
+                                                    <SelectField
+                                                        control={form.control}
+                                                        name="physicalDocType"
+                                                        label="Physical Document Type"
+                                                        options={physicalDocTypeOptions}
+                                                        placeholder="Select type"
+                                                    />
+                                                    {getIncompleteFieldComment('physicalDocType') && (
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment('physicalDocType')!}
+                                                        />
+                                                    )}
+                                                </div>
+                                                <FieldWrapper
                                                     control={form.control}
                                                     name="physicalDocsDeadline"
                                                     label="Physical Docs Submission Deadline"
                                                 >
                                                     {(field) => (
                                                         <DateTimeInput
-                                                            value={typeof field.value === "string" ? field.value : null}
+                                                            value={
+                                                                typeof field.value === 'string'
+                                                                    ? field.value
+                                                                    : null
+                                                            }
                                                             onChange={field.onChange}
                                                             className="bg-background"
                                                         />
                                                     )}
                                                 </FieldWrapper>
                                                 {getIncompleteFieldComment('physicalDocsDeadline') && (
-                                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('physicalDocsDeadline')!} />
+                                                    <IncompleteFieldAlert
+                                                        comment={getIncompleteFieldComment(
+                                                            'physicalDocsDeadline'
+                                                        )!}
+                                                    />
                                                 )}
                                             </>
                                         )}
 
+                                        {/* Eligibility */}
                                         <div>
                                             <FieldWrapper
                                                 control={form.control}
@@ -916,13 +1099,21 @@ export function TenderInformationForm({
                                                     <NumberInput
                                                         step={1}
                                                         placeholder="Enter number of years"
-                                                        value={typeof field.value === "number" ? field.value : null}
+                                                        value={
+                                                            typeof field.value === 'number'
+                                                                ? field.value
+                                                                : null
+                                                        }
                                                         onChange={field.onChange}
                                                     />
                                                 )}
                                             </FieldWrapper>
                                             {getIncompleteFieldComment('techEligibilityAgeYears') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('techEligibilityAgeYears')!} />
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment(
+                                                        'techEligibilityAgeYears'
+                                                    )!}
+                                                />
                                             )}
                                         </div>
                                         <div>
@@ -930,14 +1121,16 @@ export function TenderInformationForm({
                                                 control={form.control}
                                                 name="oemExperience"
                                                 label="OEM Experience"
-                                                options={yesNoOptions.map(option => ({
+                                                options={yesNoOptions.map((option) => ({
                                                     value: option.value,
-                                                    label: option.label
+                                                    label: option.label,
                                                 }))}
                                                 placeholder="Select type"
                                             />
                                             {getIncompleteFieldComment('oemExperience') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('oemExperience')!} />
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('oemExperience')!}
+                                                />
                                             )}
                                         </div>
                                         <div>
@@ -945,14 +1138,16 @@ export function TenderInformationForm({
                                                 control={form.control}
                                                 name="workValueType"
                                                 label="Work Value Type"
-                                                options={workValueTypeOptions.map(option => ({
+                                                options={workValueTypeOptions.map((option) => ({
                                                     value: option.value,
-                                                    label: option.label
+                                                    label: option.label,
                                                 }))}
                                                 placeholder="Select type"
                                             />
                                             {getIncompleteFieldComment('workValueType') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('workValueType')!} />
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('workValueType')!}
+                                                />
                                             )}
                                         </div>
 
@@ -960,48 +1155,78 @@ export function TenderInformationForm({
                                         {workValueType === 'WORKS_VALUES' && (
                                             <>
                                                 <div>
-                                                    <FieldWrapper control={form.control} name="orderValue1" label="1 Work Value">
+                                                    <FieldWrapper
+                                                        control={form.control}
+                                                        name="orderValue1"
+                                                        label="1 Work Value"
+                                                    >
                                                         {(field) => (
                                                             <NumberInput
                                                                 step={0.01}
                                                                 placeholder="0.00"
-                                                                value={typeof field.value === "number" ? field.value : null}
+                                                                value={
+                                                                    typeof field.value === 'number'
+                                                                        ? field.value
+                                                                        : null
+                                                                }
                                                                 onChange={field.onChange}
                                                             />
                                                         )}
                                                     </FieldWrapper>
                                                     {getIncompleteFieldComment('orderValue1') && (
-                                                        <IncompleteFieldAlert comment={getIncompleteFieldComment('orderValue1')!} />
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment('orderValue1')!}
+                                                        />
                                                     )}
                                                 </div>
                                                 <div>
-                                                    <FieldWrapper control={form.control} name="orderValue2" label="2 Works Value">
+                                                    <FieldWrapper
+                                                        control={form.control}
+                                                        name="orderValue2"
+                                                        label="2 Works Value"
+                                                    >
                                                         {(field) => (
                                                             <NumberInput
                                                                 step={0.01}
                                                                 placeholder="0.00"
-                                                                value={typeof field.value === "number" ? field.value : null}
+                                                                value={
+                                                                    typeof field.value === 'number'
+                                                                        ? field.value
+                                                                        : null
+                                                                }
                                                                 onChange={field.onChange}
                                                             />
                                                         )}
                                                     </FieldWrapper>
                                                     {getIncompleteFieldComment('orderValue2') && (
-                                                        <IncompleteFieldAlert comment={getIncompleteFieldComment('orderValue2')!} />
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment('orderValue2')!}
+                                                        />
                                                     )}
                                                 </div>
                                                 <div>
-                                                    <FieldWrapper control={form.control} name="orderValue3" label="3 Works Value">
+                                                    <FieldWrapper
+                                                        control={form.control}
+                                                        name="orderValue3"
+                                                        label="3 Works Value"
+                                                    >
                                                         {(field) => (
                                                             <NumberInput
                                                                 step={0.01}
                                                                 placeholder="0.00"
-                                                                value={typeof field.value === "number" ? field.value : null}
+                                                                value={
+                                                                    typeof field.value === 'number'
+                                                                        ? field.value
+                                                                        : null
+                                                                }
                                                                 onChange={field.onChange}
                                                             />
                                                         )}
                                                     </FieldWrapper>
                                                     {getIncompleteFieldComment('orderValue3') && (
-                                                        <IncompleteFieldAlert comment={getIncompleteFieldComment('orderValue3')!} />
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment('orderValue3')!}
+                                                        />
                                                     )}
                                                 </div>
                                             </>
@@ -1009,29 +1234,32 @@ export function TenderInformationForm({
 
                                         {/* Custom Eligibility */}
                                         {workValueType === 'CUSTOM' && (
-                                            <>
-                                                <div>
-                                                    <FieldWrapper
-                                                        control={form.control}
-                                                        name="customEligibilityCriteria"
-                                                        label="Custom Eligibility Criteria"
-                                                    >
-                                                        {(field) => (
-                                                            <textarea
-                                                                className="border-input placeholder:text-muted-foreground h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                                                placeholder="Enter custom eligibility criteria..."
-                                                                maxLength={1000}
-                                                                {...field}
-                                                            />
-                                                        )}
-                                                    </FieldWrapper>
-                                                    {getIncompleteFieldComment('customEligibilityCriteria') && (
-                                                        <IncompleteFieldAlert comment={getIncompleteFieldComment('customEligibilityCriteria')!} />
+                                            <div>
+                                                <FieldWrapper
+                                                    control={form.control}
+                                                    name="customEligibilityCriteria"
+                                                    label="Custom Eligibility Criteria"
+                                                >
+                                                    {(field) => (
+                                                        <textarea
+                                                            className="border-input placeholder:text-muted-foreground h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                                            placeholder="Enter custom eligibility criteria..."
+                                                            maxLength={1000}
+                                                            {...field}
+                                                        />
                                                     )}
-                                                </div>
-                                            </>
+                                                </FieldWrapper>
+                                                {getIncompleteFieldComment('customEligibilityCriteria') && (
+                                                    <IncompleteFieldAlert
+                                                        comment={getIncompleteFieldComment(
+                                                            'customEligibilityCriteria'
+                                                        )!}
+                                                    />
+                                                )}
+                                            </div>
                                         )}
 
+                                        {/* Technical & Commercial Documents */}
                                         <div>
                                             <MultiSelectField
                                                 control={form.control}
@@ -1041,7 +1269,9 @@ export function TenderInformationForm({
                                                 placeholder="Select documents"
                                             />
                                             {getIncompleteFieldComment('technicalWorkOrders') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('technicalWorkOrders')!} />
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('technicalWorkOrders')!}
+                                                />
                                             )}
                                         </div>
                                         <div>
@@ -1053,9 +1283,13 @@ export function TenderInformationForm({
                                                 placeholder="Select documents"
                                             />
                                             {getIncompleteFieldComment('commercialDocuments') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('commercialDocuments')!} />
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('commercialDocuments')!}
+                                                />
                                             )}
                                         </div>
+
+                                        {/* Financial Criteria */}
                                         <div>
                                             <SelectField
                                                 control={form.control}
@@ -1065,23 +1299,39 @@ export function TenderInformationForm({
                                                 placeholder="Select criteria"
                                             />
                                             {getIncompleteFieldComment('avgAnnualTurnoverCriteria') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('avgAnnualTurnoverCriteria')!} />
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment(
+                                                        'avgAnnualTurnoverCriteria'
+                                                    )!}
+                                                />
                                             )}
                                         </div>
                                         {avgAnnualTurnoverCriteria === 'AMOUNT' && (
                                             <>
-                                                <FieldWrapper control={form.control} name="avgAnnualTurnoverValue" label="Amount">
+                                                <FieldWrapper
+                                                    control={form.control}
+                                                    name="avgAnnualTurnoverValue"
+                                                    label="Amount"
+                                                >
                                                     {(field) => (
                                                         <NumberInput
                                                             step={0.01}
                                                             placeholder="0.00"
-                                                            value={typeof field.value === "number" ? field.value : null}
+                                                            value={
+                                                                typeof field.value === 'number'
+                                                                    ? field.value
+                                                                    : null
+                                                            }
                                                             onChange={field.onChange}
                                                         />
                                                     )}
                                                 </FieldWrapper>
                                                 {getIncompleteFieldComment('avgAnnualTurnoverValue') && (
-                                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('avgAnnualTurnoverValue')!} />
+                                                    <IncompleteFieldAlert
+                                                        comment={getIncompleteFieldComment(
+                                                            'avgAnnualTurnoverValue'
+                                                        )!}
+                                                    />
                                                 )}
                                             </>
                                         )}
@@ -1095,28 +1345,43 @@ export function TenderInformationForm({
                                                 placeholder="Select criteria"
                                             />
                                             {getIncompleteFieldComment('workingCapitalCriteria') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('workingCapitalCriteria')!} />
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment(
+                                                        'workingCapitalCriteria'
+                                                    )!}
+                                                />
                                             )}
                                         </div>
                                         {workingCapitalCriteria === 'AMOUNT' && (
-                                            <>
-                                                <div>
-                                                    <FieldWrapper control={form.control} name="workingCapitalValue" label="Amount">
-                                                        {(field) => (
-                                                            <NumberInput
-                                                                step={0.01}
-                                                                placeholder="0.00"
-                                                                value={typeof field.value === "number" ? field.value : null}
-                                                                onChange={field.onChange}
-                                                            />
-                                                        )}
-                                                    </FieldWrapper>
-                                                    {getIncompleteFieldComment('workingCapitalValue') && (
-                                                        <IncompleteFieldAlert comment={getIncompleteFieldComment('workingCapitalValue')!} />
+                                            <div>
+                                                <FieldWrapper
+                                                    control={form.control}
+                                                    name="workingCapitalValue"
+                                                    label="Amount"
+                                                >
+                                                    {(field) => (
+                                                        <NumberInput
+                                                            step={0.01}
+                                                            placeholder="0.00"
+                                                            value={
+                                                                typeof field.value === 'number'
+                                                                    ? field.value
+                                                                    : null
+                                                            }
+                                                            onChange={field.onChange}
+                                                        />
                                                     )}
-                                                </div>
-                                            </>
+                                                </FieldWrapper>
+                                                {getIncompleteFieldComment('workingCapitalValue') && (
+                                                    <IncompleteFieldAlert
+                                                        comment={getIncompleteFieldComment(
+                                                            'workingCapitalValue'
+                                                        )!}
+                                                    />
+                                                )}
+                                            </div>
                                         )}
+
                                         <div>
                                             <SelectField
                                                 control={form.control}
@@ -1126,28 +1391,43 @@ export function TenderInformationForm({
                                                 placeholder="Select criteria"
                                             />
                                             {getIncompleteFieldComment('solvencyCertificateCriteria') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('solvencyCertificateCriteria')!} />
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment(
+                                                        'solvencyCertificateCriteria'
+                                                    )!}
+                                                />
                                             )}
                                         </div>
                                         {solvencyCertificateCriteria === 'AMOUNT' && (
-                                            <>
-                                                <div>
-                                                    <FieldWrapper control={form.control} name="solvencyCertificateValue" label="Amount">
-                                                        {(field) => (
-                                                            <NumberInput
-                                                                step={0.01}
-                                                                placeholder="0.00"
-                                                                value={typeof field.value === "number" ? field.value : null}
-                                                                onChange={field.onChange}
-                                                            />
-                                                        )}
-                                                    </FieldWrapper>
-                                                    {getIncompleteFieldComment('solvencyCertificateValue') && (
-                                                        <IncompleteFieldAlert comment={getIncompleteFieldComment('solvencyCertificateValue')!} />
+                                            <div>
+                                                <FieldWrapper
+                                                    control={form.control}
+                                                    name="solvencyCertificateValue"
+                                                    label="Amount"
+                                                >
+                                                    {(field) => (
+                                                        <NumberInput
+                                                            step={0.01}
+                                                            placeholder="0.00"
+                                                            value={
+                                                                typeof field.value === 'number'
+                                                                    ? field.value
+                                                                    : null
+                                                            }
+                                                            onChange={field.onChange}
+                                                        />
                                                     )}
-                                                </div>
-                                            </>
+                                                </FieldWrapper>
+                                                {getIncompleteFieldComment('solvencyCertificateValue') && (
+                                                    <IncompleteFieldAlert
+                                                        comment={getIncompleteFieldComment(
+                                                            'solvencyCertificateValue'
+                                                        )!}
+                                                    />
+                                                )}
+                                            </div>
                                         )}
+
                                         <div>
                                             <SelectField
                                                 control={form.control}
@@ -1157,34 +1437,46 @@ export function TenderInformationForm({
                                                 placeholder="Select criteria"
                                             />
                                             {getIncompleteFieldComment('netWorthCriteria') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('netWorthCriteria')!} />
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('netWorthCriteria')!}
+                                                />
                                             )}
                                         </div>
                                         {netWorthCriteria === 'AMOUNT' && (
-                                            <>
-                                                <div>
-                                                    <FieldWrapper control={form.control} name="netWorthValue" label="Amount">
-                                                        {(field) => (
-                                                            <NumberInput
-                                                                step={0.01}
-                                                                placeholder="0.00"
-                                                                value={typeof field.value === "number" ? field.value : null}
-                                                                onChange={field.onChange}
-                                                            />
-                                                        )}
-                                                    </FieldWrapper>
-                                                    {getIncompleteFieldComment('netWorthValue') && (
-                                                        <IncompleteFieldAlert comment={getIncompleteFieldComment('netWorthValue')!} />
+                                            <div>
+                                                <FieldWrapper
+                                                    control={form.control}
+                                                    name="netWorthValue"
+                                                    label="Amount"
+                                                >
+                                                    {(field) => (
+                                                        <NumberInput
+                                                            step={0.01}
+                                                            placeholder="0.00"
+                                                            value={
+                                                                typeof field.value === 'number'
+                                                                    ? field.value
+                                                                    : null
+                                                            }
+                                                            onChange={field.onChange}
+                                                        />
                                                     )}
-                                                </div>
-                                            </>
+                                                </FieldWrapper>
+                                                {getIncompleteFieldComment('netWorthValue') && (
+                                                    <IncompleteFieldAlert
+                                                        comment={getIncompleteFieldComment('netWorthValue')!}
+                                                    />
+                                                )}
+                                            </div>
                                         )}
                                     </div>
 
                                     {/* Client Details */}
                                     <div className="space-y-4 mt-6">
                                         <div className="flex items-center justify-between">
-                                            <h4 className="font-medium text-sm text-primary border-b pb-2">Client Details</h4>
+                                            <h4 className="font-medium text-sm text-primary border-b pb-2">
+                                                Client Details
+                                            </h4>
                                             <Button
                                                 type="button"
                                                 variant="outline"
@@ -1203,9 +1495,14 @@ export function TenderInformationForm({
                                         </div>
 
                                         {clientFields.map((field, index) => (
-                                            <div key={field.id} className="p-4 border rounded-lg space-y-4 bg-muted/20">
+                                            <div
+                                                key={field.id}
+                                                className="p-4 border rounded-lg space-y-4 bg-muted/20"
+                                            >
                                                 <div className="flex items-center justify-between">
-                                                    <h5 className="font-medium text-sm">Client {index + 1}</h5>
+                                                    <h5 className="font-medium text-sm">
+                                                        Client {index + 1}
+                                                    </h5>
                                                     {clientFields.length > 1 && (
                                                         <Button
                                                             type="button"
@@ -1225,10 +1522,18 @@ export function TenderInformationForm({
                                                             name={`clients.${index}.clientName`}
                                                             label="Name"
                                                         >
-                                                            {(field) => <Input placeholder="Enter name" {...field} />}
+                                                            {(field) => (
+                                                                <Input placeholder="Enter name" {...field} />
+                                                            )}
                                                         </FieldWrapper>
-                                                        {getIncompleteFieldComment(`clients.${index}.clientName`) && (
-                                                            <IncompleteFieldAlert comment={getIncompleteFieldComment(`clients.${index}.clientName`)!} />
+                                                        {getIncompleteFieldComment(
+                                                            `clients.${index}.clientName`
+                                                        ) && (
+                                                            <IncompleteFieldAlert
+                                                                comment={getIncompleteFieldComment(
+                                                                    `clients.${index}.clientName`
+                                                                )!}
+                                                            />
                                                         )}
                                                     </div>
                                                     <div>
@@ -1237,10 +1542,21 @@ export function TenderInformationForm({
                                                             name={`clients.${index}.clientDesignation`}
                                                             label="Designation"
                                                         >
-                                                            {(field) => <Input placeholder="Enter designation" {...field} />}
+                                                            {(field) => (
+                                                                <Input
+                                                                    placeholder="Enter designation"
+                                                                    {...field}
+                                                                />
+                                                            )}
                                                         </FieldWrapper>
-                                                        {getIncompleteFieldComment(`clients.${index}.clientDesignation`) && (
-                                                            <IncompleteFieldAlert comment={getIncompleteFieldComment(`clients.${index}.clientDesignation`)!} />
+                                                        {getIncompleteFieldComment(
+                                                            `clients.${index}.clientDesignation`
+                                                        ) && (
+                                                            <IncompleteFieldAlert
+                                                                comment={getIncompleteFieldComment(
+                                                                    `clients.${index}.clientDesignation`
+                                                                )!}
+                                                            />
                                                         )}
                                                     </div>
                                                     <div>
@@ -1249,10 +1565,22 @@ export function TenderInformationForm({
                                                             name={`clients.${index}.clientEmail`}
                                                             label="Email"
                                                         >
-                                                            {(field) => <Input type="email" placeholder="Enter email" {...field} />}
+                                                            {(field) => (
+                                                                <Input
+                                                                    type="email"
+                                                                    placeholder="Enter email"
+                                                                    {...field}
+                                                                />
+                                                            )}
                                                         </FieldWrapper>
-                                                        {getIncompleteFieldComment(`clients.${index}.clientEmail`) && (
-                                                            <IncompleteFieldAlert comment={getIncompleteFieldComment(`clients.${index}.clientEmail`)!} />
+                                                        {getIncompleteFieldComment(
+                                                            `clients.${index}.clientEmail`
+                                                        ) && (
+                                                            <IncompleteFieldAlert
+                                                                comment={getIncompleteFieldComment(
+                                                                    `clients.${index}.clientEmail`
+                                                                )!}
+                                                            />
                                                         )}
                                                     </div>
                                                     <div>
@@ -1264,12 +1592,21 @@ export function TenderInformationForm({
                                                         >
                                                             {(field) => (
                                                                 <div>
-                                                                    <Input placeholder="Enter phone number(s), separated by comma" {...field} />
+                                                                    <Input
+                                                                        placeholder="Enter phone number(s), separated by comma"
+                                                                        {...field}
+                                                                    />
                                                                 </div>
                                                             )}
                                                         </FieldWrapper>
-                                                        {getIncompleteFieldComment(`clients.${index}.clientMobile`) && (
-                                                            <IncompleteFieldAlert comment={getIncompleteFieldComment(`clients.${index}.clientMobile`)!} />
+                                                        {getIncompleteFieldComment(
+                                                            `clients.${index}.clientMobile`
+                                                        ) && (
+                                                            <IncompleteFieldAlert
+                                                                comment={getIncompleteFieldComment(
+                                                                    `clients.${index}.clientMobile`
+                                                                )!}
+                                                            />
                                                         )}
                                                     </div>
                                                 </div>
@@ -1280,7 +1617,11 @@ export function TenderInformationForm({
                                     {/* Courier & TE Remark */}
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
                                         <div>
-                                            <FieldWrapper control={form.control} name="courierAddress" label="Courier Delivery Address">
+                                            <FieldWrapper
+                                                control={form.control}
+                                                name="courierAddress"
+                                                label="Courier Delivery Address"
+                                            >
                                                 {(field) => (
                                                     <textarea
                                                         className="border-input placeholder:text-muted-foreground h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
@@ -1291,11 +1632,17 @@ export function TenderInformationForm({
                                                 )}
                                             </FieldWrapper>
                                             {getIncompleteFieldComment('courierAddress') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('courierAddress')!} />
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('courierAddress')!}
+                                                />
                                             )}
                                         </div>
                                         <div>
-                                            <FieldWrapper control={form.control} name="teRemark" label="TE Final Remark">
+                                            <FieldWrapper
+                                                control={form.control}
+                                                name="teRemark"
+                                                label="TE Final Remark"
+                                            >
                                                 {(field) => (
                                                     <textarea
                                                         className="border-input placeholder:text-muted-foreground h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
@@ -1306,15 +1653,24 @@ export function TenderInformationForm({
                                                 )}
                                             </FieldWrapper>
                                             {getIncompleteFieldComment('teRemark') && (
-                                                <IncompleteFieldAlert comment={getIncompleteFieldComment('teRemark')!} />
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('teRemark')!}
+                                                />
                                             )}
                                         </div>
                                     </div>
+                                </>
+                            )}
                         </div>
 
                         {/* Submit Buttons */}
                         <div className="flex items-center justify-end gap-2 pt-6 border-t mt-6">
-                            <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={isSubmitting}>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => navigate(-1)}
+                                disabled={isSubmitting}
+                            >
                                 Cancel
                             </Button>
                             <Button
@@ -1325,10 +1681,7 @@ export function TenderInformationForm({
                             >
                                 Reset
                             </Button>
-                            <Button
-                                type="submit"
-                                disabled={isSubmitting}
-                            >
+                            <Button type="submit" disabled={isSubmitting}>
                                 {isSubmitting ? (
                                     <>
                                         <span className="animate-spin mr-2">⏳</span>
