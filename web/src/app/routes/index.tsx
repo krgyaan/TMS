@@ -27,6 +27,8 @@ const DocumentDashboardRoutes = lazy(() => import("./sections/document-dashboard
 const HrmsRoutes = lazy(() => import("./sections/hrms.routes"));
 const Profile = lazy(() => import("@/modules/profile"));
 
+import { ProfileProvider } from "@/modules/profile/contexts/ProfileContext";
+
 export default function AppRoutes() {
     return (
         <Routes>
@@ -47,7 +49,7 @@ export default function AppRoutes() {
 
             {/* ==================== PROTECTED ROUTES ==================== */}
             <Route element={<ProtectedRoute />}>
-                <Route element={<DashboardLayout />}>
+                <Route element={<ProfileProvider><DashboardLayout /></ProfileProvider>}>
                     {/* Dashboard */}
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/dashboard" element={<Navigate to="/" replace />} />
