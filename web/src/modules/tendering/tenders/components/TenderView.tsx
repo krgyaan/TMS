@@ -10,12 +10,16 @@ import { formatDateTime } from '@/hooks/useFormatedDate';
 import { tenderFilesService } from '@/services/api/tender-files.service';
 
 import { useTender } from '@/hooks/api/useTenders';
-import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
 import { useInfoSheet } from '@/hooks/api/useInfoSheets';
 import { InfoSheetView } from '@/modules/tendering/info-sheet/components/InfoSheetView';
 import { TenderApprovalView } from '@/modules/tendering/tender-approval/components/TenderApprovalView';
+import { SubmitQueryView } from '@/modules/tendering/submit-queries/components/SubmitQueryView';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
+import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
+import { useRequestExtensionByTender } from '@/hooks/api/useRequestExtension';
+import { useSubmitQueryByTender } from '@/hooks/api/useSubmitQuery';
+import RequestExtensionView from '../../request-extension/components/RequestExtensionView';
 
 interface TenderViewProps {
     tender?: TenderInfoWithNames | null;
@@ -301,9 +305,15 @@ export function TenderView({
 export function TenderDetailsSection({ tenderId }: { tenderId: number | null }) {
     const { data: tender, isLoading: tenderLoading } = useTender(tenderId);
     const { data: approval, isLoading: approvalLoading } = useTenderApproval(tenderId);
-    const { data: infoSheet, isLoading: infoSheetLoading, error: infoSheetError } = useInfoSheet(tenderId);
+    const { data: infoSheet, isLoading: infoSheetLoading } = useInfoSheet(tenderId);
+    const { data: requestExt, isLoading: requestExtLoading, error: requestExtError } = useRequestExtensionByTender(tenderId);
+    const { data: submitQuery, isLoading: submitQueryLoading, error: submitQueryError } = useSubmitQueryByTender(tenderId);
 
     const tenderWithRelations = tender ? { ...tender, approval: approval || null } : null;
+
+    if (tenderLoading && !tender) {
+        return <TenderView tender={null} isLoading />;
+    }
 
     return (
         <div className="space-y-6">
@@ -312,8 +322,6 @@ export function TenderDetailsSection({ tenderId }: { tenderId: number | null }) 
                     tender={tenderWithRelations}
                     isLoading={tenderLoading || approvalLoading}
                 />
-            ) : tenderLoading ? (
-                <TenderView tender={null} isLoading />
             ) : (
                 <Alert>
                     <AlertCircle className="h-4 w-4" />
@@ -321,29 +329,22 @@ export function TenderDetailsSection({ tenderId }: { tenderId: number | null }) 
                 </Alert>
             )}
 
-            {infoSheetLoading ? (
-                <InfoSheetView isLoading />
-            ) : infoSheet ? (
-                <InfoSheetView infoSheet={infoSheet} />
-            ) : infoSheetError ? (
-                <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>
-                        Failed to load info sheet details. Please try again later.
-                    </AlertDescription>
-                </Alert>
-            ) : (
-                <Alert>
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>No info sheet exists for this tender yet.</AlertDescription>
-                </Alert>
+            {/* Info Sheet Section */}
+            <InfoSheetView infoSheet={infoSheet} isLoading={infoSheetLoading} />
+
+            {/* Tender Approval Section */}
+            {tenderWithRelations && (
+                <TenderApprovalView tender={tenderWithRelations} isLoading={tenderLoading || approvalLoading} />
             )}
 
-            {tenderWithRelations && (
-                <TenderApprovalView
-                    tender={tenderWithRelations}
-                    isLoading={tenderLoading || approvalLoading}
-                />
+            {/* Request Extension Section */}
+            {requestExt && (
+                <RequestExtensionView data={requestExt} isLoading={requestExtLoading} error={requestExtError} />
+            )}
+
+            {/* Submit Query Section */}
+            {submitQuery && (
+                <SubmitQueryView data={submitQuery} isLoading={submitQueryLoading} error={submitQueryError} />
             )}
         </div>
     );
