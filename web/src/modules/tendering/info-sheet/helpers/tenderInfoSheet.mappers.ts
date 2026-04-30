@@ -137,6 +137,13 @@ export const buildDefaultValues = (tender?: TenderInfoWithNames | null): TenderI
     netWorthValue: 0,
 
     courierAddress: '',
+    courierName: '',
+    courierPhone: '',
+    courierAddressLine1: '',
+    courierAddressLine2: '',
+    courierCity: '',
+    courierState: '',
+    courierPincode: '',
     // Allow zero clients by default; user can add as needed
     clients: [],
 
@@ -247,6 +254,13 @@ export const mapResponseToForm = (
         netWorthValue: toNumber(data.netWorthValue),
 
         courierAddress: data.courierAddress ?? '',
+        courierName: data.courierName ?? '',
+        courierPhone: data.courierPhone ?? '',
+        courierAddressLine1: data.courierAddressLine1 ?? '',
+        courierAddressLine2: data.courierAddressLine2 ?? '',
+        courierCity: data.courierCity ?? '',
+        courierState: data.courierState ?? '',
+        courierPincode: data.courierPincode ?? '',
 
         // Map existing clients, otherwise use an empty array (0 or more)
         clients: data.clients && data.clients.length > 0
@@ -390,6 +404,13 @@ export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderI
             netWorthType: null,
             netWorthValue: null,
             courierAddress: null,
+            courierName: null,
+            courierPhone: null,
+            courierAddressLine1: null,
+            courierAddressLine2: null,
+            courierCity: null,
+            courierState: null,
+            courierPincode: null,
             clients: [],
             teFinalRemark: null,
         });
@@ -565,6 +586,13 @@ export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderI
                 : null,
 
         courierAddress: values.courierAddress || null,
+        courierName: values.courierName || null,
+        courierPhone: values.courierPhone || null,
+        courierAddressLine1: values.courierAddressLine1 || null,
+        courierAddressLine2: values.courierAddressLine2 || null,
+        courierCity: values.courierCity || null,
+        courierState: values.courierState || null,
+        courierPincode: values.courierPincode || null,
 
         clients: values.clients.map((client) => ({
             clientName: client.clientName,

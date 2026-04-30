@@ -1614,30 +1614,57 @@ export function TenderInformationForm({
                                         ))}
                                     </div>
 
-                                    {/* Courier & TE Remark */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                                        <div>
-                                            <FieldWrapper
-                                                control={form.control}
-                                                name="courierAddress"
-                                                label="Courier Delivery Address"
-                                            >
-                                                {(field) => (
-                                                    <textarea
-                                                        className="border-input placeholder:text-muted-foreground h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                                        placeholder="Enter courier delivery address..."
-                                                        maxLength={1000}
-                                                        {...field}
-                                                    />
-                                                )}
-                                            </FieldWrapper>
-                                            {getIncompleteFieldComment('courierAddress') && (
-                                                <IncompleteFieldAlert
-                                                    comment={getIncompleteFieldComment('courierAddress')!}
-                                                />
-                                            )}
+                                    <div className="space-y-4 mt-6">
+                                        <h3 className="text-lg font-semibold border-b pb-2">Courier Delivery Address</h3>
+                                        
+                                        {form.watch('courierAddress') && (
+                                            <div className="bg-amber-50 dark:bg-amber-950/50 p-4 rounded-md mb-4">
+                                                <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 mb-2">
+                                                    <AlertCircle className="h-4 w-4" />
+                                                    <span className="text-sm font-semibold">Legacy Address Found</span>
+                                                </div>
+                                                <p className="text-sm text-amber-700 dark:text-amber-400 whitespace-pre-wrap">
+                                                    {form.watch('courierAddress')}
+                                                </p>
+                                                <p className="text-xs text-amber-600 dark:text-amber-500 mt-2 italic">
+                                                    Note: Please migrate this to the structured fields below.
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                <FieldWrapper control={form.control} name="courierName" label="Name">
+                                                    {(field) => <Input placeholder="Contact person name" {...field} value={field.value || ''} />}
+                                                </FieldWrapper>
+                                                <FieldWrapper control={form.control} name="courierPhone" label="Phone No">
+                                                    {(field) => <Input placeholder="Contact phone number" {...field} value={field.value || ''} />}
+                                                </FieldWrapper>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                <FieldWrapper control={form.control} name="courierAddressLine1" label="Address Line 1">
+                                                    {(field) => <Input placeholder="Building, Street, etc." {...field} value={field.value || ''} />}
+                                                </FieldWrapper>
+                                                <FieldWrapper control={form.control} name="courierAddressLine2" label="Address Line 2">
+                                                    {(field) => <Input placeholder="Area, Landmark, etc." {...field} value={field.value || ''} />}
+                                                </FieldWrapper>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:col-span-2">
+                                                <FieldWrapper control={form.control} name="courierCity" label="City">
+                                                    {(field) => <Input placeholder="City" {...field} value={field.value || ''} />}
+                                                </FieldWrapper>
+                                                <FieldWrapper control={form.control} name="courierState" label="State">
+                                                    {(field) => <Input placeholder="State" {...field} value={field.value || ''} />}
+                                                </FieldWrapper>
+                                                <FieldWrapper control={form.control} name="courierPincode" label="Pin Code">
+                                                    {(field) => <Input placeholder="Pin Code" {...field} value={field.value || ''} />}
+                                                </FieldWrapper>
+                                            </div>
                                         </div>
-                                        <div>
+
+                                        <div className="grid grid-cols-1 gap-6 mt-2">
                                             <FieldWrapper
                                                 control={form.control}
                                                 name="teRemark"

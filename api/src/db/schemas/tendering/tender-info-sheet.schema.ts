@@ -72,6 +72,13 @@ export const tenderInformation = pgTable("tender_information", {
     netWorthValue: numeric("net_worth_value", { precision: 12, scale: 2 }),
 
     courierAddress: text("courier_address"),
+    courierName: varchar("courier_name", { length: 255 }),
+    courierPhone: varchar("courier_phone", { length: 20 }),
+    courierAddressLine1: text("courier_address_line_1"),
+    courierAddressLine2: text("courier_address_line_2"),
+    courierCity: varchar("courier_city", { length: 100 }),
+    courierState: varchar("courier_state", { length: 100 }),
+    courierPincode: varchar("courier_pincode", { length: 20 }),
 
     teFinalRemark: text("te_final_remark"),
     teRejectionProof: text("te_rejection_proof").array(),

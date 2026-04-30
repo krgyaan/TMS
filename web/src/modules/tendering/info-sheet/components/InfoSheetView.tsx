@@ -584,28 +584,48 @@ const AllFieldsTable = ({ infoSheet }: { infoSheet: TenderInfoSheet }) => {
                     </>
                 )}
 
-                {/* Courier Address */}
-                {infoSheet.courierAddress && (
+                {/* Courier Information */}
+                {(infoSheet.courierName || infoSheet.courierAddressLine1 || infoSheet.courierAddress) && (
                     <>
                         <TableRow className="bg-muted/50">
-                            <TableCell
-                                colSpan={4}
-                                className="font-semibold text-sm"
-                            >
+                            <TableCell colSpan={4} className="font-semibold text-sm">
                                 Courier Information
                             </TableCell>
                         </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Courier Address
-                            </TableCell>
-                            <TableCell
-                                className="text-sm whitespace-normal [overflow-wrap:anywhere]"
-                                colSpan={3}
-                            >
-                                {infoSheet.courierAddress}
-                            </TableCell>
-                        </TableRow>
+                        {infoSheet.courierName && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">Name</TableCell>
+                                <TableCell className="text-sm" colSpan={3}>{infoSheet.courierName}</TableCell>
+                            </TableRow>
+                        )}
+                        {infoSheet.courierPhone && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">Phone No</TableCell>
+                                <TableCell className="text-sm" colSpan={3}>{infoSheet.courierPhone}</TableCell>
+                            </TableRow>
+                        )}
+                        {infoSheet.courierAddressLine1 && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">Address</TableCell>
+                                <TableCell className="text-sm" colSpan={3}>
+                                    <div>{infoSheet.courierAddressLine1}</div>
+                                    {infoSheet.courierAddressLine2 && <div>{infoSheet.courierAddressLine2}</div>}
+                                    <div>
+                                        {[infoSheet.courierCity, infoSheet.courierState, infoSheet.courierPincode]
+                                            .filter(Boolean)
+                                            .join(", ")}
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        )}
+                        {!infoSheet.courierAddressLine1 && infoSheet.courierAddress && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">Address (Legacy)</TableCell>
+                                <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]" colSpan={3}>
+                                    {infoSheet.courierAddress}
+                                </TableCell>
+                            </TableRow>
+                        )}
                     </>
                 )}
 

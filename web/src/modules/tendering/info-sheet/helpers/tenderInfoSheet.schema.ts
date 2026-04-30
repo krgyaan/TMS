@@ -152,6 +152,13 @@ export const TenderInformationFormSchema = z.object({
 
     // Address & Remarks
     courierAddress: z.string().max(1000).optional(),
+    courierName: z.string().max(255).optional(),
+    courierPhone: z.string().max(20).optional(),
+    courierAddressLine1: z.string().max(1000).optional(),
+    courierAddressLine2: z.string().max(1000).optional(),
+    courierCity: z.string().max(100).optional(),
+    courierState: z.string().max(100).optional(),
+    courierPincode: z.string().max(20).optional(),
     teRemark: z.string().max(1000).optional(),
 }).superRefine((data, ctx) => {
     if (data.teRecommendation === 'NO') {

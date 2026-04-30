@@ -58,7 +58,14 @@ const getFieldLabel = (fieldPath: string): string => {
         'netWorthValue': 'Net Worth Value',
         'clientOrganization': 'Client Organization',
         'clients': 'Client Details',
-        'courierAddress': 'Courier Address',
+        'courierAddress': 'Courier Address (Legacy)',
+        'courierName': 'Courier Name',
+        'courierPhone': 'Courier Phone No',
+        'courierAddressLine1': 'Courier Address Line 1',
+        'courierAddressLine2': 'Courier Address Line 2',
+        'courierCity': 'Courier City',
+        'courierState': 'Courier State',
+        'courierPincode': 'Courier Pin Code',
         'teRemark': 'TE Final Remark',
     };
 

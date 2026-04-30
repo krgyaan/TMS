@@ -92,6 +92,13 @@ export interface SaveTenderInfoSheetDto {
     netWorthValue: number | null;
 
     courierAddress: string | null;
+    courierName: string | null;
+    courierPhone: string | null;
+    courierAddressLine1: string | null;
+    courierAddressLine2: string | null;
+    courierCity: string | null;
+    courierState: string | null;
+    courierPincode: string | null;
     clients: TenderClientDto[];
 
     teFinalRemark: string | null;
@@ -172,6 +179,13 @@ export interface TenderInfoSheetResponse {
     netWorthValue: string | number | null;
 
     courierAddress: string | null;
+    courierName: string | null;
+    courierPhone: string | null;
+    courierAddressLine1: string | null;
+    courierAddressLine2: string | null;
+    courierCity: string | null;
+    courierState: string | null;
+    courierPincode: string | null;
 
     clients: Array<{
         id?: number;
