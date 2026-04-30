@@ -1,8 +1,6 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import { SubmitQueriesService } from './submit-queries.service';
 import { CreateSubmitQueriesDto, CreateSubmitQueriesSchema, UpdateSubmitQueriesDto, UpdateSubmitQueriesSchema } from './dto/submit-queries.dto';
-import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
-import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 @Controller('submit-queries')
 export class SubmitQueriesController {
@@ -29,6 +27,11 @@ export class SubmitQueriesController {
     @Get(':id')
     async getById(@Param('id', ParseIntPipe) id: number) {
         return this.submitQueriesService.findById(id);
+    }
+
+    @Get('tender/:tenderId')
+    async getByTenderId(@Param('tenderId', ParseIntPipe) tenderId: number) {
+        return this.submitQueriesService.findByTenderId(tenderId);
     }
 
     @Post()

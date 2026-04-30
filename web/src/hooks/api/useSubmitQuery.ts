@@ -11,6 +11,7 @@ export const submitQueryKeys = {
     list: (params?: SubmitQueryListParams) => [...submitQueryKeys.lists(), params] as const,
     details: () => [...submitQueryKeys.all, 'detail'] as const,
     detail: (id: number) => [...submitQueryKeys.details(), id] as const,
+    byTender: (tenderId: number) => [...submitQueryKeys.all, 'by-tender', tenderId] as const,
 };
 
 export interface UseSubmitQueriesParams {
@@ -64,6 +65,17 @@ export function useSubmitQuery(id: number | null | undefined) {
         queryKey: submitQueryKeys.detail(id ?? 0),
         queryFn: () => submitQueryService.getById(id!),
         enabled: !!id && id > 0,
+    });
+}
+
+/**
+ * Fetch latest submit query by Tender ID
+ */
+export function useSubmitQueryByTender(tenderId: number | null | undefined) {
+    return useQuery<SubmitQueryResponse | null>({
+        queryKey: tenderId ? submitQueryKeys.byTender(tenderId) : submitQueryKeys.byTender(0),
+        queryFn: () => submitQueryService.getByTenderId(tenderId!),
+        enabled: !!tenderId && tenderId > 0,
     });
 }
 
