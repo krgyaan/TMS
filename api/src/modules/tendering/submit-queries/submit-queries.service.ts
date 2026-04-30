@@ -178,6 +178,35 @@ export class SubmitQueriesService {
         return this.mapRowToResponse(row, queries);
     }
 
+    async findByTenderId(tenderId: number) {
+        const [row] = await this.db
+            .select({
+                id: submitQueries.id,
+                tenderId: submitQueries.tenderId,
+                tenderName: tenderInfos.tenderName,
+                tenderNo: tenderInfos.tenderNo,
+                clientContacts: submitQueries.clientContacts,
+                createdAt: submitQueries.createdAt,
+                updatedAt: submitQueries.updatedAt,
+            })
+            .from(submitQueries)
+            .innerJoin(tenderInfos, eq(submitQueries.tenderId, tenderInfos.id))
+            .where(eq(submitQueries.tenderId, tenderId))
+            .orderBy(desc(submitQueries.createdAt))
+            .limit(1);
+
+        if (!row) {
+            return null;
+        }
+
+        const queries = await this.db
+            .select()
+            .from(submitQueriesLists)
+            .where(eq(submitQueriesLists.submitQueriesId, BigInt(row.id)));
+
+        return this.mapRowToResponse(row, queries);
+    }
+
     async create(data: CreateSubmitQueriesDto) {
         const result = await this.db.transaction(async (tx) => {
             // Insert main record

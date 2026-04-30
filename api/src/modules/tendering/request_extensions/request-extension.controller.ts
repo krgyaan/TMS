@@ -31,6 +31,11 @@ export class RequestExtensionsController {
         return this.requestExtensionsService.findById(id);
     }
 
+    @Get('tender/:tenderId')
+    async getByTenderId(@Param('tenderId', ParseIntPipe) tenderId: number) {
+        return this.requestExtensionsService.findByTenderId(tenderId);
+    }
+
     @Post()
     @HttpCode(HttpStatus.CREATED)
     async create(@Body() body: unknown) {

@@ -1,31 +1,21 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { Trophy, XCircle, Clock, Gavel, CheckCircle2, FileText, ExternalLink, Download } from 'lucide-react';
+import { XCircle, Clock, Gavel, CheckCircle2, FileText, ExternalLink, Download } from 'lucide-react';
 import { formatINR } from '@/hooks/useINRFormatter';
-import { formatDateTime } from '@/hooks/useFormatedDate';
-import type { ResultDashboardRow } from '../helpers/tenderResult.types';
 import { Button } from '@/components/ui/button';
-import { tenderFilesService } from '@/services/api/tender-files.service';
 
-interface TenderResultShowProps {
-    result: ResultDashboardRow & {
-        disqualificationReason?: string | null;
-        qualifiedPartiesCount?: string | null;
-        qualifiedPartiesNames?: string[] | null;
-        result?: string | null;
-        l1Price?: string | null;
-        l2Price?: string | null;
-        ourPrice?: string | null;
-        qualifiedPartiesScreenshot?: string | null;
-        finalResultScreenshot?: string | null;
-        reverseAuctionId?: number | null;
-        resultReason?: string | null;
-    };
-    isLoading?: boolean;
+import { useTenderResultByTenderId } from '@/hooks/api/useTenderResults';
+
+import { tenderFilesService } from '@/services/api/tender-files.service';
+import { BI_STATUSES, getReadableStatusName, getStatusBadgeVariant } from '../../emds-tenderfees/constants';
+
+import type { TenderResult } from '../helpers/tenderResult.types';
+
+interface TenderResultViewProps {
+    result: TenderResult;
     onViewRa?: (raId: number) => void;
-    className?: string;
 }
 
 // Helper function to get file URL from stored path
@@ -40,148 +30,24 @@ const getFileUrl = (filePath: string): string => {
         const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
         return `${baseUrl}/tender-files/serve/${context}/${encodeURIComponent(fileName)}`;
     }
-    // Fallback: try to use as-is (shouldn't happen with proper paths)
     return tenderFilesService.getFileUrl(filePath);
 };
 
-const getStatusVariant = (status: string): string => {
-    switch (status) {
-        case 'Result Awaited':
-        case 'Under Evaluation':
-            return 'secondary';
-        case 'Won':
-            return 'success';
-        case 'Lost':
-        case 'Lost - H1 Elimination':
-        case 'Disqualified':
-            return 'destructive';
-        default:
-            return 'secondary';
-    }
-};
-
-const getEmdStatusVariant = (status: string | null): string => {
-    if (!status) return 'secondary';
-    const upperStatus = status.toUpperCase();
-
-    if (upperStatus.includes('REJECTED')) return 'destructive';
-    if (upperStatus.includes('APPROVED') || upperStatus.includes('COMPLETED')) return 'success';
-    if (upperStatus.includes('SUBMITTED') || upperStatus.includes('INITIATED')) return 'info';
-    if (upperStatus.includes('PENDING')) return 'warning';
-    return 'secondary';
-};
-
-export function TenderResultShow({
+export function TenderResultView({
     result,
-    isLoading = false,
     onViewRa,
-    className = '',
-}: TenderResultShowProps) {
-    if (isLoading) {
-        return (
-            <Card className={className}>
-                <CardHeader className="pb-3">
-                    <Skeleton className="h-5 w-40" />
-                </CardHeader>
-                <CardContent className="pt-0">
-                    <div className="space-y-2">
-                        {Array.from({ length: 4 }).map((_, i) => (
-                            <Skeleton key={i} className="h-10 w-full" />
-                        ))}
-                    </div>
-                </CardContent>
-            </Card>
-        );
-    }
+}: TenderResultViewProps) {
+    if (!result) return null;
 
     const isQualified = result?.technicallyQualified === 'Yes';
     const isDisqualified = result?.technicallyQualified === 'No';
     const hasResult = !!result.result;
 
     return (
-        <Card className={className}>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    <Trophy className="h-5 w-5" />
-                    Tender Result Details
-                </CardTitle>
-            </CardHeader>
+        <Card>
             <CardContent>
                 <Table>
                     <TableBody>
-                        {/* Tender Information */}
-                        <TableRow className="bg-muted/50">
-                            <TableCell colSpan={4} className="font-semibold text-sm">
-                                Tender Information
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
-                                Tender No
-                            </TableCell>
-                            <TableCell className="text-sm font-semibold w-1/4">
-                                {result.tenderNo || '—'}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
-                                Tender Name
-                            </TableCell>
-                            <TableCell className="text-sm w-1/4">
-                                {result.tenderName || '—'}
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Team Executive
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {result.teamExecutiveName || '—'}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Item
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {result.itemName || '—'}
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Bid Submission Date
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {result.bidSubmissionDate ? formatDateTime(result.bidSubmissionDate) : '—'}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Tender Status
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {result.tenderStatus || '—'}
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Tender Value
-                            </TableCell>
-                            <TableCell className="text-sm font-semibold">
-                                {result.tenderValue ? formatINR(parseFloat(result.tenderValue)) : '—'}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Final Price
-                            </TableCell>
-                            <TableCell className="text-sm font-semibold">
-                                {result.finalPrice ? formatINR(parseFloat(result.finalPrice)) : '—'}
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Result Status
-                            </TableCell>
-                            <TableCell colSpan={3}>
-                                <Badge variant={getStatusVariant(result.resultStatus) as any}>
-                                    {result.resultStatus}
-                                </Badge>
-                            </TableCell>
-                        </TableRow>
-
                         {/* RA Information */}
                         {result.raApplicable && (
                             <>
@@ -237,19 +103,14 @@ export function TenderResultShow({
                                         EMD Status
                                     </TableCell>
                                     <TableCell>
-                                        {result.emdDetails.displayText !== 'Not Applicable' &&
-                                            result.emdDetails.displayText !== 'Not Requested' && (
-                                                <Badge
-                                                    variant={
-                                                        getEmdStatusVariant(
-                                                            result.emdDetails.instrumentStatus
-                                                        ) as any
-                                                    }
-                                                >
-                                                    {result.emdDetails.displayText}
+                                        {result?.emdDetails?.displayText !== 'Not Applicable' &&
+                                            result?.emdDetails?.displayText !== 'Not Requested' &&
+                                            result?.emdDetails?.instrumentStatus && (
+                                                <Badge variant={getStatusBadgeVariant(result.emdDetails.instrumentStatus) as any}>
+                                                    {getReadableStatusName(result.emdDetails.instrumentStatus as keyof typeof BI_STATUSES)}
                                                 </Badge>
                                             )}
-                                        {result.emdDetails.displayText === 'Not Requested' && (
+                                        {result?.emdDetails?.displayText === 'Not Requested' && (
                                             <Badge variant="outline">Not Requested</Badge>
                                         )}
                                     </TableCell>
@@ -494,4 +355,40 @@ export function TenderResultShow({
             </CardContent>
         </Card>
     );
+}
+
+/** Self-fetching section for Tender Result */
+export function TenderResultSection({ tenderId }: { tenderId: number | null }) {
+    const { data: result, isLoading } = useTenderResultByTenderId(tenderId);
+
+    if (isLoading) {
+        return (
+            <Card>
+                <CardHeader className="pb-3">
+                    <Skeleton className="h-5 w-40" />
+                </CardHeader>
+                <CardContent className="pt-0">
+                    <div className="space-y-2">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                            <Skeleton key={i} className="h-10 w-full" />
+                        ))}
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (!result) {
+        return (
+            <Card>
+                <CardContent className="p-8">
+                    <div className="flex items-center justify-center text-muted-foreground">
+                        Tender Result not yet added.
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    return <TenderResultView result={result ?? null} />;
 }

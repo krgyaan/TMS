@@ -114,6 +114,7 @@ export interface SubmitBidFormProps {
     tenderDetails: TenderDetails;
     mode: 'submit' | 'edit';
     existingData?: BidSubmission;
+    isChecklistFulfilled?: boolean;
 }
 
 /**

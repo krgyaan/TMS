@@ -5,7 +5,6 @@ import type { TenderApprovalPayload } from '@/modules/tendering/tender-approval/
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { eq, and, asc, desc, sql, or, inArray, isNull, SQL } from 'drizzle-orm';
 import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
-import { tenderStatusHistory } from '@db/schemas/tendering/tender-status-history.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
 import { items } from '@db/schemas/master/items.schema';
@@ -339,11 +338,15 @@ export class TenderApprovalService {
                 approvePqrSelection: tenderInfos.approvePqrSelection,
                 approveFinanceDocSelection: tenderInfos.approveFinanceDocSelection,
                 tenderStatus: tenderInfos.status,
+                statusName: statuses.name,
                 oemNotAllowed: tenderInfos.oemNotAllowed,
+                oemNotAllowedName: vendorOrganizations.name,
                 tlRejectionRemarks: tenderInfos.tlRejectionRemarks,
                 tlIncompleteRemarks: tenderInfos.tlIncompleteRemarks,
             })
             .from(tenderInfos)
+            .leftJoin(statuses, eq(tenderInfos.status, statuses.id))
+            .leftJoin(vendorOrganizations, sql`${tenderInfos.oemNotAllowed} = ${vendorOrganizations.id}::varchar`)
             .where(eq(tenderInfos.id, tenderId))
             .limit(1);
 

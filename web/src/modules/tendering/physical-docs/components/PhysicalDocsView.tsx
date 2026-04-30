@@ -6,105 +6,20 @@ import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Package } from 'lucide-react';
 import type { PhysicalDocs } from '../helpers/physicalDocs.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
+import { usePhysicalDocByTenderId } from '@/hooks/api/usePhysicalDocs';
+import { useInfoSheet } from '@/hooks/api/useInfoSheets';
 
 interface PhysicalDocsViewProps {
-    physicalDoc: PhysicalDocs | null;
-    tenderWithRelations: any | null;
-    infoSheet: any | null;
-    infoSheetError?: Error | null;
-    isLoading?: boolean;
-    className?: string;
+    physicalDoc?: PhysicalDocs | null;
 }
 
-export function PhysicalDocsView({
-    physicalDoc,
-    tenderWithRelations,
-    infoSheet,
-    infoSheetError,
-    isLoading = false,
-    className = '',
-}: PhysicalDocsViewProps) {
-    if (isLoading) {
-        return (
-            <Card className={className}>
-                <CardHeader className="pb-3">
-                    <Skeleton className="h-5 w-40" />
-                </CardHeader>
-                <CardContent className="pt-0">
-                    <div className="space-y-2">
-                        {Array.from({ length: 4 }).map((_, i) => (
-                            <Skeleton key={i} className="h-10 w-full" />
-                        ))}
-                    </div>
-                </CardContent>
-            </Card>
-        );
-    }
-
-//     console.log("tenderInfo" , infoSheet);
-//     console.log("tender" , tenderWithRelations);
-    
-//     if (!infoSheet && infoSheetError) {
-//     return <Card>...Error loading info sheet...</Card>;
-// }
-
-
-//     if (!infoSheet) {
-//         return (
-//             <Card className={className}>
-//                 <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-//                     <Package className="h-8 w-8 mb-2 opacity-50" />
-//                     <p className="text-sm">Tender Info Sheet Not Filled</p>
-//                 </div>
-//             </Card>
-//         );
-//     }
-
-//     else if (infoSheet && infoSheet.physicalDocsRequired == 'NO' ) {
-//         return (
-//             <Card className={className}>
-//                 <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-//                     <Package className="h-8 w-8 mb-2 opacity-50" />
-//                     <p className="text-sm">Physical Docs Not Required</p>
-//                 </div>
-//             </Card>
-//         );
-//     }
-
-//     else if (infoSheet &&  (infoSheet.physicalDocsRequired == 'YES' || infoSheet.physicalDocsRequired == null)  && !physicalDoc) {
-//         return (
-//             <Card className={className}>
-//                 <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-//                     <Package className="h-8 w-8 mb-2 opacity-50" />
-//                     <p className="text-sm">No Physical Docs Submitted</p>
-//                 </div>
-//             </Card>
-//         );
-//     }
-
-    if (!physicalDoc) {
-        return (
-            <Card className={className}>
-                <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                        <Package className="h-4 w-4" />
-                        Physical Documents
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                    <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-                        <Package className="h-8 w-8 mb-2 opacity-50" />
-                        <p className="text-sm">No physical documents information available yet.</p>
-                    </div>
-                </CardContent>
-            </Card>
-        );
-    }
+export function PhysicalDocsView({ physicalDoc }: PhysicalDocsViewProps) {
+    if (!physicalDoc) return null;
 
     return (
-        <Card className={className}>
+        <Card>
             <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2"> 
                     <Package className="h-5 w-5 text-blue-500" />
                     Physical Documents Details
                 </CardTitle>
@@ -129,31 +44,7 @@ export function PhysicalDocsView({
                                 Submitted Documents
                             </TableCell>
                             <TableCell className="text-sm">
-                                {physicalDoc.submittedDocs ? (() => {
-                                    let docIds: string[] = [];
-                                    try {
-                                        const parsed = JSON.parse(physicalDoc.submittedDocs);
-                                        if (Array.isArray(parsed)) {
-                                            docIds = parsed.filter(Boolean);
-                                        } else {
-                                            docIds = physicalDoc.submittedDocs.split(',').filter(Boolean);
-                                        }
-                                    } catch {
-                                        docIds = physicalDoc.submittedDocs.split(',').filter(Boolean);
-                                    }
-
-                                    return docIds.length > 0 ? (
-                                        <div className="flex flex-wrap gap-2">
-                                            {docIds.map((docId, idx) => (
-                                                <Badge key={idx} variant="outline">
-                                                    {docId}
-                                                </Badge>
-                                            ))}
-                                        </div>
-                                    ) : '—';
-                                })() : (
-                                    '—'
-                                )}
+                                {physicalDoc.submittedDocs?.map((doc) => doc.name).join(", ")}
                             </TableCell>
                         </TableRow>
                         {physicalDoc.createdAt && (
@@ -217,3 +108,74 @@ export function PhysicalDocsView({
 }
 
 export default PhysicalDocsView;
+
+/** Self-fetching section for PhysicalDocs */
+export function PhysicalDocsSection({ tenderId }: { tenderId: number | null }) {
+    const { data: physicalDoc, isLoading } = usePhysicalDocByTenderId(tenderId);
+    const { data: infoSheet } = useInfoSheet(tenderId);
+
+        if (isLoading) {
+        return (
+            <Card>
+                <CardHeader className="pb-3">
+                    <Skeleton className="h-5 w-40" />
+                </CardHeader>
+                <CardContent className="pt-0">
+                    <div className="space-y-2">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                            <Skeleton key={i} className="h-10 w-full" />
+                        ))}
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (!infoSheet) {
+        return (
+            <Card>
+                <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                    <Package className="h-8 w-8 mb-2 opacity-50" />
+                    <p className="text-sm">Tender Info Sheet Not Filled</p>
+                </div>
+            </Card>
+        );
+    }
+
+    else if (infoSheet && infoSheet.physicalDocsRequired == 'NO' || infoSheet.physicalDocsRequired == null) {
+        return (
+            <Card>
+                <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                    <Package className="h-8 w-8 mb-2 opacity-50" />
+                    <p className="text-sm">Physical Docs Not Required</p>
+                </div>
+            </Card>
+        );
+    }
+
+    else if (infoSheet && infoSheet.physicalDocsRequired == 'YES' && !physicalDoc) {
+        return (
+            <Card>
+                <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                    <Package className="h-8 w-8 mb-2 opacity-50" />
+                    <p className="text-sm">No Physical Docs Submitted</p>
+                </div>
+            </Card>
+        );
+    }
+
+    if (!physicalDoc) {
+        return (
+            <Card>
+                <CardContent className="pt-0">
+                    <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                        <Package className="h-8 w-8 mb-2 opacity-50" />
+                        <p className="text-sm">No physical documents information available yet.</p>
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    return <PhysicalDocsView physicalDoc={physicalDoc}/>;
+}

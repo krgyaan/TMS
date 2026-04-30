@@ -49,6 +49,7 @@ export const tenderInformation = pgTable("tender_information", {
     maxLdPercentage: numeric("max_ld_percentage", { precision: 5, scale: 2 }),
 
     physicalDocsRequired: varchar("physical_docs_required", { length: 5 }),
+    physicalDocType: varchar("physical_doc_type", { length: 50 }),
     physicalDocsDeadline: timestamp("physical_docs_deadline"),
     techEligibilityAge: integer("technical_eligibility_age"),
 

@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { PaginatedResult } from '@/types/api.types';
 import { toast } from 'sonner';
 import { handleQueryError } from '@/lib/react-query';
-import type { CreateRequestExtensionDto, RequestExtensionListParams, RequestExtensionListRow, UpdateRequestExtensionDto } from '@/modules/tendering/request-extension/helpers/requestExtension.types';
+import type { CreateRequestExtensionDto, RequestExtensionListParams, RequestExtensionListRow, RequestExtensionResponse, UpdateRequestExtensionDto } from '@/modules/tendering/request-extension/helpers/requestExtension.types';
 import { requestExtensionService } from '@/services/api/request-extension.service';
 
 export const requestExtensionKey = {
@@ -10,6 +10,7 @@ export const requestExtensionKey = {
     lists: () => [...requestExtensionKey.all, 'list'] as const,
     list: (filters?: Record<string, unknown>) => [...requestExtensionKey.lists(), { filters }] as const,
     detail: (id: number) => [...requestExtensionKey.all, 'detail', id] as const,
+    byTender: (tenderId: number) => [...requestExtensionKey.all, 'by-tender', tenderId] as const,
 };
 
 export const useRequestExtensions = (
@@ -54,6 +55,14 @@ export const useRequestExtension = (id: number | null) => {
         queryKey: requestExtensionKey.detail(id ?? 0),
         queryFn: () => requestExtensionService.getById(id!),
         enabled: !!id,
+    });
+};
+
+export const useRequestExtensionByTender = (tenderId: number | null) => {
+    return useQuery<RequestExtensionResponse | null>({
+        queryKey: tenderId ? requestExtensionKey.byTender(tenderId) : requestExtensionKey.byTender(0),
+        queryFn: () => requestExtensionService.getByTenderId(tenderId!),
+        enabled: !!tenderId,
     });
 };
 

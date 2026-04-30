@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table"
 import { FileText } from "lucide-react"
 import type { TenderInfoSheet } from "@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types"
+import { physicalDocTypeOptions } from "@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types"
 import { formatDateTime } from "@/hooks/useFormatedDate"
 import { formatINR } from "@/hooks/useINRFormatter"
 import { useDnbStatusOptions } from "@/hooks/useSelectOptions"
@@ -126,12 +127,18 @@ export const InfoSheetView = ({
                             <TableCell className="text-sm font-semibold w-1/4">
                                 {formatYesNo(infoSheet.teRecommendation)}
                             </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
-                                Rejection Reason
-                            </TableCell>
-                            <TableCell className="text-sm w-1/4">
-                                {getOptionLabel(rejectionReasonOptions, infoSheet.teRejectionReason)}
-                            </TableCell>
+                            {
+                                infoSheet.teRecommendation === "NO" && (
+                                    <>
+                                        <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                            Rejection Reason
+                                        </TableCell>
+                                        <TableCell className="text-sm w-1/4">
+                                            {getOptionLabel(rejectionReasonOptions, infoSheet.teRejectionReason)}
+                                        </TableCell>
+                                    </>
+                                )
+                            }
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">
@@ -142,12 +149,18 @@ export const InfoSheetView = ({
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Rejection Remarks
-                            </TableCell>
-                            <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]" colSpan={3}>
-                                {formatValue(infoSheet.teRejectionRemarks)}
-                            </TableCell>
+                            {
+                                infoSheet.teRecommendation === "NO" && (
+                                    <>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Rejection Remarks
+                                        </TableCell>
+                                        <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]" colSpan={3}>
+                                            {formatValue(infoSheet.teRejectionRemarks)}
+                                        </TableCell>
+                                    </>
+                                )
+                            }
                         </TableRow>
                         {infoSheet.teRejectionProof && (
                             <TableRow className="hover:bg-muted/30 transition-colors">
@@ -156,26 +169,33 @@ export const InfoSheetView = ({
                                 </TableCell>
                                 <TableCell className="text-sm" colSpan={3}>
                                     <div className="flex flex-wrap gap-1">
-                                        {infoSheet.teRejectionProof.map((path, idx) => (
+                                        {(infoSheet?.teRejectionProof ?? []).map((path, idx) => (
                                             <Badge key={idx} variant="outline" className="text-xs hover:bg-primary/10">
-                                                <a href={tenderFilesService.getFileUrl(path)} target="_blank" rel="noopener noreferrer">
-                                                    View Proof {infoSheet.teRejectionProof.length > 1 ? idx + 1 : ''}
-                                                </a>
+                                            <a href={tenderFilesService.getFileUrl(path)} target="_blank" rel="noopener noreferrer">
+                                                View Proof {(infoSheet?.teRejectionProof?.length ?? 0) > 1 ? idx + 1 : ''}
+                                            </a>
                                             </Badge>
                                         ))}
                                     </div>
                                 </TableCell>
                             </TableRow>
                         )}
+                        <TableCell className="text-sm font-medium text-muted-foreground">
+                            MAF Required
+                        </TableCell>
+                        <TableCell className="text-sm">
+                            {toTitleCase(formatValue(infoSheet.mafRequired?.replaceAll('_', ' ')))}
+                        </TableCell>
 
+                        {/* Financial Terms */}
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                Financial Terms
+                            </TableCell>
+                        </TableRow>
                         {/* Processing Fee */}
                         {(infoSheet.processingFeeRequired || infoSheet.processingFeeAmount) && (
                             <>
-                                <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={4} className="font-semibold text-sm">
-                                        Processing Fee
-                                    </TableCell>
-                                </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">
                                         Processing Fee Required
@@ -202,13 +222,6 @@ export const InfoSheetView = ({
                                 )}
                             </>
                         )}
-
-                        {/* Financial Terms */}
-                        <TableRow className="bg-muted/50">
-                            <TableCell colSpan={4} className="font-semibold text-sm">
-                                Financial Terms
-                            </TableCell>
-                        </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Tender Fee Required
@@ -257,62 +270,34 @@ export const InfoSheetView = ({
                                 </TableCell>
                             </TableRow>
                         )}
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Reverse Auction Applicable
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {formatYesNo(infoSheet.reverseAuctionApplicable)}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Physical Docs Required
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {formatYesNo(infoSheet.physicalDocsRequired)}
-                            </TableCell>
-                        </TableRow>
-                        {infoSheet.physicalDocsDeadline && infoSheet.physicalDocsRequired === 'YES' && (
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Physical Docs Deadline
-                                </TableCell>
-                                <TableCell className="text-sm" colSpan={3}>
-                                    {formatDateTime(infoSheet.physicalDocsDeadline)}
-                                </TableCell>
-                            </TableRow>
-                        )}
 
                         {/* Payment Terms */}
-                        {(infoSheet.paymentTermsSupply || infoSheet.paymentTermsInstallation) && (
-                            <>
-                                <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={4} className="font-semibold text-sm">
-                                        Payment Terms
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Payment Terms Supply (Days)
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {formatValue(infoSheet.paymentTermsSupply)}
-                                    </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Payment Terms Installation (Days)
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {formatValue(infoSheet.paymentTermsInstallation)}
-                                    </TableCell>
-                                </TableRow>
-                            </>
-                        )}
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                Payment Terms
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Payment Terms Supply (%)
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatValue(infoSheet.paymentTermsSupply)}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Payment Terms Installation (%)
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatValue(infoSheet.paymentTermsInstallation)}
+                            </TableCell>
+                        </TableRow>
 
                         {/* Commercial Evaluation */}
                         {(infoSheet.commercialEvaluation || infoSheet.mafRequired) && (
                             <>
                                 <TableRow className="bg-muted/50">
                                     <TableCell colSpan={4} className="font-semibold text-sm">
-                                        Commercial Evaluation
+                                        Evaluation
                                     </TableCell>
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
@@ -323,10 +308,10 @@ export const InfoSheetView = ({
                                         {toTitleCase(formatValue(infoSheet.commercialEvaluation?.replaceAll('_', ' ')))}
                                     </TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground">
-                                        MAF Required
+                                        Reverse Auction Applicable
                                     </TableCell>
                                     <TableCell className="text-sm">
-                                        {toTitleCase(formatValue(infoSheet.mafRequired?.replaceAll('_', ' ')))}
+                                        {formatYesNo(infoSheet.reverseAuctionApplicable)}
                                     </TableCell>
                                 </TableRow>
                             </>
@@ -384,7 +369,20 @@ export const InfoSheetView = ({
                                 PBG Mode
                             </TableCell>
                             <TableCell className="text-sm">
-                                {infoSheet.pbgMode}
+                                {(() => {
+                                    if (!infoSheet.pbgMode) return "N/A";
+
+                                    if (Array.isArray(infoSheet.pbgMode)) {
+                                        return infoSheet.pbgMode.join(", ");
+                                    }
+
+                                    try {
+                                        const parsed = JSON.parse(infoSheet.pbgMode);
+                                        return Array.isArray(parsed) ? parsed.join(", ") : infoSheet.pbgMode;
+                                    } catch {
+                                        return infoSheet.pbgMode;
+                                    }
+                                })()}
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -431,38 +429,34 @@ export const InfoSheetView = ({
                         </TableRow>
 
                         {/* Liquidated Damages */}
-                        {infoSheet.ldRequired && (
-                            <>
-                                <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={4} className="font-semibold text-sm">
-                                        Liquidated Damages
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        LD Required
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {formatYesNo(infoSheet.ldRequired)}
-                                    </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        LD Percentage Per Week
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {formatPercentage(Number(infoSheet.ldPercentagePerWeek))}
-                                    </TableCell>
-                                </TableRow>
-                                {infoSheet.maxLdPercentage && (
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Max LD Percentage
-                                        </TableCell>
-                                        <TableCell className="text-sm" colSpan={3}>
-                                            {formatPercentage(Number(infoSheet.maxLdPercentage))}
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </>
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                Liquidated Damages
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                LD Applicable
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatYesNo(infoSheet.ldRequired)}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                LD Percentage Per Week
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatPercentage(Number(infoSheet.ldPercentagePerWeek))}
+                            </TableCell>
+                        </TableRow>
+                        {infoSheet.maxLdPercentage && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Max LD Percentage
+                                </TableCell>
+                                <TableCell className="text-sm" colSpan={3}>
+                                    {formatPercentage(Number(infoSheet.maxLdPercentage))}
+                                </TableCell>
+                            </TableRow>
                         )}
 
                         {/* Eligibility Summary */}
@@ -626,6 +620,36 @@ export const InfoSheetView = ({
                                 </TableRow>
                             </>
                         )}
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Physical Docs Required
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatYesNo(infoSheet.physicalDocsRequired)}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            {infoSheet.physicalDocsRequired === 'YES' && (
+                                <>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Physical Document Type
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {getOptionLabel(physicalDocTypeOptions, infoSheet.physicalDocType)}
+                                    </TableCell>
+                                </>
+                            )}
+                            {infoSheet.physicalDocsDeadline && infoSheet.physicalDocsRequired === 'YES' && (
+                                <>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Physical Docs Deadline
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {formatDateTime(infoSheet.physicalDocsDeadline)}
+                                    </TableCell>
+                                </>
+                            )}
+                        </TableRow>
 
                         {/* Client Contacts */}
                         {infoSheet.clients && infoSheet.clients.length > 0 ? (

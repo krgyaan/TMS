@@ -23,7 +23,16 @@ export const buildDefaultValues = (
 
     return {
         tenderId,
-        courierNo: 0 as number,
+        isCourierRequested: 'yes',
+        courierNo: undefined,
+        toOrg: '',
+        toName: infoSheet?.clients?.[0]?.clientName || '',
+        toAddr: infoSheet?.courierAddress || '',
+        toPin: '',
+        toMobile: infoSheet?.clients?.[0]?.clientMobile || '',
+        empFrom: undefined,
+        delDate: '',
+        urgency: undefined,
         submittedDocs: [],
         physicalDocsPersons: personsFromClients.length > 0
             ? personsFromClients
@@ -61,7 +70,16 @@ export const mapResponseToForm = (
 
     return {
         tenderId,
+        isCourierRequested: 'yes', // Existing records are assumed to have courier requested
         courierNo: existingData.courierNo,
+        toOrg: '',
+        toName: '',
+        toAddr: '',
+        toPin: '',
+        toMobile: '',
+        empFrom: undefined,
+        delDate: '',
+        urgency: undefined,
         submittedDocs: submittedDocsArray,
         physicalDocsPersons: existingData.persons?.map(person => ({
             name: person.name,
@@ -75,7 +93,7 @@ export const mapResponseToForm = (
 export const mapFormToCreatePayload = (values: PhysicalDocsFormValues): CreatePhysicalDocsDto => {
     return {
         tenderId: values.tenderId,
-        courierNo: values.courierNo,
+        courierNo: values.courierNo || 0,
         submittedDocs: JSON.stringify(values.submittedDocs),
         physicalDocsPersons: values.physicalDocsPersons.map(person => ({
             name: person.name,

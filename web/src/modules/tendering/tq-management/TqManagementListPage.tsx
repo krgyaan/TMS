@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Send, XCircle, Eye, Edit, FileX2, CheckCircle, FileCheck, Search, RefreshCw } from 'lucide-react';
+import { AlertCircle, Send, XCircle, Eye, Edit, FileX2, CheckCircle, FileCheck, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useTqManagement, useMarkAsNoTq, useTqManagementDashboardCounts, useTqQualified } from '@/hooks/api/useTqManagement';
@@ -184,28 +184,19 @@ const TqManagementListPage = () => {
             visible: (row) => row.tqStatus === 'Disqualified, TQ missed' && row.tqId !== null,
         },
         {
-            label: 'View Details',
-            onClick: (row: TqManagementDashboardRowWithTimer) => {
-                navigate(paths.tendering.tqView(row.tqId!));
-            },
-            icon: <Eye className="h-4 w-4" />,
-            visible: (row) => row.tqId !== null,
-        },
-        {
-            label: 'View All TQs',
-            onClick: (row: TqManagementDashboardRowWithTimer) => {
-                navigate(paths.tendering.tqViewAll(row.tenderId));
-            },
-            icon: <Eye className="h-4 w-4" />,
-            visible: (row) => row.tqCount > 1,
-        },
-        {
             label: 'TQ Qualified',
             onClick: (row: TqManagementDashboardRowWithTimer) => {
                 handleTqQualified(row.tqId!);
             },
             icon: <FileCheck className="h-4 w-4" />,
             visible: (row) => row.tqStatus === 'TQ replied' && row.tqId !== null,
+        },
+        {
+            label: 'View Details',
+            onClick: (row: TqManagementDashboardRowWithTimer) => {
+                navigate(paths.tendering.tqView(row.tenderId));
+            },
+            icon: <Eye className="h-4 w-4" />,
         },
     ], [navigate, markNoTqMutation, handleTqQualified]);
 

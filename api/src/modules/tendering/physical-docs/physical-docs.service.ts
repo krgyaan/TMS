@@ -23,6 +23,7 @@ import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import { TimersService } from '@/modules/timers/timers.service';
 import { couriers } from '@db/schemas/shared/couriers.schema';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { documentsSubmitted } from '@/db/schemas';
 
 export type PhysicalDocFilters = {
     physicalDocsSent?: boolean;
@@ -59,11 +60,16 @@ export type PhysicalDocPerson = {
     phone: string;
 };
 
+export type SubmittedDoc = {
+    id: number;
+    name: string;
+};
+
 export type PhysicalDocWithPersons = {
     id: number;
     tenderId: number;
     courierNo: number;
-    submittedDocs: string | null;
+    submittedDocs: SubmittedDoc[] | null;
     createdAt: string | Date;
     updatedAt: string | Date;
     persons: PhysicalDocPerson[];
@@ -115,6 +121,38 @@ export class PhysicalDocsService {
         }
 
         return roleFilterConditions;
+    }
+
+    private async getSubmittedDocsDetails(submittedDocsString: string | null, dbInstance: any = this.db): Promise<SubmittedDoc[]> {
+        let parsedSubmittedDocIds: number[] = [];
+        if (submittedDocsString) {
+            try {
+                const parsed = JSON.parse(submittedDocsString);
+                if (Array.isArray(parsed)) {
+                    parsedSubmittedDocIds = parsed.map(Number).filter(n => !isNaN(n));
+                } else {
+                    parsedSubmittedDocIds = [Number(parsed)].filter(n => !isNaN(n));
+                }
+            } catch (e) {
+                parsedSubmittedDocIds = submittedDocsString
+                    .split(',')
+                    .map(s => Number(s.trim()))
+                    .filter(n => !isNaN(n));
+            }
+        }
+
+        let submittedDocs: { id: number; name: string }[] = [];
+        if (parsedSubmittedDocIds.length > 0) {
+            submittedDocs = await dbInstance
+                .select()
+                .from(documentsSubmitted)
+                .where(inArray(documentsSubmitted.id, parsedSubmittedDocIds));
+        }
+
+        return submittedDocs.map((s) => ({
+            id: s.id,
+            name: s.name,
+        }));
     }
 
     private getDefaultSortByTab(tab: string): SQL<unknown> {
@@ -392,11 +430,13 @@ export class PhysicalDocsService {
             .from(physicalDocsPersons)
             .where(eq(physicalDocsPersons.physicalDocId, id));
 
+        const submittedDocsList = await this.getSubmittedDocsDetails(physicalDoc.submittedDocs);
+
         return {
             id: physicalDoc.id,
             tenderId: physicalDoc.tenderId,
             courierNo: physicalDoc.courierNo,
-            submittedDocs: physicalDoc.submittedDocs,
+            submittedDocs: submittedDocsList,
             createdAt: physicalDoc.createdAt || '',
             updatedAt: physicalDoc.updatedAt || '',
             persons: persons.map((p) => ({
@@ -455,11 +495,13 @@ export class PhysicalDocsService {
             .from(physicalDocsPersons)
             .where(eq(physicalDocsPersons.physicalDocId, physicalDoc.id));
 
+        const submittedDocsList = await this.getSubmittedDocsDetails(physicalDoc.submittedDocs);
+
         return {
             id: physicalDoc.id,
             tenderId: physicalDoc.tenderId,
             courierNo: physicalDoc.courierNo,
-            submittedDocs: physicalDoc.submittedDocs,
+            submittedDocs: submittedDocsList,
             createdAt: physicalDoc.createdAt || '',
             updatedAt: physicalDoc.updatedAt || '',
             persons: persons.map((p) => ({
@@ -548,18 +590,20 @@ export class PhysicalDocsService {
                 tx
             );
 
+            const submittedDocsList = await this.getSubmittedDocsDetails(physicalDoc.submittedDocs, tx);
+
             return {
                 id: physicalDoc.id,
                 tenderId: physicalDoc.tenderId,
                 courierNo: physicalDoc.courierNo,
-                submittedDocs: physicalDoc.submittedDocs,
+                submittedDocs: submittedDocsList,
                 createdAt: physicalDoc.createdAt || '',
                 updatedAt: physicalDoc.updatedAt || '',
                 persons,
             };
         }).then(async (result) => {
             // Send email notification after transaction
-            await this.sendPhysicalDocsSentEmail(data.tenderId, result, changedBy);
+            // await this.sendPhysicalDocsSentEmail(data.tenderId, result, changedBy);
 
             // TIMER TRANSITION: Stop physical_docs timer
             try {
@@ -680,11 +724,13 @@ export class PhysicalDocsService {
                 }));
             }
 
+            const submittedDocsList = await this.getSubmittedDocsDetails(physicalDoc.submittedDocs, tx);
+
             return {
                 id: physicalDoc.id,
                 tenderId: physicalDoc.tenderId,
                 courierNo: physicalDoc.courierNo,
-                submittedDocs: physicalDoc.submittedDocs,
+                submittedDocs: submittedDocsList,
                 createdAt: physicalDoc.createdAt || '',
                 updatedAt: physicalDoc.updatedAt || '',
                 persons,

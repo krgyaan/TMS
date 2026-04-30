@@ -34,6 +34,8 @@ export interface SaveTenderApprovalDto {
 }
 
 // Response from API
+type Vendor = { name: string };
+
 export interface TenderApproval {
     id?: number;
     tenderId?: number;
@@ -41,7 +43,8 @@ export interface TenderApproval {
     tlDecision?: "0" | "1" | "2" | "3" | number;
     rfqRequired?: "yes" | "no" | null;
     quotationFiles?: string[] | null;
-    rfqTo: string[] | null;
+    rfqTo: Vendor[] | null;
+    // rfqTo: string[] | null;
     processingFeeMode: string | null;
     tenderFeeMode: string | null;
     emdMode: string | null;
@@ -50,7 +53,9 @@ export interface TenderApproval {
     alternativeTechnicalDocs?: string[] | null;
     alternativeFinancialDocs?: string[] | null;
     tenderStatus: number | null;
+    statusName: string | null;
     oemNotAllowed: string | null;
+    oemNotAllowedName: string | null;
     tlRejectionRemarks: string | null;
     tlIncompleteRemarks: string | null;
     incompleteFields?: IncompleteField[];
@@ -165,12 +170,13 @@ export const infoSheetFieldOptions = [
     { value: 'sdDurationMonths', label: 'SD Duration' },
 
     // LD
-    { value: 'ldRequired', label: 'LD Required' },
+    { value: 'ldRequired', label: 'LD Applicable' },
     { value: 'ldPercentagePerWeek', label: 'LD Per Week' },
     { value: 'maxLdPercentage', label: 'Max LD Percentage' },
 
     // Physical Docs
     { value: 'physicalDocsRequired', label: 'Physical Docs Required' },
+    { value: 'physicalDocType', label: 'Physical Document Type' },
     { value: 'physicalDocsDeadline', label: 'Physical Docs Deadline' },
 
     // Technical Eligibility

@@ -1,64 +1,20 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { FileText, ExternalLink, Download } from 'lucide-react';
 import type { Rfq } from '../helpers/rfq.types';
-import type { TenderInfoWithNames } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 
 interface RfqViewProps {
     rfq: Rfq | null;
-    tender?: TenderInfoWithNames;
-    isLoading?: boolean;
-    className?: string;
 }
 
-export function RfqView({
-    rfq,
-    isLoading = false,
-    className = '',
-}: RfqViewProps) {
-    if (isLoading) {
-        return (
-            <Card className={className}>
-                <CardHeader className="pb-3">
-                    <Skeleton className="h-5 w-40" />
-                </CardHeader>
-                <CardContent className="pt-0">
-                    <div className="space-y-2">
-                        {Array.from({ length: 4 }).map((_, i) => (
-                            <Skeleton key={i} className="h-10 w-full" />
-                        ))}
-                    </div>
-                </CardContent>
-            </Card>
-        );
-    }
-
-    if (!rfq) {
-        return (
-            <Card className={className}>
-                <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                        <FileText className="h-4 w-4" />
-                        RFQ
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                    <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-                        <FileText className="h-8 w-8 mb-2 opacity-50" />
-                        <p className="text-sm">No RFQ available for this tender yet.</p>
-                    </div>
-                </CardContent>
-            </Card>
-        );
-    }
-
+export function RfqView({ rfq }: RfqViewProps) {
+    if (!rfq) return null;
     return (
-        <Card className={className}>
-
+        <Card>
             <CardContent className="p-2">
                 <Table>
                     <TableBody>
@@ -234,5 +190,150 @@ export function RfqView({
                 </Table>
             </CardContent>
         </Card>
+    );
+}
+
+import { useRfqByTenderId } from '@/hooks/api/useRfqs';
+import { useRfqResponses } from '@/hooks/api/useRfqResponses';
+import { RfqResponseDetailAccordion } from '@/modules/tendering/rfq-response/components/RfqResponseDetailAccordion';
+import { useMemo } from 'react';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
+
+/** Local component for RFQ item with its responses (from RfqShowPage) */
+function RfqItemWithResponses({ rfq, index }: { rfq: Rfq; index: number }) {
+    const { data: rfqResponses = [], isLoading: rfqResponsesLoading } = useRfqResponses(rfq.id);
+    if (!rfq) return null;
+
+    const groupedResponses = useMemo(() => {
+        const groups: Record<string, typeof rfqResponses> = {};
+        rfqResponses.forEach(res => {
+            const org = res.organizationName || 'Other';
+            if (!groups[org]) groups[org] = [];
+            groups[org].push(res);
+        });
+        return groups;
+    }, [rfqResponses]);
+
+    return (
+        <Accordion type="single" collapsible defaultValue="request" className="w-full border rounded-lg bg-card overflow-hidden shadow-sm">
+            <AccordionItem value="request" className="border-b-0">
+                <AccordionTrigger className="px-4 py-2 hover:no-underline hover:bg-muted/30 transition-colors">
+                    <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="rounded-sm font-bold text-[10px]">
+                            RFQ REQUEST #{index}
+                        </Badge>
+                        <span className="text-xs font-semibold">
+                           {rfq.itemName || 'RFQ Details'}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground italic">
+                            (ID: #{rfq.id})
+                        </span>
+                        {rfqResponses.length > 0 && (
+                             <Badge variant="secondary" className="text-[10px] ml-2 px-1.5 h-4">
+                                {rfqResponses.length} {rfqResponses.length === 1 ? 'Response' : 'Responses'}
+                             </Badge>
+                        )}
+                    </div>
+                </AccordionTrigger>
+                <AccordionContent className="px-4 pb-4 pt-2 border-t">
+                    <div className="space-y-4 mt-2">
+                        <RfqView rfq={rfq} />
+                        <div className="flex items-center justify-between mt-4">
+                            <h3 className="text-[11px] font-bold uppercase tracking-tight text-muted-foreground">Responses</h3>
+                        </div>
+
+                        <div className="space-y-2">
+                            {rfqResponsesLoading ? (
+                                <div className="flex items-center justify-center py-4 text-muted-foreground text-xs">
+                                    Loading responses…
+                                </div>
+                            ) : rfqResponses.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center p-2 bg-muted/10 border border-dashed rounded-lg text-muted-foreground w-full">
+                                    <p className="text-xs">No responses yet</p>
+                                </div>
+                            ) : (
+                                Object.entries(groupedResponses).map(([orgName, responses]) => (
+                                    <div key={orgName} className="space-y-1">
+                                        <div className="flex items-center gap-2 px-1">
+                                            <Badge variant="secondary" className="px-2 py-0.5 text-[10px] font-semibold">
+                                                {orgName}
+                                            </Badge>
+                                            <div className="h-[1px] flex-1 bg-border/60" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            {responses.map((res) => (
+                                                <RfqResponseDetailAccordion
+                                                    key={res.id}
+                                                    responseSummary={res}
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </AccordionContent>
+            </AccordionItem>
+        </Accordion>
+    );
+}
+
+/** Self-fetching section that renders multiple RFQs + Responses */
+export function RfqSection({ tenderId }: { tenderId: number | null }) {
+    const { data: approvalData } = useTenderApproval(tenderId);
+    const { data: rfqData, isLoading } = useRfqByTenderId(tenderId);
+
+    if (!approvalData?.rfqRequired) {
+        return (
+            <Card>
+                <CardContent className="pt-0">
+                    <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                        <FileText className="h-8 w-8 mb-2 opacity-50" />
+                        <p className="text-sm">RFQ not required for this tender.</p>
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (isLoading) {
+        return (
+            <Card>
+                <CardContent className="pt-0">
+                    <div className="space-y-2">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                            <Skeleton key={i} className="h-10 w-full" />
+                        ))}
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (!rfqData || rfqData.length === 0) {
+        return (
+            <Card>
+                <CardContent className="pt-0">
+                    <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                        <FileText className="h-8 w-8 mb-2 opacity-50" />
+                        <p className="text-sm">No RFQ available for this tender yet.</p>
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    return (
+        <div className="space-y-4">
+            {rfqData.map((rfq, index) => (
+                <RfqItemWithResponses
+                    key={rfq.id}
+                    rfq={rfq}
+                    index={index + 1}
+                />  
+            ))}
+        </div>
     );
 }

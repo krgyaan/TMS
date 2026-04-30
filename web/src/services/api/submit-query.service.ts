@@ -22,6 +22,10 @@ class SubmitQueryService extends BaseApiService {
         return this.get<SubmitQueryListRow>(`/${id}`);
     }
 
+    async getByTenderId(tenderId: number): Promise<SubmitQueryListRow | null> {
+        return this.get<SubmitQueryListRow | null>(`/tender/${tenderId}`);
+    }
+
     async create(data: CreateSubmitQueryPayload): Promise<SubmitQueryListRow> {
         return this.post<SubmitQueryListRow>('', data);
     }

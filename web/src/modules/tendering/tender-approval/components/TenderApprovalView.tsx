@@ -175,7 +175,7 @@ export function TenderApprovalView({
                                 </Badge>
                             </TableCell>
                         </TableRow>
-                        {approval.tlStatus && (
+                        {!!approval.tlStatus && (
                             <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     Tender Approval Status
@@ -206,21 +206,54 @@ export function TenderApprovalView({
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">
-                                        RFQ To (Vendor Organizations)
+                                        Is RFQ Required?
                                     </TableCell>
-                                    <TableCell className="text-sm" colSpan={3}>
-                                        {approval.rfqTo?.length ? (
-                                            <div className="flex flex-wrap gap-2">
-                                                {approval.rfqTo.map((vendor) => (
-                                                    <Badge key={vendor.name} variant="outline">
-                                                        {vendor.name}
-                                                    </Badge>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            '—'
-                                        )}
+                                    <TableCell className="text-sm">
+                                        {approval?.rfqRequired?.toUpperCase()}
                                     </TableCell>
+                                    {approval?.rfqRequired?.toLowerCase() === "yes" && (
+                                        <>
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                RFQ To (Vendor Organizations)
+                                            </TableCell>
+                                            <TableCell className="text-sm" colSpan={3}>
+                                                {approval.rfqTo?.length ? (
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {approval.rfqTo?.map((vendor, i) => {
+                                                            const name = typeof vendor === "string" ? vendor : vendor.name;
+                                                            return (
+                                                                <Badge key={i} variant="outline">
+                                                                    {name}
+                                                                </Badge>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                ) : (
+                                                    '—'
+                                                )}
+                                            </TableCell>
+                                        </>
+                                    )}
+                                </TableRow>
+                                <TableRow>
+                                    {approval?.quotationFiles && approval?.quotationFiles?.length > 0 && (
+                                        <>
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                Quotation Files
+                                            </TableCell>
+                                            <TableCell className="text-sm" colSpan={3}>
+                                                {approval?.quotationFiles.map((doc, i) => {
+                                                    return (
+                                                        <Badge key={i} variant="outline" className="text-xs hover:bg-primary/10">
+                                                            <a href={tenderFilesService.getFileUrl(doc)} target="_blank" rel="noopener noreferrer">
+                                                                View File
+                                                            </a>
+                                                        </Badge>
+                                                    );
+                                                })}
+                                            </TableCell>
+                                        </>
+                                    )}
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">
@@ -323,13 +356,13 @@ export function TenderApprovalView({
                                         Tender Status
                                     </TableCell>
                                     <TableCell className="text-sm">
-                                        {approval.tenderStatus ? `Status ID: ${approval.tenderStatus}` : '—'}
+                                        {approval.statusName}
                                     </TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground">
                                         OEM Not Allowed
                                     </TableCell>
                                     <TableCell className="text-sm">
-                                        {approval.oemNotAllowed ? 'Yes' : 'No'}
+                                        {approval.oemNotAllowedName}
                                     </TableCell>
                                 </TableRow>
                                 {approval.tlRejectionRemarks && (

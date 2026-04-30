@@ -10,50 +10,11 @@ import { formatDateTime } from '@/hooks/useFormatedDate';
 
 interface CostingSheetViewProps {
     costingSheet?: TenderCostingSheet | null;
-    isLoading?: boolean;
-    className?: string;
+    vendors?: VendorOrganization[];
 }
 
-export function CostingSheetView({
-    costingSheet,
-    isLoading = false,
-    className = '',
-}: CostingSheetViewProps) {
-    if (isLoading) {
-        return (
-            <Card className={className}>
-                <CardHeader className="pb-3">
-                    <Skeleton className="h-5 w-40" />
-                </CardHeader>
-                <CardContent className="pt-0">
-                    <div className="space-y-2">
-                        {Array.from({ length: 4 }).map((_, i) => (
-                            <Skeleton key={i} className="h-10 w-full" />
-                        ))}
-                    </div>
-                </CardContent>
-            </Card>
-        );
-    }
-
-    if (!costingSheet) {
-        return (
-            <Card className={className}>
-                <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                        <FileText className="h-4 w-4" />
-                        Costing Sheet
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                    <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-                        <FileText className="h-8 w-8 mb-2 opacity-50" />
-                        <p className="text-sm">No costing sheet available for this tender yet.</p>
-                    </div>
-                </CardContent>
-            </Card>
-        );
-    }
+export function CostingSheetView({ costingSheet, vendors }: CostingSheetViewProps) {
+    if (!costingSheet) return null;
 
     const getStatusVariant = (status: string) => {
         switch (status) {
@@ -69,7 +30,7 @@ export function CostingSheetView({
     };
 
     return (
-        <Card className={className}>
+        <Card>
             <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                     <FileText className="h-5 w-5" />
@@ -165,7 +126,7 @@ export function CostingSheetView({
                                         Gross Margin
                                     </TableCell>
                                     <TableCell className="text-sm font-semibold">
-                                        {costingSheet.submittedGrossMargin ? `${costingSheet.submittedGrossMargin}%` : '—'}
+                                        {costingSheet.submittedGrossMargin ? `${parseFloat(costingSheet.submittedGrossMargin)}%` : '—'}
                                     </TableCell>
                                 </TableRow>
                                 {costingSheet.teRemarks && (
@@ -178,23 +139,13 @@ export function CostingSheetView({
                                         </TableCell>
                                     </TableRow>
                                 )}
-                                {costingSheet.submittedAt && (
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Submitted At
-                                        </TableCell>
-                                        <TableCell className="text-sm" colSpan={3}>
-                                            {formatDateTime(costingSheet.submittedAt)}
-                                        </TableCell>
-                                    </TableRow>
-                                )}
                             </>
                         )}
 
                         {/* Approved Values */}
-                        {(costingSheet.finalPrice || costingSheet.receiptPrice || costingSheet.budgetPrice) && (
+                        {(costingSheet.status == 'Approved') && (
                             <>
-                                <TableRow className="bg-muted/50">
+                                <TableRow className='w-full bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800'>
                                     <TableCell colSpan={4} className="font-semibold text-sm">
                                         Approved Values (by Team Lead)
                                     </TableCell>
@@ -224,7 +175,7 @@ export function CostingSheetView({
                                         Gross Margin
                                     </TableCell>
                                     <TableCell className="text-sm font-semibold">
-                                        {costingSheet.grossMargin ? `${costingSheet.grossMargin}%` : '—'}
+                                        {costingSheet.grossMargin ? `${parseFloat(costingSheet.grossMargin)}%` : '—'}
                                     </TableCell>
                                 </TableRow>
                                 {costingSheet.oemVendorIds && costingSheet.oemVendorIds.length > 0 && (
@@ -233,13 +184,13 @@ export function CostingSheetView({
                                             OEM Vendor IDs
                                         </TableCell>
                                         <TableCell className="text-sm" colSpan={3}>
-                                            <div className="flex flex-wrap gap-2">
-                                                {costingSheet.oemVendorIds.map((id) => (
-                                                    <Badge key={id} variant="outline">
-                                                        Vendor ID: {id}
-                                                    </Badge>
-                                                ))}
-                                            </div>
+                                            <div className="flex flex-wrap gap-2 mt-2">
+                                                {vendors && vendors.length > 0 ? (
+                                                    vendors.map(vendorOrg => (
+                                                        <Badge key={vendorOrg.id} variant="outline" className="border-green-200 dark:border-green-800">{vendorOrg.name}</Badge>
+                                                    ))
+                                                ) : <p className="text-sm text-muted-foreground">—</p>}
+                                            </div>  
                                         </TableCell>
                                     </TableRow>
                                 )}
@@ -253,23 +204,13 @@ export function CostingSheetView({
                                         </TableCell>
                                     </TableRow>
                                 )}
-                                {costingSheet.approvedAt && (
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Approved At
-                                        </TableCell>
-                                        <TableCell className="text-sm" colSpan={3}>
-                                            {formatDateTime(costingSheet.approvedAt)}
-                                        </TableCell>
-                                    </TableRow>
-                                )}
                             </>
                         )}
 
                         {/* Rejection Reason */}
                         {costingSheet.rejectionReason && (
                             <>
-                                <TableRow className="bg-muted/50">
+                                <TableRow className='w-full bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-800'>
                                     <TableCell colSpan={4} className="font-semibold text-sm">
                                         Rejection Details
                                     </TableCell>
@@ -311,5 +252,55 @@ export function CostingSheetView({
                 </Table>
             </CardContent>
         </Card>
+    );
+}
+
+import { useCostingSheetByTender } from '@/hooks/api/useCostingSheets';
+import { useVendorOrganizations } from '@/hooks/api/useVendorOrganizations';
+import type { VendorOrganization } from '@/types/api.types';
+
+/** Smart Section component for Costing Sheet and Approval Details */
+export function CostingSheetSection({ tenderId }: { tenderId: number | null }) {
+    const { data: costingSheet, isLoading } = useCostingSheetByTender(tenderId ?? 0);
+    const { data: vendorOrganizations } = useVendorOrganizations();
+
+    if (isLoading) {
+        return (
+            <Card>
+                <CardHeader className="pb-3">
+                    <Skeleton className="h-5 w-40" />
+                </CardHeader>
+                <CardContent className="pt-0">
+                    <div className="space-y-2">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                            <Skeleton key={i} className="h-10 w-full" />
+                        ))}
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (!costingSheet) {
+        return (
+            <Card>
+                <CardContent className="pt-0">
+                    <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                        <FileText className="h-8 w-8 mb-2 opacity-50" />
+                        <p className="text-sm">Costing sheet not created for this tender yet.</p>
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    const selectedVendorOrganizations = vendorOrganizations?.filter(vo =>
+        costingSheet?.oemVendorIds?.includes(vo.id) || false
+    ) || [];
+
+    return (
+        <div className="space-y-6">
+            <CostingSheetView costingSheet={costingSheet ?? null} vendors={selectedVendorOrganizations} />
+        </div>
     );
 }

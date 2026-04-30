@@ -165,6 +165,32 @@ export class RequestExtensionsService {
         return this.mapRowToResponse(row);
     }
 
+    async findByTenderId(tenderId: number) {
+        const [row] = await this.db.select({
+            id: requestExtension.id,
+            tenderId: requestExtension.tenderId,
+            tenderName: tenderInfos.tenderName,
+            tenderNo: tenderInfos.tenderNo,
+            tenderDue: tenderInfos.dueDate,
+            days: requestExtension.days,
+            reason: requestExtension.reason,
+            clients: requestExtension.clients,
+            createdAt: requestExtension.createdAt,
+            updatedAt: requestExtension.updatedAt,
+        })
+            .from(requestExtension)
+            .innerJoin(tenderInfos, eq(requestExtension.tenderId, tenderInfos.id))
+            .where(eq(requestExtension.tenderId, tenderId))
+            .orderBy(desc(requestExtension.createdAt))
+            .limit(1);
+
+        if (!row) {
+            return null;
+        }
+
+        return this.mapRowToResponse(row);
+    }
+
     async create(data: CreateRequestExtensionDto) {
         const insertValues = this.mapCreateToDb(data);
         const [inserted] = await this.db

@@ -35,10 +35,10 @@ export function RfqResponseDetailAccordion({ responseSummary }: RfqResponseDetai
                     <div className="flex items-center justify-between w-full pr-4 text-left">
                         <div className="flex flex-col gap-0.5">
                             <span className="font-semibold text-sm">
-                                {responseSummary.organizationName ?? '—'}
+                                Response { } 
                             </span>
                             <span className="text-xs text-muted-foreground">
-                                {responseSummary.vendorName ?? '—'} · {formatDateTime(responseSummary.receiptDatetime)}
+                                Received At {formatDateTime(responseSummary.receiptDatetime)}
                             </span>
                         </div>
                         <div className="flex items-center gap-3">
@@ -66,14 +66,14 @@ export function RfqResponseDetailAccordion({ responseSummary }: RfqResponseDetai
                         <div className="space-y-6">
                             {/* Vendor & Conditions Summary */}
                             <div className="grid grid-cols-2 lg:grid-cols-6 gap-2 bg-muted/30 p-2 rounded-md">
-                                <div>
+                                {/* <div>
                                     <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">Org</p>
                                     <p className="text-xs font-semibold">{response.organizationName ?? '—'}</p>
                                 </div>
                                 <div>
                                     <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">Contact</p>
                                     <p className="text-xs font-medium">{response.vendorName ?? '—'}</p>
-                                </div>
+                                </div> */}
                                 <div>
                                     <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">Delivery</p>
                                     <p className="text-xs font-medium">{response.deliveryTime ? `${response.deliveryTime}d` : '—'}</p>

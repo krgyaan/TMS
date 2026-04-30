@@ -35,7 +35,7 @@ const getFieldLabel = (fieldPath: string): string => {
         'sdForm': 'SD Mode',
         'securityDepositPercentage': 'Security Deposit Percentage',
         'sdDurationMonths': 'SD Duration',
-        'ldRequired': 'LD Required',
+        'ldRequired': 'LD Applicable',
         'ldPercentagePerWeek': 'LD Percentage Per Week',
         'maxLdPercentage': 'Max LD Percentage',
         'physicalDocsRequired': 'Physical Docs Required',

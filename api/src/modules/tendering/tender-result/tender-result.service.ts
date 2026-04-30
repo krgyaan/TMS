@@ -524,6 +524,16 @@ export class TenderResultService {
     }
 
     async findById(id: number) {
+        const latestBidSubmissionSq = this.db
+            .selectDistinctOn([bidSubmissions.tenderId], {
+                tenderId: bidSubmissions.tenderId,
+                submissionDatetime: bidSubmissions.submissionDatetime,
+            })
+            .from(bidSubmissions)
+            .where(eq(bidSubmissions.status, 'Bid Submitted'))
+            .orderBy(bidSubmissions.tenderId, desc(bidSubmissions.submissionDatetime))
+            .as('latestBidSubmission');
+
         const [result] = await this.db
             .select({
                 result: tenderResults,
@@ -531,18 +541,24 @@ export class TenderResultService {
                 tenderName: tenderInfos.tenderName,
                 teamExecutiveName: users.name,
                 tenderValue: tenderInfos.gstValues,
+                emdAmount: tenderInfos.emd,
                 costingFinalPrice: tenderCostingSheets.finalPrice,
                 itemName: items.name,
                 tenderStatus: statuses.name,
                 reverseAuctionApplicable: tenderInformation.reverseAuctionApplicable,
+                bidSubmissionDate: latestBidSubmissionSq.submissionDatetime,
+                resultReason: tenderResults.resultReason,
+                woBasicDetailId: woBasicDetails.id,
             })
             .from(tenderResults)
             .innerJoin(tenderInfos, eq(tenderResults.tenderId, tenderInfos.id))
-            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
             .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+            .leftJoin(woBasicDetails, eq(woBasicDetails.tenderId, tenderInfos.id))
+            .leftJoin(latestBidSubmissionSq, eq(latestBidSubmissionSq.tenderId, tenderInfos.id))
             .where(eq(tenderResults.id, id))
             .limit(1);
 
@@ -550,6 +566,9 @@ export class TenderResultService {
             throw new NotFoundException('Tender result not found');
         }
 
+        const emdDetailsMap = await this.getEmdDetailsForTenders([result.result.tenderId]);
+        const emdDetails = this.formatEmdDetails(result.emdAmount, emdDetailsMap.get(result.result.tenderId));
+
         return {
             ...result.result,
             tenderNo: result.tenderNo,
@@ -559,11 +578,26 @@ export class TenderResultService {
             finalPrice: result.costingFinalPrice || result.tenderValue,
             itemName: result.itemName,
             tenderStatus: result.tenderStatus,
+            resultStatus: result.result.status || '',
             raApplicable: result.reverseAuctionApplicable === 'Yes',
+            bidSubmissionDate: result.bidSubmissionDate,
+            woBasicDetailId: result.woBasicDetailId,
+            resultReason: result.resultReason,
+            emdDetails,
         };
     }
 
     async findByTenderId(tenderId: number) {
+        const latestBidSubmissionSq = this.db
+            .selectDistinctOn([bidSubmissions.tenderId], {
+                tenderId: bidSubmissions.tenderId,
+                submissionDatetime: bidSubmissions.submissionDatetime,
+            })
+            .from(bidSubmissions)
+            .where(eq(bidSubmissions.status, 'Bid Submitted'))
+            .orderBy(bidSubmissions.tenderId, desc(bidSubmissions.submissionDatetime))
+            .as('latestBidSubmission');
+
         const [result] = await this.db
             .select({
                 result: tenderResults,
@@ -571,24 +605,33 @@ export class TenderResultService {
                 tenderName: tenderInfos.tenderName,
                 teamExecutiveName: users.name,
                 tenderValue: tenderInfos.gstValues,
+                emdAmount: tenderInfos.emd,
                 costingFinalPrice: tenderCostingSheets.finalPrice,
                 itemName: items.name,
                 tenderStatus: statuses.name,
                 reverseAuctionApplicable: tenderInformation.reverseAuctionApplicable,
+                bidSubmissionDate: latestBidSubmissionSq.submissionDatetime,
+                woBasicDetailId: woBasicDetails.id,
+                resultReason: tenderResults.resultReason,
             })
             .from(tenderResults)
             .innerJoin(tenderInfos, eq(tenderResults.tenderId, tenderInfos.id))
-            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
             .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+            .leftJoin(woBasicDetails, eq(woBasicDetails.tenderId, tenderInfos.id))
+            .leftJoin(latestBidSubmissionSq, eq(latestBidSubmissionSq.tenderId, tenderInfos.id))
             .where(eq(tenderResults.tenderId, tenderId))
             .limit(1);
 
         if (!result) {
             return null;
         }
+
+        const emdDetailsMap = await this.getEmdDetailsForTenders([tenderId]);
+        const emdDetails = this.formatEmdDetails(result.emdAmount, emdDetailsMap.get(tenderId));
 
         return {
             ...result.result,
@@ -599,7 +642,12 @@ export class TenderResultService {
             finalPrice: result.costingFinalPrice || result.tenderValue,
             itemName: result.itemName,
             tenderStatus: result.tenderStatus,
+            resultStatus: result.result.status || '',
             raApplicable: result.reverseAuctionApplicable === 'Yes',
+            bidSubmissionDate: result.bidSubmissionDate,
+            woBasicDetailId: result.woBasicDetailId,
+            resultReason: result.resultReason,
+            emdDetails,
         };
     }
 
