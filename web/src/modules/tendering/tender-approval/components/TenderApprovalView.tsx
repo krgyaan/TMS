@@ -359,12 +359,16 @@ export function TenderApprovalView({
                                     <TableCell className="text-sm">
                                         {approval.statusName}
                                     </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        OEM Not Allowed
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {approval.oemNotAllowedName}
-                                    </TableCell>
+                                    {approval.tenderStatus == 10 && (
+                                        <>
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                OEM Not Allowed
+                                            </TableCell>
+                                            <TableCell className="text-sm">
+                                                {approval.oemNotAllowedName}
+                                            </TableCell>
+                                        </>
+                                    )}
                                 </TableRow>
                                 {approval.tlRejectionRemarks && (
                                     <TableRow className="hover:bg-muted/30 transition-colors">
@@ -372,7 +376,7 @@ export function TenderApprovalView({
                                             Rejection Remarks
                                         </TableCell>
                                         <TableCell className="text-sm" colSpan={3}>
-                                            <div className="bg-destructive/10 p-3 rounded-md break-words">
+                                            <div className="bg-destructive/10 p-3 rounded-md text-sm whitespace-normal [overflow-wrap:anywhere]">
                                                 {approval.tlRejectionRemarks}
                                             </div>
                                         </TableCell>
