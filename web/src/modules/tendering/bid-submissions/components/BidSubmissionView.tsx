@@ -93,8 +93,7 @@ export function BidSubmissionView({ bidSubmission }: BidSubmissionViewProps) {
                                         <TableRow>
                                             <TableCell colSpan={4} className="p-4">
                                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                                                    {Array.isArray(bidSubmission.documents?.submittedDocs) &&
-                                                        bidSubmission.documents?.submittedDocs?.map((doc, idx) => (
+                                                    {bidSubmission.documents?.submittedDocs?.map((doc, idx) => (
                                                         <div key={`submitted-${idx}`} className="flex flex-col border rounded-md p-3 bg-card shadow-sm gap-2">
                                                             <div className="flex items-start gap-2 overflow-hidden">
                                                                 <FileText className="h-6 w-6 text-muted-foreground shrink-0" />
@@ -132,7 +131,7 @@ export function BidSubmissionView({ bidSubmission }: BidSubmissionViewProps) {
                                                             </div>
                                                         </div>
                                                     ))}
-                                                    {bidSubmission.documents?.submissionProof && (
+                                                    {bidSubmission.documents.submissionProof && (
                                                         <div className="flex flex-col border rounded-md p-3 bg-card shadow-sm gap-2">
                                                             <div className="flex items-start gap-2 overflow-hidden">
                                                                 <FileText className="h-6 w-6 text-muted-foreground shrink-0" />
