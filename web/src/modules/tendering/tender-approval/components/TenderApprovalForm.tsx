@@ -416,10 +416,10 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                         )}
                                     </div>
                                 </div>
-                                {infoSheet.teFinalRemark && (
+                                {(infoSheet.teFinalRemark || infoSheet.teRejectionRemarks) && (
                                     <div className="flex-1">
                                         <p className="text-sm font-medium text-muted-foreground">Remarks</p>
-                                        <p className="text-sm mt-1">{infoSheet.teFinalRemark}</p>
+                                        <p className="text-sm mt-1">{infoSheet.teFinalRemark || infoSheet.teRejectionRemarks}</p>
                                     </div>
                                 )}
                             </div>

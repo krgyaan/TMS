@@ -545,9 +545,9 @@ export class TenderApprovalService {
         });
 
         // Send email notification for approval/rejection/review
-        if (payload.tlStatus === "1" || payload.tlStatus === "2" || payload.tlStatus === "3") {
-            await this.sendApprovalEmail(tenderId, payload, changedBy);
-        }
+        // if (payload.tlStatus === "1" || payload.tlStatus === "2" || payload.tlStatus === "3") {
+        //     await this.sendApprovalEmail(tenderId, payload, changedBy);
+        // }
 
         try {
             // TIMER TRANSITION
