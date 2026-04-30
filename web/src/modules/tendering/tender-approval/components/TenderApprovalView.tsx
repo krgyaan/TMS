@@ -2,9 +2,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { CheckCircle2, XCircle, AlertTriangle, Clock } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertTriangle, Clock, Pencil } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
 import type { TenderWithRelations } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 import { usePqrOptions, useFinanceDocumentOptions } from '@/hooks/useSelectOptions';
+import { paths } from '@/app/routes/paths';
+import { useAuth } from '@/contexts/AuthContext';
 import { tenderFilesService } from '@/services/api/tender-files.service';
 
 // Helper function to map document IDs to names
@@ -84,6 +88,11 @@ export function TenderApprovalView({
     isLoading = false,
     className = '',
 }: TenderApprovalViewProps) {    
+    const navigate = useNavigate();
+    const { isAdmin, isSuperUser, canRead } = useAuth();
+
+    let canView = canRead("tender-approval");
+;    
     const approval = tender.approval;
     const pqrOptions = usePqrOptions();
     const financeDocumentOptions = useFinanceDocumentOptions();
@@ -134,6 +143,18 @@ export function TenderApprovalView({
                     <StatusIcon className={`h-5 w-5 ${statusConfig.color}`} />
                     Tender Approval Details
                 </CardTitle>
+
+                {canView &&
+                <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="gap-2"
+                    onClick={() => navigate(paths.tendering.tenderApprovalCreate(tender.id))}
+                >
+                    <Pencil className="h-3.5 w-3.5" />
+                    Edit Approval
+                </Button>
+            }
             </CardHeader>
             <CardContent>
                 <Table>
