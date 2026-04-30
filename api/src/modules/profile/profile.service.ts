@@ -7,6 +7,15 @@ import * as path from 'path';
 
 const EMPLOYEE_DOCS_UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'hrms', 'employee-documents');
 
+const REQUIRED_DOC_TYPES = [
+  'Aadhar Card',
+  'Graduation Certificate',
+  'Resume / CV',
+  'Passport Size Photo',
+  'Bank Passbook / Cancelled Cheque',
+];
+
+
 import { users } from '@/db/schemas/auth/users.schema';
 import { userProfiles } from '@/db/schemas/auth/user-profiles.schema';
 import { employeeProfiles } from '@/db/schemas/hrms/employee-profiles.schema';
@@ -1166,6 +1175,8 @@ export class ProfileService {
         } as any)
         .returning();
 
+      await this.checkAndUpdateDocumentStatus(onboardingId!);
+
       return {
         id: inserted.id,
         docType: inserted.docType,
@@ -1284,6 +1295,8 @@ export class ProfileService {
         .where(eq(onboardingDocuments.id, docId))
         .returning();
 
+      await this.checkAndUpdateDocumentStatus(activeReqs[0].id);
+
       return {
         id: updated.id,
         docType: updated.docType,
@@ -1379,6 +1392,7 @@ export class ProfileService {
       }
 
       await this.db.delete(onboardingDocuments).where(eq(onboardingDocuments.id, docId));
+      await this.checkAndUpdateDocumentStatus(activeReqs[0].id);
       return;
     }
         const [existing] = await this.db
@@ -1408,5 +1422,25 @@ export class ProfileService {
     await this.db
       .delete(employeeDocuments)
       .where(eq(employeeDocuments.id, docId));
+  }
+
+  private async checkAndUpdateDocumentStatus(onboardingId: number) {
+    const currentDocs = await this.db
+      .select({ docType: onboardingDocuments.docType })
+      .from(onboardingDocuments)
+      .where(eq(onboardingDocuments.onboardingId, onboardingId));
+
+    const uploadedTypes = currentDocs.map((d) => d.docType);
+    const allUploaded = REQUIRED_DOC_TYPES.every((type) => uploadedTypes.includes(type));
+
+    const newStatus = allUploaded ? 'submitted' : 'pending';
+
+    await this.db
+      .update(onboardingRequests)
+      .set({
+        documentStatus: newStatus,
+        updatedAt: new Date(),
+      })
+      .where(eq(onboardingRequests.id, onboardingId));
   }
 }

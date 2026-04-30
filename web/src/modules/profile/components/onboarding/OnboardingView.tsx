@@ -615,6 +615,12 @@ export function OnboardingView() {
             }
           }
 
+          // If stage is still pending by employee and not rejected by HR, don't show HR status
+          // This prevents showing "Approved" by default when no data exists
+          if (stageStatus === 'pending' && approvalStatus !== 'rejected' && stage.key !== 'induction') {
+            approvalStatus = null;
+          }
+
           return (
             <OnboardingStageCard
               key={stage.key}
