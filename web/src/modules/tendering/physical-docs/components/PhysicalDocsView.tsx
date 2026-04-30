@@ -44,7 +44,7 @@ export function PhysicalDocsView({ physicalDoc }: PhysicalDocsViewProps) {
                                 Submitted Documents
                             </TableCell>
                             <TableCell className="text-sm">
-                                {physicalDoc.submittedDocs?.map((doc) => doc.name).join(", ")}
+                                {physicalDoc.submittedDocs && physicalDoc.submittedDocs?.map((doc) => doc.name).join(", ")}
                             </TableCell>
                         </TableRow>
                         {physicalDoc.createdAt && (
