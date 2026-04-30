@@ -2,14 +2,7 @@ import { Inject, Injectable, NotFoundException, ConflictException, BadRequestExc
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { eq, inArray, or } from 'drizzle-orm';
-import {
-    tenderInformation,
-    tenderClients,
-    tenderTechnicalDocuments,
-    tenderFinancialDocuments,
-    type TenderInformation,
-    type TenderClient,
-} from '@db/schemas/tendering/tender-info-sheet.schema';
+import { tenderInformation, tenderClients, tenderTechnicalDocuments, tenderFinancialDocuments, type TenderInformation, type TenderClient } from '@db/schemas/tendering/tender-info-sheet.schema';
 import type { TenderInfoSheetPayload } from '@/modules/tendering/info-sheets/dto/info-sheet.dto';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
@@ -263,13 +256,14 @@ export class TenderInfoSheetsService {
         payload: TenderInfoSheetPayload,
         changedBy: number
     ): Promise<TenderInfoSheetWithRelations> {
-        // Validate tender exists
         await this.tenderInfosService.validateExists(tenderId);
 
-        // Validate YES/NO fields before database insertion
-        this.validateYesNoFields(payload);
+        // Only validate YES/NO field constraints when recommending
+        // When teRecommendation === 'NO', most fields will be null — skip validation
+        if (payload.teRecommendation === 'YES') {
+            this.validateYesNoFields(payload);
+        }
 
-        // Check if info sheet already exists
         const existing = await this.findByTenderId(tenderId);
         if (existing) {
             throw new ConflictException(
@@ -277,120 +271,253 @@ export class TenderInfoSheetsService {
             );
         }
 
-        // Get current tender status before update
         const currentTender = await this.tenderInfosService.findById(tenderId);
         const prevStatus = currentTender?.status ?? null;
-
-        // AUTO STATUS CHANGE: Update tender status to 2 (Tender Info filled) and track it
-        const newStatus = 2; // Status ID for "Tender Info filled"
+        const newStatus = 2;
 
         try {
             await this.db.transaction(async (tx) => {
-                // Prepare values with logging for debugging
-                const mafRequiredValue = payload.mafRequired ? String(payload.mafRequired).trim() : null;
-                const processingFeeRequiredValue = payload.processingFeeRequired ? String(payload.processingFeeRequired).trim() : null;
-                const tenderFeeRequiredValue = payload.tenderFeeRequired ? String(payload.tenderFeeRequired).trim() : null;
-                const emdRequiredValue = payload.emdRequired ? String(payload.emdRequired).trim() : null;
-                const reverseAuctionApplicableValue = payload.reverseAuctionApplicable ? String(payload.reverseAuctionApplicable).trim() : null;
-                const pbgRequiredValue = payload.pbgRequired ? String(payload.pbgRequired).trim() : null;
-                const sdRequiredValue = payload.sdRequired ? String(payload.sdRequired).trim() : null;
-                const ldRequiredValue = payload.ldRequired ? String(payload.ldRequired).trim() : null;
-                const physicalDocsRequiredValue = payload.physicalDocsRequired ? String(payload.physicalDocsRequired).trim() : null;
-
-                // Helper function to filter invalid values from arrays
-                const filterArray = (arr: string[] | null | undefined): string[] | null => {
-                    if (!arr || !Array.isArray(arr) || arr.length === 0) return null;
-                    const filtered = arr.filter(mode => mode && mode !== 'undefined' && String(mode).trim().length > 0);
+                const filterArray = (
+                    arr: string[] | null | undefined
+                ): string[] | null => {
+                    if (!arr || !Array.isArray(arr) || arr.length === 0)
+                        return null;
+                    const filtered = arr.filter(
+                        (mode) =>
+                            mode &&
+                            mode !== 'undefined' &&
+                            String(mode).trim().length > 0
+                    );
                     return filtered.length > 0 ? filtered : null;
                 };
 
-                // Convert pbgMode and sdMode arrays to JSON strings for storage
-                // Filter out invalid values (undefined, null, empty strings) before stringifying
-                const pbgModeValue = payload.pbgMode && Array.isArray(payload.pbgMode) && payload.pbgMode.length > 0
-                    ? (() => {
-                        const filtered = payload.pbgMode.filter(mode => mode && mode !== 'undefined' && String(mode).trim().length > 0);
-                        return filtered.length > 0 ? JSON.stringify(filtered) : null;
-                    })()
-                    : null;
-                const sdModeValue = payload.sdMode && Array.isArray(payload.sdMode) && payload.sdMode.length > 0
-                    ? (() => {
-                        const filtered = payload.sdMode.filter(mode => mode && mode !== 'undefined' && String(mode).trim().length > 0);
-                        return filtered.length > 0 ? JSON.stringify(filtered) : null;
-                    })()
-                    : null;
+                // ── When NO: nullify all YES-branch fields before insert ───────────
+                const isRejection = payload.teRecommendation === 'NO';
 
-                // Filter processingFeeModes, tenderFeeModes, and emdModes arrays
-                const processingFeeModesFiltered = filterArray(payload.processingFeeModes);
-                const tenderFeeModesFiltered = filterArray(payload.tenderFeeModes);
-                const emdModesFiltered = filterArray(payload.emdModes);
+                const pbgModeValue =
+                    !isRejection &&
+                    payload.pbgMode &&
+                    Array.isArray(payload.pbgMode) &&
+                    payload.pbgMode.length > 0
+                        ? (() => {
+                            const filtered = payload.pbgMode!.filter(
+                                (mode) =>
+                                    mode &&
+                                    mode !== 'undefined' &&
+                                    String(mode).trim().length > 0
+                            );
+                            return filtered.length > 0
+                                ? JSON.stringify(filtered)
+                                : null;
+                        })()
+                        : null;
 
-                // Insert main info sheet
-                const [infoSheet] = await tx
+                const sdModeValue =
+                    !isRejection &&
+                    payload.sdMode &&
+                    Array.isArray(payload.sdMode) &&
+                    payload.sdMode.length > 0
+                        ? (() => {
+                            const filtered = payload.sdMode!.filter(
+                                (mode) =>
+                                    mode &&
+                                    mode !== 'undefined' &&
+                                    String(mode).trim().length > 0
+                            );
+                            return filtered.length > 0
+                                ? JSON.stringify(filtered)
+                                : null;
+                        })()
+                        : null;
+
+                const processingFeeModesFiltered = isRejection
+                    ? null
+                    : filterArray(payload.processingFeeModes);
+                const tenderFeeModesFiltered = isRejection
+                    ? null
+                    : filterArray(payload.tenderFeeModes);
+                const emdModesFiltered = isRejection
+                    ? null
+                    : filterArray(payload.emdModes);
+
+                await tx
                     .insert(tenderInformation)
                     .values({
                         tenderId,
-                        tenderValue: payload.tenderValue?.toString() ?? null,
                         teRecommendation: payload.teRecommendation,
+
+                        // Rejection fields — always from payload
                         teRejectionReason: payload.teRejectionReason ?? null,
                         teRejectionRemarks: payload.teRejectionRemarks ?? null,
-                        processingFeeRequired: processingFeeRequiredValue,
-                        processingFeeAmount: payload.processingFeeAmount?.toString() ?? null,
+                        teRejectionProof: isRejection
+                            ? filterArray(payload.teRejectionProof)
+                            : null,
+
+                        // YES-branch fields — null when rejecting
+                        tenderValue: isRejection
+                            ? null
+                            : (payload.tenderValue?.toString() ?? null),
+                        oemExperience: isRejection
+                            ? null
+                            : (payload.oemExperience ?? null),
+                        processingFeeRequired: isRejection
+                            ? null
+                            : (payload.processingFeeRequired
+                                ? String(payload.processingFeeRequired).trim()
+                                : null),
+                        processingFeeAmount: isRejection
+                            ? null
+                            : (payload.processingFeeAmount?.toString() ?? null),
                         processingFeeMode: processingFeeModesFiltered,
-                        tenderFeeRequired: tenderFeeRequiredValue,
-                        tenderFeeAmount: payload.tenderFeeAmount?.toString() ?? null,
+                        tenderFeeRequired: isRejection
+                            ? null
+                            : (payload.tenderFeeRequired
+                                ? String(payload.tenderFeeRequired).trim()
+                                : null),
+                        tenderFeeAmount: isRejection
+                            ? null
+                            : (payload.tenderFeeAmount?.toString() ?? null),
                         tenderFeeMode: tenderFeeModesFiltered,
-                        emdRequired: emdRequiredValue,
-                        emdAmount: payload.emdAmount?.toString() ?? null,
+                        emdRequired: isRejection
+                            ? null
+                            : (payload.emdRequired
+                                ? String(payload.emdRequired).trim()
+                                : null),
+                        emdAmount: isRejection
+                            ? null
+                            : (payload.emdAmount?.toString() ?? null),
                         emdMode: emdModesFiltered,
-                        reverseAuctionApplicable: reverseAuctionApplicableValue,
-                        paymentTermsSupply: payload.paymentTermsSupply ?? null,
-                        paymentTermsInstallation: payload.paymentTermsInstallation ?? null,
-                        bidValidityDays: payload.bidValidityDays ?? null,
-                        commercialEvaluation: payload.commercialEvaluation ?? null,
-                        mafRequired: mafRequiredValue,
-                        deliveryTimeSupply: payload.deliveryTimeSupply ?? null,
-                        deliveryTimeInstallationInclusive:
-                            payload.deliveryTimeInstallationInclusive ?? false,
-                        deliveryTimeInstallationDays:
-                            payload.deliveryTimeInstallationDays ?? null,
-                        pbgRequired: pbgRequiredValue,
+                        reverseAuctionApplicable: isRejection
+                            ? null
+                            : (payload.reverseAuctionApplicable
+                                ? String(payload.reverseAuctionApplicable).trim()
+                                : null),
+                        paymentTermsSupply: isRejection
+                            ? null
+                            : (payload.paymentTermsSupply ?? null),
+                        paymentTermsInstallation: isRejection
+                            ? null
+                            : (payload.paymentTermsInstallation ?? null),
+                        bidValidityDays: isRejection
+                            ? null
+                            : (payload.bidValidityDays ?? null),
+                        commercialEvaluation: isRejection
+                            ? null
+                            : (payload.commercialEvaluation ?? null),
+                        mafRequired: isRejection
+                            ? null
+                            : (payload.mafRequired
+                                ? String(payload.mafRequired).trim()
+                                : null),
+                        deliveryTimeSupply: isRejection
+                            ? null
+                            : (payload.deliveryTimeSupply ?? null),
+                        deliveryTimeInstallationInclusive: isRejection
+                            ? false
+                            : (payload.deliveryTimeInstallationInclusive ?? false),
+                        deliveryTimeInstallationDays: isRejection
+                            ? null
+                            : (payload.deliveryTimeInstallationDays ?? null),
+                        pbgRequired: isRejection
+                            ? null
+                            : (payload.pbgRequired
+                                ? String(payload.pbgRequired).trim()
+                                : null),
                         pbgMode: pbgModeValue,
-                        pbgPercentage: payload.pbgPercentage?.toString() ?? null,
-                        pbgDurationMonths: payload.pbgDurationMonths ?? null,
-                        sdRequired: sdRequiredValue,
+                        pbgPercentage: isRejection
+                            ? null
+                            : (payload.pbgPercentage?.toString() ?? null),
+                        pbgDurationMonths: isRejection
+                            ? null
+                            : (payload.pbgDurationMonths ?? null),
+                        sdRequired: isRejection
+                            ? null
+                            : (payload.sdRequired
+                                ? String(payload.sdRequired).trim()
+                                : null),
                         sdMode: sdModeValue,
-                        sdPercentage: payload.sdPercentage?.toString() ?? null,
-                        sdDurationMonths: payload.sdDurationMonths ?? null,
-                        ldRequired: ldRequiredValue,
-                        ldPercentagePerWeek: payload.ldPercentagePerWeek?.toString() ?? null,
-                        maxLdPercentage: payload.maxLdPercentage?.toString() ?? null,
-                        physicalDocsRequired: physicalDocsRequiredValue,
-                        physicalDocsDeadline: payload.physicalDocsDeadline ?? null,
-                        techEligibilityAge: payload.techEligibilityAge ?? null,
-                        workValueType: payload.workValueType ?? null,
-                        orderValue1: payload.orderValue1?.toString() ?? null,
-                        orderValue2: payload.orderValue2?.toString() ?? null,
-                        orderValue3: payload.orderValue3?.toString() ?? null,
-                        customEligibilityCriteria: payload.customEligibilityCriteria ?? null,
-                        avgAnnualTurnoverType: payload.avgAnnualTurnoverType ?? null,
-                        avgAnnualTurnoverValue:
-                            payload.avgAnnualTurnoverValue?.toString() ?? null,
-                        workingCapitalType: payload.workingCapitalType ?? null,
-                        workingCapitalValue: payload.workingCapitalValue?.toString() ?? null,
-                        solvencyCertificateType: payload.solvencyCertificateType ?? null,
-                        solvencyCertificateValue:
-                            payload.solvencyCertificateValue?.toString() ?? null,
-                        netWorthType: payload.netWorthType ?? null,
-                        netWorthValue: payload.netWorthValue?.toString() ?? null,
-                        courierAddress: payload.courierAddress ?? null,
-                        teFinalRemark: payload.teFinalRemark ?? null,
-                        teRejectionProof: filterArray(payload.teRejectionProof),
-                        oemExperience: payload.oemExperience ?? null,
+                        sdPercentage: isRejection
+                            ? null
+                            : (payload.sdPercentage?.toString() ?? null),
+                        sdDurationMonths: isRejection
+                            ? null
+                            : (payload.sdDurationMonths ?? null),
+                        ldRequired: isRejection
+                            ? null
+                            : (payload.ldRequired
+                                ? String(payload.ldRequired).trim()
+                                : null),
+                        ldPercentagePerWeek: isRejection
+                            ? null
+                            : (payload.ldPercentagePerWeek?.toString() ?? null),
+                        maxLdPercentage: isRejection
+                            ? null
+                            : (payload.maxLdPercentage?.toString() ?? null),
+                        physicalDocsRequired: isRejection
+                            ? null
+                            : (payload.physicalDocsRequired
+                                ? String(payload.physicalDocsRequired).trim()
+                                : null),
+                        physicalDocsDeadline: isRejection
+                            ? null
+                            : (payload.physicalDocsDeadline ?? null),
+                        physicalDocType: isRejection
+                            ? null
+                            : (payload.physicalDocType ?? null),
+                        techEligibilityAge: isRejection
+                            ? null
+                            : (payload.techEligibilityAge ?? null),
+                        workValueType: isRejection
+                            ? null
+                            : (payload.workValueType ?? null),
+                        orderValue1: isRejection
+                            ? null
+                            : (payload.orderValue1?.toString() ?? null),
+                        orderValue2: isRejection
+                            ? null
+                            : (payload.orderValue2?.toString() ?? null),
+                        orderValue3: isRejection
+                            ? null
+                            : (payload.orderValue3?.toString() ?? null),
+                        customEligibilityCriteria: isRejection
+                            ? null
+                            : (payload.customEligibilityCriteria ?? null),
+                        avgAnnualTurnoverType: isRejection
+                            ? null
+                            : (payload.avgAnnualTurnoverType ?? null),
+                        avgAnnualTurnoverValue: isRejection
+                            ? null
+                            : (payload.avgAnnualTurnoverValue?.toString() ?? null),
+                        workingCapitalType: isRejection
+                            ? null
+                            : (payload.workingCapitalType ?? null),
+                        workingCapitalValue: isRejection
+                            ? null
+                            : (payload.workingCapitalValue?.toString() ?? null),
+                        solvencyCertificateType: isRejection
+                            ? null
+                            : (payload.solvencyCertificateType ?? null),
+                        solvencyCertificateValue: isRejection
+                            ? null
+                            : (payload.solvencyCertificateValue?.toString() ??
+                                null),
+                        netWorthType: isRejection
+                            ? null
+                            : (payload.netWorthType ?? null),
+                        netWorthValue: isRejection
+                            ? null
+                            : (payload.netWorthValue?.toString() ?? null),
+                        courierAddress: isRejection
+                            ? null
+                            : (payload.courierAddress ?? null),
+                        teFinalRemark: isRejection
+                            ? null
+                            : (payload.teFinalRemark ?? null),
                     })
                     .returning();
 
-                // Insert clients
-                const clients = payload.clients ?? [];
+                // Clients only relevant when recommending
+                const clients = isRejection ? [] : (payload.clients ?? []);
                 if (clients.length > 0) {
                     await tx.insert(tenderClients).values(
                         clients.map((client) => ({
@@ -403,66 +530,69 @@ export class TenderInfoSheetsService {
                     );
                 }
 
-                // Insert technical documents
-                const technicalDocs = payload.technicalWorkOrders ?? [];
-                if (technicalDocs.length > 0) {
-                    await tx.insert(tenderTechnicalDocuments).values(
-                        technicalDocs.map((docName) => ({
-                            tenderId,
-                            documentName: docName,
-                        }))
-                    );
+                // Technical & financial documents only relevant when recommending
+                if (!isRejection) {
+                    const technicalDocs = payload.technicalWorkOrders ?? [];
+                    if (technicalDocs.length > 0) {
+                        await tx.insert(tenderTechnicalDocuments).values(
+                            technicalDocs.map((docName) => ({
+                                tenderId,
+                                documentName: docName,
+                            }))
+                        );
+                    }
+
+                    const financialDocs = payload.commercialDocuments ?? [];
+                    if (financialDocs.length > 0) {
+                        await tx.insert(tenderFinancialDocuments).values(
+                            financialDocs.map((docName) => ({
+                                tenderId,
+                                documentName: docName,
+                            }))
+                        );
+                    }
                 }
 
-                // Insert financial documents
-                const financialDocs = payload.commercialDocuments ?? [];
-                if (financialDocs.length > 0) {
-                    await tx.insert(tenderFinancialDocuments).values(
-                        financialDocs.map((docName) => ({
-                            tenderId,
-                            documentName: docName,
-                        }))
-                    );
-                }
-
-                // Update tender status
                 await tx
                     .update(tenderInfos)
                     .set({ status: newStatus, updatedAt: new Date() })
                     .where(eq(tenderInfos.id, tenderId));
 
-                // Track status change
                 await this.tenderStatusHistoryService.trackStatusChange(
                     tenderId,
                     newStatus,
                     changedBy,
                     prevStatus,
-                    'Tender info sheet filled',
+                    isRejection
+                        ? 'Tender info sheet filled (not recommended)'
+                        : 'Tender info sheet filled',
                     tx
                 );
             });
 
-            const result = await this.findByTenderId(tenderId) as TenderInfoSheetWithRelations;
+            const result = (await this.findByTenderId(
+                tenderId
+            )) as TenderInfoSheetWithRelations;
 
-            // TIMER TRANSITION: Stop tender_info_sheet timer and start tender_approval timer
+            // Timer transition (unchanged)
             try {
-                this.logger.log(`Transitioning timers for tender ${tenderId}`);
-
-                // 1. Stop the tender_info_sheet timer
+                this.logger.log(
+                    `Transitioning timers for tender ${tenderId}`
+                );
                 try {
                     await this.timersService.stopTimer({
                         entityType: 'TENDER',
                         entityId: tenderId,
                         stage: 'tender_info_sheet',
                         userId: changedBy,
-                        reason: 'Tender info sheet completed'
+                        reason: 'Tender info sheet completed',
                     });
-                    this.logger.log(`Successfully stopped tender_info_sheet timer for tender ${tenderId}`);
                 } catch (error) {
-                    this.logger.warn(`Failed to stop tender_info_sheet timer for tender ${tenderId}:`, error);
+                    this.logger.warn(
+                        `Failed to stop tender_info_sheet timer for tender ${tenderId}:`,
+                        error
+                    );
                 }
-
-                // 2. Start the tender_approval timer
                 try {
                     await this.timersService.startTimer({
                         entityType: 'TENDER',
@@ -471,91 +601,27 @@ export class TenderInfoSheetsService {
                         userId: changedBy,
                         timerConfig: {
                             type: 'FIXED_DURATION',
-                            durationHours: 24
-                        }
+                            durationHours: 24,
+                        },
                     });
-                    this.logger.log(`Successfully started tender_approval timer for tender ${tenderId}`);
                 } catch (error) {
-                    this.logger.warn(`Failed to start tender_approval timer for tender ${tenderId}:`, error);
+                    this.logger.warn(
+                        `Failed to start tender_approval timer for tender ${tenderId}:`,
+                        error
+                    );
                 }
-
-                this.logger.log(`Successfully transitioned timers for tender ${tenderId}`);
             } catch (error) {
-                this.logger.error(`Failed to transition timers for tender ${tenderId}:`, error);
-                // Don't fail the entire operation if timer transition fails
-            }
-
-            // Send email notification
-            await this.sendInfoSheetFilledEmail(tenderId, result, changedBy);
-
-            return result;
-        } catch (error: any) {
-            // Handle database constraint errors
-            if (error?.cause?.code === '22001') {
-                // PostgreSQL error code for "value too long for type"
-                const message = error?.cause?.message || error?.message || '';
-
-                // Log the full error structure for debugging
-                this.logger.error(`Database constraint error - Full error object:`, JSON.stringify(error, null, 2));
-                this.logger.error(`Error message: ${message}`);
-
-                // Validate YES/NO fields and find the problematic one
-                const yesNoFields = {
-                    processingFeeRequired: payload.processingFeeRequired,
-                    tenderFeeRequired: payload.tenderFeeRequired,
-                    emdRequired: payload.emdRequired,
-                    pbgRequired: payload.pbgRequired,
-                    sdRequired: payload.sdRequired,
-                    ldRequired: payload.ldRequired,
-                    physicalDocsRequired: payload.physicalDocsRequired,
-                    reverseAuctionApplicable: payload.reverseAuctionApplicable,
-                    oemExperience: payload.oemExperience,
-                };
-
-                // Check each field for invalid values
-                const invalidFields: string[] = [];
-                for (const [fieldName, value] of Object.entries(yesNoFields)) {
-                    if (value !== null && value !== undefined) {
-                        const strValue = String(value);
-                        if (strValue.length > 5) {
-                            invalidFields.push(`${fieldName}="${strValue}" (length: ${strValue.length})`);
-                        } else if (strValue !== 'YES' && strValue !== 'NO' && strValue !== 'EXEMPT') {
-                            invalidFields.push(`${fieldName}="${strValue}"`);
-                        }
-                    }
-                }
-
-                this.logger.error(`YES/NO field values:`, JSON.stringify(yesNoFields));
-                if (invalidFields.length > 0) {
-                    this.logger.error(`Invalid fields detected: ${invalidFields.join(', ')}`);
-                }
-
-                if (message.includes('character varying(5)')) {
-                    const errorMsg = invalidFields.length > 0
-                        ? `Invalid YES/NO field values detected: ${invalidFields.join(', ')}. Please ensure YES/NO fields contain only "YES" or "NO".`
-                        : `One or more YES/NO fields have invalid values. Please ensure YES/NO fields contain only "YES" or "NO". Original error: ${message}`;
-                    throw new BadRequestException(errorMsg);
-                }
-                throw new BadRequestException(
-                    `Invalid data: ${message.includes('too long') ? 'One or more values exceed the maximum length allowed. ' : ''}${message}`
+                this.logger.error(
+                    `Failed to transition timers for tender ${tenderId}:`,
+                    error
                 );
             }
 
-            // Handle other database errors
-            if (error?.code === '23505') {
-                throw new BadRequestException('A record with this information already exists.');
-            }
+            // await this.sendInfoSheetFilledEmail(tenderId, result, changedBy);
 
-            // Re-throw known exceptions
-            if (error instanceof BadRequestException || error instanceof NotFoundException) {
-                throw error;
-            }
-
-            // Log and throw generic error for unknown cases
-            console.error('Failed to create info sheet:', error);
-            throw new InternalServerErrorException(
-                'Failed to save tender information. Please check your input and try again.'
-            );
+            return result;
+        } catch (error: any) {
+            this._handleDbError(error, payload);
         }
     }
 
@@ -564,11 +630,12 @@ export class TenderInfoSheetsService {
         payload: TenderInfoSheetPayload,
         changedBy: number
     ): Promise<TenderInfoSheetWithRelations> {
-        // Validate tender exists
         await this.tenderInfosService.validateExists(tenderId);
 
-        // Validate YES/NO fields before database insertion
-        this.validateYesNoFields(payload);
+        // Only validate YES/NO constraints when recommending
+        if (payload.teRecommendation === 'YES') {
+            this.validateYesNoFields(payload);
+        }
 
         const existing = await this.findByTenderId(tenderId);
         if (!existing) {
@@ -577,107 +644,259 @@ export class TenderInfoSheetsService {
             );
         }
 
-        // Get tender to check approval status
         const tender = await this.tenderInfosService.findById(tenderId);
         const isApproved = tender?.tlStatus === 1 || tender?.tlStatus === 2;
-        // 1 = approved, 2 = rejected (both mean approval process completed)
 
-        // Update main info sheet
         try {
             await this.db.transaction(async (tx) => {
-                // Helper function to filter invalid values from arrays
-                const filterArray = (arr: string[] | null | undefined): string[] | null => {
-                    if (!arr || !Array.isArray(arr) || arr.length === 0) return null;
-                    const filtered = arr.filter(mode => mode && mode !== 'undefined' && String(mode).trim().length > 0);
+                const filterArray = (
+                    arr: string[] | null | undefined
+                ): string[] | null => {
+                    if (!arr || !Array.isArray(arr) || arr.length === 0)
+                        return null;
+                    const filtered = arr.filter(
+                        (mode) =>
+                            mode &&
+                            mode !== 'undefined' &&
+                            String(mode).trim().length > 0
+                    );
                     return filtered.length > 0 ? filtered : null;
                 };
 
-                // Convert pbgMode and sdMode arrays to JSON strings for storage
-                // Filter out invalid values (undefined, null, empty strings) before stringifying
-                const pbgModeValue = payload.pbgMode && Array.isArray(payload.pbgMode) && payload.pbgMode.length > 0
-                    ? (() => {
-                        const filtered = payload.pbgMode.filter(mode => mode && mode !== 'undefined' && String(mode).trim().length > 0);
-                        return filtered.length > 0 ? JSON.stringify(filtered) : null;
-                    })()
-                    : null;
-                const sdModeValue = payload.sdMode && Array.isArray(payload.sdMode) && payload.sdMode.length > 0
-                    ? (() => {
-                        const filtered = payload.sdMode.filter(mode => mode && mode !== 'undefined' && String(mode).trim().length > 0);
-                        return filtered.length > 0 ? JSON.stringify(filtered) : null;
-                    })()
-                    : null;
+                const isRejection = payload.teRecommendation === 'NO';
 
-                // Filter processingFeeModes, tenderFeeModes, and emdModes arrays
-                const processingFeeModesFiltered = filterArray(payload.processingFeeModes);
-                const tenderFeeModesFiltered = filterArray(payload.tenderFeeModes);
-                const emdModesFiltered = filterArray(payload.emdModes);
+                const pbgModeValue =
+                    !isRejection &&
+                    payload.pbgMode &&
+                    Array.isArray(payload.pbgMode) &&
+                    payload.pbgMode.length > 0
+                        ? (() => {
+                            const filtered = payload.pbgMode!.filter(
+                                (mode) =>
+                                    mode &&
+                                    mode !== 'undefined' &&
+                                    String(mode).trim().length > 0
+                            );
+                            return filtered.length > 0
+                                ? JSON.stringify(filtered)
+                                : null;
+                        })()
+                        : null;
+
+                const sdModeValue =
+                    !isRejection &&
+                    payload.sdMode &&
+                    Array.isArray(payload.sdMode) &&
+                    payload.sdMode.length > 0
+                        ? (() => {
+                            const filtered = payload.sdMode!.filter(
+                                (mode) =>
+                                    mode &&
+                                    mode !== 'undefined' &&
+                                    String(mode).trim().length > 0
+                            );
+                            return filtered.length > 0
+                                ? JSON.stringify(filtered)
+                                : null;
+                        })()
+                        : null;
+
+                const processingFeeModesFiltered = isRejection
+                    ? null
+                    : filterArray(payload.processingFeeModes);
+                const tenderFeeModesFiltered = isRejection
+                    ? null
+                    : filterArray(payload.tenderFeeModes);
+                const emdModesFiltered = isRejection
+                    ? null
+                    : filterArray(payload.emdModes);
 
                 await tx
                     .update(tenderInformation)
                     .set({
-                        tenderValue: payload.tenderValue?.toString() ?? null,
                         teRecommendation: payload.teRecommendation,
                         teRejectionReason: payload.teRejectionReason ?? null,
                         teRejectionRemarks: payload.teRejectionRemarks ?? null,
-                        processingFeeRequired: payload.processingFeeRequired ? String(payload.processingFeeRequired).trim() : null,
-                        processingFeeAmount: payload.processingFeeAmount?.toString() ?? null,
+                        teRejectionProof: isRejection
+                            ? filterArray(payload.teRejectionProof)
+                            : null,
+
+                        tenderValue: isRejection
+                            ? null
+                            : (payload.tenderValue?.toString() ?? null),
+                        oemExperience: isRejection
+                            ? null
+                            : (payload.oemExperience ?? null),
+                        processingFeeRequired: isRejection
+                            ? null
+                            : (payload.processingFeeRequired
+                                ? String(
+                                        payload.processingFeeRequired
+                                    ).trim()
+                                : null),
+                        processingFeeAmount: isRejection
+                            ? null
+                            : (payload.processingFeeAmount?.toString() ??
+                                null),
                         processingFeeMode: processingFeeModesFiltered,
-                        tenderFeeRequired: payload.tenderFeeRequired ? String(payload.tenderFeeRequired).trim() : null,
-                        tenderFeeAmount: payload.tenderFeeAmount?.toString() ?? null,
+                        tenderFeeRequired: isRejection
+                            ? null
+                            : (payload.tenderFeeRequired
+                                ? String(payload.tenderFeeRequired).trim()
+                                : null),
+                        tenderFeeAmount: isRejection
+                            ? null
+                            : (payload.tenderFeeAmount?.toString() ?? null),
                         tenderFeeMode: tenderFeeModesFiltered,
-                        emdRequired: payload.emdRequired ? String(payload.emdRequired).trim() : null,
-                        emdAmount: payload.emdAmount?.toString() ?? null,
+                        emdRequired: isRejection
+                            ? null
+                            : (payload.emdRequired
+                                ? String(payload.emdRequired).trim()
+                                : null),
+                        emdAmount: isRejection
+                            ? null
+                            : (payload.emdAmount?.toString() ?? null),
                         emdMode: emdModesFiltered,
-                        reverseAuctionApplicable: payload.reverseAuctionApplicable ? String(payload.reverseAuctionApplicable).trim() : null,
-                        paymentTermsSupply: payload.paymentTermsSupply ?? null,
-                        paymentTermsInstallation: payload.paymentTermsInstallation ?? null,
-                        bidValidityDays: payload.bidValidityDays ?? null,
-                        commercialEvaluation: payload.commercialEvaluation ?? null,
-                        mafRequired: payload.mafRequired ?? null,
-                        deliveryTimeSupply: payload.deliveryTimeSupply ?? null,
-                        deliveryTimeInstallationInclusive:
-                            payload.deliveryTimeInstallationInclusive ?? false,
-                        deliveryTimeInstallationDays:
-                            payload.deliveryTimeInstallationDays ?? null,
-                        pbgRequired: payload.pbgRequired ? String(payload.pbgRequired).trim() : null,
+                        reverseAuctionApplicable: isRejection
+                            ? null
+                            : (payload.reverseAuctionApplicable
+                                ? String(
+                                        payload.reverseAuctionApplicable
+                                    ).trim()
+                                : null),
+                        paymentTermsSupply: isRejection
+                            ? null
+                            : (payload.paymentTermsSupply ?? null),
+                        paymentTermsInstallation: isRejection
+                            ? null
+                            : (payload.paymentTermsInstallation ?? null),
+                        bidValidityDays: isRejection
+                            ? null
+                            : (payload.bidValidityDays ?? null),
+                        commercialEvaluation: isRejection
+                            ? null
+                            : (payload.commercialEvaluation ?? null),
+                        mafRequired: isRejection
+                            ? null
+                            : (payload.mafRequired
+                                ? String(payload.mafRequired).trim()
+                                : null),
+                        deliveryTimeSupply: isRejection
+                            ? null
+                            : (payload.deliveryTimeSupply ?? null),
+                        deliveryTimeInstallationInclusive: isRejection
+                            ? false
+                            : (payload.deliveryTimeInstallationInclusive ??
+                                false),
+                        deliveryTimeInstallationDays: isRejection
+                            ? null
+                            : (payload.deliveryTimeInstallationDays ?? null),
+                        pbgRequired: isRejection
+                            ? null
+                            : (payload.pbgRequired
+                                ? String(payload.pbgRequired).trim()
+                                : null),
                         pbgMode: pbgModeValue,
-                        pbgPercentage: payload.pbgPercentage?.toString() ?? null,
-                        pbgDurationMonths: payload.pbgDurationMonths ?? null,
-                        sdRequired: payload.sdRequired ? String(payload.sdRequired).trim() : null,
+                        pbgPercentage: isRejection
+                            ? null
+                            : (payload.pbgPercentage?.toString() ?? null),
+                        pbgDurationMonths: isRejection
+                            ? null
+                            : (payload.pbgDurationMonths ?? null),
+                        sdRequired: isRejection
+                            ? null
+                            : (payload.sdRequired
+                                ? String(payload.sdRequired).trim()
+                                : null),
                         sdMode: sdModeValue,
-                        sdPercentage: payload.sdPercentage?.toString() ?? null,
-                        sdDurationMonths: payload.sdDurationMonths ?? null,
-                        ldRequired: payload.ldRequired ? String(payload.ldRequired).trim() : null,
-                        ldPercentagePerWeek: payload.ldPercentagePerWeek?.toString() ?? null,
-                        maxLdPercentage: payload.maxLdPercentage?.toString() ?? null,
-                        physicalDocsRequired: payload.physicalDocsRequired ? String(payload.physicalDocsRequired).trim() : null,
-                        physicalDocsDeadline: payload.physicalDocsDeadline ?? null,
-                        techEligibilityAge: payload.techEligibilityAge ?? null,
-                        workValueType: payload.workValueType ?? null,
-                        orderValue1: payload.orderValue1?.toString() ?? null,
-                        orderValue2: payload.orderValue2?.toString() ?? null,
-                        orderValue3: payload.orderValue3?.toString() ?? null,
-                        customEligibilityCriteria: payload.customEligibilityCriteria ?? null,
-                        avgAnnualTurnoverType: payload.avgAnnualTurnoverType ?? null,
-                        avgAnnualTurnoverValue:
-                            payload.avgAnnualTurnoverValue?.toString() ?? null,
-                        workingCapitalType: payload.workingCapitalType ?? null,
-                        workingCapitalValue: payload.workingCapitalValue?.toString() ?? null,
-                        solvencyCertificateType: payload.solvencyCertificateType ?? null,
-                        solvencyCertificateValue:
-                            payload.solvencyCertificateValue?.toString() ?? null,
-                        netWorthType: payload.netWorthType ?? null,
-                        netWorthValue: payload.netWorthValue?.toString() ?? null,
-                        courierAddress: payload.courierAddress ?? null,
-                        teFinalRemark: payload.teFinalRemark ?? null,
-                        teRejectionProof: filterArray(payload.teRejectionProof),
-                        oemExperience: payload.oemExperience ?? null,
+                        sdPercentage: isRejection
+                            ? null
+                            : (payload.sdPercentage?.toString() ?? null),
+                        sdDurationMonths: isRejection
+                            ? null
+                            : (payload.sdDurationMonths ?? null),
+                        ldRequired: isRejection
+                            ? null
+                            : (payload.ldRequired
+                                ? String(payload.ldRequired).trim()
+                                : null),
+                        ldPercentagePerWeek: isRejection
+                            ? null
+                            : (payload.ldPercentagePerWeek?.toString() ??
+                                null),
+                        maxLdPercentage: isRejection
+                            ? null
+                            : (payload.maxLdPercentage?.toString() ?? null),
+                        physicalDocsRequired: isRejection
+                            ? null
+                            : (payload.physicalDocsRequired
+                                ? String(
+                                        payload.physicalDocsRequired
+                                    ).trim()
+                                : null),
+                        physicalDocsDeadline: isRejection
+                            ? null
+                            : (payload.physicalDocsDeadline ?? null),
+                        physicalDocType: isRejection
+                            ? null
+                            : (payload.physicalDocType ?? null),
+                        techEligibilityAge: isRejection
+                            ? null
+                            : (payload.techEligibilityAge ?? null),
+                        workValueType: isRejection
+                            ? null
+                            : (payload.workValueType ?? null),
+                        orderValue1: isRejection
+                            ? null
+                            : (payload.orderValue1?.toString() ?? null),
+                        orderValue2: isRejection
+                            ? null
+                            : (payload.orderValue2?.toString() ?? null),
+                        orderValue3: isRejection
+                            ? null
+                            : (payload.orderValue3?.toString() ?? null),
+                        customEligibilityCriteria: isRejection
+                            ? null
+                            : (payload.customEligibilityCriteria ?? null),
+                        avgAnnualTurnoverType: isRejection
+                            ? null
+                            : (payload.avgAnnualTurnoverType ?? null),
+                        avgAnnualTurnoverValue: isRejection
+                            ? null
+                            : (payload.avgAnnualTurnoverValue?.toString() ??
+                                null),
+                        workingCapitalType: isRejection
+                            ? null
+                            : (payload.workingCapitalType ?? null),
+                        workingCapitalValue: isRejection
+                            ? null
+                            : (payload.workingCapitalValue?.toString() ??
+                                null),
+                        solvencyCertificateType: isRejection
+                            ? null
+                            : (payload.solvencyCertificateType ?? null),
+                        solvencyCertificateValue: isRejection
+                            ? null
+                            : (payload.solvencyCertificateValue?.toString() ??
+                                null),
+                        netWorthType: isRejection
+                            ? null
+                            : (payload.netWorthType ?? null),
+                        netWorthValue: isRejection
+                            ? null
+                            : (payload.netWorthValue?.toString() ?? null),
+                        courierAddress: isRejection
+                            ? null
+                            : (payload.courierAddress ?? null),
+                        teFinalRemark: isRejection
+                            ? null
+                            : (payload.teFinalRemark ?? null),
                         updatedAt: new Date(),
                     })
                     .where(eq(tenderInformation.tenderId, tenderId));
 
-                // Update tenderInfo table's gstValues if tender is approved
-                if (isApproved && payload.tenderValue) {
+                // Update gstValues only when recommending and approved
+                if (!isRejection && isApproved && payload.tenderValue) {
                     await tx
                         .update(tenderInfos)
                         .set({
@@ -687,146 +906,97 @@ export class TenderInfoSheetsService {
                         .where(eq(tenderInfos.id, tenderId));
                 }
 
-                // Delete existing related records
+                // Delete existing related records (always, to clear stale data)
                 await Promise.all([
                     tx
                         .delete(tenderClients)
                         .where(eq(tenderClients.tenderId, tenderId)),
                     tx
                         .delete(tenderTechnicalDocuments)
-                        .where(eq(tenderTechnicalDocuments.tenderId, tenderId)),
+                        .where(
+                            eq(tenderTechnicalDocuments.tenderId, tenderId)
+                        ),
                     tx
                         .delete(tenderFinancialDocuments)
-                        .where(eq(tenderFinancialDocuments.tenderId, tenderId)),
+                        .where(
+                            eq(tenderFinancialDocuments.tenderId, tenderId)
+                        ),
                 ]);
 
-                // Insert updated related records
-                const clients = payload.clients ?? [];
-                if (clients.length > 0) {
-                    await tx.insert(tenderClients).values(
-                        clients.map((client) => ({
-                            tenderId,
-                            clientName: client.clientName,
-                            clientDesignation: client.clientDesignation ?? null,
-                            clientMobile: client.clientMobile ?? null,
-                            clientEmail: client.clientEmail ?? null,
-                        }))
-                    );
-                }
+                // Re-insert related records only when recommending
+                if (!isRejection) {
+                    const clients = payload.clients ?? [];
+                    if (clients.length > 0) {
+                        await tx.insert(tenderClients).values(
+                            clients.map((client) => ({
+                                tenderId,
+                                clientName: client.clientName,
+                                clientDesignation:
+                                    client.clientDesignation ?? null,
+                                clientMobile: client.clientMobile ?? null,
+                                clientEmail: client.clientEmail ?? null,
+                            }))
+                        );
+                    }
 
-                const technicalDocs = payload.technicalWorkOrders ?? [];
-                if (technicalDocs.length > 0) {
-                    await tx.insert(tenderTechnicalDocuments).values(
-                        technicalDocs.map((docName) => ({
-                            tenderId,
-                            documentName: docName,
-                        }))
-                    );
-                }
+                    const technicalDocs = payload.technicalWorkOrders ?? [];
+                    if (technicalDocs.length > 0) {
+                        await tx.insert(tenderTechnicalDocuments).values(
+                            technicalDocs.map((docName) => ({
+                                tenderId,
+                                documentName: docName,
+                            }))
+                        );
+                    }
 
-                const financialDocs = payload.commercialDocuments ?? [];
-                if (financialDocs.length > 0) {
-                    await tx.insert(tenderFinancialDocuments).values(
-                        financialDocs.map((docName) => ({
-                            tenderId,
-                            documentName: docName,
-                        }))
-                    );
+                    const financialDocs = payload.commercialDocuments ?? [];
+                    if (financialDocs.length > 0) {
+                        await tx.insert(tenderFinancialDocuments).values(
+                            financialDocs.map((docName) => ({
+                                tenderId,
+                                documentName: docName,
+                            }))
+                        );
+                    }
                 }
             });
 
-            const result = await this.findByTenderId(tenderId) as TenderInfoSheetWithRelations;
+            const result = (await this.findByTenderId(
+                tenderId
+            )) as TenderInfoSheetWithRelations;
 
             const prevStatus = tender?.status ?? null;
             let newStatus = prevStatus ?? 2;
 
             if (prevStatus === 29) {
                 newStatus = 2;
-
                 await this.db
                     .update(tenderInfos)
                     .set({ status: newStatus, updatedAt: new Date() })
                     .where(eq(tenderInfos.id, tenderId));
             }
 
-            // Always track history
+            const isRejection = payload.teRecommendation === 'NO';
+
             await this.tenderStatusHistoryService.trackStatusChange(
                 tenderId,
                 newStatus,
                 changedBy,
                 prevStatus,
                 prevStatus === 29
-                    ? 'Tender info sheet re-filled (was incomplete)'
-                    : 'Tender info sheet updated',
+                    ? isRejection
+                        ? 'Tender info sheet re-filled (not recommended)'
+                        : 'Tender info sheet re-filled (was incomplete)'
+                    : isRejection
+                        ? 'Tender info sheet updated (not recommended)'
+                        : 'Tender info sheet updated',
             );
 
-            // Send email notification
-            await this.sendInfoSheetFilledEmail(tenderId, result, changedBy);
+            // await this.sendInfoSheetFilledEmail(tenderId, result, changedBy);
 
             return result;
         } catch (error: any) {
-            // Same error handling as create method
-            if (error?.cause?.code === '22001') {
-                const message = error?.cause?.message || error?.message || '';
-
-                // Log the full error structure for debugging
-                this.logger.error(`Database constraint error - Full error object:`, JSON.stringify(error, null, 2));
-                this.logger.error(`Error message: ${message}`);
-
-                // Validate YES/NO fields and find the problematic one
-                const yesNoFields = {
-                    processingFeeRequired: payload.processingFeeRequired,
-                    tenderFeeRequired: payload.tenderFeeRequired,
-                    emdRequired: payload.emdRequired,
-                    pbgRequired: payload.pbgRequired,
-                    sdRequired: payload.sdRequired,
-                    ldRequired: payload.ldRequired,
-                    physicalDocsRequired: payload.physicalDocsRequired,
-                    reverseAuctionApplicable: payload.reverseAuctionApplicable,
-                    oemExperience: payload.oemExperience,
-                };
-
-                // Check each field for invalid values
-                const invalidFields: string[] = [];
-                for (const [fieldName, value] of Object.entries(yesNoFields)) {
-                    if (value !== null && value !== undefined) {
-                        const strValue = String(value);
-                        if (strValue.length > 5) {
-                            invalidFields.push(`${fieldName}="${strValue}" (length: ${strValue.length})`);
-                        } else if (strValue !== 'YES' && strValue !== 'NO' && strValue !== 'EXEMPT') {
-                            invalidFields.push(`${fieldName}="${strValue}"`);
-                        }
-                    }
-                }
-
-                this.logger.error(`YES/NO field values:`, JSON.stringify(yesNoFields));
-                if (invalidFields.length > 0) {
-                    this.logger.error(`Invalid fields detected: ${invalidFields.join(', ')}`);
-                }
-
-                if (message.includes('character varying(5)')) {
-                    const errorMsg = invalidFields.length > 0
-                        ? `Invalid YES/NO field values detected: ${invalidFields.join(', ')}. Please ensure YES/NO fields contain only "YES" or "NO".`
-                        : `One or more YES/NO fields have invalid values. Please ensure YES/NO fields contain only "YES" or "NO". Original error: ${message}`;
-                    throw new BadRequestException(errorMsg);
-                }
-                throw new BadRequestException(
-                    `Invalid data: ${message.includes('too long') ? 'One or more values exceed the maximum length allowed. ' : ''}${message}`
-                );
-            }
-
-            if (error?.code === '23505') {
-                throw new BadRequestException('A record with this information already exists.');
-            }
-
-            if (error instanceof BadRequestException || error instanceof NotFoundException) {
-                throw error;
-            }
-
-            console.error('Failed to update info sheet:', error);
-            throw new InternalServerErrorException(
-                'Failed to update tender information. Please check your input and try again.'
-            );
+            this._handleDbError(error, payload);
         }
     }
 
@@ -1070,6 +1240,79 @@ export class TenderInfoSheetsService {
                     { type: 'role', role: 'Coordinator', teamId: tender.team },
                 ],
             }
+        );
+    }
+
+    /**
+     * Centralised DB error handler — eliminates duplication between
+     * create() and update().  Always throws, so callers don't need a
+     * return value.
+     */
+    private _handleDbError(error: any, payload: TenderInfoSheetPayload): never {
+        if (error?.cause?.code === '22001') {
+            const message = error?.cause?.message || error?.message || '';
+            this.logger.error(
+                `Database constraint error:`,
+                JSON.stringify(error, null, 2)
+            );
+
+            const yesNoFields = {
+                processingFeeRequired: payload.processingFeeRequired,
+                tenderFeeRequired: payload.tenderFeeRequired,
+                emdRequired: payload.emdRequired,
+                pbgRequired: payload.pbgRequired,
+                sdRequired: payload.sdRequired,
+                ldRequired: payload.ldRequired,
+                physicalDocsRequired: payload.physicalDocsRequired,
+                reverseAuctionApplicable: payload.reverseAuctionApplicable,
+                oemExperience: payload.oemExperience,
+            };
+
+            const invalidFields: string[] = [];
+            for (const [fieldName, value] of Object.entries(yesNoFields)) {
+                if (value !== null && value !== undefined) {
+                    const strValue = String(value);
+                    if (
+                        strValue.length > 5 ||
+                        (strValue !== 'YES' &&
+                            strValue !== 'NO' &&
+                            strValue !== 'EXEMPT')
+                    ) {
+                        invalidFields.push(`${fieldName}="${strValue}"`);
+                    }
+                }
+            }
+
+            if (message.includes('character varying(5)')) {
+                throw new BadRequestException(
+                    invalidFields.length > 0
+                        ? `Invalid YES/NO field values: ${invalidFields.join(', ')}.`
+                        : `One or more YES/NO fields have invalid values. Original error: ${message}`
+                );
+            }
+
+            throw new BadRequestException(
+                `Invalid data: ${message.includes('too long') ? 'One or more values exceed the maximum length. ' : ''}${message}`
+            );
+        }
+
+        if (error?.code === '23505') {
+            throw new BadRequestException(
+                'A record with this information already exists.'
+            );
+        }
+
+        if (
+            error instanceof BadRequestException ||
+            error instanceof NotFoundException ||
+            error instanceof ConflictException
+        ) {
+            throw error;
+        }
+
+        this.logger.error('Unexpected info sheet error:', error);
+        throw new InternalServerErrorException(
+            'Failed to save tender information. Please check your input and try again.'
         );
     }
 }

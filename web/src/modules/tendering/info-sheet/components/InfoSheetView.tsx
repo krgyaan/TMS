@@ -3,7 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table"
-import { FileText } from "lucide-react"
+import {
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+} from "@/components/ui/accordion"
+import { FileText, CheckCircle2, AlertTriangle } from "lucide-react"
 import type { TenderInfoSheet } from "@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types"
 import { physicalDocTypeOptions } from "@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types"
 import { formatDateTime } from "@/hooks/useFormatedDate"
@@ -22,7 +28,12 @@ const formatValue = (value?: string | number | null) => {
 }
 
 function toTitleCase(str: string | number) {
-    return str.toString().toLowerCase().split(" ").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
+    return str
+        .toString()
+        .toLowerCase()
+        .split(" ")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ")
 }
 
 const formatYesNo = (value?: string | null) => {
@@ -31,40 +42,729 @@ const formatYesNo = (value?: string | null) => {
 }
 
 const formatPercentage = (value?: number | null) => {
-    if (value === null || value === undefined) return "—"
+    if (value === null || value === undefined || isNaN(value)) return "—"
     return `${value}%`
 }
 
 const getOptionLabel = (
     options: Array<{ value: string; label: string }> | undefined,
-    raw: string | number | null | undefined,
+    raw: string | number | null | undefined
 ) => {
     if (raw === null || raw === undefined) return "—"
     const rawStr = String(raw).trim()
     if (!rawStr) return "—"
-
-    if (!options || options.length === 0) {
-        return rawStr
-    }
-
+    if (!options || options.length === 0) return rawStr
     const match = options.find((option) => option.value === rawStr)
-    if (match) {
-        return match.label
-    }
-
-    // If it's already a descriptive string, keep it as-is
-    if (isNaN(Number(rawStr))) {
-        return rawStr
-    }
-
-    // Fallback to the raw id string when no label is found
+    if (match) return match.label
+    if (isNaN(Number(rawStr))) return rawStr
     return rawStr
 }
 
-export const InfoSheetView = ({
-    infoSheet,
-    isLoading,
-}: InfoSheetViewProps) => {
+/**
+ * All the "YES-branch" fields rendered in the exact same
+ * section order and field placement as the old view page.
+ */
+const AllFieldsTable = ({ infoSheet }: { infoSheet: TenderInfoSheet }) => {
+    return (
+        <Table>
+            <TableBody>
+                {/* TE Final Remark */}
+                <TableRow className="hover:bg-muted/30 transition-colors">
+                    <TableCell className="text-sm font-medium text-muted-foreground">
+                        TE Final Remark
+                    </TableCell>
+                    <TableCell
+                        className="text-sm whitespace-normal [overflow-wrap:anywhere]"
+                        colSpan={3}
+                    >
+                        {infoSheet.teFinalRemark || "—"}
+                    </TableCell>
+                </TableRow>
+                <TableRow className="hover:bg-muted/30 transition-colors">
+                    <TableCell className="text-sm font-medium text-muted-foreground">
+                        MAF Required
+                    </TableCell>
+                    <TableCell className="text-sm">
+                        {toTitleCase(
+                            formatValue(infoSheet.mafRequired?.replaceAll("_", " "))
+                        )}
+                    </TableCell>
+                </TableRow>
+
+                {/* Financial Terms */}
+                <TableRow className="bg-muted/50">
+                    <TableCell colSpan={4} className="font-semibold text-sm">
+                        Financial Terms
+                    </TableCell>
+                </TableRow>
+                {/* Processing Fee */}
+                {(infoSheet.processingFeeRequired ||
+                    infoSheet.processingFeeAmount) && (
+                    <>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Processing Fee Required
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatYesNo(infoSheet.processingFeeRequired)}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Processing Fee Amount
+                            </TableCell>
+                            <TableCell className="text-sm font-semibold">
+                                {infoSheet.processingFeeAmount
+                                    ? formatINR(Number(infoSheet.processingFeeAmount))
+                                    : "—"}
+                            </TableCell>
+                        </TableRow>
+                        {infoSheet.processingFeeMode && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Processing Fee Mode
+                                </TableCell>
+                                <TableCell className="text-sm" colSpan={3}>
+                                    {infoSheet.processingFeeMode.join(", ")}
+                                </TableCell>
+                            </TableRow>
+                        )}
+                    </>
+                )}
+                <TableRow className="hover:bg-muted/30 transition-colors">
+                    <TableCell className="text-sm font-medium text-muted-foreground">
+                        Tender Fee Required
+                    </TableCell>
+                    <TableCell className="text-sm">
+                        {formatYesNo(infoSheet.tenderFeeRequired)}
+                    </TableCell>
+                    <TableCell className="text-sm font-medium text-muted-foreground">
+                        Tender Fee Amount
+                    </TableCell>
+                    <TableCell className="text-sm font-semibold">
+                        {infoSheet.tenderFeeAmount
+                            ? formatINR(Number(infoSheet.tenderFeeAmount))
+                            : "—"}
+                    </TableCell>
+                </TableRow>
+                {infoSheet.tenderFeeMode && (
+                    <TableRow className="hover:bg-muted/30 transition-colors">
+                        <TableCell className="text-sm font-medium text-muted-foreground">
+                            Tender Fee Mode
+                        </TableCell>
+                        <TableCell className="text-sm" colSpan={3}>
+                            {infoSheet.tenderFeeMode.join(", ")}
+                        </TableCell>
+                    </TableRow>
+                )}
+                <TableRow className="hover:bg-muted/30 transition-colors">
+                    <TableCell className="text-sm font-medium text-muted-foreground">
+                        EMD Required
+                    </TableCell>
+                    <TableCell className="text-sm">
+                        {formatYesNo(infoSheet.emdRequired)}
+                    </TableCell>
+                    <TableCell className="text-sm font-medium text-muted-foreground">
+                        EMD Amount
+                    </TableCell>
+                    <TableCell className="text-sm font-semibold">
+                        {infoSheet.emdAmount
+                            ? formatINR(Number(infoSheet.emdAmount))
+                            : "—"}
+                    </TableCell>
+                </TableRow>
+                {infoSheet.emdMode && (
+                    <TableRow className="hover:bg-muted/30 transition-colors">
+                        <TableCell className="text-sm font-medium text-muted-foreground">
+                            EMD Mode
+                        </TableCell>
+                        <TableCell className="text-sm" colSpan={3}>
+                            {infoSheet.emdMode.join(", ")}
+                        </TableCell>
+                    </TableRow>
+                )}
+
+                {/* Payment Terms */}
+                <TableRow className="bg-muted/50">
+                    <TableCell colSpan={4} className="font-semibold text-sm">
+                        Payment Terms
+                    </TableCell>
+                </TableRow>
+                <TableRow className="hover:bg-muted/30 transition-colors">
+                    <TableCell className="text-sm font-medium text-muted-foreground">
+                        Payment Terms Supply (%)
+                    </TableCell>
+                    <TableCell className="text-sm">
+                        {formatValue(infoSheet.paymentTermsSupply)}
+                    </TableCell>
+                    <TableCell className="text-sm font-medium text-muted-foreground">
+                        Payment Terms Installation (%)
+                    </TableCell>
+                    <TableCell className="text-sm">
+                        {formatValue(infoSheet.paymentTermsInstallation)}
+                    </TableCell>
+                </TableRow>
+
+                {/* Commercial Evaluation */}
+                {(infoSheet.commercialEvaluation || infoSheet.mafRequired) && (
+                    <>
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                Evaluation
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Commercial Evaluation Type
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {toTitleCase(
+                                    formatValue(
+                                        infoSheet.commercialEvaluation?.replaceAll("_", " ")
+                                    )
+                                )}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Reverse Auction Applicable
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatYesNo(infoSheet.reverseAuctionApplicable)}
+                            </TableCell>
+                        </TableRow>
+                    </>
+                )}
+
+                {/* Delivery Terms */}
+                {(infoSheet.deliveryTimeSupply ||
+                    infoSheet.deliveryTimeInstallationDays) && (
+                    <>
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                Delivery Terms
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Delivery Time Supply (Days)
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {formatValue(infoSheet.deliveryTimeSupply)}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Installation Inclusive
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {infoSheet.deliveryTimeInstallationInclusive
+                                    ? "Yes"
+                                    : "No"}
+                            </TableCell>
+                        </TableRow>
+                        {infoSheet.deliveryTimeInstallationDays && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Delivery Time Installation (Days)
+                                </TableCell>
+                                <TableCell className="text-sm" colSpan={3}>
+                                    {formatValue(
+                                        infoSheet.deliveryTimeInstallationDays
+                                    )}
+                                </TableCell>
+                            </TableRow>
+                        )}
+                    </>
+                )}
+
+                {/* PBG & Security Deposit */}
+                <TableRow className="bg-muted/50">
+                    <TableCell colSpan={4} className="font-semibold text-sm">
+                        PBG & Security Deposit
+                    </TableCell>
+                </TableRow>
+                <TableRow className="hover:bg-muted/30 transition-colors">
+                    <TableCell className="text-sm font-medium text-muted-foreground">
+                        PBG Required
+                    </TableCell>
+                    <TableCell className="text-sm">
+                        {formatYesNo(infoSheet.pbgRequired)}
+                    </TableCell>
+                    <TableCell className="text-sm font-medium text-muted-foreground">
+                        PBG Mode
+                    </TableCell>
+                    <TableCell className="text-sm">
+                        {(() => {
+                            if (!infoSheet.pbgMode) return "N/A"
+                            if (Array.isArray(infoSheet.pbgMode)) {
+                                return infoSheet.pbgMode.join(", ")
+                            }
+                            try {
+                                const parsed = JSON.parse(infoSheet.pbgMode)
+                                return Array.isArray(parsed)
+                                    ? parsed.join(", ")
+                                    : infoSheet.pbgMode
+                            } catch {
+                                return infoSheet.pbgMode
+                            }
+                        })()}
+                    </TableCell>
+                </TableRow>
+                <TableRow className="hover:bg-muted/30 transition-colors">
+                    <TableCell className="text-sm font-medium text-muted-foreground">
+                        PBG Percentage
+                    </TableCell>
+                    <TableCell className="text-sm">
+                        {formatPercentage(Number(infoSheet.pbgPercentage))}
+                    </TableCell>
+                    <TableCell className="text-sm font-medium text-muted-foreground">
+                        PBG Duration (Months)
+                    </TableCell>
+                    <TableCell className="text-sm">
+                        {formatValue(infoSheet.pbgDurationMonths)}
+                    </TableCell>
+                </TableRow>
+                <TableRow className="hover:bg-muted/30 transition-colors">
+                    <TableCell className="text-sm font-medium text-muted-foreground">
+                        SD Required
+                    </TableCell>
+                    <TableCell className="text-sm">
+                        {formatYesNo(infoSheet.sdRequired)}
+                    </TableCell>
+                    <TableCell className="text-sm font-medium text-muted-foreground">
+                        Security Deposit Mode
+                    </TableCell>
+                    <TableCell className="text-sm">
+                        {infoSheet.sdMode}
+                    </TableCell>
+                </TableRow>
+                <TableRow className="hover:bg-muted/30 transition-colors">
+                    <TableCell className="text-sm font-medium text-muted-foreground">
+                        Security Deposit %
+                    </TableCell>
+                    <TableCell className="text-sm">
+                        {formatPercentage(Number(infoSheet.sdPercentage))}
+                    </TableCell>
+                    <TableCell className="text-sm font-medium text-muted-foreground">
+                        SD Duration (Months)
+                    </TableCell>
+                    <TableCell className="text-sm">
+                        {formatValue(infoSheet.sdDurationMonths)}
+                    </TableCell>
+                </TableRow>
+
+                {/* Liquidated Damages */}
+                <TableRow className="bg-muted/50">
+                    <TableCell colSpan={4} className="font-semibold text-sm">
+                        Liquidated Damages
+                    </TableCell>
+                </TableRow>
+                <TableRow className="hover:bg-muted/30 transition-colors">
+                    <TableCell className="text-sm font-medium text-muted-foreground">
+                        LD Applicable
+                    </TableCell>
+                    <TableCell className="text-sm">
+                        {formatYesNo(infoSheet.ldRequired)}
+                    </TableCell>
+                    <TableCell className="text-sm font-medium text-muted-foreground">
+                        LD Percentage Per Week
+                    </TableCell>
+                    <TableCell className="text-sm">
+                        {formatPercentage(Number(infoSheet.ldPercentagePerWeek))}
+                    </TableCell>
+                </TableRow>
+                {infoSheet.maxLdPercentage && (
+                    <TableRow className="hover:bg-muted/30 transition-colors">
+                        <TableCell className="text-sm font-medium text-muted-foreground">
+                            Max LD Percentage
+                        </TableCell>
+                        <TableCell className="text-sm" colSpan={3}>
+                            {formatPercentage(Number(infoSheet.maxLdPercentage))}
+                        </TableCell>
+                    </TableRow>
+                )}
+
+                {/* Eligibility Summary */}
+                <TableRow className="bg-muted/50">
+                    <TableCell colSpan={4} className="font-semibold text-sm">
+                        Eligibility Summary
+                    </TableCell>
+                </TableRow>
+                <TableRow className="hover:bg-muted/30 transition-colors">
+                    <TableCell className="text-sm font-medium text-muted-foreground">
+                        Eligibility Criterion (Years)
+                    </TableCell>
+                    <TableCell className="text-sm">
+                        {formatValue(infoSheet.techEligibilityAge)}
+                    </TableCell>
+                    <TableCell className="text-sm font-medium text-muted-foreground">
+                        Bid Validity (Days)
+                    </TableCell>
+                    <TableCell className="text-sm">
+                        {formatValue(infoSheet.bidValidityDays)}
+                    </TableCell>
+                </TableRow>
+
+                {/* Work Orders */}
+                {infoSheet.workValueType && (
+                    <>
+                        {infoSheet.workValueType === "WORKS_VALUES" && (
+                            <>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Value of 1st Work Order
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {infoSheet.orderValue1
+                                            ? formatINR(Number(infoSheet.orderValue1))
+                                            : "—"}
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Value of 2nd Work Order
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {infoSheet.orderValue2
+                                            ? formatINR(Number(infoSheet.orderValue2))
+                                            : "—"}
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Value of 3rd Work Order
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {infoSheet.orderValue3
+                                            ? formatINR(Number(infoSheet.orderValue3))
+                                            : "—"}
+                                    </TableCell>
+                                </TableRow>
+                            </>
+                        )}
+                        {infoSheet.workValueType === "CUSTOM" && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Custom Eligibility Criteria
+                                </TableCell>
+                                <TableCell
+                                    className="text-sm whitespace-normal [overflow-wrap:anywhere]"
+                                    colSpan={3}
+                                >
+                                    {infoSheet.customEligibilityCriteria || "—"}
+                                </TableCell>
+                            </TableRow>
+                        )}
+                    </>
+                )}
+
+                {/* Financial Requirements */}
+                {(infoSheet.avgAnnualTurnoverType ||
+                    infoSheet.workingCapitalType ||
+                    infoSheet.solvencyCertificateType ||
+                    infoSheet.netWorthType) && (
+                    <>
+                        <TableRow className="bg-muted/50">
+                            <TableCell
+                                colSpan={4}
+                                className="font-semibold text-sm"
+                            >
+                                Financial Requirements
+                            </TableCell>
+                        </TableRow>
+                        {infoSheet.avgAnnualTurnoverType && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Avg Annual Turnover Type
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                    {toTitleCase(
+                                        formatValue(
+                                            infoSheet.avgAnnualTurnoverType?.replaceAll(
+                                                "_",
+                                                " "
+                                            )
+                                        )
+                                    )}
+                                </TableCell>
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Avg Annual Turnover Value
+                                </TableCell>
+                                <TableCell className="text-sm font-semibold">
+                                    {infoSheet.avgAnnualTurnoverValue
+                                        ? formatINR(
+                                              Number(
+                                                  infoSheet.avgAnnualTurnoverValue
+                                              )
+                                          )
+                                        : "—"}
+                                </TableCell>
+                            </TableRow>
+                        )}
+                        {infoSheet.workingCapitalType && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Working Capital Type
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                    {toTitleCase(
+                                        formatValue(
+                                            infoSheet.workingCapitalType?.replaceAll(
+                                                "_",
+                                                " "
+                                            )
+                                        )
+                                    )}
+                                </TableCell>
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Working Capital Value
+                                </TableCell>
+                                <TableCell className="text-sm font-semibold">
+                                    {infoSheet.workingCapitalValue
+                                        ? formatINR(
+                                              Number(
+                                                  infoSheet.workingCapitalValue
+                                              )
+                                          )
+                                        : "—"}
+                                </TableCell>
+                            </TableRow>
+                        )}
+                        {infoSheet.solvencyCertificateType && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Solvency Certificate Type
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                    {toTitleCase(
+                                        formatValue(
+                                            infoSheet.solvencyCertificateType?.replaceAll(
+                                                "_",
+                                                " "
+                                            )
+                                        )
+                                    )}
+                                </TableCell>
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Solvency Certificate Value
+                                </TableCell>
+                                <TableCell className="text-sm font-semibold">
+                                    {infoSheet.solvencyCertificateValue
+                                        ? formatINR(
+                                              Number(
+                                                  infoSheet.solvencyCertificateValue
+                                              )
+                                          )
+                                        : "—"}
+                                </TableCell>
+                            </TableRow>
+                        )}
+                        {infoSheet.netWorthType && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Net Worth Type
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                    {toTitleCase(
+                                        formatValue(
+                                            infoSheet.netWorthType?.replaceAll(
+                                                "_",
+                                                " "
+                                            )
+                                        )
+                                    )}
+                                </TableCell>
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Net Worth Value
+                                </TableCell>
+                                <TableCell className="text-sm font-semibold">
+                                    {infoSheet.netWorthValue
+                                        ? formatINR(
+                                              Number(infoSheet.netWorthValue)
+                                          )
+                                        : "—"}
+                                </TableCell>
+                            </TableRow>
+                        )}
+                    </>
+                )}
+
+                {/* Courier Address */}
+                {infoSheet.courierAddress && (
+                    <>
+                        <TableRow className="bg-muted/50">
+                            <TableCell
+                                colSpan={4}
+                                className="font-semibold text-sm"
+                            >
+                                Courier Information
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Courier Address
+                            </TableCell>
+                            <TableCell
+                                className="text-sm whitespace-normal [overflow-wrap:anywhere]"
+                                colSpan={3}
+                            >
+                                {infoSheet.courierAddress}
+                            </TableCell>
+                        </TableRow>
+                    </>
+                )}
+
+                {/* Physical Docs */}
+                <TableRow className="hover:bg-muted/30 transition-colors">
+                    <TableCell className="text-sm font-medium text-muted-foreground">
+                        Physical Docs Required
+                    </TableCell>
+                    <TableCell className="text-sm">
+                        {formatYesNo(infoSheet.physicalDocsRequired)}
+                    </TableCell>
+                </TableRow>
+                <TableRow className="hover:bg-muted/30 transition-colors">
+                    {infoSheet.physicalDocsRequired === "YES" && (
+                        <>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Physical Document Type
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {getOptionLabel(
+                                    physicalDocTypeOptions,
+                                    infoSheet.physicalDocType
+                                )}
+                            </TableCell>
+                        </>
+                    )}
+                    {infoSheet.physicalDocsDeadline &&
+                        infoSheet.physicalDocsRequired === "YES" && (
+                            <>
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Physical Docs Deadline
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                    {formatDateTime(infoSheet.physicalDocsDeadline)}
+                                </TableCell>
+                            </>
+                        )}
+                </TableRow>
+
+                {/* Client Contacts */}
+                {infoSheet.clients && infoSheet.clients.length > 0 ? (
+                    <>
+                        <TableRow className="bg-muted/50">
+                            <TableCell
+                                colSpan={4}
+                                className="font-semibold text-sm"
+                            >
+                                Client Contacts
+                            </TableCell>
+                        </TableRow>
+                        {infoSheet.clients.map((client, idx) => (
+                            <React.Fragment
+                                key={`${client.clientName}-${idx}`}
+                            >
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Client {idx + 1} Name
+                                    </TableCell>
+                                    <TableCell className="text-sm font-semibold">
+                                        {client.clientName || "—"}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Designation
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {client.clientDesignation || "—"}
+                                    </TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Mobile
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {client.clientMobile || "—"}
+                                    </TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Email
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        {client.clientEmail || "—"}
+                                    </TableCell>
+                                </TableRow>
+                            </React.Fragment>
+                        ))}
+                    </>
+                ) : null}
+
+                {/* Documents */}
+                <TableRow className="bg-muted/50">
+                    <TableCell colSpan={4} className="font-semibold text-sm">
+                        Documents
+                    </TableCell>
+                </TableRow>
+                <TableRow className="hover:bg-muted/30 transition-colors">
+                    <TableCell className="text-sm font-medium text-muted-foreground">
+                        Technical Documents
+                    </TableCell>
+                    <TableCell className="text-sm" colSpan={3}>
+                        <div className="flex flex-wrap gap-1">
+                            {infoSheet.technicalWorkOrders?.map((order) => {
+                                const filePath = order.poDocument?.[0]
+                                return (
+                                    <Badge
+                                        key={order.id}
+                                        variant="outline"
+                                        className="text-xs hover:bg-primary/10"
+                                    >
+                                        <a
+                                            href={tenderFilesService.getFileUrl(
+                                                filePath!
+                                            )}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                        >
+                                            {order.projectName}
+                                        </a>
+                                    </Badge>
+                                )
+                            })}
+                        </div>
+                    </TableCell>
+                </TableRow>
+                <TableRow className="hover:bg-muted/30 transition-colors">
+                    <TableCell className="text-sm font-medium text-muted-foreground">
+                        Financial Documents
+                    </TableCell>
+                    <TableCell className="text-sm" colSpan={3}>
+                        <div className="flex flex-wrap gap-1">
+                            {infoSheet.commercialDocuments?.map((doc) => {
+                                const filePath = doc.documentPath?.[0]
+                                return (
+                                    <Badge
+                                        key={doc.id}
+                                        variant="outline"
+                                        className="text-xs hover:bg-primary/10"
+                                    >
+                                        <a
+                                            href={tenderFilesService.getFileUrl(
+                                                filePath!
+                                            )}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                        >
+                                            {doc.documentName}
+                                        </a>
+                                    </Badge>
+                                )
+                            })}
+                        </div>
+                    </TableCell>
+                </TableRow>
+            </TableBody>
+        </Table>
+    )
+}
+
+// ─── Main Component ──────────────────────────────────────────────────────────
+
+export const InfoSheetView = ({ infoSheet, isLoading }: InfoSheetViewProps) => {
     const rejectionReasonOptions = useDnbStatusOptions()
 
     if (isLoading) {
@@ -96,12 +796,16 @@ export const InfoSheetView = ({
                 <CardContent className="pt-0">
                     <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
                         <FileText className="h-8 w-8 mb-2 opacity-50" />
-                        <p className="text-sm">No info sheet available for this tender.</p>
+                        <p className="text-sm">
+                            No info sheet available for this tender.
+                        </p>
                     </div>
                 </CardContent>
             </Card>
         )
     }
+
+    const isRecommended = infoSheet.teRecommendation === "YES"
 
     return (
         <Card>
@@ -111,635 +815,147 @@ export const InfoSheetView = ({
                     Tender Info Sheet
                 </CardTitle>
             </CardHeader>
-            <CardContent>
-                <Table>
-                    <TableBody>
-                        {/* TE Evaluation */}
-                        <TableRow className="bg-muted/50">
-                            <TableCell colSpan={4} className="font-semibold text-sm">
-                                TE Evaluation
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
-                                Recommendation
-                            </TableCell>
-                            <TableCell className="text-sm font-semibold w-1/4">
-                                {formatYesNo(infoSheet.teRecommendation)}
-                            </TableCell>
-                            {
-                                infoSheet.teRecommendation === "NO" && (
-                                    <>
+            <CardContent className="space-y-4">
+                {/* ── TE Evaluation (always visible) ──────────────────── */}
+                <div className="border rounded-lg overflow-hidden">
+                    <Table>
+                        <TableBody>
+                            <TableRow className="bg-muted/50">
+                                <TableCell
+                                    colSpan={4}
+                                    className="font-semibold text-sm"
+                                >
+                                    <span className="flex items-center gap-2">
+                                        {isRecommended ? (
+                                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                        ) : (
+                                            <AlertTriangle className="h-4 w-4 text-destructive" />
+                                        )}
+                                        TE Evaluation
+                                    </span>
+                                </TableCell>
+                            </TableRow>
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                    Recommendation
+                                </TableCell>
+                                <TableCell
+                                    className="text-sm font-semibold w-1/4"
+                                    colSpan={3}
+                                >
+                                    <Badge
+                                        variant={
+                                            isRecommended
+                                                ? "default"
+                                                : "destructive"
+                                        }
+                                        className="text-xs"
+                                    >
+                                        {isRecommended
+                                            ? "Yes — Recommended"
+                                            : "No — Not Recommended"}
+                                    </Badge>
+                                </TableCell>
+                            </TableRow>
+                        </TableBody>
+                    </Table>
+                </div>
+
+                {/* ── NOT RECOMMENDED ─────────────────────────────────── */}
+                {!isRecommended && (
+                    <>
+                        {/* Rejection details card */}
+                        <div className="border border-destructive/40 rounded-lg overflow-hidden">
+                            <Table>
+                                <TableBody>
+                                    <TableRow className="bg-muted/50">
+                                        <TableCell
+                                            colSpan={4}
+                                            className="font-semibold text-sm text-destructive"
+                                        >
+                                            Rejection Details
+                                        </TableCell>
+                                    </TableRow>
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
                                         <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
                                             Rejection Reason
                                         </TableCell>
-                                        <TableCell className="text-sm w-1/4">
-                                            {getOptionLabel(rejectionReasonOptions, infoSheet.teRejectionReason)}
+                                        <TableCell
+                                            className="text-sm w-1/4"
+                                            colSpan={3}
+                                        >
+                                            {getOptionLabel(
+                                                rejectionReasonOptions,
+                                                infoSheet.teRejectionReason
+                                            )}
                                         </TableCell>
-                                    </>
-                                )
-                            }
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                TE Final Remark
-                            </TableCell>
-                            <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]" colSpan={3}>
-                                {infoSheet.teFinalRemark || '—'}
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            {
-                                infoSheet.teRecommendation === "NO" && (
-                                    <>
+                                    </TableRow>
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
                                         <TableCell className="text-sm font-medium text-muted-foreground">
                                             Rejection Remarks
                                         </TableCell>
-                                        <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]" colSpan={3}>
-                                            {formatValue(infoSheet.teRejectionRemarks)}
-                                        </TableCell>
-                                    </>
-                                )
-                            }
-                        </TableRow>
-                        {infoSheet.teRejectionProof && (
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Rejection Proof
-                                </TableCell>
-                                <TableCell className="text-sm" colSpan={3}>
-                                    <div className="flex flex-wrap gap-1">
-                                        {(infoSheet?.teRejectionProof ?? []).map((path, idx) => (
-                                            <Badge key={idx} variant="outline" className="text-xs hover:bg-primary/10">
-                                            <a href={tenderFilesService.getFileUrl(path)} target="_blank" rel="noopener noreferrer">
-                                                View Proof {(infoSheet?.teRejectionProof?.length ?? 0) > 1 ? idx + 1 : ''}
-                                            </a>
-                                            </Badge>
-                                        ))}
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                        )}
-                        <TableCell className="text-sm font-medium text-muted-foreground">
-                            MAF Required
-                        </TableCell>
-                        <TableCell className="text-sm">
-                            {toTitleCase(formatValue(infoSheet.mafRequired?.replaceAll('_', ' ')))}
-                        </TableCell>
-
-                        {/* Financial Terms */}
-                        <TableRow className="bg-muted/50">
-                            <TableCell colSpan={4} className="font-semibold text-sm">
-                                Financial Terms
-                            </TableCell>
-                        </TableRow>
-                        {/* Processing Fee */}
-                        {(infoSheet.processingFeeRequired || infoSheet.processingFeeAmount) && (
-                            <>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Processing Fee Required
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {formatYesNo(infoSheet.processingFeeRequired)}
-                                    </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Processing Fee Amount
-                                    </TableCell>
-                                    <TableCell className="text-sm font-semibold">
-                                        {infoSheet.processingFeeAmount ? formatINR(Number(infoSheet.processingFeeAmount)) : '—'}
-                                    </TableCell>
-                                </TableRow>
-                                {infoSheet.processingFeeMode && (
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Processing Fee Mode
-                                        </TableCell>
-                                        <TableCell className="text-sm" colSpan={3}>
-                                            {infoSheet.processingFeeMode.join(', ')}
+                                        <TableCell
+                                            className="text-sm whitespace-normal [overflow-wrap:anywhere]"
+                                            colSpan={3}
+                                        >
+                                            {formatValue(
+                                                infoSheet.teRejectionRemarks
+                                            )}
                                         </TableCell>
                                     </TableRow>
-                                )}
-                            </>
-                        )}
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Tender Fee Required
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {formatYesNo(infoSheet.tenderFeeRequired)}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Tender Fee Amount
-                            </TableCell>
-                            <TableCell className="text-sm font-semibold">
-                                {infoSheet.tenderFeeAmount ? formatINR(Number(infoSheet.tenderFeeAmount)) : '—'}
-                            </TableCell>
-                        </TableRow>
-                        {infoSheet.tenderFeeMode && (
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Tender Fee Mode
-                                </TableCell>
-                                <TableCell className="text-sm" colSpan={3}>
-                                    {infoSheet.tenderFeeMode.join(', ')}
-                                </TableCell>
-                            </TableRow>
-                        )}
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                EMD Required
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {formatYesNo(infoSheet.emdRequired)}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                EMD Amount
-                            </TableCell>
-                            <TableCell className="text-sm font-semibold">
-                                {infoSheet.emdAmount ? formatINR(Number(infoSheet.emdAmount)) : '—'}
-                            </TableCell>
-                        </TableRow>
-                        {infoSheet.emdMode && (
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    EMD Mode
-                                </TableCell>
-                                <TableCell className="text-sm" colSpan={3}>
-                                    {infoSheet.emdMode.join(', ')}
-                                </TableCell>
-                            </TableRow>
-                        )}
-
-                        {/* Payment Terms */}
-                        <TableRow className="bg-muted/50">
-                            <TableCell colSpan={4} className="font-semibold text-sm">
-                                Payment Terms
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Payment Terms Supply (%)
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {formatValue(infoSheet.paymentTermsSupply)}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Payment Terms Installation (%)
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {formatValue(infoSheet.paymentTermsInstallation)}
-                            </TableCell>
-                        </TableRow>
-
-                        {/* Commercial Evaluation */}
-                        {(infoSheet.commercialEvaluation || infoSheet.mafRequired) && (
-                            <>
-                                <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={4} className="font-semibold text-sm">
-                                        Evaluation
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Commercial Evaluation Type
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {toTitleCase(formatValue(infoSheet.commercialEvaluation?.replaceAll('_', ' ')))}
-                                    </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Reverse Auction Applicable
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {formatYesNo(infoSheet.reverseAuctionApplicable)}
-                                    </TableCell>
-                                </TableRow>
-                            </>
-                        )}
-
-                        {/* Delivery Terms */}
-                        {(infoSheet.deliveryTimeSupply || infoSheet.deliveryTimeInstallationDays) && (
-                            <>
-                                <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={4} className="font-semibold text-sm">
-                                        Delivery Terms
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Delivery Time Supply (Days)
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {formatValue(infoSheet.deliveryTimeSupply)}
-                                    </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Installation Inclusive
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {infoSheet.deliveryTimeInstallationInclusive ? 'Yes' : 'No'}
-                                    </TableCell>
-                                </TableRow>
-                                {infoSheet.deliveryTimeInstallationDays && (
                                     <TableRow className="hover:bg-muted/30 transition-colors">
                                         <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Delivery Time Installation (Days)
+                                            Rejection Proof
                                         </TableCell>
-                                        <TableCell className="text-sm" colSpan={3}>
-                                            {formatValue(infoSheet.deliveryTimeInstallationDays)}
-                                        </TableCell>
+                                        {infoSheet.teRejectionProof &&
+                                            infoSheet.teRejectionProof.length > 0 ? (
+                                                    <TableCell className="text-sm" colSpan={3}>
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {infoSheet.teRejectionProof.map(
+                                                                (path, idx) => (
+                                                                    <Badge key={idx} variant="outline" className="text-xs hover:bg-primary/10">
+                                                                        <a href={tenderFilesService.getFileUrl(path)} target="_blank" rel="noopener noreferrer">
+                                                                            View Proof {" "}
+                                                                            {infoSheet.teRejectionProof!.length > 1 ? idx + 1 : ""}
+                                                                        </a>
+                                                                    </Badge>
+                                                                )
+                                                            )}
+                                                        </div>
+                                                    </TableCell>
+                                                ) : (
+                                                    <TableCell className="text-sm" colSpan={3}>
+                                                        Not Uploaded
+                                                    </TableCell>
+                                                )}
                                     </TableRow>
-                                )}
-                            </>
-                        )}
+                                </TableBody>
+                            </Table>
+                        </div>
 
-                        {/* PBG & Security Deposit */}
-                        <TableRow className="bg-muted/50">
-                            <TableCell colSpan={4} className="font-semibold text-sm">
-                                PBG & Security Deposit
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                PBG Required
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {formatYesNo(infoSheet.pbgRequired)}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                PBG Mode
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {(() => {
-                                    if (!infoSheet.pbgMode) return "N/A";
+                        {/* Single accordion with ALL other fields (collapsed by default) */}
+                        <Accordion
+                            type="single"
+                            collapsible
+                            className="w-full"
+                        >
+                            <AccordionItem
+                                value="full-tender-details"
+                                className="border rounded-lg overflow-hidden"
+                            >
+                                <AccordionTrigger className="px-4 py-3 text-sm font-semibold bg-muted/30 hover:bg-muted/50 hover:no-underline">
+                                    View Full Tender Information
+                                </AccordionTrigger>
+                                <AccordionContent className="p-0">
+                                    <AllFieldsTable infoSheet={infoSheet} />
+                                </AccordionContent>
+                            </AccordionItem>
+                        </Accordion>
+                    </>
+                )}
 
-                                    if (Array.isArray(infoSheet.pbgMode)) {
-                                        return infoSheet.pbgMode.join(", ");
-                                    }
-
-                                    try {
-                                        const parsed = JSON.parse(infoSheet.pbgMode);
-                                        return Array.isArray(parsed) ? parsed.join(", ") : infoSheet.pbgMode;
-                                    } catch {
-                                        return infoSheet.pbgMode;
-                                    }
-                                })()}
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                PBG Percentage
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {formatPercentage(Number(infoSheet.pbgPercentage))}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                PBG Duration (Months)
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {formatValue(infoSheet.pbgDurationMonths)}
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                SD Required
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {formatYesNo(infoSheet.sdRequired)}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Security Deposit Mode
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {infoSheet.sdMode}
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Security Deposit %
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {formatPercentage(Number(infoSheet.sdPercentage))}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                SD Duration (Months)
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {formatValue(infoSheet.sdDurationMonths)}
-                            </TableCell>
-                        </TableRow>
-
-                        {/* Liquidated Damages */}
-                        <TableRow className="bg-muted/50">
-                            <TableCell colSpan={4} className="font-semibold text-sm">
-                                Liquidated Damages
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                LD Applicable
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {formatYesNo(infoSheet.ldRequired)}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                LD Percentage Per Week
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {formatPercentage(Number(infoSheet.ldPercentagePerWeek))}
-                            </TableCell>
-                        </TableRow>
-                        {infoSheet.maxLdPercentage && (
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Max LD Percentage
-                                </TableCell>
-                                <TableCell className="text-sm" colSpan={3}>
-                                    {formatPercentage(Number(infoSheet.maxLdPercentage))}
-                                </TableCell>
-                            </TableRow>
-                        )}
-
-                        {/* Eligibility Summary */}
-                        <TableRow className="bg-muted/50">
-                            <TableCell colSpan={4} className="font-semibold text-sm">
-                                Eligibility Summary
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Eligibility Criterion (Years)
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {formatValue(infoSheet.techEligibilityAge)}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Bid Validity (Days)
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {formatValue(infoSheet.bidValidityDays)}
-                            </TableCell>
-                        </TableRow>
-
-                        {/* Work Orders */}
-                        {(infoSheet.workValueType) && (
-                            <>
-                                {infoSheet.workValueType === 'WORKS_VALUES' && (
-                                    <>
-                                        <TableRow className="hover:bg-muted/30 transition-colors">
-                                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                                Value of 1st Work Order
-                                            </TableCell>
-                                            <TableCell className="text-sm">
-                                                {infoSheet.orderValue1 ? formatINR(Number(infoSheet.orderValue1)) : '—'}
-                                            </TableCell>
-                                        </TableRow>
-                                        <TableRow className="hover:bg-muted/30 transition-colors">
-                                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                                Value of 2nd Work Order
-                                            </TableCell>
-                                            <TableCell className="text-sm">
-                                                {infoSheet.orderValue2 ? formatINR(Number(infoSheet.orderValue2)) : '—'}
-                                            </TableCell>
-                                        </TableRow>
-                                        <TableRow className="hover:bg-muted/30 transition-colors">
-                                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                                Value of 3rd Work Order
-                                            </TableCell>
-                                            <TableCell className="text-sm">
-                                                {infoSheet.orderValue3 ? formatINR(Number(infoSheet.orderValue3)) : '—'}
-                                            </TableCell>
-                                        </TableRow>
-                                    </>
-                                )}
-                                {infoSheet.workValueType === 'CUSTOM' && (
-                                    <>
-                                        <TableRow className="hover:bg-muted/30 transition-colors">
-                                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                                Custom Eligibility Criteria
-                                            </TableCell>
-                                            <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
-                                                {infoSheet.customEligibilityCriteria || '—'}
-                                            </TableCell>
-
-                                        </TableRow>
-                                    </>
-                                )}
-                            </>
-                        )}
-
-                        {/* Financial Requirements */}
-                        {(infoSheet.avgAnnualTurnoverType || infoSheet.workingCapitalType || infoSheet.solvencyCertificateType || infoSheet.netWorthType) && (
-                            <>
-                                <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={4} className="font-semibold text-sm">
-                                        Financial Requirements
-                                    </TableCell>
-                                </TableRow>
-                                {infoSheet.avgAnnualTurnoverType && (
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Avg Annual Turnover Type
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {toTitleCase(formatValue(infoSheet.avgAnnualTurnoverType?.replaceAll('_', ' ')))}
-                                        </TableCell>
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Avg Annual Turnover Value
-                                        </TableCell>
-                                        <TableCell className="text-sm font-semibold">
-                                            {infoSheet.avgAnnualTurnoverValue ? formatINR(Number(infoSheet.avgAnnualTurnoverValue)) : '—'}
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                                {infoSheet.workingCapitalType && (
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Working Capital Type
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {toTitleCase(formatValue(infoSheet.workingCapitalType?.replaceAll('_', ' ')))}
-                                        </TableCell>
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Working Capital Value
-                                        </TableCell>
-                                        <TableCell className="text-sm font-semibold">
-                                            {infoSheet.workingCapitalValue ? formatINR(Number(infoSheet.workingCapitalValue)) : '—'}
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                                {infoSheet.solvencyCertificateType && (
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Solvency Certificate Type
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {toTitleCase(formatValue(infoSheet.solvencyCertificateType?.replaceAll('_', ' ')))}
-                                        </TableCell>
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Solvency Certificate Value
-                                        </TableCell>
-                                        <TableCell className="text-sm font-semibold">
-                                            {infoSheet.solvencyCertificateValue ? formatINR(Number(infoSheet.solvencyCertificateValue)) : '—'}
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                                {infoSheet.netWorthType && (
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Net Worth Type
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {toTitleCase(formatValue(infoSheet.netWorthType?.replaceAll('_', ' ')))}
-                                        </TableCell>
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Net Worth Value
-                                        </TableCell>
-                                        <TableCell className="text-sm font-semibold">
-                                            {infoSheet.netWorthValue ? formatINR(Number(infoSheet.netWorthValue)) : '—'}
-                                        </TableCell>
-                                    </TableRow>
-                                )}
-                            </>
-                        )}
-
-                        {/* Courier Address */}
-                        {infoSheet.courierAddress && (
-                            <>
-                                <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={4} className="font-semibold text-sm">
-                                        Courier Information
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Courier Address
-                                    </TableCell>
-                                    <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]" colSpan={3}>
-                                        {infoSheet.courierAddress}
-                                    </TableCell>
-                                </TableRow>
-                            </>
-                        )}
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Physical Docs Required
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {formatYesNo(infoSheet.physicalDocsRequired)}
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            {infoSheet.physicalDocsRequired === 'YES' && (
-                                <>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Physical Document Type
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {getOptionLabel(physicalDocTypeOptions, infoSheet.physicalDocType)}
-                                    </TableCell>
-                                </>
-                            )}
-                            {infoSheet.physicalDocsDeadline && infoSheet.physicalDocsRequired === 'YES' && (
-                                <>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Physical Docs Deadline
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {formatDateTime(infoSheet.physicalDocsDeadline)}
-                                    </TableCell>
-                                </>
-                            )}
-                        </TableRow>
-
-                        {/* Client Contacts */}
-                        {infoSheet.clients && infoSheet.clients.length > 0 ? (
-                            <>
-                                <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={4} className="font-semibold text-sm">
-                                        Client Contacts
-                                    </TableCell>
-                                </TableRow>
-                                {infoSheet.clients.map((client, idx) => (
-                                    <React.Fragment key={`${client.clientName}-${idx}`}>
-                                        <TableRow className="hover:bg-muted/30 transition-colors">
-                                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                                Client {idx + 1} Name
-                                            </TableCell>
-                                            <TableCell className="text-sm font-semibold">
-                                                {client.clientName || '—'}
-                                            </TableCell>
-                                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                                Designation
-                                            </TableCell>
-                                            <TableCell className="text-sm">
-                                                {client.clientDesignation || '—'}
-                                            </TableCell>
-                                        </TableRow>
-                                        <TableRow className="hover:bg-muted/30 transition-colors">
-                                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                                Mobile
-                                            </TableCell>
-                                            <TableCell className="text-sm">
-                                                {client.clientMobile || '—'}
-                                            </TableCell>
-                                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                                Email
-                                            </TableCell>
-                                            <TableCell className="text-sm">
-                                                {client.clientEmail || '—'}
-                                            </TableCell>
-                                        </TableRow>
-                                    </React.Fragment>
-                                ))}
-                            </>
-                        ) : null}
-
-                        {/* Documents */}
-                        <TableRow className="bg-muted/50">
-                            <TableCell colSpan={4} className="font-semibold text-sm">
-                                Documents
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Technical Documents
-                            </TableCell>
-                            <TableCell className="text-sm" colSpan={3}>
-                                <div className="flex flex-wrap gap-1">
-                                    {infoSheet.technicalWorkOrders?.map((order) => {
-                                        const filePath = order.poDocument?.[0];
-                                        return (
-                                            <Badge key={order.id} variant="outline" className="text-xs hover:bg-primary/10">
-                                                <a href={tenderFilesService.getFileUrl(filePath!)} target="_blank" rel="noopener noreferrer">
-                                                    {order.projectName}
-                                                </a>
-                                            </Badge>
-                                        )
-                                    })}
-                                </div>
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Financial Documents
-                            </TableCell>
-                            <TableCell className="text-sm" colSpan={3}>
-                                <div className="flex flex-wrap gap-1">
-                                    {infoSheet.commercialDocuments?.map((doc) => {
-                                        const filePath = doc.documentPath?.[0];
-                                        return (
-                                            <Badge key={doc.id} variant="outline" className="text-xs hover:bg-primary/10">
-                                                <a href={tenderFilesService.getFileUrl(filePath!)} target="_blank" rel="noopener noreferrer">
-                                                    {doc.documentName}
-                                                </a>
-                                            </Badge>
-                                        );
-                                    })}
-                                </div>
-                            </TableCell>
-                        </TableRow>
-                    </TableBody>
-                </Table>
+                {/* ── RECOMMENDED — show all fields directly ─────────── */}
+                {isRecommended && <AllFieldsTable infoSheet={infoSheet} />}
             </CardContent>
         </Card>
     )
