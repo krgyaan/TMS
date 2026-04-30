@@ -124,12 +124,12 @@ function getBannerConfig(onboardingStatus: OnboardingStatus) {
       textColor: "text-blue-800 dark:text-blue-200",
       subtextColor: "text-blue-600/80 dark:text-blue-400/70",
       icon: Shield,
-      title: "Submitted for Review",
+      title: "Submitted For Review",
       description: "Your onboarding details are being reviewed by HR. You'll be notified once approved.",
     };
   }
 
-  if (onboardingStatus.profileStatus !== 'completed') {
+  if (!employeeCompleted) {
     return {
       bg: "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800/50",
       iconBg: "bg-amber-100 dark:bg-amber-900/50",
@@ -137,8 +137,8 @@ function getBannerConfig(onboardingStatus: OnboardingStatus) {
       textColor: "text-amber-800 dark:text-amber-200",
       subtextColor: "text-amber-600/80 dark:text-amber-400/70",
       icon: Sparkles,
-      title: "Profile Details Incomplete",
-      description: "Please provide your basic information to proceed with your official onboarding.",
+      title: "Please Complete the Onboarding Details",
+      description: "Please complete all the stages",
     };
   }
 
@@ -152,12 +152,6 @@ function getBannerConfig(onboardingStatus: OnboardingStatus) {
     title: "Onboarding In Progress",
     description: "Complete the remaining sections below and submit for HR review.",
   };
-}
-
-function hasProfileData(data: any): boolean {
-  if (!data?.profile) return false;
-  const p = data.profile;
-  return Boolean(p.firstName || p.dateOfBirth || p.gender || p.aadharNumber || p.panNumber);
 }
 
 function buildProfileDetails(data: any): StageDetail[] {
@@ -376,16 +370,16 @@ export function OnboardingView() {
   const [editingStage, setEditingStage] = useState<StageKey | null>(null);
 
   const onboardingStatus = data?.onboardingStatus;
-  const profileFilled = hasProfileData(data);
   const employeeCompleted = onboardingStatus?.employeeCompleted ?? false;
 
   // ── View state ─────────────────────────────────────────────────────────
   const viewState = useMemo(() => {
     if (!onboardingStatus) return "welcome";
-    if (!profileFilled && !employeeCompleted) return "welcome";
+    // Show welcome state if profile hasn't been submitted yet
+    if (onboardingStatus.profileStatus === "pending" && !employeeCompleted) return "welcome";
     if (employeeCompleted) return "submitted";
     return "in_progress";
-  }, [onboardingStatus, profileFilled, employeeCompleted]);
+  }, [onboardingStatus, employeeCompleted]);
 
   // ── Stage statuses ─────────────────────────────────────────────────────
   type StageStatusValue = "pending" | "submitted";
