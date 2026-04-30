@@ -79,14 +79,6 @@ const profileSchema = z.object({
   emergencyPhone: z.string().min(10, "Phone is required"),
   emergencyAltPhone: z.string().optional(),
   emergencyEmail: z.string().email().optional().or(z.literal("")),
-
-  // Bank Details
-  bankName: z.string().min(2, "Bank name is required"),
-  accountHolderName: z.string().min(2, "Holder name is required"),
-  accountNumber: z.string().min(8, "Account number is required"),
-  ifscCode: z.string().min(4, "IFSC code is required"),
-  branchName: z.string().optional(),
-  upiId: z.string().optional(),
 });
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
@@ -113,13 +105,13 @@ const SectionHeader = ({ icon: Icon, title, description }: { icon: any, title: s
 interface OnboardingProfileFormProps {
   onCancel: () => void;
   onSuccess: () => void;
-  initialTab?: "personal" | "address" | "emergency" | "bank";
+  initialTab?: "personal" | "address" | "emergency";
 }
 
 export function OnboardingProfileForm({ onCancel, onSuccess, initialTab = "personal" }: OnboardingProfileFormProps) {
   const { data } = useProfileContext();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState<"personal" | "address" | "emergency" | "bank">(initialTab as any);
+  const [activeTab, setActiveTab] = useState<"personal" | "address" | "emergency">(initialTab as any);
   const [sameAsCurrent, setSameAsCurrent] = useState(false);
 
   const P = data?.profile || {};
@@ -164,13 +156,6 @@ export function OnboardingProfileForm({ onCancel, onSuccess, initialTab = "perso
       emergencyPhone: EC.phone || "",
       emergencyAltPhone: EC.altPhone || "",
       emergencyEmail: EC.email || "",
-
-      bankName: EP.bankName || "",
-      accountHolderName: EP.accountHolderName || "",
-      accountNumber: EP.accountNumber || "",
-      ifscCode: EP.ifscCode || "",
-      branchName: EP.branchName || "",
-      upiId: EP.upiId || "",
     },
   });
 
@@ -231,7 +216,6 @@ export function OnboardingProfileForm({ onCancel, onSuccess, initialTab = "perso
     { id: "personal", label: "Personal", icon: User },
     { id: "address", label: "Address", icon: MapPin },
     { id: "emergency", label: "Emergency", icon: Heart },
-    { id: "bank", label: "Bank Details", icon: CreditCard },
   ] as const;
 
   return (
@@ -494,54 +478,7 @@ export function OnboardingProfileForm({ onCancel, onSuccess, initialTab = "perso
           </div>
         )}
 
-        {/* BANK SECTION */}
-        {activeTab === "bank" && (
-          <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <SectionHeader 
-              icon={CreditCard} 
-              title="Banking Details" 
-              description="For salary processing and reimbursements" 
-            />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="bankName" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Bank Name *</Label>
-                <div className="relative">
-                  <Building2 className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground/50" />
-                  <Input {...form.register("bankName")} id="bankName" className="rounded-xl h-11 pl-10" placeholder="e.g. HDFC Bank" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="accountHolderName" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Account Holder Name *</Label>
-                <div className="relative">
-                  <User className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground/50" />
-                  <Input {...form.register("accountHolderName")} id="accountHolderName" className="rounded-xl h-11 pl-10" placeholder="Full name as per bank" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="accountNumber" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Account Number *</Label>
-                <div className="relative">
-                  <Hash className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground/50" />
-                  <Input {...form.register("accountNumber")} id="accountNumber" className="rounded-xl h-11 pl-10 font-mono" placeholder="XXXXXXXXXXXX" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="ifscCode" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">IFSC Code *</Label>
-                <div className="relative">
-                  <Hash className="absolute left-3.5 top-3.5 h-4 w-4 text-muted-foreground/50" />
-                  <Input {...form.register("ifscCode")} id="ifscCode" className="rounded-xl h-11 pl-10 font-mono uppercase" placeholder="HDFC0001234" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="branchName" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Branch Name</Label>
-                <Input {...form.register("branchName")} id="branchName" className="rounded-xl h-11" placeholder="Main Branch" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="upiId" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">UPI ID (Optional)</Label>
-                <Input {...form.register("upiId")} id="upiId" className="rounded-xl h-11 font-mono" placeholder="username@bank" />
-              </div>
-            </div>
-          </div>
-        )}
+
       </div>
 
       <Separator className="bg-border/20" />
@@ -573,7 +510,7 @@ export function OnboardingProfileForm({ onCancel, onSuccess, initialTab = "perso
             </Button>
           )}
           
-          {activeTab !== "bank" ? (
+          {activeTab !== "emergency" ? (
             <Button 
               type="button" 
               onClick={() => {

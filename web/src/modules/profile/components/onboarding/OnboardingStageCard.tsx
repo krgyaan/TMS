@@ -13,6 +13,8 @@ import {
   Upload,
   Lock,
   ExternalLink,
+  CreditCard,
+  Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -22,7 +24,7 @@ import { Badge } from "@/components/ui/badge";
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type StageStatus = "pending" | "in_progress" | "completed";
+export type StageStatus = "pending" | "in_progress" | "completed" | "approved" | "rejected";
 
 export type ApprovalStatus = "pending" | "approved" | "rejected" | null;
 
@@ -74,6 +76,15 @@ export type ExperienceInfo = {
   responsibilities?: string | null;
 };
 
+export type BankAccountInfo = {
+  id: number;
+  bankName: string;
+  accountHolderName: string;
+  accountNumber: string;
+  ifscCode: string;
+  isPrimary: boolean;
+};
+
 export type StageCardProps = {
   /** Unique key for the stage */
   stageKey: string;
@@ -117,6 +128,8 @@ export type StageCardProps = {
   education?: EducationInfo[];
   /** Experience info for experience stage */
   experience?: ExperienceInfo[];
+  /** Bank accounts for bank stage */
+  bankAccounts?: BankAccountInfo[];
   /** Custom expanded content (overrides default) */
   children?: React.ReactNode;
 };
@@ -127,25 +140,15 @@ export type StageCardProps = {
 
 function getStageStatusMeta(status: StageStatus) {
   switch (status) {
-    case "completed":
+    case "submitted":
       return {
-        label: "Completed",
-        color: "text-emerald-600 dark:text-emerald-400",
-        bg: "bg-emerald-50 dark:bg-emerald-950/40",
-        border: "border-emerald-200/60 dark:border-emerald-800/40",
-        iconBg: "bg-emerald-100 dark:bg-emerald-900/40",
-        dot: "bg-emerald-500",
+        label: "Submitted",
+        color: "text-blue-600 dark:text-blue-400",
+        bg: "bg-blue-50 dark:bg-blue-950/40",
+        border: "border-blue-200/60 dark:border-blue-800/40",
+        iconBg: "bg-blue-100 dark:bg-blue-900/40",
+        dot: "bg-blue-500",
         icon: CheckCircle2,
-      };
-    case "in_progress":
-      return {
-        label: "In Progress",
-        color: "text-amber-600 dark:text-amber-400",
-        bg: "bg-amber-50 dark:bg-amber-950/40",
-        border: "border-amber-200/60 dark:border-amber-800/40",
-        iconBg: "bg-amber-100 dark:bg-amber-900/40",
-        dot: "bg-amber-500",
-        icon: Clock,
       };
     default:
       return {
@@ -191,6 +194,63 @@ function getApprovalMeta(status: ApprovalStatus) {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Rejection Notice Component
+// ─────────────────────────────────────────────────────────────────────────────
+
+function RejectionNotice({ 
+  rejection, 
+  onEdit 
+}: { 
+  rejection: RejectionInfo | string | null | undefined; 
+  onEdit?: () => void;
+}) {
+  if (!rejection) return null;
+
+  const reason = typeof rejection === 'string' ? rejection : rejection.reason;
+  const rejectedAt = typeof rejection === 'string' ? null : rejection.rejectedAt;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -5 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-xl border border-red-200 dark:border-red-800/50 bg-red-50/80 dark:bg-red-950/30 p-4 mb-4"
+    >
+      <div className="flex items-start gap-3">
+        <XCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold text-red-800 dark:text-red-200 mb-1">
+            Correction Required
+          </p>
+          <p className="text-xs text-red-700/80 dark:text-red-300/70 leading-relaxed">
+            {reason || "Kindly fill the details again since they were rejected."}
+          </p>
+          {rejectedAt && (
+            <p className="text-[10px] text-red-500/60 mt-1.5">
+              {new Date(rejectedAt).toLocaleDateString("en-IN", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              })}
+            </p>
+          )}
+        </div>
+      </div>
+      {onEdit && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onEdit}
+          className="mt-3 rounded-lg text-xs gap-1.5 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/40"
+        >
+          <Pencil className="h-3 w-3" />
+          Edit & Resubmit
+        </Button>
+      )}
+    </motion.div>
+  );
+}
+
 function getActionLabel(
   status: StageStatus,
   approvalStatus: ApprovalStatus,
@@ -198,24 +258,15 @@ function getActionLabel(
   readOnly: boolean
 ): { text: string; icon: React.ElementType } {
   if (readOnly) {
-    return { text: "View progress", icon: Eye };
+    return { text: "HR Managed", icon: Lock };
+  }
+  if (isSubmitted && approvalStatus !== "rejected") {
+    return { text: "Details Submitted", icon: Shield };
   }
   if (approvalStatus === "rejected") {
-    return { text: "Re-fill & resubmit", icon: Pencil };
+    return { text: "Correction Required", icon: AlertCircle };
   }
-  if (isSubmitted) {
-    return { text: "View details", icon: Eye };
-  }
-  switch (status) {
-    case "pending":
-      return { text: "Begin filling", icon: Pencil };
-    case "in_progress":
-      return { text: "Continue editing", icon: Pencil };
-    case "completed":
-      return { text: "Review & edit", icon: Eye };
-    default:
-      return { text: "Open", icon: ExternalLink };
-  }
+  return { text: "Fill Details", icon: Pencil };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -269,7 +320,7 @@ function ProfileDetailsContent({
 }: {
   details: StageDetail[];
   approvalStatus: ApprovalStatus;
-  rejection?: RejectionInfo | null;
+  rejection?: RejectionInfo | string | null;
   onEdit?: () => void;
   isSubmitted: boolean;
 }) {
@@ -279,44 +330,8 @@ function ProfileDetailsContent({
   return (
     <div className="space-y-4">
       {/* Rejection notice */}
-      {approvalStatus === "rejected" && rejection && (
-        <motion.div
-          initial={{ opacity: 0, y: -5 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="rounded-xl border border-red-200 dark:border-red-800/50 bg-red-50/80 dark:bg-red-950/30 p-4"
-        >
-          <div className="flex items-start gap-3">
-            <XCircle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-red-800 dark:text-red-200 mb-1">
-                Correction Required
-              </p>
-              <p className="text-xs text-red-700/80 dark:text-red-300/70 leading-relaxed">
-                {rejection.reason}
-              </p>
-              {rejection.rejectedAt && (
-                <p className="text-[10px] text-red-500/60 mt-1.5">
-                  {new Date(rejection.rejectedAt).toLocaleDateString("en-IN", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
-                </p>
-              )}
-            </div>
-          </div>
-          {onEdit && (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={onEdit}
-              className="mt-3 rounded-lg text-xs gap-1.5 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/40"
-            >
-              <Pencil className="h-3 w-3" />
-              Edit & Resubmit
-            </Button>
-          )}
-        </motion.div>
+      {approvalStatus === "rejected" && (
+        <RejectionNotice rejection={rejection} onEdit={onEdit} />
       )}
 
       {/* Filled details grid */}
@@ -381,15 +396,23 @@ function DocumentsContent({
   documents,
   onEdit,
   isSubmitted,
+  approvalStatus,
+  rejection,
 }: {
   documents: DocumentDetail[];
   onEdit?: () => void;
   isSubmitted: boolean;
+  approvalStatus?: ApprovalStatus;
+  rejection?: RejectionInfo | string | null;
 }) {
   const rejectedDocs = documents.filter(d => d.status === "rejected");
 
   return (
     <div className="space-y-3">
+      {/* Rejection notice */}
+      {approvalStatus === "rejected" && (
+        <RejectionNotice rejection={rejection} onEdit={onEdit} />
+      )}
       {documents.length === 0 ? (
         <div className="flex flex-col items-center py-8 text-center">
           <div className="rounded-xl bg-muted/40 p-3 mb-3">
@@ -474,6 +497,79 @@ function DocumentsContent({
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function BankAccountsContent({ 
+  accounts,
+  onEdit,
+  approvalStatus,
+  rejection
+}: { 
+  accounts: BankAccountInfo[];
+  onEdit?: () => void;
+  approvalStatus?: ApprovalStatus;
+  rejection?: RejectionInfo | string | null;
+}) {
+  if (accounts.length === 0) {
+    return (
+      <div className="flex flex-col items-center py-8 text-center">
+        <div className="rounded-xl bg-muted/40 p-3 mb-3">
+          <CreditCard className="h-5 w-5 text-muted-foreground/50" />
+        </div>
+        <p className="text-sm text-muted-foreground font-medium mb-1">
+          No bank accounts added
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Rejection notice */}
+      {approvalStatus === "rejected" && (
+        <RejectionNotice rejection={rejection} onEdit={onEdit} />
+      )}
+      {accounts.map((acc, i) => (
+        <motion.div
+          key={acc.id}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: i * 0.05 }}
+          className={cn(
+            "rounded-xl border p-4",
+            acc.isPrimary
+              ? "border-emerald-200/50 bg-emerald-50/20 dark:border-emerald-800/30 dark:bg-emerald-950/10"
+              : "border-border/30 bg-muted/10"
+          )}
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <p className="text-sm font-bold text-foreground truncate">
+                  {acc.bankName}
+                </p>
+                {acc.isPrimary && (
+                  <Badge variant="secondary" className="text-[10px] h-5 rounded-full px-2">
+                    Primary
+                  </Badge>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">{acc.accountHolderName}</p>
+              <div className="flex items-center gap-4 mt-2">
+                <p className="text-xs font-mono text-foreground tracking-wide">
+                  •••• {acc.accountNumber.slice(-4)}
+                </p>
+                <p className="text-xs font-mono text-muted-foreground">{acc.ifscCode}</p>
+              </div>
+            </div>
+            <div className="shrink-0 rounded-lg bg-muted p-2">
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
+            </div>
+          </div>
+        </motion.div>
+      ))}
     </div>
   );
 }
@@ -579,7 +675,17 @@ function InductionContent({ tasks }: { tasks: InductionTask[] }) {
   );
 }
 
-function EducationContent({ education }: { education: EducationInfo[] }) {
+function EducationContent({ 
+  education,
+  onEdit,
+  approvalStatus,
+  rejection
+}: { 
+  education: EducationInfo[];
+  onEdit?: () => void;
+  approvalStatus?: ApprovalStatus;
+  rejection?: RejectionInfo | string | null;
+}) {
   if (education.length === 0) {
     return (
       <div className="flex flex-col items-center py-8 text-center">
@@ -595,6 +701,10 @@ function EducationContent({ education }: { education: EducationInfo[] }) {
 
   return (
     <div className="space-y-4">
+      {/* Rejection notice */}
+      {approvalStatus === "rejected" && (
+        <RejectionNotice rejection={rejection} onEdit={onEdit} />
+      )}
       {education.map((edu, i) => (
         <motion.div
           key={edu.id || i}
@@ -639,7 +749,17 @@ function EducationContent({ education }: { education: EducationInfo[] }) {
   );
 }
 
-function ExperienceContent({ experience }: { experience: ExperienceInfo[] }) {
+function ExperienceContent({ 
+  experience,
+  onEdit,
+  approvalStatus,
+  rejection
+}: { 
+  experience: ExperienceInfo[];
+  onEdit?: () => void;
+  approvalStatus?: ApprovalStatus;
+  rejection?: RejectionInfo | string | null;
+}) {
   if (experience.length === 0) {
     return (
       <div className="flex flex-col items-center py-8 text-center">
@@ -655,6 +775,10 @@ function ExperienceContent({ experience }: { experience: ExperienceInfo[] }) {
 
   return (
     <div className="space-y-4">
+      {/* Rejection notice */}
+      {approvalStatus === "rejected" && (
+        <RejectionNotice rejection={rejection} onEdit={onEdit} />
+      )}
       {experience.map((exp, i) => (
         <motion.div
           key={exp.id || i}
@@ -721,6 +845,7 @@ export function OnboardingStageCard({
   inductionTasks,
   education,
   experience,
+  bankAccounts,
   children,
 }: StageCardProps) {
   const meta = getStageStatusMeta(status);
@@ -729,10 +854,10 @@ export function OnboardingStageCard({
   const ActionIcon = action.icon;
 
   const hasRejection = approvalStatus === "rejected" && rejection;
-  const showPulse = hasRejection || (status === "in_progress" && !isSubmitted);
+  const showPulse = hasRejection || (status === "pending" && !isSubmitted);
 
   // ── Determine what to render in expanded section ─────────────────────
-  const hasExpandedContent = Boolean(children || details || documents || inductionTasks || education || experience);
+  const hasExpandedContent = Boolean(children || details || documents || inductionTasks || education || experience || bankAccounts);
 
   return (
     <motion.div
@@ -828,11 +953,11 @@ export function OnboardingStageCard({
                   )}
                 >
                   <span className={cn("h-1.5 w-1.5 rounded-full", meta.dot)} />
-                  {meta.label}
+                  Progress: {meta.label}
                 </span>
 
-                {/* Approval badge (only if submitted) */}
-                {approval && isSubmitted && (
+                {/* Approval badge */}
+                {approval && (
                   <span
                     className={cn(
                       "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold",
@@ -842,7 +967,7 @@ export function OnboardingStageCard({
                     )}
                   >
                     <approval.icon className="h-3 w-3" />
-                    {approval.label}
+                    HR Status: {approval.label}
                   </span>
                 )}
 
@@ -902,11 +1027,30 @@ export function OnboardingStageCard({
                     documents={documents}
                     onEdit={onEdit}
                     isSubmitted={isSubmitted}
+                    approvalStatus={approvalStatus}
+                    rejection={rejection}
                   />
                 ) : education ? (
-                  <EducationContent education={education} />
+                  <EducationContent 
+                    education={education} 
+                    onEdit={onEdit}
+                    approvalStatus={approvalStatus}
+                    rejection={rejection}
+                  />
                 ) : experience ? (
-                  <ExperienceContent experience={experience} />
+                  <ExperienceContent 
+                    experience={experience} 
+                    onEdit={onEdit}
+                    approvalStatus={approvalStatus}
+                    rejection={rejection}
+                  />
+                ) : bankAccounts ? (
+                  <BankAccountsContent 
+                    accounts={bankAccounts} 
+                    onEdit={onEdit}
+                    approvalStatus={approvalStatus}
+                    rejection={rejection}
+                  />
                 ) : inductionTasks ? (
                   <InductionContent tasks={inductionTasks} />
                 ) : null}
@@ -928,8 +1072,8 @@ export function OnboardingStageCard({
                       </Button>
                     )}
 
-                    {(status === "in_progress" || status === "completed") &&
-                      !isSubmitted &&
+                    {(status === "pending" || approvalStatus === "rejected") &&
+                      (!isSubmitted || approvalStatus === "rejected") &&
                       onEdit && (
                         <Button
                           size="sm"

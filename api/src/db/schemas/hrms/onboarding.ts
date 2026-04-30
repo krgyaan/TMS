@@ -29,6 +29,8 @@ export const onboardingRequests = pgTable('hrms_onboarding_requests', {
 
   status: varchar('status', { length: 50 }).notNull().default('pending'),
 
+  // Aggregate stage statuses (computed from individual entity statuses)
+  // Values: 'pending' | 'in_progress' | 'submitted' | 'approved' | 'rejected'
   profileStatus: varchar('profile_status', { length: 50 }).default('pending'),
   bankStatus: varchar('bank_status', { length: 50 }).default('pending'),
   educationStatus: varchar('education_status', { length: 50 }).default('pending'),
@@ -80,7 +82,7 @@ export const onboardingProfiles = pgTable('hrms_onboarding_profiles', {
   permanentAddress: jsonb('permanent_address').default({}),
   emergencyContact: jsonb('emergency_contact').default({}),
 
-  // HR DETAILS
+  // HR DETAILS (filled by HR, not employee)
   employeeType: varchar('employee_type', { length: 50 }),
   employeeStatus: varchar('employee_status', { length: 50 }).default('Active'),
   designationId: bigint('designation_id', { mode: 'number' }),
@@ -102,16 +104,19 @@ export const onboardingProfiles = pgTable('hrms_onboarding_profiles', {
   pfApplicable: boolean('pf_applicable').default(false),
   esicApplicable: boolean('esic_applicable').default(false),
 
-  // BANK DETAILS
-  bankName: varchar('bank_name', { length: 255 }),
-  accountHolderName: varchar('account_holder_name', { length: 255 }),
-  accountNumber: varchar('account_number', { length: 50 }),
-  ifscCode: varchar('ifsc_code', { length: 20 }),
-  branchName: varchar('branch_name', { length: 255 }),
-  branchAddress: text('branch_address'),
-  upiId: varchar('upi_id', { length: 100 }),
+  // EMPLOYEE SUBMISSION STATUS
+  // 'pending'   — employee has not submitted yet (form is a draft)
+  // 'submitted' — employee submitted for HR review
+  status: varchar('status', { length: 50 }).default('pending'),
 
-  // COMPLETION FLAGS
+  // HR REVIEW STATUS (per-record)
+  // 'pending'  — HR has not reviewed yet
+  // 'approved' — HR approved; data is copied to permanent tables
+  // 'rejected' — HR rejected; employee must submit a new record
+  hrStatus: varchar('hr_status', { length: 50 }).default('pending'),
+  hrRemark: text('hr_remark'),
+
+  // Legacy boolean flags (kept for backward compatibility)
   hrCompleted: boolean('hr_completed').default(false),
   employeeCompleted: boolean('employee_completed').default(false),
 
@@ -142,11 +147,15 @@ export const onboardingDocuments = pgTable('hrms_onboarding_documents', {
   issueDate: date('issue_date'),
   expiryDate: date('expiry_date'),
 
+  // Employee status: 'pending' | 'submitted'
   status: varchar('status', { length: 50 }).default('pending'),
+
+  // HR status: 'pending' | 'approved' | 'rejected'
+  hrStatus: varchar('hr_status', { length: 50 }).default('pending'),
+  hrRemark: text('hr_remark'),
 
   verifiedBy: bigint('verified_by', { mode: 'number' }),
   verificationDate: date('verification_date'),
-  remarks: text('remarks'),
 
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -221,8 +230,13 @@ export const onboardingEducation = pgTable('hrms_onboarding_education', {
   startDate: date('start_date'),
   endDate: date('end_date'),
   grade: varchar('grade', { length: 50 }),
-  
+
+  // Employee status: 'pending' | 'submitted'
   status: varchar('status', { length: 50 }).default('pending'),
+
+  // HR review status: 'pending' | 'approved' | 'rejected'
+  hrStatus: varchar('hr_status', { length: 50 }).default('pending'),
+  hrRemark: text('hr_remark'),
 
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -248,7 +262,12 @@ export const onboardingExperience = pgTable('hrms_onboarding_experience', {
   currentlyWorking: boolean('currently_working').default(false),
   responsibilities: text('responsibilities'),
 
+  // Employee status: 'pending' | 'submitted'
   status: varchar('status', { length: 50 }).default('pending'),
+
+  // HR review status: 'pending' | 'approved' | 'rejected'
+  hrStatus: varchar('hr_status', { length: 50 }).default('pending'),
+  hrRemark: text('hr_remark'),
 
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -256,3 +275,36 @@ export const onboardingExperience = pgTable('hrms_onboarding_experience', {
 
 export type OnboardingExperience = typeof onboardingExperience.$inferSelect;
 export type NewOnboardingExperience = typeof onboardingExperience.$inferInsert;
+
+//
+// ==============================
+// 8. ONBOARDING BANK DETAILS
+// ==============================
+//
+
+export const onboardingBankDetails = pgTable('hrms_onboarding_bank_details', {
+  id: bigserial('id', { mode: 'number' }).primaryKey(),
+  onboardingId: bigint('onboarding_id', { mode: 'number' }).notNull(),
+
+  bankName: varchar('bank_name', { length: 255 }).notNull(),
+  accountHolderName: varchar('account_holder_name', { length: 255 }).notNull(),
+  accountNumber: varchar('account_number', { length: 50 }).notNull(),
+  ifscCode: varchar('ifsc_code', { length: 20 }).notNull(),
+  branchName: varchar('branch_name', { length: 255 }),
+  branchAddress: text('branch_address'),
+  upiId: varchar('upi_id', { length: 100 }),
+  isPrimary: boolean('is_primary').default(false),
+
+  // Employee status: 'pending' | 'submitted'
+  status: varchar('status', { length: 50 }).default('pending'),
+
+  // HR review status: 'pending' | 'approved' | 'rejected'
+  hrStatus: varchar('hr_status', { length: 50 }).default('pending'),
+  hrRemark: text('hr_remark'),
+
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type OnboardingBankDetail = typeof onboardingBankDetails.$inferSelect;
+export type NewOnboardingBankDetail = typeof onboardingBankDetails.$inferInsert;

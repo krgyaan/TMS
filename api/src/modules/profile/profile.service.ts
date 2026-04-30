@@ -14,6 +14,7 @@ import { employeeDocuments } from '@/db/schemas/hrms/employee-documents.schema';
 import { employeeAssets } from '@/db/schemas/hrms/employee-assets.schema';
 import { employeeEducation } from '@/db/schemas/hrms/employee-education.schema';
 import { employeeExperience } from '@/db/schemas/hrms/employee-experience.schema';
+import { employeeBankDetails } from '@/db/schemas/hrms/employee-bank-details.schema';
 import { 
   onboardingRequests, 
   onboardingDocuments, 
@@ -21,7 +22,8 @@ import {
   onboardingEducation,
   onboardingExperience,
   onboardingActivityLogs,
-  onboardingInduction
+  onboardingInduction,
+  onboardingBankDetails
 } from '@/db/schemas/hrms/onboarding';
 import { complaints } from '@/db/schemas/hrms/complaints.schema';
 import { teams } from '@/db/schemas/master/teams.schema';
@@ -131,6 +133,7 @@ export class ProfileService {
     let experience: any[] = [];
     let onboardingStatus: any = null;
     let inductionTasks: any = null;
+    let bankAccounts: any[] = [];
 
     if (isOnboarding) {
       // 2 & 3. Fetch Onboarding Profile Data
@@ -198,24 +201,25 @@ export class ProfileService {
           probationMonths: obProfile.probationMonths,
           probationEndDate: obProfile.probationEndDate ? String(obProfile.probationEndDate).split('T')[0] : null,
           salaryType: obProfile.salaryType,
-          bankName: obProfile.bankName,
-          accountHolderName: obProfile.accountHolderName,
-          accountNumber: obProfile.accountNumber,
-          ifscCode: obProfile.ifscCode,
-          branchName: obProfile.branchName,
           joiningDate: obProfile.dateOfJoining ? String(obProfile.dateOfJoining).split('T')[0] : null,
           designation: obProfileRow.designationName || (obProfile.designationId ? `ID ${obProfile.designationId}` : null),
           department: obProfileRow.departmentName || (obProfile.departmentId ? `ID ${obProfile.departmentId}` : null),
         };
       }
 
-      // 4. Fetch Onboarding Documents
+      // 4. Fetch Onboarding Documents (Latest per category)
       const obDocsRows = await this.db
         .select()
         .from(onboardingDocuments)
-        .where(eq(onboardingDocuments.onboardingId, onboardingId!));
+        .where(eq(onboardingDocuments.onboardingId, onboardingId!))
+        .orderBy(desc(onboardingDocuments.id));
 
-      documents = obDocsRows.map(d => ({
+      // Filter to show only latest per docType
+      documents = obDocsRows.reduce((acc: any[], curr) => {
+        const exists = acc.find(d => d.docType === curr.docType);
+        if (!exists) acc.push(curr);
+        return acc;
+      }, []).map(d => ({
         id: d.id,
         docCategory: d.docCategory,
         docType: d.docType,
@@ -225,19 +229,27 @@ export class ProfileService {
         issueDate: d.issueDate || null,
         expiryDate: d.expiryDate || null,
         verificationStatus: d.status,
+        hrStatus: d.hrStatus,
         verifiedBy: d.verifiedBy ? String(d.verifiedBy) : null,
         verificationDate: d.verificationDate || null,
-        remarks: d.remarks || null,
+        hrRemark: d.hrRemark || null,
         uploadedAt: d.createdAt?.toISOString() || null,
       }));
 
-      // 5. Fetch Onboarding Education
+      // 5. Fetch Onboarding Education (Active only - latest for each degree/inst or just all non-rejected)
       const obEduRows = await this.db
         .select()
         .from(onboardingEducation)
-        .where(eq(onboardingEducation.onboardingId, onboardingId!));
+        .where(eq(onboardingEducation.onboardingId, onboardingId!))
+        .orderBy(desc(onboardingEducation.id));
 
-      education = obEduRows.map(e => ({
+      // We only show records that are NOT rejected OR the latest resubmission
+      // For simplicity, let's just group by degree/institution and take the latest
+      education = obEduRows.reduce((acc: any[], curr) => {
+        const exists = acc.find(e => e.degree === curr.degree && e.institution === curr.institution);
+        if (!exists) acc.push(curr);
+        return acc;
+      }, []).map(e => ({
         id: e.id,
         degree: e.degree,
         institution: e.institution,
@@ -246,15 +258,21 @@ export class ProfileService {
         endDate: e.endDate ? String(e.endDate).split('T')[0] : null,
         grade: e.grade,
         status: e.status,
+        hrStatus: e.hrStatus,
       }));
 
       // 6. Fetch Onboarding Experience
       const obExpRows = await this.db
         .select()
         .from(onboardingExperience)
-        .where(eq(onboardingExperience.onboardingId, onboardingId!));
+        .where(eq(onboardingExperience.onboardingId, onboardingId!))
+        .orderBy(desc(onboardingExperience.id));
 
-      experience = obExpRows.map(e => ({
+      experience = obExpRows.reduce((acc: any[], curr) => {
+        const exists = acc.find(e => e.companyName === curr.companyName && e.designation === curr.designation);
+        if (!exists) acc.push(curr);
+        return acc;
+      }, []).map(e => ({
         id: e.id,
         companyName: e.companyName,
         designation: e.designation,
@@ -263,6 +281,7 @@ export class ProfileService {
         currentlyWorking: e.currentlyWorking,
         responsibilities: e.responsibilities,
         status: e.status,
+        hrStatus: e.hrStatus,
       }));
 
       // 7. Fetch Induction Tasks
@@ -271,31 +290,88 @@ export class ProfileService {
         .from(onboardingInduction)
         .where(eq(onboardingInduction.onboardingId, onboardingId!));
 
+      // 7.5 Fetch Onboarding Bank Details
+      const obBankRows = await this.db
+        .select()
+        .from(onboardingBankDetails)
+        .where(eq(onboardingBankDetails.onboardingId, onboardingId!))
+        .orderBy(desc(onboardingBankDetails.id));
+
+      bankAccounts = obBankRows.reduce((acc: any[], curr) => {
+        const exists = acc.find(e => e.accountNumber === curr.accountNumber);
+        if (!exists) acc.push(curr);
+        return acc;
+      }, []).map(b => ({
+        id: b.id,
+        bankName: b.bankName,
+        accountHolderName: b.accountHolderName,
+        accountNumber: b.accountNumber,
+        ifscCode: b.ifscCode,
+        branchName: b.branchName,
+        branchAddress: b.branchAddress,
+        upiId: b.upiId,
+        isPrimary: b.isPrimary,
+        status: b.status,
+        hrStatus: b.hrStatus,
+      }));
+
       // 8. Build onboarding status for frontend
       const obReq = activeReqs[0];
       const obProfile = obProfileRow?.profile;
-      
-      const bankStatus = (obProfile?.bankName && obProfile?.accountNumber && obProfile?.ifscCode) 
-        ? 'completed' 
-        : (obProfile?.bankName || obProfile?.accountNumber) 
-          ? 'in_progress' 
-          : 'pending';
 
-      const educationStatus = education.length > 0 ? 'completed' : 'pending';
-      const experienceStatus = experience.length > 0 ? 'completed' : 'pending';
+      // ── Derive profile stage status from the latest profile record ──────────
+      // Priority: hrStatus ('approved'|'rejected') > submissionStatus > fill state
+      // ── Derive profile stage status (Employee only) ─────────────────────────
+      // ── Derive profile stage status (Employee only) ─────────────────────────
+      const profileStatus = obProfile?.status === 'submitted' ? 'submitted' : 'pending';
+      const profileHrStatus = (obProfile?.hrStatus as any) || 'pending';
+
+      // ── Derive bank stage status (Employee only) ────────────────────────────
+      const bankStatus = bankAccounts.some((b: any) => b.status === 'submitted') ? 'submitted' : 'pending';
+      
+      const bankApproved = bankAccounts.some((b: any) => b.hrStatus === 'approved');
+      const bankRejected = bankAccounts.some((b: any) => b.hrStatus === 'rejected');
+      const bankHrStatus = bankApproved ? 'approved' : bankRejected ? 'rejected' : 'pending';
+
+      // ── Derive education stage status (Employee only) ───────────────────────
+      const educationStatus = education.some((e: any) => e.status === 'submitted') ? 'submitted' : 'pending';
+
+      const eduApproved = education.some((e: any) => e.hrStatus === 'approved');
+      const eduRejected = education.some((e: any) => e.hrStatus === 'rejected');
+      const educationHrStatus = eduApproved ? 'approved' : eduRejected ? 'rejected' : 'pending';
+
+      // ── Derive experience stage status (Employee only) ──────────────────────
+      const experienceStatus = experience.some((e: any) => e.status === 'submitted') ? 'submitted' : 'pending';
+
+      const expApproved = experience.some((e: any) => e.hrStatus === 'approved');
+      const expRejected = experience.some((e: any) => e.hrStatus === 'rejected');
+      const experienceHrStatus = expApproved ? 'approved' : expRejected ? 'rejected' : 'pending';
 
       onboardingStatus = {
         id: obReq.id,
         requestType: obReq.requestType,
         status: obReq.status,
-        profileStatus: obReq.profileStatus || 'pending',
-        documentStatus: obReq.documentStatus || 'pending',
+        profileStatus,
+        documentStatus: (documents.some((d: any) => d.status === 'submitted' || d.status === 'approved') ? 'submitted' : 'pending') as any,
         bankStatus,
         educationStatus,
         experienceStatus,
-        inductionStatus: obReq.inductionStatus || 'pending',
+        inductionStatus: (inductionTasks?.some((t: any) => t.status === 'completed' || t.status === 'submitted') ? 'submitted' : 'pending') as any,
+        
+        profileHrStatus,
+        bankHrStatus,
+        educationHrStatus,
+        experienceHrStatus,
+        documentHrStatus: (documents.every((d: any) => d.hrStatus === 'approved') ? 'approved' : documents.some((d: any) => d.hrStatus === 'rejected') ? 'rejected' : 'pending') as any,
         progress: obReq.progress || 0,
-        employeeCompleted: obProfile?.employeeCompleted ?? false,
+        // Per-entity HR remarks for rejection feedback
+        profileHrRemark: obProfile?.hrRemark || null,
+        bankHrRemark: bankAccounts.find((b: any) => b.hrStatus === 'rejected')?.hrRemark || null,
+        educationHrRemark: education.find((e: any) => e.hrStatus === 'rejected')?.hrRemark || null,
+        experienceHrRemark: experience.find((e: any) => e.hrStatus === 'rejected')?.hrRemark || null,
+        documentHrRemark: documents.find((d: any) => (d as any).hrStatus === 'rejected')?.hrRemark || null,
+
+        employeeCompleted: obProfile?.status === 'submitted' || obProfile?.employeeCompleted || false,
         hrCompleted: obProfile?.hrCompleted ?? false,
         createdAt: obReq.createdAt?.toISOString() || null,
         updatedAt: obReq.updatedAt?.toISOString() || null,
@@ -369,11 +445,6 @@ export class ProfileService {
           probationMonths: employeeProfiles.probationMonths,
           probationEndDate: employeeProfiles.probationEndDate,
           salaryType: employeeProfiles.salaryType,
-          bankName: employeeProfiles.bankName,
-          accountHolderName: employeeProfiles.accountHolderName,
-          accountNumber: employeeProfiles.accountNumber,
-          ifscCode: employeeProfiles.ifscCode,
-          branchName: employeeProfiles.branchName,
           uanNumber: employeeProfiles.uanNumber,
           pfNumber: employeeProfiles.pfNumber,
           esicNumber: employeeProfiles.esicNumber,
@@ -433,6 +504,12 @@ export class ProfileService {
         .select()
         .from(employeeExperience)
         .where(eq(employeeExperience.userId, userId));
+
+      // 7. Fetch Permanent Bank Details
+      bankAccounts = await this.db
+        .select()
+        .from(employeeBankDetails)
+        .where(eq(employeeBankDetails.userId, userId));
     }
 
     // 5. Fetch Assets
@@ -481,6 +558,7 @@ export class ProfileService {
       documents,
       inductionTasks,
       assets,
+      bankAccounts,
       complaints: mappedComplaints,
       notifications: [],
     };
@@ -501,7 +579,25 @@ export class ProfileService {
     const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
 
     if (isOnboarding) {
-      const [updated] = await this.db.update(onboardingProfiles).set({
+      const onboardingId = activeReqs[0].id;
+
+      // Fetch the LATEST profile record for this onboarding
+      const [currentProfile] = await this.db
+        .select({ id: onboardingProfiles.id, hrStatus: onboardingProfiles.hrStatus, status: onboardingProfiles.status })
+        .from(onboardingProfiles)
+        .where(eq(onboardingProfiles.onboardingId, onboardingId))
+        .orderBy(desc(onboardingProfiles.id))
+        .limit(1);
+
+      // If current profile was approved, block editing
+      if (currentProfile?.hrStatus === 'approved') {
+        throw new ForbiddenException('Profile has been approved and can no longer be edited.');
+      }
+
+      // If current profile was rejected, INSERT a new record (audit trail)
+      // Otherwise, UPDATE the existing one
+      const profileData = {
+        onboardingId,
         firstName: dto.firstName,
         middleName: dto.middleName,
         lastName: dto.lastName,
@@ -538,15 +634,50 @@ export class ProfileService {
           altPhone: dto.emergencyContact.altPhone,
           email: dto.emergencyContact.email,
         } : undefined,
-        bankName: dto.bankName,
-        accountHolderName: dto.accountHolderName,
-        accountNumber: dto.accountNumber,
-        ifscCode: dto.ifscCode,
-        branchName: dto.branchName,
-        branchAddress: dto.branchAddress,
-        upiId: dto.upiId,
         updatedAt: new Date(),
-      }).where(eq(onboardingProfiles.onboardingId, activeReqs[0].id)).returning();
+      };
+
+      let updated: any;
+      if (currentProfile?.hrStatus === 'rejected') {
+        // Audit trail: create a fresh record, old rejected one is preserved
+        [updated] = await this.db.insert(onboardingProfiles).values({
+          ...profileData,
+          status: 'submitted',
+          hrStatus: 'pending',
+        } as any).returning();
+      } else if (currentProfile) {
+        // Now every save is a submission
+        [updated] = await this.db.update(onboardingProfiles)
+          .set({ ...profileData, status: 'submitted' })
+          .where(eq(onboardingProfiles.id, currentProfile.id))
+          .returning();
+      } else {
+        // First time — insert as submitted
+        [updated] = await this.db.insert(onboardingProfiles).values({
+          ...profileData,
+          status: 'submitted',
+          hrStatus: 'pending',
+        } as any).returning();
+      }
+
+      // Handle Bank Accounts Sync
+      if (dto.bankAccounts && Array.isArray(dto.bankAccounts)) {
+        await this.db.delete(onboardingBankDetails).where(eq(onboardingBankDetails.onboardingId, activeReqs[0].id));
+        if (dto.bankAccounts.length > 0) {
+          await this.db.insert(onboardingBankDetails).values(dto.bankAccounts.map((b: any) => ({
+            onboardingId: activeReqs[0].id,
+            bankName: b.bankName,
+            accountHolderName: b.accountHolderName,
+            accountNumber: b.accountNumber,
+            ifscCode: b.ifscCode,
+            branchName: b.branchName || null,
+            branchAddress: b.branchAddress || null,
+            upiId: b.upiId || null,
+            isPrimary: b.isPrimary === true || b.isPrimary === 'true',
+            status: 'pending',
+          })));
+        }
+      }
 
       // Handle Education Sync
       if (dto.education && Array.isArray(dto.education)) {
@@ -626,22 +757,33 @@ export class ProfileService {
       throw new BadRequestException('No active onboarding found.');
     }
 
-    // Check if already submitted
+    // Fetch the latest profile record
     const [obProfile] = await this.db
-      .select({ employeeCompleted: onboardingProfiles.employeeCompleted })
+      .select({ id: onboardingProfiles.id, status: onboardingProfiles.status, employeeCompleted: onboardingProfiles.employeeCompleted })
       .from(onboardingProfiles)
       .where(eq(onboardingProfiles.onboardingId, activeReqs[0].id))
+      .orderBy(desc(onboardingProfiles.id))
       .limit(1);
 
-    if (obProfile?.employeeCompleted) {
+    const alreadySubmitted = obProfile?.status === 'submitted' || obProfile?.employeeCompleted;
+    if (alreadySubmitted) {
       return { success: true, message: 'Already submitted for review.' };
     }
 
-    // Mark employee side as completed
-    await this.db.update(onboardingProfiles).set({
-      employeeCompleted: true,
+    // Mark as submitted
+    if (obProfile) {
+      await this.db.update(onboardingProfiles).set({
+        status: 'submitted',
+        employeeCompleted: true,
+        updatedAt: new Date(),
+      } as any).where(eq(onboardingProfiles.id, obProfile.id));
+    }
+
+    // Update the profileStatus on the onboarding request
+    await this.db.update(onboardingRequests).set({
+      profileStatus: 'submitted',
       updatedAt: new Date(),
-    }).where(eq(onboardingProfiles.onboardingId, activeReqs[0].id));
+    }).where(eq(onboardingRequests.id, activeReqs[0].id));
 
     // Log the activity
     await this.db.insert(onboardingActivityLogs).values({
@@ -669,6 +811,8 @@ export class ProfileService {
         startDate: dto.startDate ? (dto.startDate.length === 7 ? `${dto.startDate}-01` : dto.startDate) : null,
         endDate: dto.endDate ? (dto.endDate.length === 7 ? `${dto.endDate}-01` : dto.endDate) : null,
         grade: dto.grade,
+        status: 'submitted',
+        hrStatus: 'pending',
       }).returning();
       return inserted;
     }
@@ -682,6 +826,24 @@ export class ProfileService {
     const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
 
     if (isOnboarding) {
+      const [current] = await this.db.select().from(onboardingEducation).where(eq(onboardingEducation.id, eduId)).limit(1);
+      
+      if (current?.hrStatus === 'rejected') {
+        // Create new record for resubmission
+        const [inserted] = await this.db.insert(onboardingEducation).values({
+          onboardingId: activeReqs[0].id,
+          degree: dto.degree,
+          institution: dto.institution,
+          fieldOfStudy: dto.fieldOfStudy,
+          startDate: dto.startDate ? (dto.startDate.length === 7 ? `${dto.startDate}-01` : dto.startDate) : null,
+          endDate: dto.endDate ? (dto.endDate.length === 7 ? `${dto.endDate}-01` : dto.endDate) : null,
+          grade: dto.grade,
+          status: 'submitted',
+          hrStatus: 'pending',
+        }).returning();
+        return inserted;
+      }
+
       const [updated] = await this.db.update(onboardingEducation).set({
         degree: dto.degree,
         institution: dto.institution,
@@ -689,6 +851,7 @@ export class ProfileService {
         startDate: dto.startDate ? (dto.startDate.length === 7 ? `${dto.startDate}-01` : dto.startDate) : null,
         endDate: dto.endDate ? (dto.endDate.length === 7 ? `${dto.endDate}-01` : dto.endDate) : null,
         grade: dto.grade,
+        status: 'submitted',
         updatedAt: new Date(),
       }).where(eq(onboardingEducation.id, eduId)).returning();
       return updated;
@@ -731,6 +894,8 @@ export class ProfileService {
         toDate: parseDate(dto.toDate),
         currentlyWorking: dto.currentlyWorking,
         responsibilities: dto.responsibilities,
+        status: 'submitted',
+        hrStatus: 'pending',
       }).returning();
       return inserted;
     }
@@ -752,11 +917,32 @@ export class ProfileService {
       toDate: dto.toDate !== undefined ? parseDate(dto.toDate) : undefined,
       currentlyWorking: dto.currentlyWorking,
       responsibilities: dto.responsibilities,
+      status: 'completed',
       updatedAt: new Date(),
     };
 
     if (isOnboarding) {
-      const [updated] = await this.db.update(onboardingExperience).set(payload).where(eq(onboardingExperience.id, expId)).returning();
+      const [current] = await this.db.select().from(onboardingExperience).where(eq(onboardingExperience.id, expId)).limit(1);
+
+      if (current?.hrStatus === 'rejected') {
+        const [inserted] = await this.db.insert(onboardingExperience).values({
+          onboardingId: activeReqs[0].id,
+          companyName: dto.companyName,
+          designation: dto.designation,
+          fromDate: parseDate(dto.fromDate),
+          toDate: parseDate(dto.toDate),
+          currentlyWorking: dto.currentlyWorking,
+          responsibilities: dto.responsibilities,
+          status: 'submitted',
+          hrStatus: 'pending',
+        }).returning();
+        return inserted;
+      }
+
+      const [updated] = await this.db.update(onboardingExperience).set({
+        ...payload,
+        status: 'submitted',
+      }).where(eq(onboardingExperience.id, expId)).returning();
       return updated;
     }
 
@@ -777,6 +963,73 @@ export class ProfileService {
     }
 
     throw new BadRequestException('Experience details can only be modified during onboarding.');
+  }
+
+  // --- Bank Accounts ---
+
+  async addBankDetails(userId: number, dto: any) {
+    const activeReqs = await this.db.select({ id: onboardingRequests.id, status: onboardingRequests.status })
+      .from(onboardingRequests).where(eq(onboardingRequests.userId, userId)).orderBy(desc(onboardingRequests.createdAt)).limit(1);
+    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
+
+    if (isOnboarding) {
+      const [inserted] = await this.db.insert(onboardingBankDetails).values({
+        onboardingId: activeReqs[0].id,
+        bankName: dto.bankName,
+        accountHolderName: dto.accountHolderName,
+        accountNumber: dto.accountNumber,
+        ifscCode: dto.ifscCode,
+        branchName: dto.branchName || null,
+        branchAddress: dto.branchAddress || null,
+        upiId: dto.upiId || null,
+        isPrimary: dto.isPrimary || false,
+        status: 'submitted',
+        hrStatus: 'pending',
+      }).returning();
+      return inserted;
+    }
+
+    throw new BadRequestException('Bank details can only be modified during onboarding.');
+  }
+
+  async updateBankDetails(userId: number, bankId: number, dto: any) {
+    const activeReqs = await this.db.select({ id: onboardingRequests.id, status: onboardingRequests.status })
+      .from(onboardingRequests).where(eq(onboardingRequests.userId, userId)).orderBy(desc(onboardingRequests.createdAt)).limit(1);
+    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
+
+    if (isOnboarding) {
+      const [updated] = await this.db.update(onboardingBankDetails).set({
+        bankName: dto.bankName,
+        accountHolderName: dto.accountHolderName,
+        accountNumber: dto.accountNumber,
+        ifscCode: dto.ifscCode,
+        branchName: dto.branchName || null,
+        branchAddress: dto.branchAddress || null,
+        upiId: dto.upiId || null,
+        isPrimary: dto.isPrimary || false,
+        status: 'completed',
+        updatedAt: new Date(),
+      }).where(eq(onboardingBankDetails.id, bankId)).returning();
+      return updated;
+    }
+
+    throw new BadRequestException('Bank details can only be modified during onboarding.');
+  }
+
+  async deleteBankDetails(userId: number, bankId: number) {
+    const activeReqs = await this.db.select({ id: onboardingRequests.id, status: onboardingRequests.status })
+      .from(onboardingRequests).where(eq(onboardingRequests.userId, userId)).orderBy(desc(onboardingRequests.createdAt)).limit(1);
+    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
+
+    if (isOnboarding) {
+      const [existing] = await this.db.select().from(onboardingBankDetails).where(eq(onboardingBankDetails.id, bankId)).limit(1);
+      if (existing && existing.onboardingId === activeReqs[0].id) {
+        await this.db.delete(onboardingBankDetails).where(eq(onboardingBankDetails.id, bankId));
+      }
+      return;
+    }
+
+    throw new BadRequestException('Bank details can only be modified during onboarding.');
   }
 
   async updateMyEducations(userId: number, body: any) {
@@ -1024,7 +1277,8 @@ export class ProfileService {
           status: 'pending',
           verifiedBy: null,
           verificationDate: null,
-          remarks: null,
+          hrStatus: 'pending',
+          hrRemark: null,
           updatedAt: new Date(),
         })
         .where(eq(onboardingDocuments.id, docId))
