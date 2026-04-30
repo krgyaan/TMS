@@ -7,6 +7,15 @@ import * as path from 'path';
 
 const EMPLOYEE_DOCS_UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'hrms', 'employee-documents');
 
+const REQUIRED_DOC_TYPES = [
+  'Aadhar Card',
+  'Graduation Certificate',
+  'Resume / CV',
+  'Passport Size Photo',
+  'Bank Passbook / Cancelled Cheque',
+];
+
+
 import { users } from '@/db/schemas/auth/users.schema';
 import { userProfiles } from '@/db/schemas/auth/user-profiles.schema';
 import { employeeProfiles } from '@/db/schemas/hrms/employee-profiles.schema';
@@ -319,50 +328,57 @@ export class ProfileService {
       const obReq = activeReqs[0];
       const obProfile = obProfileRow?.profile;
 
-      // ── Derive profile stage status from the latest profile record ──────────
-      // Priority: hrStatus ('approved'|'rejected') > submissionStatus > fill state
-      // ── Derive profile stage status (Employee only) ─────────────────────────
-      // ── Derive profile stage status (Employee only) ─────────────────────────
+      // ── Status Derivations ──────────────────────────────────────────────────
       const profileStatus = obProfile?.status === 'submitted' ? 'submitted' : 'pending';
       const profileHrStatus = (obProfile?.hrStatus as any) || 'pending';
 
-      // ── Derive bank stage status (Employee only) ────────────────────────────
       const bankStatus = bankAccounts.some((b: any) => b.status === 'submitted') ? 'submitted' : 'pending';
-      
       const bankApproved = bankAccounts.some((b: any) => b.hrStatus === 'approved');
       const bankRejected = bankAccounts.some((b: any) => b.hrStatus === 'rejected');
       const bankHrStatus = bankApproved ? 'approved' : bankRejected ? 'rejected' : 'pending';
 
-      // ── Derive education stage status (Employee only) ───────────────────────
       const educationStatus = education.some((e: any) => e.status === 'submitted') ? 'submitted' : 'pending';
-
       const eduApproved = education.some((e: any) => e.hrStatus === 'approved');
       const eduRejected = education.some((e: any) => e.hrStatus === 'rejected');
       const educationHrStatus = eduApproved ? 'approved' : eduRejected ? 'rejected' : 'pending';
 
-      // ── Derive experience stage status (Employee only) ──────────────────────
       const experienceStatus = experience.some((e: any) => e.status === 'submitted') ? 'submitted' : 'pending';
-
       const expApproved = experience.some((e: any) => e.hrStatus === 'approved');
       const expRejected = experience.some((e: any) => e.hrStatus === 'rejected');
       const experienceHrStatus = expApproved ? 'approved' : expRejected ? 'rejected' : 'pending';
+
+      // Document status based on REQUIRED_DOC_TYPES
+      const uploadedTypes = obDocsRows.map(d => d.docType);
+      const allDocsUploaded = REQUIRED_DOC_TYPES.every(type => uploadedTypes.includes(type));
+      const documentStatus = allDocsUploaded ? 'submitted' : 'pending';
+      const documentHrStatus = (documents.every((d: any) => d.hrStatus === 'approved') ? 'approved' : documents.some((d: any) => d.hrStatus === 'rejected') ? 'rejected' : 'pending') as any;
+
+      const inductionStatus = (inductionTasks?.some((t: any) => t.status === 'completed' || t.status === 'submitted') ? 'submitted' : 'pending') as any;
+
+      // Employee is only "completed" when all sections are submitted
+      const employeeCompleted = 
+        profileStatus === 'submitted' &&
+        documentStatus === 'submitted' &&
+        bankStatus === 'submitted' &&
+        educationStatus === 'submitted' &&
+        experienceStatus === 'submitted';
 
       onboardingStatus = {
         id: obReq.id,
         requestType: obReq.requestType,
         status: obReq.status,
         profileStatus,
-        documentStatus: (documents.some((d: any) => d.status === 'submitted' || d.status === 'approved') ? 'submitted' : 'pending') as any,
+        documentStatus,
         bankStatus,
         educationStatus,
         experienceStatus,
-        inductionStatus: (inductionTasks?.some((t: any) => t.status === 'completed' || t.status === 'submitted') ? 'submitted' : 'pending') as any,
+        inductionStatus,
         
         profileHrStatus,
         bankHrStatus,
         educationHrStatus,
         experienceHrStatus,
-        documentHrStatus: (documents.every((d: any) => d.hrStatus === 'approved') ? 'approved' : documents.some((d: any) => d.hrStatus === 'rejected') ? 'rejected' : 'pending') as any,
+        documentHrStatus,
         progress: obReq.progress || 0,
         // Per-entity HR remarks for rejection feedback
         profileHrRemark: obProfile?.hrRemark || null,
@@ -371,7 +387,7 @@ export class ProfileService {
         experienceHrRemark: experience.find((e: any) => e.hrStatus === 'rejected')?.hrRemark || null,
         documentHrRemark: documents.find((d: any) => (d as any).hrStatus === 'rejected')?.hrRemark || null,
 
-        employeeCompleted: obProfile?.status === 'submitted' || obProfile?.employeeCompleted || false,
+        employeeCompleted: employeeCompleted || obProfile?.employeeCompleted || false,
         hrCompleted: obProfile?.hrCompleted ?? false,
         createdAt: obReq.createdAt?.toISOString() || null,
         updatedAt: obReq.updatedAt?.toISOString() || null,
@@ -1166,6 +1182,8 @@ export class ProfileService {
         } as any)
         .returning();
 
+      await this.checkAndUpdateDocumentStatus(onboardingId!);
+
       return {
         id: inserted.id,
         docType: inserted.docType,
@@ -1284,6 +1302,8 @@ export class ProfileService {
         .where(eq(onboardingDocuments.id, docId))
         .returning();
 
+      await this.checkAndUpdateDocumentStatus(activeReqs[0].id);
+
       return {
         id: updated.id,
         docType: updated.docType,
@@ -1379,6 +1399,7 @@ export class ProfileService {
       }
 
       await this.db.delete(onboardingDocuments).where(eq(onboardingDocuments.id, docId));
+      await this.checkAndUpdateDocumentStatus(activeReqs[0].id);
       return;
     }
         const [existing] = await this.db
@@ -1408,5 +1429,25 @@ export class ProfileService {
     await this.db
       .delete(employeeDocuments)
       .where(eq(employeeDocuments.id, docId));
+  }
+
+  private async checkAndUpdateDocumentStatus(onboardingId: number) {
+    const currentDocs = await this.db
+      .select({ docType: onboardingDocuments.docType })
+      .from(onboardingDocuments)
+      .where(eq(onboardingDocuments.onboardingId, onboardingId));
+
+    const uploadedTypes = currentDocs.map((d) => d.docType);
+    const allUploaded = REQUIRED_DOC_TYPES.every((type) => uploadedTypes.includes(type));
+
+    const newStatus = allUploaded ? 'submitted' : 'pending';
+
+    await this.db
+      .update(onboardingRequests)
+      .set({
+        documentStatus: newStatus,
+        updatedAt: new Date(),
+      })
+      .where(eq(onboardingRequests.id, onboardingId));
   }
 }
