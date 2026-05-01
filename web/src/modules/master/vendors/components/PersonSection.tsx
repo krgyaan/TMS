@@ -22,7 +22,7 @@ type PersonForm = {
 };
 
 type Props = {
-    orgId: number;
+    orgId?: number;
 };
 
 export const PersonSection = ({ orgId }: Props) => {
@@ -69,24 +69,28 @@ export const PersonSection = ({ orgId }: Props) => {
 
             update(editingIndex, formState);
 
-            if (person?.id) {
+            if (orgId && person?.id) {
                 updateVendor.mutate({
                     id: person.id,
                     data: formState,
                 });
             }
         } else {
-            createVendor.mutate(
-                {
-                    ...formState,
-                    orgId: orgId,
-                },
-                {
-                    onSuccess: created => {
-                        append(created);
+            if (orgId) {
+                createVendor.mutate(
+                    {
+                        ...formState,
+                        orgId: orgId,
                     },
-                }
-            );
+                    {
+                        onSuccess: created => {
+                            append(created);
+                        },
+                    }
+                );
+            } else {
+                append(formState);
+            }
         }
 
         setOpen(false);

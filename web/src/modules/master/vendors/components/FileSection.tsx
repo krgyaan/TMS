@@ -23,7 +23,7 @@ type FileForm = {
 };
 
 type Props = {
-    orgId: number;
+    orgId?: number;
 };
 
 export const FileSection = ({ orgId }: Props) => {
@@ -69,44 +69,56 @@ export const FileSection = ({ orgId }: Props) => {
         const persons = getValues("persons");
         const selectedPerson = persons?.[formState.personIndex];
 
-        if (!selectedPerson?.id) return;
+        if (orgId) {
+            // Edit mode logic - needs existing person ID
+            if (!selectedPerson?.id) return;
 
-        const payload = {
-            vendorId: selectedPerson.id,
-            name: formState.name,
-            filePath: formState.filePath,
-        };
+            const payload = {
+                vendorId: selectedPerson.id,
+                name: formState.name,
+                filePath: formState.filePath,
+            };
 
-        if (editingIndex !== null) {
-            const existing = getValues(`files.${editingIndex}`);
+            if (editingIndex !== null) {
+                const existing = getValues(`files.${editingIndex}`);
 
-            if (existing?.id) {
-                updateFile.mutate(
-                    {
-                        id: existing.id,
-                        data: payload,
-                    },
-                    {
-                        onSuccess: updated => {
-                            update(editingIndex, {
-                                ...updated,
-                                personIndex: formState.personIndex,
-                                status: true,
-                            });
+                if (existing?.id) {
+                    updateFile.mutate(
+                        {
+                            id: existing.id,
+                            data: payload,
                         },
-                    }
-                );
+                        {
+                            onSuccess: updated => {
+                                update(editingIndex, {
+                                    ...updated,
+                                    personIndex: formState.personIndex,
+                                    status: true,
+                                });
+                            },
+                        }
+                    );
+                } else {
+                    update(editingIndex, { ...existing, ...formState });
+                }
+            } else {
+                createFile.mutate(payload, {
+                    onSuccess: created => {
+                        append({
+                            ...created,
+                            personIndex: formState.personIndex,
+                            status: true,
+                        });
+                    },
+                });
             }
         } else {
-            createFile.mutate(payload, {
-                onSuccess: created => {
-                    append({
-                        ...created,
-                        personIndex: formState.personIndex,
-                        status: true,
-                    });
-                },
-            });
+            // Create mode logic - just append to field array
+            if (editingIndex !== null) {
+                update(editingIndex, formState);
+            } else {
+                append(formState);
+            }
         }
 
         setOpen(false);

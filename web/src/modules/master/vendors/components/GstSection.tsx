@@ -21,7 +21,7 @@ type GstForm = {
 };
 
 type Props = {
-    orgId: number;
+    orgId?: number;
 };
 
 export const GstSection = ({ orgId }: Props) => {
@@ -64,26 +64,29 @@ export const GstSection = ({ orgId }: Props) => {
         if (editingIndex !== null) {
             const existing = getValues(`gsts.${editingIndex}`);
 
-            if (existing?.id) {
+            if (orgId && existing?.id) {
                 updateGst.mutate({
                     id: existing.id,
                     data: formState,
                 });
-
-                update(editingIndex, { ...existing, ...formState });
             }
+            update(editingIndex, { ...existing, ...formState });
         } else {
-            createGst.mutate(
-                {
-                    ...formState,
-                    orgId: orgId,
-                },
-                {
-                    onSuccess: created => {
-                        append(created);
+            if (orgId) {
+                createGst.mutate(
+                    {
+                        ...formState,
+                        orgId: orgId,
                     },
-                }
-            );
+                    {
+                        onSuccess: created => {
+                            append(created);
+                        },
+                    }
+                );
+            } else {
+                append(formState);
+            }
         }
 
         setOpen(false);

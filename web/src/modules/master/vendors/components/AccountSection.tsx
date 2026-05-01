@@ -15,14 +15,14 @@ import { useCreateVendorAccount, useUpdateVendorAccount, useDeleteVendorAccount 
 
 type AccountForm = {
     id?: number;
-    accountName: string;
+    bankAccountName: string;
     accountNum: string;
-    accountIfsc: string;
+    ifscCode: string;
     status: boolean;
 };
 
 type Props = {
-    orgId: number;
+    orgId?: number;
 };
 
 export const AccountSection = ({ orgId }: Props) => {
@@ -41,9 +41,9 @@ export const AccountSection = ({ orgId }: Props) => {
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
 
     const emptyAccount: AccountForm = {
-        accountName: "",
+        bankAccountName: "",
         accountNum: "",
-        accountIfsc: "",
+        ifscCode: "",
         status: true,
     };
 
@@ -66,35 +66,38 @@ export const AccountSection = ({ orgId }: Props) => {
         if (editingIndex !== null) {
             const existing = getValues(`accounts.${editingIndex}`);
 
-            if (existing?.id) {
+            if (orgId && existing?.id) {
                 updateAccount.mutate({
                     id: existing.id,
                     data: {
                         orgId,
-                        bankAccountName: formState.accountName,
+                        bankAccountName: formState.bankAccountName,
                         accountNum: formState.accountNum,
-                        ifscCode: formState.accountIfsc,
+                        ifscCode: formState.ifscCode,
                         status: formState.status,
                     },
                 });
-
-                update(editingIndex, { ...existing, ...formState });
             }
+            update(editingIndex, { ...existing, ...formState });
         } else {
-            createAccount.mutate(
-                {
-                    orgId,
-                    bankAccountName: formState.accountName,
-                    accountNum: formState.accountNum,
-                    ifscCode: formState.accountIfsc,
-                    status: formState.status,
-                },
-                {
-                    onSuccess: created => {
-                        append(created);
+            if (orgId) {
+                createAccount.mutate(
+                    {
+                        orgId,
+                        bankAccountName: formState.bankAccountName,
+                        accountNum: formState.accountNum,
+                        ifscCode: formState.ifscCode,
+                        status: formState.status,
                     },
-                }
-            );
+                    {
+                        onSuccess: created => {
+                            append(created);
+                        },
+                    }
+                );
+            } else {
+                append(formState);
+            }
         }
 
         setOpen(false);
@@ -162,7 +165,7 @@ export const AccountSection = ({ orgId }: Props) => {
                     <div className="space-y-4">
                         <div>
                             <label className="text-sm font-medium">Account Name</label>
-                            <Input value={formState.bankAccountName} onChange={e => setFormState({ ...formState, accountName: e.target.value })} />
+                            <Input value={formState.bankAccountName} onChange={e => setFormState({ ...formState, bankAccountName: e.target.value })} />
                         </div>
 
                         <div>
@@ -172,7 +175,7 @@ export const AccountSection = ({ orgId }: Props) => {
 
                         <div>
                             <label className="text-sm font-medium">IFSC Code</label>
-                            <Input value={formState.ifscCode} onChange={e => setFormState({ ...formState, accountIfsc: e.target.value })} />
+                            <Input value={formState.ifscCode} onChange={e => setFormState({ ...formState, ifscCode: e.target.value })} />
                         </div>
 
                         <div className="flex items-center gap-2">
