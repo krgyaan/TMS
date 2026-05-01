@@ -324,7 +324,31 @@
             </tbody>
         </table>
 
-        {{#if data.courier_address}}
+        {{#if data.courier_name}}
+            <p><b>Courier Delivery Address:</b></p>
+            <table width="100%" cellpadding="8" cellspacing="0" style="border: 1px solid #000; border-collapse: collapse; margin-bottom: 16px;">
+                <tbody>
+                    <tr>
+                        <th style="border: 1px solid #000; text-align: left; width: 20%;">Name</th>
+                        <td style="border: 1px solid #000; text-align: left; width: 30%;">{{data.courier_name}}</td>
+                        <th style="border: 1px solid #000; text-align: left; width: 20%;">Phone No</th>
+                        <td style="border: 1px solid #000; text-align: left; width: 30%;">{{data.courier_phone}}</td>
+                    </tr>
+                    <tr>
+                        <th style="border: 1px solid #000; text-align: left;">Address</th>
+                        <td colspan="3" style="border: 1px solid #000; text-align: left;">
+                            {{data.courier_address_line1}}<br />
+                            {{#if data.courier_address_line2}}{{data.courier_address_line2}}<br />{{/if}}
+                            {{data.courier_city}}, {{data.courier_state}}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th style="border: 1px solid #000; text-align: left;">Pin Code</th>
+                        <td colspan="3" style="border: 1px solid #000; text-align: left;">{{data.courier_pincode}}</td>
+                    </tr>
+                </tbody>
+            </table>
+        {{else if data.courier_address}}
             <p><b>Courier Delivery Address:</b></p>
             <pre style="white-space: pre-wrap; background-color: #f5f5f5; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">{{data.courier_address}}</pre>
         {{/if}}
