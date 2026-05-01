@@ -24,7 +24,9 @@ export const TenderApprovalFormSchema = z.object({
     // Rejection Details
     tenderStatus: z.string().optional(),
     oemNotAllowed: z.string().optional(),
-    remarks: z.string().max(1000).optional(),
+    tlApprovalRemarks: z.string().max(2000).optional(),
+    tlRejectionRemarks: z.string().max(2000).optional(),
+    tlIncompleteRemarks: z.string().max(2000).optional(),
 
     // Incomplete Fields
     incompleteFields: z.array(z.object({

@@ -16,7 +16,9 @@ export const getInitialValues = (approval?: TenderApproval | null): TenderApprov
             alternativeFinancialDocs: [],
             tenderStatus: undefined,
             oemNotAllowed: undefined,
-            remarks: undefined,
+            tlApprovalRemarks: undefined,
+            tlRejectionRemarks: undefined,
+            tlIncompleteRemarks: undefined,
             incompleteFields: [],
         };
     }
@@ -40,11 +42,9 @@ export const getInitialValues = (approval?: TenderApproval | null): TenderApprov
         alternativeFinancialDocs: approval.alternativeFinancialDocs ?? [],
         tenderStatus: approval.tenderStatus ? String(approval.tenderStatus) : undefined,
         oemNotAllowed: approval.oemNotAllowed ? String(approval.oemNotAllowed) : undefined,
-        remarks: (approval.tlStatus === '3' || approval.tlDecision === '3')
-            ? (approval.tlIncompleteRemarks ?? undefined)
-            : (approval.tlStatus === '1' || approval.tlDecision === '1')
-                ? (approval.tlApprovalRemarks ?? undefined)
-                : (approval.tlRejectionRemarks ?? undefined),
+        tlApprovalRemarks: toOptionalString(approval.tlApprovalRemarks),
+        tlRejectionRemarks: toOptionalString(approval.tlRejectionRemarks),
+        tlIncompleteRemarks: toOptionalString(approval.tlIncompleteRemarks),
         incompleteFields: approval.incompleteFields ?? [],
     };
 };
@@ -89,8 +89,8 @@ export const mapFormToPayload = (values: TenderApprovalFormValues): SaveTenderAp
         if (values.alternativeFinancialDocs && values.alternativeFinancialDocs.length > 0) {
             payload.alternativeFinancialDocs = values.alternativeFinancialDocs;
         }
-        if (values.remarks) {
-            payload.tlApprovalRemarks = values.remarks;
+        if (values.tlApprovalRemarks) {
+            payload.tlApprovalRemarks = values.tlApprovalRemarks;
         }
         return payload;
     }
@@ -106,8 +106,8 @@ export const mapFormToPayload = (values: TenderApprovalFormValues): SaveTenderAp
         if (values.oemNotAllowed) {
             payload.oemNotAllowed = values.oemNotAllowed;
         }
-        if (values.remarks) {
-            payload.tlRejectionRemarks = values.remarks;
+        if (values.tlRejectionRemarks) {
+            payload.tlRejectionRemarks = values.tlRejectionRemarks;
         }
         return payload;
     }
@@ -120,8 +120,8 @@ export const mapFormToPayload = (values: TenderApprovalFormValues): SaveTenderAp
         if (values.incompleteFields && values.incompleteFields.length > 0) {
             payload.incompleteFields = values.incompleteFields;
         }
-        if (values.remarks) {
-            payload.tlIncompleteRemarks = values.remarks;
+        if (values.tlIncompleteRemarks) {
+            payload.tlIncompleteRemarks = values.tlIncompleteRemarks;
         }
         return payload;
     }
