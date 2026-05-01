@@ -111,13 +111,37 @@ interface OnboardingProfileFormProps {
 export function OnboardingProfileForm({ onCancel, onSuccess, initialTab = "personal" }: OnboardingProfileFormProps) {
   const { data } = useProfileContext();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState<"personal" | "address" | "emergency">(initialTab as any);
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab as any);
   const [sameAsCurrent, setSameAsCurrent] = useState(false);
 
   const P = data?.profile || {};
   const ADDR = data?.address || {};
   const EC = data?.emergencyContact || {};
   const EP = data?.employeeProfile || {};
+
+  const tabs = [
+    { id: "personal", label: "Personal", icon: User },
+    { id: "address", label: "Address", icon: MapPin },
+    { id: "emergency", label: "Emergency", icon: Heart },
+  ] as const;
+
+  type TabId = typeof tabs[number]["id"];
+
+  const TAB_FIELDS: Record<TabId, (keyof ProfileFormValues)[]> = {
+    personal: [
+      "firstName", "middleName", "lastName", "dateOfBirth", "gender", 
+      "maritalStatus", "nationality", "bloodGroup", "personalEmail", 
+      "phone", "alternatePhone", "aadharNumber", "panNumber", "linkedinProfile"
+    ],
+    address: [
+      "currentAddressLine1", "currentAddressLine2", "currentCity", "currentState", 
+      "currentCountry", "currentPostalCode", "permanentAddressLine1", "permanentAddressLine2", 
+      "permanentCity", "permanentState", "permanentCountry", "permanentPostalCode"
+    ],
+    emergency: [
+      "emergencyName", "emergencyRelationship", "emergencyPhone", "emergencyAltPhone", "emergencyEmail"
+    ]
+  };
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -199,6 +223,20 @@ export function OnboardingProfileForm({ onCancel, onSuccess, initialTab = "perso
     }
   };
 
+  const onError = (errors: any) => {
+    const errorFields = Object.keys(errors) as (keyof ProfileFormValues)[];
+    
+    // Find the earliest tab that has an error
+    for (const tab of tabs) {
+      const hasErrorInTab = TAB_FIELDS[tab.id].some(field => errorFields.includes(field));
+      if (hasErrorInTab) {
+        setActiveTab(tab.id);
+        break;
+      }
+    }
+    toast.error("Please fix the errors in the form before saving");
+  };
+
   const handleSameAddress = (checked: boolean) => {
     setSameAsCurrent(checked);
     if (checked) {
@@ -212,14 +250,8 @@ export function OnboardingProfileForm({ onCancel, onSuccess, initialTab = "perso
     }
   };
 
-  const tabs = [
-    { id: "personal", label: "Personal", icon: User },
-    { id: "address", label: "Address", icon: MapPin },
-    { id: "emergency", label: "Emergency", icon: Heart },
-  ] as const;
-
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+    <form onSubmit={form.handleSubmit(onSubmit, onError)} className="space-y-8">
       {/* Tab Navigation */}
       <div className="flex flex-wrap gap-2 p-1 bg-muted/30 rounded-2xl border border-border/10">
         {tabs.map((tab) => (
@@ -313,6 +345,7 @@ export function OnboardingProfileForm({ onCancel, onSuccess, initialTab = "perso
               <div className="space-y-2">
                 <Label htmlFor="nationality" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Nationality *</Label>
                 <Input {...form.register("nationality")} id="nationality" className="rounded-xl h-11" placeholder="Indian" />
+                {form.formState.errors.nationality && <p className="text-[10px] text-destructive font-medium">{form.formState.errors.nationality.message}</p>}
               </div>
 
               <div className="space-y-2">
@@ -353,6 +386,7 @@ export function OnboardingProfileForm({ onCancel, onSuccess, initialTab = "perso
                 <div className="md:col-span-2 space-y-2">
                   <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Address Line 1 *</Label>
                   <Input {...form.register("currentAddressLine1")} className="rounded-xl h-11" />
+                  {form.formState.errors.currentAddressLine1 && <p className="text-[10px] text-destructive font-medium">{form.formState.errors.currentAddressLine1.message}</p>}
                 </div>
                 <div className="md:col-span-2 space-y-2">
                   <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Address Line 2</Label>
@@ -361,18 +395,22 @@ export function OnboardingProfileForm({ onCancel, onSuccess, initialTab = "perso
                 <div className="space-y-2">
                   <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">City *</Label>
                   <Input {...form.register("currentCity")} className="rounded-xl h-11" />
+                  {form.formState.errors.currentCity && <p className="text-[10px] text-destructive font-medium">{form.formState.errors.currentCity.message}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">State *</Label>
                   <Input {...form.register("currentState")} className="rounded-xl h-11" />
+                  {form.formState.errors.currentState && <p className="text-[10px] text-destructive font-medium">{form.formState.errors.currentState.message}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Country *</Label>
                   <Input {...form.register("currentCountry")} className="rounded-xl h-11" />
+                  {form.formState.errors.currentCountry && <p className="text-[10px] text-destructive font-medium">{form.formState.errors.currentCountry.message}</p>}
                 </div>
                 <div className="space-y-2">
                   <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Postal Code *</Label>
                   <Input {...form.register("currentPostalCode")} className="rounded-xl h-11" />
+                  {form.formState.errors.currentPostalCode && <p className="text-[10px] text-destructive font-medium">{form.formState.errors.currentPostalCode.message}</p>}
                 </div>
               </div>
             </div>
@@ -402,6 +440,7 @@ export function OnboardingProfileForm({ onCancel, onSuccess, initialTab = "perso
                   <div className="md:col-span-2 space-y-2">
                     <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Address Line 1 *</Label>
                     <Input {...form.register("permanentAddressLine1")} className="rounded-xl h-11" />
+                    {form.formState.errors.permanentAddressLine1 && <p className="text-[10px] text-destructive font-medium">{form.formState.errors.permanentAddressLine1.message}</p>}
                   </div>
                   <div className="md:col-span-2 space-y-2">
                     <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Address Line 2</Label>
@@ -410,18 +449,22 @@ export function OnboardingProfileForm({ onCancel, onSuccess, initialTab = "perso
                   <div className="space-y-2">
                     <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">City *</Label>
                     <Input {...form.register("permanentCity")} className="rounded-xl h-11" />
+                    {form.formState.errors.permanentCity && <p className="text-[10px] text-destructive font-medium">{form.formState.errors.permanentCity.message}</p>}
                   </div>
                   <div className="space-y-2">
                     <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">State *</Label>
                     <Input {...form.register("permanentState")} className="rounded-xl h-11" />
+                    {form.formState.errors.permanentState && <p className="text-[10px] text-destructive font-medium">{form.formState.errors.permanentState.message}</p>}
                   </div>
                   <div className="space-y-2">
                     <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Country *</Label>
                     <Input {...form.register("permanentCountry")} className="rounded-xl h-11" />
+                    {form.formState.errors.permanentCountry && <p className="text-[10px] text-destructive font-medium">{form.formState.errors.permanentCountry.message}</p>}
                   </div>
                   <div className="space-y-2">
                     <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Postal Code *</Label>
                     <Input {...form.register("permanentPostalCode")} className="rounded-xl h-11" />
+                    {form.formState.errors.permanentPostalCode && <p className="text-[10px] text-destructive font-medium">{form.formState.errors.permanentPostalCode.message}</p>}
                   </div>
                 </div>
               )}
@@ -448,6 +491,7 @@ export function OnboardingProfileForm({ onCancel, onSuccess, initialTab = "perso
               <div className="space-y-2">
                 <Label htmlFor="emergencyName" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Contact Name *</Label>
                 <Input {...form.register("emergencyName")} id="emergencyName" className="rounded-xl h-11" placeholder="Jane Doe" />
+                {form.formState.errors.emergencyName && <p className="text-[10px] text-destructive font-medium">{form.formState.errors.emergencyName.message}</p>}
               </div>
               <div className="space-y-2">
                 <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Relationship *</Label>
@@ -461,10 +505,12 @@ export function OnboardingProfileForm({ onCancel, onSuccess, initialTab = "perso
                     ))}
                   </SelectContent>
                 </Select>
+                {form.formState.errors.emergencyRelationship && <p className="text-[10px] text-destructive font-medium">{form.formState.errors.emergencyRelationship.message}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="emergencyPhone" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Primary Phone *</Label>
                 <Input {...form.register("emergencyPhone")} id="emergencyPhone" className="rounded-xl h-11" />
+                {form.formState.errors.emergencyPhone && <p className="text-[10px] text-destructive font-medium">{form.formState.errors.emergencyPhone.message}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="emergencyAltPhone" className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Alternate Phone</Label>
@@ -513,9 +559,14 @@ export function OnboardingProfileForm({ onCancel, onSuccess, initialTab = "perso
           {activeTab !== "emergency" ? (
             <Button 
               type="button" 
-              onClick={() => {
-                // We could validate the current section here if we wanted
-                setActiveTab(tabs[tabs.findIndex(t => t.id === activeTab) + 1].id);
+              onClick={async () => {
+                const fieldsToValidate = TAB_FIELDS[activeTab];
+                const isValid = await form.trigger(fieldsToValidate);
+                if (isValid) {
+                  setActiveTab(tabs[tabs.findIndex(t => t.id === activeTab) + 1].id);
+                } else {
+                  toast.error("Please resolve the errors in this section before proceeding");
+                }
               }}
               className="rounded-xl gap-2 h-11 px-8 flex-1 sm:flex-none shadow-lg shadow-primary/20"
             >
