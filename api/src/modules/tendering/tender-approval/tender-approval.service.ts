@@ -344,6 +344,7 @@ export class TenderApprovalService {
                 tlRejectionRemarks: tenderInfos.tlRejectionRemarks,
                 tlIncompleteRemarks: tenderInfos.tlIncompleteRemarks,
                 tlApprovalRemarks: tenderInfos.tlApprovalRemarks,
+                tlApprovalTimestamp: tenderInfos.tlApprovalTimestamp,
             })
             .from(tenderInfos)
             .leftJoin(statuses, eq(tenderInfos.status, statuses.id))
@@ -446,7 +447,7 @@ export class TenderApprovalService {
             updateData.emdMode = payload.emdMode ?? null;
             updateData.approvePqrSelection = payload.approvePqrSelection ?? null;
             updateData.approveFinanceDocSelection = payload.approveFinanceDocSelection ?? null;
-
+            
             updateData.tlApprovalRemarks = payload.tlApprovalRemarks ?? null;
             updateData.tlRejectionRemarks = null;
             updateData.tlIncompleteRemarks = null;
@@ -454,6 +455,8 @@ export class TenderApprovalService {
             updateData.status = 3; // Tender Info approved
             newStatus = 3;
             statusComment = "Tender info approved";
+
+            updateData.tlApprovalTimestamp = new Date(); // tl approval timestamp
 
             // Update tender values from info sheet
             const infoSheet = await this.tenderInfoSheetsService.findByTenderId(tenderId);
@@ -492,6 +495,9 @@ export class TenderApprovalService {
             updateData.approvePqrSelection = null;
             updateData.tlApprovalRemarks = null;
             updateData.approveFinanceDocSelection = null;
+
+            updateData.tlApprovalTimestamp = new Date(); // tl approval timestamp
+
         } else if (payload.tlStatus === "3") {
             // Incomplete - Status 29
             // Incomplete status - clear approval/rejection fields
@@ -504,6 +510,7 @@ export class TenderApprovalService {
             updateData.approvePqrSelection = null;
             updateData.approveFinanceDocSelection = null;
             updateData.tlApprovalRemarks = null;
+            updateData.tlApprovalTimestamp = null;
             updateData.tlRejectionRemarks = null;
             updateData.tlIncompleteRemarks = payload.tlIncompleteRemarks;
             updateData.oemNotAllowed = null;
