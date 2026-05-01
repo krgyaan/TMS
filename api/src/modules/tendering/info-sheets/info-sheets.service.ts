@@ -1,4 +1,5 @@
 import { Inject, Injectable, NotFoundException, ConflictException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { eq, inArray, or } from 'drizzle-orm';
@@ -43,6 +44,7 @@ export class TenderInfoSheetsService {
 
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly configService: ConfigService,
         private readonly tenderInfosService: TenderInfosService,
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
@@ -1228,7 +1230,6 @@ export class TenderInfoSheetsService {
             // ── NO branch ─
             recommendation_reason: rejectionReasonLabel,
             rejection_remarks: infoSheet.teRejectionRemarks || '',
-            rejection_proofs: (infoSheet.teRejectionProof ?? []),
 
             // ── Processing Fee ─
             processing_fee_required:
@@ -1364,12 +1365,24 @@ export class TenderInfoSheetsService {
 
             // ── Documents ─
             te_docs: infoSheet.technicalWorkOrders.map(
-                (doc) => doc.projectName || `Document ${doc.id}`
+                (doc) => ({
+                    name: doc.projectName || `Document ${doc.id}`,
+                    path: doc.poDocument?.[0] || null
+                })
             ),
             ce_docs: infoSheet.commercialDocuments.map(
-                (doc) => doc.documentName || `Document ${doc.id}`
+                (doc) => ({
+                    name: doc.documentName || `Document ${doc.id}`,
+                    path: doc.documentPath?.[0] || null
+                })
             ),
             tender_docs: tenderDocsList,
+
+            // ── Rejection Proofs ─
+            rejection_proofs: (infoSheet.teRejectionProof ?? []).map((path) => ({ path })),
+
+            // ── File Base URL for email links ─
+            fileBaseUrl: this.configService.get<string>('app.publicAppUrl') || '',
 
             // ── Clients 
             clients: infoSheet.clients.map((client) => ({
