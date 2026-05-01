@@ -125,6 +125,8 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
             // Clear rejection and incomplete fields
             form.setValue('tenderStatus', undefined);
             form.setValue('oemNotAllowed', undefined);
+            form.setValue('tlRejectionRemarks', undefined);
+            form.setValue('tlIncompleteRemarks', undefined);
             form.setValue('incompleteFields', []);
         } else if (tlDecision === '2') {
             // Clear approval and incomplete fields
@@ -138,6 +140,8 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
             form.setValue('approveFinanceDocSelection', undefined);
             form.setValue('alternativeTechnicalDocs', []);
             form.setValue('alternativeFinancialDocs', []);
+            form.setValue('tlApprovalRemarks', undefined);
+            form.setValue('tlIncompleteRemarks', undefined);
             form.setValue('incompleteFields', []);
         } else if (tlDecision === '3') {
             // Clear approval and rejection fields
@@ -153,6 +157,8 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
             form.setValue('alternativeFinancialDocs', []);
             form.setValue('tenderStatus', undefined);
             form.setValue('oemNotAllowed', undefined);
+            form.setValue('tlApprovalRemarks', undefined);
+            form.setValue('tlRejectionRemarks', undefined);
         } else if (tlDecision === '0') {
             // Clear all conditional fields
             form.setValue('rfqRequired', undefined);
@@ -167,7 +173,9 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
             form.setValue('alternativeFinancialDocs', []);
             form.setValue('tenderStatus', undefined);
             form.setValue('oemNotAllowed', undefined);
-            form.setValue('remarks', undefined);
+            form.setValue('tlApprovalRemarks', undefined);
+            form.setValue('tlRejectionRemarks', undefined);
+            form.setValue('tlIncompleteRemarks', undefined);
             form.setValue('incompleteFields', []);
         }
     }, [tlDecision, form]);
@@ -639,7 +647,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                         <CheckCircle className="h-4 w-4 text-primary" />
                                         <h4 className="font-semibold text-base text-primary">Final Approval Remarks</h4>
                                     </div>
-                                    <FieldWrapper control={form.control} name="remarks" label="Overall TL Remarks">
+                                    <FieldWrapper control={form.control} name="tlApprovalRemarks" label="TL Acceptance Remarks">
                                         {(field) => (
                                             <textarea
                                                 {...field}
@@ -672,7 +680,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                         placeholder="Select OEM who didn't allow"
                                     />
                                 )}
-                                <FieldWrapper control={form.control} name="remarks" label="Remarks">
+                                <FieldWrapper control={form.control} name="tlRejectionRemarks" label="TL Rejection Remarks">
                                     {(field) => (
                                         <textarea
                                             {...field}
@@ -792,7 +800,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                         <CheckCircle className="h-4 w-4 text-primary" />
                                         <h4 className="font-semibold text-base text-primary">Final Review Summary</h4>
                                     </div>
-                                    <FieldWrapper control={form.control} name="remarks" label="Overall TL Remarks">
+                                    <FieldWrapper control={form.control} name="tlIncompleteRemarks" label="Overall TL Remarks">
                                         {(field) => (
                                             <textarea
                                                 {...field}

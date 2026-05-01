@@ -21,6 +21,7 @@ export const tenderInfos = pgTable("tender_infos", {
     documents: text("documents"),
     // Tender approval fields
     tlRemarks: varchar("tl_remarks", { length: 200 }),
+    tlApprovalRemarks: varchar("tl_approval_remarks", { length: 200 }),
     rfqTo: varchar("rfq_to", { length: 15 }),
     tlStatus: integer("tl_status").default(0).notNull(),
     processingFeeMode: varchar("processing_fee_mode", { length: 100 }),

@@ -343,7 +343,7 @@ export class TenderApprovalService {
                 oemNotAllowedName: vendorOrganizations.name,
                 tlRejectionRemarks: tenderInfos.tlRejectionRemarks,
                 tlIncompleteRemarks: tenderInfos.tlIncompleteRemarks,
-                tlApprovalRemarks: tenderInformation.teFinalRemark,
+                tlApprovalRemarks: tenderInfos.tlApprovalRemarks,
             })
             .from(tenderInfos)
             .leftJoin(statuses, eq(tenderInfos.status, statuses.id))
@@ -447,6 +447,7 @@ export class TenderApprovalService {
             updateData.approvePqrSelection = payload.approvePqrSelection ?? null;
             updateData.approveFinanceDocSelection = payload.approveFinanceDocSelection ?? null;
 
+            updateData.tlApprovalRemarks = payload.tlApprovalRemarks ?? null;
             updateData.tlRejectionRemarks = null;
             updateData.tlIncompleteRemarks = null;
             updateData.oemNotAllowed = null;
@@ -468,12 +469,7 @@ export class TenderApprovalService {
                     updateData.emd = String(infoSheet.emdAmount);
                 }
 
-                // Update te_final_remark if provided
-                if (payload.tlApprovalRemarks) {
-                    await this.db.update(tenderInformation)
-                        .set({ teFinalRemark: payload.tlApprovalRemarks, updatedAt: new Date() })
-                        .where(eq(tenderInformation.tenderId, tenderId));
-                }
+
             }
         } else if (payload.tlStatus === "2") {
             // Rejected - Use tenderStatus from payload (contains rejection reason status ID)
@@ -494,6 +490,7 @@ export class TenderApprovalService {
             updateData.tenderFeeMode = null;
             updateData.emdMode = null;
             updateData.approvePqrSelection = null;
+            updateData.tlApprovalRemarks = null;
             updateData.approveFinanceDocSelection = null;
         } else if (payload.tlStatus === "3") {
             // Incomplete - Status 29
@@ -506,6 +503,7 @@ export class TenderApprovalService {
             updateData.emdMode = null;
             updateData.approvePqrSelection = null;
             updateData.approveFinanceDocSelection = null;
+            updateData.tlApprovalRemarks = null;
             updateData.tlRejectionRemarks = null;
             updateData.tlIncompleteRemarks = payload.tlIncompleteRemarks;
             updateData.oemNotAllowed = null;
