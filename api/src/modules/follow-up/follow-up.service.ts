@@ -228,6 +228,7 @@ export class FollowUpService {
                         followUpFor: followUp.followupFor,
                         followUpInitiator: fromUser?.name ?? "",
                         formLink: `${process.env.FRONTEND_URL}/shared/follow-up/edit/${followUp.id}`,
+                        comment: followUp.comment ?? "",
                     };
 
                     await this.mailerService.sendMail(
