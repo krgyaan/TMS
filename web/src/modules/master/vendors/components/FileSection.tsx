@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Edit, Trash2 } from "lucide-react";
 
 import { useCreateVendorFile, useUpdateVendorFile, useDeleteVendorFile } from "@/hooks/api/useVendorFiles";
+import { DialogDescription } from "@radix-ui/react-dialog";
 
 type FileForm = {
     id?: number;
@@ -177,6 +178,7 @@ export const FileSection = ({ orgId }: Props) => {
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>{editingIndex !== null ? "Edit File" : "Add File"}</DialogTitle>
+                        <DialogDescription className="hidden">Add or edit file details</DialogDescription>
                     </DialogHeader>
 
                     <div className="space-y-4">

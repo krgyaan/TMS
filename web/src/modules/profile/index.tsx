@@ -1,5 +1,3 @@
-// web/src/modules/profile/index.tsx
-
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,7 +14,6 @@ import { cn } from "@/lib/utils";
 import { ProfileProvider, useProfileContext } from "./contexts/ProfileContext";
 import { staggerContainer } from "./animations";
 
-// Standard Profile Components
 import { ProfileHeader } from "./components/ProfileHeader";
 import { OverviewTab } from "./components/OverviewTab";
 import { DocumentsSection } from "./components/DocumentsSection";
@@ -24,7 +21,6 @@ import { NotificationsSection } from "./components/NotificationsSection";
 import { AssetsSection } from "./components/AssetsSection";
 import { ComplaintsSection } from "./components/ComplaintsSection";
 
-// Onboarding Components
 import { OnboardingView } from "./components/onboarding/OnboardingView";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -41,7 +37,7 @@ function StandardProfileView() {
   const tabs = [
     { value: "overview",       label: "Overview",  icon: User },
     { value: "documents",      label: "Documents", icon: FileText },
-    { value: "notifications",  label: "Activity",  icon: Bell,          badge: unreadNotifCount },
+    { value: "notifications",  label: "Activity",  icon: Bell, badge: unreadNotifCount },
     { value: "assets",         label: "Assets",    icon: Laptop },
     { value: "complaints",     label: "Support",   icon: MessageSquare },
   ];
@@ -169,32 +165,18 @@ function ProfilePageContent() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 relative">
-        {/*
-         * ── View Router ───────────────────────────────────────────────────
-         *
-         *  isOnboarding === true
-         *    → <OnboardingView /> replaces the entire page.
-         *      The standard tabs (Overview, Documents, Assets, Support, Activity)
-         *      are NOT rendered — they only make sense after onboarding completes.
-         *
-         *  isOnboarding === false
-         *    → <StandardProfileView /> with the full tab set.
-         */}
+        {/* my very personal router */}
         {data.isOnboarding ? (
-          <OnboardingView />
-        ) : (
-          <StandardProfileView />
-        )}
+            <OnboardingView />
+          ) : (
+            <StandardProfileView />
+          )}
       </div>
     </div>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ProfilePage — Root Export
-// Wraps everything in the ProfileProvider (data fetching context)
-// ─────────────────────────────────────────────────────────────────────────────
-
+// profile provider to give context
 export default function ProfilePage() {
   return (
     <ProfileProvider>

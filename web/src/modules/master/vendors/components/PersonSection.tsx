@@ -12,11 +12,13 @@ import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/comp
 
 import { Plus, Edit, Trash2 } from "lucide-react";
 import { useCreateVendor, useDeleteVendor, useUpdateVendor } from "@/hooks/api/useVendors";
+import { DialogDescription } from "@radix-ui/react-dialog";
 
 type PersonForm = {
+    id?: number;
     name: string;
-    email?: string;
-    mobile?: string;
+    email: string;
+    mobile: string;
     address?: string;
     status: boolean;
 };
@@ -65,16 +67,17 @@ export const PersonSection = ({ orgId }: Props) => {
 
     const handleSave = () => {
         if (editingIndex !== null) {
-            const person = getValues(`persons.${editingIndex}`);
+            const existing = getValues(`persons.${editingIndex}`);
 
             update(editingIndex, formState);
 
             if (orgId && person?.id) {
                 updateVendor.mutate({
-                    id: person.id,
+                    id: existing.id,
                     data: formState,
                 });
             }
+            update(editingIndex, { ...existing, ...formState });
         } else {
             if (orgId) {
                 createVendor.mutate(
@@ -153,6 +156,7 @@ export const PersonSection = ({ orgId }: Props) => {
                 <DialogContent className="sm:max-w-[500px]">
                     <DialogHeader>
                         <DialogTitle>{editingIndex !== null ? "Edit Person" : "Add Person"}</DialogTitle>
+                        <DialogDescription className="hidden">Add or edit person details</DialogDescription>
                     </DialogHeader>
 
                     <div className="space-y-4">

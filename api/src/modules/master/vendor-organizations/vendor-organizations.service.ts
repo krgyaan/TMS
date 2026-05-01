@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { Inject, Injectable, NotFoundException, ConflictException } from "@nestjs/common";
 import { eq, inArray, asc } from "drizzle-orm";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
@@ -107,21 +107,35 @@ export class VendorOrganizationsService {
     }
 
     async create(data: NewVendorOrganization): Promise<VendorOrganization> {
-        const rows = await this.db.insert(vendorOrganizations).values(data).returning();
-        return rows[0];
+        try {
+            const rows = await this.db.insert(vendorOrganizations).values(data).returning();
+            return rows[0];
+        } catch (error: any) {
+            if (error.code === '23505' || error.cause?.code === '23505') {
+                throw new ConflictException(`Vendor Organization with name "${data.name}" already exists`);
+            }
+            throw error;
+        }
     }
 
     async update(id: number, data: Partial<NewVendorOrganization>): Promise<VendorOrganization> {
-        const rows = await this.db
-            .update(vendorOrganizations)
-            .set({ ...data, updatedAt: new Date() })
-            .where(eq(vendorOrganizations.id, id))
-            .returning();
+        try {
+            const rows = await this.db
+                .update(vendorOrganizations)
+                .set({ ...data, updatedAt: new Date() })
+                .where(eq(vendorOrganizations.id, id))
+                .returning();
 
-        if (!rows[0]) {
-            throw new NotFoundException(`Vendor Organization with ID ${id} not found`);
+            if (!rows[0]) {
+                throw new NotFoundException(`Vendor Organization with ID ${id} not found`);
+            }
+            return rows[0];
+        } catch (error: any) {
+            if (error.code === '23505' || error.cause?.code === '23505') {
+                throw new ConflictException(`A Vendor Organization with this name already exists`);
+            }
+            throw error;
         }
-        return rows[0];
     }
 
     async delete(id: number): Promise<void> {
@@ -137,10 +151,10 @@ export class VendorOrganizationsService {
      */
     async createWithRelations(data: {
         organization: NewVendorOrganization;
-        gsts?: Omit<NewVendorGst, "org">[];
-        accounts?: Omit<NewVendorAcc, "org">[];
+        gsts?: Omit<NewVendorGst, "orgId">[];
+        accounts?: Omit<NewVendorAcc, "orgId">[];
         persons?: Array<
-            Omit<NewVendor, "organizationId"> & {
+            Omit<NewVendor, "orgId"> & {
                 files?: Omit<NewVendorFile, "vendorId">[];
             }
         >;
@@ -153,7 +167,7 @@ export class VendorOrganizationsService {
             await this.db.insert(vendorGsts).values(
                 data.gsts.map(gst => ({
                     ...gst,
-                    org: organization.id,
+                    orgId: organization.id,
                 }))
             );
         }
@@ -163,7 +177,7 @@ export class VendorOrganizationsService {
             await this.db.insert(vendorAccs).values(
                 data.accounts.map(acc => ({
                     ...acc,
-                    org: organization.id,
+                    orgId: organization.id,
                 }))
             );
         }
@@ -204,22 +218,22 @@ export class VendorOrganizationsService {
         data: {
             organization?: Partial<NewVendorOrganization>;
             gsts?: {
-                create?: Omit<NewVendorGst, "org">[];
-                update?: Array<{ id: number; data: Partial<Omit<NewVendorGst, "org">> }>;
+                create?: Omit<NewVendorGst, "orgId">[];
+                update?: Array<{ id: number; data: Partial<Omit<NewVendorGst, "orgId">> }>;
                 delete?: number[];
             };
             accounts?: {
-                create?: Omit<NewVendorAcc, "org">[];
-                update?: Array<{ id: number; data: Partial<Omit<NewVendorAcc, "org">> }>;
+                create?: Omit<NewVendorAcc, "orgId">[];
+                update?: Array<{ id: number; data: Partial<Omit<NewVendorAcc, "orgId">> }>;
                 delete?: number[];
             };
             persons?: {
                 create?: Array<
-                    Omit<NewVendor, "organizationId"> & {
+                    Omit<NewVendor, "orgId"> & {
                         files?: Omit<NewVendorFile, "vendorId">[];
                     }
                 >;
-                update?: Array<{ id: number; data: Partial<Omit<NewVendor, "organizationId">> }>;
+                update?: Array<{ id: number; data: Partial<Omit<NewVendor, "orgId">> }>;
                 delete?: number[];
             };
         }
@@ -235,7 +249,7 @@ export class VendorOrganizationsService {
                 await this.db.insert(vendorGsts).values(
                     data.gsts.create.map(gst => ({
                         ...gst,
-                        org: id,
+                        orgId: id,
                     }))
                 );
             }
@@ -260,7 +274,7 @@ export class VendorOrganizationsService {
                 await this.db.insert(vendorAccs).values(
                     data.accounts.create.map(acc => ({
                         ...acc,
-                        org: id,
+                        orgId: id,
                     }))
                 );
             }

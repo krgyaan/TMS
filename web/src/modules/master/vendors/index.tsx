@@ -75,6 +75,7 @@ const VendorsPage = () => {
             flex: 1,
             filter: false,
             sortable: false,
+            cellDataType: false,
             cellRenderer: (params: any) => {
                 const org = params.data as VendorOrganizationWithRelations;
                 const count = org._counts?.gsts || org.gsts?.length || 0;
@@ -96,6 +97,7 @@ const VendorsPage = () => {
             flex: 1,
             filter: false,
             sortable: false,
+            cellDataType: false,
             cellRenderer: (params: any) => {
                 const org = params.data as VendorOrganizationWithRelations;
                 const count = org._counts?.accounts || org.accounts?.length || 0;
@@ -128,6 +130,7 @@ const VendorsPage = () => {
             flex: 1,
             filter: false,
             sortable: false,
+            cellDataType: false,
             cellRenderer: (params: any) => {
                 const org = params.data as VendorOrganizationWithRelations;
                 const count = org._counts?.persons || org.persons?.length || 0;
@@ -160,6 +163,7 @@ const VendorsPage = () => {
             flex: 1,
             filter: false,
             sortable: false,
+            cellDataType: false,
             cellRenderer: (params: any) => {
                 const org = params.data as VendorOrganizationWithRelations;
                 const count = org.files?.length || 0;

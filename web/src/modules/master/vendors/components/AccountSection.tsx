@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Plus, Edit, Trash2 } from "lucide-react";
 
 import { useCreateVendorAccount, useUpdateVendorAccount, useDeleteVendorAccount } from "@/hooks/api/useVendorAccounts";
+import { DialogDescription } from "@radix-ui/react-dialog";
 
 type AccountForm = {
     id?: number;
@@ -160,6 +161,7 @@ export const AccountSection = ({ orgId }: Props) => {
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>{editingIndex !== null ? "Edit Account" : "Add Account"}</DialogTitle>
+                        <DialogDescription className="hidden">Add or edit account details</DialogDescription>
                     </DialogHeader>
 
                     <div className="space-y-4">

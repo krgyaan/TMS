@@ -184,7 +184,7 @@ export interface VendorFile {
 
 export interface VendorGst {
     id: number;
-    org: number;
+    orgId: number;
     gstState: string;
     gstNum: string;
     status: boolean;
@@ -194,10 +194,10 @@ export interface VendorGst {
 
 export interface VendorAcc {
     id: number;
-    org: number;
-    accountName: string;
+    orgId: number;
+    bankAccountName: string;
     accountNum: string;
-    accountIfsc: string;
+    ifscCode: string;
     status: boolean;
     createdAt: string;
     updatedAt: string;
@@ -284,11 +284,12 @@ export interface CreateVendorOrganizationWithRelationsDto {
         address?: string;
         status?: boolean;
     };
-    gsts?: Omit<CreateVendorGstDto, "org">[];
-    accounts?: Omit<CreateVendorAccountDto, "org">[];
+    gsts?: Omit<CreateVendorGstDto, "orgId">[];
+    accounts?: Omit<CreateVendorAccountDto, "orgId">[];
     persons?: Array<{
         name: string;
-        email?: string;
+        email: string;
+        mobile: string;
         address?: string;
         status?: boolean;
         files?: Omit<CreateVendorFileDto, "vendorId">[];
@@ -302,19 +303,20 @@ export interface UpdateVendorOrganizationWithRelationsDto {
         status?: boolean;
     };
     gsts?: {
-        create?: Omit<CreateVendorGstDto, "org">[];
+        create?: Omit<CreateVendorGstDto, "orgId">[];
         update?: Array<{ id: number; data: UpdateVendorGstDto }>;
         delete?: number[];
     };
     accounts?: {
-        create?: Omit<CreateVendorAccountDto, "org">[];
+        create?: Omit<CreateVendorAccountDto, "orgId">[];
         update?: Array<{ id: number; data: UpdateVendorAccountDto }>;
         delete?: number[];
     };
     persons?: {
         create?: Array<{
             name: string;
-            email?: string;
+            email: string;
+            mobile: string;
             address?: string;
             status?: boolean;
             files?: Omit<CreateVendorFileDto, "vendorId">[];
