@@ -46,9 +46,9 @@ const VendorFormSchema = z.object({
         .array(
             z.object({
                 id: z.number().optional(),
-                accountName: z.string().min(1, "Account name is required"),
+                bankAccountName: z.string().min(1, "Account name is required"),
                 accountNum: z.string().min(1, "Account number is required"),
-                accountIfsc: z.string().min(1, "IFSC code is required"),
+                ifscCode: z.string().min(1, "IFSC code is required"),
                 status: z.boolean().default(true),
             })
         )
@@ -59,7 +59,8 @@ const VendorFormSchema = z.object({
             z.object({
                 id: z.number().optional(),
                 name: z.string().min(1, "Person name is required"),
-                email: z.string().email("Invalid email").optional().or(z.literal("")),
+                email: z.string().email("Invalid email").min(1, "Email is required"),
+                mobile: z.string().min(1, "Mobile number is required"),
                 address: z.string().optional(),
                 status: z.boolean().default(true),
             })
@@ -249,13 +250,21 @@ const EditVendorPage = () => {
                     </Card>
 
                     {/* Submit Buttons */}
-                    <div className="flex items-center justify-end gap-4 pt-4 border-t">
-                        <Button type="button" variant="outline" onClick={() => navigate(paths.master.vendors)} disabled={updateVendor.isPending}>
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={updateVendor.isPending}>
-                            {updateVendor.isPending ? "Updating..." : "Update Organization"}
-                        </Button>
+                    <div className="flex flex-col items-end gap-4 pt-4 border-t">
+                        {Object.keys(form.formState.errors).length > 0 && (
+                            <div className="text-sm text-destructive flex items-center gap-2">
+                                <AlertCircle className="h-4 w-4" />
+                                Please fix the validation errors (check organization details and ensure all added persons have a valid email and mobile number).
+                            </div>
+                        )}
+                        <div className="flex items-center gap-4">
+                            <Button type="button" variant="outline" onClick={() => navigate(paths.master.vendors)} disabled={updateVendor.isPending}>
+                                Cancel
+                            </Button>
+                            <Button type="submit" disabled={updateVendor.isPending}>
+                                {updateVendor.isPending ? "Updating..." : "Update Organization"}
+                            </Button>
+                        </div>
                     </div>
                 </form>
             </Form>
@@ -330,9 +339,9 @@ const AccountList = ({ orgId, accounts }: { orgId: number; accounts: any[] }) =>
                         <Card key={account.id} className="p-4">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <div className="font-medium">{account.accountName}</div>
+                                    <div className="font-medium">{account.bankAccountName}</div>
                                     <div className="text-sm text-muted-foreground">
-                                        {account.accountNum} | {account.accountIfsc}
+                                        {account.accountNum} | {account.ifscCode}
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -354,7 +363,7 @@ const AccountList = ({ orgId, accounts }: { orgId: number; accounts: any[] }) =>
 
 const PersonList = ({ orgId, persons }: { orgId: number; persons: any[] }) => {
     const createPerson = useCreateVendor();
-    const deletePerson = useDeleteVendorGst(); // Note: Need delete vendor hook
+    const deletePerson = useDeleteVendor();
 
     return (
         <div className="space-y-4">

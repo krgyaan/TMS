@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Plus, Edit, Trash2 } from "lucide-react";
 
 import { useCreateVendorGst, useUpdateVendorGst, useDeleteVendorGst } from "@/hooks/api/useVendorGsts";
+import { DialogDescription } from "@radix-ui/react-dialog";
 
 type GstForm = {
     id?: number;
@@ -21,7 +22,7 @@ type GstForm = {
 };
 
 type Props = {
-    orgId: number;
+    orgId?: number;
 };
 
 export const GstSection = ({ orgId }: Props) => {
@@ -64,26 +65,29 @@ export const GstSection = ({ orgId }: Props) => {
         if (editingIndex !== null) {
             const existing = getValues(`gsts.${editingIndex}`);
 
-            if (existing?.id) {
+            if (orgId && existing?.id) {
                 updateGst.mutate({
                     id: existing.id,
                     data: formState,
                 });
-
-                update(editingIndex, { ...existing, ...formState });
             }
+            update(editingIndex, { ...existing, ...formState });
         } else {
-            createGst.mutate(
-                {
-                    ...formState,
-                    orgId: orgId,
-                },
-                {
-                    onSuccess: created => {
-                        append(created);
+            if (orgId) {
+                createGst.mutate(
+                    {
+                        ...formState,
+                        orgId: orgId,
                     },
-                }
-            );
+                    {
+                        onSuccess: created => {
+                            append(created);
+                        },
+                    }
+                );
+            } else {
+                append(formState);
+            }
         }
 
         setOpen(false);
@@ -141,9 +145,10 @@ export const GstSection = ({ orgId }: Props) => {
             {/* Dialog */}
 
             <Dialog open={open} onOpenChange={setOpen}>
-                <DialogContent className="sm:max-w-[450px]">
+                <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>{editingIndex !== null ? "Edit GST" : "Add GST"}</DialogTitle>
+                        <DialogTitle>{editingIndex !== null ? "Edit GST Number" : "Add GST Number"}</DialogTitle>
+                        <DialogDescription className="hidden">Add or edit GST details</DialogDescription>
                     </DialogHeader>
 
                     <div className="space-y-4">
