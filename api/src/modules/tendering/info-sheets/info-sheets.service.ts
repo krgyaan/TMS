@@ -13,6 +13,7 @@ import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
 import { organizations } from '@db/schemas/master/organizations.schema';
 import { websites } from '@db/schemas/master/websites.schema';
+import { statuses } from '@db/schemas/master/statuses.schema';
 import { TimersService } from '@/modules/timers/timers.service';
 import { pqrDocuments } from '@db/schemas/shared/pqr.schema';
 import { financeDocuments } from '@db/schemas/shared/finance_docs.schema';
@@ -28,7 +29,9 @@ export type FinancialDocument = {
     documentPath: string[] | null;
 };
 
-export type TenderInfoSheetWithRelations = TenderInformation & {
+export type TenderInfoSheetWithRelations = Omit<TenderInformation, 'pbgMode' | 'sdMode'> & {
+    pbgMode: string[] | null;
+    sdMode: string[] | null;
     clients: TenderClient[];
     technicalWorkOrders: TechnicalDocument[];
     commercialDocuments: FinancialDocument[];
@@ -291,7 +294,7 @@ export class TenderInfoSheetsService {
                     return filtered.length > 0 ? filtered : null;
                 };
 
-                // ── When NO: nullify all YES-branch fields before insert ───────────
+                // ── When NO: nullify all YES-branch fields before insert 
                 const isRejection = payload.teRecommendation === 'NO';
 
                 const pbgModeValue =
@@ -1049,7 +1052,8 @@ export class TenderInfoSheetsService {
         subject: string,
         template: string,
         data: Record<string, any>,
-        recipients: { to?: RecipientSource[]; cc?: RecipientSource[] }
+        recipients: { to?: RecipientSource[]; cc?: RecipientSource[] },
+        attachments?: { files: string[]; baseDir?: string }
     ) {
         try {
             await this.emailService.sendTenderEmail({
@@ -1061,6 +1065,7 @@ export class TenderInfoSheetsService {
                 subject,
                 template,
                 data,
+                attachments,
             });
         } catch (error) {
             this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
@@ -1076,213 +1081,338 @@ export class TenderInfoSheetsService {
         const tender = await this.tenderInfosService.findById(tenderId);
         if (!tender || !tender.teamMember) return;
 
-        const assignee = await this.recipientResolver.getUserById(tender.teamMember);
+        const assignee = await this.recipientResolver.getUserById(
+            tender.teamMember
+        );
         if (!assignee) return;
 
         const [websiteData, orgData] = await Promise.all([
-            tender.website ? this.db.select({ name: websites.name, url: websites.url }).from(websites).where(eq(websites.id, tender.website)).limit(1) : Promise.resolve([]),
-            tender.organization ? this.db.select({ name: organizations.name, shortName: organizations.acronym }).from(organizations).where(eq(organizations.id, tender.organization)).limit(1) : Promise.resolve([]),
-        ]);
-        const websiteName = websiteData[0]?.name || websiteData[0]?.url || 'Not specified';
-        const organizationName = orgData[0]?.name || orgData[0]?.shortName || 'Not specified';
-
-        // Format due date
-        const dueDate = tender.dueDate ? new Date(tender.dueDate).toLocaleString('en-IN', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-        }) : 'Not specified';
-
-        // Format currency values
-        const formatCurrency = (value: string | null) => {
-            if (!value) return '0';
-            const num = Number(value);
-            return isNaN(num) ? value : `₹${num.toLocaleString('en-IN')}`;
-        };
-
-        // Format percentage
-        const formatPercent = (value: string | null) => {
-            if (!value) return '0';
-            return `${value}`;
-        };
-
-        // Fetch all PQR and Finance documents for mapping
-        const [allPqrDocs, allFinanceDocs] = await Promise.all([
-            this.db.select().from(pqrDocuments).limit(1000),
-            this.db.select().from(financeDocuments).limit(1000),
+            tender.website
+                ? this.db
+                    .select({ name: websites.name, url: websites.url })
+                    .from(websites)
+                    .where(eq(websites.id, tender.website))
+                    .limit(1)
+                : Promise.resolve([]),
+            tender.organization
+                ? this.db
+                    .select({
+                        name: organizations.name,
+                        shortName: organizations.acronym,
+                    })
+                    .from(organizations)
+                    .where(eq(organizations.id, tender.organization))
+                    .limit(1)
+                : Promise.resolve([]),
         ]);
 
-        // Create maps for document lookup
-        const pqrMap = new Map<number, string>();
-        allPqrDocs.forEach(pqr => {
-            const label = pqr.projectName
-                ? (pqr.item ? `${pqr.projectName} - ${pqr.item}` : pqr.projectName)
-                : `PQR ${pqr.id}`;
-            pqrMap.set(pqr.id, label);
-        });
+        const websiteName =
+            websiteData[0]?.name || websiteData[0]?.url || 'Not specified';
+        const organizationName =
+            orgData[0]?.name || orgData[0]?.shortName || 'Not specified';
 
-        const financeMap = new Map<number, string>();
-        allFinanceDocs.forEach(doc => {
-            if (doc.documentName) {
-                financeMap.set(doc.id, doc.documentName);
-            }
-        });
-
-        // Build document lists with mapped names
-        const teDocs = infoSheet.technicalWorkOrders.length > 0
-            ? infoSheet.technicalWorkOrders.map(doc =>
-                `<li>${doc.projectName || `Document ${doc.id}`}</li>`
-            ).join('') : '<li>None</li>';
-
-        const ceDocs = infoSheet.commercialDocuments.length > 0
-            ? infoSheet.commercialDocuments.map(doc =>
-                `<li>${doc.documentName || `Document ${doc.id}`}</li>`
-            ).join('') : '<li>None</li>';
-
-        let docs = [];
-        if (tender.documents) {
-            try {
-                docs = JSON.parse(tender.documents);
-            } catch (e) {
-                docs = [];
-            }
-        }
-
-        const tenderDocs = docs.length > 0
-            ? docs.map((doc, index) => `<li>${doc || `Document ${index + 1}`}</li>`).join('')
-            : '<li>None</li>';
-
-
-        // Format array fields (modes) as comma-separated strings
-        const formatArray = (arr: string[] | null | undefined): string => {
-            if (!arr || arr.length === 0) return 'Not specified';
-            return arr.join(', ');
-        };
-
-        // Format physical docs deadline
-        const formatPhysicalDocsDeadline = (deadline: Date | string | null): string => {
-            if (!deadline) return 'N/A';
-            const date = deadline instanceof Date ? deadline : new Date(deadline);
-            return date.toLocaleString('en-IN', {
+        const dueDate = tender.dueDate
+            ? new Date(tender.dueDate).toLocaleString('en-IN', {
                 year: 'numeric',
                 month: 'long',
                 day: 'numeric',
                 hour: '2-digit',
                 minute: '2-digit',
-            });
+            })
+            : 'Not specified';
+
+        // ── Helpers 
+
+        const formatCurrency = (
+            value: string | number | null | undefined
+        ): string => {
+            if (value === null || value === undefined || value === '')
+                return '0';
+            const num = Number(value);
+            if (isNaN(num)) return '0';
+            if (num === 0) return '0';
+            return `₹${num.toLocaleString('en-IN')}`;
         };
 
-        // Build email data matching template
+        const formatArray = (
+            arr: string[] | null | undefined
+        ): string => {
+            if (!arr || arr.length === 0) return 'Not specified';
+            return arr.join(', ');
+        };
+
+        const formatPhysicalDocsDeadline = (
+            deadline: Date | string | null | undefined
+        ): string => {
+            if (!deadline) return 'N/A';
+            const date =
+                deadline instanceof Date ? deadline : new Date(deadline);
+            return isNaN(date.getTime())
+                ? 'N/A'
+                : date.toLocaleString('en-IN', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                });
+        };
+
+        const parseModeField = (val: unknown): string[] | null => {
+            if (!val) return null;
+            if (Array.isArray(val)) return val.length > 0 ? val : null;
+            try {
+                const parsed = JSON.parse(String(val));
+                return Array.isArray(parsed) && parsed.length > 0
+                    ? parsed
+                    : [String(val)];
+            } catch {
+                return [String(val)];
+            }
+        };
+
+        const formatLabel = (val: string | null | undefined): string => {
+            if (!val) return 'Not specified';
+            return val
+                .replaceAll('_', ' ')
+                .toLowerCase()
+                .split(' ')
+                .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                .join(' ');
+        };
+
+        // ── Tender documents 
+
+        let tenderDocsList: string[] = [];
+        if (tender.documents) {
+            try {
+                const parsed = JSON.parse(tender.documents);
+                tenderDocsList = Array.isArray(parsed)
+                    ? parsed.filter(Boolean).map(String)
+                    : [];
+            } catch {
+                tenderDocsList = [];
+            }
+        }
+
+        // ── Resolve rejection reason 
+
+        let rejectionReasonLabel = 'N/A';
+        if (infoSheet.teRecommendation === 'NO') {
+            if (infoSheet.teRejectionReason) {
+                const statusResult = await this.db
+                    .select({ name: statuses.name })
+                    .from(statuses)
+                    .where(eq(statuses.id, infoSheet.teRejectionReason))
+                    .limit(1);
+                rejectionReasonLabel = statusResult[0]?.name || String(infoSheet.teRejectionReason);
+            } else if (infoSheet.teRejectionRemarks) {
+                rejectionReasonLabel = infoSheet.teRejectionRemarks;
+            }
+        }
+
+        // ── Build email data 
+
+        const isRecommended = infoSheet.teRecommendation === 'YES';
+
         const emailData = {
+            // ── Common ─
             organization: organizationName,
             tender_name: tender.tenderName,
             tender_no: tender.tenderNo,
             website: websiteName,
             dueDate,
+            is_recommended: isRecommended,
+            recommendation_by_te: isRecommended ? 'Yes' : 'No',
 
-            is_recommended: infoSheet.teRecommendation === 'YES',
-            recommendation_by_te: infoSheet.teRecommendation,
-            recommendation_reason:
-                infoSheet.teRecommendation === 'NO'
-                ? (infoSheet.teRejectionReason || infoSheet.teRejectionRemarks || 'N/A')
-                : 'N/A',
-
+            // ── NO branch ─
+            recommendation_reason: rejectionReasonLabel,
             rejection_remarks: infoSheet.teRejectionRemarks || '',
-            rejection_proofs: infoSheet.teRejectionProof ?? [],
+            rejection_proofs: (infoSheet.teRejectionProof ?? []),
 
-            processing_fee_required: infoSheet.processingFeeRequired || 'No',
-            processing_fee_amount: formatCurrency(infoSheet.processingFeeAmount),
-            processing_fee_modes: formatArray(infoSheet.processingFeeMode),
+            // ── Processing Fee ─
+            processing_fee_required:
+                infoSheet.processingFeeRequired || 'No',
+            processing_fee_required_bool:
+                infoSheet.processingFeeRequired == 'YES',
+            processing_fee_amount: formatCurrency(
+                infoSheet.processingFeeAmount
+            ),
+            processing_fee_modes: formatArray(
+                parseModeField(infoSheet.processingFeeMode)
+            ),
 
+            // ── Tender Fee 
             tender_fee_required: infoSheet.tenderFeeRequired || 'No',
+            tender_fee_required_bool:
+                infoSheet.tenderFeeRequired == 'YES',
             tender_fees: formatCurrency(infoSheet.tenderFeeAmount),
-            tender_fees_in_form_of: formatArray(infoSheet.tenderFeeMode),
+            tender_fees_in_form_of: formatArray(
+                parseModeField(infoSheet.tenderFeeMode)
+            ),
 
+            // ── EMD 
             emd_required: infoSheet.emdRequired || 'No',
+            emd_required_bool:
+                infoSheet.emdRequired == 'YES' ||
+                infoSheet.emdRequired == 'EXEMPT',
             emd: formatCurrency(infoSheet.emdAmount),
-            emd_in_form_of: formatArray(infoSheet.emdMode),
+            emd_in_form_of: formatArray(
+                parseModeField(infoSheet.emdMode)
+            ),
 
-            tender_value: formatCurrency(infoSheet.tenderValue),
+            // ── Tender Value / OEM 
+            tender_value:
+                formatCurrency(infoSheet.tenderValue) || 'Not specified',
             oem_experience: infoSheet.oemExperience || 'Not specified',
-            bid_validity: infoSheet.bidValidityDays ? `${infoSheet.bidValidityDays} Days` : 'Not specified',
-            commercial_evaluation: infoSheet.commercialEvaluation || 'Not specified',
-            ra_applicable: infoSheet.reverseAuctionApplicable || 'No',
-            maf_required: infoSheet.mafRequired || 'No',
 
-            delivery_time: infoSheet.deliveryTimeSupply ? `${infoSheet.deliveryTimeSupply} Days` : 'Not specified',
-            delivery_time_ic_inclusive: infoSheet.deliveryTimeInstallationInclusive ? 'Yes' : 'No',
-            delivery_time_ic_inclusive_bool: !!infoSheet.deliveryTimeInstallationInclusive,
+            // ── Bid / Commercial 
+            bid_validity:
+                infoSheet.bidValidityDays != null
+                    ? `${infoSheet.bidValidityDays} Days`
+                    : 'Not specified',
+            commercial_evaluation: formatLabel(
+                infoSheet.commercialEvaluation
+            ),
+            ra_applicable:
+                infoSheet.reverseAuctionApplicable || 'No',
+            maf_required: formatLabel(infoSheet.mafRequired),
+
+            // ── Delivery 
+            delivery_time: infoSheet.deliveryTimeSupply
+                ? `${infoSheet.deliveryTimeSupply} Days`
+                : 'Not specified',
+            delivery_time_ic_inclusive:
+                infoSheet.deliveryTimeInstallationInclusive ? 'Yes' : 'No',
+            delivery_time_ic_inclusive_bool:
+                !!infoSheet.deliveryTimeInstallationInclusive,
             delivery_time_ic: infoSheet.deliveryTimeInstallationDays
                 ? `${infoSheet.deliveryTimeInstallationDays} Days`
                 : 'Not specified',
 
+            // ── PBG 
             pbg_required: infoSheet.pbgRequired || 'No',
-            pbg_form: formatArray(infoSheet.pbgMode ? JSON.parse(infoSheet.pbgMode) : null),
-            pbg_percentage: infoSheet.pbgPercentage ? `${infoSheet.pbgPercentage}%` : 'Not specified',
-            pbg_duration: infoSheet.pbgDurationMonths ? `${infoSheet.pbgDurationMonths} Months` : 'Not specified',
+            pbg_required_bool: infoSheet.pbgRequired === 'YES',
+            pbg_form: formatArray(parseModeField(infoSheet.pbgMode)),
+            pbg_percentage: infoSheet.pbgPercentage
+                ? `${infoSheet.pbgPercentage}%`
+                : 'Not specified',
+            pbg_duration: infoSheet.pbgDurationMonths
+                ? `${infoSheet.pbgDurationMonths} Months`
+                : 'Not specified',
 
-            payment_terms: infoSheet.paymentTermsSupply != null ? `${infoSheet.paymentTermsSupply}%` : 'Not specified',
-            payment_terms_ic: infoSheet.paymentTermsInstallation != null ? `${infoSheet.paymentTermsInstallation}%` : 'Not specified',
+            // ── Payment Terms 
+            payment_terms:
+                infoSheet.paymentTermsSupply != null
+                    ? `${infoSheet.paymentTermsSupply}%`
+                    : 'Not specified',
+            payment_terms_ic:
+                infoSheet.paymentTermsInstallation != null
+                    ? `${infoSheet.paymentTermsInstallation}%`
+                    : 'Not specified',
 
+            // ── SD 
             sd_required: infoSheet.sdRequired || 'No',
-            sd_form: formatArray(infoSheet.sdMode ? JSON.parse(infoSheet.sdMode) : null),
-            sd_percentage: infoSheet.sdPercentage ? `${infoSheet.sdPercentage}%` : 'Not specified',
-            sd_duration: infoSheet.sdDurationMonths ? `${infoSheet.sdDurationMonths} Months` : 'Not specified',
+            sd_required_bool: infoSheet.sdRequired === 'YES',
+            sd_form: formatArray(parseModeField(infoSheet.sdMode)),
+            sd_percentage: infoSheet.sdPercentage
+                ? `${infoSheet.sdPercentage}%`
+                : 'Not specified',
+            sd_duration: infoSheet.sdDurationMonths
+                ? `${infoSheet.sdDurationMonths} Months`
+                : 'Not specified',
 
+            // ── LD 
             ld_required: infoSheet.ldRequired || 'No',
-            ld_percentage: infoSheet.ldPercentagePerWeek ? `${infoSheet.ldPercentagePerWeek}%` : 'Not specified',
-            max_ld: infoSheet.maxLdPercentage ? `${infoSheet.maxLdPercentage}%` : 'Not specified',
+            ld_percentage: infoSheet.ldPercentagePerWeek
+                ? `${infoSheet.ldPercentagePerWeek}%`
+                : 'Not specified',
+            max_ld: infoSheet.maxLdPercentage
+                ? `${infoSheet.maxLdPercentage}%`
+                : 'Not specified',
 
-            phydocs_submission_required: infoSheet.physicalDocsRequired || 'No',
-            phydocs_required_bool: infoSheet.physicalDocsRequired === 'YES',
-            phydocs_doc_type: infoSheet.physicalDocType?.replaceAll('_', ' ') || 'N/A',
-            phydocs_submission_deadline: formatPhysicalDocsDeadline(infoSheet.physicalDocsDeadline),
+            // ── Physical Docs 
+            phydocs_submission_required:
+                infoSheet.physicalDocsRequired || 'No',
+            phydocs_required_bool:
+                infoSheet.physicalDocsRequired === 'YES',
+            phydocs_doc_type: formatLabel(infoSheet.physicalDocType),
+            phydocs_submission_deadline: formatPhysicalDocsDeadline(
+                infoSheet.physicalDocsDeadline
+            ),
 
+            // ── Eligibility 
             eligibility_criterion: infoSheet.techEligibilityAge
                 ? `${infoSheet.techEligibilityAge} Years`
                 : 'Not specified',
-
-            work_value_type: infoSheet.workValueType || 'Not specified',
-            custom_eligibility_criteria: infoSheet.customEligibilityCriteria || null,
+            work_value_type: formatLabel(infoSheet.workValueType),
+            custom_eligibility_criteria:
+                infoSheet.customEligibilityCriteria || null,
             work_value1: formatCurrency(infoSheet.orderValue1),
             work_value2: formatCurrency(infoSheet.orderValue2),
             work_value3: formatCurrency(infoSheet.orderValue3),
 
-            aat_display: infoSheet.avgAnnualTurnoverType || 'Not specified',
+            // ── Financial Criteria 
+            aat_display: formatLabel(infoSheet.avgAnnualTurnoverType),
             aat_amt: formatCurrency(infoSheet.avgAnnualTurnoverValue),
-            wc_display: infoSheet.workingCapitalType || 'Not specified',
+            wc_display: formatLabel(infoSheet.workingCapitalType),
             wc_amt: formatCurrency(infoSheet.workingCapitalValue),
-            nw_display: infoSheet.netWorthType || 'Not specified',
+            nw_display: formatLabel(infoSheet.netWorthType),
             nw_amt: formatCurrency(infoSheet.netWorthValue),
-            sc_display: infoSheet.solvencyCertificateType || 'Not specified',
+            sc_display: formatLabel(infoSheet.solvencyCertificateType),
             sc_amt: formatCurrency(infoSheet.solvencyCertificateValue),
 
-            te_docs: infoSheet.technicalWorkOrders.map(doc => doc.projectName || `Document ${doc.id}`),
-            ce_docs: infoSheet.commercialDocuments.map(doc => doc.documentName || `Document ${doc.id}`),
-            tender_docs: docs,
+            // ── Documents ─
+            te_docs: infoSheet.technicalWorkOrders.map(
+                (doc) => doc.projectName || `Document ${doc.id}`
+            ),
+            ce_docs: infoSheet.commercialDocuments.map(
+                (doc) => doc.documentName || `Document ${doc.id}`
+            ),
+            tender_docs: tenderDocsList,
 
-            clients: infoSheet.clients.map(client => ({
+            // ── Clients 
+            clients: infoSheet.clients.map((client) => ({
                 client_name: client.clientName || '',
                 client_designation: client.clientDesignation || '',
                 client_email: client.clientEmail || '',
                 client_mobile: client.clientMobile || '',
             })),
 
-            courier_name: infoSheet.courierName || null,
-            courier_phone: infoSheet.courierPhone || null,
-            courier_address_line1: infoSheet.courierAddressLine1 || null,
-            courier_address_line2: infoSheet.courierAddressLine2 || null,
-            courier_city: infoSheet.courierCity || null,
-            courier_state: infoSheet.courierState || null,
-            courier_pincode: infoSheet.courierPincode || null,
+            // ── Courier 
             courier_address: infoSheet.courierAddress || null,
+            courier_name: infoSheet.courierName || 'Not specified',
+            courier_phone: infoSheet.courierPhone || 'Not specified',
+            courier_city: infoSheet.courierCity || 'Not specified',
+            courier_state: infoSheet.courierState || 'Not specified',
+            courier_pincode: infoSheet.courierPincode || 'Not specified',
+
+            // ── Remarks 
             te_final_remark: infoSheet.teFinalRemark || null,
 
+            // ── Link / Assignee 
             link: `/tendering/tender-approvals/${tenderId}/approval`,
             assignee: assignee.name,
         };
+
+        console.log("emailData", emailData);
+
+        // ── Build attachments based on recommendation ─────────────────────
+        let attachments: { files: string[]; baseDir?: string } | undefined;
+
+        // Attach tender documents
+        const tenderDocFiles = tenderDocsList.filter(Boolean);
+        if (tenderDocFiles.length > 0) {
+            attachments = { files: tenderDocFiles };
+        }
+
+        if (infoSheet.teRecommendation === 'NO') {
+            // Attach rejection proofs
+            const rejectionProofFiles = (infoSheet.teRejectionProof ?? []).filter(Boolean);
+            if (rejectionProofFiles.length > 0) {
+                attachments = { files: rejectionProofFiles };
+            }
+        }
 
         await this.sendEmail(
             'info-sheet.filled',
@@ -1297,7 +1427,8 @@ export class TenderInfoSheetsService {
                 //     { type: 'role', role: 'Admin', teamId: tender.team },
                 //     { type: 'role', role: 'Coordinator', teamId: tender.team },
                 // ],
-            }
+            },
+            attachments
         );
     }
 
