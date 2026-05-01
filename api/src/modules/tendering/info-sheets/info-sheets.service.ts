@@ -510,6 +510,27 @@ export class TenderInfoSheetsService {
                         courierAddress: isRejection
                             ? null
                             : (payload.courierAddress ?? null),
+                        courierName: isRejection
+                            ? null
+                            : (payload.courierName ?? null),
+                        courierPhone: isRejection
+                            ? null
+                            : (payload.courierPhone ?? null),
+                        courierAddressLine1: isRejection
+                            ? null
+                            : (payload.courierAddressLine1 ?? null),
+                        courierAddressLine2: isRejection
+                            ? null
+                            : (payload.courierAddressLine2 ?? null),
+                        courierCity: isRejection
+                            ? null
+                            : (payload.courierCity ?? null),
+                        courierState: isRejection
+                            ? null
+                            : (payload.courierState ?? null),
+                        courierPincode: isRejection
+                            ? null
+                            : (payload.courierPincode ?? null),
                         teFinalRemark: isRejection
                             ? null
                             : (payload.teFinalRemark ?? null),
@@ -888,6 +909,27 @@ export class TenderInfoSheetsService {
                         courierAddress: isRejection
                             ? null
                             : (payload.courierAddress ?? null),
+                        courierName: isRejection
+                            ? null
+                            : (payload.courierName ?? null),
+                        courierPhone: isRejection
+                            ? null
+                            : (payload.courierPhone ?? null),
+                        courierAddressLine1: isRejection
+                            ? null
+                            : (payload.courierAddressLine1 ?? null),
+                        courierAddressLine2: isRejection
+                            ? null
+                            : (payload.courierAddressLine2 ?? null),
+                        courierCity: isRejection
+                            ? null
+                            : (payload.courierCity ?? null),
+                        courierState: isRejection
+                            ? null
+                            : (payload.courierState ?? null),
+                        courierPincode: isRejection
+                            ? null
+                            : (payload.courierPincode ?? null),
                         teFinalRemark: isRejection
                             ? null
                             : (payload.teFinalRemark ?? null),

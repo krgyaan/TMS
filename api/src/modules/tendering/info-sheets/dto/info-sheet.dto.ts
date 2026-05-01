@@ -180,6 +180,13 @@ export const TenderInfoSheetPayloadSchema = z
         // Client & Address
         clients: z.array(ClientSchema),
         courierAddress: optionalString,
+        courierName: optionalString,
+        courierPhone: optionalString,
+        courierAddressLine1: optionalString,
+        courierAddressLine2: optionalString,
+        courierCity: optionalString,
+        courierState: optionalString,
+        courierPincode: optionalString,
 
         // Final Remark
         teFinalRemark: optionalString,

@@ -595,27 +595,29 @@ const AllFieldsTable = ({ infoSheet }: { infoSheet: TenderInfoSheet }) => {
                         {infoSheet.courierName && (
                             <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">Name</TableCell>
-                                <TableCell className="text-sm" colSpan={3}>{infoSheet.courierName}</TableCell>
-                            </TableRow>
-                        )}
-                        {infoSheet.courierPhone && (
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">Phone No</TableCell>
-                                <TableCell className="text-sm" colSpan={3}>{infoSheet.courierPhone}</TableCell>
+                                <TableCell className="text-sm">{infoSheet.courierName}</TableCell>
+                                {infoSheet.courierPhone && (
+                                    <>
+                                        <TableCell className="text-sm font-medium text-muted-foreground">Phone No</TableCell>
+                                        <TableCell className="text-sm">{infoSheet.courierPhone}</TableCell>
+                                    </>
+                                )}
                             </TableRow>
                         )}
                         {infoSheet.courierAddressLine1 && (
                             <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">Address</TableCell>
-                                <TableCell className="text-sm" colSpan={3}>
+                                <TableCell className="text-sm">
                                     <div>{infoSheet.courierAddressLine1}</div>
                                     {infoSheet.courierAddressLine2 && <div>{infoSheet.courierAddressLine2}</div>}
                                     <div>
-                                        {[infoSheet.courierCity, infoSheet.courierState, infoSheet.courierPincode]
+                                        {[infoSheet.courierCity, infoSheet.courierState]
                                             .filter(Boolean)
                                             .join(", ")}
                                     </div>
                                 </TableCell>
+                                <TableCell className="text-sm font-medium text-muted-foreground">Pin Code</TableCell>
+                                <TableCell className="text-sm">{infoSheet.courierPincode}</TableCell> 
                             </TableRow>
                         )}
                         {!infoSheet.courierAddressLine1 && infoSheet.courierAddress && (
