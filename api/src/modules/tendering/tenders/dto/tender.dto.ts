@@ -86,7 +86,7 @@ export const UpdateTenderSchema = z.object({
     approvePqrSelection: optionalTextField(50),
     approveFinanceDocSelection: optionalTextField(50),
     tenderApprovalStatus: optionalTextField(50),
-    oemNotAllowed: optionalString,
+    oemNotAllowed: z.array(z.string()).optional(),
     tlRejectionRemarks: optionalString,
     documents: z.string().nullable().optional(),
 });

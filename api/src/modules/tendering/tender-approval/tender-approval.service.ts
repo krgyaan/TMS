@@ -340,7 +340,6 @@ export class TenderApprovalService {
                 tenderStatus: tenderInfos.status,
                 statusName: statuses.name,
                 oemNotAllowed: tenderInfos.oemNotAllowed,
-                oemNotAllowedName: vendorOrganizations.name,
                 tlRejectionRemarks: tenderInfos.tlRejectionRemarks,
                 tlIncompleteRemarks: tenderInfos.tlIncompleteRemarks,
                 tlApprovalRemarks: tenderInfos.tlApprovalRemarks,
@@ -357,12 +356,27 @@ export class TenderApprovalService {
             return null;
         }
 
-        const data = result[0];
+        const data = result[0] as {
+            tlStatus: number;
+            rfqRequired: string | null;
+            quotationFiles: string | null;
+            rfqTo: string | null;
+            processingFeeMode: string | null;
+            tenderFeeMode: string | null;
+            emdMode: string | null;
+            approvePqrSelection: string | null;
+            approveFinanceDocSelection: string | null;
+            tenderStatus: number;
+            statusName: string;
+            oemNotAllowed: string[] | null;
+            tlRejectionRemarks: string | null;
+            tlIncompleteRemarks: string | null;
+        };
 
         let vendorOrganizationNames: { name: string }[] = [];
 
         if (data.rfqTo) {
-            const vendorOrganizationIds = (data.rfqTo ?? "")
+            const vendorOrganizationIds = data.rfqTo
                 .split(",")
                 .map(id => parseInt(id.trim(), 10))
                 .filter(id => Number.isInteger(id) && id > 0);
@@ -397,11 +411,28 @@ export class TenderApprovalService {
             .from(tenderIncompleteFields)
             .where(eq(tenderIncompleteFields.tenderId, tenderId));
 
+        // Fetch OEM names for oemNotAllowed array
+        let oemNotAllowedNames: string[] = [];
+        if (data.oemNotAllowed && data.oemNotAllowed.length > 0) {
+            const oemOrgIds = data.oemNotAllowed
+                .map(id => parseInt(id, 10))
+                .filter(id => Number.isInteger(id) && id > 0);
+            
+            if (oemOrgIds.length > 0) {
+                const oemNames = await this.db
+                    .select({ name: vendorOrganizations.name })
+                    .from(vendorOrganizations)
+                    .where(inArray(vendorOrganizations.id, oemOrgIds));
+                oemNotAllowedNames = oemNames.map(o => o.name);
+            }
+        }
+
         return {
             ...data,
             rfqTo: vendorOrganizationNames,
             quotationFiles: quotationFilesArray,
             incompleteFields: incompleteFieldsResult,
+            oemNotAllowedName: oemNotAllowedNames.length > 0 ? oemNotAllowedNames.join(', ') : null,
         };
     }
 
@@ -545,9 +576,9 @@ export class TenderApprovalService {
         });
 
         // Send email notification for approval/rejection/review
-        // if (payload.tlStatus === "1" || payload.tlStatus === "2" || payload.tlStatus === "3") {
-        //     await this.sendApprovalEmail(tenderId, payload, changedBy);
-        // }
+        if (payload.tlStatus === "1" || payload.tlStatus === "2" || payload.tlStatus === "3") {
+            await this.sendApprovalEmail(tenderId, payload, changedBy);
+        }
 
         try {
             // TIMER TRANSITION
@@ -884,11 +915,11 @@ export class TenderApprovalService {
             : undefined;
 
         await this.sendEmail(eventType, tenderId, changedBy, subject, template, emailData, {
-            to: [{ type: "user", userId: tender.teamMember }],
-            cc: [
-                { type: "role", role: "Admin", teamId: tender.team },
-                { type: "role", role: "Coordinator", teamId: tender.team },
-            ],
+            to: [{ type: "emails", emails: ['gyan@volksenergie.in'] }],
+            // cc: [
+            //     { type: "role", role: "Admin", teamId: tender.team },
+            //     { type: "role", role: "Coordinator", teamId: tender.team },
+            // ],
         }, attachments);
     }
 }

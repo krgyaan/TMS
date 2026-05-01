@@ -33,7 +33,7 @@ export const tenderInfos = pgTable("tender_infos", {
     tenderApprovalStatus: varchar("tender_approval_status", { length: 50 }),
     tlRejectionRemarks: text("tl_rejection_remarks"),
     tlIncompleteRemarks: text("tl_incomplete_remarks"),
-    oemNotAllowed: varchar("oem_not_allowed", { length: 50 }),
+    oemNotAllowed: text("oem_not_allowed").array(),
     rfqRequired: varchar("rfq_required", { length: 10 }),
     quotationFiles: text("quotation_files"),
 
