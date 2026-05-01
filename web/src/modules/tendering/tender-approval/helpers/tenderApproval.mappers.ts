@@ -41,7 +41,7 @@ export const getInitialValues = (approval?: TenderApproval | null): TenderApprov
         alternativeTechnicalDocs: approval.alternativeTechnicalDocs ?? [],
         alternativeFinancialDocs: approval.alternativeFinancialDocs ?? [],
         tenderStatus: approval.tenderStatus ? String(approval.tenderStatus) : undefined,
-        oemNotAllowed: approval.oemNotAllowed ? String(approval.oemNotAllowed) : undefined,
+        oemNotAllowed: approval.oemNotAllowed?.map((item) => String(item)) ?? [],
         tlApprovalRemarks: toOptionalString(approval.tlApprovalRemarks),
         tlRejectionRemarks: toOptionalString(approval.tlRejectionRemarks),
         tlIncompleteRemarks: toOptionalString(approval.tlIncompleteRemarks),

@@ -365,7 +365,17 @@ export function TenderApprovalView({
                                                 OEM Not Allowed
                                             </TableCell>
                                             <TableCell className="text-sm">
-                                                {approval.oemNotAllowedName}
+                                                {approval.oemNotAllowedName ? (
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {approval.oemNotAllowedName.split(',').map((name, i) => (
+                                                            <Badge key={i} variant="outline">
+                                                                {name.trim()}
+                                                            </Badge>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    '—'
+                                                )}
                                             </TableCell>
                                         </>
                                     )}

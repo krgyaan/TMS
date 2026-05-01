@@ -27,7 +27,7 @@ export interface SaveTenderApprovalDto {
     alternativeTechnicalDocs?: string[];
     alternativeFinancialDocs?: string[];
     tenderStatus?: number;
-    oemNotAllowed?: string;
+    oemNotAllowed?: string[];
     tlRejectionRemarks?: string;
     tlIncompleteRemarks?: string;
     tlApprovalRemarks?: string;
@@ -55,7 +55,7 @@ export interface TenderApproval {
     alternativeFinancialDocs?: string[] | null;
     tenderStatus: number | null;
     statusName: string | null;
-    oemNotAllowed: string | null;
+    oemNotAllowed: string[] | null;
     oemNotAllowedName: string | null;
     tlRejectionRemarks: string | null;
     tlIncompleteRemarks: string | null;

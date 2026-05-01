@@ -27,6 +27,7 @@ import { getInitialValues, mapFormToPayload } from '../helpers/tenderApproval.ma
 import { usePqrOptions, useFinanceDocumentOptions } from '@/hooks/useSelectOptions';
 import { TenderFileUploader } from '@/components/tender-file-upload/TenderFileUploader';
 import { tenderFilesService } from '@/services/api/tender-files.service';
+import { formatINR } from '@/hooks/useINRFormatter';
 
 interface TenderApprovalFormProps {
     tenderId: number;
@@ -425,20 +426,22 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                             </div>
                         </div>
 
-                        <SelectField
-                            control={form.control}
-                            name="tlDecision"
-                            label="TL's Decision to Bid"
-                            options={tlDecisionOptions}
-                            placeholder="Select decision"
-                        />
+                        <div className='grid grid-cols-4'>
+                            <SelectField
+                                control={form.control}
+                                name="tlDecision"
+                                label="TL's Decision to Bid"
+                                options={tlDecisionOptions}
+                                placeholder="Select decision"
+                            />
+                        </div>
                         {form.formState.errors.tlDecision && (
                             <p className="text-sm text-destructive mt-1">{form.formState.errors.tlDecision.message}</p>
                         )}
 
                         {tlDecision === '1' && (
                             <div className="space-y-8 animate-in fade-in-50 duration-300">
-                                <div className="grid gap-2 md:grid-cols-2 items-start">
+                                <div className="grid gap-4 grid-cols-4 items-start">
                                     <SelectField
                                         control={form.control}
                                         name="rfqRequired"
@@ -487,21 +490,13 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                             />
                                             {infoSheet && (infoSheet.processingFeeAmount || (infoSheet.processingFeeMode && infoSheet.processingFeeMode.length > 0)) && (
                                                 <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded space-y-1">
-                                                    {infoSheet.processingFeeAmount && (
+                                                    {infoSheet.processingFeeRequired == 'YES' ? (
+
                                                         <div>
-                                                            <strong>Amount:</strong> ₹{(() => {
-                                                                const amount = typeof infoSheet.processingFeeAmount === 'number'
-                                                                    ? infoSheet.processingFeeAmount
-                                                                    : parseFloat(String(infoSheet.processingFeeAmount));
-                                                                return isNaN(amount) ? '0.00' : amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                                                            })()}
+                                                            <strong>Amount:</strong> {infoSheet.processingFeeAmount ? formatINR(infoSheet.processingFeeAmount) : ''}
+                                                            <strong>Available Modes:</strong> {infoSheet.processingFeeMode ? infoSheet.processingFeeMode.join(', ') : '-'}
                                                         </div>
-                                                    )}
-                                                    {infoSheet.processingFeeMode && infoSheet.processingFeeMode.length > 0 && (
-                                                        <div>
-                                                            <strong>Available Modes:</strong> {infoSheet.processingFeeMode.join(', ')}
-                                                        </div>
-                                                    )}
+                                                    ) : <p className="text-xs text-muted-foreground">Processing Fee Not Required</p>}
                                                 </div>
                                             )}
                                         </div>
@@ -515,21 +510,12 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                             />
                                             {infoSheet && (infoSheet.tenderFeeAmount || (infoSheet.tenderFeeMode && infoSheet.tenderFeeMode.length > 0)) && (
                                                 <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded space-y-1">
-                                                    {infoSheet.tenderFeeAmount && (
+                                                    {infoSheet.tenderFeeRequired == 'YES' ? (
                                                         <div>
-                                                            <strong>Amount:</strong> ₹{(() => {
-                                                                const amount = typeof infoSheet.tenderFeeAmount === 'number'
-                                                                    ? infoSheet.tenderFeeAmount
-                                                                    : parseFloat(String(infoSheet.tenderFeeAmount));
-                                                                return isNaN(amount) ? '0.00' : amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                                                            })()}
+                                                            <strong>Amount:</strong> {infoSheet.tenderFeeAmount ? formatINR(infoSheet.tenderFeeAmount) : ''}
+                                                            <strong>Available Modes:</strong> {infoSheet.tenderFeeMode ? infoSheet.tenderFeeMode.join(', ') : '-'}
                                                         </div>
-                                                    )}
-                                                    {infoSheet.tenderFeeMode && infoSheet.tenderFeeMode.length > 0 && (
-                                                        <div>
-                                                            <strong>Available Modes:</strong> {infoSheet.tenderFeeMode.join(', ')}
-                                                        </div>
-                                                    )}
+                                                    ) : <p className="text-xs text-muted-foreground">Tender Fee Not Required</p>}
                                                 </div>
                                             )}
                                         </div>
@@ -543,20 +529,15 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                             />
                                             {infoSheet && (infoSheet.emdAmount || (infoSheet.emdMode && infoSheet.emdMode.length > 0)) && (
                                                 <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded space-y-1">
-                                                    {infoSheet.emdAmount && (
+                                                    {infoSheet.emdRequired == 'YES' ? (
                                                         <div>
-                                                            <strong>Amount:</strong> ₹{(() => {
-                                                                const amount = typeof infoSheet.emdAmount === 'number'
-                                                                    ? infoSheet.emdAmount
-                                                                    : parseFloat(String(infoSheet.emdAmount));
-                                                                return isNaN(amount) ? '0.00' : amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                                                            })()}
+                                                            <strong>Amount:</strong> {infoSheet.emdAmount ? formatINR(infoSheet.emdAmount) : ''}
+                                                            <strong>Available Modes:</strong> {infoSheet.emdMode ? infoSheet.emdMode.join(', ') : '-'}
                                                         </div>
-                                                    )}
-                                                    {infoSheet.emdMode && infoSheet.emdMode.length > 0 && (
-                                                        <div>
-                                                            <strong>Available Modes:</strong> {infoSheet.emdMode.join(', ')}
-                                                        </div>
+                                                    ) : infoSheet.emdRequired == 'EXEMPT' ? (
+                                                        <p className="text-xs text-muted-foreground">EMD Exempt</p>
+                                                    ) : (
+                                                        <p className="text-xs text-muted-foreground">EMD Not Required</p>
                                                     )}
                                                 </div>
                                             )}
@@ -662,35 +643,37 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                         )}
 
                         {tlDecision === '2' && (
-                            <div className="space-y-8 animate-in fade-in-50 duration-300">
+                            <>
                                 <h4 className="font-semibold text-base text-primary border-b pb-2">Rejection Details</h4>
-                                <SelectField
-                                    control={form.control}
-                                    name="tenderStatus"
-                                    label="Tender Status"
-                                    options={tenderStatusOptions}
-                                    placeholder="Select tender status"
-                                />
-                                {isNotAllowedByOem && (
+                                <div className="grid gap-4 grid-cols-1 md:grid-cols-3 items-start">
                                     <SelectField
                                         control={form.control}
-                                        name="oemNotAllowed"
-                                        label="OEM who didn't allow"
-                                        options={vendorOrgOptions}
-                                        placeholder="Select OEM who didn't allow"
+                                        name="tenderStatus"
+                                        label="Tender Status"
+                                        options={tenderStatusOptions}
+                                        placeholder="Select tender status"
                                     />
-                                )}
-                                <FieldWrapper control={form.control} name="tlRejectionRemarks" label="TL Rejection Remarks">
-                                    {(field) => (
-                                        <textarea
-                                            {...field}
-                                            className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                                            placeholder="Enter rejection remarks..."
-                                            maxLength={1000}
+                                    {isNotAllowedByOem && (
+                                        <MultiSelectField
+                                            control={form.control}
+                                            name="oemNotAllowed"
+                                            label="OEM who didn't allow"
+                                            options={vendorOrgOptions}
+                                            placeholder="Select OEM who didn't allow"
                                         />
                                     )}
-                                </FieldWrapper>
-                            </div>
+                                    <FieldWrapper control={form.control} name="tlRejectionRemarks" label="TL Rejection Remarks">
+                                        {(field) => (
+                                            <textarea
+                                                {...field}
+                                                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                                placeholder="Enter rejection remarks..."
+                                                maxLength={1000}
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                </div>
+                            </>
                         )}
 
                         {tlDecision === '3' && (
