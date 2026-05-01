@@ -72,7 +72,10 @@ export const AccountSection = ({ orgId }: Props) => {
                     id: existing.id,
                     data: {
                         orgId,
-                        ...formState,
+                        bankAccountName: formState.bankAccountName,
+                        accountNum: formState.accountNum,
+                        ifscCode: formState.ifscCode,
+                        status: formState.status,
                     },
                 });
             }
@@ -82,7 +85,10 @@ export const AccountSection = ({ orgId }: Props) => {
                 createAccount.mutate(
                     {
                         orgId,
-                        ...formState,
+                        bankAccountName: formState.bankAccountName,
+                        accountNum: formState.accountNum,
+                        ifscCode: formState.ifscCode,
+                        status: formState.status,
                     },
                     {
                         onSuccess: created => {
