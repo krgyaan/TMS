@@ -1050,11 +1050,12 @@ export class TenderApprovalService {
         }
 
         await this.sendEmail(eventType, tenderId, changedBy, subject, template, emailData, {
-            to: [{ type: "emails", emails: ['gyan@volksenergie.in'] }],
-            // cc: [
-            //     { type: "role", role: "Admin", teamId: tender.team },
-            //     { type: "role", role: "Coordinator", teamId: tender.team },
-            // ],
+            // to: [{ type: "emails", emails: ['gyan@volksenergie.in'] }],
+            to: [{ type: "role", role: "Team Leader", teamId: tender.team }],
+            cc: [
+                { type: "role", role: "Admin", teamId: tender.team },
+                { type: "role", role: "Coordinator", teamId: tender.team },
+            ],
         });
     }
 }
