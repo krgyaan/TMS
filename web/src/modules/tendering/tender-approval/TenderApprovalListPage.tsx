@@ -28,7 +28,7 @@ const TABS_NAMES: Record<TenderApprovalTab, TenderApprovalTabName> = {
     'pending': 'Pending', 'accepted': 'Approved', 'rejected': 'Rejected', 'tender-dnb': 'Tender DNB'
 };
 
-const TL_STATUS_NAMES: Record<number, string> = { 0: 'Pending', 1: 'Accepted', 2: 'Rejected', 3: 'Tender DNB' };
+const TL_STATUS_NAMES: Record<number, string> = { 0: 'Pending', 1: 'Accepted', 2: 'Rejected', 3: 'Incomplete' };
 
 const TenderApprovalListPage = () => {
     const [activeTab, setActiveTab] = useState<TenderApprovalTab>('pending');
@@ -220,6 +220,23 @@ const TenderApprovalListPage = () => {
                         className={isGreen ? 'bg-green-500 text-white' : ''}
                     >
                         {statusName || '—'}
+                    </Badge>
+                );
+            },
+            sortable: true,
+            filter: true,
+        },
+        {
+            field: 'teRecommendation',
+            headerName: 'TE',
+            colId: 'teRecommendation',
+            width: 100,
+            cellRenderer: (params: any) => {
+                const status = params.data?.teRecommendation;
+                if (!status) return '—';
+                return (
+                    <Badge variant={status == 'YES' ? 'default' : 'destructive'}>
+                        {status}
                     </Badge>
                 );
             },

@@ -34,9 +34,6 @@ export interface SaveTenderApprovalDto {
     incompleteFields?: IncompleteField[];
 }
 
-// Response from API
-type Vendor = { name: string };
-
 export interface TenderApproval {
     id?: number;
     tenderId?: number;
@@ -87,6 +84,7 @@ export interface TenderApprovalRow {
     itemName: string;
     statusName: string;
     tlStatus: number;
+    teRecommendation: string;
 }
 
 export type TenderApprovalFilters = {

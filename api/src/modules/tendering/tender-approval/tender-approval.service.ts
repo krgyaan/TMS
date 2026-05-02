@@ -52,6 +52,7 @@ type TenderRow = {
     statusRemark?: string | null;
     rejectReason?: number | null;
     rejectRemarks?: string | null;
+    teRecommendation: string | null;
 };
 
 @Injectable()
@@ -239,6 +240,7 @@ export class TenderApprovalService {
                 teamMemberName: users.name,
                 itemName: items.name,
                 statusName: statuses.name,
+                teRecommendation: tenderInformation.teRecommendation,
                 rejectReason: tenderInformation.teRejectionReason,
                 rejectRemarks: tenderInformation.teRejectionRemarks,
             })
