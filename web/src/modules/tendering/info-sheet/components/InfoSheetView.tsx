@@ -592,34 +592,28 @@ const AllFieldsTable = ({ infoSheet }: { infoSheet: TenderInfoSheet }) => {
                                 Courier Information
                             </TableCell>
                         </TableRow>
-                        {infoSheet.courierName && (
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">Name</TableCell>
-                                <TableCell className="text-sm">{infoSheet.courierName}</TableCell>
-                                {infoSheet.courierPhone && (
-                                    <>
-                                        <TableCell className="text-sm font-medium text-muted-foreground">Phone No</TableCell>
-                                        <TableCell className="text-sm">{infoSheet.courierPhone}</TableCell>
-                                    </>
-                                )}
-                            </TableRow>
-                        )}
-                        {infoSheet.courierAddressLine1 && (
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">Address</TableCell>
-                                <TableCell className="text-sm">
-                                    <div>{infoSheet.courierAddressLine1}</div>
-                                    {infoSheet.courierAddressLine2 && <div>{infoSheet.courierAddressLine2}</div>}
-                                    <div>
-                                        {[infoSheet.courierCity, infoSheet.courierState]
-                                            .filter(Boolean)
-                                            .join(", ")}
-                                    </div>
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">Pin Code</TableCell>
-                                <TableCell className="text-sm">{infoSheet.courierPincode}</TableCell> 
-                            </TableRow>
-                        )}
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">Name</TableCell>
+                            <TableCell className="text-sm">{infoSheet.courierName}</TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">Phone No</TableCell>
+                            <TableCell className="text-sm">{infoSheet.courierPhone}</TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">Address Line 1</TableCell>
+                            <TableCell className="text-sm">{infoSheet.courierAddressLine1}</TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">Address Line 2</TableCell>
+                            <TableCell className="text-sm">{infoSheet.courierAddressLine2}</TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">City</TableCell>
+                            <TableCell className="text-sm">{infoSheet.courierCity}</TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">State</TableCell>
+                            <TableCell className="text-sm">{infoSheet.courierState}</TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">Pincode</TableCell>
+                            <TableCell className="text-sm">{infoSheet.courierPincode}</TableCell>
+                        </TableRow>
                         {!infoSheet.courierAddressLine1 && infoSheet.courierAddress && (
                             <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">Address (Legacy)</TableCell>
@@ -765,9 +759,7 @@ const AllFieldsTable = ({ infoSheet }: { infoSheet: TenderInfoSheet }) => {
                                         className="text-xs hover:bg-primary/10"
                                     >
                                         <a
-                                            href={tenderFilesService.getFileUrl(
-                                                filePath!
-                                            )}
+                                            href={tenderFilesService.getFileUrl(filePath!)}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                         >

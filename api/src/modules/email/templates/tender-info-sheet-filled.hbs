@@ -240,14 +240,14 @@
                     <ul style="margin: 0; padding-left: 18px;">
                         {{#each data.te_docs}}
                             <li>
-                                {{#if this.path}}
-                                    <a href="{{data.fileBaseUrl}}/tender-files/serve/{{this.path}}" target="_blank" style="color: #0066cc; text-decoration: underline;">{{this.name}}</a>
+                                {{#if this.url}}
+                                    <a href="{{this.url}}" target="_blank" style="color: #0066cc; text-decoration: underline;">{{this.name}}</a>
                                 {{else}}
                                     {{this.name}}
                                 {{/if}}
                             </li>
                         {{else}}
-                            <li>None</li>
+                            <li>No Technical Eligibility Documents Available</li>
                         {{/each}}
                     </ul>
                 </td>
@@ -256,12 +256,12 @@
                 <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Tender Documents</th>
                 <td style="border: 1px solid #444; text-align: left; padding: 8px;">
                     <ul style="margin: 0; padding-left: 18px;">
-                        {{#each data.tender_docs}}
+                        {{#each data.tender_docs_urls}}
                             <li>
-                                <a href="{{data.fileBaseUrl}}/tender-files/serve/{{this}}" target="_blank" style="color: #0066cc; text-decoration: underline;">{{this}}</a>
+                                <a href="{{this}}" target="_blank" style="color: #0066cc; text-decoration: underline;">Open File</a>
                             </li>
                         {{else}}
-                            <li>None</li>
+                            <li>No Tender Documents Available</li>
                         {{/each}}
                     </ul>
                 </td>
@@ -274,14 +274,14 @@
                     <ul style="margin: 0; padding-left: 18px;">
                         {{#each data.ce_docs}}
                             <li>
-                                {{#if this.path}}
-                                    <a href="{{data.fileBaseUrl}}/tender-files/serve/{{this.path}}" target="_blank" style="color: #0066cc; text-decoration: underline;">{{this.name}}</a>
+                                {{#if this.url}}
+                                    <a href="{{this.url}}" target="_blank" style="color: #0066cc; text-decoration: underline;">{{this.name}}</a>
                                 {{else}}
                                     {{this.name}}
                                 {{/if}}
                             </li>
                         {{else}}
-                            <li>None</li>
+                            <li>No Commercial Eligibility Documents Available</li>
                         {{/each}}
                     </ul>
                 </td>
@@ -325,40 +325,54 @@
     </table>
 
     <!-- Courier Address -->
-        <table width="100%" cellpadding="6" cellspacing="0"
-            style="border: 1px solid #444; border-collapse: collapse; margin-bottom: 16px;">
-            <tbody>
+    <table width="100%" cellpadding="6" cellspacing="0"
+        style="border: 1px solid #444; border-collapse: collapse; margin-bottom: 16px;">
+        <tbody>
+            <tr>
+                <td colspan="6" style="border: 1px solid #444; text-align: center;
+                    background-color: #2c3e50; color: #fff; padding: 10px;">
+                    <b>Courier Details</b>
+                </td>
+            </tr>
+
+            {{#if data.courier_name}}
                 <tr>
-                    <td colspan="4" style="border: 1px solid #444; text-align: center;
-                        background-color: #2c3e50; color: #fff; padding: 10px;">
-                        <b>Courier Details</b>
-                    </td>
+                    <th style="border: 1px solid #444; background-color: #e8e8e8;">Name</th>
+                    <td style="border: 1px solid #444;">{{data.courier_name}}</td>
+
+                    <th style="border: 1px solid #444; background-color: #e8e8e8;">Phone</th>
+                    <td style="border: 1px solid #444;">{{data.courier_phone}}</td>
+
+                    <th style="border: 1px solid #444; background-color: #e8e8e8;">City</th>
+                    <td style="border: 1px solid #444;">{{data.courier_city}}</td>
                 </tr>
-                {{#if data.courier_name}}
-                    <tr>
-                        <th style="border: 1px solid #444; text-align: left; width: 20%; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Name</th>
-                        <td style="border: 1px solid #444; text-align: left; width: 30%; padding: 8px;">{{data.courier_name}}</td>
-                        <th style="border: 1px solid #444; text-align: left; width: 20%; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Phone</th>
-                        <td style="border: 1px solid #444; text-align: left; width: 30%; padding: 8px;">{{data.courier_phone}}</td>
-                        <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">City</th>
-                        <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.courier_city}}</td>
-                    </tr>
-                    <tr style="background-color: #f9f9f9;">
-                        <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">State</th>
-                        <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.courier_state}}</td>
-                        <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Pincode</th>
-                        <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{data.courier_pincode}}</td>
-                    </tr>
-                {{else}}
-                    <tr>
-                        <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Address</th>
-                        <td style="border: 1px solid #444; text-align: left; padding: 8px;" colspan="3">
-                            {{data.courier_address}}
-                        </td>
-                    </tr>
-                {{/if}}
-            </tbody>
-        </table>
+
+                <tr>
+                    <th style="border: 1px solid #444; background-color: #e8e8e8;">Address Line 1</th>
+                    <td colspan="2" style="border: 1px solid #444;">{{data.courier_address_line_1}}</td>
+
+                    <th style="border: 1px solid #444; background-color: #e8e8e8;">Address Line 2</th>
+                    <td colspan="2" style="border: 1px solid #444;">{{data.courier_address_line_2}}</td>
+                </tr>
+
+                <tr>
+                    <th style="border: 1px solid #444; background-color: #e8e8e8;">State</th>
+                    <td style="border: 1px solid #444;">{{data.courier_state}}</td>
+
+                    <th style="border: 1px solid #444; background-color: #e8e8e8;">Pincode</th>
+                    <td style="border: 1px solid #444;">{{data.courier_pincode}}</td>
+
+                    <!-- Empty cells to maintain 6 columns -->
+                    <td colspan="2" style="border: 1px solid #444;"></td>
+                </tr>
+            {{else}}
+                <tr>
+                    <th style="border: 1px solid #444; background-color: #e8e8e8;">Address</th>
+                    <td colspan="5" style="border: 1px solid #444;">{{data.courier_address}}</td>
+                </tr>
+            {{/if}}
+        </tbody>
+    </table>
 
     <!-- TE Final Remark -->
     {{#if data.te_final_remark}}
@@ -400,10 +414,14 @@
                     <ul style="margin: 0; padding-left: 18px;">
                         {{#each data.rejection_proofs}}
                             <li>
-                                <a href="{{data.fileBaseUrl}}/tender-files/serve/{{this.path}}" target="_blank" style="color: #0066cc; text-decoration: underline;">View Proof</a>
+                                {{#if this.url}}
+                                    <a href="{{this.url}}" target="_blank" style="color: #0066cc; text-decoration: underline;">Open Proof</a>
+                                {{else}}
+                                    {{this.path}}
+                                {{/if}}
                             </li>
                         {{else}}
-                            <li>No proof attached</li>
+                            <li>No Proof of Rejection Available</li>
                         {{/each}}
                     </ul>
                 </td>
@@ -414,12 +432,12 @@
                 </th>
                 <td style="border: 1px solid #444; text-align: left; padding: 8px;">
                     <ul style="margin: 0; padding-left: 18px;">
-                        {{#each data.tender_docs}}
+                        {{#each data.tender_docs_urls}}
                             <li>
-                                <a href="{{data.fileBaseUrl}}/tender-files/serve/{{this}}" target="_blank" style="color: #0066cc; text-decoration: underline;">{{this}}</a>
+                                <a href="{{this}}" target="_blank" style="color: #0066cc; text-decoration: underline;">Open File</a>
                             </li>
                         {{else}}
-                            <li>None</li>
+                            <li>No Tender Documents Available</li>
                         {{/each}}
                     </ul>
                 </td>

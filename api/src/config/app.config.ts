@@ -10,6 +10,7 @@ const appEnvSchema = z.object({
         .default(3000),
     API_PREFIX: z.string().optional().default('api/v1'),
     PUBLIC_APP_URL: z.string().optional().default('http://localhost:5173'),
+    API_URL: z.string().optional().default('http://localhost:3000/api/v1'),
 });
 
 export type AppConfig = z.infer<typeof appEnvSchema>;
@@ -25,5 +26,6 @@ export default registerAs('app', () => {
         port: parsed.PORT,
         apiPrefix: parsed.API_PREFIX,
         publicAppUrl: parsed.PUBLIC_APP_URL,
-    } as { port: number; apiPrefix: string; publicAppUrl: string };
+        apiUrl: parsed.API_URL,
+    } as { port: number; apiPrefix: string; publicAppUrl: string; apiUrl: string };
 });

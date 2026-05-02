@@ -1367,22 +1367,34 @@ export class TenderInfoSheetsService {
             te_docs: infoSheet.technicalWorkOrders.map(
                 (doc) => ({
                     name: doc.projectName || `Document ${doc.id}`,
-                    path: doc.poDocument?.[0] || null
+                    path: doc.poDocument?.[0] || null,
+                    url: doc.poDocument?.[0]
+                        ? `${this.configService.get<string>('app.apiUrl') || ''}/tender-files/serve/${doc.poDocument[0]}`
+                        : null
                 })
             ),
             ce_docs: infoSheet.commercialDocuments.map(
                 (doc) => ({
                     name: doc.documentName || `Document ${doc.id}`,
-                    path: doc.documentPath?.[0] || null
+                    path: doc.documentPath?.[0] || null,
+                    url: doc.documentPath?.[0]
+                        ? `${this.configService.get<string>('app.apiUrl') || ''}/tender-files/serve/${doc.documentPath[0]}`
+                        : null
                 })
             ),
             tender_docs: tenderDocsList,
+            tender_docs_urls: tenderDocsList.map(
+                (file) => `${this.configService.get<string>('app.apiUrl') || ''}/tender-files/serve/${file}`
+            ),
 
             // ── Rejection Proofs ─
-            rejection_proofs: (infoSheet.teRejectionProof ?? []).map((path) => ({ path })),
+            rejection_proofs: (infoSheet.teRejectionProof ?? []).map((path) => ({
+                path,
+                url: `${this.configService.get<string>('app.apiUrl') || ''}/tender-files/serve/${path}`
+            })),
 
             // ── File Base URL for email links ─
-            fileBaseUrl: this.configService.get<string>('app.publicAppUrl') || '',
+            fileBaseUrl: this.configService.get<string>('app.apiUrl') || '',
 
             // ── Clients 
             clients: infoSheet.clients.map((client) => ({
@@ -1394,6 +1406,8 @@ export class TenderInfoSheetsService {
 
             // ── Courier 
             courier_address: infoSheet.courierAddress || null,
+            courier_address_line_1: infoSheet.courierAddressLine1 || '',
+            courier_address_line_2: infoSheet.courierAddressLine2 || '',
             courier_name: infoSheet.courierName || 'Not specified',
             courier_phone: infoSheet.courierPhone || 'Not specified',
             courier_city: infoSheet.courierCity || 'Not specified',
@@ -1410,23 +1424,6 @@ export class TenderInfoSheetsService {
 
         console.log("emailData", emailData);
 
-        // ── Build attachments based on recommendation ─────────────────────
-        let attachments: { files: string[]; baseDir?: string } | undefined;
-
-        // Attach tender documents
-        const tenderDocFiles = tenderDocsList.filter(Boolean);
-        if (tenderDocFiles.length > 0) {
-            attachments = { files: tenderDocFiles };
-        }
-
-        if (infoSheet.teRecommendation === 'NO') {
-            // Attach rejection proofs
-            const rejectionProofFiles = (infoSheet.teRejectionProof ?? []).filter(Boolean);
-            if (rejectionProofFiles.length > 0) {
-                attachments = { files: rejectionProofFiles };
-            }
-        }
-
         await this.sendEmail(
             'info-sheet.filled',
             tenderId,
@@ -1435,13 +1432,13 @@ export class TenderInfoSheetsService {
             'tender-info-sheet-filled',
             emailData,
             {
-                to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
-                cc: [
-                    { type: 'role', role: 'Admin', teamId: tender.team },
-                    { type: 'role', role: 'Coordinator', teamId: tender.team },
-                ],
-            },
-            attachments
+                to: [{ type: 'emails', emails: ['gyan@volksenergie.in']}],
+                // to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
+                // cc: [
+                //     { type: 'role', role: 'Admin', teamId: tender.team },
+                //     { type: 'role', role: 'Coordinator', teamId: tender.team },
+                // ],
+            }
         );
     }
 
