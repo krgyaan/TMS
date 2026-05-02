@@ -13,6 +13,7 @@ export const UploadResultSchema = z.object({
     qualifiedPartiesCount: optionalTextField(50),
     qualifiedPartiesNames: z.array(z.string()).optional(),
     result: z.enum(['Won', 'Lost']).optional(),
+    resultReason: optionalString,
     l1Price: optionalNumber(z.coerce.number().min(0, 'L1 price must be non-negative')),
     l2Price: optionalNumber(z.coerce.number().min(0, 'L2 price must be non-negative')),
     ourPrice: optionalNumber(z.coerce.number().min(0, 'Our price must be non-negative')),

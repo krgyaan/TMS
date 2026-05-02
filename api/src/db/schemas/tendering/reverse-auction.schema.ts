@@ -54,7 +54,10 @@ export const reverseAuctions = pgTable(
         // Pricing
         raStartPrice: decimal("ra_start_price", { precision: 15, scale: 2 }),
         raClosePrice: decimal("ra_close_price", { precision: 15, scale: 2 }),
+        raClosePriceL2: decimal("ra_close_price_l2", { precision: 15, scale: 2 }),
+        raOurPrice: decimal("ra_our_price", { precision: 15, scale: 2 }),
         raCloseTime: timestamp("ra_close_time", { withTimezone: true }),
+        resultReason: text("result_reason"),
 
         // Screenshots (file paths or URLs)
         screenshotQualifiedParties: text("screenshot_qualified_parties"),

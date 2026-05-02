@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { eq, like } from "drizzle-orm";
+import { eq, ilike, like } from "drizzle-orm";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
 import { emdResponsibilityTypes, type EmdResponsibilityType, type NewEmdResponsibilityType } from "@db/schemas/master/emd-responsibilities";
@@ -46,6 +46,6 @@ export class EmdResponsibilityService {
 
     async search(query: string): Promise<EmdResponsibilityType[]> {
         const searchPattern = `%${query}%`;
-        return this.db.select().from(emdResponsibilityTypes).where(like(emdResponsibilityTypes.name, searchPattern));
+        return this.db.select().from(emdResponsibilityTypes).where(ilike(emdResponsibilityTypes.name, searchPattern));
     }
 }

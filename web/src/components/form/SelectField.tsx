@@ -1,26 +1,23 @@
-import * as React from "react"
-import { type Control, type FieldPath, type FieldValues } from "react-hook-form"
-import { Button } from "@/components/ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Input } from "@/components/ui/input"
-import { FieldWrapper } from "./FieldWrapper"
-import { cn } from "@/lib/utils"
+import * as React from "react";
+import { type Control, type FieldPath, type FieldValues } from "react-hook-form";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { FieldWrapper } from "./FieldWrapper";
+import { cn } from "@/lib/utils";
 
-export type SelectOption = { id: string; name: string }
+export type SelectOption = { id: string; name: string };
 
 type SelectFieldProps<TFieldValues extends FieldValues, TName extends FieldPath<TFieldValues>> = {
-    control: Control<TFieldValues>
-    name: TName
-    label: React.ReactNode
-    options: Array<SelectOption | { value: string; label: string }>
-    placeholder: string
-    disabled?: boolean
-}
+    control: Control<TFieldValues>;
+    name: TName;
+    label: React.ReactNode;
+    options: Array<SelectOption | { value: string; label: string }>;
+    placeholder: string;
+    disabled?: boolean;
+};
 
-export function SelectField<
-    TFieldValues extends FieldValues,
-    TName extends FieldPath<TFieldValues>
->({
+export function SelectField<TFieldValues extends FieldValues, TName extends FieldPath<TFieldValues>>({
     control,
     name,
     label,
@@ -28,35 +25,27 @@ export function SelectField<
     placeholder,
     disabled,
 }: SelectFieldProps<TFieldValues, TName>) {
-    const normalizedOptions = React.useMemo<SelectOption[]>(
-        () =>
-            options.map((option) =>
-                'id' in option
-                    ? option
-                    : { id: option.value, name: option.label }
-            ),
-        [options],
-    )
+    const normalizedOptions = React.useMemo<SelectOption[]>(() => (options || []).map(option => ("id" in option ? option : { id: option.value, name: option.label })), [options]);
 
     return (
         <FieldWrapper control={control} name={name} label={label}>
-            {(field) => (
+            {field => (
                 <Combobox
                     value={String(field.value ?? "")}
-                    onChange={(v) => {
+                    onChange={v => {
                         if (v === "") {
-                            field.onChange(undefined)
+                            field.onChange(undefined);
                         } else {
                             // Preserve string values for enum types (like '0', '1', '2', '3')
                             // Check if the current field value is a string enum (single char) or if the value itself is a single char
                             // This handles cases where tlDecision should be '0' | '1' | '2' | '3' as strings
                             const isStringEnum = v.length === 1 && /^[0-3]$/.test(v);
-                            if (isStringEnum || typeof field.value === 'string') {
+                            if (isStringEnum || typeof field.value === "string") {
                                 field.onChange(v);
                             } else {
                                 // Try to convert to number for other numeric fields
                                 const numValue = Number(v);
-                                const isNumeric = !isNaN(numValue) && v.trim() !== '';
+                                const isNumeric = !isNaN(numValue) && v.trim() !== "";
                                 field.onChange(isNumeric ? numValue : v);
                             }
                         }
@@ -67,52 +56,44 @@ export function SelectField<
                 />
             )}
         </FieldWrapper>
-    )
+    );
 }
 
-
-function Combobox({
+export function Combobox({
     value,
     onChange,
     options,
     placeholder,
     disabled,
 }: {
-    value: string
-    onChange: (v: string) => void
-    options: SelectOption[]
-    placeholder: string
-    disabled?: boolean
+    value: string;
+    onChange: (v: string) => void;
+    options: SelectOption[];
+    placeholder: string;
+    disabled?: boolean;
 }) {
-    const [open, setOpen] = React.useState(false)
-    const [query, setQuery] = React.useState("")
-    const inputRef = React.useRef<HTMLInputElement>(null)
-    const selected = options.find((o) => o.id === value)
+    const [open, setOpen] = React.useState(false);
+    const [query, setQuery] = React.useState("");
+    const inputRef = React.useRef<HTMLInputElement>(null);
+    const selected = options.find(o => o.id === value);
     const filtered = React.useMemo(() => {
-        const q = query.trim().toLowerCase()
-        if (!q) return options
-        return options.filter((o) => o.name.toLowerCase().includes(q))
-    }, [options, query])
+        const q = query.trim().toLowerCase();
+        if (!q) return options;
+        return options.filter(o => o.name.toLowerCase().includes(q));
+    }, [options, query]);
 
     React.useEffect(() => {
         if (open) {
             // Delay to ensure content has mounted in the portal before focusing
-            const id = setTimeout(() => inputRef.current?.focus(), 0)
-            return () => clearTimeout(id)
+            const id = setTimeout(() => inputRef.current?.focus(), 0);
+            return () => clearTimeout(id);
         }
-    }, [open])
+    }, [open]);
 
     return (
         <DropdownMenu open={open} onOpenChange={setOpen}>
             <DropdownMenuTrigger asChild disabled={disabled}>
-                <Button
-                    type="button"
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={open}
-                    className="w-full justify-between"
-                    disabled={disabled}
-                >
+                <Button type="button" variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between" disabled={disabled}>
                     {selected ? selected.name : placeholder}
                     <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -135,24 +116,23 @@ function Combobox({
                         autoFocus
                         placeholder="Search..."
                         value={query}
-                        onChange={(e) => setQuery(e.target.value)}
+                        onChange={e => setQuery(e.target.value)}
+                        onKeyDown={e => e.stopPropagation()}
                         className="h-8"
                     />
                 </div>
                 <div className="max-h-64 overflow-auto py-1">
-                    {filtered.length === 0 && (
-                        <div className="text-muted-foreground px-2 py-2 text-sm">No results</div>
-                    )}
-                    {filtered.map((o) => {
-                        const isSelected = value === o.id
+                    {filtered.length === 0 && <div className="text-muted-foreground px-2 py-2 text-sm">No results</div>}
+                    {filtered.map(o => {
+                        const isSelected = value === o.id;
                         return (
                             <DropdownMenuItem
                                 key={`${o.id}-${o.name}`}
                                 onClick={() => {
-                                    const next = isSelected ? "" : o.id
-                                    onChange(next)
-                                    setOpen(false)
-                                    setQuery("")
+                                    const next = isSelected ? "" : o.id;
+                                    onChange(next);
+                                    setOpen(false);
+                                    setQuery("");
                                 }}
                                 className="flex items-center gap-2"
                             >
@@ -170,12 +150,12 @@ function Combobox({
                                 </svg>
                                 {o.name}
                             </DropdownMenuItem>
-                        )
+                        );
                     })}
                 </div>
             </DropdownMenuContent>
         </DropdownMenu>
-    )
+    );
 }
 
-export default SelectField
+export default SelectField;

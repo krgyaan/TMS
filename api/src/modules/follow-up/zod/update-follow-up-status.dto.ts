@@ -1,23 +1,19 @@
 import { z } from "zod";
 
-const frequencyValues = ["daily", "alternate", "weekly", "biweekly", "monthly", "stopped"] as const;
-
-const stopReasonValues = ["party_angry", "objective_achieved", "not_reachable", "other"] as const;
-
 // Update status schema (for modal quick update)
 export const updateFollowUpStatusSchema = z
     .object({
-        latestComment: z.string().min(1, "Comment is required"),
+        latestComment: z.string().optional(),
         nextFollowUpDate: z.string().nullable().optional(),
-        frequency: z.enum(frequencyValues).optional(),
-        stopReason: z.enum(stopReasonValues).nullable().optional(),
+        frequency: z.union([z.string(), z.number()]).transform(v => Number(v)).optional(),
+        stopReason: z.union([z.string(), z.number()]).transform(v => Number(v)).nullable().optional(),
         proofText: z.string().nullable().optional(),
         proofImagePath: z.string().nullable().optional(),
         stopRemarks: z.string().nullable().optional(),
     })
     .refine(
         data => {
-            if (data.frequency === "stopped" && !data.stopReason) {
+            if (data.frequency === 6 && !data.stopReason) {
                 return false;
             }
             return true;
@@ -29,7 +25,7 @@ export const updateFollowUpStatusSchema = z
     )
     .refine(
         data => {
-            if (data.stopReason === "objective_achieved" && !data.proofText) {
+            if (data.stopReason === 2 && !data.proofText) {
                 return false;
             }
             return true;

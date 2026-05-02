@@ -37,13 +37,15 @@ interface CostingSheetSubmitFormProps {
     };
     mode: 'submit' | 'edit' | 'resubmit';
     existingData?: TenderCostingSheet;
+    isChecklistFulfilled?: boolean;
 }
 
 export default function CostingSheetSubmitForm({
     tenderId,
     tenderDetails,
     mode,
-    existingData
+    existingData,
+    isChecklistFulfilled = true
 }: CostingSheetSubmitFormProps) {
     const navigate = useNavigate();
     const submitMutation = useSubmitCostingSheet();
@@ -69,8 +71,9 @@ export default function CostingSheetSubmitForm({
         const receipt = parseFloat(receiptPrice) || 0;
         const budget = parseFloat(budgetPrice) || 0;
 
-        if (budget > 0) {
-            const margin = ((budget - receipt) / budget) * 100;
+        // grossMargin = receipt > 0 ? ((receipt - budget) / receipt) * 100 : 0;
+        if (receipt > 0) {
+            const margin = ((receipt - budget) / receipt) * 100;
             form.setValue('submittedGrossMargin', margin.toFixed(2));
         } else {
             form.setValue('submittedGrossMargin', '0.00');
@@ -300,6 +303,11 @@ export default function CostingSheetSubmitForm({
                         </div>
 
                         {/* Form Actions */}
+                        {!isChecklistFulfilled && (
+                            <p className="text-[10px] text-red-500 font-medium mt-1 text-right italic">
+                                * Complete all checkpoints to enable submission
+                            </p>
+                        )}
                         <div className="flex justify-end gap-2 pt-6 border-t">
                             <Button
                                 type="button"
@@ -319,7 +327,9 @@ export default function CostingSheetSubmitForm({
                             </Button>
                             <Button
                                 type="submit"
-                                disabled={isSubmitting}
+                                disabled={isSubmitting || !isChecklistFulfilled}
+                                className={!isChecklistFulfilled ? "cursor-not-allowed opacity-50" : ""}
+                                title={!isChecklistFulfilled ? "Please complete all mandatory checkpoints first" : ""}
                             >
                                 {isSubmitting && <span className="animate-spin mr-2">⏳</span>}
                                 <Save className="mr-2 h-4 w-4" />

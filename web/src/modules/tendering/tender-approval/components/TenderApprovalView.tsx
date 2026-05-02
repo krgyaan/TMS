@@ -1,19 +1,52 @@
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { Pencil, ArrowLeft, CheckCircle2, XCircle, AlertTriangle, Clock } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertTriangle, Clock, Pencil } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useNavigate } from 'react-router-dom';
 import type { TenderWithRelations } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
-import { formatDateTime } from '@/hooks/useFormatedDate';
+import { usePqrOptions, useFinanceDocumentOptions } from '@/hooks/useSelectOptions';
+import { paths } from '@/app/routes/paths';
+import { useAuth } from '@/contexts/AuthContext';
+import { tenderFilesService } from '@/services/api/tender-files.service';
+
+// Helper function to map document IDs to names
+const mapDocumentIdsToNames = (ids: string[] | null | undefined, documentList: Array<{ value: string; label: string }>): string[] => {
+    if (!ids || !Array.isArray(ids) || ids.length === 0) return [];
+    return ids
+        .map(id => {
+            const doc = documentList.find(d => d.value === id);
+            return doc ? doc.label : id;
+        })
+        .filter(Boolean);
+};
+
+const formatDocuments = (documents: string[] | Array<{ id?: number; documentName: string }> = []) => {
+    if (!documents.length) {
+        return <span className="text-muted-foreground">No documents listed</span>
+    }
+
+    return (
+        <div className="flex flex-wrap gap-2">
+            {documents.map((doc, index) => {
+                // Handle both string arrays and object arrays
+                const docName = typeof doc === 'string' ? doc : doc.documentName;
+                const docKey = typeof doc === 'string' ? doc : (doc.id ?? doc.documentName ?? index);
+
+                return (
+                    <Badge key={docKey} variant="outline">
+                        {docName}
+                    </Badge>
+                );
+            })}
+        </div>
+    )
+}
 
 interface TenderApprovalViewProps {
     tender: TenderWithRelations;
     isLoading?: boolean;
-    showEditButton?: boolean;
-    showBackButton?: boolean;
-    onEdit?: () => void;
-    onBack?: () => void;
     className?: string;
 }
 
@@ -53,24 +86,27 @@ const getTlStatusConfig = (status: number) => {
 export function TenderApprovalView({
     tender,
     isLoading = false,
-    showEditButton = true,
-    showBackButton = true,
-    onEdit,
-    onBack,
     className = '',
-}: TenderApprovalViewProps) {
+}: TenderApprovalViewProps) {    
+    const navigate = useNavigate();
+    const { isAdmin, isSuperUser, canRead } = useAuth();
+
+    let canView = canRead("tender-approval");
+;    
     const approval = tender.approval;
+    const pqrOptions = usePqrOptions();
+    const financeDocumentOptions = useFinanceDocumentOptions();
 
     if (isLoading) {
         return (
             <Card className={className}>
-                <CardHeader>
-                    <Skeleton className="h-8 w-48" />
+                <CardHeader className="pb-3">
+                    <Skeleton className="h-5 w-40" />
                 </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
-                        {Array.from({ length: 8 }).map((_, i) => (
-                            <Skeleton key={i} className="h-12 w-full" />
+                <CardContent className="pt-0">
+                    <div className="space-y-2">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                            <Skeleton key={i} className="h-10 w-full" />
                         ))}
                     </div>
                 </CardContent>
@@ -81,29 +117,16 @@ export function TenderApprovalView({
     if (!approval) {
         return (
             <Card className={className}>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Clock className="h-5 w-5" />
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
                         Tender Approval
                     </CardTitle>
-                    <CardAction className="flex gap-2">
-                        {showEditButton && onEdit && (
-                            <Button variant="default" size="sm" onClick={onEdit}>
-                                <Pencil className="h-4 w-4 mr-2" />
-                                Start Approval
-                            </Button>
-                        )}
-                        {showBackButton && onBack && (
-                            <Button variant="outline" size="sm" onClick={onBack}>
-                                <ArrowLeft className="h-4 w-4 mr-2" />
-                                Back
-                            </Button>
-                        )}
-                    </CardAction>
                 </CardHeader>
-                <CardContent>
-                    <div className="text-center py-8 text-muted-foreground">
-                        No approval information available yet.
+                <CardContent className="pt-0">
+                    <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                        <Clock className="h-8 w-8 mb-2 opacity-50" />
+                        <p className="text-sm">No approval information available yet.</p>
                     </div>
                 </CardContent>
             </Card>
@@ -115,25 +138,23 @@ export function TenderApprovalView({
 
     return (
         <Card className={className}>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                 <CardTitle className="flex items-center gap-2">
                     <StatusIcon className={`h-5 w-5 ${statusConfig.color}`} />
                     Tender Approval Details
                 </CardTitle>
-                <CardAction className="flex gap-2">
-                    {showEditButton && onEdit && (
-                        <Button variant="default" size="sm" onClick={onEdit}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit
-                        </Button>
-                    )}
-                    {showBackButton && onBack && (
-                        <Button variant="outline" size="sm" onClick={onBack}>
-                            <ArrowLeft className="h-4 w-4 mr-2" />
-                            Back
-                        </Button>
-                    )}
-                </CardAction>
+
+                {canView &&
+                <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="gap-2"
+                    onClick={() => navigate(paths.tendering.tenderApprovalCreate(tender.id))}
+                >
+                    <Pencil className="h-3.5 w-3.5" />
+                    Edit Approval
+                </Button>
+            }
             </CardHeader>
             <CardContent>
                 <Table>
@@ -155,13 +176,13 @@ export function TenderApprovalView({
                                 </Badge>
                             </TableCell>
                         </TableRow>
-                        {approval.tlStatus && (
+                        {!!approval.tlStatus && (
                             <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     Tender Approval Status
                                 </TableCell>
                                 <TableCell className="text-sm" colSpan={3}>
-                                    {approval.tlStatus}
+                                    {approval.tlStatus == 1 ? 'Approved' : approval.tlStatus == 2 ? 'Rejected' : approval.tlStatus == 3 ? 'Incomplete' : 'Pending'}
                                 </TableCell>
                             </TableRow>
                         )}
@@ -170,7 +191,7 @@ export function TenderApprovalView({
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     TL Remarks
                                 </TableCell>
-                                <TableCell className="text-sm" colSpan={3}>
+                                <TableCell className="text-sm break-words" colSpan={3}>
                                     {approval.tlDecision}
                                 </TableCell>
                             </TableRow>
@@ -186,21 +207,51 @@ export function TenderApprovalView({
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">
-                                        RFQ To (Vendor Organizations)
+                                        Is RFQ Required?
                                     </TableCell>
-                                    <TableCell className="text-sm" colSpan={3}>
-                                        {approval.rfqTo && approval.rfqTo.length > 0 ? (
-                                            <div className="flex flex-wrap gap-2">
-                                                {approval.rfqTo.map((vendorId) => (
-                                                    <Badge key={vendorId} variant="outline">
-                                                        Vendor ID: {vendorId}
-                                                    </Badge>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            '—'
-                                        )}
+                                    <TableCell className="text-sm">
+                                        {approval?.rfqRequired?.toUpperCase()}
                                     </TableCell>
+                                    {approval?.rfqRequired?.toLowerCase() === "yes" && (
+                                        <>
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                RFQ To (Vendor Organizations)
+                                            </TableCell>
+                                            <TableCell className="text-sm" colSpan={3}>
+                                                {approval.rfqToName ? (
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {approval.rfqToName.split(',').map((name, i) => (
+                                                            <Badge key={i} variant="outline">
+                                                                {name.trim()}
+                                                            </Badge>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    '—'
+                                                )}
+                                            </TableCell>
+                                        </>
+                                    )}
+                                </TableRow>
+                                <TableRow>
+                                    {approval?.quotationFiles && approval?.quotationFiles?.length > 0 && (
+                                        <>
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                Quotation Files
+                                            </TableCell>
+                                            <TableCell className="text-sm" colSpan={3}>
+                                                {approval?.quotationFiles.map((doc, i) => {
+                                                    return (
+                                                        <Badge key={i} variant="outline" className="text-xs hover:bg-primary/10">
+                                                            <a href={tenderFilesService.getFileUrl(doc)} target="_blank" rel="noopener noreferrer">
+                                                                View File
+                                                            </a>
+                                                        </Badge>
+                                                    );
+                                                })}
+                                            </TableCell>
+                                        </>
+                                    )}
                                 </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">
@@ -267,6 +318,26 @@ export function TenderApprovalView({
                                         )}
                                     </TableCell>
                                 </TableRow>
+                                {approval.approvePqrSelection === '2' && approval.alternativeTechnicalDocs && approval.alternativeTechnicalDocs.length > 0 && (
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Alternative Technical Documents
+                                        </TableCell>
+                                        <TableCell className="text-sm" colSpan={3}>
+                                            {formatDocuments(mapDocumentIdsToNames(approval.alternativeTechnicalDocs, pqrOptions))}
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                                {approval.approveFinanceDocSelection === '2' && approval.alternativeFinancialDocs && approval.alternativeFinancialDocs.length > 0 && (
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Alternative Financial Documents
+                                        </TableCell>
+                                        <TableCell className="text-sm" colSpan={3}>
+                                            {formatDocuments(mapDocumentIdsToNames(approval.alternativeFinancialDocs, financeDocumentOptions))}
+                                        </TableCell>
+                                    </TableRow>
+                                )}
                             </>
                         )}
 
@@ -283,14 +354,28 @@ export function TenderApprovalView({
                                         Tender Status
                                     </TableCell>
                                     <TableCell className="text-sm">
-                                        {approval.tenderStatus ? `Status ID: ${approval.tenderStatus}` : '—'}
+                                        {approval.statusName}
                                     </TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        OEM Not Allowed
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {approval.oemNotAllowed ? 'Yes' : 'No'}
-                                    </TableCell>
+                                    {approval.tenderStatus == 10 && (
+                                        <>
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                OEM Not Allowed
+                                            </TableCell>
+                                            <TableCell className="text-sm">
+                                                {approval.oemNotAllowedName ? (
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {approval.oemNotAllowedName.split(',').map((name, i) => (
+                                                            <Badge key={i} variant="outline">
+                                                                {name.trim()}
+                                                            </Badge>
+                                                        ))}
+                                                    </div>
+                                                ) : (
+                                                    '—'
+                                                )}
+                                            </TableCell>
+                                        </>
+                                    )}
                                 </TableRow>
                                 {approval.tlRejectionRemarks && (
                                     <TableRow className="hover:bg-muted/30 transition-colors">
@@ -298,7 +383,7 @@ export function TenderApprovalView({
                                             Rejection Remarks
                                         </TableCell>
                                         <TableCell className="text-sm" colSpan={3}>
-                                            <div className="bg-destructive/10 p-3 rounded-md">
+                                            <div className="bg-destructive/10 p-3 rounded-md text-sm whitespace-normal [overflow-wrap:anywhere]">
                                                 {approval.tlRejectionRemarks}
                                             </div>
                                         </TableCell>
@@ -321,7 +406,7 @@ export function TenderApprovalView({
                                             {field.fieldName}
                                         </TableCell>
                                         <TableCell className="text-sm" colSpan={3}>
-                                            <div className="bg-yellow-50 dark:bg-yellow-950/20 p-2 rounded-md text-yellow-800 dark:text-yellow-200">
+                                            <div className="bg-yellow-50 dark:bg-yellow-950/20 p-2 rounded-md text-yellow-800 dark:text-yellow-200 break-words">
                                                 {field.comment}
                                             </div>
                                         </TableCell>
@@ -329,27 +414,6 @@ export function TenderApprovalView({
                                 ))}
                             </>
                         )}
-
-                        {/* Timestamps */}
-                        <TableRow className="bg-muted/50">
-                            <TableCell colSpan={4} className="font-semibold text-sm">
-                                Timeline
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Created At
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {formatDateTime(approval.createdAt)}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Last Updated
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {formatDateTime(approval.updatedAt)}
-                            </TableCell>
-                        </TableRow>
                     </TableBody>
                 </Table>
             </CardContent>

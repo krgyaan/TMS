@@ -1,0 +1,855 @@
+import { Inject, Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
+import { eq, desc, asc, sql, and, or, ilike, isNull } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
+import { woBasicDetails, woContacts, woDetails } from '@db/schemas/operations';
+import { users } from '@db/schemas/auth/users.schema';
+import type { CreateWoBasicDetailDto, UpdateWoBasicDetailDto, AssignOeDto, BulkAssignOeDto, RemoveOeAssignmentDto, WoBasicDetailsQueryDto } from './dto/wo-basic-details.dto';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { projects, teams, tenderInfos } from '@/db/schemas';
+import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
+
+const oeFirstUser = alias(users, 'oeFirstUser');
+const oeSiteVisitUser = alias(users, 'oeSiteVisitUser');
+const oeDocsPrepUser = alias(users, 'oeDocsPrepUser');
+
+export type WoBasicDetailRow = typeof woBasicDetails.$inferSelect;
+
+@Injectable()
+export class WoBasicDetailsService {
+    private readonly logger = new Logger(WoBasicDetailsService.name);
+
+    constructor(
+        @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly tenderStatusHistoryService: TenderStatusHistoryService,
+    ) {}
+
+    private mapCreateToDb(data: CreateWoBasicDetailDto) {
+        const now = new Date();
+        const out: Record<string, any> = {
+            tenderId: data.tenderId ?? null,
+            enquiryId: data.enquiryId ?? null,
+            woNumber: data.woNumber ?? null,
+            woDate: data.woDate ?? null,
+            projectCode: data.projectCode ?? '',
+            projectName: data.projectName ?? null,
+            currentStage: data.currentStage ?? 'basic_details',
+            woValuePreGst: data.woValuePreGst ?? null,
+            woValueGstAmt: data.woValueGstAmt ?? null,
+            receiptPreGst: data.receiptPreGst ?? null,
+            budgetPreGst: data.budgetPreGst ?? null,
+            grossMargin: data.grossMargin ?? null,
+            woDraft: data.woDraft ?? null,
+            teChecklistConfirmed: data.teChecklistConfirmed ?? false,
+            tmsDocuments: data.tmsDocuments ?? null,
+            isWorkflowPaused: false,
+            createdAt: now,
+            updatedAt: now,
+        };
+        return out as Partial<typeof woBasicDetails.$inferInsert>;
+    }
+
+    private mapUpdateToDb(data: UpdateWoBasicDetailDto) {
+        const out: Record<string, unknown> = { updatedAt: new Date() };
+
+        if (data.woNumber !== undefined) out.woNumber = data.woNumber;
+        if (data.woDate !== undefined) out.woDate = data.woDate;
+        if (data.projectCode !== undefined) out.projectCode = data.projectCode;
+        if (data.projectName !== undefined) out.projectName = data.projectName;
+        if (data.currentStage !== undefined) out.currentStage = data.currentStage;
+        if (data.woValuePreGst !== undefined) out.woValuePreGst = data.woValuePreGst;
+        if (data.woValueGstAmt !== undefined) out.woValueGstAmt = data.woValueGstAmt;
+        if (data.receiptPreGst !== undefined) out.receiptPreGst = data.receiptPreGst;
+        if (data.budgetPreGst !== undefined) out.budgetPreGst = data.budgetPreGst;
+        if (data.grossMargin !== undefined) out.grossMargin = data.grossMargin;
+        if (data.woDraft !== undefined) out.woDraft = data.woDraft;
+        if (data.teChecklistConfirmed !== undefined) out.teChecklistConfirmed = data.teChecklistConfirmed;
+        if (data.tmsDocuments !== undefined) out.tmsDocuments = data.tmsDocuments;
+
+        return out as any;
+    }
+
+    private mapRowToResponse(row: WoBasicDetailRow) {
+        return {
+            id: row.id,
+            tenderId: row.tenderId,
+            enquiryId: row.enquiryId,
+            team: row.team,
+            woNumber: row.woNumber,
+            woDate: row.woDate,
+            projectCode: row.projectCode,
+            projectName: row.projectName,
+            currentStage: row.currentStage,
+            woValuePreGst: row.woValuePreGst,
+            woValueGstAmt: row.woValueGstAmt,
+            receiptPreGst: row.receiptPreGst,
+            budgetPreGst: row.budgetPreGst,
+            grossMargin: row.grossMargin,
+            woDraft: row.woDraft,
+            tmsDocuments: row.tmsDocuments,
+            oeFirst: row.oeFirst,
+            oeFirstAssignedAt: row.oeFirstAssignedAt,
+            oeFirstAssignedBy: row.oeFirstAssignedBy,
+            oeSiteVisit: row.oeSiteVisit,
+            oeSiteVisitAssignedAt: row.oeSiteVisitAssignedAt,
+            oeSiteVisitAssignedBy: row.oeSiteVisitAssignedBy,
+            oeDocsPrep: row.oeDocsPrep,
+            oeDocsPrepAssignedAt: row.oeDocsPrepAssignedAt,
+            oeDocsPrepAssignedBy: row.oeDocsPrepAssignedBy,
+            isWorkflowPaused: row.isWorkflowPaused,
+            workflowPausedAt: row.workflowPausedAt,
+            workflowResumedAt: row.workflowResumedAt,
+            createdAt: row.createdAt,
+            updatedAt: row.updatedAt,
+        };
+    }
+
+    private mapJoinedRowToResponseList(row: any) {
+        return {
+            id: row.woBasicDetails.id,
+            projectId: row.woBasicDetails.projectId,
+            woNumber: row.woBasicDetails.woNumber,
+            woDate: row.woBasicDetails.woDate,
+            projectName: row.woBasicDetails.projectName,
+            currentStage: row.woBasicDetails.currentStage,
+            woValuePreGst: row.woBasicDetails.woValuePreGst,
+            woValueGstAmt: row.woBasicDetails.woValueGstAmt,
+            grossMargin: row.woBasicDetails.grossMargin,
+            stage: row.woBasicDetails.currentStage,
+            oeFirstName: row.oeFirstUser?.name ?? null,
+            oeSiteVisitName: row.oeSiteVisitUser?.name ?? null,
+            oeDocsPrepName: row.oeDocsPrepUser?.name ?? null,
+        };
+    }
+
+    private getWoBaseSelect() {
+        return {
+            woBasicDetails: {
+                id: woBasicDetails.id,
+                tenderId: woBasicDetails.tenderId,
+                projectId: projects.id,
+                woNumber: woBasicDetails.woNumber,
+                woDate: woBasicDetails.woDate,
+                projectName: woBasicDetails.projectName,
+                currentStage: woBasicDetails.currentStage,
+                woValuePreGst: woBasicDetails.woValuePreGst,
+                woValueGstAmt: woBasicDetails.woValueGstAmt,
+                grossMargin: woBasicDetails.grossMargin,
+                stage: woBasicDetails.currentStage,
+            },
+            oeFirstUser: {
+                name: oeFirstUser.name,
+            },
+            oeSiteVisitUser: {
+                name: oeSiteVisitUser.name,
+            },
+            oeDocsPrepUser: {
+                name: oeDocsPrepUser.name,
+            },
+        };
+    }
+
+    private getBaseQueryBuilder() {
+        return this.db
+            .select(this.getWoBaseSelect())
+            .from(woBasicDetails)
+            .leftJoin(projects, eq(projects.tenderId, woBasicDetails.tenderId))
+            .leftJoin(oeFirstUser, eq(oeFirstUser.id, woBasicDetails.oeFirst))
+            .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
+            .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep));
+    }
+
+    private async getProjectId(tenderId: number){
+        const [project] = await this.db.select({id : projects.id})
+        .from(projects)
+        .where(eq(projects.tenderId, tenderId))
+        .limit(1);
+
+        return project?.id ?? null;
+    }
+
+    async findAll(filters?: WoBasicDetailsQueryDto) {
+        const page = filters?.page ?? 1;
+        const limit = Math.min(Math.max(filters?.limit ?? 50, 1), 100);
+        const offset = (page - 1) * limit;
+        const sortOrder = filters?.sortOrder ?? 'desc';
+        const sortBy = filters?.sortBy ?? 'createdAt';
+        const search = filters?.search?.trim();
+
+        // 1. Build Conditions
+        const conditions: any[] = [];
+
+        // Apply role-based filtering
+        if (filters?.user) {
+            conditions.push(...this.getVisibilityConditions(filters.user, filters.teamId));
+        }
+        // Additional filters
+        if (filters?.projectName) {
+            conditions.push(ilike(woBasicDetails.projectName, `%${filters.projectName}%`));
+        }
+        if (filters?.currentStage) {
+            conditions.push(eq(woBasicDetails.currentStage, filters.currentStage));
+        }
+        if (filters?.oeFirst) {
+            conditions.push(eq(woBasicDetails.oeFirst, filters.oeFirst));
+        }
+        if (filters?.oeSiteVisit) {
+            conditions.push(eq(woBasicDetails.oeSiteVisit, filters.oeSiteVisit));
+        }
+        if (filters?.oeDocsPrep) {
+            conditions.push(eq(woBasicDetails.oeDocsPrep, filters.oeDocsPrep));
+        }
+
+        // Search condition (Expanded to joined fields)
+        if (search) {
+            const searchStr = `%${search}%`;
+            conditions.push(
+                or(
+                    ilike(woBasicDetails.projectName, searchStr),
+                    ilike(woBasicDetails.woNumber, searchStr),
+                    ilike(woBasicDetails.projectCode, searchStr),
+                    ilike(oeFirstUser.name, searchStr),
+                    ilike(oeSiteVisitUser.name, searchStr),
+                    ilike(oeDocsPrepUser.name, searchStr),
+                ),
+            );
+        }
+
+        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+        // 2. Get Total Count
+        let countQuery: any = this.db
+            .select({ count: sql<number>`count(distinct ${woBasicDetails.id})::int` })
+            .from(woBasicDetails);
+
+        // Add joins if search is being used (searches in joined tables)
+        if (search) {
+            countQuery = countQuery
+                .leftJoin(oeFirstUser, eq(oeFirstUser.id, woBasicDetails.oeFirst))
+                .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
+                .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep));
+        }
+
+        const [countResult] = await countQuery.where(whereClause);
+        const total = Number(countResult?.count || 0);
+
+        // 3. Determine sorting
+        const orderFn = sortOrder === 'desc' ? desc : asc;
+        let orderByClause: any;
+
+        switch (sortBy) {
+            case 'woDate':
+                orderByClause = orderFn(woBasicDetails.woDate);
+                break;
+            case 'woNumber':
+                orderByClause = orderFn(woBasicDetails.woNumber);
+                break;
+            case 'projectName':
+                orderByClause = orderFn(woBasicDetails.projectName);
+                break;
+            case 'woValuePreGst':
+                orderByClause = orderFn(woBasicDetails.woValuePreGst);
+                break;
+            case 'woValueGstAmt':
+                orderByClause = orderFn(woBasicDetails.woValueGstAmt);
+                break;
+            case 'grossMargin':
+                orderByClause = orderFn(woBasicDetails.grossMargin);
+                break;
+            case 'oeFirstName':
+                orderByClause = orderFn(oeFirstUser.name);
+                break;
+            case 'oeSiteVisitName':
+                orderByClause = orderFn(oeSiteVisitUser.name);
+                break;
+            case 'oeDocsPrepName':
+                orderByClause = orderFn(oeDocsPrepUser.name);
+                break;
+            case 'currentStage':
+                orderByClause = orderFn(woBasicDetails.currentStage);
+                break;
+            default:
+                orderByClause = orderFn(woBasicDetails.createdAt);
+        }
+
+        // 4. Get Data
+        const rows = await this.getBaseQueryBuilder()
+            .where(whereClause)
+            .orderBy(orderByClause)
+            .limit(limit)
+            .offset(offset);
+
+        const data = rows.map((r) => this.mapJoinedRowToResponseList(r));
+
+        return {
+            data,
+            meta: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit) || 1,
+            },
+        };
+    }
+
+    async findById(id: number) {
+        const [row] = await this.db
+            .select()
+            .from(woBasicDetails)
+            .where(eq(woBasicDetails.id, id))
+            .limit(1);
+
+        if (!row) {
+            throw new NotFoundException(`WO Basic Detail with ID ${id} not found`);
+        }
+
+        const response = this.mapRowToResponse(row);
+        return response;
+    }
+
+    async findByIdWithRelations(id: number) {
+        const [row] = await this.db
+            .select()
+            .from(woBasicDetails)
+            .where(eq(woBasicDetails.id, id))
+            .limit(1);
+
+        if (!row) {
+            throw new NotFoundException(`WO Basic Detail with ID ${id} not found`);
+        }
+
+        // Fetch related contacts
+        const contacts = await this.db
+            .select()
+            .from(woContacts)
+            .where(eq(woContacts.woBasicDetailId, id));
+
+        // Fetch related WO details
+        const [woDetail] = await this.db
+            .select()
+            .from(woDetails)
+            .where(eq(woDetails.woBasicDetailId, id))
+            .limit(1);
+
+        return {
+            ...this.mapRowToResponse(row),
+            contacts,
+            woDetail: woDetail ?? null,
+        };
+    }
+
+    async create(data: CreateWoBasicDetailDto, userId?: number) {
+        // Check if project code already exists (if provided)
+        if (data.projectCode) {
+            const existing = await this.checkProjectCodeExists(data.projectCode);
+            if (existing.exists) {
+                throw new ConflictException(`Project code ${data.projectCode} already exists`);
+            }
+        }
+
+        let teamId: number | null = null;
+        let prevStatus: number | null = null;
+
+        if (data.tenderId) {
+            const [tender] = await this.db
+                .select({
+                    teamId: tenderInfos.team,
+                    status: tenderInfos.status
+                })
+                .from(tenderInfos)
+                .where(eq(tenderInfos.id, data.tenderId))
+                .limit(1);
+
+            if (!tender) {
+                this.logger.error(`Tender with ID ${data.tenderId} not found, skipping project creation`);
+                return;
+            }
+
+            teamId = tender.teamId;
+            prevStatus = tender.status;
+        }
+
+        const insertValues = this.mapCreateToDb(data);
+        if (userId) {
+            insertValues.createdBy = userId;
+            insertValues.updatedBy = userId;
+            insertValues.team = teamId;
+        }
+
+        // Create WO Basic Detail
+        const [row] = await this.db
+            .insert(woBasicDetails)
+            .values(insertValues)
+            .returning();
+
+        // Update tender status to 26 (Wo Basic detail filled) after successful creation
+        if (data.tenderId && userId) {
+            const newStatus = 26;
+            await this.db
+                .update(tenderInfos)
+                .set({ status: newStatus, updatedAt: new Date() })
+                .where(eq(tenderInfos.id, data.tenderId));
+
+            // Track status change
+            await this.tenderStatusHistoryService.trackStatusChange(
+                data.tenderId,
+                newStatus,
+                userId,
+                prevStatus,
+                "WO Basic Details created"
+            );
+        }
+
+        // Create Project asynchronously (non-blocking)
+        this.safeCreateProject(data, row?.id);
+
+        return this.mapRowToResponse(row!);
+    }
+
+    private async safeCreateProject(data: CreateWoBasicDetailDto, woBasicDetailId?: number): Promise<void> {
+        if (!woBasicDetailId) return;
+
+        setImmediate(async () => {
+            try {
+                let teamId: number | null = null;
+                let itemId: number | null = null;
+                let locationId: number | null = null;
+                let organisationId: number | null = null;
+
+                // Fetch details from tender (required for project creation)
+                if (data.tenderId) {
+                    const [tender] = await this.db
+                        .select({
+                            teamId: tenderInfos.team,
+                            itemId: tenderInfos.item,
+                            locationId: tenderInfos.location,
+                            organisationId: tenderInfos.organization,
+                        })
+                        .from(tenderInfos)
+                        .where(eq(tenderInfos.id, data.tenderId))
+                        .limit(1);
+
+                    if (!tender) {
+                        this.logger.error(`Tender with ID ${data.tenderId} not found, skipping project creation`);
+                        return;
+                    }
+
+                    teamId = tender.teamId;
+                    itemId = tender.itemId;
+                    locationId = tender.locationId;
+                    organisationId = tender.organisationId;
+                } else {
+                    // No tender linked - cannot create project without item
+                    this.logger.warn(`No tender linked to WO Basic Detail: ${woBasicDetailId}, skipping project creation`);
+                    return;
+                }
+
+                // Validate required field
+                if (!itemId) {
+                    this.logger.error(`Cannot create project: itemId is required for WO Basic Detail: ${woBasicDetailId}`);
+                    return;
+                }
+
+                // Get team name
+                const teamName = await this.getTeamName(teamId);
+
+                // Skip if project already exists
+                if (data.projectCode) {
+                    const exists = await this.projectCodeExists(data.projectCode);
+                    if (exists) {
+                        this.logger.warn(`Project ${data.projectCode} already exists, skipping`);
+                        return;
+                    }
+                }
+
+                const now = new Date();
+
+                await this.db.insert(projects).values({
+                    teamName,
+                    organisationId: organisationId ?? null,
+                    itemId: itemId,
+                    locationId: locationId ?? null,
+                    poNo: data.woNumber ?? null,
+                    projectCode: data.projectCode ?? null,
+                    projectName: data.projectName ?? null,
+                    poUpload: data.woDraft ?? null,
+                    poDate: this.parseDate(data.woDate),
+                    performanceProof: null,
+                    performanceDate: null,
+                    completionProof: null,
+                    completionDate: null,
+                    sapPoDate: null,
+                    sapPoNo: null,
+                    tenderId: data.tenderId ?? null,
+                    enquiryId: data.enquiryId ?? null,
+                    createdAt: now,
+                    updatedAt: now,
+                } as typeof projects.$inferInsert);
+
+                this.logger.log(`Project created for WO Basic Detail: ${woBasicDetailId}`);
+            } catch (error) {
+                this.logger.error(
+                    `Failed to create project for WO Basic Detail: ${woBasicDetailId}`,
+                    error instanceof Error ? error.stack : String(error),
+                );
+            }
+        });
+    }
+
+    private parseDate(dateValue: string | Date | null | undefined): Date | null {
+        if (!dateValue) return null;
+        if (dateValue instanceof Date) {
+            return isNaN(dateValue.getTime()) ? null : dateValue;
+        }
+        if (typeof dateValue === 'string') {
+            const parsed = new Date(dateValue);
+            return isNaN(parsed.getTime()) ? null : parsed;
+        }
+        return null;
+    }
+
+    private async getTeamName(teamId?: number | null): Promise<string> {
+        if (!teamId) return 'UNKNOWN';
+
+        const [teamRow] = await this.db
+            .select({ name: teams.name })
+            .from(teams)
+            .where(eq(teams.id, teamId))
+            .limit(1);
+
+        return teamRow?.name || 'UNKNOWN';
+    }
+
+    private async projectCodeExists(projectCode: string): Promise<boolean> {
+        const [existing] = await this.db
+            .select({ id: projects.id })
+            .from(projects)
+            .where(eq(projects.projectCode, projectCode))
+            .limit(1);
+
+        return !!existing;
+    }
+
+    async update(id: number, data: UpdateWoBasicDetailDto, userId?: number) {
+        // Check if record exists
+        await this.findById(id);
+
+        // Check project code uniqueness if being updated
+        if (data.projectCode) {
+            const existing = await this.db
+                .select({ id: woBasicDetails.id })
+                .from(woBasicDetails)
+                .where(
+                    and(
+                        eq(woBasicDetails.projectCode, data.projectCode),
+                        sql`${woBasicDetails.id} != ${id}`,
+                    ),
+                )
+                .limit(1);
+
+            if (existing.length > 0) {
+                throw new ConflictException(`Project code ${data.projectCode} already exists`);
+            }
+        }
+
+        const updateValues = this.mapUpdateToDb(data);
+        if (userId) {
+            updateValues.updatedBy = userId;
+        }
+
+        const [row] = await this.db
+            .update(woBasicDetails)
+            .set(updateValues)
+            .where(eq(woBasicDetails.id, id))
+            .returning();
+
+        if (!row) {
+            throw new NotFoundException(`WO Basic Detail with ID ${id} not found`);
+        }
+
+        return this.mapRowToResponse(row);
+    }
+
+    async delete(id: number): Promise<void> {
+        const [row] = await this.db
+            .delete(woBasicDetails)
+            .where(eq(woBasicDetails.id, id))
+            .returning();
+
+        if (!row) {
+            throw new NotFoundException(`WO Basic Detail with ID ${id} not found`);
+        }
+    }
+
+    // OE ASSIGNMENT OPERATIONS
+    async assignOe(id: number, data: AssignOeDto, assignedByUserId?: number) {
+        // Check if record exists
+        await this.findById(id);
+
+        const now = new Date();
+        const updateValues: Record<string, unknown> = { updatedAt: now };
+
+        // Handle oeFirst assignment
+        if (data.oeFirst !== undefined) {
+            updateValues.oeFirst = data.oeFirst;
+            updateValues.oeFirstAssignedAt = data.oeFirstAssignedAt ?? now;
+            updateValues.oeFirstAssignedBy = data.oeFirstAssignedBy ?? assignedByUserId ?? null;
+        }
+
+        // Handle oeSiteVisit assignment
+        if (data.oeSiteVisit !== undefined) {
+            updateValues.oeSiteVisit = data.oeSiteVisit;
+            updateValues.oeSiteVisitAssignedAt = data.oeSiteVisitAssignedAt ?? now;
+            updateValues.oeSiteVisitAssignedBy = data.oeSiteVisitAssignedBy ?? assignedByUserId ?? null;
+        }
+
+        // Handle oeDocsPrep assignment
+        if (data.oeDocsPrep !== undefined) {
+            updateValues.oeDocsPrep = data.oeDocsPrep;
+            updateValues.oeDocsPrepAssignedAt = data.oeDocsPrepAssignedAt ?? now;
+            updateValues.oeDocsPrepAssignedBy = data.oeDocsPrepAssignedBy ?? assignedByUserId ?? null;
+        }
+
+        const [row] = await this.db
+            .update(woBasicDetails)
+            .set(updateValues as Partial<typeof woBasicDetails.$inferInsert>)
+            .where(eq(woBasicDetails.id, id))
+            .returning();
+
+        return this.mapRowToResponse(row!);
+    }
+
+    async bulkAssignOe(id: number, data: BulkAssignOeDto) {
+        // Check if record exists
+        await this.findById(id);
+
+        const now = new Date();
+        const updateValues: Record<string, unknown> = { updatedAt: now };
+
+        for (const assignment of data.assignments) {
+            switch (assignment.assignmentType) {
+                case 'first':
+                    updateValues.oeFirst = assignment.oeUserId;
+                    updateValues.oeFirstAssignedAt = now;
+                    updateValues.oeFirstAssignedBy = data.assignedBy ?? null;
+                    break;
+                case 'siteVisit':
+                    updateValues.oeSiteVisit = assignment.oeUserId;
+                    updateValues.oeSiteVisitAssignedAt = now;
+                    updateValues.oeSiteVisitAssignedBy = data.assignedBy ?? null;
+                    break;
+                case 'docsPrep':
+                    updateValues.oeDocsPrep = assignment.oeUserId;
+                    updateValues.oeDocsPrepVisitAssignedAt = now;
+                    updateValues.oeDocsPrepVisitAssignedBy = data.assignedBy ?? null;
+                    break;
+            }
+        }
+
+        const [row] = await this.db
+            .update(woBasicDetails)
+            .set(updateValues as Partial<typeof woBasicDetails.$inferInsert>)
+            .where(eq(woBasicDetails.id, id))
+            .returning();
+
+        return this.mapRowToResponse(row!);
+    }
+
+    async removeOeAssignment(id: number, data: RemoveOeAssignmentDto) {
+        // Check if record exists
+        await this.findById(id);
+
+        const updateValues: Record<string, unknown> = { updatedAt: new Date() };
+
+        switch (data.assignmentType) {
+            case 'first':
+                updateValues.oeFirst = null;
+                updateValues.oeFirstAssignedAt = null;
+                updateValues.oeFirstAssignedBy = null;
+                break;
+            case 'siteVisit':
+                updateValues.oeSiteVisit = null;
+                updateValues.oeSiteVisitAssignedAt = null;
+                updateValues.oeSiteVisitAssignedBy = null;
+                break;
+            case 'docsPrep':
+                updateValues.oeDocsPrep = null;
+                updateValues.oeDocsPrepVisitAssignedAt = null;
+                updateValues.oeDocsPrepVisitAssignedBy = null;
+                break;
+        }
+
+        const [row] = await this.db
+            .update(woBasicDetails)
+            .set(updateValues as Partial<typeof woBasicDetails.$inferInsert>)
+            .where(eq(woBasicDetails.id, id))
+            .returning();
+
+        return this.mapRowToResponse(row!);
+    }
+
+    async getOeAssignments(id: number) {
+        const row = await this.findById(id);
+
+        return {
+            woBasicDetailId: id,
+            assignments: {
+                first: row.oeFirst
+                    ? {
+                          oeUserId: row.oeFirst,
+                          assignedAt: row.oeFirstAssignedAt,
+                          assignedBy: row.oeFirstAssignedBy,
+                      }
+                    : null,
+                siteVisit: row.oeSiteVisit
+                    ? {
+                          oeUserId: row.oeSiteVisit,
+                          assignedAt: row.oeSiteVisitAssignedAt,
+                          assignedBy: row.oeSiteVisitAssignedBy,
+                      }
+                    : null,
+                docsPrep: row.oeDocsPrep
+                    ? {
+                          oeUserId: row.oeDocsPrep,
+                          assignedAt: row.oeDocsPrepAssignedAt,
+                          assignedBy: row.oeDocsPrepAssignedBy,
+                      }
+                    : null,
+            },
+        };
+    }
+
+    // UTILITY OPERATIONS
+    async checkProjectCodeExists(projectCode: string) {
+        const [existing] = await this.db
+            .select({ id: woBasicDetails.id })
+            .from(woBasicDetails)
+            .where(eq(woBasicDetails.projectCode, projectCode))
+            .limit(1);
+
+        return {
+            exists: !!existing,
+            projectCode,
+        };
+    }
+
+    async findByTenderId(tenderId: number) {
+        const rows = await this.db
+            .select()
+            .from(woBasicDetails)
+            .where(eq(woBasicDetails.tenderId, tenderId));
+
+        return rows.map((r) => this.mapRowToResponse(r));
+    }
+
+    async findByEnquiryId(enquiryId: number) {
+        const rows = await this.db
+            .select()
+            .from(woBasicDetails)
+            .where(eq(woBasicDetails.enquiryId, enquiryId));
+
+        return rows.map((r) => this.mapRowToResponse(r));
+    }
+
+    // DASHBOARD/REPORTING
+    private getVisibilityConditions(user: ValidatedUser, teamId?: number) {
+        const conditions: any[] = [];
+
+        // Role ID 1 = Super User, 2 = Admin: Show all, respect teamId filter if provided
+        // const hasAdminViewPermission = user?.permissions.includes("ops.admin:read");
+
+        if (user.roleId === 1 || user.roleId === 2 ) {
+            if (teamId !== undefined && teamId !== null) {
+                conditions.push(eq(woBasicDetails.team, teamId));
+            }
+        } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+            // Team Leader, Coordinator, Engineer: Filter by teamId
+            if (user.teamId) {
+                conditions.push(eq(woBasicDetails.team, user.teamId));
+            }
+        } else {
+            // Other roles: Show where they created or are assigned as OE
+            conditions.push(
+                or(
+                    eq(woBasicDetails.createdBy, user.sub),
+                    eq(woBasicDetails.oeFirst, user.sub),
+                    eq(woBasicDetails.oeSiteVisit, user.sub),
+                    eq(woBasicDetails.oeDocsPrep, user.sub),
+                ),
+            );
+        }
+
+        return conditions;
+    }
+
+    async getDashboardSummary(user?: ValidatedUser, teamId?: number) {
+        const conditions: any[] = [];
+        if (user) {
+            conditions.push(...this.getVisibilityConditions(user, teamId));
+        }
+        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+        const [stageCounts] = await this.db
+            .select({
+                total: sql<number>`count(*)::int`,
+                basicDetails: sql<number>`count(*) filter (where ${woBasicDetails.currentStage} = 'basic_details')::int`,
+                woDetails: sql<number>`count(*) filter (where ${woBasicDetails.currentStage} = 'wo_details')::int`,
+                woAcceptance: sql<number>`count(*) filter (where ${woBasicDetails.currentStage} = 'wo_acceptance')::int`,
+                woUpload: sql<number>`count(*) filter (where ${woBasicDetails.currentStage} = 'wo_upload')::int`,
+                completed: sql<number>`count(*) filter (where ${woBasicDetails.currentStage} = 'completed')::int`,
+                paused: sql<number>`count(*) filter (where ${woBasicDetails.isWorkflowPaused} = true)::int`,
+            })
+            .from(woBasicDetails)
+            .where(whereClause);
+
+        return {
+            summary: stageCounts,
+            generatedAt: new Date().toISOString(),
+        };
+    }
+
+    async getPendingOeAssignments(user?: ValidatedUser, teamId?: number) {
+        const conditions: any[] = [
+            isNull(woBasicDetails.oeFirst),
+            eq(woBasicDetails.currentStage, 'basic_details'),
+        ];
+        if (user) {
+            conditions.push(...this.getVisibilityConditions(user, teamId));
+        }
+
+        const rows = await this.db
+            .select()
+            .from(woBasicDetails)
+            .where(and(...conditions))
+            .orderBy(asc(woBasicDetails.createdAt));
+
+        return {
+            count: rows.length,
+            data: rows.map((r) => this.mapRowToResponse(r)),
+        };
+    }
+
+    async getWorkflowStatusSummary(user?: ValidatedUser, teamId?: number) {
+        const conditions: any[] = [];
+        if (user) {
+            conditions.push(...this.getVisibilityConditions(user, teamId));
+        }
+        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+        const [summary] = await this.db
+            .select({
+                totalActive: sql<number>`count(*) filter (where ${woBasicDetails.isWorkflowPaused} = false)::int`,
+                totalPaused: sql<number>`count(*) filter (where ${woBasicDetails.isWorkflowPaused} = true)::int`,
+                avgGrossMargin: sql<string>`round(avg(${woBasicDetails.grossMargin}::numeric), 2)::text`,
+                totalWoValue: sql<string>`sum(${woBasicDetails.woValuePreGst}::numeric)::text`,
+            })
+            .from(woBasicDetails)
+            .where(whereClause);
+
+        return {
+            ...summary,
+            generatedAt: new Date().toISOString(),
+        };
+    }
+}

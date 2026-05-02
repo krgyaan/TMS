@@ -29,6 +29,9 @@ class RfqsService extends BaseApiService {
             if (filters.search) {
                 search.set('search', filters.search);
             }
+            if (filters.teamId !== undefined && filters.teamId !== null) {
+                search.set('teamId', String(filters.teamId));
+            }
         }
 
         const queryString = search.toString();
@@ -39,8 +42,8 @@ class RfqsService extends BaseApiService {
         return this.get<Rfq>(`/${id}`);
     }
 
-    async getByTenderId(tenderId: number): Promise<Rfq> {
-        return this.get<Rfq>(`/by-tender/${tenderId}`);
+    async getByTenderId(tenderId: number): Promise<Rfq[]> {
+        return this.get<Rfq[]>(`/by-tender/${tenderId}`);
     }
 
     async create(data: CreateRfqDto): Promise<Rfq> {
@@ -55,9 +58,16 @@ class RfqsService extends BaseApiService {
         return this.delete<void>(`/${id}`);
     }
 
-    async getDashboardCounts(): Promise<any> {
-        return this.get<any>('/dashboard/counts');
+    async getDashboardCounts(teamId?: number): Promise<any> {
+        const params = new URLSearchParams();
+        if (teamId !== undefined && teamId !== null) {
+            params.append('teamId', teamId.toString());
+        }
+        const query = params.toString();
+        return this.get<any>(query ? `/dashboard/counts?${query}` : '/dashboard/counts');
     }
+
+
 }
 
 export const rfqsService = new RfqsService();

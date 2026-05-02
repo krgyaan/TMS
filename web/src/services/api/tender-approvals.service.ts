@@ -14,7 +14,8 @@ class TenderApprovalsService extends BaseApiService {
     }
 
     async getAll(
-        params?: TenderApprovalFilters
+        params?: TenderApprovalFilters,
+        teamId?: number
     ): Promise<PaginatedResult<TenderApprovalRow>> {
         const search = new URLSearchParams();
         if (params) {
@@ -26,6 +27,9 @@ class TenderApprovalsService extends BaseApiService {
             if (params.sortBy) search.set('sortBy', params.sortBy);
             if (params.sortOrder) search.set('sortOrder', params.sortOrder);
             if (params.search) search.set('search', params.search);
+        }
+        if (teamId !== undefined && teamId !== null) {
+            search.set('teamId', String(teamId));
         }
 
         const queryString = search.toString();
@@ -44,8 +48,13 @@ class TenderApprovalsService extends BaseApiService {
         return this.put<TenderApproval>(`/${tenderId}/approval`, data);
     }
 
-    async getDashboardCounts(): Promise<TenderApprovalDashboardCounts> {
-        return this.get<TenderApprovalDashboardCounts>('/dashboard/counts');
+    async getDashboardCounts(teamId?: number): Promise<TenderApprovalDashboardCounts> {
+        const params = new URLSearchParams();
+        if (teamId !== undefined && teamId !== null) {
+            params.append('teamId', teamId.toString());
+        }
+        const query = params.toString();
+        return this.get<TenderApprovalDashboardCounts>(query ? `/dashboard/counts?${query}` : '/dashboard/counts');
     }
 }
 

@@ -86,7 +86,7 @@ export const UpdateTenderSchema = z.object({
     approvePqrSelection: optionalTextField(50),
     approveFinanceDocSelection: optionalTextField(50),
     tenderApprovalStatus: optionalTextField(50),
-    oemNotAllowed: optionalString,
+    oemNotAllowed: z.array(z.string()).optional(),
     tlRejectionRemarks: optionalString,
     documents: z.string().nullable().optional(),
 });
@@ -98,7 +98,7 @@ export type UpdateTenderDto = z.infer<typeof UpdateTenderSchema>;
  */
 export const UpdateStatusSchema = z.object({
     status: z.coerce.number().int().positive('Status must be a positive number'),
-    comment: textField().min(1, 'Comment is required'),
+    comment: textField().min(10, 'Comment must be at least 10 characters'),
 });
 
 export type UpdateStatusDto = z.infer<typeof UpdateStatusSchema>;

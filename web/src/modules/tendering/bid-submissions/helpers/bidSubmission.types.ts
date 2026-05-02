@@ -54,6 +54,8 @@ export type BidSubmissionListParams = {
     limit?: number;
     sortBy?: string;
     sortOrder?: "asc" | "desc";
+    search?: string;
+    teamId?: number;
 };
 
 export type SubmitBidDto = {
@@ -112,6 +114,7 @@ export interface SubmitBidFormProps {
     tenderDetails: TenderDetails;
     mode: 'submit' | 'edit';
     existingData?: BidSubmission;
+    isChecklistFulfilled?: boolean;
 }
 
 /**

@@ -1,42 +1,77 @@
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { Pencil, ArrowLeft, FileText } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { FileText, ExternalLink, Download } from 'lucide-react';
 import type { TenderInfoWithNames } from '../helpers/tenderInfo.types'
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDateTime } from '@/hooks/useFormatedDate';
+import { tenderFilesService } from '@/services/api/tender-files.service';
+
+import { useTender } from '@/hooks/api/useTenders';
+import { useInfoSheet } from '@/hooks/api/useInfoSheets';
+import { InfoSheetView } from '@/modules/tendering/info-sheet/components/InfoSheetView';
+import { TenderApprovalView } from '@/modules/tendering/tender-approval/components/TenderApprovalView';
+import { SubmitQueryView } from '@/modules/tendering/submit-queries/components/SubmitQueryView';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
+import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
+import { useRequestExtensionByTender } from '@/hooks/api/useRequestExtension';
+import { useSubmitQueryByTender } from '@/hooks/api/useSubmitQuery';
+import RequestExtensionView from '../../request-extension/components/RequestExtensionView';
 
 interface TenderViewProps {
-    tender: TenderInfoWithNames;
+    tender?: TenderInfoWithNames | null;
+    tenderId?: number | null;
     isLoading?: boolean;
-    showEditButton?: boolean;
-    showBackButton?: boolean;
-    onEdit?: () => void;
-    onBack?: () => void;
     className?: string;
 }
 
+/**
+ * Parse documents field from JSON string to array of file paths
+ */
+const parseDocuments = (documents: string | null): string[] => {
+    if (!documents) return [];
+    try {
+        const parsed = JSON.parse(documents);
+        return Array.isArray(parsed) ? parsed.filter(Boolean) : [];
+    } catch {
+        return [];
+    }
+};
+
+/**
+ * Extract filename from file path
+ */
+const getFileName = (filePath: string): string => {
+    // Handle paths like "tender-documents/filename.pdf" or just "filename.pdf"
+    const parts = filePath.split('/');
+    return parts[parts.length - 1] || filePath;
+};
+
 export function TenderView({
-    tender,
-    isLoading = false,
-    showEditButton = true,
-    showBackButton = true,
-    onEdit,
-    onBack,
+    tender: manualTender,
+    tenderId,
+    isLoading: manualLoading = false,
     className = '',
 }: TenderViewProps) {
+    const { data: tenderData, isLoading: queryLoading } = useTender(Number(tenderId));
+
+    const tender = manualTender || tenderData;
+    const isLoading = manualLoading || queryLoading;
+
+    const documents = parseDocuments(tender?.documents || "");
     if (isLoading) {
         return (
             <Card className={className}>
-                <CardHeader>
-                    <Skeleton className="h-8 w-48" />
+                <CardHeader className="pb-3">
+                    <Skeleton className="h-5 w-40" />
                 </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
-                        {Array.from({ length: 8 }).map((_, i) => (
-                            <Skeleton key={i} className="h-12 w-full" />
+                <CardContent className="pt-0">
+                    <div className="space-y-2">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                            <Skeleton key={i} className="h-10 w-full" />
                         ))}
                     </div>
                 </CardContent>
@@ -51,20 +86,6 @@ export function TenderView({
                     <FileText className="h-5 w-5" />
                     Tender Details
                 </CardTitle>
-                <CardAction className='flex gap-2'>
-                    {showEditButton && onEdit && (
-                        <Button variant="default" size="sm" onClick={onEdit}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit
-                        </Button>
-                    )}
-                    {showBackButton && onBack && (
-                        <Button variant="outline" size="sm" onClick={onBack}>
-                            <ArrowLeft className="h-4 w-4 mr-2" />
-                            Back
-                        </Button>
-                    )}
-                </CardAction>
             </CardHeader>
             <CardContent>
                 <Table>
@@ -80,13 +101,13 @@ export function TenderView({
                                 Tender No
                             </TableCell>
                             <TableCell className="text-sm font-semibold w-1/4">
-                                {tender.tenderNo || '—'}
+                                {tender?.tenderNo || '—'}
                             </TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
                                 Status
                             </TableCell>
                             <TableCell className="w-1/4">
-                                <Badge variant="outline">{tender.statusName || '—'}</Badge>
+                                <Badge variant="outline">{tender?.statusName || '—'}</Badge>
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -94,7 +115,7 @@ export function TenderView({
                                 Tender Name
                             </TableCell>
                             <TableCell className="text-sm" colSpan={3}>
-                                {tender.tenderName || '—'}
+                                {tender?.tenderName || '—'}
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -102,13 +123,13 @@ export function TenderView({
                                 Organization
                             </TableCell>
                             <TableCell className="text-sm">
-                                {tender.organizationName || '—'}
+                                {tender?.organizationName || tender?.organizationAcronym || '—'}
                             </TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Item
                             </TableCell>
                             <TableCell className="text-sm">
-                                {tender.itemName || '—'}
+                                {tender?.itemName || '—'}
                             </TableCell>
                         </TableRow>
 
@@ -123,13 +144,13 @@ export function TenderView({
                                 Tender Value (GST Inclusive)
                             </TableCell>
                             <TableCell className="text-sm font-semibold">
-                                {formatINR(tender.gstValues ?? 0)}
+                                {formatINR(tender?.gstValues ?? 0)}
                             </TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Tender Fee
                             </TableCell>
                             <TableCell className="text-sm font-semibold">
-                                {formatINR(tender.tenderFees ?? 0)}
+                                {formatINR(tender?.tenderFees ?? 0)}
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -137,13 +158,13 @@ export function TenderView({
                                 EMD
                             </TableCell>
                             <TableCell className="text-sm font-semibold">
-                                {formatINR(tender.emd ?? 0)}
+                                {formatINR(tender?.emd ?? 0)}
                             </TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Due Date & Time
                             </TableCell>
                             <TableCell className="text-sm">
-                                {formatDateTime(tender.dueDate)}
+                                {formatDateTime(tender?.dueDate)}
                             </TableCell>
                         </TableRow>
 
@@ -158,7 +179,7 @@ export function TenderView({
                                 Team Member
                             </TableCell>
                             <TableCell className="text-sm">
-                                {tender.teamMemberName || (
+                                {tender?.teamMemberName || (
                                     <span className="text-muted-foreground italic">Unassigned</span>
                                 )}
                             </TableCell>
@@ -166,7 +187,7 @@ export function TenderView({
                                 Location
                             </TableCell>
                             <TableCell className="text-sm">
-                                {tender.locationName || '—'} <span className='text-gray-400'>({tender.locationState})</span>
+                                {tender?.locationName || '—'} <span className='text-gray-400'>({tender?.locationState})</span>
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -174,10 +195,10 @@ export function TenderView({
                                 Website
                             </TableCell>
                             <TableCell className="text-sm" colSpan={3}>
-                                {tender.websiteLink ? (() => {
-                                    const url = tender.websiteLink.startsWith('http://') || tender.websiteLink.startsWith('https://')
-                                        ? tender.websiteLink
-                                        : `https://${tender.websiteLink}`;
+                                {tender?.websiteLink ? (() => {
+                                    const url = tender?.websiteLink.startsWith('http://') || tender?.websiteLink.startsWith('https://')
+                                        ? tender?.websiteLink
+                                        : `https://${tender?.websiteLink}`;
                                     return (
                                         <a
                                             href={url}
@@ -185,7 +206,7 @@ export function TenderView({
                                             rel='noopener noreferrer'
                                             className='hover:text-primary underline'
                                         >
-                                            {tender.websiteName || tender.websiteLink.replace(/^https?:\/\//i, "")}
+                                            {tender?.websiteName || tender?.websiteLink.replace(/^https?:\/\//i, "")}
                                         </a>
                                     );
                                 })() : (
@@ -195,7 +216,7 @@ export function TenderView({
                         </TableRow>
 
                         {/* Additional Information */}
-                        {tender.remarks && (
+                        {tender?.remarks && (
                             <>
                                 <TableRow className="bg-muted/50">
                                     <TableCell colSpan={4} className="font-semibold text-sm">
@@ -206,15 +227,125 @@ export function TenderView({
                                     <TableCell className="text-sm font-medium text-muted-foreground">
                                         Remarks
                                     </TableCell>
-                                    <TableCell className="text-sm" colSpan={3}>
-                                        {tender.remarks}
+                                    <TableCell className="text-sm break-words" colSpan={3}>
+                                        {tender?.remarks}
                                     </TableCell>
                                 </TableRow>
                             </>
+                        )}
+
+                        {/* Documents */}
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                Documents ({documents.length})
+                            </TableCell>
+                        </TableRow>
+                        {documents.length > 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={4} className="p-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+                                        {documents.map((filePath, index) => (
+                                            <div key={index} className="flex flex-col border rounded-md p-3 bg-card shadow-sm gap-2">
+                                                <div className="flex items-start gap-2 overflow-hidden">
+                                                    <FileText className="h-6 w-6 text-muted-foreground shrink-0" />
+                                                    <div className="flex flex-col overflow-hidden">
+                                                        <span className="font-medium text-sm truncate" title={getFileName(filePath)}>
+                                                            {getFileName(filePath)}
+                                                        </span>
+                                                        <span className="text-xs text-muted-foreground truncate">
+                                                            {filePath.split('.').pop()?.toUpperCase() || `Document ${index + 1}`}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2 mt-auto">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="flex-1 h-8 text-xs gap-1"
+                                                        onClick={() => window.open(tenderFilesService.getFileUrl(filePath), '_blank')}
+                                                    >
+                                                        <ExternalLink className="h-3 w-3" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="flex-1 h-8 text-xs gap-1"
+                                                        onClick={() => {
+                                                            const a = document.createElement('a');
+                                                            a.href = tenderFilesService.getFileUrl(filePath);
+                                                            a.download = getFileName(filePath);
+                                                            a.click();
+                                                        }}
+                                                    >
+                                                        <Download className="h-3 w-3" />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        ) : (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm text-muted-foreground" colSpan={4}>
+                                    No documents uploaded
+                                </TableCell>
+                            </TableRow>
                         )}
                     </TableBody>
                 </Table>
             </CardContent>
         </Card>
+    );
+}
+
+/**
+ * Smart Section component for Tender Details (Tender + Info Sheet + Approval)
+ */
+export function TenderDetailsSection({ tenderId }: { tenderId: number | null }) {
+    const { data: tender, isLoading: tenderLoading } = useTender(tenderId);
+    const { data: approval, isLoading: approvalLoading } = useTenderApproval(tenderId);
+    const { data: infoSheet, isLoading: infoSheetLoading } = useInfoSheet(tenderId);
+    const { data: requestExt, isLoading: requestExtLoading, error: requestExtError } = useRequestExtensionByTender(tenderId);
+    const { data: submitQuery, isLoading: submitQueryLoading, error: submitQueryError } = useSubmitQueryByTender(tenderId);
+
+    const tenderWithRelations = tender ? { ...tender, approval: approval || null } : null;
+
+    if (tenderLoading && !tender) {
+        return <TenderView tender={null} isLoading />;
+    }
+
+    return (
+        <div className="space-y-6">
+            {tenderWithRelations ? (
+                <TenderView
+                    tender={tenderWithRelations}
+                    isLoading={tenderLoading || approvalLoading}
+                />
+            ) : (
+                <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>Tender information not available.</AlertDescription>
+                </Alert>
+            )}
+
+            {/* Info Sheet Section */}
+            <InfoSheetView infoSheet={infoSheet} isLoading={infoSheetLoading} />
+
+            {/* Tender Approval Section */}
+            {tenderWithRelations && (
+                <TenderApprovalView tender={tenderWithRelations} isLoading={tenderLoading || approvalLoading} />
+            )}
+
+            {/* Request Extension Section */}
+            {requestExt && (
+                <RequestExtensionView data={requestExt} isLoading={requestExtLoading} error={requestExtError} />
+            )}
+
+            {/* Submit Query Section */}
+            {submitQuery && (
+                <SubmitQueryView data={submitQuery} isLoading={submitQueryLoading} error={submitQueryError} />
+            )}
+        </div>
     );
 }

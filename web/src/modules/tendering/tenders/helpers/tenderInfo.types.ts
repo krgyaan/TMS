@@ -46,6 +46,8 @@ export interface TenderInfoWithNames extends TenderInfo {
     websiteName?: string | null;
     websiteLink?: string | null;
     oemExperience?: string | null;
+    bidSubmissionDate?: Date | null;
+    resultDate?: Date | null;
 }
 
 export interface CreateTenderRequest {
@@ -106,6 +108,8 @@ import type { TqManagementDashboardRow } from "@/modules/tendering/tq-management
 import type { RaDashboardRow } from "@/modules/tendering/ras/helpers/reverseAuction.types";
 import type { ResultDashboardRow } from "@/modules/tendering/results/helpers/tenderResult.types";
 import type { EmdDashboardRow } from "@/modules/tendering/emds-tenderfees/helpers/emdTenderFee.types";
+import type { RequestExtensionResponse } from "@/modules/tendering/request-extension/helpers/requestExtension.types";
+import type { SubmitQueryResponse } from "@/modules/tendering/submit-queries/helpers/submitQueries.types";
 
 export interface TenderWithRelations extends TenderInfo {
     organizationName?: string | null;
@@ -128,6 +132,8 @@ export interface TenderWithRelations extends TenderInfo {
     emds?: EmdDashboardRow | null;
     processingFees?: EmdDashboardRow | null;
     emdsTenderFees?: EmdDashboardRow | null;
+    requestExtension?: RequestExtensionResponse | null;
+    submitQuery?: SubmitQueryResponse | null;
 }
 
 export interface TenderListParams {
@@ -139,6 +145,8 @@ export interface TenderListParams {
     search?: string;
     page?: number;
     limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
 }
 
 export interface TenderInfoDashboardCounts {

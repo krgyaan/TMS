@@ -1,14 +1,16 @@
-import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Pencil, ArrowLeft, Gavel, Calendar, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { Gavel, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import type { RaDashboardRow } from '../helpers/reverseAuction.types';
+import { tenderFilesService } from '@/services/api/tender-files.service';
+
+import { useReverseAuctionByTender } from '@/hooks/api/useReverseAuctions';
 
 interface RaShowProps {
-    ra: RaDashboardRow & {
+    ra?: RaDashboardRow & {
         disqualificationReason?: string | null;
         qualifiedPartiesCount?: string | null;
         qualifiedPartiesNames?: string[] | null;
@@ -21,11 +23,8 @@ interface RaShowProps {
         screenshotDecrements?: string | null;
         finalResultScreenshot?: string | null;
     };
+    tenderId?: number;
     isLoading?: boolean;
-    showEditButton?: boolean;
-    showBackButton?: boolean;
-    onEdit?: () => void;
-    onBack?: () => void;
     className?: string;
 }
 
@@ -51,25 +50,39 @@ const getStatusVariant = (status: string): string => {
 };
 
 export function RaShow({
-    ra,
-    isLoading = false,
-    showEditButton = true,
-    showBackButton = true,
-    onEdit,
-    onBack,
+    ra: initialRa,
+    tenderId,
+    isLoading: initialLoading = false,
     className = '',
 }: RaShowProps) {
+    const { data: fetchedRa, isLoading: fetchLoading } = useReverseAuctionByTender(tenderId ?? 0);
+
+    const ra = initialRa || fetchedRa;
+    const isLoading = initialLoading || (tenderId ? fetchLoading : false);
+
     if (isLoading) {
         return (
             <Card className={className}>
-                <CardHeader>
-                    <Skeleton className="h-8 w-48" />
+                <CardHeader className="pb-3">
+                    <Skeleton className="h-5 w-40" />
                 </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
-                        {Array.from({ length: 8 }).map((_, i) => (
-                            <Skeleton key={i} className="h-12 w-full" />
+                <CardContent className="pt-0">
+                    <div className="space-y-2">
+                        {Array.from({ length: 4 }).map((_, i) => (
+                            <Skeleton key={i} className="h-10 w-full" />
                         ))}
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (!ra) {
+        return (
+            <Card className={className}>
+                <CardContent className="p-8">
+                    <div className="flex items-center justify-center text-muted-foreground">
+                        No Reverse Auction data found.
                     </div>
                 </CardContent>
             </Card>
@@ -80,6 +93,9 @@ export function RaShow({
     const isDisqualified = ra.technicallyQualified === 'No';
     const hasResult = !!ra.raResult;
 
+    const raStatus = 'raStatus' in ra ? ra.raStatus : ra.status;
+    const tenderStatus = 'tenderStatus' in ra ? ra.tenderStatus : ra.status;
+
     return (
         <Card className={className}>
             <CardHeader>
@@ -87,20 +103,6 @@ export function RaShow({
                     <Gavel className="h-5 w-5" />
                     Reverse Auction Details
                 </CardTitle>
-                <CardAction className="flex gap-2">
-                    {showEditButton && onEdit && (
-                        <Button variant="default" size="sm" onClick={onEdit}>
-                            <Pencil className="h-4 w-4 mr-2" />
-                            Edit
-                        </Button>
-                    )}
-                    {showBackButton && onBack && (
-                        <Button variant="outline" size="sm" onClick={onBack}>
-                            <ArrowLeft className="h-4 w-4 mr-2" />
-                            Back
-                        </Button>
-                    )}
-                </CardAction>
             </CardHeader>
             <CardContent>
                 <div className="overflow-x-auto">
@@ -159,14 +161,14 @@ export function RaShow({
                                     Tender Status
                                 </td>
                                 <td className="px-4 py-3 text-sm">
-                                    {ra.tenderStatus || '—'}
+                                    {tenderStatus || '—'}
                                 </td>
                                 <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
                                     RA Status
                                 </td>
                                 <td className="px-4 py-3">
-                                    <Badge variant={getStatusVariant(ra.raStatus) as any}>
-                                        {ra.raStatus}
+                                    <Badge variant={getStatusVariant(raStatus) as any}>
+                                        {raStatus}
                                     </Badge>
                                 </td>
                             </tr>
@@ -205,7 +207,7 @@ export function RaShow({
                                     <td className="px-4 py-3 text-sm font-medium text-muted-foreground">
                                         Disqualification Reason
                                     </td>
-                                    <td className="px-4 py-3 text-sm" colSpan={3}>
+                                    <td className="px-4 py-3 text-sm break-words" colSpan={3}>
                                         {ra.disqualificationReason}
                                     </td>
                                 </tr>
@@ -349,7 +351,7 @@ export function RaShow({
                                             </td>
                                             <td className="px-4 py-3 text-sm" colSpan={3}>
                                                 <a
-                                                    href={ra.screenshotQualifiedParties}
+                                                    href={tenderFilesService.getFileUrl(ra.screenshotQualifiedParties)}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="text-primary hover:underline"
@@ -366,7 +368,7 @@ export function RaShow({
                                             </td>
                                             <td className="px-4 py-3 text-sm" colSpan={3}>
                                                 <a
-                                                    href={ra.screenshotDecrements}
+                                                    href={tenderFilesService.getFileUrl(ra.screenshotDecrements)}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="text-primary hover:underline"
@@ -383,7 +385,7 @@ export function RaShow({
                                             </td>
                                             <td className="px-4 py-3 text-sm" colSpan={3}>
                                                 <a
-                                                    href={ra.finalResultScreenshot}
+                                                    href={tenderFilesService.getFileUrl(ra.finalResultScreenshot)}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="text-primary hover:underline"
@@ -401,4 +403,8 @@ export function RaShow({
             </CardContent>
         </Card>
     );
+}
+
+export function RaSection({ tenderId }: { tenderId: number }) {
+    return <RaShow tenderId={tenderId} />;
 }
