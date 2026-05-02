@@ -1,4 +1,5 @@
 import { Inject, Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import type { TenderApprovalPayload } from '@/modules/tendering/tender-approval/dto/tender-approval.dto';
@@ -65,6 +66,7 @@ export class TenderApprovalService {
         private readonly recipientResolver: RecipientResolver,
         private readonly timersService: TimersService,
         private readonly tenderInfoSheetsService: TenderInfoSheetsService,
+        private readonly configService: ConfigService,
     ) { }
 
     private buildRoleFilterConditions(user?: ValidatedUser, teamId?: number): any[] {
@@ -374,9 +376,10 @@ export class TenderApprovalService {
         };
 
         let vendorOrganizationNames: { name: string }[] = [];
+        let vendorOrganizationIds: number[] = [];
 
         if (data.rfqTo) {
-            const vendorOrganizationIds = data.rfqTo
+            vendorOrganizationIds = data.rfqTo
                 .split(",")
                 .map(id => parseInt(id.trim(), 10))
                 .filter(id => Number.isInteger(id) && id > 0);
@@ -429,9 +432,11 @@ export class TenderApprovalService {
 
         return {
             ...data,
-            rfqTo: vendorOrganizationNames,
+            rfqTo: vendorOrganizationIds,
+            rfqToName: vendorOrganizationNames.map(v => v.name).join(', '),
             quotationFiles: quotationFilesArray,
             incompleteFields: incompleteFieldsResult,
+            oemNotAllowed: data.oemNotAllowed || [],
             oemNotAllowedName: oemNotAllowedNames.length > 0 ? oemNotAllowedNames.join(', ') : null,
         };
     }
@@ -756,7 +761,10 @@ export class TenderApprovalService {
         const infoSheet = await this.tenderInfoSheetsService.findByTenderId(tenderId);
 
         // Get physical docs requirement
-        const phyDocs = infoSheet?.courierAddress || "As per tender requirements";
+        const courierAddress = infoSheet?.courierName
+            ? `${infoSheet?.courierName}, ${infoSheet?.courierPhone}, ${infoSheet?.courierAddressLine1}, ${infoSheet?.courierAddressLine2}, ${infoSheet?.courierCity}, ${infoSheet?.courierState}, ${infoSheet?.courierPincode}`
+            : infoSheet?.courierAddress;
+        const phyDocs = courierAddress || "As per tender requirements";
 
         // Fetch all PQR and Finance documents for mapping
         const [allPqrDocs, allFinanceDocs] = await Promise.all([
@@ -868,40 +876,172 @@ export class TenderApprovalService {
         const alternativeTechnicalDocNames = mapAlternativeTechnicalDocs(payload.alternativeTechnicalDocs);
         const alternativeFinancialDocNames = mapAlternativeFinancialDocs(payload.alternativeFinancialDocs);
 
+        // Get rejection reason if rejected
+        let rejectionReasonLabel = "";
+        if (isRejected && payload.tenderStatus) {
+            const rejectionResult = await this.db
+                .select({ name: statuses.name })
+                .from(statuses)
+                .where(eq(statuses.id, payload.tenderStatus))
+                .limit(1);
+            rejectionReasonLabel = rejectionResult[0]?.name || String(payload.tenderStatus);
+        }
+
+        // Get rejection proof URLs
+        const rejectionProofs: string[] = [];
+        if (infoSheet?.teRejectionProof && Array.isArray(infoSheet.teRejectionProof)) {
+            const apiUrl = this.configService.get<string>('app.apiUrl') || '';
+            infoSheet.teRejectionProof.forEach((path: string) => {
+                if (path) {
+                    rejectionProofs.push(`${apiUrl}/tender-files/serve/${path}`);
+                }
+            });
+        }
+
+        // Get review fields with current values from infoSheet
+        const reviewFields: Array<{ field: string; value: string; remark: string }> = [];
+        if (isReview) {
+            const incompleteFieldsData = await this.db
+                .select({
+                    fieldName: tenderIncompleteFields.fieldName,
+                    comment: tenderIncompleteFields.comment,
+                })
+                .from(tenderIncompleteFields)
+                .where(eq(tenderIncompleteFields.tenderId, tenderId));
+
+            const fieldLabelMap: Record<string, string> = {
+                teRecommendation: 'TE Recommendation',
+                teRejectionReason: 'Rejection Reason',
+                teRejectionRemarks: 'Rejection Remarks',
+                processingFeeRequired: 'Processing Fee Required',
+                processingFeeModes: 'Processing Fee Mode',
+                processingFeeAmount: 'Processing Fee Amount',
+                tenderFeeRequired: 'Tender Fee Required',
+                tenderFeeModes: 'Tender Fee Mode',
+                tenderFeeAmount: 'Tender Fee Amount',
+                emdRequired: 'EMD Required',
+                emdModes: 'EMD Mode',
+                emdAmount: 'EMD Amount',
+                tenderValueGstInclusive: 'Tender Value (GST Inclusive)',
+                bidValidityDays: 'Bid Validity',
+                mafRequired: 'MAF Required',
+                commercialEvaluation: 'Commercial Evaluation',
+                reverseAuctionApplicable: 'Reverse Auction',
+                paymentTermsSupply: 'Payment Terms Supply',
+                paymentTermsInstallation: 'Payment Terms Installation',
+                deliveryTimeSupply: 'Delivery Time Supply',
+                deliveryTimeInstallation: 'Delivery Time Installation',
+                deliveryTimeInstallationInclusive: 'Installation Inclusive',
+                pbgRequired: 'PBG Required',
+                pbgForm: 'PBG Form',
+                pbgPercentage: 'PBG Percentage',
+                pbgDurationMonths: 'PBG Duration',
+                sdRequired: 'SD Required',
+                sdForm: 'SD Form',
+                securityDepositPercentage: 'SD Percentage',
+                sdDurationMonths: 'SD Duration',
+                ldRequired: 'LD Applicable',
+                ldPercentagePerWeek: 'LD Per Week',
+                maxLdPercentage: 'Max LD Percentage',
+            };
+
+            for (const field of incompleteFieldsData) {
+                const fieldName = field.fieldName;
+                if (!fieldName) continue;
+
+                const fieldLabel = fieldLabelMap[fieldName] || fieldName;
+                const infoSheetAny = infoSheet as Record<string, unknown>;
+                const currentValue = infoSheetAny[fieldName] !== undefined && infoSheetAny[fieldName] !== null 
+                    ? String(infoSheetAny[fieldName]) 
+                    : 'Not filled';
+
+                reviewFields.push({
+                    field: fieldLabel,
+                    value: currentValue,
+                    remark: field.comment || '',
+                });
+            }
+        }
+
+        const status = parseInt(payload.tlStatus, 10);
+
+        // Get document URLs for email
+        const apiUrl = this.configService.get<string>('app.apiUrl') || '';
+        
+        const technicalDocUrls: Array<{ name: string; url: string }> = [];
+        if (infoSheet?.technicalWorkOrders) {
+            infoSheet.technicalWorkOrders.forEach((doc: any) => {
+                if (doc.poDocument?.[0]) {
+                    technicalDocUrls.push({
+                        name: doc.projectName || `PQR ${doc.id}`,
+                        url: `${apiUrl}/tender-files/serve/${doc.poDocument[0]}`,
+                    });
+                }
+            });
+        }
+
+        const financialDocUrls: Array<{ name: string; url: string }> = [];
+        if (infoSheet?.commercialDocuments) {
+            infoSheet.commercialDocuments.forEach((doc: any) => {
+                if (doc.documentPath?.[0]) {
+                    financialDocUrls.push({
+                        name: doc.documentName || `Finance Doc ${doc.id}`,
+                        url: `${apiUrl}/tender-files/serve/${doc.documentPath[0]}`,
+                    });
+                }
+            });
+        }
+
+        const quotationFileUrls: string[] = [];
+        if (payload.quotationFiles && payload.quotationFiles.length > 0) {
+            payload.quotationFiles.forEach((file: string) => {
+                if (file) {
+                    quotationFileUrls.push(`${apiUrl}/tender-files/serve/${file}`);
+                }
+            });
+        }
+
         const emailData = {
-            assignee: assignee.name,
-            isBidApproved,
-            isRejected,
-            isReview,
-            remarks: payload.tlRejectionRemarks || "",
-            rej_remark: payload.tlRejectionRemarks || "",
+            te_name: assignee.name,
+            tl_name: tlName,
+            status,
+            tl_approval_remark: payload.tlApprovalRemarks || "",
+            rejection_reason: rejectionReasonLabel,
+            rejection_remark: payload.tlRejectionRemarks || "",
+            rejection_proof: rejectionProofs.length > 0 ? rejectionProofs.join(", ") : "",
+            review_fields: reviewFields,
+            final_remarks: payload.tlIncompleteRemarks || "",
             emdLink,
             tenderFeesLink,
             rfqLink,
-            processingFeeMode: payload.processingFeeMode || "Not specified",
-            tenderFeesMode: payload.tenderFeeMode || "Not specified",
-            emdMode: payload.emdMode || "Not specified",
+            processingFeeMode: payload.processingFeeMode || "Not Required",
+            tenderFeesMode: payload.tenderFeeMode || "Not Required",
+            emdMode: payload.emdMode || "Not Required",
             rfqRequired: payload.rfqRequired || null,
-            quotationFilesCount: payload.quotationFiles?.length || 0,
             vendor,
-            phyDocs,
+            courier_address: phyDocs,
             pqrApproved: payload.approvePqrSelection === "1",
             finApproved: payload.approveFinanceDocSelection === "1",
-            technicalDocs: originalTechnicalDocs.length > 0 ? originalTechnicalDocs.join(", ") : "None",
-            financialDocs: originalFinancialDocs.length > 0 ? originalFinancialDocs.join(", ") : "None",
+            technical_docs: originalTechnicalDocs,
+            financial_docs: originalFinancialDocs,
+            technical_doc_urls: technicalDocUrls,
+            financial_doc_urls: financialDocUrls,
+            quotation_file_urls: quotationFileUrls,
             alternativeTechnicalDocs: alternativeTechnicalDocNames.length > 0 ? alternativeTechnicalDocNames.join(", ") : "",
             alternativeFinancialDocs: alternativeFinancialDocNames.length > 0 ? alternativeFinancialDocNames.join(", ") : "",
-            tlName,
         };
 
-        const template = isBidApproved ? "tender-approved-by-tl" : isReview ? "tender-rejected-by-tl" : "tender-rejected-by-tl";
+        console.log("Email Data: ", emailData);
+
+
+        const template = "tender-approved-by-tl";
         let subject: string;
         let eventType: string;
 
-        if (isBidApproved) {
+        if (status === 1) {
             subject = `Tender Approved - ${tender.tenderName}`;
             eventType = "tender.approved";
-        } else if (isReview) {
+        } else if (status === 3) {
             subject = `Tender Needs Review - ${tender.tenderName}`;
             eventType = "tender.review";
         } else {
@@ -909,17 +1049,12 @@ export class TenderApprovalService {
             eventType = "tender.rejected";
         }
 
-        // Prepare attachments if quotation files exist
-        const attachments = payload.rfqRequired === 'no' && payload.quotationFiles && payload.quotationFiles.length > 0
-            ? { files: payload.quotationFiles }
-            : undefined;
-
         await this.sendEmail(eventType, tenderId, changedBy, subject, template, emailData, {
             to: [{ type: "emails", emails: ['gyan@volksenergie.in'] }],
             // cc: [
             //     { type: "role", role: "Admin", teamId: tender.team },
             //     { type: "role", role: "Coordinator", teamId: tender.team },
             // ],
-        }, attachments);
+        });
     }
 }

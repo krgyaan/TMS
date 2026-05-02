@@ -218,16 +218,13 @@ export function TenderApprovalView({
                                                 RFQ To (Vendor Organizations)
                                             </TableCell>
                                             <TableCell className="text-sm" colSpan={3}>
-                                                {approval.rfqTo?.length ? (
+                                                {approval.rfqToName ? (
                                                     <div className="flex flex-wrap gap-2">
-                                                        {approval.rfqTo?.map((vendor, i) => {
-                                                            const name = typeof vendor === "string" ? vendor : vendor.name;
-                                                            return (
-                                                                <Badge key={i} variant="outline">
-                                                                    {name}
-                                                                </Badge>
-                                                            );
-                                                        })}
+                                                        {approval.rfqToName.split(',').map((name, i) => (
+                                                            <Badge key={i} variant="outline">
+                                                                {name.trim()}
+                                                            </Badge>
+                                                        ))}
                                                     </div>
                                                 ) : (
                                                     '—'

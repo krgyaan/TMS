@@ -44,8 +44,10 @@ export interface TenderApproval {
     tlDecision?: "0" | "1" | "2" | "3" | number;
     rfqRequired?: "yes" | "no" | null;
     quotationFiles?: string[] | null;
-    rfqTo: Vendor[] | null;
-    // rfqTo: string[] | null;
+    // IDs for edit
+    rfqTo: number[] | null;
+    // Names for display
+    rfqToName: string | null;
     processingFeeMode: string | null;
     tenderFeeMode: string | null;
     emdMode: string | null;
@@ -55,7 +57,9 @@ export interface TenderApproval {
     alternativeFinancialDocs?: string[] | null;
     tenderStatus: number | null;
     statusName: string | null;
+    // IDs for edit
     oemNotAllowed: string[] | null;
+    // Names for display
     oemNotAllowedName: string | null;
     tlRejectionRemarks: string | null;
     tlIncompleteRemarks: string | null;
