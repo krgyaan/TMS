@@ -228,9 +228,9 @@ const TenderApprovalListPage = () => {
         },
         {
             field: 'teRecommendation',
-            headerName: 'TE',
+            headerName: 'TE Recommendation',
             colId: 'teRecommendation',
-            width: 100,
+            width: 110,
             cellRenderer: (params: any) => {
                 const status = params.data?.teRecommendation;
                 if (!status) return '—';
