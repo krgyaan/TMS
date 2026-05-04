@@ -2,7 +2,7 @@ import { useTender } from "@/hooks/api/useTenders";
 import { useTenderApproval } from "@/hooks/api/useTenderApprovals";
 import { usePhysicalDocByTenderId } from "@/hooks/api/usePhysicalDocs";
 import { useRfqByTenderId } from "@/hooks/api/useRfqs";
-import { usePaymentRequestsByTender } from "@/hooks/api/useEmds";
+import { usePaymentRequestsByTender } from "@/hooks/api/usePaymentRequests";
 import { useDocumentChecklistByTender } from "@/hooks/api/useDocumentChecklists";
 import { useCostingSheetByTender } from "@/hooks/api/useCostingSheets";
 import { useBidSubmissionByTender } from "@/hooks/api/useBidSubmissions";
