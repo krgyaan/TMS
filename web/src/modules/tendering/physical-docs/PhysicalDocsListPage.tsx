@@ -19,6 +19,7 @@ import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { QuickFilter } from '@/components/ui/quick-filter';
 import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
+import { useAuth } from '@/contexts/AuthContext';
 
 const PhysicalDocsListPage = () => {
     const [activeTab, setActiveTab] = useState<'pending' | 'sent' | 'tender-dnb'>('pending');
@@ -31,6 +32,12 @@ const PhysicalDocsListPage = () => {
         tenderId: null
     });
     const navigate = useNavigate();
+
+    const { isSuperUser, isAdmin, isTeamLeader, teamId } = useAuth();
+
+    const isTenderLead = isTeamLeader && (teamId == 1 || teamId == 2); 
+    
+    const hasPermission = isTenderLead || isAdmin || isSuperUser;
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
@@ -70,12 +77,13 @@ const PhysicalDocsListPage = () => {
                 navigate(paths.tendering.bidMissedGlobal(row.tenderId, 'phy-doc'));
             },
             icon: <XCircle className="h-4 w-4" />,
-            visible: () => activeTab !== 'tender-dnb',
+            visible: () => hasPermission && activeTab !== 'tender-dnb',
         },
         {
             label: 'Send',
             onClick: (row: PhysicalDocsDashboardRowWithTimer) => row.physicalDocs ? navigate(paths.tendering.physicalDocsEdit(row.tenderId)) : navigate(paths.tendering.physicalDocsCreate(row.tenderId)),
             icon: <CheckCircle className="h-4 w-4" />,
+            visible: () => activeTab !== 'tender-dnb',
         },
         {
             label: 'View',
