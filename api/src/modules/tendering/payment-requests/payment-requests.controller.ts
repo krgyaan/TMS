@@ -1,29 +1,27 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query, Req, Logger } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query, Logger } from '@nestjs/common';
 import { PaymentRequestsService } from './payment-requests.service';
+import { PaymentRequestsQueryService } from './services/payment-requests.query.service';
+import { PaymentRequestsCommandService } from './services/payment-requests.command.service';
+import { PaymentRequestsStatusService } from './services/payment-requests-status.service';
+import { PaymentRequestsNotificationService } from './services/payment-requests-notification.service';
 import { CreatePaymentRequestSchema, UpdatePaymentRequestSchema, UpdateStatusSchema, DashboardQuerySchema, type DashboardResponse, type DashboardCounts, type DashboardTab } from './dto/payment-requests.dto';
-import type { Request } from 'express';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { TimersService } from '@/modules/timers/timers.service';
 import { getFrontendTimer } from '@/modules/timers/timer-helper';
 
-// Extend Express Request to include user
-interface AuthenticatedRequest extends Request {
-    user?: {
-        id: number;
-        email: string;
-        name: string;
-        // Add other user properties as needed
-    };
-}
-
 @Controller('payment-requests')
 export class PaymentRequestsController {
     private readonly logger = new Logger(PaymentRequestsController.name);
+
     constructor(
         private readonly paymentRequestsService: PaymentRequestsService,
+        private readonly queryService: PaymentRequestsQueryService,
+        private readonly commandService: PaymentRequestsCommandService,
+        private readonly statusService: PaymentRequestsStatusService,
+        private readonly notificationService: PaymentRequestsNotificationService,
         private readonly timersService: TimersService
-    ) { }
+    ) {}
 
     @Get('/')
     async getDashboard(
@@ -37,7 +35,7 @@ export class PaymentRequestsController {
             const num = parseInt(v, 10);
             return Number.isNaN(num) ? undefined : num;
         };
-        const result = await this.paymentRequestsService.getDashboardData(
+        const result = await this.queryService.getDashboardData(
             parsed.tab as DashboardTab ?? 'pending',
             user,
             parseNumber(teamId),
@@ -72,7 +70,7 @@ export class PaymentRequestsController {
             const num = parseInt(v, 10);
             return Number.isNaN(num) ? undefined : num;
         };
-        return this.paymentRequestsService.getDashboardCounts(user, parseNumber(teamId));
+        return this.queryService.getDashboardCounts(user, parseNumber(teamId));
     }
 
     @Post('tenders/:tenderId')
@@ -83,29 +81,29 @@ export class PaymentRequestsController {
         @CurrentUser() user: ValidatedUser,
     ) {
         const payload = CreatePaymentRequestSchema.parse(body);
-        return this.paymentRequestsService.create(tenderId, payload, user.sub);
+        return this.commandService.create(tenderId, payload, user.sub);
     }
 
     @Get('tenders/:tenderId')
     async findByTender(@Param('tenderId', ParseIntPipe) tenderId: number) {
-        return this.paymentRequestsService.findByTenderId(tenderId);
+        return this.queryService.findByTenderId(tenderId);
     }
 
     @Get('tenders/:tenderId/with-details')
     async findByTenderWithDetails(
         @Param('tenderId', ParseIntPipe) tenderId: number,
     ) {
-        return this.paymentRequestsService.findByTenderIdWithTender(tenderId);
+        return this.queryService.findByTenderIdWithTender(tenderId);
     }
 
     @Get(':id')
     async findById(@Param('id', ParseIntPipe) id: number) {
-        return this.paymentRequestsService.findById(id);
+        return this.queryService.findById(id);
     }
 
     @Get(':id/with-details')
     async findByIdWithDetails(@Param('id', ParseIntPipe) id: number) {
-        return this.paymentRequestsService.findByIdWithTender(id);
+        return this.queryService.findByIdWithTender(id);
     }
 
     @Patch(':id')
@@ -114,7 +112,7 @@ export class PaymentRequestsController {
         @Body() body: unknown,
     ) {
         const payload = UpdatePaymentRequestSchema.parse(body);
-        return this.paymentRequestsService.update(id, payload);
+        return this.commandService.update(id, payload);
     }
 
     @Patch(':id/status')
@@ -123,6 +121,6 @@ export class PaymentRequestsController {
         @Body() body: unknown,
     ) {
         const payload = UpdateStatusSchema.parse(body);
-        return this.paymentRequestsService.updateStatus(id, payload);
+        return this.commandService.updateStatus(id, payload);
     }
 }
