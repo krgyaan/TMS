@@ -407,7 +407,7 @@ export const ChequeSchema = z.object({
  * Note: Mode-specific validation is handled by the individual form components
  * via their respective schemas (BankTransferSchema, PayOnPortalSchema, etc.)
  */
-export const EmdRequestSchema = z.object({
+export const PaymentRequestSchema = z.object({
     tenderNo: z.string().optional(),
     tenderName: z.string().optional(),
     tenderDueDate: z.string().optional(),
@@ -434,7 +434,7 @@ export const EmdRequestSchema = z.object({
 /**
  * Schema for Old EMD Request Form (includes tender details)
  */
-export const OldEmdRequestSchema = z.object({
+export const OldEntryPaymentRequestSchema = z.object({
     tenderName: z.string().optional(),
     tenderNo: z.string().optional(),
     tenderDueDate: z.string().optional(),
@@ -460,7 +460,7 @@ export const OldEmdRequestSchema = z.object({
 /**
  * Schema for BI Other Than EMD Request Form (includes tender details, only EMD)
  */
-export const BiOtherThanEmdRequestSchema = z.object({
+export const BiOtherThanTenderRequestSchema = z.object({
     tenderName: z.string().optional(),
     tenderNo: z.string().optional(),
     tenderDueDate: z.string().optional(),
@@ -471,9 +471,9 @@ export const BiOtherThanEmdRequestSchema = z.object({
     }).optional(),
 });
 
-export type EmdRequestFormValues = z.infer<typeof EmdRequestSchema>;
-export type OldEmdRequestFormValues = z.infer<typeof OldEmdRequestSchema>;
-export type BiOtherThanEmdRequestFormValues = z.infer<typeof BiOtherThanEmdRequestSchema>;
+export type PaymentRequestFormValues = z.infer<typeof PaymentRequestSchema>;
+export type OldEntryPaymentRequestFormValues = z.infer<typeof OldEntryPaymentRequestSchema>;
+export type BiOtherThanTenderRequestFormValues = z.infer<typeof BiOtherThanTenderRequestSchema>;
 export type PaymentDetailsFormValues = z.infer<typeof PaymentDetailsSchema>;
 export type BankTransferFormValues = z.infer<typeof BankTransferSchema>;
 export type PayOnPortalFormValues = z.infer<typeof PayOnPortalSchema>;

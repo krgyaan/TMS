@@ -1,4 +1,4 @@
-import type { EmdRequestFormValues, PaymentDetailsFormValues } from './emdTenderFee.schema';
+import type { PaymentRequestFormValues, PaymentDetailsFormValues } from './payment-request.schema';
 import type { TimerStatus } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 
 /**
@@ -11,7 +11,13 @@ export interface EmdTenderFeeRequestFormProps {
 }
 
 // Re-export form value types
-export type { EmdRequestFormValues, PaymentDetailsFormValues };
+export type { PaymentRequestFormValues, PaymentDetailsFormValues };
+export type { OldEntryPaymentRequestFormValues, BiOtherThanTenderRequestFormValues } from './payment-request.schema';
+
+// Backward-compatible aliases (deprecated - use new names)
+export type EmdRequestFormValues = PaymentRequestFormValues;
+export type OldEmdRequestFormValues = OldEntryPaymentRequestFormValues;
+export type BiOtherThanEmdRequestFormValues = BiOtherThanTenderRequestFormValues;
 
 export type PaymentPurpose = "EMD" | "Tender Fee" | "Processing Fee";
 

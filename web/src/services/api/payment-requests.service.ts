@@ -7,7 +7,7 @@ import type {
     UpdateStatusDto,
     EmdDashboardRow,
     EmdDashboardFilters,
-} from '@/modules/tendering/emds-tenderfees/helpers/emdTenderFee.types';
+} from '@/modules/tendering/emds-tenderfees/helpers/payment-request.types';
 
 class PaymentRequestsService extends BaseApiService {
     constructor() {

@@ -13,9 +13,9 @@ import { DateInput } from '@/components/form/DateInput';
 import FieldWrapper from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
 import { parseAllowedModes } from '../constants';
-import { OldEmdRequestSchema, type OldEmdRequestFormValues } from '../helpers/emdTenderFee.schema';
+import { OldEntryPaymentRequestSchema, type OldEntryPaymentRequestFormValues } from '../helpers/payment-request.schema';
 
-type FormValues = OldEmdRequestFormValues;
+type FormValues = OldEntryPaymentRequestFormValues;
 
 interface OldEmdRequestFormProps {
     tenderId?: number;
@@ -43,7 +43,7 @@ export function OldEmdRequestForm({ tenderId, requestIds, initialData, mode = 'c
     const isEditMode = mode === 'edit';
 
     const form = useForm<FormValues>({
-        resolver: zodResolver(OldEmdRequestSchema) as Resolver<FormValues>,
+        resolver: zodResolver(OldEntryPaymentRequestSchema) as Resolver<FormValues>,
         defaultValues: initialData || {
             tenderName: '',
             tenderNo: '',
