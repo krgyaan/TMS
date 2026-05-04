@@ -5,7 +5,7 @@ import { useCostingSheetByTender } from '@/hooks/api/useCostingSheets';
 import { useInfoSheet } from '@/hooks/api/useInfoSheets';
 import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
 import { useRfqByTenderId } from '@/hooks/api/useRfqs';
-import { usePaymentRequestsByTender } from '@/hooks/api/useEmds';
+import { usePaymentRequestsByTender } from '@/hooks/api/usePaymentRequests';
 import { usePhysicalDocByTenderId } from '@/hooks/api/usePhysicalDocs';
 import { useDocumentChecklistByTender } from '@/hooks/api/useDocumentChecklists';
 import { Skeleton } from '@/components/ui/skeleton';

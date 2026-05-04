@@ -403,307 +403,31 @@ export const ChequeSchema = z.object({
 });
 
 /**
- * Helper function to validate payment details based on selected mode
- * Only fields relevant to the selected mode are required
- */
-function validatePaymentDetailsByMode(data: z.infer<typeof PaymentDetailsSchema>, mode: string | undefined, ctx: z.RefinementCtx) {
-    if (!mode || mode === 'NA') return;
-
-    // DD mode validation
-    if (mode === 'DD') {
-        if (!data.ddFavouring || (typeof data.ddFavouring === 'string' && data.ddFavouring.trim() === '')) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'DD in Favour of is required',
-                path: ['details', 'ddFavouring'],
-            });
-        }
-        if (!data.ddPayableAt || (typeof data.ddPayableAt === 'string' && data.ddPayableAt.trim() === '')) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'Payable At is required',
-                path: ['details', 'ddPayableAt'],
-            });
-        }
-        if (!data.ddDeliverBy) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'Deliver By is required',
-                path: ['details', 'ddDeliverBy'],
-            });
-        }
-        if (!data.ddPurpose || (typeof data.ddPurpose === 'string' && data.ddPurpose.trim() === '')) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'Purpose of DD is required',
-                path: ['details', 'ddPurpose'],
-            });
-        }
-        if (data.ddAmount !== undefined && data.ddAmount < 0) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'Amount must be greater than 0',
-                path: ['details', 'ddAmount'],
-            });
-        }
-    }
-
-    // FDR mode validation
-    if (mode === 'FDR') {
-        if (!data.fdrFavouring || (typeof data.fdrFavouring === 'string' && data.fdrFavouring.trim() === '')) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'FDR in Favour of is required',
-                path: ['details', 'fdrFavouring'],
-            });
-        }
-        if (!data.fdrExpiryDate || (typeof data.fdrExpiryDate === 'string' && data.fdrExpiryDate.trim() === '')) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'FDR Expiry Date is required',
-                path: ['details', 'fdrExpiryDate'],
-            });
-        }
-        if (!data.fdrDeliverBy) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'Deliver By is required',
-                path: ['details', 'fdrDeliverBy'],
-            });
-        }
-        if (!data.fdrPurpose || (typeof data.fdrPurpose === 'string' && data.fdrPurpose.trim() === '')) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'Purpose of FDR is required',
-                path: ['details', 'fdrPurpose'],
-            });
-        }
-        if (data.fdrAmount !== undefined && data.fdrAmount < 0) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'FDR Amount must be greater than 0',
-                path: ['details', 'fdrAmount'],
-            });
-        }
-    }
-
-    // BG mode validation
-    if (mode === 'BG') {
-        if (!data.bgNeededIn || (typeof data.bgNeededIn === 'string' && data.bgNeededIn.trim() === '')) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'BG Needed In is required',
-                path: ['details', 'bgNeededIn'],
-            });
-        }
-        if (!data.bgPurpose || (typeof data.bgPurpose === 'string' && data.bgPurpose.trim() === '')) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'Purpose of BG is required',
-                path: ['details', 'bgPurpose'],
-            });
-        }
-        if (data.bgAmount !== undefined && data.bgAmount < 0) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'BG Amount must be greater than 0',
-                path: ['details', 'bgAmount'],
-            });
-        }
-        if (!data.bgFavouring || (typeof data.bgFavouring === 'string' && data.bgFavouring.trim() === '')) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'BG in Favour of is required',
-                path: ['details', 'bgFavouring'],
-            });
-        }
-        if (!data.bgAddress || (typeof data.bgAddress === 'string' && data.bgAddress.trim() === '')) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'BG Address is required',
-                path: ['details', 'bgAddress'],
-            });
-        }
-        if (!data.bgExpiryDate || (typeof data.bgExpiryDate === 'string' && data.bgExpiryDate.trim() === '')) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'BG Expiry Date is required',
-                path: ['details', 'bgExpiryDate'],
-            });
-        }
-        if (!data.bgClaimPeriod || (typeof data.bgClaimPeriod === 'string' && data.bgClaimPeriod.trim() === '')) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'BG Claim Period is required',
-                path: ['details', 'bgClaimPeriod'],
-            });
-        }
-        if (data.bgStampValue !== undefined && data.bgStampValue < 0) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'BG Stamp Value must be greater than 0',
-                path: ['details', 'bgStampValue'],
-            });
-        }
-        if (!data.bgBank || (typeof data.bgBank === 'string' && data.bgBank.trim() === '')) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'BG Bank is required',
-                path: ['details', 'bgBank'],
-            });
-        }
-        if (!data.bgCourierAddress || (typeof data.bgCourierAddress === 'string' && data.bgCourierAddress.trim() === '')) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'Courier Address is required',
-                path: ['details', 'bgCourierAddress'],
-            });
-        }
-    }
-
-    // Bank Transfer mode validation
-    if (mode === 'BT') {
-        if (!data.btPurpose || (typeof data.btPurpose === 'string' && data.btPurpose.trim() === '')) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'Bank Transfer Purpose is required',
-                path: ['details', 'btPurpose'],
-            });
-        }
-        if (!data.btAccountName || (typeof data.btAccountName === 'string' && data.btAccountName.trim() === '')) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'Bank Transfer Account Name is required',
-                path: ['details', 'btAccountName'],
-            });
-        }
-        if (!data.btAccountNo || (typeof data.btAccountNo === 'string' && data.btAccountNo.trim() === '')) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'Bank Transfer Account No. is required',
-                path: ['details', 'btAccountNo'],
-            });
-        }
-        if (!data.btIfsc || (typeof data.btIfsc === 'string' && data.btIfsc.trim() === '')) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'Bank Transfer IFSC is required',
-                path: ['details', 'btIfsc'],
-            });
-        }
-        if (data.btAmount !== undefined && data.btAmount < 0) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'Amount must be greater than 0',
-                path: ['details', 'btAmount'],
-            });
-        }
-    }
-
-    // Portal mode validation
-    if (mode === 'POP') {
-        if (!data.portalPurpose || (typeof data.portalPurpose === 'string' && data.portalPurpose.trim() === '')) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'Portal Purpose is required',
-                path: ['details', 'portalPurpose'],
-            });
-        }
-        if (!data.portalName || (typeof data.portalName === 'string' && data.portalName.trim() === '')) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'Portal Name is required',
-                path: ['details', 'portalName'],
-            });
-        }
-        if (data.portalAmount !== undefined && data.portalAmount < 0) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'Amount must be greater than 0',
-                path: ['details', 'portalAmount'],
-            });
-        }
-    }
-
-    // Cheque mode validation
-    if (mode === 'CHEQUE') {
-        if (!data.chequeFavouring || (typeof data.chequeFavouring === 'string' && data.chequeFavouring.trim() === '')) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'Cheque in Favour of is required',
-                path: ['details', 'chequeFavouring'],
-            });
-        }
-        if (!data.chequeDate || (typeof data.chequeDate === 'string' && data.chequeDate.trim() === '')) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'Cheque Date is required',
-                path: ['details', 'chequeDate'],
-            });
-        }
-        if (!data.chequeNeededIn) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'Cheque Needed In is required',
-                path: ['details', 'chequeNeededIn'],
-            });
-        }
-        if (!data.chequePurpose || (typeof data.chequePurpose === 'string' && data.chequePurpose.trim() === '')) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'Purpose of Cheque is required',
-                path: ['details', 'chequePurpose'],
-            });
-        }
-        if (!data.chequeAccount || (typeof data.chequeAccount === 'string' && data.chequeAccount.trim() === '')) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'Cheque Account is required',
-                path: ['details', 'chequeAccount'],
-            });
-        }
-        if (data.chequeAmount !== undefined && data.chequeAmount < 0) {
-            ctx.addIssue({
-                code: 'custom',
-                message: 'Cheque Amount must be greater than 0',
-                path: ['details', 'chequeAmount'],
-            });
-        }
-    }
-}
-
-/**
  * Schema for EMD/Tender Fee/Processing Fee request form
+ * Note: Mode-specific validation is handled by the individual form components
+ * via their respective schemas (BankTransferSchema, PayOnPortalSchema, etc.)
  */
 export const EmdRequestSchema = z.object({
+    tenderNo: z.string().optional(),
+    tenderName: z.string().optional(),
+    tenderDueDate: z.string().optional(),
+    requestedBy: z.string().optional(),
     // EMD
     emd: z.object({
         mode: z.enum(['DD', 'FDR', 'BG', 'CHEQUE', 'BT', 'POP', 'SURETY_BOND', 'NA']).optional(),
         details: PaymentDetailsSchema.optional(),
-    }).superRefine((data, ctx) => {
-        if (data.mode && data.mode !== 'NA' && data.details) {
-            validatePaymentDetailsByMode(data.details, data.mode, ctx);
-        }
     }).optional(),
 
     // Tender Fee
     tenderFee: z.object({
         mode: z.enum(['POP', 'BT', 'DD', 'NA']).optional(),
         details: PaymentDetailsSchema.optional(),
-    }).superRefine((data, ctx) => {
-        if (data.mode && data.mode !== 'NA' && data.details) {
-            validatePaymentDetailsByMode(data.details, data.mode, ctx);
-        }
     }).optional(),
 
     // Processing Fee
     processingFee: z.object({
         mode: z.enum(['POP', 'BT', 'DD', 'NA']).optional(),
         details: PaymentDetailsSchema.optional(),
-    }).superRefine((data, ctx) => {
-        if (data.mode && data.mode !== 'NA' && data.details) {
-            validatePaymentDetailsByMode(data.details, data.mode, ctx);
-        }
     }).optional(),
 });
 
@@ -718,30 +442,18 @@ export const OldEmdRequestSchema = z.object({
     emd: z.object({
         mode: z.enum(['DD', 'FDR', 'BG', 'CHEQUE', 'BT', 'POP', 'SURETY_BOND', 'NA']).optional(),
         details: PaymentDetailsSchema.optional(),
-    }).superRefine((data, ctx) => {
-        if (data.mode && data.mode !== 'NA' && data.details) {
-            validatePaymentDetailsByMode(data.details, data.mode, ctx);
-        }
     }).optional(),
 
     // Tender Fee
     tenderFee: z.object({
         mode: z.enum(['POP', 'BT', 'DD', 'NA']).optional(),
         details: PaymentDetailsSchema.optional(),
-    }).superRefine((data, ctx) => {
-        if (data.mode && data.mode !== 'NA' && data.details) {
-            validatePaymentDetailsByMode(data.details, data.mode, ctx);
-        }
     }).optional(),
 
     // Processing Fee
     processingFee: z.object({
         mode: z.enum(['POP', 'BT', 'DD', 'NA']).optional(),
         details: PaymentDetailsSchema.optional(),
-    }).superRefine((data, ctx) => {
-        if (data.mode && data.mode !== 'NA' && data.details) {
-            validatePaymentDetailsByMode(data.details, data.mode, ctx);
-        }
     }).optional(),
 });
 
@@ -756,10 +468,6 @@ export const BiOtherThanEmdRequestSchema = z.object({
     emd: z.object({
         mode: z.enum(['DD', 'FDR', 'BG', 'CHEQUE']).optional(),
         details: PaymentDetailsSchema.optional(),
-    }).superRefine((data, ctx) => {
-        if (data.mode && data.details) {
-            validatePaymentDetailsByMode(data.details, data.mode, ctx);
-        }
     }).optional(),
 });
 

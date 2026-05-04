@@ -58,7 +58,7 @@ export const MODE_LABELS: Record<string, string> = {
 export const PURPOSE_OPTIONS = [
     { value: 'EMD', label: 'EMD' },
     { value: 'TENDER_FEES', label: 'Tender Fees' },
-    { value: 'PROCESSING_FEE', label: 'Processing Fee' },
+    { value: 'PROCESSING_FEES', label: 'Processing Fees' },
     { value: 'SECURITY_DEPOSIT', label: 'Security Deposit' },
     { value: 'OTHER_PAYMENT', label: 'Other Payment' },
     { value: 'OTHER_SECURITY', label: 'Other Security' },
@@ -78,6 +78,20 @@ export const DELIVERY_OPTIONS = [
     { value: 'TENDER_DUE', label: 'Tender Due Date' },
     { value: '24', label: '24 Hours' },
     { value: '48', label: '48 Hours' },
+];
+
+export const CHEQUE_DELIVERY_OPTIONS = [
+    { value: '3', label: '3 Hours' },
+    { value: '6', label: '6 Hours' },
+    { value: '12', label: '12 Hours' },
+    { value: '24', label: '24 Hours' },
+];
+
+export const CHEQUE_TYPE_OPTIONS = [
+    { value: 'PAYABLE', label: 'Payable' },
+    { value: 'SECURITY', label: 'Security' },
+    { value: 'DD', label: 'DD' },
+    { value: 'FDR', label: 'FDR' },
 ];
 
 export const BG_NEEDED_IN_OPTIONS = [
