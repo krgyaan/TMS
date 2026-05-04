@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, Query } from '@nestjs/common';
 import { BidSubmissionsService } from '@/modules/tendering/bid-submissions/bid-submissions.service';
-import type { SubmitBidDto, MarkAsMissedDto, UpdateBidSubmissionDto } from './dto/bid-submission.dto';
+import type { SubmitBidDto, MarkAsMissedDto, UpdateBidSubmissionDto, MarkAsMissedGlobalDto } from './dto/bid-submission.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { TimersService } from '@/modules/timers/timers.service';
@@ -100,6 +100,25 @@ export class BidSubmissionsController {
         return this.bidSubmissionsService.markAsMissed({
             tenderId: dto.tenderId,
             reasonForMissing: dto.reasonForMissing,
+            preventionMeasures: dto.preventionMeasures,
+            tmsImprovements: dto.tmsImprovements,
+            submittedBy: user.sub,
+        });
+    }
+
+    @Get('missed-global-statuses/:stage')
+    getValidMissedStatuses(@Param('stage') stage: string) {
+        return this.bidSubmissionsService.getValidMissedStatuses(stage);
+    }
+
+    @Post('missed-global')
+    markAsMissedGlobal(
+        @Body() dto: MarkAsMissedGlobalDto,
+        @CurrentUser() user: ValidatedUser
+    ) {
+        return this.bidSubmissionsService.markAsMissedGlobal({
+            tenderId: dto.tenderId,
+            rejectionStatus: dto.rejectionStatus,
             preventionMeasures: dto.preventionMeasures,
             tmsImprovements: dto.tmsImprovements,
             submittedBy: user.sub,

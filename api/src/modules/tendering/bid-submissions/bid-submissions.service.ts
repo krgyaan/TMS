@@ -661,6 +661,41 @@ export class BidSubmissionsService {
       }
     }
 
+    async getValidMissedStatuses(stage: string) {
+        let validStatusIds: number[] = [];
+
+        // Define valid status IDs for each stage
+        switch (stage) {
+            case 'phy-doc':
+                validStatusIds = []; // TODO: Add valid status IDs for phy-doc
+                break;
+            case 'checklist':
+                validStatusIds = []; // TODO: Add valid status IDs for checklist
+                break;
+            case 'rfq':
+                validStatusIds = []; // TODO: Add valid status IDs for rfq
+                break;
+            case 'emd':
+                validStatusIds = []; // TODO: Add valid status IDs for emd
+            case 'costing-sheet':
+                validStatusIds = []; // TODO: Add valid status IDs for costing-sheet
+                break;
+            case 'costing-approval':
+                validStatusIds = []; // TODO: Add valid status IDs for costing-approval
+                break;
+        }
+
+        if (validStatusIds.length > 0) {
+            return this.db
+                .select({ id: statuses.id, name: statuses.name })
+                .from(statuses)
+                .where(inArray(statuses.id, validStatusIds));
+        }
+
+        // Fallback: return any status containing "Missed" or "Reject"
+        return "Missed";
+    }
+
     async update(
         id: number,
         data: {
