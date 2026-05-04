@@ -1,6 +1,6 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query, Req, Logger } from '@nestjs/common';
-import { EmdsService } from '@/modules/tendering/emds/emds.service';
-import { CreatePaymentRequestSchema, UpdatePaymentRequestSchema, UpdateStatusSchema, DashboardQuerySchema, type DashboardResponse, type DashboardCounts, type DashboardTab } from '@/modules/tendering/emds/dto/emds.dto';
+import { PaymentRequestsService } from './payment-requests.service';
+import { CreatePaymentRequestSchema, UpdatePaymentRequestSchema, UpdateStatusSchema, DashboardQuerySchema, type DashboardResponse, type DashboardCounts, type DashboardTab } from './dto/payment-requests.dto';
 import type { Request } from 'express';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
@@ -17,11 +17,11 @@ interface AuthenticatedRequest extends Request {
     };
 }
 
-@Controller('emds-tenderfees')
-export class EmdsController {
-    private readonly logger = new Logger(EmdsController.name);
+@Controller('payment-requests')
+export class PaymentRequestsController {
+    private readonly logger = new Logger(PaymentRequestsController.name);
     constructor(
-        private readonly emdsService: EmdsService,
+        private readonly paymentRequestsService: PaymentRequestsService,
         private readonly timersService: TimersService
     ) { }
 
@@ -37,7 +37,7 @@ export class EmdsController {
             const num = parseInt(v, 10);
             return Number.isNaN(num) ? undefined : num;
         };
-        const result = await this.emdsService.getDashboardData(
+        const result = await this.paymentRequestsService.getDashboardData(
             parsed.tab as DashboardTab ?? 'pending',
             user,
             parseNumber(teamId),
@@ -72,7 +72,7 @@ export class EmdsController {
             const num = parseInt(v, 10);
             return Number.isNaN(num) ? undefined : num;
         };
-        return this.emdsService.getDashboardCounts(user, parseNumber(teamId));
+        return this.paymentRequestsService.getDashboardCounts(user, parseNumber(teamId));
     }
 
     @Post('tenders/:tenderId')
@@ -83,29 +83,29 @@ export class EmdsController {
         @CurrentUser() user: ValidatedUser,
     ) {
         const payload = CreatePaymentRequestSchema.parse(body);
-        return this.emdsService.create(tenderId, payload, user.sub);
+        return this.paymentRequestsService.create(tenderId, payload, user.sub);
     }
 
     @Get('tenders/:tenderId')
     async findByTender(@Param('tenderId', ParseIntPipe) tenderId: number) {
-        return this.emdsService.findByTenderId(tenderId);
+        return this.paymentRequestsService.findByTenderId(tenderId);
     }
 
     @Get('tenders/:tenderId/with-details')
     async findByTenderWithDetails(
         @Param('tenderId', ParseIntPipe) tenderId: number,
     ) {
-        return this.emdsService.findByTenderIdWithTender(tenderId);
+        return this.paymentRequestsService.findByTenderIdWithTender(tenderId);
     }
 
     @Get(':id')
     async findById(@Param('id', ParseIntPipe) id: number) {
-        return this.emdsService.findById(id);
+        return this.paymentRequestsService.findById(id);
     }
 
     @Get(':id/with-details')
     async findByIdWithDetails(@Param('id', ParseIntPipe) id: number) {
-        return this.emdsService.findByIdWithTender(id);
+        return this.paymentRequestsService.findByIdWithTender(id);
     }
 
     @Patch(':id')
@@ -114,7 +114,7 @@ export class EmdsController {
         @Body() body: unknown,
     ) {
         const payload = UpdatePaymentRequestSchema.parse(body);
-        return this.emdsService.update(id, payload);
+        return this.paymentRequestsService.update(id, payload);
     }
 
     @Patch(':id/status')
@@ -123,6 +123,6 @@ export class EmdsController {
         @Body() body: unknown,
     ) {
         const payload = UpdateStatusSchema.parse(body);
-        return this.emdsService.updateStatus(id, payload);
+        return this.paymentRequestsService.updateStatus(id, payload);
     }
 }

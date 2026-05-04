@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
-import { EmdsController } from '@/modules/tendering/emds/emds.controller';
-import { EmdsService } from '@/modules/tendering/emds/emds.service';
-import { InstrumentStatusService } from '@/modules/tendering/emds/services/instrument-status.service';
-import { InstrumentStatusHistoryService } from '@/modules/tendering/emds/services/instrument-status-history.service';
+import { PaymentRequestsController } from './payment-requests.controller';
+import { PaymentRequestsService } from './payment-requests.service';
+import { InstrumentStatusService } from './services/instrument-status.service';
+import { InstrumentStatusHistoryService } from './services/instrument-status-history.service';
 import { TendersModule } from '@/modules/tendering/tenders/tenders.module';
 import { TenderStatusHistoryModule } from '@/modules/tendering/tender-status-history/tender-status-history.module';
 import { EmailModule } from '@/modules/email/email.module';
@@ -11,12 +11,12 @@ import { PdfGeneratorModule } from '@/modules/pdf/pdf-generator.module';
 
 @Module({
     imports: [TendersModule, TenderStatusHistoryModule, EmailModule, TimersModule, PdfGeneratorModule],
-    controllers: [EmdsController],
+    controllers: [PaymentRequestsController],
     providers: [
-        EmdsService,
+        PaymentRequestsService,
         InstrumentStatusService,
         InstrumentStatusHistoryService,
     ],
-    exports: [EmdsService, InstrumentStatusService],
+    exports: [PaymentRequestsService, InstrumentStatusService],
 })
-export class EmdsModule { }
+export class PaymentRequestsModule { }

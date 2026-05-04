@@ -10,11 +10,11 @@ import {
     instrumentChequeDetails,
     instrumentTransferDetails,
     type PaymentInstrument,
-} from '@db/schemas/tendering/emds.schema';
+} from '@db/schemas/tendering/payment-requests.schema';
 import {
     InstrumentStatusHistoryService,
     type StatusChangeContext,
-} from '@/modules/tendering/emds/services/instrument-status-history.service';
+} from './instrument-status-history.service';
 import {
     getStagesForInstrument,
     getStageFromStatus,
@@ -28,7 +28,7 @@ import {
     CHEQUE_STATUSES,
     BT_STATUSES,
     PORTAL_STATUSES,
-} from '@/modules/tendering/emds/constants/emd-statuses';
+} from '../constants/payment-request-statuses';
 
 export interface StageFormData {
     [key: string]: unknown;
