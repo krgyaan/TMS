@@ -1,6 +1,10 @@
 import { Module } from '@nestjs/common';
 import { PaymentRequestsController } from './payment-requests.controller';
 import { PaymentRequestsService } from './payment-requests.service';
+import { PaymentRequestsQueryService } from './services/payment-requests.query.service';
+import { PaymentRequestsCommandService } from './services/payment-requests.command.service';
+import { PaymentRequestsStatusService } from './services/payment-requests-status.service';
+import { PaymentRequestsNotificationService } from './services/payment-requests-notification.service';
 import { InstrumentStatusService } from './services/instrument-status.service';
 import { InstrumentStatusHistoryService } from './services/instrument-status-history.service';
 import { TendersModule } from '@/modules/tendering/tenders/tenders.module';
@@ -14,9 +18,20 @@ import { PdfGeneratorModule } from '@/modules/pdf/pdf-generator.module';
     controllers: [PaymentRequestsController],
     providers: [
         PaymentRequestsService,
+        PaymentRequestsQueryService,
+        PaymentRequestsCommandService,
+        PaymentRequestsStatusService,
+        PaymentRequestsNotificationService,
         InstrumentStatusService,
         InstrumentStatusHistoryService,
     ],
-    exports: [PaymentRequestsService, InstrumentStatusService],
+    exports: [
+        PaymentRequestsService,
+        PaymentRequestsQueryService,
+        PaymentRequestsCommandService,
+        PaymentRequestsStatusService,
+        PaymentRequestsNotificationService,
+        InstrumentStatusService,
+    ],
 })
 export class PaymentRequestsModule { }
