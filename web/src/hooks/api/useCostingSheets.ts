@@ -71,7 +71,7 @@ export const useSubmitCostingSheet = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: costingSheetsService.submit,
+        mutationFn: (data) => costingSheetsService.submit(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: costingSheetsKey.all });
             queryClient.invalidateQueries({ queryKey: costingSheetsKey.dashboardCounts() });
