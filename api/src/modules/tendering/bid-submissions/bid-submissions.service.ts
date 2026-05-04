@@ -505,7 +505,7 @@ export class BidSubmissionsService {
         const prevStatus = currentTender?.status ?? null;
 
         // AUTO STATUS CHANGE: Update tender status to 8 (Missed) and track it
-        const newStatus = 43; // Status ID for "Bid Missed" -> new updated status specifically for Bid Missed
+        const newStatus = 8; // Status ID for "Bid Missed" -> new updated status specifically for Bid Missed
 
         // Check if bid submission already exists
         const existing = await this.findByTenderId(data.tenderId);
