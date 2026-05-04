@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Inject, forwardRef } from '@nestjs/common';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
-import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { PaymentRequestsService } from '../payment-requests.service';
 import type {
@@ -10,8 +9,6 @@ import type {
     DashboardCounts,
     PendingTabResponse,
     RequestTabResponse,
-    PaymentRequestRow,
-    PendingTenderRow,
 } from '../dto/payment-requests.dto';
 
 @Injectable()
@@ -20,7 +17,6 @@ export class PaymentRequestsQueryService {
 
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
-        private readonly tenderInfosService: TenderInfosService,
         @Inject(forwardRef(() => PaymentRequestsService))
         private readonly paymentRequestsService: PaymentRequestsService,
     ) {}
