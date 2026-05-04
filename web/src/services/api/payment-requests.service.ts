@@ -9,9 +9,9 @@ import type {
     EmdDashboardFilters,
 } from '@/modules/tendering/emds-tenderfees/helpers/emdTenderFee.types';
 
-class EmdsService extends BaseApiService {
+class PaymentRequestsService extends BaseApiService {
     constructor() {
-        super('/emds-tenderfees');
+        super('/payment-requests');
     }
 
     // Dashboard endpoints
@@ -62,5 +62,5 @@ class EmdsService extends BaseApiService {
     }
 }
 
-export const emdsService = new EmdsService();
+export const paymentRequestsService = new PaymentRequestsService();
 export type { EmdDashboardRow, EmdDashboardCounts, EmdDashboardResponse };

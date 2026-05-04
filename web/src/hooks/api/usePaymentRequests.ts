@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { emdsService } from '@/services/api';
+import { paymentRequestsService } from '@/services/api';
 import { handleQueryError } from '@/lib/react-query';
 import { toast } from 'sonner';
 import { useTeamFilter } from '@/hooks/useTeamFilter';
@@ -62,7 +62,7 @@ export const usePaymentDashboard = (
 
     return useQuery({
         queryKey: [...paymentRequestsKey.dashboardTab(tab), queryKeyFilters],
-        queryFn: () => emdsService.getDashboard({
+        queryFn: () => paymentRequestsService.getDashboard({
             tab: tab as any,
             ...(pagination && { page: pagination.page, limit: pagination.limit }),
             ...(sort?.sortBy && { sortBy: sort.sortBy }),
@@ -87,7 +87,7 @@ export const usePaymentDashboardCounts = () => {
 
     return useQuery({
         queryKey,
-        queryFn: () => emdsService.getDashboardCounts(teamIdParam),
+        queryFn: () => paymentRequestsService.getDashboardCounts(teamIdParam),
         staleTime: 0,
     });
 };
@@ -96,14 +96,14 @@ export const usePaymentDashboardCounts = () => {
 export const usePaymentRequests = (statusFilter?: string) => {
     return useQuery({
         queryKey: paymentRequestsKey.list({ status: statusFilter }),
-        queryFn: () => emdsService.getDashboard({ tab: statusFilter as any }).then(res => res.data),
+        queryFn: () => paymentRequestsService.getDashboard({ tab: statusFilter as any }).then(res => res.data),
     });
 };
 
 export const usePaymentRequestsByTender = (tenderId: number | null) => {
     return useQuery({
         queryKey: tenderId ? paymentRequestsKey.byTenderId(tenderId) : paymentRequestsKey.byTenderId(0),
-        queryFn: () => emdsService.getByTenderId(tenderId!),
+        queryFn: () => paymentRequestsService.getByTenderId(tenderId!),
         enabled: !!tenderId,
     });
 };
@@ -111,7 +111,7 @@ export const usePaymentRequestsByTender = (tenderId: number | null) => {
 export const usePaymentRequest = (id: number | null) => {
     return useQuery({
         queryKey: id ? paymentRequestsKey.detail(id) : paymentRequestsKey.detail(0),
-        queryFn: () => emdsService.getById(id!),
+        queryFn: () => paymentRequestsService.getById(id!),
         enabled: !!id,
     });
 };
@@ -121,7 +121,7 @@ export const useCreatePaymentRequest = () => {
 
     return useMutation({
         mutationFn: ({ tenderId, data }: { tenderId: number; data: any }) =>
-            emdsService.create(tenderId, data),
+            paymentRequestsService.create(tenderId, data),
         onSuccess: (_, variables) => {
             // Invalidate all dashboard queries
             queryClient.invalidateQueries({ queryKey: paymentRequestsKey.dashboard() });
@@ -139,7 +139,7 @@ export const useUpdatePaymentRequest = () => {
 
     return useMutation({
         mutationFn: ({ id, data }: { id: number; data: any }) =>
-            emdsService.update(id, data),
+            paymentRequestsService.update(id, data),
         onSuccess: (data, variables) => {
             queryClient.invalidateQueries({ queryKey: paymentRequestsKey.detail(variables.id) });
             queryClient.invalidateQueries({ queryKey: paymentRequestsKey.dashboard() });
@@ -159,7 +159,7 @@ export const useUpdatePaymentStatus = () => {
 
     return useMutation({
         mutationFn: ({ id, status, remarks }: { id: number; status: string; remarks?: string }) =>
-            emdsService.updateStatus(id, { status, remarks }),
+            paymentRequestsService.updateStatus(id, { status, remarks }),
         onSuccess: (data, variables) => {
             queryClient.invalidateQueries({ queryKey: paymentRequestsKey.detail(variables.id) });
             queryClient.invalidateQueries({ queryKey: paymentRequestsKey.dashboard() });
