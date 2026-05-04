@@ -605,10 +605,6 @@ export class BidSubmissionsService {
                         preventionMeasures: data.preventionMeasures,
                         tmsImprovements: data.tmsImprovements,
                         submittedBy: data.submittedBy,
-                        // Clear bid fields if any
-                        submissionDatetime: null,
-                        finalBiddingPrice: null,
-                        documents: null,
                         updatedAt: new Date(),
                     })
                     .where(eq(bidSubmissions.id, existing.id))
