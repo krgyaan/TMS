@@ -5,13 +5,14 @@ import { useEffect } from 'react';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Save, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useCreatePaymentRequest, useUpdatePaymentRequest } from '@/hooks/api/useEmds';
-import { EmdSection } from './EmdSection';
+import { useCreatePaymentRequest, useUpdatePaymentRequest } from '@/hooks/api/usePaymentRequests';
+import { PaymentSection } from './PaymentSection';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import DateInput from '@/components/form/DateInput';
 import FieldWrapper from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
+import { parseAllowedModes } from '../constants';
 import { BiOtherThanEmdRequestSchema, type BiOtherThanEmdRequestFormValues } from '../helpers/emdTenderFee.schema';
 
 type FormValues = BiOtherThanEmdRequestFormValues;
@@ -112,9 +113,9 @@ export function BiOtherThanEmdRequestForm({ tenderId, requestIds, initialData, m
 
 
 
-    const allowedEmdModes = ['DD', 'FDR', 'CHEQUE', 'BG'];
+    const allowedEmdModes = parseAllowedModes(['DD', 'FDR', 'BG', 'CHEQUE'].join(','));
     const hasEmd = true;
-    const type = 'BI_OTHER_THAN_EMD';
+    const type = 'OTHER_THAN_TENDER';
 
     const isPending = isEditMode ? updateRequest.isPending : createRequest.isPending;
 
@@ -146,7 +147,7 @@ export function BiOtherThanEmdRequestForm({ tenderId, requestIds, initialData, m
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
                         {/* Tender Details */}
                         {
-                            (type === 'BI_OTHER_THAN_EMD') && (
+                            (type === 'OTHER_THAN_TENDER') && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start mb-4">
                                     <FieldWrapper control={form.control} name="tenderName" label="Tender/Project Name">
                                         {(field) => <Input {...field} />}
@@ -162,12 +163,13 @@ export function BiOtherThanEmdRequestForm({ tenderId, requestIds, initialData, m
                         }
 
                         {hasEmd && (
-                            <EmdSection
+                            <PaymentSection
+                                purpose="EMD"
                                 allowedModes={allowedEmdModes}
                                 amount={0}
-                                defaultPurpose="EMD"
                                 type={type}
                                 courierAddress={''}
+                                defaultPurpose="EMD"
                             />
                         )}
 

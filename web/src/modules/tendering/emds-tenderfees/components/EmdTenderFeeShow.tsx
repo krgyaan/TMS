@@ -454,7 +454,7 @@ export const EmdTenderFeeShow = ({ paymentRequests, text }: EmdTenderFeeShowProp
     );
 };
 
-import { usePaymentRequestsByTender } from '@/hooks/api/useEmds';
+import { usePaymentRequestsByTender } from '@/hooks/api/usePaymentRequests';
 import { useInfoSheet } from "@/hooks/api/useInfoSheets";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 

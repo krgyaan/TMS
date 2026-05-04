@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
-import { useFormContext, useWatch } from 'react-hook-form';
+import { useFormContext } from 'react-hook-form';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { EMD_MODES, MODE_LABELS, } from '../constants';
 import { BankTransferForm } from './BankTransferForm';
@@ -20,7 +20,7 @@ interface EmdSectionProps {
     type?: 'EMD' | 'OLD_EMD' | 'BI_OTHER_THAN_EMD';
 }
 
-export function EmdSection({ allowedModes, amount, defaultPurpose = 'EMD', courierAddress, type = 'EMD' }: EmdSectionProps) {
+export function EmdSection({ allowedModes, amount, defaultPurpose = 'EMD', courierAddress}: EmdSectionProps) {
     const { control, watch, setValue } = useFormContext();
     const selectedMode = watch('emd.mode');
     const currentDdCourierAddress = watch('emd.details.ddCourierAddress');
@@ -102,53 +102,22 @@ export function EmdSection({ allowedModes, amount, defaultPurpose = 'EMD', couri
                     </p>
 
                     {/* Portal Payment */}
-                    {selectedMode === 'POP' && (
-                        <PayOnPortalForm
-                            control={control}
-                            showPurposeAmount={type === 'OLD_EMD' || type === 'BI_OTHER_THAN_EMD'}
-                        />
-                    )}
+                    {selectedMode === 'POP' && <PayOnPortalForm />}
 
                     {/* Bank Transfer */}
-                    {selectedMode === 'BT' && (
-                        <BankTransferForm
-                            control={control}
-                            showPurposeAmount={type === 'OLD_EMD' || type === 'BI_OTHER_THAN_EMD'}
-                        />
-                    )}
+                    {selectedMode === 'BT' && <BankTransferForm />}
 
                     {/* Demand Draft */}
-                    {selectedMode === 'DD' && (
-                        <DemandDraftForm
-                            control={control}
-                            showPurposeAmount={type === 'OLD_EMD' || type === 'BI_OTHER_THAN_EMD'}
-                        />
-                    )}
+                    {selectedMode === 'DD' && <DemandDraftForm />}
 
                     {/* Bank Guarantee */}
-                    {selectedMode === 'BG' && (
-                        <BankGuaranteeForm
-                            control={control}
-                            showPurposeAmount={type === 'OLD_EMD' || type === 'BI_OTHER_THAN_EMD'}
-                            setValue={setValue}
-                        />
-                    )}
+                    {selectedMode === 'BG' && <BankGuaranteeForm />}
 
                     {/* FDR */}
-                    {selectedMode === 'FDR' && (
-                        <FdrForm
-                            control={control}
-                            showPurposeAmount={type === 'OLD_EMD' || type === 'BI_OTHER_THAN_EMD'}
-                        />
-                    )}
+                    {selectedMode === 'FDR' && <FdrForm />}
 
                     {/* Cheque */}
-                    {selectedMode === 'CHEQUE' && (
-                        <ChequeForm
-                            control={control}
-                            showPurposeAmount={type === 'OLD_EMD' || type === 'BI_OTHER_THAN_EMD'}
-                        />
-                    )}
+                    {selectedMode === 'CHEQUE' && <ChequeForm />}
                 </div>
             )}
         </div>
