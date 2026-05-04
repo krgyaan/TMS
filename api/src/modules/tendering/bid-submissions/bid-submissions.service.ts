@@ -667,21 +667,21 @@ export class BidSubmissionsService {
         // Define valid status IDs for each stage
         switch (stage) {
             case 'phy-doc':
-                validStatusIds = []; // TODO: Add valid status IDs for phy-doc
+                validStatusIds = [8]; // TODO: Add valid status IDs for phy-doc
                 break;
             case 'checklist':
-                validStatusIds = []; // TODO: Add valid status IDs for checklist
+                validStatusIds = [8]; // TODO: Add valid status IDs for checklist
                 break;
             case 'rfq':
-                validStatusIds = []; // TODO: Add valid status IDs for rfq
+                validStatusIds = [8 ,14 ,35]; // TODO: Add valid status IDs for rfq
                 break;
             case 'emd':
-                validStatusIds = []; // TODO: Add valid status IDs for emd
+                validStatusIds = [8]; // TODO: Add valid status IDs for emd
             case 'costing-sheet':
-                validStatusIds = []; // TODO: Add valid status IDs for costing-sheet
+                validStatusIds = [8 ,14 ,34 ]; // TODO: Add valid status IDs for costing-sheet
                 break;
             case 'costing-approval':
-                validStatusIds = []; // TODO: Add valid status IDs for costing-approval
+                validStatusIds = [8]; // TODO: Add valid status IDs for costing-approval
                 break;
         }
 
