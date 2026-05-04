@@ -8,15 +8,15 @@ import {
     instrumentChequeDetails,
     instrumentDdDetails,
     instrumentFdrDetails,
-} from '@db/schemas/tendering/emds.schema';
+} from '@db/schemas/tendering/payment-requests.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import type { ChequeDashboardRow, ChequeDashboardCounts } from '@/modules/bi-dashboard/cheque/helpers/cheque.types';
-import { CHEQUE_STATUSES } from '@/modules/tendering/emds/constants/emd-statuses';
-import { EmdsService } from '@/modules/tendering/emds/emds.service';
+import { CHEQUE_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
+import { PaymentRequestsService } from '@/modules/tendering/payment-requests/payment-requests.service';
 
 @Injectable()
 export class ChequeService {
@@ -24,7 +24,7 @@ export class ChequeService {
 
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
-        @Inject(forwardRef(() => EmdsService)) private readonly emdsService: EmdsService,
+        @Inject(forwardRef(() => PaymentRequestsService)) private readonly paymentRequestsService: PaymentRequestsService,
     ) { }
 
     private statusMap() {
@@ -564,7 +564,7 @@ export class ChequeService {
                             const tenderId = request?.tenderId || 0;
 
                             // Send DD mail
-                            await this.emdsService.sendDdMailAfterChequeAction(
+                            await this.paymentRequestsService.sendDdMailAfterChequeAction(
                                 ddInstrument.id,
                                 requestId,
                                 tenderId,

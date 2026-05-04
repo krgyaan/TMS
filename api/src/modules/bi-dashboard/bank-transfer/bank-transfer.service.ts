@@ -6,7 +6,7 @@ import {
     paymentRequests,
     paymentInstruments,
     instrumentTransferDetails,
-} from '@db/schemas/tendering/emds.schema';
+} from '@db/schemas/tendering/payment-requests.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
@@ -14,7 +14,7 @@ import { teams } from '@db/schemas/master/teams.schema';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import type { BankTransferDashboardRow, BankTransferDashboardCounts } from '@/modules/bi-dashboard/bank-transfer/helpers/bankTransfer.types';
-import { BT_STATUSES } from '@/modules/tendering/emds/constants/emd-statuses';
+import { BT_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
 import { FollowUpService } from '@/modules/follow-up/follow-up.service';
 import type { CreateFollowUpDto } from '@/modules/follow-up/zod';
 

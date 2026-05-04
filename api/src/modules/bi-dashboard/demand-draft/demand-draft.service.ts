@@ -6,14 +6,14 @@ import {
     paymentRequests,
     paymentInstruments,
     instrumentDdDetails,
-} from '@db/schemas/tendering/emds.schema';
+} from '@db/schemas/tendering/payment-requests.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import type { DemandDraftDashboardRow, DemandDraftDashboardCounts } from '@/modules/bi-dashboard/demand-draft/helpers/demandDraft.types';
-import { DD_STATUSES } from '@/modules/tendering/emds/constants/emd-statuses';
+import { DD_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
 import { FollowUpService } from '@/modules/follow-up/follow-up.service';
 
 @Injectable()
