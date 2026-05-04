@@ -9,7 +9,7 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Form } from "@/components/ui/form";
-import { usePaymentRequest } from "@/hooks/api/useEmds";
+import { usePaymentRequest } from "@/hooks/api/usePaymentRequests";
 import { useTender } from "@/hooks/api/useTenders";
 import { ContactPersonSchema } from "@/modules/shared/follow-up/follow-up.types";
 import { useCreateFollowUp, useUpdateFollowUp, useEmdMailPreview } from "@/modules/shared/follow-up/follow-up.hooks";

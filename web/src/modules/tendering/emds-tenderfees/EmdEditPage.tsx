@@ -2,7 +2,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { EmdTenderFeeRequestForm } from "./components/EmdTenderFeeRequestForm";
 import { useParams, useNavigate } from "react-router-dom";
 import { AlertCircle } from "lucide-react";
-import { usePaymentRequest } from "@/hooks/api/useEmds";
+import { usePaymentRequest } from "@/hooks/api/usePaymentRequests";
 import { useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
