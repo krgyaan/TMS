@@ -34,7 +34,7 @@ const Rfqs = () => {
         tenderId: null
     });
     const navigate = useNavigate();
-    const hasTenderingPermission = useTenderingPermissions();
+    const { hasTenderingPermission } = useTenderingPermissions();
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
