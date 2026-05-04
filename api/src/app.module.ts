@@ -52,7 +52,7 @@ import { join } from "path";
 import { existsSync } from "fs";
 import { MailerModule } from "@/mailer/mailer.module";
 import { FollowUpModule } from "@/modules/follow-up/follow-up.module";
-import { EmdsModule } from "@/modules/tendering/emds/emds.module";
+import { PaymentRequestsModule } from "@/modules/tendering/payment-requests/payment-requests.module";
 import { DocumentChecklistsModule } from "@/modules/tendering/checklists/document-checklists.module";
 import { CostingSheetsModule } from "@/modules/tendering/costing-sheets/costing-sheets.module";
 import { CostingApprovalsModule } from "@/modules/tendering/costing-approvals/costing-approvals.module";
@@ -169,7 +169,7 @@ import { ProfileModule } from './modules/profile/profile.module';
         CourierModule,
         MailerModule,
         FollowUpModule,
-        EmdsModule,
+        PaymentRequestsModule,
         DocumentChecklistsModule,
         CostingSheetsModule,
         CostingApprovalsModule,

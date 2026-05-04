@@ -2,20 +2,20 @@ import { Inject, Injectable, NotFoundException, BadRequestException, } from '@ne
 import { eq, and, inArray, or, gt, asc, desc, isNull, sql, isNotNull, not, SQL } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
-import { paymentRequests, paymentInstruments, instrumentDdDetails, instrumentFdrDetails, instrumentBgDetails, instrumentChequeDetails, instrumentTransferDetails, type PaymentRequest, type PaymentInstrument, } from '@db/schemas/tendering/emds.schema';
+import { paymentRequests, paymentInstruments, instrumentDdDetails, instrumentFdrDetails, instrumentBgDetails, instrumentChequeDetails, instrumentTransferDetails, type PaymentRequest, type PaymentInstrument, } from '@db/schemas/tendering/payment-requests.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
 import { teams } from '@db/schemas/master/teams.schema';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
-import { InstrumentStatusService } from '@/modules/tendering/emds/services/instrument-status.service';
-import { InstrumentStatusHistoryService } from '@/modules/tendering/emds/services/instrument-status-history.service';
+import { InstrumentStatusService } from './services/instrument-status.service';
+import { InstrumentStatusHistoryService } from './services/instrument-status-history.service';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import { StatusCache } from '@/utils/status-cache';
-import type { CreatePaymentRequestDto, UpdatePaymentRequestDto, UpdateStatusDto, PaymentPurpose, InstrumentType, } from '@/modules/tendering/emds/dto/emds.dto';
-import { DD_STATUSES, FDR_STATUSES, BG_STATUSES, CHEQUE_STATUSES, BT_STATUSES, PORTAL_STATUSES } from '@/modules/tendering/emds/constants/emd-statuses';
+import type { CreatePaymentRequestDto, UpdatePaymentRequestDto, UpdateStatusDto, PaymentPurpose, InstrumentType, } from './dto/payment-requests.dto';
+import { DD_STATUSES, FDR_STATUSES, BG_STATUSES, CHEQUE_STATUSES, BT_STATUSES, PORTAL_STATUSES } from './constants/payment-request-statuses';
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import { PdfGeneratorService } from '@/modules/pdf/pdf-generator.service';
@@ -202,8 +202,8 @@ const deriveDisplayStatus = (instrumentStatus: string | null): string => {
 };
 
 @Injectable()
-export class EmdsService {
-    private readonly logger = new Logger(EmdsService.name);
+export class PaymentRequestsService {
+    private readonly logger = new Logger(PaymentRequestsService.name);
 
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,

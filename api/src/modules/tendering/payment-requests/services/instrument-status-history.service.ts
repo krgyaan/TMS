@@ -6,11 +6,11 @@ import {
     instrumentStatusHistory,
     paymentInstruments,
     type NewInstrumentStatusHistory,
-} from '@db/schemas/tendering/emds.schema';
+} from '@db/schemas/tendering/payment-requests.schema';
 import {
     getStageFromStatus,
     type InstrumentType,
-} from '@/modules/tendering/emds/constants/emd-statuses';
+} from '../constants/payment-request-statuses';
 
 export interface StatusChangeContext {
     userId?: number;
