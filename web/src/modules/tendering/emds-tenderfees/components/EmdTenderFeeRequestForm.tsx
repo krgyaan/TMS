@@ -14,9 +14,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
-import { EmdRequestSchema, type EmdRequestFormValues } from '../helpers/emdTenderFee.schema';
+import { PaymentRequestSchema, type PaymentRequestFormValues } from '../helpers/payment-request.schema';
 
-type FormValues = EmdRequestFormValues;
+type FormValues = PaymentRequestFormValues;
 
 interface EmdTenderFeeRequestFormProps {
     tenderId?: number;
@@ -46,7 +46,7 @@ export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mod
     const isEditMode = mode === 'edit';
 
     const form = useForm<FormValues>({
-        resolver: zodResolver(EmdRequestSchema) as Resolver<FormValues>,
+        resolver: zodResolver(PaymentRequestSchema) as Resolver<FormValues>,
         defaultValues: initialData || {
             emd: { mode: undefined, details: {} },
             tenderFee: { mode: undefined, details: {} },

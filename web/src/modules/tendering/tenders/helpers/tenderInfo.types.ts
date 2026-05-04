@@ -107,7 +107,7 @@ import type { BidSubmission } from "@/modules/tendering/bid-submissions/helpers/
 import type { TqManagementDashboardRow } from "@/modules/tendering/tq-management/helpers/tqManagement.types";
 import type { RaDashboardRow } from "@/modules/tendering/ras/helpers/reverseAuction.types";
 import type { ResultDashboardRow } from "@/modules/tendering/results/helpers/tenderResult.types";
-import type { EmdDashboardRow } from "@/modules/tendering/emds-tenderfees/helpers/emdTenderFee.types";
+import type { EmdDashboardRow } from "@/modules/tendering/emds-tenderfees/helpers/payment-request.types";
 import type { RequestExtensionResponse } from "@/modules/tendering/request-extension/helpers/requestExtension.types";
 import type { SubmitQueryResponse } from "@/modules/tendering/submit-queries/helpers/submitQueries.types";
 

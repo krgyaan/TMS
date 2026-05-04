@@ -693,7 +693,7 @@ export type {
     CreatePaymentRequestDto,
     UpdatePaymentRequestDto,
     UpdateStatusDto,
-} from "@/modules/tendering/emds-tenderfees/helpers/emdTenderFee.types";
+} from "@/modules/tendering/emds-tenderfees/helpers/payment-request.types";
 
 // Re-export Document Checklist types
 export type {

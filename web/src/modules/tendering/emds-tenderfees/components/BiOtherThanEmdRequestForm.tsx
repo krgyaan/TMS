@@ -13,9 +13,9 @@ import DateInput from '@/components/form/DateInput';
 import FieldWrapper from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
 import { parseAllowedModes } from '../constants';
-import { BiOtherThanEmdRequestSchema, type BiOtherThanEmdRequestFormValues } from '../helpers/emdTenderFee.schema';
+import { BiOtherThanTenderRequestSchema, type BiOtherThanTenderRequestFormValues } from '../helpers/payment-request.schema';
 
-type FormValues = BiOtherThanEmdRequestFormValues;
+type FormValues = BiOtherThanTenderRequestFormValues;
 
 interface BiOtherThanEmdRequestFormProps {
     tenderId?: number;
@@ -35,7 +35,7 @@ export function BiOtherThanEmdRequestForm({ tenderId, requestIds, initialData, m
     const isEditMode = mode === 'edit';
 
     const form = useForm<FormValues>({
-        resolver: zodResolver(BiOtherThanEmdRequestSchema) as Resolver<FormValues>,
+        resolver: zodResolver(BiOtherThanTenderRequestSchema) as Resolver<FormValues>,
         defaultValues: initialData || { tenderName: '', tenderNo: '', tenderDueDate: '', emd: { mode: undefined, details: {} } },
     });
 
