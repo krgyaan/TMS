@@ -10,7 +10,7 @@ import { paths } from '@/app/routes/paths';
 import type { PhysicalDocsDashboardRowWithTimer } from './helpers/physicalDocs.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle, Eye, FileX2, Search, RefreshCw } from 'lucide-react';
+import { AlertCircle, CheckCircle, Eye, FileX2, Search, RefreshCw, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { usePhysicalDocs, usePhysicalDocsDashboardCounts } from '@/hooks/api/usePhysicalDocs';
 import { dateCol, tenderNameCol } from '@/components/data-grid';
@@ -64,11 +64,14 @@ const PhysicalDocsListPage = () => {
     const totalRows = apiResponse?.meta?.total || 0;
 
     const physicalDocsActions: ActionItem<PhysicalDocsDashboardRowWithTimer>[] = [
-        // {
-        //     label: 'Change Status',
-        //     onClick: (row: PhysicalDocsDashboardRowWithTimer) => setChangeStatusModal({ open: true, tenderId: row.tenderId }),
-        //     icon: <RefreshCw className="h-4 w-4" />,
-        // },
+        {
+            label: 'Mark as Missed',
+            onClick: (row) => {
+                navigate(paths.tendering.bidMissedGlobal(row.tenderId, 'phy-doc'));
+            },
+            icon: <XCircle className="h-4 w-4" />,
+            visible: () => activeTab !== 'tender-dnb',
+        },
         {
             label: 'Send',
             onClick: (row: PhysicalDocsDashboardRowWithTimer) => row.physicalDocs ? navigate(paths.tendering.physicalDocsEdit(row.tenderId)) : navigate(paths.tendering.physicalDocsCreate(row.tenderId)),
