@@ -65,6 +65,7 @@ export const paths = {
         bidSubmit: (tenderId: number) => `/tendering/bid-submissions/submit/${tenderId}`,
         bidEdit: (bidSubmissionId: number) => `/tendering/bid-submissions/edit/${bidSubmissionId}`,
         bidMarkMissed: (tenderId: number) => `/tendering/bid-submissions/mark-missed/${tenderId}`,
+        bidMissedGlobal: (tenderId: number, stage: string) => `/tendering/bid-submissions/mark-missed/${tenderId}/${stage}`,
         bidEditMissed: (bidSubmissionId: number) => `/tendering/bid-submissions/edit-missed/${bidSubmissionId}`,
         bidView: (tenderId: number) => `/tendering/bid-submissions/view/${tenderId}`,
         tqManagement: "/tendering/tq-management",

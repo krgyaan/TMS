@@ -48,6 +48,7 @@ const BidSubmissionListPage = lazy(() => import('@/modules/tendering/bid-submiss
 const BidSubmitPage = lazy(() => import('@/modules/tendering/bid-submissions/BidSubmitPage'));
 const BidEditPage = lazy(() => import('@/modules/tendering/bid-submissions/BidEditPage'));
 const BidMarkMissedPage = lazy(() => import('@/modules/tendering/bid-submissions/BidMarkMissedPage'));
+const GlobalBidMissedPage = lazy(() => import('@/modules/tendering/bid-submissions/GlobalBidMissedPage'));
 const BidEditMissedPage = lazy(() => import('@/modules/tendering/bid-submissions/BidEditMissedPage'));
 const BidSubmissionViewPage = lazy(() => import('@/modules/tendering/bid-submissions/BidSubmissionShowPage'));
 const TqManagementListPage = lazy(() => import('@/modules/tendering/tq-management/TqManagementListPage'));
@@ -125,6 +126,7 @@ export default function TenderingRoutes() {
             <Route path="bid-submissions/submit/:tenderId" element={<RouteWrapper><BidSubmitPage /></RouteWrapper>} />
             <Route path="bid-submissions/edit/:id" element={<RouteWrapper><BidEditPage /></RouteWrapper>} />
             <Route path="bid-submissions/mark-missed/:tenderId" element={<RouteWrapper><BidMarkMissedPage /></RouteWrapper>} />
+            <Route path="bid-submissions/mark-missed/:tenderId/:stage" element={<RouteWrapper><GlobalBidMissedPage /></RouteWrapper>} />
             <Route path="bid-submissions/edit-missed/:id" element={<RouteWrapper><BidEditMissedPage /></RouteWrapper>} />
             <Route path="bid-submissions/view/:tenderId" element={<RouteWrapper><BidSubmissionViewPage /></RouteWrapper>} />
             <Route path="tq-management" element={<RouteWrapper><TqManagementListPage /></RouteWrapper>} />
