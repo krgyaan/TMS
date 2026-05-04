@@ -2,9 +2,9 @@
 export * from './tenders.schema';
 export * from './tenders.relations';
 
-// EMDs
-export * from './emds.schema';
-export * from './emds.relations';
+// Payment Requests
+export * from './payment-requests.schema';
+export * from './payment-requests.relations';
 
 // RFQs
 export * from './rfqs.schema';

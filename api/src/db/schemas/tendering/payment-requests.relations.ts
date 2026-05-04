@@ -7,7 +7,7 @@ import {
     instrumentBgDetails,
     instrumentChequeDetails,
     instrumentTransferDetails,
-} from '@db/schemas/tendering/emds.schema';
+} from './payment-requests.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 
 export const paymentRequestRelations = relations(paymentRequests, ({ one, many }) => ({
