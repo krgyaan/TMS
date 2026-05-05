@@ -27,7 +27,6 @@ export function DemandDraftForm({ amount, prefix = 'emd.details' }: PaymentFormB
             <FieldWrapper control={control} name={`${prefix}.ddAmount`} label="Amount *">
                 {(field) => (
                     <NumberInput
-                        {...field}
                         value={field.value ?? amount}
                         onChange={field.onChange}
                     />

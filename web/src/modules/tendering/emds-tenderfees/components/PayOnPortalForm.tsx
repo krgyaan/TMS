@@ -25,7 +25,6 @@ export function PayOnPortalForm({ amount, prefix = 'emd.details' }: PaymentFormB
             <FieldWrapper control={control} name={`${prefix}.portalAmount`} label="Amount *">
                 {(field) => (
                     <NumberInput
-                        {...field}
                         value={field.value ?? amount}
                         onChange={field.onChange}
                     />

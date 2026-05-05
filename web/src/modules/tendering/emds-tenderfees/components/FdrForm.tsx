@@ -27,7 +27,6 @@ export function FdrForm({ amount, prefix = 'emd.details' }: PaymentFormBaseProps
             <FieldWrapper control={control} name={`${prefix}.fdrAmount`} label="FDR Amount *">
                 {(field) => (
                     <NumberInput
-                        {...field}
                         value={field.value ?? amount}
                         onChange={field.onChange}
                     />
