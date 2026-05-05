@@ -4,19 +4,13 @@ import { ChequeController } from './cheque.controller';
 import { ChequeService } from './cheque.service';
 import { FollowUpModule } from '@/modules/follow-up/follow-up.module';
 import { PaymentRequestsModule } from '@/modules/tendering/payment-requests/payment-requests.module';
-import { PaymentRequestsService } from '@/modules/tendering/payment-requests/payment-requests.service';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
-import { EmailService } from '@/modules/email/email.service';
-import { EmailModule } from '@/modules/email/email.module';
-import { RecipientResolver } from '@/modules/email/recipient.resolver';
-import { GmailClient } from '@/modules/email/gmail.client';
-import { TenderFilesService } from '@/modules/tendering/tender-files/tender-files.service';
 
 @Module({
-    imports: [DatabaseModule, FollowUpModule, PaymentRequestsModule, EmailModule],
+    imports: [DatabaseModule, FollowUpModule, PaymentRequestsModule],
     controllers: [ChequeController],
-    providers: [ChequeService, PaymentRequestsService, TenderInfosService, TenderStatusHistoryService, EmailService, RecipientResolver, GmailClient, TenderFilesService],
+    providers: [ChequeService, TenderInfosService, TenderStatusHistoryService],
     exports: [ChequeService],
 })
 export class ChequeModule { }
