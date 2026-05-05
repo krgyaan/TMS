@@ -48,9 +48,9 @@ export function OldEmdRequestForm({ tenderId, requestIds, initialData, mode = 'c
             tenderName: '',
             tenderNo: '',
             tenderDueDate: '',
-            emd: { mode: undefined, details: {} },
-            tenderFee: { mode: undefined, details: {} },
-            processingFee: { mode: undefined, details: {} },
+            EMD: { mode: undefined, details: {} },
+            TENDER_FEES: { mode: undefined, details: {} },
+            PROCESSING_FEES: { mode: undefined, details: {} },
         },
     });
 
@@ -64,11 +64,11 @@ export function OldEmdRequestForm({ tenderId, requestIds, initialData, mode = 'c
         if (isEditMode) {
             const updatePromises: Promise<any>[] = [];
 
-            if (values.emd?.mode && requestIds?.emd) {
+            if (values.EMD?.mode && requestIds?.emd) {
                 const payload = {
-                    emd: {
-                        mode: transformModeForBackend(values.emd.mode),
-                        details: values.emd.details || {},
+                    EMD: {
+                        mode: transformModeForBackend(values.EMD.mode),
+                        details: values.EMD.details || {},
                     },
                 };
                 updatePromises.push(
@@ -100,14 +100,14 @@ export function OldEmdRequestForm({ tenderId, requestIds, initialData, mode = 'c
                 dueDate: values.tenderDueDate || '',
             };
 
-            if (values.emd?.mode) {
-                payload.emd = {
-                    mode: transformModeForBackend(values.emd.mode),
-                    details: values.emd.details || {},
+            if (values.EMD?.mode) {
+                payload.EMD = {
+                    mode: transformModeForBackend(values.EMD.mode),
+                    details: values.EMD.details || {},
                 };
             }
 
-            if (!payload.emd) {
+            if (!payload.EMD) {
                 toast.error('Please select at least one payment mode');
                 return;
             }
@@ -158,7 +158,13 @@ export function OldEmdRequestForm({ tenderId, requestIds, initialData, mode = 'c
                     </Alert>
                 )}
                 <FormProvider {...form}>
-                    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
+                    <form
+                        onSubmit={form.handleSubmit(handleSubmit, (errors) => {
+                            console.error('Form validation errors:', errors);
+                            toast.error('Please fix the errors in the form before submitting');
+                        })}
+                        className="space-y-8"
+                    >
                         {/* Tender Details */}
                         {
                             (type === 'OLD_ENTRY') && (

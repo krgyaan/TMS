@@ -242,7 +242,13 @@ export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mod
 
             <CardContent>
                 <FormProvider {...form}>
-                    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
+                    <form
+                        onSubmit={form.handleSubmit(handleSubmit, (errors) => {
+                            console.error('Form validation errors:', errors);
+                            toast.error('Please fix the errors in the form before submitting');
+                        })}
+                        className="space-y-8"
+                    >
                         {/* Tender Related FormFields */}
                         {tenderId && (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-muted/30 rounded-lg border">

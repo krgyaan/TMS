@@ -36,7 +36,7 @@ export function BiOtherThanEmdRequestForm({ tenderId, requestIds, initialData, m
 
     const form = useForm<FormValues>({
         resolver: zodResolver(BiOtherThanTenderRequestSchema) as Resolver<FormValues>,
-        defaultValues: initialData || { tenderName: '', tenderNo: '', tenderDueDate: '', emd: { mode: undefined, details: {} } },
+        defaultValues: initialData || { tenderName: '', tenderNo: '', tenderDueDate: '', EMD: { mode: undefined, details: {} } },
     });
 
     useEffect(() => {
@@ -49,11 +49,11 @@ export function BiOtherThanEmdRequestForm({ tenderId, requestIds, initialData, m
         if (isEditMode) {
             const updatePromises: Promise<any>[] = [];
 
-            if (values.emd?.mode && requestIds?.emd) {
+            if (values.EMD?.mode && requestIds?.emd) {
                 const payload = {
-                    emd: {
-                        mode: values.emd.mode,
-                        details: values.emd.details || {},
+                    EMD: {
+                        mode: values.EMD.mode,
+                        details: values.EMD.details || {},
                     },
                 };
                 updatePromises.push(
@@ -85,14 +85,14 @@ export function BiOtherThanEmdRequestForm({ tenderId, requestIds, initialData, m
                 dueDate: values.tenderDueDate || '',
             };
 
-            if (values.emd?.mode) {
-                payload.emd = {
-                    mode: values.emd.mode,
-                    details: values.emd.details || {},
+            if (values.EMD?.mode) {
+                payload.EMD = {
+                    mode: values.EMD.mode,
+                    details: values.EMD.details || {},
                 };
             }
 
-            if (!payload.emd) {
+            if (!payload.EMD) {
                 toast.error('Please select at least one payment mode');
                 return;
             }
@@ -144,7 +144,13 @@ export function BiOtherThanEmdRequestForm({ tenderId, requestIds, initialData, m
                     </Alert>
                 )}
                 <FormProvider {...form}>
-                    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
+                    <form
+                        onSubmit={form.handleSubmit(handleSubmit, (errors) => {
+                            console.error('Form validation errors:', errors);
+                            toast.error('Please fix the errors in the form before submitting');
+                        })}
+                        className="space-y-8"
+                    >
                         {/* Tender Details */}
                         {
                             (type === 'OTHER_THAN_TENDER') && (
