@@ -7,6 +7,7 @@ import type {
     SubmitBidDto,
     MarkAsMissedDto,
     UpdateBidSubmissionDto,
+    MarkAsMissedGlobalDto,
 } from '@/modules/tendering/bid-submissions/helpers/bidSubmission.types';
 import type { PaginatedResult } from '@/types/api.types';
 
@@ -61,6 +62,14 @@ class BidSubmissionsService extends BaseApiService {
 
     async markAsMissed(data: MarkAsMissedDto): Promise<BidSubmission> {
         return this.post<BidSubmission>('/missed', data);
+    }
+
+    async markAsMissedGlobal(data: MarkAsMissedGlobalDto): Promise<BidSubmission> {
+        return this.post<BidSubmission>('/missed-global', data);
+    }
+
+    async getValidMissedStatuses(stage: string): Promise<any> {
+        return this.get<any>(`/missed-global-statuses/${stage}`);
     }
 
     async update(id: number, data: UpdateBidSubmissionDto): Promise<BidSubmission> {
