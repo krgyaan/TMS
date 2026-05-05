@@ -413,19 +413,19 @@ export const PaymentRequestSchema = z.object({
     tenderDueDate: z.string().optional(),
     requestedBy: z.string().optional(),
     // EMD
-    emd: z.object({
+    EMD: z.object({
         mode: z.enum(['DD', 'FDR', 'BG', 'CHEQUE', 'BANK_TRANSFER', 'PORTAL', 'SURETY_BOND', 'NA']).optional(),
         details: PaymentDetailsSchema.optional(),
     }).optional(),
 
     // Tender Fee
-    tenderFee: z.object({
+    TENDER_FEES: z.object({
         mode: z.enum(['PORTAL', 'BANK_TRANSFER', 'DD', 'NA']).optional(),
         details: PaymentDetailsSchema.optional(),
     }).optional(),
 
     // Processing Fee
-    processingFee: z.object({
+    PROCESSING_FEES: z.object({
         mode: z.enum(['PORTAL', 'BANK_TRANSFER', 'DD', 'NA']).optional(),
         details: PaymentDetailsSchema.optional(),
     }).optional(),

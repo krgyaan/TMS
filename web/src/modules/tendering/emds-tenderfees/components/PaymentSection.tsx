@@ -45,25 +45,25 @@ export function PaymentSection({
     }, [type, allowedModes]);
 
     useEffect(() => {
-        if (selectedMode) {
-            if (selectedMode === 'BG') {
-                setValue(`${purpose}.details.bgPurpose`, defaultPurpose);
-                setValue(`${purpose}.details.bgAmount`, amount);
-            } else if (selectedMode === 'DD') {
-                setValue(`${purpose}.details.ddPurpose`, defaultPurpose);
-                setValue(`${purpose}.details.ddAmount`, amount);
-            } else if (selectedMode === 'FDR') {
-                setValue(`${purpose}.details.fdrPurpose`, defaultPurpose);
-                setValue(`${purpose}.details.fdrAmount`, amount);
-            } else if (selectedMode === 'BANK_TRANSFER') {
-                setValue(`${purpose}.details.btPurpose`, defaultPurpose);
-                setValue(`${purpose}.details.btAmount`, amount);
-            } else if (selectedMode === 'PORTAL') {
-                setValue(`${purpose}.details.portalPurpose`, defaultPurpose);
-                setValue(`${purpose}.details.portalAmount`, amount);
-            } else if (selectedMode === 'CHEQUE') {
-                setValue(`${purpose}.details.chequePurpose`, defaultPurpose);
-            }
+        if (!selectedMode) return;
+
+        const setAmountAndPurpose = (amountField: string, purposeField: string) => {
+            setValue(amountField, amount, { shouldValidate: false });
+            setValue(purposeField, defaultPurpose, { shouldValidate: false });
+        };
+
+        if (selectedMode === 'BG') {
+            setAmountAndPurpose(`${purpose}.details.bgAmount`, `${purpose}.details.bgPurpose`);
+        } else if (selectedMode === 'DD') {
+            setAmountAndPurpose(`${purpose}.details.ddAmount`, `${purpose}.details.ddPurpose`);
+        } else if (selectedMode === 'FDR') {
+            setAmountAndPurpose(`${purpose}.details.fdrAmount`, `${purpose}.details.fdrPurpose`);
+        } else if (selectedMode === 'BANK_TRANSFER') {
+            setAmountAndPurpose(`${purpose}.details.btAmount`, `${purpose}.details.btPurpose`);
+        } else if (selectedMode === 'PORTAL') {
+            setAmountAndPurpose(`${purpose}.details.portalAmount`, `${purpose}.details.portalPurpose`);
+        } else if (selectedMode === 'CHEQUE') {
+            setAmountAndPurpose(`${purpose}.details.chequeAmount`, `${purpose}.details.chequePurpose`);
         }
     }, [selectedMode, setValue, defaultPurpose, purpose, amount]);
 

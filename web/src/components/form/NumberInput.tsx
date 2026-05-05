@@ -7,27 +7,24 @@ type NumberInputProps = Omit<React.ComponentProps<"input">, "value" | "onChange"
 }
 
 export function NumberInput({ value, onChange, ...rest }: NumberInputProps) {
-    const toString = (v: number | null | undefined) => (typeof v === "number" ? String(v) : "")
-    const [inner, setInner] = React.useState<string>(toString(value))
-
-    React.useEffect(() => {
-        setInner(toString(value))
-    }, [value])
+    const toString = (v: number | null | undefined) => {
+        if (v === null || v === undefined) return ""
+        return String(v)
+    }
 
     return (
         <Input
             type="number"
             inputMode="decimal"
-            value={inner}
+            value={toString(value)}
             onChange={(e) => {
                 const v = e.target.value
-                setInner(v)
                 if (v === "" || v === "-") {
-                    onChange(null as any) // Pass null instead of 0
+                    onChange(null as any)
                     return
                 }
                 const n = Number(v)
-                onChange(Number.isNaN(n) ? (null as any) : n) // Pass null instead of 0 for NaN
+                onChange(Number.isNaN(n) ? (null as any) : n)
             }}
             {...rest}
         />

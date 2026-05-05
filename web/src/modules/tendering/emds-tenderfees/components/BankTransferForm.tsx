@@ -25,8 +25,8 @@ export function BankTransferForm({ amount, prefix = 'emd.details' }: PaymentForm
             <FieldWrapper control={control} name={`${prefix}.btAmount`} label="Amount *">
                 {(field) => (
                     <NumberInput
-                        {...field}
-                        value={field.value ?? amount}
+                        value={amount}
+                        placeholder={String(amount)}
                         onChange={field.onChange}
                     />
                 )}

@@ -48,9 +48,9 @@ export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mod
     const form = useForm<FormValues>({
         resolver: zodResolver(PaymentRequestSchema) as Resolver<FormValues>,
         defaultValues: initialData || {
-            emd: { mode: undefined, details: {} },
-            tenderFee: { mode: undefined, details: {} },
-            processingFee: { mode: undefined, details: {} },
+            EMD: { mode: undefined, details: {} },
+            TENDER_FEES: { mode: undefined, details: {} },
+            PROCESSING_FEES: { mode: undefined, details: {} },
         },
     });
 
@@ -61,14 +61,17 @@ export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mod
     }, [initialData, form]);
 
     const handleSubmit = async (values: FormValues) => {
+        console.log("Initial Form Values", initialData);
+        console.log("Updated Form Values", values);
+
         if (isEditMode) {
             const updatePromises: Promise<any>[] = [];
 
-            if (values.emd?.mode && requestIds?.emd) {
+            if (values.EMD?.mode && requestIds?.emd) {
                 const payload = {
-                    emd: {
-                        mode: transformModeForBackend(values.emd.mode),
-                        details: values.emd.details || {},
+                    EMD: {
+                        mode: transformModeForBackend(values.EMD.mode),
+                        details: values.EMD.details || {},
                     },
                 };
                 updatePromises.push(
@@ -79,11 +82,11 @@ export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mod
                 );
             }
 
-            if (values.tenderFee?.mode && requestIds?.tenderFee) {
+            if (values.TENDER_FEES?.mode && requestIds?.tenderFee) {
                 const payload = {
-                    tenderFee: {
-                        mode: transformModeForBackend(values.tenderFee.mode),
-                        details: values.tenderFee.details || {},
+                    TENDER_FEES: {
+                        mode: transformModeForBackend(values.TENDER_FEES.mode),
+                        details: values.TENDER_FEES.details || {},
                     },
                 };
                 updatePromises.push(
@@ -94,11 +97,11 @@ export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mod
                 );
             }
 
-            if (values.processingFee?.mode && requestIds?.processingFee) {
+            if (values.PROCESSING_FEES?.mode && requestIds?.processingFee) {
                 const payload = {
-                    processingFee: {
-                        mode: transformModeForBackend(values.processingFee.mode),
-                        details: values.processingFee.details || {},
+                    PROCESSING_FEES: {
+                        mode: transformModeForBackend(values.PROCESSING_FEES.mode),
+                        details: values.PROCESSING_FEES.details || {},
                     },
                 };
                 updatePromises.push(
@@ -125,28 +128,28 @@ export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mod
         } else {
             const payload: any = {};
 
-            if (values.emd?.mode) {
-                payload.emd = {
-                    mode: transformModeForBackend(values.emd.mode),
-                    details: values.emd.details || {},
+            if (values.EMD?.mode) {
+                payload.EMD = {
+                    mode: transformModeForBackend(values.EMD.mode),
+                    details: values.EMD.details || {},
                 };
             }
 
-            if (values.tenderFee?.mode) {
-                payload.tenderFee = {
-                    mode: transformModeForBackend(values.tenderFee.mode),
-                    details: values.tenderFee.details || {},
+            if (values.TENDER_FEES?.mode) {
+                payload.TENDER_FEES = {
+                    mode: transformModeForBackend(values.TENDER_FEES.mode),
+                    details: values.TENDER_FEES.details || {},
                 };
             }
 
-            if (values.processingFee?.mode) {
-                payload.processingFee = {
-                    mode: transformModeForBackend(values.processingFee.mode),
-                    details: values.processingFee.details || {},
+            if (values.PROCESSING_FEES?.mode) {
+                payload.PROCESSING_FEES = {
+                    mode: transformModeForBackend(values.PROCESSING_FEES.mode),
+                    details: values.PROCESSING_FEES.details || {},
                 };
             }
 
-            if (!payload.emd && !payload.tenderFee && !payload.processingFee) {
+            if (!payload.EMD && !payload.TENDER_FEES && !payload.PROCESSING_FEES) {
                 toast.error('Please select at least one payment mode');
                 return;
             }

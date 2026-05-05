@@ -31,7 +31,6 @@ export function BankGuaranteeForm({ amount, prefix = 'emd.details' }: PaymentFor
                 <FieldWrapper control={control} name={`${prefix}.bgAmount`} label="Amount *">
                     {(field) => (
                         <NumberInput
-                            {...field}
                             value={field.value ?? amount}
                             onChange={field.onChange}
                         />
