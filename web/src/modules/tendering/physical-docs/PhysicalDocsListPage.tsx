@@ -5,7 +5,7 @@ import type { ColDef } from 'ag-grid-community';
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import type { PhysicalDocsDashboardRowWithTimer } from './helpers/physicalDocs.types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -19,10 +19,12 @@ import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { QuickFilter } from '@/components/ui/quick-filter';
 import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
-import { useAuth } from '@/contexts/AuthContext';
+import { useTenderingPermissions } from '../hooks/useTenderingPermissions';
 
 const PhysicalDocsListPage = () => {
-    const [activeTab, setActiveTab] = useState<'pending' | 'sent' | 'tender-dnb'>('pending');
+    const [searchParams] = useSearchParams();
+    const initialTab = (searchParams.get('tab') as 'pending' | 'sent' | 'tender-dnb') || 'pending';
+    const [activeTab, setActiveTab] = useState<'pending' | 'sent' | 'tender-dnb'>(initialTab);
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
@@ -32,12 +34,7 @@ const PhysicalDocsListPage = () => {
         tenderId: null
     });
     const navigate = useNavigate();
-
-    const { isSuperUser, isAdmin, isTeamLeader, teamId } = useAuth();
-
-    const isTenderLead = isTeamLeader && (teamId == 1 || teamId == 2); 
-    
-    const hasPermission = isTenderLead || isAdmin || isSuperUser;
+    const { hasTenderingPermission } = useTenderingPermissions();
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
@@ -72,14 +69,6 @@ const PhysicalDocsListPage = () => {
 
     const physicalDocsActions: ActionItem<PhysicalDocsDashboardRowWithTimer>[] = [
         {
-            label: 'Mark as Missed',
-            onClick: (row) => {
-                navigate(paths.tendering.bidMissedGlobal(row.tenderId, 'phy-doc'));
-            },
-            icon: <XCircle className="h-4 w-4" />,
-            visible: () => hasPermission && activeTab !== 'tender-dnb',
-        },
-        {
             label: 'Send',
             onClick: (row: PhysicalDocsDashboardRowWithTimer) => row.physicalDocs ? navigate(paths.tendering.physicalDocsEdit(row.tenderId)) : navigate(paths.tendering.physicalDocsCreate(row.tenderId)),
             icon: <CheckCircle className="h-4 w-4" />,
@@ -91,7 +80,15 @@ const PhysicalDocsListPage = () => {
                 navigate(paths.tendering.physicalDocsView(row.tenderId));
             },
             icon: <Eye className="h-4 w-4" />,
-        }
+        },
+        {
+            label: 'Mark as Missed',
+            onClick: (row) => {
+                navigate(paths.tendering.bidMissedGlobal(row.tenderId, 'phy-doc'));
+            },
+            icon: <XCircle className="h-4 w-4" />,
+            visible: () => hasTenderingPermission && activeTab !== 'tender-dnb',
+        },
     ];
 
     const tabsConfig = useMemo(() => {

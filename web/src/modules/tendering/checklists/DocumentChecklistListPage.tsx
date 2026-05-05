@@ -5,7 +5,7 @@ import type { ColDef } from 'ag-grid-community';
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -22,7 +22,9 @@ import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
 import { useTenderingPermissions } from '../hooks/useTenderingPermissions';
 
 const Checklists = () => {
-    const [activeTab, setActiveTab] = useState<'pending' | 'submitted' | 'tender-dnb'>('pending');
+    const [searchParams] = useSearchParams();
+    const initialTab = (searchParams.get('tab') as 'pending' | 'submitted' | 'tender-dnb') || 'pending';
+    const [activeTab, setActiveTab] = useState<'pending' | 'submitted' | 'tender-dnb'>(initialTab);
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
