@@ -531,98 +531,115 @@ export class PhysicalDocsService {
 
     async create(data: CreatePhysicalDocDto, changedBy: number): Promise<PhysicalDocWithPersons> {
         // Validate tender exists and is approved
-        await this.tenderInfosService.validateApproved(data.tenderId);
+        let result : PhysicalDocWithPersons;
+        try{
+            result = await this.db.transaction(async (tx) => {
+                await this.tenderInfosService.validateApproved(data.tenderId);
 
-        // Get current tender status before update
-        const currentTender = await this.tenderInfosService.findById(data.tenderId);
-        const prevStatus = currentTender?.status ?? null;
+                // Get current tender status before update
+                const currentTender = await this.tenderInfosService.findById(data.tenderId);
+                const prevStatus = currentTender?.status ?? null;
 
-        // AUTO STATUS CHANGE: Update tender status to 30 (Physical Docs Submitted) and track it
-        const newStatus = 30; // Status ID for "Physical Docs Submitted"
+                // AUTO STATUS CHANGE: Update tender status to 30 (Physical Docs Submitted) and track it
+                const newStatus = 30; // Status ID for "Physical Docs Submitted"
 
-        return await this.db.transaction(async (tx) => {
-            // Insert physical doc
-            const [physicalDoc] = await tx
-                .insert(physicalDocs)
-                .values({
-                    tenderId: data.tenderId,
-                    courierNo: data.courierNo,
-                    submittedDocs: data.submittedDocs || null,
-                })
-                .returning();
-
-            // Insert persons if provided
-            let persons: PhysicalDocPerson[] = [];
-            if (data.physicalDocsPersons && data.physicalDocsPersons.length > 0) {
-                const personsToInsert = data.physicalDocsPersons.map((person) => ({
-                    physicalDocId: physicalDoc.id,
-                    name: person.name,
-                    email: person.email,
-                    phone: person.phone,
-                }));
-
-                const insertedPersons = await tx
-                    .insert(physicalDocsPersons)
-                    .values(personsToInsert)
+                // Insert physical doc
+                const [physicalDoc] = await tx
+                    .insert(physicalDocs)
+                    .values({
+                        tenderId: data.tenderId,
+                        courierNo: data.courierNo,
+                        submittedDocs: data.submittedDocs || null,
+                    })
                     .returning();
 
-                persons = insertedPersons.map((p) => ({
-                    id: p.id,
-                    name: p.name,
-                    email: p.email,
-                    phone: p.phone,
-                }));
-            }
+                // Insert persons if provided
+                let persons: PhysicalDocPerson[] = [];
+                if (data.physicalDocsPersons && data.physicalDocsPersons.length > 0) {
+                    const personsToInsert = data.physicalDocsPersons.map((person) => ({
+                        physicalDocId: physicalDoc.id,
+                        name: person.name,
+                        email: person.email,
+                        phone: person.phone,
+                    }));
 
-            // Update tender status
-            await tx
-                .update(tenderInfos)
-                .set({ status: newStatus, updatedAt: new Date() })
-                .where(eq(tenderInfos.id, data.tenderId));
+                    const insertedPersons = await tx
+                        .insert(physicalDocsPersons)
+                        .values(personsToInsert)
+                        .returning();
 
-            // Track status change
-            await this.tenderStatusHistoryService.trackStatusChange(
-                data.tenderId,
-                newStatus,
-                changedBy,
-                prevStatus,
-                'Physical docs submitted',
-                tx
-            );
+                    persons = insertedPersons.map((p) => ({
+                        id: p.id,
+                        name: p.name,
+                        email: p.email,
+                        phone: p.phone,
+                    }));
+                }
 
-            const submittedDocsList = await this.getSubmittedDocsDetails(physicalDoc.submittedDocs, tx);
+                // Update tender status
+                await tx
+                    .update(tenderInfos)
+                    .set({ status: newStatus, updatedAt: new Date() })
+                    .where(eq(tenderInfos.id, data.tenderId));
 
-            return {
-                id: physicalDoc.id,
-                tenderId: physicalDoc.tenderId,
-                courierNo: physicalDoc.courierNo,
-                submittedDocs: submittedDocsList,
-                createdAt: physicalDoc.createdAt || '',
-                updatedAt: physicalDoc.updatedAt || '',
-                persons,
-            };
-        }).then(async (result) => {
+                // Track status change
+                await this.tenderStatusHistoryService.trackStatusChange(
+                    data.tenderId,
+                    newStatus,
+                    changedBy,
+                    prevStatus,
+                    'Physical docs submitted',
+                    tx
+                );
+
+                const submittedDocsList = await this.getSubmittedDocsDetails(physicalDoc.submittedDocs, tx);
+
+                return {
+                    id: physicalDoc.id,
+                    tenderId: physicalDoc.tenderId,
+                    courierNo: physicalDoc.courierNo,
+                    submittedDocs: submittedDocsList,
+                    createdAt: physicalDoc.createdAt || '',
+                    updatedAt: physicalDoc.updatedAt || '',
+                    persons,
+                };
+            });
+        }catch(err){
+            this.logger.error("Error Occured while creating physical docs. TRANSACTION FAILED" , err);
+            throw err;
+        }
+    
+        //SENDING MAIL
+        try{
+            this.logger.debug("Starting the mail")
+
             // Send email notification after transaction
-            // await this.sendPhysicalDocsSentEmail(data.tenderId, result, changedBy);
+            await this.sendPhysicalDocsSentEmail(data.tenderId, result, changedBy);
 
-            // TIMER TRANSITION: Stop physical_docs timer
-            try {
-                this.logger.log(`Stopping timer for tender ${data.tenderId} after physical docs submitted`);
-                await this.timersService.stopTimer({
-                    entityType: 'TENDER',
-                    entityId: data.tenderId,
-                    stage: 'physical_docs',
-                    userId: changedBy,
-                    reason: 'Physical docs submitted'
-                });
-                this.logger.log(`Successfully stopped physical_docs timer for tender ${data.tenderId}`);
-            } catch (error) {
-                this.logger.error(`Failed to stop timer for tender ${data.tenderId} after physical docs submitted:`, error);
-                // Don't fail the entire operation if timer transition fails
-            }
+            this.logger.debug("mail completed successfully");
+        } catch(err){
+            this.logger.error("Mail sending failed", err);
+        }
 
-            return result;
-        });
+        //STOPPING TIMER
+        try{
+             // TIMER TRANSITION: Stop physical_docs timer
+            this.logger.log(`Stopping timer for tender ${data.tenderId} after physical docs submitted`);
+
+            await this.timersService.stopTimer({
+                entityType: 'TENDER',
+                entityId: data.tenderId,
+                stage: 'physical_docs',
+                userId: changedBy,
+                reason: 'Physical docs submitted'
+            });
+
+            this.logger.log(`Successfully stopped physical_docs timer for tender ${data.tenderId}`);
+
+        } catch(err){
+            this.logger.error("Error in stopping timer" , err);
+        }
+        return result;
     }
 
     async update(
