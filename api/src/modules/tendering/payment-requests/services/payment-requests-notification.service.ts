@@ -1,12 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Inject, forwardRef } from '@nestjs/common';
+import { Inject } from '@nestjs/common';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
-import { eq, sql, and } from 'drizzle-orm';
-import { paymentInstruments, paymentRequests, tenderInfos } from '@db/schemas/tendering/payment-requests.schema';
+import { eq } from 'drizzle-orm';
+import { paymentInstruments } from '@db/schemas/tendering/payment-requests.schema';
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import { PdfGeneratorService } from '@/modules/pdf/pdf-generator.service';
+import { tenderInfos } from '@/db/schemas';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 
 @Injectable()
@@ -30,7 +31,6 @@ export class PaymentRequestsNotificationService {
         tenderId: number,
         userId: number
     ) {
-        // Find related instruments
         const [ddInstrument] = await this.db
             .select()
             .from(paymentInstruments)
@@ -42,7 +42,6 @@ export class PaymentRequestsNotificationService {
             return { success: false, message: 'DD instrument not found' };
         }
 
-        // Get tender details
         const [tender] = await this.db
             .select()
             .from(tenderInfos)
@@ -56,34 +55,45 @@ export class PaymentRequestsNotificationService {
 
         // Generate PDF for DD
         try {
-            await this.generatePdfsForInstrument(ddInstrumentId);
+            const pdfPaths = await this.pdfGenerator.generatePdfs(
+                'dd-request',
+                {
+                    tenderNo: tender.tenderNo,
+                    tenderName: tender.tenderName,
+                    amount: ddInstrument.amount,
+                    favouring: ddInstrument.favouring,
+                    payableAt: ddInstrument.payableAt,
+                },
+                ddInstrumentId,
+                'DD'
+            );
+            this.logger.log(`Generated PDFs for DD: ${pdfPaths.join(', ')}`);
         } catch (error) {
             this.logger.error(`Failed to generate PDF for DD ${ddInstrumentId}`, error);
         }
 
-        // Send email to accounts team
+        // Send email to accounts team using sendTenderEmail
         const teamId = tender.team;
-        const recipients = await this.getCcRecipientsByTeam(teamId);
-        
-        if (recipients.length > 0) {
-            try {
-                await this.emailService.sendEmail({
-                    to: recipients,
-                    subject: `DD Request - ${tender.tenderNo} - ${tender.tenderName}`,
-                    body: `
-                        <h2>DD Request Generated</h2>
-                        <p><strong>Tender No:</strong> ${tender.tenderNo}</p>
-                        <p><strong>Tender Name:</strong> ${tender.tenderName}</p>
-                        <p><strong>DD Amount:</strong> ${ddInstrument.amount}</p>
-                        <p><strong>Favouring:</strong> ${ddInstrument.favouring}</p>
-                        <p>Please process the DD request.</p>
-                    `,
-                    priority: 'normal',
-                });
-            } catch (error) {
-                this.logger.error(`Failed to send DD email for tender ${tenderId}`, error);
-                return { success: false, message: 'Email failed' };
-            }
+        try {
+            await this.emailService.sendTenderEmail({
+                tenderId: tenderId,
+                eventType: 'DD_REQUEST',
+                fromUserId: userId,
+                to: [{ type: 'role', role: 'accounts', teamId }],
+                subject: `DD Request - ${tender.tenderNo} - ${tender.tenderName}`,
+                template: 'dd-request',
+                data: {
+                    tenderNo: tender.tenderNo,
+                    tenderName: tender.tenderName,
+                    amount: ddInstrument.amount,
+                    favouring: ddInstrument.favouring,
+                    payableAt: ddInstrument.payableAt,
+                },
+            });
+            this.logger.log(`DD email sent successfully for tender ${tenderId}`);
+        } catch (error) {
+            this.logger.error(`Failed to send DD email for tender ${tenderId}`, error);
+            return { success: false, message: 'Email failed' };
         }
 
         return { success: true, message: 'DD mail triggered successfully' };
@@ -103,48 +113,61 @@ export class PaymentRequestsNotificationService {
             throw new Error(`Instrument ${instrumentId} not found`);
         }
 
+        const instrumentTypeMap: Record<string, string> = {
+            'DD': 'DD',
+            'FDR': 'FDR',
+            'BG': 'BG',
+            'Cheque': 'CHEQUE',
+            'Bank Transfer': 'BANK_TRANSFER',
+            'Portal Payment': 'PORTAL',
+        };
+
+        const instrumentType = instrumentTypeMap[instrument.instrumentType] || instrument.instrumentType;
+
         try {
-            await this.pdfGenerator.generatePaymentInstrumentPdf(instrument);
+            const pdfPaths = await this.pdfGenerator.generatePdfs(
+                `${instrumentType.toLowerCase()}-request`,
+                {
+                    amount: instrument.amount,
+                    favouring: instrument.favouring,
+                    payableAt: instrument.payableAt,
+                },
+                instrumentId,
+                instrumentType
+            );
+            this.logger.log(`Generated PDFs for instrument ${instrumentId}: ${pdfPaths.join(', ')}`);
+            return { success: true, instrumentId, pdfPaths };
         } catch (error) {
             this.logger.error(`Failed to generate PDF for instrument ${instrumentId}`, error);
             throw error;
         }
-
-        return { success: true, instrumentId };
     }
 
     /**
      * Get accounts team ID
      */
     private async getAccountsTeamId(): Promise<number | null> {
-        // Query to get accounts team ID from system config or hardcoded value
-        // This is a placeholder - implement based on your system
-        return 1; // Default accounts team
+        return 1;
     }
 
     /**
-     * Get user details for email
+     * Get user emails for notification
      */
-    private async getUserDetailsForEmail(userId: number): Promise<RecipientSource[]> {
-        const recipients = await this.recipientResolver.resolveRecipients({
-            type: 'user',
-            userId,
-        });
-        return recipients;
+    private async getUserEmailsForNotification(userId: number): Promise<string[]> {
+        return this.recipientResolver.getEmailByUserId(userId);
     }
 
     /**
-     * Get CC recipients by team
+     * Get accounts team emails by team
      */
-    private async getCcRecipientsByTeam(teamId: number | null): Promise<RecipientSource[]> {
-        if (!teamId) return [];
-        
-        const recipients = await this.recipientResolver.resolveRecipients({
-            type: 'team',
-            teamId,
-            roles: ['accounts'],
-        });
-        
-        return recipients;
+    private async getAccountsTeamEmails(teamId: number): Promise<string[]> {
+        return this.recipientResolver.getEmailsByRole('accounts', teamId);
+    }
+
+    /**
+     * Get recipients by role for a team
+     */
+    private getRecipientsByRole(teamId: number, role: string): RecipientSource[] {
+        return [{ type: 'role', role, teamId }];
     }
 }
