@@ -2,13 +2,16 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
-import { eq, and, sql, desc, asc } from 'drizzle-orm';
-import { paymentRequests,  paymentInstruments } from '@db/schemas/tendering/payment-requests.schema';
+import { eq, and, or, inArray, gt, sql, desc, asc } from 'drizzle-orm';
+import { paymentRequests, paymentInstruments } from '@db/schemas/tendering/payment-requests.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
+import { tenderInformation } from '@/db/schemas/tendering/tender-info-sheet.schema';
 import { users } from '@db/schemas/auth/users.schema';
+import { statuses } from '@/db/schemas/master/statuses.schema';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
+import { StatusCache } from '@/utils/status-cache';
 import type { 
     DashboardTab, 
     DashboardCounts, 
@@ -24,7 +27,6 @@ import {
     getTabSqlCondition,
     deriveDisplayStatus,
 } from './payment-requests.shared';
-import { tenderInformation } from '@/db/schemas';
 
 @Injectable()
 export class PaymentRequestsQueryService {
@@ -79,14 +81,26 @@ export class PaymentRequestsQueryService {
         const roleFilterConditions = buildTenderRoleFilters(user, teamId);
 
         const [result] = await this.db
-            .select({ count: sql<number>`count(*)` })
+            .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
             .from(tenderInfos)
             .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
             .where(and(
-                ...roleFilterConditions,
-                eq(tenderInfos.tlStatus, 1),
-                sql`${tenderInfos.emd}::numeric > 0 OR ${tenderInfos.tenderFees}::numeric > 0`
+                TenderInfosService.getActiveCondition(),
+                TenderInfosService.getApprovedCondition(),
+                TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+                or(
+                    inArray(tenderInformation.emdRequired, ['Yes', 'YES']),
+                    inArray(tenderInformation.tenderFeeRequired, ['Yes', 'YES']),
+                    inArray(tenderInformation.processingFeeRequired, ['Yes', 'YES'])
+                ),
+                or(
+                    gt(tenderInfos.emd, sql`0`),
+                    gt(tenderInfos.tenderFees, sql`0`),
+                    gt(tenderInformation.processingFeeAmount, sql`0`)
+                ),
+                sql`${tenderInfos.id} NOT IN (SELECT tender_id FROM payment_requests)`,
+                ...roleFilterConditions
             ));
 
         return Number(result?.count || 0);
@@ -97,11 +111,10 @@ export class PaymentRequestsQueryService {
         teamId?: number
     ): Promise<{ sent: number; approved: number; rejected: number; returned: number; }> {
         const roleFilterConditions = buildRequestRoleFilters(user, teamId);
-        const tabCondition = getTabSqlCondition('sent');
 
         const [result] = await this.db
             .select({
-                sent: sql<number>`COALESCE(SUM(CASE WHEN ${tabCondition} THEN 1 ELSE 0 END), 0)`,
+                sent: sql<number>`COALESCE(SUM(CASE WHEN ${getTabSqlCondition('sent')} THEN 1 ELSE 0 END), 0)`,
                 approved: sql<number>`COALESCE(SUM(CASE WHEN ${getTabSqlCondition('approved')} THEN 1 ELSE 0 END), 0)`,
                 rejected: sql<number>`COALESCE(SUM(CASE WHEN ${getTabSqlCondition('rejected')} THEN 1 ELSE 0 END), 0)`,
                 returned: sql<number>`COALESCE(SUM(CASE WHEN ${getTabSqlCondition('returned')} THEN 1 ELSE 0 END), 0)`,
@@ -125,16 +138,24 @@ export class PaymentRequestsQueryService {
 
     private async countTenderDnb(user?: ValidatedUser, teamId?: number): Promise<number> {
         const roleFilterConditions = buildTenderRoleFilters(user, teamId);
+        const dnbStatusIds = StatusCache.getIds('dnb');
 
         const [result] = await this.db
-            .select({ count: sql<number>`count(*)` })
+            .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
             .from(tenderInfos)
             .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
             .where(and(
-                ...roleFilterConditions,
-                eq(tenderInfos.tlStatus, 1),
-                sql`${tenderInfos.emd}::numeric > 0`
+                TenderInfosService.getActiveCondition(),
+                TenderInfosService.getApprovedCondition(),
+                TenderInfosService.getExcludeStatusCondition(['lost']),
+                inArray(tenderInfos.status, dnbStatusIds),
+                or(
+                    inArray(tenderInformation.emdRequired, ['Yes', 'YES']),
+                    inArray(tenderInformation.tenderFeeRequired, ['Yes', 'YES']),
+                    inArray(tenderInformation.processingFeeRequired, ['Yes', 'YES'])
+                ),
+                ...roleFilterConditions
             ));
 
         return Number(result?.count || 0);
@@ -163,30 +184,71 @@ export class PaymentRequestsQueryService {
             const searchStr = `%${searchTerm}%`;
             searchConditions.push(
                 sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
-                sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`
+                sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
+                sql`${tenderInfos.gstValues}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.emd}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderFees}::text ILIKE ${searchStr}`,
+                sql`${tenderInformation.processingFeeAmount}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.dueDate}::text ILIKE ${searchStr}`,
+                sql`${users.name} ILIKE ${searchStr}`,
+                sql`${statuses.name} ILIKE ${searchStr}`
             );
         }
 
         const whereClause = and(
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(),
+            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
+            or(
+                inArray(tenderInformation.emdRequired, ['Yes', 'YES']),
+                inArray(tenderInformation.tenderFeeRequired, ['Yes', 'YES']),
+                inArray(tenderInformation.processingFeeRequired, ['Yes', 'YES'])
+            ),
+            or(
+                gt(tenderInfos.emd, sql`0`),
+                gt(tenderInfos.tenderFees, sql`0`),
+                gt(tenderInformation.processingFeeAmount, sql`0`)
+            ),
+            sql`${tenderInfos.id} NOT IN (SELECT tender_id FROM payment_requests)`,
             ...roleFilterConditions,
-            eq(tenderInfos.tlStatus, 1),
-            sql`${tenderInfos.emd}::numeric > 0 OR ${tenderInfos.tenderFees}::numeric > 0`,
             searchConditions.length > 0 ? sql`(${sql.join(searchConditions, sql` OR `)})` : undefined
         );
 
         const [countResult] = await this.db
-            .select({ count: sql<number>`count(*)` })
+            .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
             .from(tenderInfos)
             .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .where(whereClause);
 
         const totalCount = Number(countResult?.count || 0);
 
-        const direction = sort?.sortOrder === 'desc' ? desc : asc;
-        const orderBy = sort?.sortBy 
-            ? direction(tenderInfos.tenderNo)
-            : sql`${tenderInfos.dueDate} ASC NULLS LAST`;
+        let orderClause: any;
+        if (sort?.sortBy) {
+            const direction = sort.sortOrder === 'desc' ? desc : asc;
+            switch (sort.sortBy) {
+                case 'tenderNo':
+                    orderClause = direction(tenderInfos.tenderNo);
+                    break;
+                case 'tenderName':
+                    orderClause = direction(tenderInfos.tenderName);
+                    break;
+                case 'dueDate':
+                    orderClause = direction(tenderInfos.dueDate);
+                    break;
+                case 'teamMember':
+                    orderClause = direction(users.name);
+                    break;
+                case 'emdRequired':
+                    orderClause = direction(tenderInfos.emd);
+                    break;
+                default:
+                    orderClause = getDefaultSortByTab('pending');
+            }
+        } else {
+            orderClause = getDefaultSortByTab('pending');
+        }
 
         const rows = await this.db
             .select({
@@ -195,7 +257,7 @@ export class PaymentRequestsQueryService {
                 tenderName: tenderInfos.tenderName,
                 gstValues: tenderInfos.gstValues,
                 status: tenderInfos.status,
-                statusName: sql`${tenderInfos.status}::text`,
+                statusName: statuses.name,
                 dueDate: tenderInfos.dueDate,
                 teamMemberId: tenderInfos.teamMember,
                 teamMember: users.name,
@@ -203,12 +265,15 @@ export class PaymentRequestsQueryService {
                 emdMode: tenderInfos.emdMode,
                 tenderFee: tenderInfos.tenderFees,
                 tenderFeeMode: tenderInfos.tenderFeeMode,
+                processingFee: tenderInformation.processingFeeAmount,
+                processingFeeMode: tenderInformation.processingFeeMode,
             })
             .from(tenderInfos)
             .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .where(whereClause)
-            .orderBy(orderBy)
+            .orderBy(orderClause)
             .limit(limit)
             .offset(offset);
 
@@ -218,7 +283,7 @@ export class PaymentRequestsQueryService {
             tenderName: row.tenderName?.toString() || '',
             gstValues: row.gstValues,
             status: row.status || 0,
-            statusName: null,
+            statusName: row.statusName?.toString() || null,
             dueDate: row.dueDate,
             teamMemberId: row.teamMemberId,
             teamMember: row.teamMember?.toString() || null,
@@ -226,8 +291,8 @@ export class PaymentRequestsQueryService {
             emdMode: row.emdMode?.toString() || null,
             tenderFee: row.tenderFee?.toString() || null,
             tenderFeeMode: row.tenderFeeMode?.toString() || null,
-            processingFee: null,
-            processingFeeMode: null,
+            processingFee: row.processingFee?.toString() || null,
+            processingFeeMode: row.processingFeeMode?.toString() || null,
         }));
 
         const wrapped = wrapPaginatedResponse(data, totalCount, page, limit);
@@ -263,7 +328,15 @@ export class PaymentRequestsQueryService {
                 sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
                 sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
                 sql`${paymentRequests.tenderNo} ILIKE ${searchStr}`,
-                sql`${paymentRequests.projectName} ILIKE ${searchStr}`
+                sql`${paymentRequests.projectName} ILIKE ${searchStr}`,
+                sql`${paymentRequests.purpose}::text ILIKE ${searchStr}`,
+                sql`${paymentRequests.type}::text ILIKE ${searchStr}`,
+                sql`${paymentRequests.amountRequired}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.dueDate}::text ILIKE ${searchStr}`,
+                sql`${paymentRequests.dueDate}::text ILIKE ${searchStr}`,
+                sql`${users.name} ILIKE ${searchStr}`,
+                sql`${paymentInstruments.instrumentType}::text ILIKE ${searchStr}`,
+                sql`${paymentInstruments.status} ILIKE ${searchStr}`
             );
         }
 
@@ -279,6 +352,15 @@ export class PaymentRequestsQueryService {
                     break;
                 case 'dueDate':
                     orderClause = direction(tenderInfos.dueDate);
+                    break;
+                case 'amountRequired':
+                    orderClause = direction(paymentRequests.amountRequired);
+                    break;
+                case 'purpose':
+                    orderClause = direction(paymentRequests.purpose);
+                    break;
+                case 'teamMember':
+                    orderClause = direction(users.name);
                     break;
                 default:
                     orderClause = getDefaultSortByTab(tab);
@@ -392,26 +474,74 @@ export class PaymentRequestsQueryService {
         const page = pagination?.page || 1;
         const limit = pagination?.limit || 50;
         const offset = (page - 1) * limit;
+        const dnbStatusIds = StatusCache.getIds('dnb');
+
+        const searchTerm = search?.trim();
+        const searchConditions: any[] = [];
+        if (searchTerm) {
+            const searchStr = `%${searchTerm}%`;
+            searchConditions.push(
+                sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
+                sql`${tenderInfos.gstValues}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.emd}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderFees}::text ILIKE ${searchStr}`,
+                sql`${tenderInformation.processingFeeAmount}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.dueDate}::text ILIKE ${searchStr}`,
+                sql`${users.name} ILIKE ${searchStr}`,
+                sql`${statuses.name} ILIKE ${searchStr}`
+            );
+        }
 
         const whereClause = and(
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(),
+            TenderInfosService.getExcludeStatusCondition(['lost']),
+            inArray(tenderInfos.status, dnbStatusIds),
+            or(
+                inArray(tenderInformation.emdRequired, ['Yes', 'YES']),
+                inArray(tenderInformation.tenderFeeRequired, ['Yes', 'YES']),
+                inArray(tenderInformation.processingFeeRequired, ['Yes', 'YES'])
+            ),
             ...roleFilterConditions,
-            eq(tenderInfos.tlStatus, 1),
-            sql`${tenderInfos.emd}::numeric > 0`
+            searchConditions.length > 0 ? sql`(${sql.join(searchConditions, sql` OR `)})` : undefined
         );
 
         const [countResult] = await this.db
-            .select({ count: sql<number>`count(*)` })
+            .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
             .from(tenderInfos)
             .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .where(whereClause);
 
         const totalCount = Number(countResult?.count || 0);
 
-        const direction = sort?.sortOrder === 'desc' ? desc : asc;
-        const orderBy = sort?.sortBy 
-            ? direction(tenderInfos.tenderNo)
-            : sql`${tenderInfos.dueDate} ASC NULLS LAST`;
+        let orderClause: any;
+        if (sort?.sortBy) {
+            const direction = sort.sortOrder === 'desc' ? desc : asc;
+            switch (sort.sortBy) {
+                case 'tenderNo':
+                    orderClause = direction(tenderInfos.tenderNo);
+                    break;
+                case 'tenderName':
+                    orderClause = direction(tenderInfos.tenderName);
+                    break;
+                case 'dueDate':
+                    orderClause = direction(tenderInfos.dueDate);
+                    break;
+                case 'teamMember':
+                    orderClause = direction(users.name);
+                    break;
+                case 'emdRequired':
+                    orderClause = direction(tenderInfos.emd);
+                    break;
+                default:
+                    orderClause = getDefaultSortByTab('tender-dnb');
+            }
+        } else {
+            orderClause = getDefaultSortByTab('tender-dnb');
+        }
 
         const rows = await this.db
             .select({
@@ -420,7 +550,7 @@ export class PaymentRequestsQueryService {
                 tenderName: tenderInfos.tenderName,
                 gstValues: tenderInfos.gstValues,
                 status: tenderInfos.status,
-                statusName: sql`${tenderInfos.status}::text`,
+                statusName: statuses.name,
                 dueDate: tenderInfos.dueDate,
                 teamMemberId: tenderInfos.teamMember,
                 teamMember: users.name,
@@ -428,12 +558,15 @@ export class PaymentRequestsQueryService {
                 emdMode: tenderInfos.emdMode,
                 tenderFee: tenderInfos.tenderFees,
                 tenderFeeMode: tenderInfos.tenderFeeMode,
+                processingFee: tenderInformation.processingFeeAmount,
+                processingFeeMode: tenderInformation.processingFeeMode,
             })
             .from(tenderInfos)
             .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .where(whereClause)
-            .orderBy(orderBy)
+            .orderBy(orderClause)
             .limit(limit)
             .offset(offset);
 
@@ -443,7 +576,7 @@ export class PaymentRequestsQueryService {
             tenderName: row.tenderName?.toString() || '',
             gstValues: row.gstValues,
             status: row.status || 0,
-            statusName: null,
+            statusName: row.statusName?.toString() || null,
             dueDate: row.dueDate,
             teamMemberId: row.teamMemberId,
             teamMember: row.teamMember?.toString() || null,
@@ -451,8 +584,8 @@ export class PaymentRequestsQueryService {
             emdMode: row.emdMode?.toString() || null,
             tenderFee: row.tenderFee?.toString() || null,
             tenderFeeMode: row.tenderFeeMode?.toString() || null,
-            processingFee: null,
-            processingFeeMode: null,
+            processingFee: row.processingFee?.toString() || null,
+            processingFeeMode: row.processingFeeMode?.toString() || null,
         }));
 
         const wrapped = wrapPaginatedResponse(data, totalCount, page, limit);

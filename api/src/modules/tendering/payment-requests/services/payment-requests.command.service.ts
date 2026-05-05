@@ -27,6 +27,7 @@ export class PaymentRequestsCommandService {
         payload: CreatePaymentRequestDto,
         userId?: number
     ) {
+        this.logger.log(`Creating payment request for tender: ${JSON.stringify(payload)}`);
         const isNonTmsRequest = payload.type === 'Old Entries' || payload.type === 'Other Than Tender';
 
         let tender: any = null;
@@ -61,10 +62,13 @@ export class PaymentRequestsCommandService {
 
         await this.db.transaction(async (tx) => {
             // Create EMD request
-            if (payload.emd?.mode && payload.emd?.details) {
+            if (payload.EMD?.mode && payload.EMD?.details) {
                 const emdAmount = isNonTmsRequest
-                    ? extractAmountFromDetails(payload.emd.mode, payload.emd.details)
+                    ? extractAmountFromDetails(payload.EMD.mode, payload.EMD.details)
                     : Number(tender?.emd) || 0;
+                const emdRemarks = isNonTmsRequest
+                    ? `${payload.EMD.mode} Details`
+                    : `${payload.EMD.mode} Details`;
 
                 if (emdAmount > 0) {
                     const request = await this.createPaymentRequest(
@@ -77,15 +81,16 @@ export class PaymentRequestsCommandService {
                         payload.type,
                         payload.tenderNo,
                         payload.tenderName,
-                        payload.dueDate
+                        payload.dueDate,
+                        emdRemarks
                     );
                     createdRequests.push(request);
 
                     const instrument = await this.createInstrumentWithDetails(
                         tx,
                         request.id,
-                        payload.emd.mode,
-                        payload.emd.details,
+                        payload.EMD.mode,
+                        payload.EMD.details,
                         emdAmount,
                         userId
                     );
@@ -94,10 +99,13 @@ export class PaymentRequestsCommandService {
             }
 
             // Create Tender Fee request
-            if (payload.tenderFee?.mode && payload.tenderFee?.details) {
+            if (payload.TENDER_FEES?.mode && payload.TENDER_FEES?.details) {
                 const tfAmount = isNonTmsRequest
-                    ? extractAmountFromDetails(payload.tenderFee.mode, payload.tenderFee.details)
+                    ? extractAmountFromDetails(payload.TENDER_FEES.mode, payload.TENDER_FEES.details)
                     : Number(tender?.tenderFees) || 0;
+                const tfRemarks = isNonTmsRequest
+                    ? `${payload.TENDER_FEES.mode} Details`
+                    : `${payload.TENDER_FEES.mode} Details`;
 
                 if (tfAmount > 0) {
                     const request = await this.createPaymentRequest(
@@ -110,15 +118,16 @@ export class PaymentRequestsCommandService {
                         payload.type,
                         payload.tenderNo,
                         payload.tenderName,
-                        payload.dueDate
+                        payload.dueDate,
+                        tfRemarks
                     );
                     createdRequests.push(request);
 
                     const instrument = await this.createInstrumentWithDetails(
                         tx,
                         request.id,
-                        payload.tenderFee.mode,
-                        payload.tenderFee.details,
+                        payload.TENDER_FEES.mode,
+                        payload.TENDER_FEES.details,
                         tfAmount,
                         userId
                     );
@@ -127,10 +136,13 @@ export class PaymentRequestsCommandService {
             }
 
             // Create Processing Fee request
-            if (payload.processingFee?.mode && payload.processingFee?.details) {
+            if (payload.PROCESSING_FEES?.mode && payload.PROCESSING_FEES?.details) {
                 const pfAmount = isNonTmsRequest
-                    ? extractAmountFromDetails(payload.processingFee.mode, payload.processingFee.details)
+                    ? extractAmountFromDetails(payload.PROCESSING_FEES.mode, payload.PROCESSING_FEES.details)
                     : 0;
+                const pfRemarks = isNonTmsRequest
+                    ? `${payload.PROCESSING_FEES.mode} Details`
+                    : `${payload.PROCESSING_FEES.mode} Details`;
 
                 if (pfAmount > 0) {
                     const request = await this.createPaymentRequest(
@@ -143,15 +155,16 @@ export class PaymentRequestsCommandService {
                         payload.type,
                         payload.tenderNo,
                         payload.tenderName,
-                        payload.dueDate
+                        payload.dueDate,
+                        pfRemarks
                     );
                     createdRequests.push(request);
 
                     const instrument = await this.createInstrumentWithDetails(
                         tx,
                         request.id,
-                        payload.processingFee.mode,
-                        payload.processingFee.details,
+                        payload.PROCESSING_FEES.mode,
+                        payload.PROCESSING_FEES.details,
                         pfAmount,
                         userId
                     );
@@ -159,7 +172,7 @@ export class PaymentRequestsCommandService {
                 }
             }
         });
-
+        this.logger.log(`Payment request created successfully: ${JSON.stringify(results)}`);
         return results;
     }
 
@@ -168,6 +181,7 @@ export class PaymentRequestsCommandService {
     // ============================================================================
 
     async update(requestId: number, payload: UpdatePaymentRequestDto) {
+        this.logger.log(`Updating payment request: ${requestId}`);
         const [existing] = await this.db
             .select()
             .from(paymentRequests)
@@ -201,10 +215,12 @@ export class PaymentRequestsCommandService {
             }
         });
 
+        this.logger.log(`Payment request updated successfully: ${requestId}`);
         return this.findById(requestId);
     }
 
     async updateStatus(requestId: number, payload: UpdateStatusDto) {
+        this.logger.log(`Updating payment request status: ${requestId}`);
         const [existing] = await this.db
             .select()
             .from(paymentRequests)
@@ -223,6 +239,7 @@ export class PaymentRequestsCommandService {
             })
             .where(eq(paymentRequests.id, requestId));
 
+        this.logger.log(`Payment request status updated successfully: ${requestId}`);
         return this.findById(requestId);
     }
 
@@ -240,8 +257,10 @@ export class PaymentRequestsCommandService {
         type?: string,
         tenderNo?: string,
         tenderName?: string,
-        dueDate?: string
+        dueDate?: string,
+        remarks?: string
     ) {
+        this.logger.log(`Creating payment request: ${purpose} - Amount: ${amount}`);
         const effectiveDueDate = tender?.dueDate 
             ? new Date(tender.dueDate) 
             : dueDate 
@@ -260,11 +279,13 @@ export class PaymentRequestsCommandService {
                 purpose: purpose,
                 amountRequired: amount.toString(),
                 status: 'Pending',
+                remarks: remarks || 'Payment Request', 
             })
             .returning()
             .onConflictDoNothing()
             .execute();
 
+        this.logger.log(`Payment request created successfully: ${JSON.stringify(request)}`);
         return request;
     }
 
@@ -276,6 +297,7 @@ export class PaymentRequestsCommandService {
         amount: number,
         userId?: number
     ) {
+        this.logger.log(`Creating instrument with details: ${mode} - Amount: ${amount}`);
         const instrumentTypeMap: Record<string, string> = {
             'DD': 'DD',
             'FDR': 'FDR',
@@ -304,10 +326,12 @@ export class PaymentRequestsCommandService {
         // Create type-specific details
         await this.createInstrumentDetails(tx, instrument.id, mode, details);
 
+        this.logger.log(`Instrument created successfully: ${JSON.stringify(instrument)}`);
         return instrument;
     }
 
     private async createInstrumentDetails(tx: any, instrumentId: number, mode: string, details: any) {
+        this.logger.log(`Creating instrument details: ${mode} - Instrument ID: ${instrumentId}`);
         switch (mode) {
             case 'DD':
                 await tx.insert(instrumentDdDetails).values({
@@ -392,9 +416,11 @@ export class PaymentRequestsCommandService {
                 }).execute();
                 break;
         }
+        this.logger.log(`Instrument details created successfully: ${mode} - Instrument ID: ${instrumentId}`);
     }
 
     private async getDetailIdForInstrument(instrumentId: number, mode: string): Promise<number> {
+        this.logger.log(`Getting instrument details: ${mode} - Instrument ID: ${instrumentId}`);
         const tableMap: Record<string, any> = {
             DD: instrumentDdDetails,
             FDR: instrumentFdrDetails,
@@ -413,6 +439,7 @@ export class PaymentRequestsCommandService {
             .where(eq(table.instrumentId, instrumentId))
             .limit(1);
 
+        this.logger.log(`Instrument details fetched successfully: ${mode} - Instrument ID: ${instrumentId}`);
         return detail?.id || instrumentId;
     }
 
@@ -426,6 +453,7 @@ export class PaymentRequestsCommandService {
         mode: string,
         details: any
     ) {
+        this.logger.log(`Updating instrument with details: ${mode} - Instrument ID: ${instrumentId}`);
         // Update main instrument
         await tx
             .update(paymentInstruments)
@@ -436,6 +464,7 @@ export class PaymentRequestsCommandService {
             .where(eq(paymentInstruments.id, instrumentId));
 
         // Update type-specific details
+        this.logger.log(`Updating instrument details: ${mode} - Instrument ID: ${instrumentId}`);
         await this.updateDetailTable(tx, instrumentId, mode, details);
     }
 
@@ -445,6 +474,7 @@ export class PaymentRequestsCommandService {
         mode: string,
         details: any
     ) {
+        this.logger.log(`Updating instrument details: ${mode} - Instrument ID: ${instrumentId}`);
         const detailsMap: Record<string, any> = {
             DD: { updateFn: 'update', table: instrumentDdDetails, fields: { ddFavour: details.ddFavouring } },
             FDR: { updateFn: 'update', table: instrumentFdrDetails, fields: { fdrFavour: details.fdrFavouring } },
@@ -467,9 +497,11 @@ export class PaymentRequestsCommandService {
         if (existing) {
             await tx.update(table).set(fields).where(eq(table.instrumentId, instrumentId));
         }
+        this.logger.log(`Instrument details updated successfully: ${mode} - Instrument ID: ${instrumentId}`);
     }
 
     private async getInstrumentDetails(instrumentId: number) {
+        this.logger.log(`Getting instrument details: ${instrumentId}`);
         const [instrument] = await this.db
             .select()
             .from(paymentInstruments)
@@ -485,6 +517,7 @@ export class PaymentRequestsCommandService {
     }
 
     private async getInstrumentSpecificDetails(instrumentId: number, instrumentType: string) {
+        this.logger.log(`Getting instrument specific details: ${instrumentId} - ${instrumentType}`);
         const tableMap: Record<string, any> = {
             DD: instrumentDdDetails,
             FDR: instrumentFdrDetails,
@@ -507,6 +540,7 @@ export class PaymentRequestsCommandService {
     }
 
     private async findById(requestId: number) {
+        this.logger.log(`Finding payment request by ID: ${requestId}`);
         const [request] = await this.db
             .select()
             .from(paymentRequests)
