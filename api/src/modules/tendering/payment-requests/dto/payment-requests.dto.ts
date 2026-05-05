@@ -87,6 +87,42 @@ const bankTransferDetails = z.object({
     btAccountName: optionalString,
     btAccountNo: optionalString,
     btIfsc: optionalString,
+}).superRefine((data, ctx) => {
+    if (!data.btPurpose || (typeof data.btPurpose === 'string' && data.btPurpose.trim() === '')) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Payment Purpose is required',
+            path: ['btPurpose'],
+        });
+    }
+    if (!data.btAccountName || (typeof data.btAccountName === 'string' && data.btAccountName.trim() === '')) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Bank Account Name is required',
+            path: ['btAccountName'],
+        });
+    }
+    if (!data.btAccountNo || (typeof data.btAccountNo === 'string' && data.btAccountNo.trim() === '')) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Bank Account Number is required',
+            path: ['btAccountNo'],
+        });
+    }
+    if (!data.btIfsc || (typeof data.btIfsc === 'string' && data.btIfsc.trim() === '')) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Bank IFSC Code is required',
+            path: ['btIfsc'],
+        });
+    }
+    if (data.btAmount !== undefined && data.btAmount < 0) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Amount must be greater than 0',
+            path: ['btAmount'],
+        });
+    }
 });
 
 const portalDetails = z.object({
@@ -95,6 +131,42 @@ const portalDetails = z.object({
     portalName: optionalString,
     portalNetBanking: z.enum(["YES", "NO"]).optional(),
     portalDebitCard: z.enum(["YES", "NO"]).optional(),
+}).superRefine((data, ctx) => {
+    if (!data.portalPurpose || (typeof data.portalPurpose === 'string' && data.portalPurpose.trim() === '')) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Payment Purpose is required',
+            path: ['portalPurpose'],
+        });
+    }
+    if (!data.portalName || (typeof data.portalName === 'string' && data.portalName.trim() === '')) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Portal Name is required',
+            path: ['portalName'],
+        });
+    }
+    if (!data.portalNetBanking) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Is Net Banking Available?',
+            path: ['portalNetBanking'],
+        });
+    }
+    if (!data.portalDebitCard) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Is Debit Card Allowed?',
+            path: ['portalDebitCard'],
+        });
+    }
+    if (data.portalAmount !== undefined && data.portalAmount < 0) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Amount must be greater than 0',
+            path: ['portalAmount'],
+        });
+    }
 });
 
 // ============================================================================

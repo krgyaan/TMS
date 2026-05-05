@@ -105,21 +105,21 @@ export const BankTransferSchema = z.object({
     if (!data.btAccountName || (typeof data.btAccountName === 'string' && data.btAccountName.trim() === '')) {
         ctx.addIssue({
             code: 'custom',
-            message: 'Bank Transfer Account Name is required',
+            message: 'Bank Account Name is required',
             path: ['btAccountName'],
         });
     }
     if (!data.btAccountNo || (typeof data.btAccountNo === 'string' && data.btAccountNo.trim() === '')) {
         ctx.addIssue({
             code: 'custom',
-            message: 'Bank Transfer Account No. is required',
+            message: 'Bank Account No. is required',
             path: ['btAccountNo'],
         });
     }
     if (!data.btIfsc || (typeof data.btIfsc === 'string' && data.btIfsc.trim() === '')) {
         ctx.addIssue({
             code: 'custom',
-            message: 'Bank Transfer IFSC is required',
+            message: 'Bank IFSC is required',
             path: ['btIfsc'],
         });
     }
@@ -142,7 +142,7 @@ export const PayOnPortalSchema = z.object({
     if (!data.portalPurpose || (typeof data.portalPurpose === 'string' && data.portalPurpose.trim() === '')) {
         ctx.addIssue({
             code: 'custom',
-            message: 'Portal Purpose is required',
+            message: 'Payment Purpose is required',
             path: ['portalPurpose'],
         });
     }
@@ -151,6 +151,20 @@ export const PayOnPortalSchema = z.object({
             code: 'custom',
             message: 'Portal Name is required',
             path: ['portalName'],
+        });
+    }
+    if (!data.portalNetBanking) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Is Net Banking Available ?',
+            path: ['portalNetBanking'],
+        });
+    }
+    if (!data.portalDebitCard) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Is Debit Card Allowed ?',
+            path: ['portalDebitCard'],
         });
     }
     if (data.portalAmount !== undefined && data.portalAmount < 0) {
@@ -416,19 +430,73 @@ export const PaymentRequestSchema = z.object({
     EMD: z.object({
         mode: z.enum(['DD', 'FDR', 'BG', 'CHEQUE', 'BANK_TRANSFER', 'PORTAL', 'SURETY_BOND', 'NA']).optional(),
         details: PaymentDetailsSchema.optional(),
-    }).optional(),
+    }).refine(
+        (data) => {
+            if (!data.mode || data.mode === 'NA') return true;
+            if (!data.details) return false;
+            if (data.mode === 'BANK_TRANSFER') {
+                const d = data.details;
+                return !!(d.btPurpose?.trim() && d.btAccountName?.trim() && d.btAccountNo?.trim() && d.btIfsc?.trim());
+            }
+            if (data.mode === 'PORTAL') {
+                const d = data.details;
+                return !!(d.portalPurpose?.trim() && d.portalName?.trim() && d.portalNetBanking && d.portalDebitCard);
+            }
+            return true;
+        },
+        {
+            message: 'Please fill in all required fields for the selected payment mode',
+            path: ['EMD'],
+        }
+    ).optional(),
 
     // Tender Fee
     TENDER_FEES: z.object({
         mode: z.enum(['PORTAL', 'BANK_TRANSFER', 'DD', 'NA']).optional(),
         details: PaymentDetailsSchema.optional(),
-    }).optional(),
+    }).refine(
+        (data) => {
+            if (!data.mode || data.mode === 'NA') return true;
+            if (!data.details) return false;
+            if (data.mode === 'BANK_TRANSFER') {
+                const d = data.details;
+                return !!(d.btPurpose?.trim() && d.btAccountName?.trim() && d.btAccountNo?.trim() && d.btIfsc?.trim());
+            }
+            if (data.mode === 'PORTAL') {
+                const d = data.details;
+                return !!(d.portalPurpose?.trim() && d.portalName?.trim() && d.portalNetBanking && d.portalDebitCard);
+            }
+            return true;
+        },
+        {
+            message: 'Please fill in all required fields for the selected payment mode',
+            path: ['TENDER_FEES'],
+        }
+    ).optional(),
 
     // Processing Fee
     PROCESSING_FEES: z.object({
         mode: z.enum(['PORTAL', 'BANK_TRANSFER', 'DD', 'NA']).optional(),
         details: PaymentDetailsSchema.optional(),
-    }).optional(),
+    }).refine(
+        (data) => {
+            if (!data.mode || data.mode === 'NA') return true;
+            if (!data.details) return false;
+            if (data.mode === 'BANK_TRANSFER') {
+                const d = data.details;
+                return !!(d.btPurpose?.trim() && d.btAccountName?.trim() && d.btAccountNo?.trim() && d.btIfsc?.trim());
+            }
+            if (data.mode === 'PORTAL') {
+                const d = data.details;
+                return !!(d.portalPurpose?.trim() && d.portalName?.trim() && d.portalNetBanking && d.portalDebitCard);
+            }
+            return true;
+        },
+        {
+            message: 'Please fill in all required fields for the selected payment mode',
+            path: ['PROCESSING_FEES'],
+        }
+    ).optional(),
 });
 
 /**
@@ -442,19 +510,73 @@ export const OldEntryPaymentRequestSchema = z.object({
     emd: z.object({
         mode: z.enum(['DD', 'FDR', 'BG', 'CHEQUE', 'BANK_TRANSFER', 'PORTAL', 'SURETY_BOND', 'NA']).optional(),
         details: PaymentDetailsSchema.optional(),
-    }).optional(),
+    }).refine(
+        (data) => {
+            if (!data.mode || data.mode === 'NA') return true;
+            if (!data.details) return false;
+            if (data.mode === 'BANK_TRANSFER') {
+                const d = data.details;
+                return !!(d.btPurpose?.trim() && d.btAccountName?.trim() && d.btAccountNo?.trim() && d.btIfsc?.trim());
+            }
+            if (data.mode === 'PORTAL') {
+                const d = data.details;
+                return !!(d.portalPurpose?.trim() && d.portalName?.trim() && d.portalNetBanking && d.portalDebitCard);
+            }
+            return true;
+        },
+        {
+            message: 'Please fill in all required fields for the selected payment mode',
+            path: ['emd'],
+        }
+    ).optional(),
 
     // Tender Fee
     tenderFee: z.object({
         mode: z.enum(['PORTAL', 'BANK_TRANSFER', 'DD', 'NA']).optional(),
         details: PaymentDetailsSchema.optional(),
-    }).optional(),
+    }).refine(
+        (data) => {
+            if (!data.mode || data.mode === 'NA') return true;
+            if (!data.details) return false;
+            if (data.mode === 'BANK_TRANSFER') {
+                const d = data.details;
+                return !!(d.btPurpose?.trim() && d.btAccountName?.trim() && d.btAccountNo?.trim() && d.btIfsc?.trim());
+            }
+            if (data.mode === 'PORTAL') {
+                const d = data.details;
+                return !!(d.portalPurpose?.trim() && d.portalName?.trim() && d.portalNetBanking && d.portalDebitCard);
+            }
+            return true;
+        },
+        {
+            message: 'Please fill in all required fields for the selected payment mode',
+            path: ['tenderFee'],
+        }
+    ).optional(),
 
     // Processing Fee
     processingFee: z.object({
         mode: z.enum(['PORTAL', 'BANK_TRANSFER', 'DD', 'NA']).optional(),
         details: PaymentDetailsSchema.optional(),
-    }).optional(),
+    }).refine(
+        (data) => {
+            if (!data.mode || data.mode === 'NA') return true;
+            if (!data.details) return false;
+            if (data.mode === 'BANK_TRANSFER') {
+                const d = data.details;
+                return !!(d.btPurpose?.trim() && d.btAccountName?.trim() && d.btAccountNo?.trim() && d.btIfsc?.trim());
+            }
+            if (data.mode === 'PORTAL') {
+                const d = data.details;
+                return !!(d.portalPurpose?.trim() && d.portalName?.trim() && d.portalNetBanking && d.portalDebitCard);
+            }
+            return true;
+        },
+        {
+            message: 'Please fill in all required fields for the selected payment mode',
+            path: ['processingFee'],
+        }
+    ).optional(),
 });
 
 /**
