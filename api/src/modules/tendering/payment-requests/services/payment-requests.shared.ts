@@ -193,7 +193,7 @@ export function extractAmountFromDetails(mode: string, details: any): number {
         'FDR': 'fdrAmount',
         'BG': 'bgAmount',
         'CHEQUE': 'chequeAmount',
-        'BT': 'btAmount',
+        'BANK_TRANSFER': 'btAmount',
         'PORTAL': 'portalAmount',
     };
     

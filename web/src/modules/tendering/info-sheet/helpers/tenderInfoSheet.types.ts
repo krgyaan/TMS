@@ -235,20 +235,20 @@ export const emdRequiredOptions = [
 
 export const processingFeeOptions = [
     { value: "DD", label: "Demand Draft" },
-    { value: 'POP', label: 'Pay on Portal' },
-    { value: 'BT', label: 'Bank Transfer' },
+    { value: 'PORTAL', label: 'Pay on Portal' },
+    { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
 ];
 
 export const tenderFeeOptions = [
     { value: "DD", label: "Demand Draft" },
-    { value: 'POP', label: 'Pay on Portal' },
-    { value: 'BT', label: 'Bank Transfer' },
+    { value: 'PORTAL', label: 'Pay on Portal' },
+    { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
 ];
 
 export const paymentModeOptions = [
     { value: 'DD', label: 'Demand Draft' },
-    { value: 'POP', label: 'Pay on Portal' },
-    { value: 'BT', label: 'Bank Transfer' },
+    { value: 'PORTAL', label: 'Pay on Portal' },
+    { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
     { value: 'FDR', label: 'Fixed Deposit Receipt' },
     { value: 'BG', label: 'Bank Guarantee' },
     { value: 'SB', label: 'Surety Bond' },
