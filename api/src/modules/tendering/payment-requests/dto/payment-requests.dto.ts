@@ -132,9 +132,9 @@ export const CreatePaymentRequestSchema = z.object({
     tenderName: z.string().optional(),
     dueDate: z.string().optional(),
 
-    emd: emdSection,
-    tenderFee: tenderFeeSection,
-    processingFee: processingFeeSection,
+    EMD: emdSection,
+    TENDER_FEES: tenderFeeSection,
+    PROCESSING_FEES: processingFeeSection,
 });
 
 export type CreatePaymentRequestDto = z.infer<typeof CreatePaymentRequestSchema>;
