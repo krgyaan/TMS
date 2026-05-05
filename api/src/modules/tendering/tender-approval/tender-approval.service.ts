@@ -731,10 +731,12 @@ export class TenderApprovalService {
         // Get Team Leader name
         const teamLeaderEmails = await this.recipientResolver.getEmailsByRole("Team Leader", tender.team);
         let tlName = "Team Leader";
+        let tlId = 7;
         if (teamLeaderEmails.length > 0) {
-            const [tlUser] = await this.db.select({ name: users.name }).from(users).where(eq(users.email, teamLeaderEmails[0])).limit(1);
+            const [tlUser] = await this.db.select({ name: users.name, id: users.id }).from(users).where(eq(users.email, teamLeaderEmails[0])).limit(1);
             if (tlUser?.name) {
                 tlName = tlUser.name;
+                tlId = tlUser.id;
             }
         }
 
@@ -1051,7 +1053,7 @@ export class TenderApprovalService {
             eventType = "tender.rejected";
         }
 
-        await this.sendEmail(eventType, tenderId, changedBy, subject, template, emailData, {
+        await this.sendEmail(eventType, tenderId, tlId, subject, template, emailData, {
             // to: [{ type: "emails", emails: ['gyan@volksenergie.in'] }],
             to: [{ type: 'user', userId: tender.teamMember }],
             cc: [
