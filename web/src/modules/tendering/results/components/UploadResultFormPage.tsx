@@ -23,7 +23,7 @@ const UploadResultSchema = z.object({
     disqualificationReason: z.string().optional(),
     qualifiedPartiesCount: z.string().optional(),
     qualifiedPartiesNames: z.array(z.string()).optional(),
-    result: z.enum(['Won', 'Lost']).optional(),
+    result: z.enum(['Won', 'Lost', 'Cancelled']).optional(),
     resultReason: z.string().optional(),
     l1Price: z.string().optional(),
     l2Price: z.string().optional(),
@@ -38,6 +38,14 @@ const UploadResultSchema = z.object({
 }, {
     message: 'Disqualification reason is required when not qualified',
     path: ['disqualificationReason'],
+}).refine((data) => {
+    if (data.result && !data.resultReason) {
+        return false;
+    }
+    return true;
+}, {
+    message: 'Reason is required',
+    path: ['resultReason'],
 });
 
 type FormValues = z.infer<typeof UploadResultSchema>;
@@ -62,6 +70,7 @@ const yesNoOptions = [
 const resultOptions = [
     { label: "Won", value: "Won" },
     { label: "Lost", value: "Lost" },
+    { label: "Cancelled", value: "Cancelled" },
 ];
 
 export default function UploadResultFormPage({
@@ -113,7 +122,7 @@ export default function UploadResultFormPage({
                 disqualificationReason: result.disqualificationReason ?? '',
                 qualifiedPartiesCount: result.qualifiedPartiesCount ?? '',
                 qualifiedPartiesNames: result.qualifiedPartiesNames ?? [],
-                result: (result.result === 'Won' || result.result === 'Lost') ? result.result : undefined,
+                result: (result.result === 'Won' || result.result === 'Lost' || result.result === 'Cancelled') ? result.result : undefined,
                 resultReason: result.resultReason ?? '',
                 l1Price: result.l1Price ?? '',
                 l2Price: result.l2Price ?? '',
@@ -138,6 +147,11 @@ export default function UploadResultFormPage({
         control: form.control,
         name: 'qualifiedPartiesNames',
     }) || [];
+
+    const result = useWatch({
+        control: form.control,
+        name: 'result',
+    });
 
     const isSubmitting = form.formState.isSubmitting;
 
@@ -175,10 +189,13 @@ export default function UploadResultFormPage({
                 if (shouldIncludeResultDetails && data.result) {
                     submitData.result = data.result;
                     submitData.resultReason = data.resultReason;
-                    submitData.l1Price = data.l1Price;
-                    submitData.l2Price = data.l2Price;
-                    submitData.ourPrice = data.ourPrice;
-                    submitData.finalResultScreenshot = data.finalResultScreenshot.length > 0 ? data.finalResultScreenshot[0] : null;
+                    
+                    if (data.result !== 'Cancelled') {
+                        submitData.l1Price = data.l1Price;
+                        submitData.l2Price = data.l2Price;
+                        submitData.ourPrice = data.ourPrice;
+                        submitData.finalResultScreenshot = data.finalResultScreenshot.length > 0 ? data.finalResultScreenshot[0] : null;
+                    }
                 }
             }
 
@@ -330,104 +347,114 @@ export default function UploadResultFormPage({
                                                 placeholder="Select result status"
                                             />
 
-                                            {/* L1 Price */}
-                                            <FieldWrapper
-                                                control={form.control}
-                                                name="l1Price"
-                                                label="L1 Price"
-                                            >
-                                                {(field) => (
-                                                    <div className="relative">
-                                                        <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                                        <Input
-                                                            {...field}
-                                                            type="number"
-                                                            step="0.01"
-                                                            className="pl-10"
-                                                            placeholder="Enter L1 price"
-                                                        />
-                                                    </div>
-                                                )}
-                                            </FieldWrapper>
+                                            {/* Price Fields - Only if not Cancelled */}
+                                            {result !== 'Cancelled' && (
+                                                <>
+                                                    {/* L1 Price */}
+                                                    <FieldWrapper
+                                                        control={form.control}
+                                                        name="l1Price"
+                                                        label="L1 Price"
+                                                    >
+                                                        {(field) => (
+                                                            <div className="relative">
+                                                                <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                                <Input
+                                                                    {...field}
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    className="pl-10"
+                                                                    placeholder="Enter L1 price"
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </FieldWrapper>
 
-                                            {/* L2 Price */}
-                                            <FieldWrapper
-                                                control={form.control}
-                                                name="l2Price"
-                                                label="L2 Price"
-                                            >
-                                                {(field) => (
-                                                    <div className="relative">
-                                                        <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                                        <Input
-                                                            {...field}
-                                                            type="number"
-                                                            step="0.01"
-                                                            className="pl-10"
-                                                            placeholder="Enter L2 price"
-                                                        />
-                                                    </div>
-                                                )}
-                                            </FieldWrapper>
+                                                    {/* L2 Price */}
+                                                    <FieldWrapper
+                                                        control={form.control}
+                                                        name="l2Price"
+                                                        label="L2 Price"
+                                                    >
+                                                        {(field) => (
+                                                            <div className="relative">
+                                                                <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                                <Input
+                                                                    {...field}
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    className="pl-10"
+                                                                    placeholder="Enter L2 price"
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </FieldWrapper>
+                                                </>
+                                            )}
 
-                                            {/* Reason for Win/Loss */}
+                                            {/* Reason for Win/Loss/Cancellation */}
                                             <FieldWrapper
                                                 control={form.control}
                                                 name="resultReason"
-                                                label="Reason for Win/Loss"
+                                                label={result === 'Cancelled' ? "Reason for Cancellation" : "Reason for Win/Loss"}
                                                 className="md:col-span-3"
                                             >
                                                 {(field) => (
                                                     <Textarea
                                                         {...field}
-                                                        placeholder="Enter the reason for winning or losing this tender"
+                                                        placeholder={result === 'Cancelled' ? "Enter reason for cancellation" : "Enter the reason for winning or losing this tender"}
                                                         rows={3}
                                                     />
                                                 )}
                                             </FieldWrapper>
 
-                                            {/* Our Price */}
-                                            <FieldWrapper
-                                                control={form.control}
-                                                name="ourPrice"
-                                                label="Our Price"
-                                            >
-                                                {(field) => (
-                                                    <div className="relative">
-                                                        <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                                        <Input
-                                                            {...field}
-                                                            type="number"
-                                                            step="0.01"
-                                                            className="pl-10"
-                                                            placeholder="Enter our price"
-                                                        />
-                                                    </div>
-                                                )}
-                                            </FieldWrapper>
+                                            {/* Our Price and Screenshots - Only if not Cancelled */}
+                                            {result !== 'Cancelled' && (
+                                                <>
+                                                    {/* Our Price */}
+                                                    <FieldWrapper
+                                                        control={form.control}
+                                                        name="ourPrice"
+                                                        label="Our Price"
+                                                    >
+                                                        {(field) => (
+                                                            <div className="relative">
+                                                                <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                                <Input
+                                                                    {...field}
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    className="pl-10"
+                                                                    placeholder="Enter our price"
+                                                                />
+                                                            </div>
+                                                        )}
+                                                    </FieldWrapper>
 
-                                            {/* Screenshots */}
-                                            <div className="space-y-4 md:col-span-3">
-                                                <h4 className="font-semibold text-sm text-primary border-b pb-2">
-                                                    Upload Screenshots
-                                                </h4>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                    <TenderFileUploader
-                                                        context="result-screenshots"
-                                                        value={qualifiedPartiesScreenshot}
-                                                        onChange={(paths) => form.setValue('qualifiedPartiesScreenshot', paths)}
-                                                        label="Screenshot of Qualified Parties"
-                                                        disabled={isSubmitting}
-                                                    />
-                                                    <TenderFileUploader
-                                                        context="result-screenshots"
-                                                        value={finalResultScreenshot}
-                                                        onChange={(paths) => form.setValue('finalResultScreenshot', paths)}
-                                                        label="Final Result Screenshot"
-                                                        disabled={isSubmitting}
-                                                    />
-                                                </div>
-                                            </div>
+                                                    {/* Screenshots */}
+                                                    <div className="space-y-4 md:col-span-3">
+                                                        <h4 className="font-semibold text-sm text-primary border-b pb-2">
+                                                            Upload Screenshots
+                                                        </h4>
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                            <TenderFileUploader
+                                                                context="result-screenshots"
+                                                                value={qualifiedPartiesScreenshot}
+                                                                onChange={(paths) => form.setValue('qualifiedPartiesScreenshot', paths)}
+                                                                label="Screenshot of Qualified Parties"
+                                                                disabled={isSubmitting}
+                                                            />
+                                                            <TenderFileUploader
+                                                                context="result-screenshots"
+                                                                value={finalResultScreenshot}
+                                                                onChange={(paths) => form.setValue('finalResultScreenshot', paths)}
+                                                                label="Final Result Screenshot"
+                                                                disabled={isSubmitting}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </>
+                                            )}
                                         </>
                                     )}
                                 </>
