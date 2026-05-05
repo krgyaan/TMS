@@ -27,9 +27,12 @@ export class TimersService {
 
         // Calculate allocated time
         const allocatedTimeMs = this.calculateAllocatedTime(input);
-        if (allocatedTimeMs <= 0) {
-            throw new BadRequestException('Allocated time must be greater than 0');
-        }
+
+        //THE CHECK BELOW IS NOT REQUIRED, THE ALLOCATED TIME CAN BE NEGATIVE
+
+        // if (allocatedTimeMs <= 0) {
+        //     throw new BadRequestException('Allocated time must be greater than 0');
+        // }
 
         const now = new Date();
         const deadline = input.deadlineAt || new Date(now.getTime() + allocatedTimeMs);
@@ -135,6 +138,106 @@ export class TimersService {
 
         return this.computeTimer(updated);
     }
+
+    async stopAllTimers(data: {
+        entityId    : number,
+        entityType  : string,
+        userId      : number
+    }){
+        //looking at the logic to stop all the timers for multiple stages
+        const conditions = [
+            eq(timerTrackers.entityType, data.entityType),
+            eq(timerTrackers.entityId, data.entityId),
+            eq(timerTrackers.status, 'running' )
+        ];
+
+        const timersAll = await this.db
+            .select()
+            .from(timerTrackers)
+            .where(
+                and(
+                    ...conditions
+                )
+            );
+
+        if(timersAll.length == 0){
+            this.logger.debug(`No running timer found for timer for  tender Id ->${data.entityId}`)
+            return;
+        }
+
+
+        //stopping each timer
+        this.logger.debug("Stopping Bulk timers for all the BID MISSED STAGES");
+
+        for(const timer of timersAll){
+            try{
+                this.logger.debug(`begin to stop timer for timer id -> ${timer.id}`);
+
+                await this.stopTimerFromRecord(timer, {
+                    reason      : "Bid Missed",
+                    userId      : data.userId
+                });
+
+                this.logger.debug(`end to stop timer for timer id -> ${timer.id}`);
+            } catch{
+                this.logger.error(`Failed to stop timer for stage -> ${timer.stage} tender Id ->${timer.entityId}`)
+            }
+        }
+    }
+
+    private async stopTimerFromRecord(
+        timer: TimerTracker,
+        data: {
+            userId: number;
+            reason?: string;
+        }
+    ): Promise<TimerWithComputed> {
+
+
+        if (timer.status === 'completed') {
+            throw new ConflictException('Timer already completed');
+        }
+        if (timer.status === 'cancelled') {
+            throw new ConflictException('Timer was cancelled');
+        }
+
+        const now = new Date();
+        let totalPaused = timer.totalPausedDurationMs;
+
+        // ✅ Handle paused case (minimal)
+        if (timer.status === 'paused' && timer.pausedAt) {
+            totalPaused += now.getTime() - new Date(timer.pausedAt).getTime();
+        }
+
+        const [updated] = await this.db
+            .update(timerTrackers)
+            .set({
+                status: 'stopped',
+                endedAt: now,
+                pausedAt: null,                 // ✅ reset pause
+                totalPausedDurationMs: totalPaused, // ✅ update duration
+                metadata : {
+                    ...(timer.metadata ?? {}),
+                    userId : data.userId,
+                    reason : data.reason,
+                },
+                updatedAt: now,
+            })
+            .where(eq(timerTrackers.id, timer.id))
+            .returning();
+
+        await this.logEvent(
+            timer.id,
+            'stopped',
+            timer.status,
+            'completed',
+            data.userId,
+            data.reason
+        );
+        
+        return this.computeTimer(updated);
+    }
+
 
     async pauseTimer(input: TimerActionInput): Promise<TimerWithComputed> {
         const timer = await this.getTimerOrThrow(input.entityType, input.entityId, input.stage);
