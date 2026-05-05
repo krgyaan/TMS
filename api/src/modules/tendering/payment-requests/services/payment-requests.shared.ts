@@ -1,6 +1,6 @@
 import { eq, and, inArray, isNull, sql, not, or, SQL } from 'drizzle-orm';
 import { paymentRequests, paymentInstruments } from '@db/schemas/tendering/payment-requests.schema';
-import { tenderInfos, tenderInformation } from '@db/schemas/tendering/tenders.schema';
+import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { DD_STATUSES, FDR_STATUSES, BG_STATUSES, CHEQUE_STATUSES, BT_STATUSES, PORTAL_STATUSES } from '../constants/payment-request-statuses';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
@@ -61,7 +61,6 @@ export const RETURNED_STATUSES = [
     CHEQUE_STATUSES.CANCELLED_TORN,
     DD_STATUSES.PROJECT_SETTLEMENT_COMPLETED,
     FDR_STATUSES.PROJECT_SETTLEMENT_COMPLETED,
-    BG_STATUSES.PROJECT_SETTLEMENT_COMPLETED,
 ];
 
 const REJECTED_STATUS_PATTERN = '%_REJECTED';

@@ -11,6 +11,7 @@ import { TenderStatusHistoryModule } from '@/modules/tendering/tender-status-his
 import { EmailModule } from '@/modules/email/email.module';
 import { TimersModule } from '@/modules/timers/timers.module';
 import { PdfGeneratorModule } from '@/modules/pdf/pdf-generator.module';
+import { PaymentRequestsService } from './payment-requests.service';
 
 @Module({
     imports: [TendersModule, TenderStatusHistoryModule, EmailModule, TimersModule, PdfGeneratorModule],
@@ -22,6 +23,7 @@ import { PdfGeneratorModule } from '@/modules/pdf/pdf-generator.module';
         PaymentRequestsNotificationService,
         InstrumentStatusService,
         InstrumentStatusHistoryService,
+        PaymentRequestsService
     ],
     exports: [
         PaymentRequestsQueryService,
