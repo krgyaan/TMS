@@ -1,8 +1,6 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query, Logger } from '@nestjs/common';
 import { PaymentRequestsQueryService } from './services/payment-requests.query.service';
 import { PaymentRequestsCommandService } from './services/payment-requests.command.service';
-import { PaymentRequestsStatusService } from './services/payment-requests-status.service';
-import { PaymentRequestsNotificationService } from './services/payment-requests-notification.service';
 import { CreatePaymentRequestSchema, UpdatePaymentRequestSchema, UpdateStatusSchema, DashboardQuerySchema, type DashboardResponse, type DashboardCounts, type DashboardTab } from './dto/payment-requests.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
@@ -16,8 +14,6 @@ export class PaymentRequestsController {
     constructor(
         private readonly queryService: PaymentRequestsQueryService,
         private readonly commandService: PaymentRequestsCommandService,
-        private readonly statusService: PaymentRequestsStatusService,
-        private readonly notificationService: PaymentRequestsNotificationService,
         private readonly timersService: TimersService
     ) {}
 

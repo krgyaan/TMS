@@ -16,7 +16,7 @@ import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import type { ChequeDashboardRow, ChequeDashboardCounts } from '@/modules/bi-dashboard/cheque/helpers/cheque.types';
 import { CHEQUE_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
-import { PaymentRequestsService } from '@/modules/tendering/payment-requests/payment-requests.service';
+import { PaymentRequestsNotificationService } from '@/modules/tendering/payment-requests/services/payment-requests-notification.service';
 
 @Injectable()
 export class ChequeService {
@@ -24,7 +24,7 @@ export class ChequeService {
 
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
-        @Inject(forwardRef(() => PaymentRequestsService)) private readonly paymentRequestsService: PaymentRequestsService,
+        @Inject(forwardRef(() => PaymentRequestsNotificationService)) private readonly notificationService: PaymentRequestsNotificationService,
     ) { }
 
     private statusMap() {
@@ -564,7 +564,7 @@ export class ChequeService {
                             const tenderId = request?.tenderId || 0;
 
                             // Send DD mail
-                            await this.paymentRequestsService.sendDdMailAfterChequeAction(
+                            await this.notificationService.sendDdMailAfterChequeAction(
                                 ddInstrument.id,
                                 requestId,
                                 tenderId,
