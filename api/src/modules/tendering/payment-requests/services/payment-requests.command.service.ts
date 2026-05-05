@@ -1,5 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Inject } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { eq, and, sql } from 'drizzle-orm';
@@ -8,6 +7,8 @@ import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service'
 import type { CreatePaymentRequestDto, UpdatePaymentRequestDto, UpdateStatusDto, PaymentPurpose } from '../dto/payment-requests.dto';
 import { extractAmountFromDetails } from './payment-requests.shared';
 import { tenderInformation } from '@/db/schemas';
+import { PaymentRequestsNotificationService } from './payment-requests-notification.service';
+import { TimersService } from '@/modules/timers/timers.service';
 
 @Injectable()
 export class PaymentRequestsCommandService {
@@ -16,6 +17,9 @@ export class PaymentRequestsCommandService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly tenderInfosService: TenderInfosService,
+        @Inject(forwardRef(() => PaymentRequestsNotificationService))
+        private readonly notificationService: PaymentRequestsNotificationService,
+        private readonly timersService: TimersService,
     ) {}
 
     // ============================================================================
@@ -59,10 +63,12 @@ export class PaymentRequestsCommandService {
 
         const createdRequests: any[] = [];
         const results: any[] = [];
+        let emdRequested = false;
 
         await this.db.transaction(async (tx) => {
             // Create EMD request
             if (payload.EMD?.mode && payload.EMD?.details) {
+                emdRequested = true;
                 const emdAmount = isNonTmsRequest
                     ? extractAmountFromDetails(payload.EMD.mode, payload.EMD.details)
                     : Number(tender?.emd) || 0;
@@ -172,8 +178,72 @@ export class PaymentRequestsCommandService {
                 }
             }
         });
+
+        // Background operations
+        this.handleBackgroundOperations(results, tenderId, tender, userId, emdRequested, isNonTmsRequest)
+            .catch((error) => {
+                this.logger.error('Background operations failed:', error);
+            });
+
         this.logger.log(`Payment request created successfully: ${JSON.stringify(results)}`);
         return results;
+    }
+
+    /**
+     * Handle background operations asynchronously after HTTP response
+     * - Send email notifications for Bank Transfer and Portal Payment
+     * - Stop timer if EMD was requested
+     */
+    private async handleBackgroundOperations(
+        results: Array<{ request: any; instrument: any }>,
+        tenderId: number,
+        tender: any,
+        userId: number | undefined,
+        emdRequested: boolean,
+        isNonTmsRequest: boolean
+    ): Promise<void> {
+        try {
+            // Send email notifications for each instrument
+            if (tender) {
+                for (const { request, instrument } of results) {
+                    try {
+                        const mode = instrument.instrumentType;
+                        await this.notificationService.sendPaymentInstrumentEmail(
+                            instrument.id,
+                            mode,
+                            request.purpose,
+                            tenderId,
+                            tender,
+                            userId || 0
+                        );
+                    } catch (error) {
+                        this.logger.error(
+                            `Failed to send email for instrument ${instrument?.id} (${instrument?.instrumentType}): ${error instanceof Error ? error.message : String(error)}`
+                        );
+                    }
+                }
+            }
+
+            // Stop timer if EMD was requested (only for TMS requests)
+            if (emdRequested && userId && !isNonTmsRequest && tenderId > 0) {
+                try {
+                    this.logger.log(`Stopping timer for tender ${tenderId} after EMD requested`);
+                    await this.timersService.stopTimer({
+                        entityType: 'TENDER',
+                        entityId: tenderId,
+                        stage: 'emd_request',
+                        userId: userId,
+                        reason: 'EMD requested'
+                    });
+                    this.logger.log(`Successfully stopped emd_request timer for tender ${tenderId}`);
+                } catch (error) {
+                    this.logger.error(`Failed to stop timer for tender ${tenderId} after EMD requested:`, error);
+                }
+            }
+        } catch (error) {
+            this.logger.error('Unexpected error in background operations:', error);
+            throw error;
+        }
     }
 
     // ============================================================================
