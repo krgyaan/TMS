@@ -2,13 +2,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
-import { eq } from 'drizzle-orm';
-import { paymentInstruments } from '@db/schemas/tendering/payment-requests.schema';
+import { and, eq } from 'drizzle-orm';
+import { paymentInstruments, instrumentTransferDetails } from '@db/schemas/tendering/payment-requests.schema';
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import { PdfGeneratorService } from '@/modules/pdf/pdf-generator.service';
-import { tenderInfos } from '@/db/schemas';
-import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
+import { tenderInfos, userRoles, users } from '@/db/schemas';
 
 @Injectable()
 export class PaymentRequestsNotificationService {
@@ -142,32 +141,175 @@ export class PaymentRequestsNotificationService {
             throw error;
         }
     }
-
+    
     /**
-     * Get accounts team ID
+     * Get responsible user by mode
      */
-    private async getAccountsTeamId(): Promise<number | null> {
-        return 1;
+    private getResponsibleUserByMode(mode: string) {
+        switch (mode) {
+            case 'BANK_TRANSFER':
+                return 'gyan@volksenergie.in';
+            case 'PORTAL':
+                return 'gyan@volksenergie.in';
+            default:
+                return 'gyan@volksenergie.in';
+        }
     }
 
     /**
-     * Get user emails for notification
+     * Send email notification for payment instrument (Bank Transfer, Portal Payment)
      */
-    private async getUserEmailsForNotification(userId: number): Promise<string[]> {
-        return this.recipientResolver.getEmailByUserId(userId);
-    }
+    async sendPaymentInstrumentEmail(
+        instrumentId: number,
+        instrumentType: string,
+        purpose: string,
+        tenderId: number,
+        tender: any,
+        requestedBy: number
+    ): Promise<void> {
+        const [instrument] = await this.db
+            .select()
+            .from(paymentInstruments)
+            .where(eq(paymentInstruments.id, instrumentId))
+            .limit(1);
 
-    /**
-     * Get accounts team emails by team
-     */
-    private async getAccountsTeamEmails(teamId: number): Promise<string[]> {
-        return this.recipientResolver.getEmailsByRole('accounts', teamId);
-    }
+        if (!instrument) {
+            this.logger.warn(`Instrument ${instrumentId} not found`);
+            return;
+        }
 
-    /**
-     * Get recipients by role for a team
-     */
-    private getRecipientsByRole(teamId: number, role: string): RecipientSource[] {
-        return [{ type: 'role', role, teamId }];
+        // Get tender team ID
+        let tenderTeamId = 1;    
+        if (tenderId > 0) {
+            const tenderData = await this.db
+                .select({ team: tenderInfos.team })
+                .from(tenderInfos)
+                .where(eq(tenderInfos.id, tenderId))
+                .limit(1);
+            tenderTeamId = tenderData[0]?.team || 1;
+        } else {
+            const userData = await this.db
+                .select({ team: users.team })
+                .from(users)
+                .where(eq(users.id, requestedBy))
+                .limit(1);
+            tenderTeamId = userData[0]?.team || 2;
+        }
+
+        const [tlUser] = await this.db
+            .select({ name: users.name })
+            .from(users)
+            .leftJoin(userRoles, eq(users.id, userRoles.userId))
+            .where(
+                and(
+                    eq(users.team, tenderTeamId),
+                    eq(userRoles.roleId, 3)
+                )
+            )
+            .limit(1);
+
+        // Format currency
+        const formatCurrency = (amount: number) => {
+            return `₹${amount.toLocaleString('en-IN')}`;
+        };
+
+        // Format date time
+        const formatDateTime = (date: Date | null) => {
+            if (!date) return 'Not specified';
+            return new Date(date).toLocaleString('en-IN', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+            });
+        };
+
+        const mode = instrumentType.toUpperCase();
+
+        const toEmails = this.getResponsibleUserByMode(mode);
+
+        if (mode === 'BANK TRANSFER') {
+            const [btDetails] = await this.db
+                .select()
+                .from(instrumentTransferDetails)
+                .where(eq(instrumentTransferDetails.instrumentId, instrumentId))
+                .limit(1);
+
+            console.log("BT: ", btDetails);
+            
+
+            try {
+                await this.emailService.sendTenderEmail({
+                    tenderId: tenderId || 0,
+                    eventType: 'BANK_TRANSFER_REQUEST',
+                    // fromUserId: requestedBy,
+                    fromUserId: 13,
+                    subject: `Bank Transfer - ${purpose}`,
+                    template: 'bank-transfer-request',
+                    data: {
+                        tenderNo: tender?.tenderNo || 'NA',
+                        tenderName: tender?.tenderName || 'Not specified',
+                        dueDateTime: formatDateTime(tender?.dueDate),
+                        btAccName: btDetails?.accountName || 'Not specified',
+                        btAcc: btDetails?.accountNumber || 'Not specified',
+                        btIfsc: btDetails?.ifsc || 'Not specified',
+                        amount: formatCurrency(Number(instrument.amount) || 0),
+                        isOthersPurpose: tenderId > 0 ? false : true,
+                        link: `#/tendering/emds/${instrument.requestId}`,
+                        tlName: tlUser?.name || 'Team Leader',
+                    },
+                    to: [{ type: 'emails', emails: [toEmails] }],
+                    // cc: [
+                    //     { type: 'role', role: 'admin', teamId: tenderTeamId },
+                    //     { type: 'emails', emails: ['accounts@volksenergie.in']}
+                    // ]
+                });
+                this.logger.log(`Bank transfer email sent for instrument ${instrumentId}`);
+            } catch (error) {
+                this.logger.error(`Failed to send bank transfer email for instrument ${instrumentId}:`, error);
+            }
+        } else if (mode === 'PORTAL PAYMENT') {
+            const [portalDetails] = await this.db
+                .select()
+                .from(instrumentTransferDetails)
+                .where(eq(instrumentTransferDetails.instrumentId, instrumentId))
+                .limit(1);
+
+            console.log("Portal: ", portalDetails);
+                
+            try {
+                await this.emailService.sendTenderEmail({
+                    tenderId: tenderId || 0,
+                    eventType: 'PORTAL_PAYMENT_REQUEST',
+                    // fromUserId: requestedBy,
+                    fromUserId: 13,
+                    subject: `Pay on Portal - ${purpose}`,
+                    template: 'pay-on-portal-request',
+                    data: {
+                        portal: portalDetails?.portalName || 'Payment Portal',
+                        netbanking: portalDetails?.isNetbanking || 'Not specified',
+                        debit: portalDetails?.isDebit || 'Not specified',
+                        amount: formatCurrency(Number(instrument.amount) || 0),
+                        isOthersPurpose: tenderId > 0 ? false : true,
+                        tender_no: tender?.tenderNo || 'NA',
+                        tender_name: tender?.tenderName || 'Not specified',
+                        dueDate: formatDateTime(tender?.dueDate),
+                        link: `#/tendering/emds/${instrument.requestId}`,
+                        tlName: tlUser?.name || 'Team Leader',
+                    },
+                    to: [{ type: 'emails', emails: [toEmails] }],
+                    // cc: [
+                    //     { type: 'role', role: 'admin', teamId: tenderTeamId },
+                    //     { type: 'emails', emails: ['accounts@volksenergie.in']}
+                    // ]
+                });
+                this.logger.log(`Portal payment email sent for instrument ${instrumentId}`);
+            } catch (error) {
+                this.logger.error(`Failed to send portal payment email for instrument ${instrumentId}:`, error);
+            }
+        } else {
+            this.logger.log(`Email not supported for instrument type: ${instrumentType}, Mode: ${mode}`);
+        }
     }
 }

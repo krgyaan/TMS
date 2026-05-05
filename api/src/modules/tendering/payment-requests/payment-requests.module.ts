@@ -24,3 +24,6 @@ import { PdfGeneratorModule } from '@/modules/pdf/pdf-generator.module';
     ],
 })
 export class PaymentRequestsModule { }
+
+// Re-export for convenient importing
+export { PaymentRequestsNotificationService } from './services/payment-requests-notification.service';
