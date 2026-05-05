@@ -417,9 +417,61 @@ export const ChequeSchema = z.object({
 });
 
 /**
+ * Helper function to validate payment details based on the selected mode.
+ * Simplifies the schema by using existing mode-specific schemas and fixing pathing issues.
+ */
+const validatePaymentMode = (data: { mode?: string; details?: any }, ctx: z.RefinementCtx) => {
+    const { mode, details } = data;
+    if (!mode || mode === 'NA') return;
+
+    if (!details) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Please fill in all required fields for the selected payment mode',
+            path: ['details'],
+        });
+        return;
+    }
+
+    let schema: z.ZodSchema | undefined;
+    switch (mode) {
+        case 'BANK_TRANSFER':
+            schema = BankTransferSchema;
+            break;
+        case 'PORTAL':
+            schema = PayOnPortalSchema;
+            break;
+        case 'DD':
+            schema = DemandDraftSchema;
+            break;
+        case 'BG':
+            schema = BankGuaranteeSchema;
+            break;
+        case 'FDR':
+            schema = FdrSchema;
+            break;
+        case 'CHEQUE':
+            schema = ChequeSchema;
+            break;
+        default:
+            return;
+    }
+
+    if (schema) {
+        const result = schema.safeParse(details);
+        if (!result.success) {
+            result.error.issues.forEach((issue) => {
+                ctx.addIssue({
+                    ...issue,
+                    path: ['details', ...issue.path],
+                });
+            });
+        }
+    }
+};
+
+/**
  * Schema for EMD/Tender Fee/Processing Fee request form
- * Note: Mode-specific validation is handled by the individual form components
- * via their respective schemas (BankTransferSchema, PayOnPortalSchema, etc.)
  */
 export const PaymentRequestSchema = z.object({
     tenderNo: z.string().optional(),
@@ -430,73 +482,19 @@ export const PaymentRequestSchema = z.object({
     EMD: z.object({
         mode: z.enum(['DD', 'FDR', 'BG', 'CHEQUE', 'BANK_TRANSFER', 'PORTAL', 'SURETY_BOND', 'NA']).optional(),
         details: PaymentDetailsSchema.optional(),
-    }).refine(
-        (data) => {
-            if (!data.mode || data.mode === 'NA') return true;
-            if (!data.details) return false;
-            if (data.mode === 'BANK_TRANSFER') {
-                const d = data.details;
-                return !!(d.btPurpose?.trim() && d.btAccountName?.trim() && d.btAccountNo?.trim() && d.btIfsc?.trim());
-            }
-            if (data.mode === 'PORTAL') {
-                const d = data.details;
-                return !!(d.portalPurpose?.trim() && d.portalName?.trim() && d.portalNetBanking && d.portalDebitCard);
-            }
-            return true;
-        },
-        {
-            message: 'Please fill in all required fields for the selected payment mode',
-            path: ['EMD'],
-        }
-    ).optional(),
+    }).superRefine(validatePaymentMode).optional(),
 
     // Tender Fee
     TENDER_FEES: z.object({
         mode: z.enum(['PORTAL', 'BANK_TRANSFER', 'DD', 'NA']).optional(),
         details: PaymentDetailsSchema.optional(),
-    }).refine(
-        (data) => {
-            if (!data.mode || data.mode === 'NA') return true;
-            if (!data.details) return false;
-            if (data.mode === 'BANK_TRANSFER') {
-                const d = data.details;
-                return !!(d.btPurpose?.trim() && d.btAccountName?.trim() && d.btAccountNo?.trim() && d.btIfsc?.trim());
-            }
-            if (data.mode === 'PORTAL') {
-                const d = data.details;
-                return !!(d.portalPurpose?.trim() && d.portalName?.trim() && d.portalNetBanking && d.portalDebitCard);
-            }
-            return true;
-        },
-        {
-            message: 'Please fill in all required fields for the selected payment mode',
-            path: ['TENDER_FEES'],
-        }
-    ).optional(),
+    }).superRefine(validatePaymentMode).optional(),
 
     // Processing Fee
     PROCESSING_FEES: z.object({
         mode: z.enum(['PORTAL', 'BANK_TRANSFER', 'DD', 'NA']).optional(),
         details: PaymentDetailsSchema.optional(),
-    }).refine(
-        (data) => {
-            if (!data.mode || data.mode === 'NA') return true;
-            if (!data.details) return false;
-            if (data.mode === 'BANK_TRANSFER') {
-                const d = data.details;
-                return !!(d.btPurpose?.trim() && d.btAccountName?.trim() && d.btAccountNo?.trim() && d.btIfsc?.trim());
-            }
-            if (data.mode === 'PORTAL') {
-                const d = data.details;
-                return !!(d.portalPurpose?.trim() && d.portalName?.trim() && d.portalNetBanking && d.portalDebitCard);
-            }
-            return true;
-        },
-        {
-            message: 'Please fill in all required fields for the selected payment mode',
-            path: ['PROCESSING_FEES'],
-        }
-    ).optional(),
+    }).superRefine(validatePaymentMode).optional(),
 });
 
 /**
@@ -507,76 +505,22 @@ export const OldEntryPaymentRequestSchema = z.object({
     tenderNo: z.string().optional(),
     tenderDueDate: z.string().optional(),
     // EMD
-    emd: z.object({
+    EMD: z.object({
         mode: z.enum(['DD', 'FDR', 'BG', 'CHEQUE', 'BANK_TRANSFER', 'PORTAL', 'SURETY_BOND', 'NA']).optional(),
         details: PaymentDetailsSchema.optional(),
-    }).refine(
-        (data) => {
-            if (!data.mode || data.mode === 'NA') return true;
-            if (!data.details) return false;
-            if (data.mode === 'BANK_TRANSFER') {
-                const d = data.details;
-                return !!(d.btPurpose?.trim() && d.btAccountName?.trim() && d.btAccountNo?.trim() && d.btIfsc?.trim());
-            }
-            if (data.mode === 'PORTAL') {
-                const d = data.details;
-                return !!(d.portalPurpose?.trim() && d.portalName?.trim() && d.portalNetBanking && d.portalDebitCard);
-            }
-            return true;
-        },
-        {
-            message: 'Please fill in all required fields for the selected payment mode',
-            path: ['emd'],
-        }
-    ).optional(),
+    }).superRefine(validatePaymentMode).optional(),
 
     // Tender Fee
-    tenderFee: z.object({
+    TENDER_FEES: z.object({
         mode: z.enum(['PORTAL', 'BANK_TRANSFER', 'DD', 'NA']).optional(),
         details: PaymentDetailsSchema.optional(),
-    }).refine(
-        (data) => {
-            if (!data.mode || data.mode === 'NA') return true;
-            if (!data.details) return false;
-            if (data.mode === 'BANK_TRANSFER') {
-                const d = data.details;
-                return !!(d.btPurpose?.trim() && d.btAccountName?.trim() && d.btAccountNo?.trim() && d.btIfsc?.trim());
-            }
-            if (data.mode === 'PORTAL') {
-                const d = data.details;
-                return !!(d.portalPurpose?.trim() && d.portalName?.trim() && d.portalNetBanking && d.portalDebitCard);
-            }
-            return true;
-        },
-        {
-            message: 'Please fill in all required fields for the selected payment mode',
-            path: ['tenderFee'],
-        }
-    ).optional(),
+    }).superRefine(validatePaymentMode).optional(),
 
     // Processing Fee
-    processingFee: z.object({
+    PROCESSING_FEES: z.object({
         mode: z.enum(['PORTAL', 'BANK_TRANSFER', 'DD', 'NA']).optional(),
         details: PaymentDetailsSchema.optional(),
-    }).refine(
-        (data) => {
-            if (!data.mode || data.mode === 'NA') return true;
-            if (!data.details) return false;
-            if (data.mode === 'BANK_TRANSFER') {
-                const d = data.details;
-                return !!(d.btPurpose?.trim() && d.btAccountName?.trim() && d.btAccountNo?.trim() && d.btIfsc?.trim());
-            }
-            if (data.mode === 'PORTAL') {
-                const d = data.details;
-                return !!(d.portalPurpose?.trim() && d.portalName?.trim() && d.portalNetBanking && d.portalDebitCard);
-            }
-            return true;
-        },
-        {
-            message: 'Please fill in all required fields for the selected payment mode',
-            path: ['processingFee'],
-        }
-    ).optional(),
+    }).superRefine(validatePaymentMode).optional(),
 });
 
 /**
@@ -587,10 +531,10 @@ export const BiOtherThanTenderRequestSchema = z.object({
     tenderNo: z.string().optional(),
     tenderDueDate: z.string().optional(),
     // EMD only
-    emd: z.object({
+    EMD: z.object({
         mode: z.enum(['DD', 'FDR', 'BG', 'CHEQUE']).optional(),
         details: PaymentDetailsSchema.optional(),
-    }).optional(),
+    }).superRefine(validatePaymentMode).optional(),
 });
 
 export type PaymentRequestFormValues = z.infer<typeof PaymentRequestSchema>;

@@ -273,7 +273,8 @@ export class PaymentRequestsCommandService {
         await this.db.transaction(async (tx) => {
             // Update each instrument
             for (const instrument of instruments) {
-                const details = payload[instrument.purpose?.toLowerCase() as string]?.details;
+                const purpose = instrument.purpose as string;
+                const details = (payload[purpose] || payload[purpose.toLowerCase()])?.details;
                 if (details) {
                     await this.updateInstrumentWithDetails(
                         tx,
@@ -367,7 +368,7 @@ export class PaymentRequestsCommandService {
         amount: number,
         userId?: number
     ) {
-        this.logger.log(`Creating instrument with details: ${mode} - Amount: ${amount}`);
+        this.logger.log(`Creating instrument with details: ${JSON.stringify(details)}`);
         const instrumentTypeMap: Record<string, string> = {
             'DD': 'DD',
             'FDR': 'FDR',
@@ -375,18 +376,22 @@ export class PaymentRequestsCommandService {
             'CHEQUE': 'Cheque',
             'BANK_TRANSFER': 'Bank Transfer',
             'PORTAL': 'Portal Payment',
+            'SURETY_BOND': 'Surety Bond'
         };
+
+        const shorthand = mode === 'BANK_TRANSFER' ? 'bt' : mode === 'PORTAL' ? 'portal' : mode.toLowerCase();
 
         const [instrument] = await tx
             .insert(paymentInstruments)
             .values({
                 requestId: requestId,
                 instrumentType: instrumentTypeMap[mode] || mode,
-                purpose: details[`${mode.toLowerCase()}Purpose`] || null,
+                purpose: details[`${shorthand}Purpose`] || null,
                 amount: amount.toString(),
-                favouring: details[`${mode.toLowerCase()}Favouring`] || null,
-                payableAt: details[`${mode.toLowerCase()}PayableAt`] || null,
-                issueDate: details[`${mode.toLowerCase()}Date`] || null,
+                favouring: (details[`${shorthand}Favouring`] || details.btAccountName || details.portalName) || null,
+                payableAt: (details[`${shorthand}PayableAt`] || details.bgAddress) || null,
+                issueDate: (details[`${shorthand}Date`] || details.bgDate) || null,
+                expiryDate: (details[`${shorthand}ExpiryDate`] || details.bgExpiryDate || details.fdrExpiryDate) || null,
                 isActive: true,
                 createdBy: userId,
             })
@@ -401,88 +406,79 @@ export class PaymentRequestsCommandService {
     }
 
     private async createInstrumentDetails(tx: any, instrumentId: number, mode: string, details: any) {
-        this.logger.log(`Creating instrument details: ${mode} - Instrument ID: ${instrumentId}`);
+        this.logger.log(`Creating instrument details: ${JSON.stringify(details)}`);
         switch (mode) {
             case 'DD':
                 await tx.insert(instrumentDdDetails).values({
                     instrumentId,
-                    ddFavour: details.ddFavouring || null,
-                    ddPayableAt: details.ddPayableAt || null,
-                    ddDeliverBy: details.ddDeliverBy || null,
-                    ddPurpose: details.ddPurpose || null,
-                    ddCourierAddress: details.ddCourierAddress || null,
-                    ddCourierHours: details.ddCourierHours || null,
                     ddDate: details.ddDate || null,
+                    ddPurpose: details.ddPurpose || null,
+                    ddNeeds: details.ddDeliverBy || null,
                     ddRemarks: details.ddRemarks || null,
+                    reqNo: details.reqNo || null,
                 }).execute();
                 break;
 
             case 'FDR':
                 await tx.insert(instrumentFdrDetails).values({
                     instrumentId,
-                    fdrFavour: details.fdrFavouring || null,
-                    fdrExpiryDate: details.fdrExpiryDate || null,
-                    fdrDeliverBy: details.fdrDeliverBy || null,
-                    fdrPurpose: details.fdrPurpose || null,
-                    fdrCourierAddress: details.fdrCourierAddress || null,
-                    fdrCourierHours: details.fdrCourierHours || null,
                     fdrDate: details.fdrDate || null,
+                    fdrPurpose: details.fdrPurpose || null,
+                    fdrExpiryDate: details.fdrExpiryDate || null,
+                    fdrNeeds: details.fdrDeliverBy || null,
+                    fdrRemark: details.fdrRemarks || null,
                 }).execute();
                 break;
 
             case 'BG':
                 await tx.insert(instrumentBgDetails).values({
                     instrumentId,
-                    bgNeededIn: details.bgNeededIn || null,
-                    bgPurpose: details.bgPurpose || null,
-                    bgFavouring: details.bgFavouring || null,
-                    bgAddress: details.bgAddress || null,
-                    bgExpiryDate: details.bgExpiryDate || null,
-                    bgClaimPeriod: details.bgClaimPeriod || null,
-                    bgStampValue: details.bgStampValue || null,
-                    bgBank: details.bgBank || null,
-                    bgBankAccountName: details.bgBankAccountName || null,
-                    bgBankAccountNo: details.bgBankAccountNo || null,
+                    bgDate: details.bgDate || null,
+                    validityDate: details.bgExpiryDate || null,
+                    claimExpiryDate: details.bgClaimPeriod || null,
+                    beneficiaryName: details.bgFavouring || null,
+                    beneficiaryAddress: details.bgAddress || null,
+                    bankName: details.bgBank || null,
+                    bgBankAcc: details.bgBankAccountNo || null,
                     bgBankIfsc: details.bgBankIfsc || null,
-                    bgClientUserEmail: details.bgClientUserEmail || null,
-                    bgClientCpEmail: details.bgClientCpEmail || null,
-                    bgClientFinanceEmail: details.bgClientFinanceEmail || null,
-                    bgCourierAddress: details.bgCourierAddress || null,
-                    bgCourierDays: details.bgCourierDays || null,
+                    bgPurpose: details.bgPurpose || null,
+                    bgNeeds: details.bgNeededIn || null,
+                    bgClientUser: details.bgClientUserEmail || null,
+                    bgClientCp: details.bgClientCpEmail || null,
+                    bgClientFin: details.bgClientFinanceEmail || null,
+                    stampCharge: details.bgStampValue || null,
                 }).execute();
                 break;
 
             case 'CHEQUE':
                 await tx.insert(instrumentChequeDetails).values({
                     instrumentId,
-                    chequeFavour: details.chequeFavouring || null,
                     chequeDate: details.chequeDate || null,
-                    chequeNeededIn: details.chequeNeededIn || null,
-                    chequePurpose: details.chequePurpose || null,
-                    chequeAccount: details.chequeAccount || null,
-                    reason: details.chequePurpose || null,
+                    bankName: details.chequeAccount || null,
+                    chequeReason: details.chequePurpose || null,
+                    chequeNeeds: details.chequeNeededIn || null,
                 }).execute();
                 break;
 
             case 'BANK_TRANSFER':
                 await tx.insert(instrumentTransferDetails).values({
                     instrumentId,
-                    btPurpose: details.btPurpose || null,
-                    btAccountName: details.btAccountName || null,
-                    btAccountNo: details.btAccountNo || null,
-                    btIfsc: details.btIfsc || null,
+                    accountName: details.btAccountName || null,
+                    accountNumber: details.btAccountNo || null,
+                    ifsc: details.btIfsc || null,
                     reason: details.btPurpose || null,
+                    paymentMethod: 'Bank Transfer'
                 }).execute();
                 break;
 
             case 'PORTAL':
                 await tx.insert(instrumentTransferDetails).values({
                     instrumentId,
-                    portalPurpose: details.portalPurpose || null,
                     portalName: details.portalName || null,
-                    portalNetBanking: details.portalNetBanking || null,
-                    portalDebitCard: details.portalDebitCard || null,
+                    isNetbanking: details.portalNetBanking || null,
+                    isDebit: details.portalDebitCard || null,
                     reason: details.portalPurpose || null,
+                    paymentMethod: 'Portal Payment'
                 }).execute();
                 break;
         }
@@ -528,8 +524,8 @@ export class PaymentRequestsCommandService {
         await tx
             .update(paymentInstruments)
             .set({
-                favouring: details[`${mode.toLowerCase()}Favouring`] || null,
-                amount: details[`${mode.toLowerCase()}Amount`]?.toString() || null,
+                favouring: (details.btAccountName || details.portalName || details.ddFavouring || details.fdrFavouring || details.bgFavouring || details.chequeFavouring) || null,
+                amount: (details.btAmount || details.portalAmount || details.ddAmount || details.fdrAmount || details.bgAmount || details.chequeAmount)?.toString() || null,
             })
             .where(eq(paymentInstruments.id, instrumentId));
 
