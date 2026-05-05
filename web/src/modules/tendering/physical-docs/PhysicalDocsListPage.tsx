@@ -176,17 +176,18 @@ const PhysicalDocsListPage = () => {
                 const { data } = params;
                 const timer = data?.timer;
 
-                if (!timer) {
-                    return <TenderTimerDisplay
-                        remainingSeconds={0}
-                        status="NOT_STARTED"
-                    />;
-                }
+                // if (!timer) {
+                //     return <TenderTimerDisplay
+                //         remainingSeconds={0}
+                //         status="NOT_STARTED"
+                //     />;
+                // }
 
                 return (
                     <TenderTimerDisplay
                         remainingSeconds={timer.remainingSeconds}
                         status={timer.status}
+                        deadline={timer.deadline}
                     />
                 );
             },
