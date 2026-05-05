@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 
 interface TenderTimerDisplayProps {
     remainingSeconds: number;
-    status: 'NOT_STARTED' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'OVERDUE';
-    deadline?: Date | null; // Required for accurate overdue calculation
+    status: 'NOT_STARTED' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'OVERDUE' | 'TIMER_NOT_FOUND' | 'STOPPED';
+    deadline?: Date | null;
 }
 
 export const TenderTimerDisplay = ({
@@ -26,18 +26,11 @@ export const TenderTimerDisplay = ({
         return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
     };
 
-    const formatShortTime = (seconds: number) => {
-        const absSeconds = Math.abs(Math.floor(seconds));
-        const hours = Math.floor(absSeconds / 3600);
-        const minutes = Math.floor((absSeconds % 3600) / 60);
-        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-    };
-
     // Calculate time based on deadline
     const calculateTime = () => {
         if (!deadline) {
             return {
-                seconds: remainingSeconds,
+                seconds: Math.abs(remainingSeconds),
                 overdue: remainingSeconds < 0
             };
         }
@@ -75,26 +68,23 @@ export const TenderTimerDisplay = ({
         }, 1000);
 
         return () => clearInterval(intervalId);
-    }, [deadline, remainingSeconds, isActiveTimer]);
+    }, [deadline, remainingSeconds, isActiveTimer, status]);
 
     const getDisplay = () => {
-        if (isActiveTimer) {
-            if (isOverdue) {
-                // OVERDUE: Stopwatch counting UP from deadline
-                // Shows how long past the deadline (now - deadline_at)
-                return (
-                    <Badge
-                        variant="secondary"
-                        className="text-destructive font-mono"
-                    >
-                        {formatTime(displaySeconds)}
-                    </Badge>
-                );
-            }
+        const isPositive = !isOverdue;
+        const colorClass = isPositive ? "text-emerald-400" : "text-destructive";
+        const badgeVariant = isPositive ? "success" : "destructive";
 
-            // Normal countdown: time remaining until deadline
+        if (status === 'TIMER_NOT_FOUND') {
+            return <span className="text-muted-foreground italic text-[10px]">Timer N/A</span>;
+        }
+
+        if (isActiveTimer) {
             return (
-                <Badge variant="outline" className="text-emerald-400 font-mono">
+                <Badge 
+                    variant="outline" 
+                    className={`${colorClass} font-mono border-current bg-transparent`}
+                >
                     {formatTime(displaySeconds)}
                 </Badge>
             );
@@ -102,21 +92,22 @@ export const TenderTimerDisplay = ({
 
         switch (status) {
             case 'COMPLETED':
+            case 'STOPPED':
                 return (
-                    <Badge variant={isOverdue ? "destructive" : "success"}>
+                    <Badge variant={badgeVariant as any} className="font-mono">
                         <CheckCircle className="w-3 h-3 mr-1" />
-                        {isOverdue ? '+' : ''}{formatShortTime(displaySeconds)}
+                        {formatTime(displaySeconds)}
                     </Badge>
                 );
             case 'PAUSED':
                 return (
-                    <Badge variant="secondary">
+                    <Badge variant="secondary" className="font-mono">
                         <Clock className="w-3 h-3 mr-1" />
-                        {formatShortTime(displaySeconds)}
+                        {formatTime(displaySeconds)}
                     </Badge>
                 );
             default:
-                return <span className="text-muted-foreground">Not started</span>;
+                return <span className="text-muted-foreground text-xs">Not started</span>;
         }
     };
 
