@@ -10,8 +10,8 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 function mapInstrumentTypeToMode(instrumentType: string | null): string | undefined {
     if (!instrumentType) return undefined;
     const mapping: Record<string, string> = {
-        'Bank Transfer': 'BT',
-        'Portal Payment': 'POP',
+        'Bank Transfer': 'BANK_TRANSFER',
+        'Portal Payment': 'PORTAL',
         'DD': 'DD',
         'FDR': 'FDR',
         'BG': 'BG',

@@ -55,10 +55,10 @@ export function PaymentSection({
             } else if (selectedMode === 'FDR') {
                 setValue(`${purpose}.details.fdrPurpose`, defaultPurpose);
                 setValue(`${purpose}.details.fdrAmount`, amount);
-            } else if (selectedMode === 'BT') {
+            } else if (selectedMode === 'BANK_TRANSFER') {
                 setValue(`${purpose}.details.btPurpose`, defaultPurpose);
                 setValue(`${purpose}.details.btAmount`, amount);
-            } else if (selectedMode === 'POP') {
+            } else if (selectedMode === 'PORTAL') {
                 setValue(`${purpose}.details.portalPurpose`, defaultPurpose);
                 setValue(`${purpose}.details.portalAmount`, amount);
             } else if (selectedMode === 'CHEQUE') {
@@ -121,8 +121,8 @@ export function PaymentSection({
                         Fill in the details for <strong>{MODE_LABELS[selectedMode] || selectedMode}</strong>
                     </p>
 
-                    {selectedMode === 'POP' && <PayOnPortalForm amount={amount} prefix={prefix} />}
-                    {selectedMode === 'BT' && <BankTransferForm amount={amount} prefix={prefix} />}
+                    {selectedMode === 'PORTAL' && <PayOnPortalForm amount={amount} prefix={prefix} />}
+                    {selectedMode === 'BANK_TRANSFER' && <BankTransferForm amount={amount} prefix={prefix} />}
                     {selectedMode === 'DD' && <DemandDraftForm amount={amount} prefix={prefix} />}
                     {selectedMode === 'BG' && <BankGuaranteeForm amount={amount} prefix={prefix} />}
                     {selectedMode === 'FDR' && <FdrForm amount={amount} prefix={prefix} />}

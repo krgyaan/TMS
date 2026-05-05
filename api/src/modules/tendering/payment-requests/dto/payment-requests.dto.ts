@@ -107,24 +107,18 @@ const emdSection = z.discriminatedUnion("mode", [
     z.object({ mode: z.literal("BG"), details: bgDetails }),
     z.object({ mode: z.literal("CHEQUE"), details: chequeDetails }),
     z.object({ mode: z.literal("BANK_TRANSFER"), details: bankTransferDetails }),
-    z.object({ mode: z.literal("BT"), details: bankTransferDetails }),
     z.object({ mode: z.literal("PORTAL"), details: portalDetails }),
-    z.object({ mode: z.literal("POP"), details: portalDetails }),
 ]).optional();
 
 const tenderFeeSection = z.discriminatedUnion("mode", [
     z.object({ mode: z.literal("PORTAL"), details: portalDetails }),
-    z.object({ mode: z.literal("POP"), details: portalDetails }),
     z.object({ mode: z.literal("BANK_TRANSFER"), details: bankTransferDetails }),
-    z.object({ mode: z.literal("BT"), details: bankTransferDetails }),
     z.object({ mode: z.literal("DD"), details: ddDetails }),
 ]).optional();
 
 const processingFeeSection = z.discriminatedUnion("mode", [
     z.object({ mode: z.literal("PORTAL"), details: portalDetails }),
-    z.object({ mode: z.literal("POP"), details: portalDetails }),
     z.object({ mode: z.literal("BANK_TRANSFER"), details: bankTransferDetails }),
-    z.object({ mode: z.literal("BT"), details: bankTransferDetails }),
     z.object({ mode: z.literal("DD"), details: ddDetails }),
 ]).optional();
 

@@ -414,19 +414,19 @@ export const PaymentRequestSchema = z.object({
     requestedBy: z.string().optional(),
     // EMD
     emd: z.object({
-        mode: z.enum(['DD', 'FDR', 'BG', 'CHEQUE', 'BT', 'POP', 'SURETY_BOND', 'NA']).optional(),
+        mode: z.enum(['DD', 'FDR', 'BG', 'CHEQUE', 'BANK_TRANSFER', 'PORTAL', 'SURETY_BOND', 'NA']).optional(),
         details: PaymentDetailsSchema.optional(),
     }).optional(),
 
     // Tender Fee
     tenderFee: z.object({
-        mode: z.enum(['POP', 'BT', 'DD', 'NA']).optional(),
+        mode: z.enum(['PORTAL', 'BANK_TRANSFER', 'DD', 'NA']).optional(),
         details: PaymentDetailsSchema.optional(),
     }).optional(),
 
     // Processing Fee
     processingFee: z.object({
-        mode: z.enum(['POP', 'BT', 'DD', 'NA']).optional(),
+        mode: z.enum(['PORTAL', 'BANK_TRANSFER', 'DD', 'NA']).optional(),
         details: PaymentDetailsSchema.optional(),
     }).optional(),
 });
@@ -440,19 +440,19 @@ export const OldEntryPaymentRequestSchema = z.object({
     tenderDueDate: z.string().optional(),
     // EMD
     emd: z.object({
-        mode: z.enum(['DD', 'FDR', 'BG', 'CHEQUE', 'BT', 'POP', 'SURETY_BOND', 'NA']).optional(),
+        mode: z.enum(['DD', 'FDR', 'BG', 'CHEQUE', 'BANK_TRANSFER', 'PORTAL', 'SURETY_BOND', 'NA']).optional(),
         details: PaymentDetailsSchema.optional(),
     }).optional(),
 
     // Tender Fee
     tenderFee: z.object({
-        mode: z.enum(['POP', 'BT', 'DD', 'NA']).optional(),
+        mode: z.enum(['PORTAL', 'BANK_TRANSFER', 'DD', 'NA']).optional(),
         details: PaymentDetailsSchema.optional(),
     }).optional(),
 
     // Processing Fee
     processingFee: z.object({
-        mode: z.enum(['POP', 'BT', 'DD', 'NA']).optional(),
+        mode: z.enum(['PORTAL', 'BANK_TRANSFER', 'DD', 'NA']).optional(),
         details: PaymentDetailsSchema.optional(),
     }).optional(),
 });

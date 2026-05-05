@@ -281,7 +281,7 @@ export class PaymentRequestsCommandService {
             'FDR': 'FDR',
             'BG': 'BG',
             'CHEQUE': 'Cheque',
-            'BT': 'Bank Transfer',
+            'BANK_TRANSFER': 'Bank Transfer',
             'PORTAL': 'Portal Payment',
         };
 
@@ -370,7 +370,7 @@ export class PaymentRequestsCommandService {
                 }).execute();
                 break;
 
-            case 'BT':
+            case 'BANK_TRANSFER':
                 await tx.insert(instrumentTransferDetails).values({
                     instrumentId,
                     btPurpose: details.btPurpose || null,
@@ -400,7 +400,7 @@ export class PaymentRequestsCommandService {
             FDR: instrumentFdrDetails,
             BG: instrumentBgDetails,
             CHEQUE: instrumentChequeDetails,
-            BT: instrumentTransferDetails,
+            BANK_TRANSFER: instrumentTransferDetails,
             PORTAL: instrumentTransferDetails,
         };
 
