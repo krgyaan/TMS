@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { bidSubmissionsService } from '@/services/api/bid-submissions.service';
 import { toast } from 'sonner';
-import type { PaginatedResult, BidSubmissionDashboardCounts, BidSubmissionDashboardRow, BidSubmissionListParams, SubmitBidDto, MarkAsMissedDto } from '@/types/api.types';
+import type { PaginatedResult, BidSubmissionDashboardCounts, BidSubmissionDashboardRow, BidSubmissionListParams, SubmitBidDto, MarkAsMissedDto, MarkAsMissedGlobalDto } from '@/types/api.types';
 import { useTeamFilter } from '@/hooks/useTeamFilter';
 
 export const bidSubmissionsKey = {
@@ -11,6 +11,7 @@ export const bidSubmissionsKey = {
     byTender: (tenderId: number) => [...bidSubmissionsKey.all, 'byTender', tenderId] as const,
     list: (filters?: Record<string, unknown>) => [...bidSubmissionsKey.lists(), { filters }] as const,
     dashboardCounts: () => [...bidSubmissionsKey.all, 'dashboard-counts'] as const,
+    missedStatuses: (stage: string) => [...bidSubmissionsKey.all, 'missed-statuses', stage] as const,
 };
 
 export const useBidSubmissions = (
@@ -99,6 +100,30 @@ export const useMarkAsMissed = () => {
         onError: (error: any) => {
             toast.error(error?.response?.data?.message || 'Failed to mark as missed');
         },
+    });
+};
+
+export const useMarkAsMissedGlobal = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (data: MarkAsMissedGlobalDto) => bidSubmissionsService.markAsMissedGlobal(data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: bidSubmissionsKey.all });
+            queryClient.invalidateQueries({ queryKey: bidSubmissionsKey.dashboardCounts() });
+            toast.success('Tender marked as missed');
+        },
+        onError: (error: any) => {
+            toast.error(error?.response?.data?.message || 'Failed to mark as missed');
+        },
+    });
+};
+
+export const useGetValidMissedStatuses = (stage?: string) => {
+    return useQuery({
+        queryKey: bidSubmissionsKey.missedStatuses(stage || ''),
+        queryFn: () => bidSubmissionsService.getValidMissedStatuses(stage!),
+        enabled: !!stage,
     });
 };
 
