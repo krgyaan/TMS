@@ -21,6 +21,7 @@ interface PaymentSectionProps {
     type?: RequestType;
     courierAddress?: string;
     defaultPurpose?: string;
+    isEditMode?: boolean;
 }
 
 const OLD_ENTRY_MODES = ['DD', 'FDR', 'BG'];
@@ -32,6 +33,7 @@ export function PaymentSection({
     type = 'TMS',
     courierAddress,
     defaultPurpose = purpose,
+    isEditMode = false,
 }: PaymentSectionProps) {
     const { control, watch, setValue } = useFormContext();
     const selectedMode = watch(`${purpose}.mode`);
@@ -45,7 +47,7 @@ export function PaymentSection({
     }, [type, allowedModes]);
 
     useEffect(() => {
-        if (!selectedMode) return;
+        if (!selectedMode || isEditMode) return;
 
         const setAmountAndPurpose = (amountField: string, purposeField: string) => {
             setValue(amountField, amount, { shouldValidate: false });
@@ -65,7 +67,7 @@ export function PaymentSection({
         } else if (selectedMode === 'CHEQUE') {
             setAmountAndPurpose(`${purpose}.details.chequeAmount`, `${purpose}.details.chequePurpose`);
         }
-    }, [selectedMode, setValue, defaultPurpose, purpose, amount]);
+    }, [selectedMode, setValue, defaultPurpose, purpose, amount, isEditMode]);
 
     useEffect(() => {
         if (selectedMode === 'DD' && courierAddress && !currentDdCourierAddress) {
@@ -121,11 +123,11 @@ export function PaymentSection({
                         Fill in the details for <strong>{MODE_LABELS[selectedMode] || selectedMode}</strong>
                     </p>
 
-                    {selectedMode === 'PORTAL' && <PayOnPortalForm amount={amount} prefix={prefix} />}
-                    {selectedMode === 'BANK_TRANSFER' && <BankTransferForm amount={amount} prefix={prefix} />}
-                    {selectedMode === 'DD' && <DemandDraftForm amount={amount} prefix={prefix} />}
-                    {selectedMode === 'BG' && <BankGuaranteeForm amount={amount} prefix={prefix} />}
-                    {selectedMode === 'FDR' && <FdrForm amount={amount} prefix={prefix} />}
+                    {selectedMode === 'PORTAL' && <PayOnPortalForm amount={isEditMode ? undefined : amount} prefix={prefix} />}
+                    {selectedMode === 'BANK_TRANSFER' && <BankTransferForm amount={isEditMode ? undefined : amount} prefix={prefix} />}
+                    {selectedMode === 'DD' && <DemandDraftForm amount={isEditMode ? undefined : amount} prefix={prefix} />}
+                    {selectedMode === 'BG' && <BankGuaranteeForm amount={isEditMode ? undefined : amount} prefix={prefix} />}
+                    {selectedMode === 'FDR' && <FdrForm amount={isEditMode ? undefined : amount} prefix={prefix} />}
                     {selectedMode === 'CHEQUE' && <ChequeForm prefix={prefix} />}
                 </div>
             )}

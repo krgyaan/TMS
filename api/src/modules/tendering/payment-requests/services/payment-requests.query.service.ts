@@ -3,7 +3,15 @@ import { Inject } from '@nestjs/common';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { eq, and, or, inArray, gt, sql, desc, asc } from 'drizzle-orm';
-import { paymentRequests, paymentInstruments } from '@db/schemas/tendering/payment-requests.schema';
+import { 
+    paymentRequests, 
+    paymentInstruments,
+    instrumentDdDetails,
+    instrumentFdrDetails,
+    instrumentBgDetails,
+    instrumentChequeDetails,
+    instrumentTransferDetails
+} from '@db/schemas/tendering/payment-requests.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { tenderInformation } from '@/db/schemas/tendering/tender-info-sheet.schema';
 import { users } from '@db/schemas/auth/users.schema';
@@ -679,8 +687,23 @@ export class PaymentRequestsQueryService {
 
     async findByIdWithTender(requestId: number) {
         const [request] = await this.db
-            .select()
+            .select({
+                id: paymentRequests.id,
+                tenderId: paymentRequests.tenderId,
+                type: paymentRequests.type,
+                tenderNo: paymentRequests.tenderNo,
+                projectName: paymentRequests.projectName,
+                dueDate: paymentRequests.dueDate,
+                requestedBy: paymentRequests.requestedBy,
+                requestedByName: users.name,
+                purpose: paymentRequests.purpose,
+                amountRequired: paymentRequests.amountRequired,
+                status: paymentRequests.status,
+                remarks: paymentRequests.remarks,
+                createdAt: paymentRequests.createdAt,
+            })
             .from(paymentRequests)
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
             .where(eq(paymentRequests.id, requestId))
             .limit(1);
 
@@ -700,10 +723,27 @@ export class PaymentRequestsQueryService {
                 eq(paymentInstruments.isActive, true)
             ));
 
+        // Fetch details for each instrument
+        const instrumentsWithDetails = await Promise.all(instruments.map(async (instrument) => {
+            let details: any = null;
+            if (instrument.instrumentType === 'DD') {
+                [details] = await this.db.select().from(instrumentDdDetails).where(eq(instrumentDdDetails.instrumentId, instrument.id)).limit(1);
+            } else if (instrument.instrumentType === 'FDR') {
+                [details] = await this.db.select().from(instrumentFdrDetails).where(eq(instrumentFdrDetails.instrumentId, instrument.id)).limit(1);
+            } else if (instrument.instrumentType === 'BG') {
+                [details] = await this.db.select().from(instrumentBgDetails).where(eq(instrumentBgDetails.instrumentId, instrument.id)).limit(1);
+            } else if (instrument.instrumentType === 'Cheque') {
+                [details] = await this.db.select().from(instrumentChequeDetails).where(eq(instrumentChequeDetails.instrumentId, instrument.id)).limit(1);
+            } else if (instrument.instrumentType === 'Bank Transfer' || instrument.instrumentType === 'Portal Payment') {
+                [details] = await this.db.select().from(instrumentTransferDetails).where(eq(instrumentTransferDetails.instrumentId, instrument.id)).limit(1);
+            }
+            return { ...instrument, details };
+        }));
+
         return {
             ...request,
             tender,
-            instruments,
+            instruments: instrumentsWithDetails,
         };
     }
 }

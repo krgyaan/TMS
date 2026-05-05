@@ -51,6 +51,7 @@ export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mod
             EMD: { mode: undefined, details: {} },
             TENDER_FEES: { mode: undefined, details: {} },
             PROCESSING_FEES: { mode: undefined, details: {} },
+            requestedBy: '',
         },
     });
 
@@ -195,9 +196,9 @@ export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mod
     const tenderFeeAmount = data?.tenderFees || 0;
     const processingFeeAmount = data?.processingFeeAmount || 0;
 
-    const hasEmd = emdAmount > 0;
-    const hasTenderFee = tenderFeeAmount > 0;
-    const hasProcessingFee = processingFeeAmount > 0;
+    const hasEmd = isEditMode ? !!requestIds?.emd : emdAmount > 0;
+    const hasTenderFee = isEditMode ? !!requestIds?.tenderFee : tenderFeeAmount > 0;
+    const hasProcessingFee = isEditMode ? !!requestIds?.processingFee : processingFeeAmount > 0;
 
     if (!hasEmd && !hasTenderFee && !hasProcessingFee) {
         return (
@@ -220,9 +221,10 @@ export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mod
         );
     }
 
-    const allowedEmdModes = parseAllowedModes(data?.emdMode);
-    const allowedTenderFeeModes = parseAllowedModes(data?.tenderFeeMode);
-    const allowedProcessingFeeModes = parseAllowedModes(data?.processingFeeMode);
+    const ALL_MODES = ['DD', 'FDR', 'BG', 'CHEQUE', 'BANK_TRANSFER', 'PORTAL'];
+    const allowedEmdModes = isEditMode ? ALL_MODES : parseAllowedModes(data?.emdMode);
+    const allowedTenderFeeModes = isEditMode ? ['PORTAL', 'BANK_TRANSFER', 'DD'] : parseAllowedModes(data?.tenderFeeMode);
+    const allowedProcessingFeeModes = isEditMode ? ['PORTAL', 'BANK_TRANSFER', 'DD'] : parseAllowedModes(data?.processingFeeMode);
 
     const isPending = isEditMode ? updateRequest.isPending : createRequest.isPending;
 
@@ -253,16 +255,19 @@ export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mod
                         {tenderId && (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-muted/30 rounded-lg border">
                                 <FieldWrapper control={form.control} name="tenderNo" label="Tender Number">
-                                    {(field) => <Input {...field} value={data?.tenderNo || ''} readOnly className="bg-background" />}
+                                    {(field) => <Input {...field} value={field.value || data?.tenderNo || ''} readOnly className="bg-background" />}
                                 </FieldWrapper>
                                 <FieldWrapper control={form.control} name="tenderName" label="Tender Name">
-                                    {(field) => <Input {...field} value={data?.tenderName || ''} readOnly className="bg-background" />}
+                                    {(field) => <Input {...field} value={field.value || data?.tenderName || ''} readOnly className="bg-background" />}
                                 </FieldWrapper>
                                 <FieldWrapper control={form.control} name="tenderDueDate" label="Due Date">
-                                    {(field) => <Input {...field} value={data?.dueDate ? new Date(data.dueDate).toLocaleDateString('en-IN') : ''} readOnly className="bg-background" />}
+                                    {(field) => {
+                                        const dateVal = field.value || data?.dueDate;
+                                        return <Input {...field} value={dateVal ? new Date(dateVal).toLocaleDateString('en-IN') : ''} readOnly className="bg-background" />;
+                                    }}
                                 </FieldWrapper>
                                 <FieldWrapper control={form.control} name="requestedBy" label="Requested By">
-                                    {(field) => <Input {...field} value={user?.name || ''} readOnly className="bg-background" />}
+                                    {(field) => <Input {...field} value={field.value || user?.name || ''} readOnly className="bg-background" />}
                                 </FieldWrapper>
                             </div>
                         )}
@@ -275,6 +280,7 @@ export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mod
                                 type="TMS"
                                 courierAddress={data?.courierAddress || undefined}
                                 defaultPurpose="EMD"
+                                isEditMode={isEditMode}
                             />
                         )}
 
@@ -286,6 +292,7 @@ export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mod
                                 type="TMS"
                                 courierAddress={data?.courierAddress || undefined}
                                 defaultPurpose="TENDER_FEES"
+                                isEditMode={isEditMode}
                             />
                         )}
 
@@ -296,6 +303,7 @@ export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mod
                                 amount={processingFeeAmount}
                                 type="TMS"
                                 courierAddress={data?.courierAddress || undefined}
+                                isEditMode={isEditMode}
                             />
                         )}
 

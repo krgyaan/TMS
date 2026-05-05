@@ -20,11 +20,11 @@ function mapInstrumentTypeToMode(instrumentType: string | null): string | undefi
     return mapping[instrumentType];
 }
 
-function mapDetailsToForm(instrumentType: string, instrument: any): any {
+function mapDetailsToForm(instrumentType: string, instrument: any, amount: any): any {
     if (!instrument) return {};
 
     // Merge instrument fields and details fields
-    const merged = { ...instrument, ...(instrument.details || {}) };
+    const merged = { ...instrument, ...(instrument.details || {}), amountRequired: amount };
 
     switch (instrumentType) {
         case 'DD':
@@ -33,6 +33,7 @@ function mapDetailsToForm(instrumentType: string, instrument: any): any {
                 ddPayableAt: merged.payableAt || '',
                 ddDeliverBy: merged.ddNeeds || '',
                 ddPurpose: merged.ddPurpose || '',
+                ddAmount: merged.amountRequired || '',
                 ddCourierAddress: merged.courierAddress || '',
                 ddCourierHours: merged.courierDeadline || undefined,
                 ddDate: merged.ddDate || merged.issueDate || '',
@@ -51,6 +52,7 @@ function mapDetailsToForm(instrumentType: string, instrument: any): any {
         case 'FDR':
             return {
                 fdrFavouring: merged.favouring || '',
+                fdrAmount: merged.amountRequired || '',
                 fdrExpiryDate: merged.fdrExpiryDate || merged.expiryDate || '',
                 fdrDeliverBy: merged.fdrNeeds || '',
                 fdrPurpose: merged.fdrPurpose || '',
@@ -61,6 +63,7 @@ function mapDetailsToForm(instrumentType: string, instrument: any): any {
         case 'BG':
             return {
                 bgNeededIn: merged.bgNeeds || '',
+                bgAmount: merged.amountRequired || '',
                 bgPurpose: merged.bgPurpose || '',
                 bgFavouring: merged.beneficiaryName || merged.favouring || '',
                 bgAddress: merged.beneficiaryAddress || '',
@@ -79,6 +82,7 @@ function mapDetailsToForm(instrumentType: string, instrument: any): any {
         case 'Bank Transfer':
             return {
                 btPurpose: merged.purpose || '',
+                btAmount: merged.amountRequired || '',
                 btAccountName: merged.accountName || '',
                 btAccountNo: merged.accountNumber || '',
                 btIfsc: merged.ifsc || '',
@@ -86,6 +90,7 @@ function mapDetailsToForm(instrumentType: string, instrument: any): any {
         case 'Portal Payment':
             return {
                 portalPurpose: merged.purpose || '',
+                portalAmount: merged.amountRequired || '',
                 portalName: merged.portalName || '',
                 portalNetBanking: merged.isNetbanking || undefined,
                 portalDebitCard: merged.isDebit || undefined,
@@ -116,9 +121,13 @@ const EMDEditPage = () => {
         }
 
         const formData: any = {
-            emd: { mode: undefined, details: {} },
-            tenderFee: { mode: undefined, details: {} },
-            processingFee: { mode: undefined, details: {} },
+            EMD: { mode: undefined, details: {} },
+            TENDER_FEES: { mode: undefined, details: {} },
+            PROCESSING_FEES: { mode: undefined, details: {} },
+            requestedBy: paymentRequests.requestedByName || '',
+            tenderNo: paymentRequests.tenderNo || '',
+            tenderName: paymentRequests.projectName || '',
+            tenderDueDate: paymentRequests.dueDate || '',
         };
         const requestIds: any = {};
 
@@ -126,16 +135,16 @@ const EMDEditPage = () => {
         if (!instrument) return { formData: undefined, requestIds: undefined };
 
         const mode = mapInstrumentTypeToMode(instrument.instrumentType);
-        const details = mapDetailsToForm(instrument.instrumentType, instrument);
+        const details = mapDetailsToForm(instrument.instrumentType, instrument, paymentRequests.amountRequired);
 
         if (paymentRequests.purpose === 'EMD') {
-            formData.emd = { mode, details };
+            formData.EMD = { mode, details };
             requestIds.emd = paymentRequests.id;
         } else if (paymentRequests.purpose === 'Tender Fee') {
-            formData.tenderFee = { mode, details };
+            formData.TENDER_FEES = { mode, details };
             requestIds.tenderFee = paymentRequests.id;
         } else if (paymentRequests.purpose === 'Processing Fee') {
-            formData.processingFee = { mode, details };
+            formData.PROCESSING_FEES = { mode, details };
             requestIds.processingFee = paymentRequests.id;
         }
 
@@ -171,6 +180,9 @@ const EMDEditPage = () => {
             </Alert>
         );
     }
+
+    console.log("Form Data", formData);
+    console.log("Request IDs", requestIds);
     return (
         <EmdTenderFeeRequestForm
             tenderId={paymentRequests?.tenderId}
