@@ -1,45 +1,26 @@
 // Payment modes - use string identifiers that match backend
-export const EMD_MODE_VALUES = {
-    POP: 'POP',
-    BT: 'BT',
-    DD: 'DD',
-    BG: 'BG',
-    FDR: 'FDR',
-    CHEQUE: 'CHEQUE',
-    NA: 'NA',
-} as const;
-
-export const EMD_MODES = [
-    { value: 'POP', label: 'Pay on Portal' },
-    { value: 'BT', label: 'Bank Transfer' },
-    { value: 'DD', label: 'Demand Draft' },
-    { value: 'BG', label: 'Bank Guarantee' },
-    { value: 'FDR', label: 'Fixed Deposit Receipt' },
-    { value: 'CHEQUE', label: 'Cheque' },
-];
-
 export const TENDER_FEE_MODES = [
-    { value: 'POP', label: 'Pay on Portal' },
-    { value: 'BT', label: 'Bank Transfer' },
+    { value: 'PORTAL', label: 'Pay on Portal' },
+    { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
     { value: 'DD', label: 'Demand Draft' },
 ];
 
 export const PROCESSING_FEE_MODES = [
-    { value: 'POP', label: 'Pay on Portal' },
-    { value: 'BT', label: 'Bank Transfer' },
+    { value: 'PORTAL', label: 'Pay on Portal' },
+    { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
     { value: 'DD', label: 'Demand Draft' },
 ];
 
 // Legacy mode mapping (database stores numeric, we need to convert)
 export const MODE_VALUE_MAP: Record<string, string> = {
-    '1': 'POP',
-    '2': 'BT',
+    '1': 'PORTAL',
+    '2': 'BANK_TRANSFER',
     '3': 'DD',
     '4': 'BG',
     '5': 'FDR',
     '6': 'CHEQUE',
-    'POP': 'POP',
-    'BT': 'BT',
+    'PORTAL': 'PORTAL',
+    'BANK_TRANSFER': 'BANK_TRANSFER',
     'DD': 'DD',
     'BG': 'BG',
     'FDR': 'FDR',
@@ -51,8 +32,8 @@ export const MODE_LABELS: Record<string, string> = {
     'FDR': 'Fixed Deposit Receipt',
     'CHEQUE': 'Cheque',
     'BG': 'Bank Guarantee',
-    'BT': 'Bank Transfer',
-    'POP': 'Payment on Portal',
+    'BANK_TRANSFER': 'Bank Transfer',
+    'PORTAL': 'Payment on Portal',
 };
 
 export const PURPOSE_OPTIONS = [
@@ -108,8 +89,6 @@ export const BANKS = [
     { value: 'AU_5180', label: 'AU 5180' },
     { value: 'AU_5190', label: 'AU 5190' },
     { value: 'AU_9589', label: 'AU 9589' },
-    { value: 'YESBANK_2011', label: 'Yes Bank 2011' },
-    { value: 'YESBANK_0771', label: 'Yes Bank 0771' },
     { value: 'HDFC_0026', label: 'HDFC Bank 0026' },
     { value: 'HDFC_2828', label: 'HDFC Bank 2828' },
     { value: 'HDFC_2501', label: 'HDFC Bank 2501' },
@@ -118,59 +97,13 @@ export const BANKS = [
     { value: 'PNB_6011', label: 'PNB Bank 6011' },
     { value: 'SBI', label: 'State Bank of India' },
     { value: 'ICICI', label: 'ICICI Bank' },
+    { value: 'YESBANK_2011', label: 'Yes Bank 2011' },
+    { value: 'YESBANK_0771', label: 'Yes Bank 0771' },
 ];
 
 export const YES_NO_OPTIONS = [
     { value: 'YES', label: 'Yes' },
     { value: 'NO', label: 'No' },
-];
-
-export const DD_STATUS = [
-    { value: '1', label: 'Accounts Form (DD)' },
-    { value: '2', label: 'Initiate Followup' },
-    { value: '3', label: 'Returned via Courier' },
-    { value: '4', label: 'Returned via Bank Transfer' },
-    { value: '5', label: 'Settled with Project Account' },
-    { value: '6', label: 'Send DD Cancellation Request' },
-    { value: '7', label: 'DD Cancelled at Branch' },
-];
-
-export const FDR_STATUS = [
-    { value: '1', label: 'Accounts Form (FDR)' },
-    { value: '2', label: 'Initiate Followup' },
-    { value: '3', label: 'Returned via Courier' },
-    { value: '4', label: 'Returned via Bank Transfer' },
-    { value: '5', label: 'Settled with Project Account' },
-    { value: '6', label: 'Send FDR Cancellation Request' },
-    { value: '7', label: 'FDR Cancelled at Branch' },
-];
-
-export const CHEQUE_STATUS = [
-    { value: '1', label: 'Accounts Form' },
-    { value: '2', label: 'Initiate Followup' },
-    { value: '3', label: 'Stop the cheque from the bank' },
-    { value: '4', label: 'Paid via Bank Transfer' },
-    { value: '5', label: 'Deposited in Bank' },
-    { value: '6', label: 'Cancelled/Torned' },
-];
-
-export const BG_STATUS = [
-    { value: '1', label: 'Accounts Form 1 - Request to Bank' },
-    { value: '2', label: 'Accounts Form 2 - After BG Creation' },
-    { value: '3', label: 'Accounts Form 3 - Capture FDR Details' },
-    { value: '4', label: 'Initiate Followup' },
-    { value: '5', label: 'Request Extension' },
-    { value: '6', label: 'Returned via Courier' },
-    { value: '7', label: 'Request Cancellation' },
-    { value: '8', label: 'BG Cancellation Confirmation' },
-    { value: '9', label: 'FDR Cancellation Confirmation' },
-];
-
-export const BT_POP_STATUS = [
-    { value: '1', label: 'Accounts Form' },
-    { value: '2', label: 'Initiate Followup' },
-    { value: '3', label: 'Returned via Bank Transfer' },
-    { value: '4', label: 'Settled with Project Account' },
 ];
 
 // Helper to normalize mode values from database
@@ -181,7 +114,7 @@ export function normalizeModeValue(mode: string | null | undefined): string {
 
 // Helper to get allowed modes from comma-separated string or array
 export function parseAllowedModes(modes: string | string[] | null | undefined): string[] {
-    if (!modes) return ['DD', 'FDR', 'CHEQUE', 'BG', 'BT', 'POP'];
+    if (!modes) return ['DD', 'FDR', 'CHEQUE', 'BG', 'BANK_TRANSFER', 'PORTAL'];
 
     const modeArray = Array.isArray(modes)
         ? modes
@@ -230,24 +163,21 @@ export const APPROVAL_STATUS = [
 ];
 
 // ============================================================================
-// Action/Stage Constants - Per Instrument Type
+// Action/Stage Constants - Single Source of Truth
 // ============================================================================
 
-/**
- * DD (Demand Draft) Actions/Stages
- * Database: action column values 1-7, null
- */
-export const DD_ACTIONS = [
-    { value: 1, label: 'Accounts Form (DD)' },
-    { value: 2, label: 'Initiate Followup' },
-    { value: 3, label: 'Returned via Courier' },
-    { value: 4, label: 'Returned via Bank Transfer' },
-    { value: 5, label: 'Settled with Project Account' },
-    { value: 6, label: 'Send DD Cancellation Request' },
-    { value: 7, label: 'DD Cancelled at Branch' },
-];
+type ActionRecord = Record<number, string>;
+type ActionArray = Array<{ value: number; label: string }>;
 
-export const DD_ACTION_LABELS: Record<number, string> = {
+function createActionsFromRecord(record: ActionRecord): ActionArray {
+    return Object.entries(record).map(([value, label]) => ({
+        value: Number(value),
+        label,
+    }));
+}
+
+// DD (Demand Draft) - 7 stages
+const DD_ACTIONS_RECORD: ActionRecord = {
     1: 'Accounts Form (DD)',
     2: 'Initiate Followup',
     3: 'Returned via Courier',
@@ -256,39 +186,21 @@ export const DD_ACTION_LABELS: Record<number, string> = {
     6: 'Send DD Cancellation Request',
     7: 'DD Cancelled at Branch',
 };
+export const DD_ACTION_LABELS = DD_ACTIONS_RECORD;
+export const DD_ACTIONS = createActionsFromRecord(DD_ACTIONS_RECORD);
 
-/**
- * FDR (Fixed Deposit Receipt) Actions/Stages
- * Database: action column values 1-4, null
- */
-export const FDR_ACTIONS = [
-    { value: 1, label: 'Accounts Form (FDR)' },
-    { value: 2, label: 'Initiate Followup' },
-    { value: 3, label: 'Returned via Courier' },
-    { value: 4, label: 'Returned via Bank Transfer' },
-];
-
-export const FDR_ACTION_LABELS: Record<number, string> = {
+// FDR (Fixed Deposit Receipt) - 4 stages
+const FDR_ACTIONS_RECORD: ActionRecord = {
     1: 'Accounts Form (FDR)',
     2: 'Initiate Followup',
     3: 'Returned via Courier',
     4: 'Returned via Bank Transfer',
 };
+export const FDR_ACTION_LABELS = FDR_ACTIONS_RECORD;
+export const FDR_ACTIONS = createActionsFromRecord(FDR_ACTIONS_RECORD);
 
-/**
- * Cheque Actions/Stages
- * Database: action column values 1-6, null
- */
-export const CHEQUE_ACTIONS = [
-    { value: 1, label: 'Accounts Form (Cheque)' },
-    { value: 2, label: 'Initiate Followup' },
-    { value: 3, label: 'Stop Cheque from Bank' },
-    { value: 4, label: 'Paid via Bank Transfer' },
-    { value: 5, label: 'Deposited in Bank' },
-    { value: 6, label: 'Cancelled/Torn' },
-];
-
-export const CHEQUE_ACTION_LABELS: Record<number, string> = {
+// Cheque - 6 stages
+const CHEQUE_ACTIONS_RECORD: ActionRecord = {
     1: 'Accounts Form (Cheque)',
     2: 'Initiate Followup',
     3: 'Stop Cheque from Bank',
@@ -296,24 +208,11 @@ export const CHEQUE_ACTION_LABELS: Record<number, string> = {
     5: 'Deposited in Bank',
     6: 'Cancelled/Torn',
 };
+export const CHEQUE_ACTION_LABELS = CHEQUE_ACTIONS_RECORD;
+export const CHEQUE_ACTIONS = createActionsFromRecord(CHEQUE_ACTIONS_RECORD);
 
-/**
- * BG (Bank Guarantee) Actions/Stages
- * Database: action column values 1-9, null
- */
-export const BG_ACTIONS = [
-    { value: 1, label: 'Accounts Form 1 - Request to Bank' },
-    { value: 2, label: 'Accounts Form 2 - After BG Creation' },
-    { value: 3, label: 'Accounts Form 3 - Capture FDR Details' },
-    { value: 4, label: 'Initiate Followup' },
-    { value: 5, label: 'Request Extension' },
-    { value: 6, label: 'Returned via Courier' },
-    { value: 7, label: 'Request Cancellation' },
-    { value: 8, label: 'BG Cancellation Confirmation' },
-    { value: 9, label: 'FDR Cancellation Confirmation' },
-];
-
-export const BG_ACTION_LABELS: Record<number, string> = {
+// BG (Bank Guarantee) - 9 stages
+const BG_ACTIONS_RECORD: ActionRecord = {
     1: 'Accounts Form 1 - Request to Bank',
     2: 'Accounts Form 2 - After BG Creation',
     3: 'Accounts Form 3 - Capture FDR Details',
@@ -324,42 +223,35 @@ export const BG_ACTION_LABELS: Record<number, string> = {
     8: 'BG Cancellation Confirmation',
     9: 'FDR Cancellation Confirmation',
 };
+export const BG_ACTION_LABELS = BG_ACTIONS_RECORD;
+export const BG_ACTIONS = createActionsFromRecord(BG_ACTIONS_RECORD);
 
-/**
- * Bank Transfer Actions/Stages
- * Database: action column values 1-4, null
- */
-export const BANK_TRANSFER_ACTIONS = [
-    { value: 1, label: 'Accounts Form (Bank Transfer)' },
-    { value: 2, label: 'Initiate Followup' },
-    { value: 3, label: 'Returned via Bank Transfer' },
-    { value: 4, label: 'Settled with Project Account' },
-];
-
-export const BANK_TRANSFER_ACTION_LABELS: Record<number, string> = {
+// Bank Transfer - 4 stages
+const BANK_TRANSFER_ACTIONS_RECORD: ActionRecord = {
     1: 'Accounts Form (Bank Transfer)',
     2: 'Initiate Followup',
     3: 'Returned via Bank Transfer',
     4: 'Settled with Project Account',
 };
+export const BANK_TRANSFER_ACTION_LABELS = BANK_TRANSFER_ACTIONS_RECORD;
+export const BANK_TRANSFER_ACTIONS = createActionsFromRecord(BANK_TRANSFER_ACTIONS_RECORD);
 
-/**
- * Portal Payment Actions/Stages
- * Database: action column values 1-4, null
- */
-export const PORTAL_ACTIONS = [
-    { value: 1, label: 'Accounts Form (Portal)' },
-    { value: 2, label: 'Initiate Followup' },
-    { value: 3, label: 'Returned via Bank Transfer' },
-    { value: 4, label: 'Settled with Project Account' },
-];
-
-export const PORTAL_ACTION_LABELS: Record<number, string> = {
+// Portal Payment - 4 stages
+const PORTAL_ACTIONS_RECORD: ActionRecord = {
     1: 'Accounts Form (Portal)',
     2: 'Initiate Followup',
     3: 'Returned via Bank Transfer',
     4: 'Settled with Project Account',
 };
+export const PORTAL_ACTION_LABELS = PORTAL_ACTIONS_RECORD;
+export const PORTAL_ACTIONS = createActionsFromRecord(PORTAL_ACTIONS_RECORD);
+
+// Legacy status aliases for backward compatibility
+export const DD_STATUS = DD_ACTIONS;
+export const FDR_STATUS = DD_ACTIONS;
+export const CHEQUE_STATUS = CHEQUE_ACTIONS;
+export const BG_STATUS = BG_ACTIONS;
+export const BT_POP_STATUS = BANK_TRANSFER_ACTIONS;
 
 // ============================================================================
 // Helper to get actions by instrument type
