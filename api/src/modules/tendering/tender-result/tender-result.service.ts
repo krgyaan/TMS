@@ -29,6 +29,7 @@ const RESULT_STATUS = {
     UNDER_EVALUATION: 'Under Evaluation',
     WON: 'Won',
     LOST: 'Lost',
+    CANCELLED: 'Cancelled',
     LOST_H1: 'Lost - H1 Elimination',
     DISQUALIFIED: 'Disqualified',
 } as const;
@@ -158,7 +159,7 @@ export class TenderResultService {
     } else if (activeTab === 'disqualified') {
         conditions.push(
             isNotNull(latestTenderResultSq.id),
-            inArray(latestTenderResultSq.status, ['Disqualified', 'cancelled', 'disqualified'])
+            inArray(latestTenderResultSq.status, ['Disqualified', 'Cancelled', 'disqualified'])
         );
     } else {
         throw new BadRequestException(`Invalid tab: ${activeTab}`);
@@ -388,7 +389,7 @@ export class TenderResultService {
             } else if (tab === 'disqualified') {
                 conditions.push(
                     isNotNull(latestTenderResultSq.id),
-                    inArray(latestTenderResultSq.status, ['Disqualified', 'cancelled', 'disqualified'])
+                    inArray(latestTenderResultSq.status, ['Disqualified', 'Cancelled', 'disqualified'])
                 );
             }
 
@@ -725,7 +726,7 @@ export class TenderResultService {
             updateData.qualifiedPartiesScreenshot = dto.qualifiedPartiesScreenshot;
 
             // Only update tender status if result details are provided
-            if (dto.result) {
+            if (dto.result === 'Won' || dto.result === 'Lost') {
                 updateData.status = dto.result === 'Won' ? RESULT_STATUS.WON : RESULT_STATUS.LOST;
                 updateData.result = dto.result;
                 updateData.resultReason = dto.resultReason;
@@ -738,6 +739,14 @@ export class TenderResultService {
                 // Update tender status based on result
                 newStatus = dto.result === 'Won' ? 25 : 24; // 25 for Won, 24 for Lost
                 statusComment = dto.result === 'Won' ? 'Won (PO awaited)' : 'Lost';
+            } else if(dto.result === 'Cancelled'){
+                updateData.status = RESULT_STATUS.CANCELLED,
+                updateData.resultUploadedAt = new Date();
+                updateData.resultReason = dto.resultReason;
+
+                // Update tender status based on result
+                newStatus = 18;
+                statusComment = "Tender Cancelled";
             } else {
                 // No result details: Only update result status, not tender status
                 updateData.status = RESULT_STATUS.UNDER_EVALUATION;
