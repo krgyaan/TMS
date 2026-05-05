@@ -46,6 +46,18 @@ export const MarkAsMissedSchema = z.object({
 export type MarkAsMissedDto = z.infer<typeof MarkAsMissedSchema>;
 
 /**
+ * Mark As Missed Global Schema - Based on global missed status updates
+ */
+export const MarkAsMissedGlobalSchema = z.object({
+    tenderId: bigintField().positive('Tender ID must be positive'),
+    rejectionStatus: bigintField().positive('Rejection status is required'),
+    preventionMeasures: textField().min(1, 'Prevention measures are required'),
+    tmsImprovements: textField().min(1, 'TMS improvements are required'),
+});
+
+export type MarkAsMissedGlobalDto = z.infer<typeof MarkAsMissedGlobalSchema>;
+
+/**
  * Update Bid Submission Schema - Partial update schema
  */
 export const UpdateBidSubmissionSchema = z.object({

@@ -5,12 +5,12 @@ import type { ColDef } from 'ag-grid-community';
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import type { PhysicalDocsDashboardRowWithTimer } from './helpers/physicalDocs.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle, Eye, FileX2, Search, RefreshCw } from 'lucide-react';
+import { AlertCircle, CheckCircle, Eye, FileX2, Search, RefreshCw, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { usePhysicalDocs, usePhysicalDocsDashboardCounts } from '@/hooks/api/usePhysicalDocs';
 import { dateCol, tenderNameCol } from '@/components/data-grid';
@@ -19,9 +19,12 @@ import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { QuickFilter } from '@/components/ui/quick-filter';
 import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
+import { useTenderingPermissions } from '../hooks/useTenderingPermissions';
 
 const PhysicalDocsListPage = () => {
-    const [activeTab, setActiveTab] = useState<'pending' | 'sent' | 'tender-dnb'>('pending');
+    const [searchParams] = useSearchParams();
+    const initialTab = (searchParams.get('tab') as 'pending' | 'sent' | 'tender-dnb') || 'pending';
+    const [activeTab, setActiveTab] = useState<'pending' | 'sent' | 'tender-dnb'>(initialTab);
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
@@ -31,6 +34,7 @@ const PhysicalDocsListPage = () => {
         tenderId: null
     });
     const navigate = useNavigate();
+    const { hasTenderingPermission } = useTenderingPermissions();
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
@@ -64,15 +68,11 @@ const PhysicalDocsListPage = () => {
     const totalRows = apiResponse?.meta?.total || 0;
 
     const physicalDocsActions: ActionItem<PhysicalDocsDashboardRowWithTimer>[] = [
-        // {
-        //     label: 'Change Status',
-        //     onClick: (row: PhysicalDocsDashboardRowWithTimer) => setChangeStatusModal({ open: true, tenderId: row.tenderId }),
-        //     icon: <RefreshCw className="h-4 w-4" />,
-        // },
         {
             label: 'Send',
             onClick: (row: PhysicalDocsDashboardRowWithTimer) => row.physicalDocs ? navigate(paths.tendering.physicalDocsEdit(row.tenderId)) : navigate(paths.tendering.physicalDocsCreate(row.tenderId)),
             icon: <CheckCircle className="h-4 w-4" />,
+            visible: () => activeTab !== 'tender-dnb',
         },
         {
             label: 'View',
@@ -80,7 +80,15 @@ const PhysicalDocsListPage = () => {
                 navigate(paths.tendering.physicalDocsView(row.tenderId));
             },
             icon: <Eye className="h-4 w-4" />,
-        }
+        },
+        {
+            label: 'Mark as Missed',
+            onClick: (row) => {
+                navigate(paths.tendering.bidMissedGlobal(row.tenderId, 'phy-doc'));
+            },
+            icon: <XCircle className="h-4 w-4" />,
+            visible: () => hasTenderingPermission && activeTab !== 'tender-dnb',
+        },
     ];
 
     const tabsConfig = useMemo(() => {

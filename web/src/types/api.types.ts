@@ -714,6 +714,7 @@ export type {
     BidSubmissionListParams,
     SubmitBidDto,
     MarkAsMissedDto,
+    MarkAsMissedGlobalDto,
     UpdateBidSubmissionDto,
     BidSubmissionDashboardCounts,
 } from "@/modules/tendering/bid-submissions/helpers/bidSubmission.types";

@@ -502,6 +502,11 @@ export class BidSubmissionsService {
     }) {
         // Get current tender status before update
         const currentTender = await this.tenderInfosService.findById(data.tenderId);
+
+        if(!currentTender){
+            throw new Error("Tender not found!")
+        }
+
         const prevStatus = currentTender?.status ?? null;
 
         // AUTO STATUS CHANGE: Update tender status to 8 (Missed) and track it
@@ -570,7 +575,142 @@ export class BidSubmissionsService {
         // Send email notification
         await this.sendBidMissedEmail(data.tenderId, result, data.submittedBy);
 
+
+        //stopping all the timers running for this tender
+        //for the time being stopping all the running timers
+        this.timersService.stopAllTimers({
+            entityId    : currentTender.id,
+            entityType  : 'TENDER',
+            userId      : data.submittedBy
+        });
+
         return result;
+    }
+
+    async markAsMissedGlobal(data : {tenderId: number, rejectionStatus : number, preventionMeasures : string, tmsImprovements: string, submittedBy: number}){
+        try{
+
+            //checking the tender entry
+            const [tender] = await this.db.select().from(tenderInfos).where(eq(tenderInfos.id, data.tenderId));
+
+            if(!tender){
+                throw new Error("tender not found.");
+            }
+
+            const prevStatus = tender?.status ?? null; 
+
+            const [status] = await this.db.select({name: statuses.name, id: statuses.id}).from(statuses).where(eq(statuses.id, data.rejectionStatus));
+            const newStatus = status.id;
+            
+
+            //checking bid submissionis
+            const existing = await this.findByTenderId(data.tenderId);
+
+            //marking the db value as missed
+            const result = await this.db.transaction(async (tx) => {
+                let bidSubmission;
+                if (existing) {
+                    // Update existing
+                    const [updated] = await tx
+                        .update(bidSubmissions)
+                        .set({
+                            status: 'Tender Missed',
+                            reasonForMissing: status.name,
+                            preventionMeasures: data.preventionMeasures,
+                            tmsImprovements: data.tmsImprovements,
+                            submittedBy: data.submittedBy,
+                            updatedAt: new Date(),
+                        })
+                        .where(eq(bidSubmissions.id, existing.id))
+                        .returning();
+
+                    bidSubmission = updated;
+                } else {
+                    // Create new
+                    const [created] = await tx
+                        .insert(bidSubmissions)
+                        .values({
+                            tenderId: data.tenderId,
+                            status: 'Tender Missed',
+                            reasonForMissing: status.name,
+                            preventionMeasures: data.preventionMeasures,
+                            tmsImprovements: data.tmsImprovements,
+                            submittedBy: data.submittedBy,
+                        })
+                        .returning();
+
+                    bidSubmission = created;
+                }
+
+                // Update tender status
+                await tx
+                    .update(tenderInfos)
+                    .set({ status: newStatus, updatedAt: new Date() })
+                    .where(eq(tenderInfos.id, data.tenderId));
+
+                //creating entry inside tender status history
+
+                await this.tenderStatusHistoryService.trackStatusChange(
+                    data.tenderId,
+                    newStatus,
+                    data.submittedBy,
+                    prevStatus,
+                    'Tender missed'
+                );
+
+                return bidSubmission;
+            });
+
+            // Send email notification
+            await this.sendBidMissedEmail(data.tenderId, result, data.submittedBy);
+
+            //stopping all the timers running for this tender
+            //for the time being stopping all the running timers
+            this.timersService.stopAllTimers({
+                entityId    : tender.id,
+                entityType  : 'TENDER',
+                userId      : data.submittedBy
+            });
+
+        } catch (err){
+            //logging the error 
+            this.logger.error("Failed to update the status" , data, err);
+        }     
+    }
+
+    async getValidMissedStatuses(stage: string) {
+        let validStatusIds: number[] = [];
+
+        // Define valid status IDs for each stage
+        switch (stage) {
+            case 'phy-doc':
+                validStatusIds = [8]; // TODO: Add valid status IDs for phy-doc
+                break;
+            case 'checklist':
+                validStatusIds = [8]; // TODO: Add valid status IDs for checklist
+                break;
+            case 'rfq':
+                validStatusIds = [8 ,14 ,35]; // TODO: Add valid status IDs for rfq
+                break;
+            case 'emd':
+                validStatusIds = [8]; // TODO: Add valid status IDs for emd
+            case 'costing-sheet':
+                validStatusIds = [8 ,14 ,34 ]; // TODO: Add valid status IDs for costing-sheet
+                break;
+            case 'costing-approval':
+                validStatusIds = [8]; // TODO: Add valid status IDs for costing-approval
+                break;
+        }
+
+        if (validStatusIds.length > 0) {
+            return this.db
+                .select({ id: statuses.id, name: statuses.name })
+                .from(statuses)
+                .where(inArray(statuses.id, validStatusIds));
+        }
+
+        // Fallback: return any status containing "Missed" or "Reject"
+        return "Missed";
     }
 
     async update(

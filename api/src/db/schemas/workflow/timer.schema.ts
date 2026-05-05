@@ -8,7 +8,8 @@ export const timerStatusEnum = pgEnum('timer_status', [
     'paused',
     'completed',
     'overdue',
-    'cancelled'
+    'cancelled',
+    'stopped'
 ]);
 
 export const entityTypeEnum = pgEnum('entity_type', [

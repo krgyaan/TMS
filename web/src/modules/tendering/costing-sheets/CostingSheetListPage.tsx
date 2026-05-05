@@ -5,11 +5,11 @@ import type { ColDef } from "ag-grid-community";
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Eye, Edit, Send, FileX2, ExternalLink, Plus, Search, RefreshCw } from "lucide-react";
+import { AlertCircle, Eye, Edit, Send, FileX2, ExternalLink, Plus, Search, RefreshCw, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import type { CostingSheetDashboardRowWithTimer, CostingSheetTab } from "@/modules/tendering/costing-sheets/helpers/costingSheet.types";
@@ -23,12 +23,16 @@ import axiosInstance from "@/lib/axios";
 import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { QuickFilter } from "@/components/ui/quick-filter";
 import { ChangeStatusModal } from "../tenders/components/ChangeStatusModal";
+import { useTenderingPermissions } from "../hooks/useTenderingPermissions";
 
 const CostingSheets = () => {
-    const [activeTab, setActiveTab] = useState<CostingSheetTab>('pending');
+    const [searchParams] = useSearchParams();
+    const initialTab = (searchParams.get('tab') as CostingSheetTab) || 'pending';
+    const [activeTab, setActiveTab] = useState<CostingSheetTab>(initialTab);
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
+    const { hasTenderingPermission } = useTenderingPermissions();
     const debouncedSearch = useDebouncedSearch(search, 300);
     const navigate = useNavigate();
 
@@ -209,11 +213,12 @@ const CostingSheets = () => {
             },
             icon: <Eye className="h-4 w-4" />,
         },
-        // {
-        //     label: "Change Status",
-        //     onClick: (row: CostingSheetDashboardRowWithTimer) => setChangeStatusModal({ open: true, tenderId: row.tenderId, currentStatus: undefined }),
-        //     icon: <RefreshCw className="h-4 w-4" />,
-        // },
+        {
+            label : 'Mark As Missed',
+            onClick: (row) => navigate(paths.tendering.bidMissedGlobal(row.tenderId, 'costing-sheet')),
+            icon: <XCircle className ="h-4 w-4" />,
+            visible : () => hasTenderingPermission && activeTab != "tender-dnb"
+        }
     ], [navigate, handleCreateCosting, isCreating]);
 
     const tabsConfig = useMemo(() => {

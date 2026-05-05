@@ -5,12 +5,12 @@ import type { ColDef } from 'ag-grid-community';
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams} from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import type { RfqDashboardRowWithTimer } from '@/modules/tendering/rfqs/helpers/rfq.types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle, Eye, FileX2, Trash2, Search, RefreshCw, ClipboardList, List } from 'lucide-react';
+import { AlertCircle, CheckCircle, Eye, FileX2, Trash2, Search, RefreshCw, ClipboardList, List, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { useRfqsDashboard, useRfqsDashboardCounts, useDeleteRfq } from '@/hooks/api/useRfqs';
 import { dateCol, tenderNameCol } from '@/components/data-grid';
@@ -21,9 +21,12 @@ import { QuickFilter } from '@/components/ui/quick-filter';
 import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
+import { useTenderingPermissions } from '../hooks/useTenderingPermissions';
 
 const Rfqs = () => {
-    const [activeTab, setActiveTab] = useState<'pending' | 'sent' | 'responses' | 'rfq-rejected' | 'tender-dnb'>('pending');
+    const [searchParams] = useSearchParams();
+    const initialTab = (searchParams.get('tab') as 'pending' | 'sent' | 'responses' | 'rfq-rejected' | 'tender-dnb') || 'pending'; 
+    const [activeTab, setActiveTab] = useState<'pending' | 'sent' | 'responses' | 'rfq-rejected' | 'tender-dnb'>(initialTab);
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
@@ -33,6 +36,7 @@ const Rfqs = () => {
         tenderId: null
     });
     const navigate = useNavigate();
+    const { hasTenderingPermission } = useTenderingPermissions();
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
@@ -96,6 +100,14 @@ const Rfqs = () => {
             icon: <Eye className="h-4 w-4" />,
         },
         {
+            label: 'Mark as Missed',
+            onClick: (row) => {
+                navigate(paths.tendering.bidMissedGlobal(row.tenderId, 'rfq'));
+            },
+            icon: <XCircle className="h-4 w-4" />,
+            visible: () => hasTenderingPermission && activeTab !== 'tender-dnb',
+        },
+        {
             label: 'Delete',
             onClick: (row: RfqDashboardRowWithTimer) => {
                 if (row.rfqId && confirm('Are you sure you want to delete this RFQ?')) {
@@ -103,6 +115,7 @@ const Rfqs = () => {
                 }
             },
             icon: <Trash2 className="h-4 w-4" />,
+            visible: () => hasTenderingPermission,
         },
     ], [activeTab, navigate, deleteMutation]);
 

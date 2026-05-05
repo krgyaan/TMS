@@ -5,11 +5,11 @@ import type { ColDef } from 'ag-grid-community';
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Eye, FileX2, Search, RefreshCw, Send } from 'lucide-react';
+import { AlertCircle, Eye, FileX2, Search, RefreshCw, Send, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useChecklistDashboardCounts, useDocumentChecklists } from '@/hooks/api/useDocumentChecklists';
@@ -19,9 +19,12 @@ import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { QuickFilter } from '@/components/ui/quick-filter';
 import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
+import { useTenderingPermissions } from '../hooks/useTenderingPermissions';
 
 const Checklists = () => {
-    const [activeTab, setActiveTab] = useState<'pending' | 'submitted' | 'tender-dnb'>('pending');
+    const [searchParams] = useSearchParams();
+    const initialTab = (searchParams.get('tab') as 'pending' | 'submitted' | 'tender-dnb') || 'pending';
+    const [activeTab, setActiveTab] = useState<'pending' | 'submitted' | 'tender-dnb'>(initialTab);
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
@@ -31,6 +34,8 @@ const Checklists = () => {
         open: false,
         tenderId: null
     });
+
+    const {hasTenderingPermission} = useTenderingPermissions();
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
@@ -81,11 +86,14 @@ const Checklists = () => {
             },
             icon: <Eye className="h-4 w-4" />,
         },
-        // {
-        //     label: "Change Status",
-        //     onClick: (row: TenderDocumentChecklistDashboardRow) => setChangeStatusModal({ open: true, tenderId: row.tenderId, currentStatus: undefined }),
-        //     icon: <RefreshCw className="h-4 w-4" />,
-        // },
+        {
+            label: 'Mark as Missed',
+            onClick: (row) => {
+                navigate(paths.tendering.bidMissedGlobal(row.tenderId, 'checklist'));
+            },
+            icon: <XCircle className="h-4 w-4" />,
+            visible: () => hasTenderingPermission && activeTab !== 'tender-dnb',
+        },
     ];
 
     const tabsConfig = useMemo(() => {

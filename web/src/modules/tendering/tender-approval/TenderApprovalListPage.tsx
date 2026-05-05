@@ -5,7 +5,7 @@ import type { ColDef } from 'ag-grid-community';
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { useTenderApprovals, useTenderApprovalsDashboardCounts } from '@/hooks/api/useTenderApprovals';
 import type { TenderApprovalWithTimer } from './helpers/tenderApproval.types';
@@ -31,7 +31,9 @@ const TABS_NAMES: Record<TenderApprovalTab, TenderApprovalTabName> = {
 const TL_STATUS_NAMES: Record<number, string> = { 0: 'Pending', 1: 'Accepted', 2: 'Rejected', 3: 'Incomplete' };
 
 const TenderApprovalListPage = () => {
-    const [activeTab, setActiveTab] = useState<TenderApprovalTab>('pending');
+    const [searchParams] = useSearchParams();
+    const initialTab = (searchParams.get('tab') as TenderApprovalTab) || 'pending';
+    const [activeTab, setActiveTab] = useState<TenderApprovalTab>(initialTab);
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');

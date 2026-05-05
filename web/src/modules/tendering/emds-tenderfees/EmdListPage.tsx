@@ -4,12 +4,12 @@ import type { ColDef } from "ag-grid-community";
 import DataTable from "@/components/ui/data-table";
 import { formatDateTime } from "@/hooks/useFormatedDate";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
-import { EyeIcon, Pencil, Plus, RefreshCw, Search, Send } from "lucide-react";
+import { EyeIcon, Pencil, Plus, RefreshCw, Search, Send, XCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsTrigger, TabsList } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { usePaymentDashboard, usePaymentDashboardCounts } from "@/hooks/api/useEmds";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams} from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
 import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { QuickFilter } from "@/components/ui/quick-filter";
 import { ChangeStatusModal } from "../tenders/components/ChangeStatusModal";
+import { useTenderingPermissions } from "../hooks/useTenderingPermissions";
 
 const TABS = [
     { value: 'pending', label: 'EMD Request Pending' },
@@ -57,7 +58,9 @@ const INSTRUMENT_LABELS: Record<string, string> = {
 
 const EmdsAndTenderFeesPage = () => {
     const navigate = useNavigate();
-    const [activeTab, setActiveTab] = useState<TabValue>('pending');
+    const [searchParams] = useSearchParams();
+    const initialTab = (searchParams.get('tab') as TabValue) || 'pending';
+    const [activeTab, setActiveTab] = useState<TabValue>(initialTab);
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
@@ -66,6 +69,7 @@ const EmdsAndTenderFeesPage = () => {
         open: false,
         tenderId: null
     });
+    const { hasTenderingPermission } = useTenderingPermissions();
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
@@ -146,15 +150,16 @@ const EmdsAndTenderFeesPage = () => {
                 width: 57,
                 cellRenderer: (params: any) => {
                     const actions: ActionItem<PendingTenderRowWithTimer>[] = [
-                        // {
-                        //     label: 'Change Status',
-                        //     icon: <RefreshCw className="w-4 h-4" />,
-                        //     onClick: (r) => setChangeStatusModal({ open: true, tenderId: r.tenderId }),
-                        // },
                         {
                             label: 'View Tender',
                             icon: <EyeIcon className="w-4 h-4" />,
                             onClick: (r) => navigate(paths.tendering.tenderView(r.tenderId)),
+                        },
+                        {
+                            label: 'Mark As Missed',
+                            icon: <XCircle className="h-4 w-4" />,
+                            onClick: (r) => navigate(paths.tendering.bidMissedGlobal(r.tenderId, 'emd')),
+                            visible: () => hasTenderingPermission && activeTab === 'pending',
                         },
                     ];
                     if (activeTab === 'pending') {
@@ -247,17 +252,19 @@ const EmdsAndTenderFeesPage = () => {
             cellRenderer: (params: any) => {
                 const row = params.data!;
                 const actions: ActionItem<PaymentRequestRowWithTimer>[] = [
-                // {
-                //     label: 'Change Status',
-                //     icon: <RefreshCw className="w-4 h-4" />,
-                //     onClick: (r) => setChangeStatusModal({ open: true, tenderId: r.tenderId }),
-                // },
                     {
                         label: 'View Details',
                         icon: <EyeIcon className="w-4 h-4" />,
                         onClick: (r) => navigate(paths.tendering.emdsTenderFeesView(r.tenderId)),
                     },
+                    {
+                        label: 'Mark As Missed',
+                        icon: <XCircle className="h-4 w-4" />,
+                        onClick: (r) => navigate(paths.tendering.bidMissedGlobal(r.tenderId, 'emd')),
+                        visible: () => hasTenderingPermission,
+                    },
                 ];
+
                 if (activeTab === 'sent' || activeTab === 'rejected') {
                     actions.unshift({
                         label: activeTab === 'rejected' ? 'Resubmit' : 'Edit Request',
@@ -336,7 +343,7 @@ const EmdsAndTenderFeesPage = () => {
             timerCol,
             actionCol,
         ];
-    }, [navigate, activeTab, setChangeStatusModal]);
+    }, [navigate, activeTab, setChangeStatusModal, hasTenderingPermission]);
 
     const tableData = dashboardData?.data || [];
 

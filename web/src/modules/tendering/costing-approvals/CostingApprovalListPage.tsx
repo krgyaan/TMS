@@ -5,7 +5,7 @@ import type { ColDef } from 'ag-grid-community';
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -19,13 +19,17 @@ import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { QuickFilter } from '@/components/ui/quick-filter';
 import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
+import { useTenderingPermissions } from '../hooks/useTenderingPermissions';
 
 const CostingApprovalListPage = () => {
-    const [activeTab, setActiveTab] = useState<CostingApprovalTab>('pending');
+    const [searchParams] = useSearchParams();
+    const initialTab = (searchParams.get('tab') as CostingApprovalTab) || 'pending';
+    const [activeTab, setActiveTab] = useState<CostingApprovalTab>(initialTab);
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
     const debouncedSearch = useDebouncedSearch(search, 300);
+    const { hasTenderingPermission } = useTenderingPermissions();
     const navigate = useNavigate();
     const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({
         open: false,
@@ -94,12 +98,13 @@ const CostingApprovalListPage = () => {
             },
             icon: <Eye className="h-4 w-4" />,
         },
-        // {
-        //     label: "Change Status",
-        //     onClick: (row: CostingApprovalDashboardRow) => setChangeStatusModal({ open: true, tenderId: row.tenderId, currentStatus: undefined }),
-        //     icon: <RefreshCw className="h-4 w-4" />,
-        // },
-    ], [navigate]);
+        {
+            label : 'Mark As Missed',
+            onClick : (row) => navigate(paths.tendering.bidMissedGlobal(row.tenderId, "costing-approval")),
+            icon : <XCircle className='h-4 w-4' />,
+            visible : () => hasTenderingPermission && activeTab != 'tender-dnb',
+        }
+    ], [navigate, hasTenderingPermission, activeTab]);
 
     const tabsConfig = useMemo(() => {
         return [
