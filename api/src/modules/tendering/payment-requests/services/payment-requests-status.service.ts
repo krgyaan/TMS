@@ -4,7 +4,6 @@ import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { InstrumentStatusService } from './instrument-status.service';
 import { InstrumentStatusHistoryService } from './instrument-status-history.service';
-import { PaymentRequestsService } from '../payment-requests.service';
 
 @Injectable()
 export class PaymentRequestsStatusService {
@@ -14,57 +13,66 @@ export class PaymentRequestsStatusService {
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly instrumentStatusService: InstrumentStatusService,
         private readonly historyService: InstrumentStatusHistoryService,
-        @Inject(forwardRef(() => PaymentRequestsService))
-        private readonly paymentRequestsService: PaymentRequestsService,
     ) {}
 
     /**
-     * Transition instrument status - delegates to main service
+     * Transition instrument status
      */
     async transitionInstrumentStatus(
         instrumentId: number,
         newStatus: string,
-        context: Record<string, unknown>
+        formData: Record<string, unknown> = {},
+        context: { userId?: number; userName?: string; remarks?: string } = {}
     ) {
-        return this.paymentRequestsService.transitionInstrumentStatus(
+        return this.instrumentStatusService.transitionStatus(
             instrumentId,
             newStatus,
-            context as any
+            formData,
+            context
         );
     }
 
     /**
-     * Reject instrument - delegates to main service
+     * Reject instrument
      */
-    async rejectInstrument(instrumentId: number, reason: string, context: Record<string, unknown>) {
-        return this.paymentRequestsService.rejectInstrument(
+    async rejectInstrument(
+        instrumentId: number,
+        rejectionReason: string,
+        context: { userId?: number; userName?: string } = {}
+    ) {
+        return this.instrumentStatusService.rejectInstrument(
             instrumentId,
-            reason,
-            context as any
+            rejectionReason,
+            context
         );
     }
 
     /**
-     * Resubmit instrument - delegates to main service
+     * Resubmit rejected instrument
      */
-    async resubmitInstrument(instrumentId: number, context: Record<string, unknown>) {
-        return this.paymentRequestsService.resubmitInstrument(
-            instrumentId,
-            context as any
+    async resubmitInstrument(
+        rejectedInstrumentId: number,
+        formData: Record<string, unknown>,
+        context: { userId?: number; userName?: string } = {}
+    ) {
+        return this.instrumentStatusService.resubmitInstrument(
+            rejectedInstrumentId,
+            formData,
+            context
         );
     }
 
     /**
-     * Get available actions for instrument - delegates to main service
+     * Get available actions for instrument
      */
     async getInstrumentAvailableActions(instrumentId: number) {
-        return this.paymentRequestsService.getInstrumentAvailableActions(instrumentId);
+        return this.instrumentStatusService.getAvailableActions(instrumentId);
     }
 
     /**
-     * Get instrument history - delegates to main service
+     * Get instrument status history
      */
     async getInstrumentHistory(instrumentId: number) {
-        return this.paymentRequestsService.getInstrumentHistory(instrumentId);
+        return this.historyService.getInstrumentChain(instrumentId);
     }
 }
