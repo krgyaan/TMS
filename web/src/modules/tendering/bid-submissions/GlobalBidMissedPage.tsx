@@ -1,5 +1,6 @@
 import { useParams } from 'react-router-dom';
 import GlobalBidMissedForm from './components/GlobalBidMissedForm';
+import { type TenderStage } from './helpers/bidSubmission.types';
 import { useTender } from '@/hooks/api/useTenders';
 import { useCostingSheetByTender } from '@/hooks/api/useCostingSheets';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -11,7 +12,7 @@ import { useNavigate } from 'react-router-dom';
 export default function BidMarkMissedPage() {
     const { tenderId } = useParams<{ tenderId: string }>();
 
-    const { stage } = useParams<{stage : string}>();
+    const { stage } = useParams<{ stage: TenderStage }>();
     
     const navigate = useNavigate();
     const { data: tenderDetails, isLoading: tenderLoading } = useTender(Number(tenderId));
@@ -19,11 +20,11 @@ export default function BidMarkMissedPage() {
 
     if (tenderLoading || costingLoading) return <Skeleton className="h-[600px]" />;
 
-    if (!tenderDetails) return (
+    if (!tenderDetails || !stage) return (
         <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-                Tender not found.
+                {!tenderDetails ? 'Tender not found.' : 'Invalid stage specified.'}
             </AlertDescription>
             <Button variant="outline" onClick={() => navigate(-1)}>
                 Back

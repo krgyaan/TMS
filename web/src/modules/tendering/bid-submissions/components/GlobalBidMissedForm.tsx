@@ -13,18 +13,19 @@ import { useMarkAsMissedGlobal, useGetValidMissedStatuses } from '@/hooks/api/us
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { GlobalBidMissedFormSchema, type GlobalBidMissedFormValues } from '../helpers/bidSubmission.schema';
-import type { GlobalMissedFormProps } from '../helpers/bidSubmission.types';
+import { paths } from '@/app/routes/paths';
+import type { GlobalMissedFormProps, TenderStage } from '../helpers/bidSubmission.types';
 
 type FormValues = GlobalBidMissedFormValues;
 
-const stageNameKeys = {
-    "phy-doc" : "Physical Docs",
-    "rfq" : "Request for Quote",
-    "emd" : "EMD",
-    "checklist" : "Checklists",
-    "costing-sheet" : "Costing Sheet",
-    "costing-approval" : "Costing Approval",
-}
+const stageNameKeys: Record<TenderStage, string> = {
+    "phy-doc": "Physical Docs",
+    "rfq": "Request for Quote",
+    "emd": "EMD",
+    "checklist": "Checklists",
+    "costing-sheet": "Costing Sheet",
+    "costing-approval": "Costing Approval",
+};
 
 export default function GlobalBidMissedForm({
     tenderId,
@@ -67,7 +68,23 @@ export default function GlobalBidMissedForm({
                 preventionMeasures: data.preventionMeasures,
                 tmsImprovements: data.tmsImprovements,
             });
-            navigate(-1); // navigate back after marking missed
+            // Map stages to their respective list page paths
+            const stagePaths: Record<TenderStage, string> = {
+                "phy-doc": paths.tendering.physicalDocs,
+                "rfq": paths.tendering.rfqs,
+                "emd": paths.tendering.emdsTenderFees,
+                "checklist": paths.tendering.checklists,
+                "costing-sheet": paths.tendering.costingSheets,
+                "costing-approval": paths.tendering.costingApprovals,
+            };
+
+            const targetPath = stagePaths[stage];
+
+            if (targetPath) {
+                navigate(`${targetPath}?tab=tender-dnb`);
+            } else {
+                navigate(-1);
+            }
         } catch (error) {
             console.error('Error marking as missed:', error);
         }
