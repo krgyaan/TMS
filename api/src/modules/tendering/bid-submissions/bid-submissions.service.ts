@@ -634,7 +634,8 @@ export class BidSubmissionsService {
                 .set({ status: newStatus, updatedAt: new Date() })
                 .where(eq(tenderInfos.id, data.tenderId));
 
-            // Track status change
+            //creating entry inside tender status history
+
             await this.tenderStatusHistoryService.trackStatusChange(
                 data.tenderId,
                 newStatus,
@@ -648,13 +649,19 @@ export class BidSubmissionsService {
 
         // Send email notification
         await this.sendBidMissedEmail(data.tenderId, result, data.submittedBy);
-        //creating entry inside tender status history
+
+        //stopping all the timers running for this tender
+        this.timersService.stopTimer({
+            entityId    : tender.id,
+            entityType  : 'TENDER',
+            userId      : data.submittedBy,
+        });
 
       } catch (err){
         //logging the error 
         this.logger.error("Failed to update the status" , data, err);
         //returning the error
-      }
+      }     
     }
 
     async getValidMissedStatuses(stage: string) {
