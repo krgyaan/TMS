@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { PaymentRequestsController } from './payment-requests.controller';
-import { PaymentRequestsService } from './payment-requests.service';
 import { PaymentRequestsQueryService } from './services/payment-requests.query.service';
 import { PaymentRequestsCommandService } from './services/payment-requests.command.service';
 import { PaymentRequestsStatusService } from './services/payment-requests-status.service';
@@ -17,7 +16,6 @@ import { PdfGeneratorModule } from '@/modules/pdf/pdf-generator.module';
     imports: [TendersModule, TenderStatusHistoryModule, EmailModule, TimersModule, PdfGeneratorModule],
     controllers: [PaymentRequestsController],
     providers: [
-        PaymentRequestsService,
         PaymentRequestsQueryService,
         PaymentRequestsCommandService,
         PaymentRequestsStatusService,
@@ -26,7 +24,6 @@ import { PdfGeneratorModule } from '@/modules/pdf/pdf-generator.module';
         InstrumentStatusHistoryService,
     ],
     exports: [
-        PaymentRequestsService,
         PaymentRequestsQueryService,
         PaymentRequestsCommandService,
         PaymentRequestsStatusService,

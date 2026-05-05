@@ -239,6 +239,7 @@ export interface DashboardCounts {
     approved: number;
     rejected: number;
     returned: number;
+    tenderDnb: number;
     total: number;
 }
 
@@ -287,7 +288,7 @@ export interface DashboardCounts {
     total: number;
 }
 
-export type DashboardTab = 'pending' | 'sent' | 'approved' | 'rejected' | 'returned';
+export type DashboardTab = 'pending' | 'sent' | 'approved' | 'rejected' | 'returned' | 'tender-dnb';
 
 export interface PendingTabResponse {
     data: PendingTenderRow[];
