@@ -20,11 +20,13 @@ function mapInstrumentTypeToMode(instrumentType: string | null): string | undefi
     return mapping[instrumentType];
 }
 
-function mapDetailsToForm(instrumentType: string, instrument: any, amount: any): any {
+function mapDetailsToForm(instrumentType: string, instrument: any, amount: any, purpose: any): any {
     if (!instrument) return {};
 
     // Merge instrument fields and details fields
-    const merged = { ...instrument, ...(instrument.details || {}), amountRequired: amount };
+    const merged = { ...instrument, ...(instrument.details || {}), amountRequired: amount, purpose: purpose };
+    console.log("merged data", merged);
+
 
     switch (instrumentType) {
         case 'DD':
@@ -135,7 +137,7 @@ const EMDEditPage = () => {
         if (!instrument) return { formData: undefined, requestIds: undefined };
 
         const mode = mapInstrumentTypeToMode(instrument.instrumentType);
-        const details = mapDetailsToForm(instrument.instrumentType, instrument, paymentRequests.amountRequired);
+        const details = mapDetailsToForm(instrument.instrumentType, instrument, paymentRequests.amountRequired, paymentRequests.purpose);
 
         if (paymentRequests.purpose === 'EMD') {
             formData.EMD = { mode, details };
