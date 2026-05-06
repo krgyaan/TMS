@@ -124,7 +124,7 @@ export function PaymentSection({
                     </p>
 
                     {selectedMode === 'PORTAL' && <PayOnPortalForm amount={isEditMode ? undefined : amount} prefix={prefix} />}
-                    {selectedMode === 'BANK_TRANSFER' && <BankTransferForm amount={isEditMode ? undefined : amount} prefix={prefix} />}
+                    {selectedMode === 'BANK_TRANSFER' || selectedMode === 'BT' && <BankTransferForm amount={isEditMode ? undefined : amount} prefix={prefix} />}
                     {selectedMode === 'DD' && <DemandDraftForm amount={isEditMode ? undefined : amount} prefix={prefix} />}
                     {selectedMode === 'BG' && <BankGuaranteeForm amount={isEditMode ? undefined : amount} prefix={prefix} />}
                     {selectedMode === 'FDR' && <FdrForm amount={isEditMode ? undefined : amount} prefix={prefix} />}
