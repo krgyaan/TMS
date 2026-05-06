@@ -61,6 +61,9 @@ export const TransferDetailsResponse = z.object({
   ifsc: nullishString,
   reason: nullishString,
   remarks: nullishString,
+  portalName: nullishString,
+  portalNetBanking: nullishString,
+  portalDebitCard: nullishString,
 }).nullable();
 
 export const InstrumentDdResponse = CommonInstrumentFields.extend({
@@ -171,3 +174,85 @@ export const FindByIdResponse = z.object({
 
 export type FindByTenderResponseType = z.infer<typeof FindByTenderResponse>;
 export type FindByIdResponseType = z.infer<typeof FindByIdResponse>;
+
+// ============================================================================
+// Edit Page Optimized Response (Flattened)
+// ============================================================================
+
+export const PaymentRequestEditResponse = z.object({
+  id: z.number(),
+  tenderId: z.number(),
+  tenderNo: z.string(),
+  tenderName: z.string(),
+  tenderDueDate: nullishDate,
+  requestedBy: nullishString,
+  purpose: z.string(), // EMD, Tender Fee, etc.
+  mode: z.string().optional(), // DD, PORTAL, etc.
+  
+  // Flattened Instrument Details (Aligned with Frontend Keys)
+  // DD
+  ddFavouring: nullishString,
+  ddPayableAt: nullishString,
+  ddDeliverBy: nullishString,
+  ddPurpose: nullishString,
+  ddAmount: nullishString,
+  ddCourierAddress: nullishString,
+  ddCourierHours: z.number().nullable().optional(),
+  ddDate: nullishDate,
+  ddRemarks: nullishString,
+
+  // FDR
+  fdrFavouring: nullishString,
+  fdrAmount: nullishString,
+  fdrExpiryDate: nullishDate,
+  fdrDeliverBy: nullishString,
+  fdrPurpose: nullishString,
+  fdrCourierAddress: nullishString,
+  fdrCourierHours: z.number().nullable().optional(),
+  fdrDate: nullishDate,
+
+  // BG
+  bgNeededIn: nullishString,
+  bgAmount: nullishString,
+  bgPurpose: nullishString,
+  bgFavouring: nullishString,
+  bgAddress: nullishString,
+  bgExpiryDate: nullishDate,
+  bgClaimPeriod: nullishDate,
+  bgStampValue: z.number().nullable().optional(),
+  bgFormatFiles: z.array(z.string()).optional(),
+  bgPoFiles: z.array(z.string()).optional(),
+  bgClientUserEmail: nullishString,
+  bgClientCpEmail: nullishString,
+  bgClientFinanceEmail: nullishString,
+  bgBankAccountName: nullishString,
+  bgBankAccountNo: nullishString,
+  bgBankIfsc: nullishString,
+  bgCourierAddress: nullishString,
+  bgCourierDays: z.number().nullable().optional(),
+  bgBank: nullishString,
+
+  // Bank Transfer
+  btPurpose: nullishString,
+  btAmount: nullishString,
+  btAccountName: nullishString,
+  btAccountNo: nullishString,
+  btIfsc: nullishString,
+
+  // Portal Payment
+  portalPurpose: nullishString,
+  portalAmount: nullishString,
+  portalName: nullishString,
+  portalNetBanking: z.string().nullable().optional(), // YES/NO
+  portalDebitCard: z.string().nullable().optional(), // YES/NO
+
+  // Cheque
+  chequeFavouring: nullishString,
+  chequeAmount: nullishString,
+  chequeDate: nullishDate,
+  chequeNeededIn: nullishString,
+  chequePurpose: nullishString,
+  chequeAccount: nullishString,
+});
+
+export type PaymentRequestEditResponseType = z.infer<typeof PaymentRequestEditResponse>;

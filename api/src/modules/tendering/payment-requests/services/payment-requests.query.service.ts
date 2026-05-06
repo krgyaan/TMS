@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
@@ -28,7 +28,7 @@ import type {
     PaymentRequestRow,
     PendingTenderRow, 
 } from '../dto/payment-requests.dto';
-import type { InstrumentResponse } from '../dto/payment-response.dto';
+import type { InstrumentResponse, PaymentRequestEditResponseType } from '../dto/payment-response.dto';
 import {
     buildTenderRoleFilters,
     buildRequestRoleFilters,
@@ -799,30 +799,7 @@ async findByIdWithTender(requestId: number) {
             .limit(1);
 
         if (!request) return null;
-
-        const [tender] = await this.db
-            .select({
-                id: tenderInfos.id,
-                tenderNo: tenderInfos.tenderNo,
-                tenderName: tenderInfos.tenderName,
-                team: tenderInfos.team,
-                organization: tenderInfos.organization,
-                item: tenderInfos.item,
-                gstValues: tenderInfos.gstValues,
-                tenderFees: tenderInfos.tenderFees,
-                emd: tenderInfos.emd,
-                teamMember: tenderInfos.teamMember,
-                dueDate: tenderInfos.dueDate,
-                status: tenderInfos.status,
-                location: tenderInfos.location,
-                website: tenderInfos.website,
-                emdMode: tenderInfos.emdMode,
-                tenderFeeMode: tenderInfos.tenderFeeMode,
-                deleteStatus: tenderInfos.deleteStatus,
-            })
-            .from(tenderInfos)
-            .where(eq(tenderInfos.id, request.tenderId))
-            .limit(1);
+        console.log("request", request);
 
         const instruments = await this.db
             .select({
@@ -841,6 +818,7 @@ async findByIdWithTender(requestId: number) {
                 eq(paymentInstruments.requestId, requestId),
                 eq(paymentInstruments.isActive, true)
             ));
+        console.log("instruments", instruments);
 
         const instrumentsWithDetails = await Promise.all(instruments.map(async (instrument) => {
             let details: any = null;
@@ -873,6 +851,13 @@ async findByIdWithTender(requestId: number) {
                     bankName: instrumentBgDetails.bankName,
                     bgNeeds: instrumentBgDetails.bgNeeds,
                     bgPurpose: instrumentBgDetails.bgPurpose,
+                    bgSoftCopy: instrumentBgDetails.bgSoftCopy,
+                    bgPo: instrumentBgDetails.bgPo,
+                    bgBankAcc: instrumentBgDetails.bgBankAcc,
+                    bgBankIfsc: instrumentBgDetails.bgBankIfsc,
+                    bgClientUser: instrumentBgDetails.bgClientUser,
+                    bgClientCp: instrumentBgDetails.bgClientCp,
+                    bgClientFin: instrumentBgDetails.bgClientFin,
                 }).from(instrumentBgDetails).where(eq(instrumentBgDetails.instrumentId, instrument.id)).limit(1);
             } else if (instrument.instrumentType === 'Cheque') {
                 [details] = await this.db.select({
@@ -891,21 +876,22 @@ async findByIdWithTender(requestId: number) {
                     ifsc: instrumentTransferDetails.ifsc,
                     reason: instrumentTransferDetails.reason,
                     remarks: instrumentTransferDetails.remarks,
+                    portalName: instrumentTransferDetails.portalName,
+                    isNetbanking: instrumentTransferDetails.isNetbanking,
+                    isDebit: instrumentTransferDetails.isDebit,
                 }).from(instrumentTransferDetails).where(eq(instrumentTransferDetails.instrumentId, instrument.id)).limit(1);
             }
+            console.log("details", details);
             return this.mapInstrumentResponse(instrument, details);
         }));
-
+        
         return {
             ...this.mapPaymentRequest(request),
             requestedByName: request.requestedByName,
-            tender: this.mapTenderBasic(tender),
             instruments: instrumentsWithDetails,
         };
     }
 
-    // ============================================================================
-    // Response Mapping Helpers
     // ============================================================================
     // Response Mapping Helpers
     // ============================================================================
@@ -1050,10 +1036,141 @@ async findByIdWithTender(requestId: number) {
                         ifsc: details.ifsc,
                         reason: details.reason,
                         remarks: details.remarks,
+                        portalName: details.portalName,
+                        portalNetBanking: details.isNetbanking,
+                        portalDebitCard: details.isDebit,
                     } : null,
                 };
             default:
                 return base as InstrumentResponse;
         }
+    }
+
+    async findByIdForEdit(id: number): Promise<PaymentRequestEditResponseType> {
+        const request = await this.findByIdWithTender(id);
+        if (!request) {
+            throw new NotFoundException(`Payment request ${id} not found`);
+        }
+
+        const instrument = request.instruments?.[0];
+        if (!instrument) {
+            throw new NotFoundException(`No instrument found for payment request ${id}`);
+        }
+
+        const details = instrument.details as any;
+        const instrumentType = instrument.instrumentType;
+
+        // Base response with common fields
+        const response: any = {
+            id: request.id,
+            tenderId: request.tenderId,
+            tenderNo: request.tenderNo,
+            tenderName: request.projectName,
+            tenderDueDate: request.dueDate,
+            requestedBy: request.requestedByName || '',
+            purpose: request.purpose,
+            mode: instrumentType,
+        };
+
+        // Dynamically add only relevant fields based on the instrument type
+        switch (instrumentType) {
+            case 'DD':
+                Object.assign(response, this.mapDdDetails(details, request.amountRequired, instrument));
+                break;
+            case 'FDR':
+                Object.assign(response, this.mapFdrDetails(details, request.amountRequired, instrument));
+                break;
+            case 'BG':
+                Object.assign(response, this.mapBgDetails(details, request.amountRequired, instrument));
+                break;
+            case 'Bank Transfer':
+                Object.assign(response, this.mapTransferDetails(details, request.amountRequired));
+                break;
+            case 'Portal Payment':
+                Object.assign(response, this.mapTransferDetails(details, request.amountRequired));
+                break;
+            case 'Cheque':
+                Object.assign(response, this.mapChequeDetails(details, request.amountRequired, instrument));
+                break;
+        }
+
+        return response as PaymentRequestEditResponseType;
+    }
+
+    private mapDdDetails(details: any, amount: string, instrument?: any) {
+        return {
+            ddFavouring: instrument?.favouring || '',
+            ddPayableAt: instrument?.payableAt || '',
+            ddDeliverBy: details?.ddNeeds || '',
+            ddPurpose: details?.ddPurpose || '',
+            ddAmount: amount,
+            ddCourierAddress: instrument?.courierAddress || '',
+            ddCourierHours: instrument?.courierDeadline || null,
+            ddDate: details?.ddDate || instrument?.issueDate || null,
+            ddRemarks: details?.ddRemarks || '',
+        };
+    }
+
+    private mapFdrDetails(details: any, amount: string, instrument?: any) {
+        return {
+            fdrFavouring: instrument?.favouring || '',
+            fdrAmount: amount,
+            fdrExpiryDate: details?.fdrExpiryDate || instrument?.expiryDate || null,
+            fdrDeliverBy: details?.fdrNeeds || '',
+            fdrPurpose: details?.fdrPurpose || '',
+            fdrCourierAddress: instrument?.courierAddress || '',
+            fdrCourierHours: instrument?.courierDeadline || null,
+            fdrDate: details?.fdrDate || instrument?.issueDate || null,
+        };
+    }
+
+    private mapBgDetails(details: any, amount: string, instrument?: any) {
+        return {
+            bgNeededIn: details?.bgNeeds || '',
+            bgAmount: amount,
+            bgPurpose: details?.bgPurpose || '',
+            bgFavouring: details?.beneficiaryName || instrument?.favouring || '',
+            bgAddress: details?.beneficiaryAddress || '',
+            bgExpiryDate: details?.bgDate || instrument?.expiryDate || null,
+            bgClaimPeriod: details?.claimExpiryDate || null,
+            bgStampValue: details?.stampCharges ? Number(details.stampCharges) : null,
+            bgFormatFiles: details?.bgSoftCopy ? [details.bgSoftCopy] : [],
+            bgPoFiles: details?.bgPo ? [details.bgPo] : [],
+            bgClientUserEmail: details?.bgClientUser || '',
+            bgClientCpEmail: details?.bgClientCp || '',
+            bgClientFinanceEmail: details?.bgClientFin || '',
+            bgBankAccountName: details?.beneficiaryName || '',
+            bgBankAccountNo: details?.bgBankAcc || '',
+            bgBankIfsc: details?.bgBankIfsc || '',
+            bgCourierAddress: instrument?.courierAddress || '',
+            bgCourierDays: instrument?.courierDeadline || null,
+            bgBank: details?.bankName || instrument?.bankName || '',
+        };
+    }
+
+    private mapTransferDetails(details: any, amount: string) {
+        return {
+            btPurpose: details?.reason || details?.purpose || '',
+            btAmount: amount,
+            btAccountName: details?.accountName || '',
+            btAccountNo: details?.accountNumber || '',
+            btIfsc: details?.ifsc || '',
+            portalPurpose: details?.reason || details?.purpose || '',
+            portalAmount: amount,
+            portalName: details?.portalName || '',
+            portalNetBanking: details?.portalNetBanking || details?.isNetbanking || null,
+            portalDebitCard: details?.portalDebitCard || details?.isDebit || null,
+        };
+    }
+
+    private mapChequeDetails(details: any, amount: string, instrument?: any) {
+        return {
+            chequeFavouring: instrument?.favouring || '',
+            chequeAmount: amount,
+            chequeDate: details?.chequeDate || instrument?.issueDate || null,
+            chequeNeededIn: details?.chequeNeeds || '',
+            chequePurpose: details?.chequeReason || '',
+            chequeAccount: details?.bankName || instrument?.bankName || '',
+        };
     }
 }

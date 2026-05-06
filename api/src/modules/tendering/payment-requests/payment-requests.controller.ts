@@ -101,6 +101,11 @@ export class PaymentRequestsController {
         return this.queryService.findByIdWithTender(id);
     }
 
+    @Get(':id/edit')
+    async findByIdForEdit(@Param('id', ParseIntPipe) id: number) {
+        return this.queryService.findByIdForEdit(id);
+    }
+
     @Patch(':id')
     async update(
         @Param('id', ParseIntPipe) id: number,
