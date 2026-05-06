@@ -215,6 +215,27 @@ export const DemandDraftSchema = z.object({
             path: ['ddPurpose'],
         });
     }
+    if (!data.ddCourierAddress || (typeof data.ddCourierAddress === 'string' && data.ddCourierAddress.trim() === '')) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Courier Address is required',
+            path: ['ddCourierAddress'],
+        });
+    }
+    if (!data.ddCourierHours) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Courier Hours is required',
+            path: ['ddCourierHours'],
+        });
+    }
+    if (!data.ddDate || (typeof data.ddDate === 'string' && data.ddDate.trim() === '')) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'DD Date is required',
+            path: ['ddDate'],
+        });
+    }
     if (data.ddAmount !== undefined && data.ddAmount < 0) {
         ctx.addIssue({
             code: 'custom',
@@ -353,6 +374,27 @@ export const FdrSchema = z.object({
             code: 'custom',
             message: 'Purpose of FDR is required',
             path: ['fdrPurpose'],
+        });
+    }
+    if (!data.fdrCourierAddress || (typeof data.fdrCourierAddress === 'string' && data.fdrCourierAddress.trim() === '')) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Courier Address is required',
+            path: ['fdrCourierAddress'],
+        });
+    }
+    if (!data.fdrCourierHours) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Courier Hours is required',
+            path: ['fdrCourierHours'],
+        });
+    }
+    if (!data.fdrDate || (typeof data.fdrDate === 'string' && data.fdrDate.trim() === '')) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'FDR Date is required',
+            path: ['fdrDate'],
         });
     }
     if (data.fdrAmount !== undefined && data.fdrAmount < 0) {

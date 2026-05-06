@@ -101,6 +101,19 @@ export class PaymentRequestsCommandService {
                         userId
                     );
                     results.push({ request, instrument });
+
+                    // Auto-create Cheque after DD/FDR creation
+                    if ((payload.EMD.mode === 'DD' || payload.EMD.mode === 'FDR') && instrument) {
+                        const chequeResult = await this.autoCreateChequeFromDdFdr(
+                            tx,
+                            request,
+                            instrument,
+                            userId
+                        );
+                        if (chequeResult) {
+                            results.push({ request, instrument: chequeResult, isAutoCreatedCheque: true });
+                        }
+                    }
                 }
             }
 
@@ -195,7 +208,7 @@ export class PaymentRequestsCommandService {
      * - Stop timer if EMD was requested
      */
     private async handleBackgroundOperations(
-        results: Array<{ request: any; instrument: any }>,
+        results: Array<{ request: any; instrument: any; isAutoCreatedCheque?: boolean }>,
         tenderId: number,
         tender: any,
         userId: number | undefined,
@@ -205,9 +218,15 @@ export class PaymentRequestsCommandService {
         try {
             // Send email notifications for each instrument
             if (tender) {
-                for (const { request, instrument } of results) {
+                for (const { request, instrument, isAutoCreatedCheque } of results) {
                     try {
                         const mode = instrument.instrumentType;
+                        
+                        // Skip email for DD/FDR (auto-created Cheque will send its own email)
+                        if (!isAutoCreatedCheque && (mode === 'DD' || mode === 'FDR')) {
+                            continue;
+                        }
+                        
                         await this.notificationService.sendPaymentInstrumentEmail(
                             instrument.id,
                             mode,
@@ -507,6 +526,64 @@ export class PaymentRequestsCommandService {
                 break;
         }
         this.logger.log(`Instrument details created successfully: ${mode} - Instrument ID: ${instrumentId}`);
+    }
+
+    /**
+     * Auto-create Cheque entry from DD/FDR data
+     * Maps DD/FDR fields to Cheque fields and creates a new Cheque instrument
+     */
+    private async autoCreateChequeFromDdFdr(
+        tx: any,
+        ddFdrRequest: any,
+        ddFdrInstrument: any,
+        userId?: number
+    ) {
+        this.logger.log(`Auto-creating Cheque from DD/FDR: ${ddFdrInstrument.id}`);
+
+        const today = new Date().toISOString().split('T')[0];
+
+        const [chequeInstrument] = await tx
+            .insert(paymentInstruments)
+            .values({
+                requestId: ddFdrRequest.id,
+                instrumentType: 'Cheque',
+                purpose: ddFdrInstrument.purpose,
+                amount: ddFdrInstrument.amount,
+                favouring: ddFdrInstrument.favouring,
+                payableAt: ddFdrInstrument.payableAt,
+                issueDate: today,
+                courierDeadline: ddFdrInstrument.courierDeadline,
+                courierAddress: ddFdrInstrument.courierAddress,
+                isActive: true,
+                createdBy: userId,
+            })
+            .returning()
+            .execute();
+
+        await tx
+            .insert(instrumentChequeDetails)
+            .values({
+                instrumentId: chequeInstrument.id,
+                chequeDate: today,
+                chequeReason: ddFdrInstrument.purpose,
+                chequeNeeds: ddFdrInstrument.isActive ? 'DD/FDR' : null,
+                linkedDdId: ddFdrInstrument.instrumentType === 'DD' ? ddFdrInstrument.id : null,
+                linkedFdrId: ddFdrInstrument.instrumentType === 'FDR' ? ddFdrInstrument.id : null,
+            })
+            .execute();
+
+        await tx
+            .insert(instrumentTransferDetails)
+            .values({
+                instrumentId: chequeInstrument.id,
+                accountName: 'AU_9589',
+                accountNumber: 'AU_9589',
+                paymentMethod: 'Default Account'
+            })
+            .execute();
+
+        this.logger.log(`Auto-created Cheque: ${chequeInstrument.id} from DD/FDR: ${ddFdrInstrument.id}`);
+        return chequeInstrument;
     }
 
     // ============================================================================

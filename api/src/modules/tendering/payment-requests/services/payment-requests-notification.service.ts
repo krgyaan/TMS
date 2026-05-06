@@ -3,7 +3,7 @@ import { Inject } from '@nestjs/common';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { and, eq } from 'drizzle-orm';
-import { paymentInstruments, instrumentTransferDetails } from '@db/schemas/tendering/payment-requests.schema';
+import { paymentInstruments, instrumentTransferDetails, instrumentChequeDetails } from '@db/schemas/tendering/payment-requests.schema';
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import { PdfGeneratorService } from '@/modules/pdf/pdf-generator.service';
@@ -307,6 +307,35 @@ export class PaymentRequestsNotificationService {
                 this.logger.log(`Portal payment email sent for instrument ${instrumentId}`);
             } catch (error) {
                 this.logger.error(`Failed to send portal payment email for instrument ${instrumentId}:`, error);
+            }
+        } else if (mode === 'CHEQUE') {
+            const [chequeDetails] = await this.db
+                .select()
+                .from(instrumentChequeDetails)
+                .where(eq(instrumentChequeDetails.instrumentId, instrumentId))
+                .limit(1);
+
+            try {
+                await this.emailService.sendTenderEmail({
+                    tenderId: tenderId || 0,
+                    eventType: 'CHEQUE_REQUEST',
+                    fromUserId: requestedBy,
+                    subject: `Cheque Request - ${purpose}`,
+                    template: 'cheque-request',
+                    data: {
+                        purpose: purpose || 'Payment',
+                        partyName: instrument.favouring || 'Not specified',
+                        chequeDate: instrument.issueDate || new Date().toISOString().split('T')[0],
+                        amount: formatCurrency(Number(instrument.amount) || 0),
+                        chequeNeeds: instrument.courierDeadline || 24,
+                        link: `#/tendering/emds/${instrument.requestId}`,
+                        tlName: tlUser?.name || 'Team Leader',
+                    },
+                    to: [{ type: 'role', role: 'accounts', teamId: tenderTeamId }],
+                });
+                this.logger.log(`Cheque email sent for instrument ${instrumentId}`);
+            } catch (error) {
+                this.logger.error(`Failed to send cheque email for instrument ${instrumentId}:`, error);
             }
         } else {
             this.logger.log(`Email not supported for instrument type: ${instrumentType}, Mode: ${mode}`);
