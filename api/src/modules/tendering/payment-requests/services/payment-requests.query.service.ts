@@ -28,6 +28,7 @@ import type {
     PaymentRequestRow,
     PendingTenderRow, 
 } from '../dto/payment-requests.dto';
+import type { InstrumentResponse } from '../dto/payment-response.dto';
 import {
     buildTenderRoleFilters,
     buildRequestRoleFilters,
@@ -609,14 +610,38 @@ export class PaymentRequestsQueryService {
 
     async findByTenderId(tenderId: number) {
         const requests = await this.db
-            .select()
+            .select({
+                id: paymentRequests.id,
+                tenderId: paymentRequests.tenderId,
+                type: paymentRequests.type,
+                tenderNo: paymentRequests.tenderNo,
+                projectName: paymentRequests.projectName,
+                dueDate: paymentRequests.dueDate,
+                requestedBy: paymentRequests.requestedBy,
+                purpose: paymentRequests.purpose,
+                amountRequired: paymentRequests.amountRequired,
+                status: paymentRequests.status,
+                remarks: paymentRequests.remarks,
+                createdAt: paymentRequests.createdAt,
+                updatedAt: paymentRequests.updatedAt,
+            })
             .from(paymentRequests)
             .where(eq(paymentRequests.tenderId, tenderId));
 
         if (requests.length === 0) return null;
 
         const instruments = await this.db
-            .select()
+            .select({
+                id: paymentInstruments.id,
+                requestId: paymentInstruments.requestId,
+                instrumentType: paymentInstruments.instrumentType,
+                purpose: paymentInstruments.purpose,
+                amount: paymentInstruments.amount,
+                favouring: paymentInstruments.favouring,
+                payableAt: paymentInstruments.payableAt,
+                status: paymentInstruments.status,
+                isActive: paymentInstruments.isActive,
+            })
             .from(paymentInstruments)
             .where(and(
                 sql`${paymentInstruments.requestId} IN ${sql`(${requests.map(r => r.id).join(',')})`}`,
@@ -625,28 +650,70 @@ export class PaymentRequestsQueryService {
 
         return {
             requests: requests.map(request => ({
-                ...request,
-                instruments: instruments.filter(i => i.requestId === request.id),
+                ...this.mapPaymentRequest(request),
+                instruments: instruments.filter(i => i.requestId === request.id).map(i => this.mapInstrumentBase(i)),
             })),
         };
     }
 
     async findByTenderIdWithTender(tenderId: number) {
         const requests = await this.db
-            .select()
+            .select({
+                id: paymentRequests.id,
+                tenderId: paymentRequests.tenderId,
+                type: paymentRequests.type,
+                tenderNo: paymentRequests.tenderNo,
+                projectName: paymentRequests.projectName,
+                dueDate: paymentRequests.dueDate,
+                requestedBy: paymentRequests.requestedBy,
+                purpose: paymentRequests.purpose,
+                amountRequired: paymentRequests.amountRequired,
+                status: paymentRequests.status,
+                remarks: paymentRequests.remarks,
+                createdAt: paymentRequests.createdAt,
+                updatedAt: paymentRequests.updatedAt,
+            })
             .from(paymentRequests)
             .where(eq(paymentRequests.tenderId, tenderId));
 
         if (requests.length === 0) return null;
 
         const [tender] = await this.db
-            .select()
+            .select({
+                id: tenderInfos.id,
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                team: tenderInfos.team,
+                organization: tenderInfos.organization,
+                item: tenderInfos.item,
+                gstValues: tenderInfos.gstValues,
+                tenderFees: tenderInfos.tenderFees,
+                emd: tenderInfos.emd,
+                teamMember: tenderInfos.teamMember,
+                dueDate: tenderInfos.dueDate,
+                status: tenderInfos.status,
+                location: tenderInfos.location,
+                website: tenderInfos.website,
+                emdMode: tenderInfos.emdMode,
+                tenderFeeMode: tenderInfos.tenderFeeMode,
+                deleteStatus: tenderInfos.deleteStatus,
+            })
             .from(tenderInfos)
             .where(eq(tenderInfos.id, tenderId))
             .limit(1);
 
         const instruments = await this.db
-            .select()
+            .select({
+                id: paymentInstruments.id,
+                requestId: paymentInstruments.requestId,
+                instrumentType: paymentInstruments.instrumentType,
+                purpose: paymentInstruments.purpose,
+                amount: paymentInstruments.amount,
+                favouring: paymentInstruments.favouring,
+                payableAt: paymentInstruments.payableAt,
+                status: paymentInstruments.status,
+                isActive: paymentInstruments.isActive,
+            })
             .from(paymentInstruments)
             .where(and(
                 sql`${paymentInstruments.requestId} IN ${sql`(${requests.map(r => r.id).join(',')})`}`,
@@ -654,17 +721,31 @@ export class PaymentRequestsQueryService {
             ));
 
         return {
-            tender,
+            tender: this.mapTenderBasic(tender),
             requests: requests.map(request => ({
-                ...request,
-                instruments: instruments.filter(i => i.requestId === request.id),
+                ...this.mapPaymentRequest(request),
+                instruments: instruments.filter(i => i.requestId === request.id).map(i => this.mapInstrumentBase(i)),
             })),
         };
     }
 
     async findById(requestId: number) {
         const [request] = await this.db
-            .select()
+            .select({
+                id: paymentRequests.id,
+                tenderId: paymentRequests.tenderId,
+                type: paymentRequests.type,
+                tenderNo: paymentRequests.tenderNo,
+                projectName: paymentRequests.projectName,
+                dueDate: paymentRequests.dueDate,
+                requestedBy: paymentRequests.requestedBy,
+                purpose: paymentRequests.purpose,
+                amountRequired: paymentRequests.amountRequired,
+                status: paymentRequests.status,
+                remarks: paymentRequests.remarks,
+                createdAt: paymentRequests.createdAt,
+                updatedAt: paymentRequests.updatedAt,
+            })
             .from(paymentRequests)
             .where(eq(paymentRequests.id, requestId))
             .limit(1);
@@ -672,7 +753,17 @@ export class PaymentRequestsQueryService {
         if (!request) return null;
 
         const instruments = await this.db
-            .select()
+            .select({
+                id: paymentInstruments.id,
+                requestId: paymentInstruments.requestId,
+                instrumentType: paymentInstruments.instrumentType,
+                purpose: paymentInstruments.purpose,
+                amount: paymentInstruments.amount,
+                favouring: paymentInstruments.favouring,
+                payableAt: paymentInstruments.payableAt,
+                status: paymentInstruments.status,
+                isActive: paymentInstruments.isActive,
+            })
             .from(paymentInstruments)
             .where(and(
                 eq(paymentInstruments.requestId, requestId),
@@ -680,12 +771,12 @@ export class PaymentRequestsQueryService {
             ));
 
         return {
-            ...request,
-            instruments,
+            ...this.mapPaymentRequest(request),
+            instruments: instruments.map(i => this.mapInstrumentBase(i)),
         };
     }
 
-    async findByIdWithTender(requestId: number) {
+async findByIdWithTender(requestId: number) {
         const [request] = await this.db
             .select({
                 id: paymentRequests.id,
@@ -710,40 +801,259 @@ export class PaymentRequestsQueryService {
         if (!request) return null;
 
         const [tender] = await this.db
-            .select()
+            .select({
+                id: tenderInfos.id,
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                team: tenderInfos.team,
+                organization: tenderInfos.organization,
+                item: tenderInfos.item,
+                gstValues: tenderInfos.gstValues,
+                tenderFees: tenderInfos.tenderFees,
+                emd: tenderInfos.emd,
+                teamMember: tenderInfos.teamMember,
+                dueDate: tenderInfos.dueDate,
+                status: tenderInfos.status,
+                location: tenderInfos.location,
+                website: tenderInfos.website,
+                emdMode: tenderInfos.emdMode,
+                tenderFeeMode: tenderInfos.tenderFeeMode,
+                deleteStatus: tenderInfos.deleteStatus,
+            })
             .from(tenderInfos)
             .where(eq(tenderInfos.id, request.tenderId))
             .limit(1);
 
         const instruments = await this.db
-            .select()
+            .select({
+                id: paymentInstruments.id,
+                requestId: paymentInstruments.requestId,
+                instrumentType: paymentInstruments.instrumentType,
+                purpose: paymentInstruments.purpose,
+                amount: paymentInstruments.amount,
+                favouring: paymentInstruments.favouring,
+                payableAt: paymentInstruments.payableAt,
+                status: paymentInstruments.status,
+                isActive: paymentInstruments.isActive,
+            })
             .from(paymentInstruments)
             .where(and(
                 eq(paymentInstruments.requestId, requestId),
                 eq(paymentInstruments.isActive, true)
             ));
 
-        // Fetch details for each instrument
         const instrumentsWithDetails = await Promise.all(instruments.map(async (instrument) => {
             let details: any = null;
             if (instrument.instrumentType === 'DD') {
-                [details] = await this.db.select().from(instrumentDdDetails).where(eq(instrumentDdDetails.instrumentId, instrument.id)).limit(1);
+                [details] = await this.db.select({
+                    ddNo: instrumentDdDetails.ddNo,
+                    ddDate: instrumentDdDetails.ddDate,
+                    reqNo: instrumentDdDetails.reqNo,
+                    ddNeeds: instrumentDdDetails.ddNeeds,
+                    ddPurpose: instrumentDdDetails.ddPurpose,
+                    ddRemarks: instrumentDdDetails.ddRemarks,
+                }).from(instrumentDdDetails).where(eq(instrumentDdDetails.instrumentId, instrument.id)).limit(1);
             } else if (instrument.instrumentType === 'FDR') {
-                [details] = await this.db.select().from(instrumentFdrDetails).where(eq(instrumentFdrDetails.instrumentId, instrument.id)).limit(1);
+                [details] = await this.db.select({
+                    fdrNo: instrumentFdrDetails.fdrNo,
+                    fdrDate: instrumentFdrDetails.fdrDate,
+                    fdrSource: instrumentFdrDetails.fdrSource,
+                    fdrExpiryDate: instrumentFdrDetails.fdrExpiryDate,
+                    fdrNeeds: instrumentFdrDetails.fdrNeeds,
+                    fdrRemark: instrumentFdrDetails.fdrRemark,
+                }).from(instrumentFdrDetails).where(eq(instrumentFdrDetails.instrumentId, instrument.id)).limit(1);
             } else if (instrument.instrumentType === 'BG') {
-                [details] = await this.db.select().from(instrumentBgDetails).where(eq(instrumentBgDetails.instrumentId, instrument.id)).limit(1);
+                [details] = await this.db.select({
+                    bgNo: instrumentBgDetails.bgNo,
+                    bgDate: instrumentBgDetails.bgDate,
+                    validityDate: instrumentBgDetails.validityDate,
+                    claimExpiryDate: instrumentBgDetails.claimExpiryDate,
+                    beneficiaryName: instrumentBgDetails.beneficiaryName,
+                    beneficiaryAddress: instrumentBgDetails.beneficiaryAddress,
+                    bankName: instrumentBgDetails.bankName,
+                    bgNeeds: instrumentBgDetails.bgNeeds,
+                    bgPurpose: instrumentBgDetails.bgPurpose,
+                }).from(instrumentBgDetails).where(eq(instrumentBgDetails.instrumentId, instrument.id)).limit(1);
             } else if (instrument.instrumentType === 'Cheque') {
-                [details] = await this.db.select().from(instrumentChequeDetails).where(eq(instrumentChequeDetails.instrumentId, instrument.id)).limit(1);
+                [details] = await this.db.select({
+                    chequeNo: instrumentChequeDetails.chequeNo,
+                    chequeDate: instrumentChequeDetails.chequeDate,
+                    bankName: instrumentChequeDetails.bankName,
+                    chequeNeeds: instrumentChequeDetails.chequeNeeds,
+                    chequeReason: instrumentChequeDetails.chequeReason,
+                }).from(instrumentChequeDetails).where(eq(instrumentChequeDetails.instrumentId, instrument.id)).limit(1);
             } else if (instrument.instrumentType === 'Bank Transfer' || instrument.instrumentType === 'Portal Payment') {
-                [details] = await this.db.select().from(instrumentTransferDetails).where(eq(instrumentTransferDetails.instrumentId, instrument.id)).limit(1);
+                [details] = await this.db.select({
+                    utrNum: instrumentTransferDetails.utrNum,
+                    transactionDate: instrumentTransferDetails.transactionDate,
+                    accountName: instrumentTransferDetails.accountName,
+                    accountNumber: instrumentTransferDetails.accountNumber,
+                    ifsc: instrumentTransferDetails.ifsc,
+                    reason: instrumentTransferDetails.reason,
+                    remarks: instrumentTransferDetails.remarks,
+                }).from(instrumentTransferDetails).where(eq(instrumentTransferDetails.instrumentId, instrument.id)).limit(1);
             }
-            return { ...instrument, details };
+            return this.mapInstrumentResponse(instrument, details);
         }));
 
         return {
-            ...request,
-            tender,
+            ...this.mapPaymentRequest(request),
+            requestedByName: request.requestedByName,
+            tender: this.mapTenderBasic(tender),
             instruments: instrumentsWithDetails,
         };
+    }
+
+    // ============================================================================
+    // Response Mapping Helpers
+    // ============================================================================
+    // Response Mapping Helpers
+    // ============================================================================
+
+    private mapTenderBasic(tender: any) {
+        if (!tender) return null;
+        return {
+            id: tender.id,
+            tenderNo: tender.tenderNo?.toString() || '',
+            tenderName: tender.tenderName?.toString() || '',
+            team: tender.team,
+            organization: tender.organization,
+            item: tender.item,
+            gstValues: tender.gstValues?.toString() || '0',
+            tenderFees: tender.tenderFees?.toString() || '0',
+            emd: tender.emd?.toString() || '0',
+            teamMember: tender.teamMember,
+            dueDate: tender.dueDate ? tender.dueDate.toISOString() : null,
+            status: tender.status || 1,
+            location: tender.location,
+            website: tender.website,
+            emdMode: tender.emdMode?.toString() || null,
+            tenderFeeMode: tender.tenderFeeMode?.toString() || null,
+            processingFeeMode: tender.processingFeeMode?.toString() || null,
+            deleteStatus: tender.deleteStatus || 0,
+        };
+    }
+
+    private mapPaymentRequest(request: any) {
+        return {
+            id: request.id,
+            tenderId: request.tenderId,
+            type: request.type,
+            tenderNo: request.tenderNo?.toString() || '',
+            projectName: request.projectName,
+            dueDate: request.dueDate ? request.dueDate.toISOString() : null,
+            requestedBy: request.requestedBy,
+            purpose: request.purpose,
+            amountRequired: request.amountRequired?.toString() || '0',
+            status: request.status,
+            remarks: request.remarks,
+            createdAt: request.createdAt ? request.createdAt.toISOString() : null,
+            updatedAt: request.updatedAt ? request.updatedAt.toISOString() : null,
+        };
+    }
+
+    private mapInstrumentBase(instrument: any) {
+        return {
+            id: instrument.id,
+            requestId: instrument.requestId,
+            instrumentType: instrument.instrumentType,
+            purpose: instrument.purpose,
+            amount: instrument.amount?.toString() || '0',
+            favouring: instrument.favouring,
+            payableAt: instrument.payableAt,
+            status: instrument.status,
+            isActive: instrument.isActive,
+        };
+    }
+
+    private mapInstrumentResponse(instrument: any, details: any): InstrumentResponse {
+        const base = this.mapInstrumentBase(instrument);
+        
+        switch (instrument.instrumentType) {
+            case 'DD':
+                return {
+                    ...base,
+                    instrumentType: 'DD' as const,
+                    details: details ? {
+                        ddNo: details.ddNo,
+                        ddDate: details.ddDate ? details.ddDate.toISOString() : null,
+                        reqNo: details.reqNo,
+                        ddNeeds: details.ddNeeds,
+                        ddPurpose: details.ddPurpose,
+                        ddRemarks: details.ddRemarks,
+                    } : null,
+                };
+            case 'FDR':
+                return {
+                    ...base,
+                    instrumentType: 'FDR' as const,
+                    details: details ? {
+                        fdrNo: details.fdrNo,
+                        fdrDate: details.fdrDate ? details.fdrDate.toISOString() : null,
+                        fdrSource: details.fdrSource,
+                        fdrExpiryDate: details.fdrExpiryDate ? details.fdrExpiryDate.toISOString() : null,
+                        fdrNeeds: details.fdrNeeds,
+                        fdrRemark: details.fdrRemark,
+                    } : null,
+                };
+            case 'BG':
+                return {
+                    ...base,
+                    instrumentType: 'BG' as const,
+                    details: details ? {
+                        bgNo: details.bgNo,
+                        bgDate: details.bgDate ? details.bgDate.toISOString() : null,
+                        validityDate: details.validityDate ? details.validityDate.toISOString() : null,
+                        claimExpiryDate: details.claimExpiryDate ? details.claimExpiryDate.toISOString() : null,
+                        beneficiaryName: details.beneficiaryName,
+                        beneficiaryAddress: details.beneficiaryAddress,
+                        bankName: details.bankName,
+                        bgNeeds: details.bgNeeds,
+                        bgPurpose: details.bgPurpose,
+                    } : null,
+                };
+            case 'Cheque':
+                return {
+                    ...base,
+                    instrumentType: 'Cheque' as const,
+                    details: details ? {
+                        chequeNo: details.chequeNo,
+                        chequeDate: details.chequeDate ? details.chequeDate.toISOString() : null,
+                        bankName: details.bankName,
+                        chequeNeeds: details.chequeNeeds,
+                        chequeReason: details.chequeReason,
+                    } : null,
+                };
+            case 'Bank Transfer':
+                return {
+                    ...base,
+                    instrumentType: 'Bank Transfer' as const,
+                    details: details ? {
+                        utrNum: details.utrNum,
+                        transactionDate: details.transactionDate ? new Date(details.transactionDate).toISOString() : null,
+                        accountName: details.accountName,
+                        accountNumber: details.accountNumber,
+                        ifsc: details.ifsc,
+                        reason: details.reason,
+                        remarks: details.remarks,
+                    } : null,
+                };
+            case 'Portal Payment':
+                return {
+                    ...base,
+                    instrumentType: 'Portal Payment' as const,
+                    details: details ? {
+                        utrNum: details.utrNum,
+                        transactionDate: details.transactionDate ? new Date(details.transactionDate).toISOString() : null,
+                        accountName: details.accountName,
+                        accountNumber: details.accountNumber,
+                        ifsc: details.ifsc,
+                        reason: details.reason,
+                        remarks: details.remarks,
+                    } : null,
+                };
+            default:
+                return base as InstrumentResponse;
+        }
     }
 }
