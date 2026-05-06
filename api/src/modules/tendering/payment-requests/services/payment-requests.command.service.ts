@@ -277,6 +277,12 @@ export class PaymentRequestsCommandService {
             
             if (requestData?.details) {
                 const amount = requestData.details.amountRequired || 
+                              requestData.details.btAmount || 
+                              requestData.details.portalAmount || 
+                              requestData.details.ddAmount || 
+                              requestData.details.fdrAmount || 
+                              requestData.details.bgAmount || 
+                              requestData.details.chequeAmount || 
                               requestData.details[`${purpose === 'EMD' ? 'emd' : purpose === 'Tender Fee' ? 'tf' : 'pf'}Amount`] || 
                               existing.amountRequired;
                 
@@ -525,20 +531,26 @@ export class PaymentRequestsCommandService {
         };
 
         const normalizedMode = mode.toUpperCase().replace(' ', '_');
-        const shorthand = normalizedMode === 'BANK_TRANSFER' ? 'bt' : normalizedMode === 'PORTAL' ? 'portal' : normalizedMode.toLowerCase();
+        let shorthand = normalizedMode.toLowerCase();
+        
+        if (normalizedMode === 'BANK_TRANSFER' || normalizedMode === 'BT') {
+            shorthand = 'bt';
+        } else if (normalizedMode === 'PORTAL' || normalizedMode === 'PORTAL_PAYMENT') {
+            shorthand = 'portal';
+        }
 
         // Update main instrument
         await tx
             .update(paymentInstruments)
             .set({
-                purpose: details[`${shorthand}Purpose`] || null,
-                amount: (details[`${shorthand}Amount`] || details.amountRequired)?.toString() || null,
+                purpose: (details[`${shorthand}Purpose`] || details.btPurpose || details.portalPurpose || details.ddPurpose || details.fdrPurpose || details.bgPurpose || details.chequePurpose) || null,
+                amount: (details[`${shorthand}Amount`] || details.amountRequired || details.btAmount || details.portalAmount || details.ddAmount || details.fdrAmount || details.bgAmount || details.chequeAmount)?.toString() || null,
                 favouring: (details[`${shorthand}Favouring`] || details.btAccountName || details.portalName || details.bgFavouring || details.ddFavouring || details.fdrFavouring || details.chequeFavouring) || null,
-                payableAt: (details[`${shorthand}PayableAt`] || details.bgAddress) || null,
-                issueDate: (details[`${shorthand}Date`] || details.bgDate) || null,
+                payableAt: (details[`${shorthand}PayableAt`] || details.bgAddress || details.ddPayableAt || details.fdrPayableAt || details.btPayableAt || details.portalPayableAt || details.chequePayableAt) || null,
+                issueDate: (details[`${shorthand}Date`] || details.bgDate || details.ddDate || details.fdrDate || details.btDate || details.portalDate || details.chequeDate) || null,
                 expiryDate: (details[`${shorthand}ExpiryDate`] || details.bgExpiryDate || details.fdrExpiryDate) || null,
-                courierAddress: (details[`${shorthand}CourierAddress`] || details.bgCourierAddress) || null,
-                courierDeadline: (details[`${shorthand}CourierHours`] || details.bgCourierDays) || null,
+                courierAddress: (details[`${shorthand}CourierAddress`] || details.bgCourierAddress || details.ddCourierAddress || details.fdrCourierAddress) || null,
+                courierDeadline: (details[`${shorthand}CourierHours`] || details.bgCourierDays || details.ddCourierHours || details.fdrCourierHours) || null,
             })
             .where(eq(paymentInstruments.id, instrumentId));
 
@@ -608,6 +620,7 @@ export class PaymentRequestsCommandService {
                 break;
 
             case 'BANK_TRANSFER':
+            case 'BT':
                 await tx.update(instrumentTransferDetails).set({
                     accountName: details.btAccountName || null,
                     accountNumber: details.btAccountNo || null,
@@ -617,6 +630,7 @@ export class PaymentRequestsCommandService {
                 break;
 
             case 'PORTAL':
+            case 'PORTAL_PAYMENT':
                 await tx.update(instrumentTransferDetails).set({
                     portalName: details.portalName || null,
                     isNetbanking: details.portalNetBanking || null,

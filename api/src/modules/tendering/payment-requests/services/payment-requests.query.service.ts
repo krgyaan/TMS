@@ -799,7 +799,6 @@ async findByIdWithTender(requestId: number) {
             .limit(1);
 
         if (!request) return null;
-        console.log("request", request);
 
         const instruments = await this.db
             .select({
@@ -818,7 +817,6 @@ async findByIdWithTender(requestId: number) {
                 eq(paymentInstruments.requestId, requestId),
                 eq(paymentInstruments.isActive, true)
             ));
-        console.log("instruments", instruments);
 
         const instrumentsWithDetails = await Promise.all(instruments.map(async (instrument) => {
             let details: any = null;
@@ -881,7 +879,6 @@ async findByIdWithTender(requestId: number) {
                     isDebit: instrumentTransferDetails.isDebit,
                 }).from(instrumentTransferDetails).where(eq(instrumentTransferDetails.instrumentId, instrument.id)).limit(1);
             }
-            console.log("details", details);
             return this.mapInstrumentResponse(instrument, details);
         }));
         
@@ -1016,7 +1013,6 @@ async findByIdWithTender(requestId: number) {
                     instrumentType: 'Bank Transfer' as const,
                     details: details ? {
                         utrNum: details.utrNum,
-                        transactionDate: details.transactionDate ? new Date(details.transactionDate).toISOString() : null,
                         accountName: details.accountName,
                         accountNumber: details.accountNumber,
                         ifsc: details.ifsc,
@@ -1029,12 +1025,8 @@ async findByIdWithTender(requestId: number) {
                     ...base,
                     instrumentType: 'Portal Payment' as const,
                     details: details ? {
-                        utrNum: details.utrNum,
-                        transactionDate: details.transactionDate ? new Date(details.transactionDate).toISOString() : null,
-                        accountName: details.accountName,
-                        accountNumber: details.accountNumber,
-                        ifsc: details.ifsc,
                         reason: details.reason,
+                        utrNum: details.utrNum,
                         remarks: details.remarks,
                         portalName: details.portalName,
                         portalNetBanking: details.isNetbanking,
@@ -1084,10 +1076,10 @@ async findByIdWithTender(requestId: number) {
                 Object.assign(response, this.mapBgDetails(details, request.amountRequired, instrument));
                 break;
             case 'Bank Transfer':
-                Object.assign(response, this.mapTransferDetails(details, request.amountRequired));
+                Object.assign(response, this.mapBankTransferDetails(details, request.amountRequired));
                 break;
             case 'Portal Payment':
-                Object.assign(response, this.mapTransferDetails(details, request.amountRequired));
+                Object.assign(response, this.mapPortalDetails(details, request.amountRequired));
                 break;
             case 'Cheque':
                 Object.assign(response, this.mapChequeDetails(details, request.amountRequired, instrument));
@@ -1147,15 +1139,20 @@ async findByIdWithTender(requestId: number) {
             bgBank: details?.bankName || instrument?.bankName || '',
         };
     }
-
-    private mapTransferDetails(details: any, amount: string) {
+    
+    private mapBankTransferDetails(details: any, amount: string) {
         return {
-            btPurpose: details?.reason || details?.purpose || '',
+            btPurpose: details?.btPurpose || details?.reason || details?.purpose || '',
             btAmount: amount,
             btAccountName: details?.accountName || '',
             btAccountNo: details?.accountNumber || '',
             btIfsc: details?.ifsc || '',
-            portalPurpose: details?.reason || details?.purpose || '',
+        };
+    }
+
+    private mapPortalDetails(details: any, amount: string) {
+        return {
+            portalPurpose: details?.portalPurpose || details?.reason || details?.purpose || '',
             portalAmount: amount,
             portalName: details?.portalName || '',
             portalNetBanking: details?.portalNetBanking || details?.isNetbanking || null,
