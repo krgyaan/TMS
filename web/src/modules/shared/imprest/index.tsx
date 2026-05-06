@@ -134,13 +134,13 @@ const ImprestEmployeeDashboard: React.FC = () => {
     const requestedUserId = id ? Number(id) : null;
     const isOwnPage = !requestedUserId || requestedUserId === user?.id;
 
-    console.log(requestedUserId, isOwnPage);
+    // console.log(requestedUserId, isOwnPage);
 
     if (requestedUserId) {
         userDetails = useUser(requestedUserId).data;
     }
 
-    console.log("user details", userDetails);
+    // console.log("user details", userDetails);
 
     if (!isOwnPage && !isAuthorized) {
         return (
@@ -180,15 +180,15 @@ const ImprestEmployeeDashboard: React.FC = () => {
     };
 
     const numericUserId = isOwnPage ? user?.id : requestedUserId;
-    console.log(numericUserId);
+    // console.log(numericUserId);
 
     const { data, isLoading, error } = useImprestList(numericUserId);
     const addRemarkMutation = useAddImprestAccRemark();
 
-    console.log("invoiceProof", data?.invoiceProof);
+    // console.log("invoiceProof", data?.invoiceProof);
 
     const summary = data?.summary;
-    console.log("summary", { summary });
+    // console.log("summary", { summary });
     const rows = data?.imprests ?? [];
 
     const deleteMutation = useDeleteImprest();
@@ -246,7 +246,7 @@ const ImprestEmployeeDashboard: React.FC = () => {
     const submitAddProof = (e?: React.FormEvent) => {
         e?.preventDefault();
         if (!currentProofRowId || filesToUpload.length === 0) return;
-        console.log("data", filesToUpload);
+        // console.log("data", filesToUpload);
         uploadProofsMutation.mutate(
             { id: currentProofRowId, files: filesToUpload },
             {
@@ -343,6 +343,7 @@ const ImprestEmployeeDashboard: React.FC = () => {
             Date: new Date(r.createdAt).toLocaleDateString("en-GB"),
             Party: r.partyName,
             Project: r.projectName,
+            Category: r.formattedCategory,
             Amount: r.amount,
             Approved: r.approvalStatus === 1 ? "Yes" : "No",
             Tallied: r.tallyStatus === 1 ? "Yes" : "No",
