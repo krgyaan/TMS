@@ -271,10 +271,28 @@ export class PaymentRequestsCommandService {
             ));
 
         await this.db.transaction(async (tx) => {
+            // Update request level fields if provided
+            const purpose = existing.purpose;
+            const requestData = (payload[purpose] || payload[purpose.toLowerCase()]);
+            
+            if (requestData?.details) {
+                const amount = requestData.details.amountRequired || 
+                              requestData.details[`${purpose === 'EMD' ? 'emd' : purpose === 'Tender Fee' ? 'tf' : 'pf'}Amount`] || 
+                              existing.amountRequired;
+                
+                await tx
+                    .update(paymentRequests)
+                    .set({
+                        amountRequired: amount.toString(),
+                        remarks: requestData.details.remarks || existing.remarks,
+                    })
+                    .where(eq(paymentRequests.id, requestId));
+            }
+
             // Update each instrument
             for (const instrument of instruments) {
-                const purpose = instrument.purpose as string;
-                const details = (payload[purpose] || payload[purpose.toLowerCase()])?.details;
+                const instrPurpose = instrument.purpose || purpose;
+                const details = (payload[instrPurpose] || payload[instrPurpose.toLowerCase()] || requestData)?.details;
                 if (details) {
                     await this.updateInstrumentWithDetails(
                         tx,
@@ -485,30 +503,6 @@ export class PaymentRequestsCommandService {
         this.logger.log(`Instrument details created successfully: ${mode} - Instrument ID: ${instrumentId}`);
     }
 
-    private async getDetailIdForInstrument(instrumentId: number, mode: string): Promise<number> {
-        this.logger.log(`Getting instrument details: ${mode} - Instrument ID: ${instrumentId}`);
-        const tableMap: Record<string, any> = {
-            DD: instrumentDdDetails,
-            FDR: instrumentFdrDetails,
-            BG: instrumentBgDetails,
-            CHEQUE: instrumentChequeDetails,
-            BANK_TRANSFER: instrumentTransferDetails,
-            PORTAL: instrumentTransferDetails,
-        };
-
-        const table = tableMap[mode];
-        if (!table) return instrumentId;
-
-        const [detail] = await this.db
-            .select({ id: sql<number>`${table.id}` })
-            .from(table)
-            .where(eq(table.instrumentId, instrumentId))
-            .limit(1);
-
-        this.logger.log(`Instrument details fetched successfully: ${mode} - Instrument ID: ${instrumentId}`);
-        return detail?.id || instrumentId;
-    }
-
     // ============================================================================
     // Update Helpers
     // ============================================================================
@@ -520,17 +514,35 @@ export class PaymentRequestsCommandService {
         details: any
     ) {
         this.logger.log(`Updating instrument with details: ${mode} - Instrument ID: ${instrumentId}`);
+        
+        const instrumentTypeMap: Record<string, string> = {
+            'BANK_TRANSFER': 'Bank Transfer',
+            'PORTAL': 'Portal Payment',
+            'DD': 'DD',
+            'FDR': 'FDR',
+            'BG': 'BG',
+            'CHEQUE': 'Cheque'
+        };
+
+        const normalizedMode = mode.toUpperCase().replace(' ', '_');
+        const shorthand = normalizedMode === 'BANK_TRANSFER' ? 'bt' : normalizedMode === 'PORTAL' ? 'portal' : normalizedMode.toLowerCase();
+
         // Update main instrument
         await tx
             .update(paymentInstruments)
             .set({
-                favouring: (details.btAccountName || details.portalName || details.ddFavouring || details.fdrFavouring || details.bgFavouring || details.chequeFavouring) || null,
-                amount: (details.btAmount || details.portalAmount || details.ddAmount || details.fdrAmount || details.bgAmount || details.chequeAmount)?.toString() || null,
+                purpose: details[`${shorthand}Purpose`] || null,
+                amount: (details[`${shorthand}Amount`] || details.amountRequired)?.toString() || null,
+                favouring: (details[`${shorthand}Favouring`] || details.btAccountName || details.portalName || details.bgFavouring || details.ddFavouring || details.fdrFavouring || details.chequeFavouring) || null,
+                payableAt: (details[`${shorthand}PayableAt`] || details.bgAddress) || null,
+                issueDate: (details[`${shorthand}Date`] || details.bgDate) || null,
+                expiryDate: (details[`${shorthand}ExpiryDate`] || details.bgExpiryDate || details.fdrExpiryDate) || null,
+                courierAddress: (details[`${shorthand}CourierAddress`] || details.bgCourierAddress) || null,
+                courierDeadline: (details[`${shorthand}CourierHours`] || details.bgCourierDays) || null,
             })
             .where(eq(paymentInstruments.id, instrumentId));
 
         // Update type-specific details
-        this.logger.log(`Updating instrument details: ${mode} - Instrument ID: ${instrumentId}`);
         await this.updateDetailTable(tx, instrumentId, mode, details);
     }
 
@@ -540,69 +552,79 @@ export class PaymentRequestsCommandService {
         mode: string,
         details: any
     ) {
-        this.logger.log(`Updating instrument details: ${mode} - Instrument ID: ${instrumentId}`);
-        const detailsMap: Record<string, any> = {
-            DD: { updateFn: 'update', table: instrumentDdDetails, fields: { ddFavour: details.ddFavouring } },
-            FDR: { updateFn: 'update', table: instrumentFdrDetails, fields: { fdrFavour: details.fdrFavouring } },
-            BG: { updateFn: 'update', table: instrumentBgDetails, fields: { bgFavouring: details.bgFavouring } },
-            CHEQUE: { updateFn: 'update', table: instrumentChequeDetails, fields: { chequeFavour: details.chequeFavouring } },
-            BT: { updateFn: 'update', table: instrumentTransferDetails, fields: { btAccountName: details.btAccountName } },
-            PORTAL: { updateFn: 'update', table: instrumentTransferDetails, fields: { portalName: details.portalName } },
-        };
+        this.logger.log(`Updating instrument details table: ${mode} - Instrument ID: ${instrumentId}`);
+        const normalizedMode = mode.toUpperCase().replace(' ', '_');
 
-        const config = detailsMap[mode];
-        if (!config) return;
+        switch (normalizedMode) {
+            case 'DD':
+                await tx.update(instrumentDdDetails).set({
+                    ddNo: details.ddNo || null,
+                    ddDate: details.ddDate || null,
+                    ddPurpose: details.ddPurpose || null,
+                    ddNeeds: details.ddDeliverBy || null,
+                    ddRemarks: details.ddRemarks || null,
+                    reqNo: details.reqNo || null,
+                }).where(eq(instrumentDdDetails.instrumentId, instrumentId));
+                break;
 
-        const { table, fields } = config;
-        const [existing] = await tx
-            .select()
-            .from(table)
-            .where(eq(table.instrumentId, instrumentId))
-            .limit(1);
+            case 'FDR':
+                await tx.update(instrumentFdrDetails).set({
+                    fdrNo: details.fdrNo || null,
+                    fdrDate: details.fdrDate || null,
+                    fdrPurpose: details.fdrPurpose || null,
+                    fdrExpiryDate: details.fdrExpiryDate || null,
+                    fdrNeeds: details.fdrDeliverBy || null,
+                    fdrRemark: details.fdrRemarks || null,
+                    fdrSource: details.fdrSource || null,
+                }).where(eq(instrumentFdrDetails.instrumentId, instrumentId));
+                break;
 
-        if (existing) {
-            await tx.update(table).set(fields).where(eq(table.instrumentId, instrumentId));
+            case 'BG':
+                await tx.update(instrumentBgDetails).set({
+                    bgNo: details.bgNo || null,
+                    bgDate: details.bgDate || null,
+                    validityDate: details.bgExpiryDate || null,
+                    claimExpiryDate: details.bgClaimPeriod || null,
+                    beneficiaryName: details.bgFavouring || null,
+                    beneficiaryAddress: details.bgAddress || null,
+                    bankName: details.bgBank || null,
+                    bgPurpose: details.bgPurpose || null,
+                    bgNeeds: details.bgNeededIn || null,
+                    bgClientUser: details.bgClientUserEmail || null,
+                    bgClientCp: details.bgClientCpEmail || null,
+                    bgClientFin: details.bgClientFinanceEmail || null,
+                    stampCharge: details.bgStampValue || null,
+                }).where(eq(instrumentBgDetails.instrumentId, instrumentId));
+                break;
+
+            case 'CHEQUE':
+                await tx.update(instrumentChequeDetails).set({
+                    chequeNo: details.chequeNo || null,
+                    chequeDate: details.chequeDate || null,
+                    bankName: details.chequeAccount || null,
+                    chequeReason: details.chequePurpose || null,
+                    chequeNeeds: details.chequeNeededIn || null,
+                }).where(eq(instrumentChequeDetails.instrumentId, instrumentId));
+                break;
+
+            case 'BANK_TRANSFER':
+                await tx.update(instrumentTransferDetails).set({
+                    accountName: details.btAccountName || null,
+                    accountNumber: details.btAccountNo || null,
+                    ifsc: details.btIfsc || null,
+                    reason: details.btPurpose || null,
+                }).where(eq(instrumentTransferDetails.instrumentId, instrumentId));
+                break;
+
+            case 'PORTAL':
+                await tx.update(instrumentTransferDetails).set({
+                    portalName: details.portalName || null,
+                    isNetbanking: details.portalNetBanking || null,
+                    isDebit: details.portalDebitCard || null,
+                    reason: details.portalPurpose || null,
+                }).where(eq(instrumentTransferDetails.instrumentId, instrumentId));
+                break;
         }
-        this.logger.log(`Instrument details updated successfully: ${mode} - Instrument ID: ${instrumentId}`);
-    }
-
-    private async getInstrumentDetails(instrumentId: number) {
-        this.logger.log(`Getting instrument details: ${instrumentId}`);
-        const [instrument] = await this.db
-            .select()
-            .from(paymentInstruments)
-            .where(eq(paymentInstruments.id, instrumentId))
-            .limit(1);
-
-        if (!instrument) return null;
-
-        return {
-            ...instrument,
-            details: await this.getInstrumentSpecificDetails(instrumentId, instrument.instrumentType as string),
-        };
-    }
-
-    private async getInstrumentSpecificDetails(instrumentId: number, instrumentType: string) {
-        this.logger.log(`Getting instrument specific details: ${instrumentId} - ${instrumentType}`);
-        const tableMap: Record<string, any> = {
-            DD: instrumentDdDetails,
-            FDR: instrumentFdrDetails,
-            BG: instrumentBgDetails,
-            CHEQUE: instrumentChequeDetails,
-            BT: instrumentTransferDetails,
-            PORTAL: instrumentTransferDetails,
-        };
-
-        const table = tableMap[instrumentType];
-        if (!table) return null;
-
-        const [detail] = await this.db
-            .select()
-            .from(table)
-            .where(eq(table.instrumentId, instrumentId))
-            .limit(1);
-
-        return detail || null;
     }
 
     private async findById(requestId: number) {
