@@ -2,8 +2,10 @@ import { Injectable, Logger, NotFoundException, Inject, forwardRef } from '@nest
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { eq, and, sql } from 'drizzle-orm';
-import { paymentRequests, paymentInstruments, instrumentDdDetails, instrumentFdrDetails, instrumentBgDetails, instrumentChequeDetails, instrumentTransferDetails } from '@db/schemas/tendering/payment-requests.schema';;
+import { paymentRequests, paymentInstruments, instrumentDdDetails, instrumentFdrDetails, instrumentBgDetails, instrumentChequeDetails, instrumentTransferDetails, instrumentStatusHistory } from '@db/schemas/tendering/payment-requests.schema';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
+import { users } from '@/db/schemas/auth/users.schema';
+import { userRoles } from '@/db/schemas/auth/user-roles.schema';
 import type { CreatePaymentRequestDto, UpdatePaymentRequestDto, UpdateStatusDto, PaymentPurpose } from '../dto/payment-requests.dto';
 import { extractAmountFromDetails } from './payment-requests.shared';
 import { tenderInformation } from '@/db/schemas';
@@ -206,6 +208,7 @@ export class PaymentRequestsCommandService {
      * Handle background operations asynchronously after HTTP response
      * - Send email notifications for Bank Transfer and Portal Payment
      * - Stop timer if EMD was requested
+     * - Update tender status to 5 if tender_id exists
      */
     private async handleBackgroundOperations(
         results: Array<{ request: any; instrument: any; isAutoCreatedCheque?: boolean }>,
@@ -257,6 +260,17 @@ export class PaymentRequestsCommandService {
                     this.logger.log(`Successfully stopped emd_request timer for tender ${tenderId}`);
                 } catch (error) {
                     this.logger.error(`Failed to stop timer for tender ${tenderId} after EMD requested:`, error);
+                }
+            }
+
+            // Update tender status to 5 if tender_id exists (only for TMS requests)
+            if (!isNonTmsRequest && tenderId > 0) {
+                try {
+                    this.logger.log(`Updating tender ${tenderId} status to 5`);
+                    await this.tenderInfosService.updateStatus(tenderId, 5, userId || 0, 'Payment request created');
+                    this.logger.log(`Successfully updated tender ${tenderId} status to 5`);
+                } catch (error) {
+                    this.logger.error(`Failed to update tender ${tenderId} status to 5:`, error);
                 }
             }
         } catch (error) {
@@ -444,6 +458,9 @@ export class PaymentRequestsCommandService {
         // Create type-specific details
         await this.createInstrumentDetails(tx, instrument.id, mode, details);
 
+        // Create status history entry
+        await this.createStatusHistoryEntry(tx, instrument.id, mode, details, userId);
+
         this.logger.log(`Instrument created successfully: ${JSON.stringify(instrument)}`);
         return instrument;
     }
@@ -581,6 +598,9 @@ export class PaymentRequestsCommandService {
                 paymentMethod: 'Default Account'
             })
             .execute();
+
+        // Create status history entry for auto-created Cheque
+        await this.createStatusHistoryEntry(tx, chequeInstrument.id, 'CHEQUE', ddFdrInstrument, userId);
 
         this.logger.log(`Auto-created Cheque: ${chequeInstrument.id} from DD/FDR: ${ddFdrInstrument.id}`);
         return chequeInstrument;
@@ -740,5 +760,66 @@ export class PaymentRequestsCommandService {
             ...request,
             instruments,
         };
+    }
+
+    private getInitialStatus(mode: string): string {
+        const statusMap: Record<string, string> = {
+            'DD': 'DD_ACCOUNTS_FORM_PENDING',
+            'FDR': 'FDR_ACCOUNTS_FORM_PENDING',
+            'BG': 'BG_ACCOUNTS_FORM_PENDING',
+            'CHEQUE': 'CHEQUE_ACCOUNTS_FORM_PENDING',
+            'BANK_TRANSFER': 'Bank Transfer_ACCOUNTS_FORM_PENDING',
+            'PORTAL': 'Portal Payment_ACCOUNTS_FORM_PENDING',
+        };
+        return statusMap[mode] || 'ACCOUNTS_FORM_PENDING';
+    }
+
+    private async createStatusHistoryEntry(
+        tx: any,
+        instrumentId: number,
+        mode: string,
+        formData: any,
+        userId?: number
+    ) {
+        const toStatus = this.getInitialStatus(mode);
+        
+        let userName = '';
+        let userRoleId = 0;
+        
+        if (userId) {
+            const [user] = await tx
+                .select({ name: users.name })
+                .from(users)
+                .where(eq(users.id, userId))
+                .limit(1);
+            
+            if (user) {
+                userName = user.name;
+                const [role] = await tx
+                    .select({ roleId: userRoles.roleId })
+                    .from(userRoles)
+                    .where(eq(userRoles.userId, userId))
+                    .limit(1);
+                userRoleId = role?.roleId || 0;
+            }
+        }
+
+        await tx.insert(instrumentStatusHistory).values({
+            instrumentId,
+            fromStatus: '',
+            toStatus,
+            fromAction: 0,
+            toAction: 0,
+            fromStage: 0,
+            toStage: 0,
+            formData,
+            changedBy: userId || 0,
+            changedByName: userName,
+            changedByRole: String(userRoleId),
+            ipAddress: '',
+            userAgent: '',
+        }).execute();
+        
+        this.logger.log(`Status history created for instrument ${instrumentId} with status ${toStatus}`);
     }
 }
