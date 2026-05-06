@@ -53,6 +53,10 @@ class PaymentRequestsService extends BaseApiService {
         return this.get<any>(`/${id}`);
     }
 
+    async getByIdForEdit(id: number) {
+        return this.get<any>(`/${id}/edit`);
+    }
+
     async update(id: number, data: UpdatePaymentRequestDto) {
         return this.patch<any, UpdatePaymentRequestDto>(`/${id}`, data);
     }

@@ -116,6 +116,14 @@ export const usePaymentRequest = (id: number | null) => {
     });
 };
 
+export const usePaymentRequestForEdit = (id: number | null) => {
+    return useQuery({
+        queryKey: id ? [...paymentRequestsKey.detail(id), 'edit'] : [...paymentRequestsKey.detail(0), 'edit'],
+        queryFn: () => paymentRequestsService.getByIdForEdit(id!),
+        enabled: !!id,
+    });
+};
+
 export const useCreatePaymentRequest = () => {
     const queryClient = useQueryClient();
 
