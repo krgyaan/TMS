@@ -639,6 +639,8 @@ export class PaymentRequestsQueryService {
                 amount: paymentInstruments.amount,
                 favouring: paymentInstruments.favouring,
                 payableAt: paymentInstruments.payableAt,
+                courierAddress: paymentInstruments.courierAddress,
+                courierDeadline: paymentInstruments.courierDeadline,
                 status: paymentInstruments.status,
                 isActive: paymentInstruments.isActive,
             })
@@ -711,6 +713,8 @@ export class PaymentRequestsQueryService {
                 amount: paymentInstruments.amount,
                 favouring: paymentInstruments.favouring,
                 payableAt: paymentInstruments.payableAt,
+                courierAddress: paymentInstruments.courierAddress,
+                courierDeadline: paymentInstruments.courierDeadline,
                 status: paymentInstruments.status,
                 isActive: paymentInstruments.isActive,
             })
@@ -761,6 +765,8 @@ export class PaymentRequestsQueryService {
                 amount: paymentInstruments.amount,
                 favouring: paymentInstruments.favouring,
                 payableAt: paymentInstruments.payableAt,
+                courierAddress: paymentInstruments.courierAddress,
+                courierDeadline: paymentInstruments.courierDeadline,
                 status: paymentInstruments.status,
                 isActive: paymentInstruments.isActive,
             })
@@ -953,6 +959,8 @@ async findByIdWithTender(requestId: number) {
             amount: instrument.amount?.toString() || '0',
             favouring: instrument.favouring,
             payableAt: instrument.payableAt,
+            courierAddress: instrument.courierAddress,
+            courierDeadline: instrument.courierDeadline != null ? Number(instrument.courierDeadline) : null,
             status: instrument.status,
             isActive: instrument.isActive,
         };
@@ -976,8 +984,6 @@ async findByIdWithTender(requestId: number) {
                         ddNeeds: details.ddNeeds,
                         ddPurpose: details.ddPurpose,
                         ddRemarks: details.ddRemarks,
-                        courierAddress: details.courierAddress,
-                        courierDeadline: details.courierDeadline,
                     } : null,
                 };
             case 'FDR':
@@ -992,8 +998,6 @@ async findByIdWithTender(requestId: number) {
                         fdrExpiryDate: details.fdrExpiryDate,
                         fdrNeeds: details.fdrNeeds,
                         fdrRemark: details.fdrRemark,
-                        courierAddress: details.courierAddress,
-                        courierDeadline: details.courierDeadline,
                     } : null,
                 };
             case 'BG':
