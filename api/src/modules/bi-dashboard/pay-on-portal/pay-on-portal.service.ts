@@ -148,7 +148,7 @@ export class PayOnPortalService {
             })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id))
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
@@ -162,7 +162,7 @@ export class PayOnPortalService {
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-            .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id));
         if (searchTerm) {
             countQueryBuilder = countQueryBuilder
