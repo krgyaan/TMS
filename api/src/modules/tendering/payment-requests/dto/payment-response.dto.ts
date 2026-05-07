@@ -32,6 +32,7 @@ export const FdrDetailsResponse = z.object({
   fdrNo: nullishString,
   fdrDate: nullishDate,
   fdrSource: nullishString,
+  fdrPurpose: nullishString,
   fdrExpiryDate: nullishDate,
   fdrNeeds: nullishString,
   fdrRemark: nullishString,

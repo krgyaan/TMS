@@ -449,6 +449,8 @@ export class PaymentRequestsCommandService {
                 payableAt: (details[`${shorthand}PayableAt`] || details.bgAddress) || null,
                 issueDate: (details[`${shorthand}Date`] || details.bgDate) || null,
                 expiryDate: (details[`${shorthand}ExpiryDate`] || details.bgExpiryDate || details.fdrExpiryDate) || null,
+                courierAddress: (details[`${shorthand}CourierAddress`] || details.bgCourierAddress || details.ddCourierAddress || details.fdrCourierAddress) || null,
+                courierDeadline: (details[`${shorthand}CourierHours`] || details.bgCourierDays || details.ddCourierHours || details.fdrCourierHours) || null,
                 isActive: true,
                 createdBy: userId,
             })
@@ -617,16 +619,7 @@ export class PaymentRequestsCommandService {
         details: any
     ) {
         this.logger.log(`Updating instrument with details: ${mode} - Instrument ID: ${instrumentId}`);
-        
-        const instrumentTypeMap: Record<string, string> = {
-            'BANK_TRANSFER': 'Bank Transfer',
-            'PORTAL': 'Portal Payment',
-            'DD': 'DD',
-            'FDR': 'FDR',
-            'BG': 'BG',
-            'CHEQUE': 'Cheque'
-        };
-
+    
         const normalizedMode = mode.toUpperCase().replace(' ', '_');
         let shorthand = normalizedMode.toLowerCase();
         
