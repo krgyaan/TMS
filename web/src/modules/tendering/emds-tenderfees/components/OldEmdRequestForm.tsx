@@ -126,9 +126,7 @@ export function OldEmdRequestForm({ tenderId, requestIds, initialData, mode = 'c
         }
     };
 
-
-
-    const allowedEmdModes = parseAllowedModes(['DD', 'FDR', 'BG', 'BANK_TRANSFER', 'PORTAL', 'CHEQUE'].join(','));
+    const allowedEmdModes = parseAllowedModes(['DD', 'FDR', 'BG'].join(','));
     const type = 'OLD_ENTRY';
 
     const isPending = isEditMode ? updateRequest.isPending : createRequest.isPending;

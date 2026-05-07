@@ -9,9 +9,10 @@ import DateInput from '@/components/form/DateInput';
 interface PaymentFormBaseProps {
     amount?: number;
     prefix?: string;
+    readOnly?: boolean;
 }
 
-export function ChequeForm({ prefix = 'emd.details' }: PaymentFormBaseProps) {
+export function ChequeForm({ prefix = 'emd.details', readOnly = false }: PaymentFormBaseProps) {
     const { control } = useFormContext();
 
     return (
@@ -22,9 +23,10 @@ export function ChequeForm({ prefix = 'emd.details' }: PaymentFormBaseProps) {
                 label="Purpose"
                 options={CHEQUE_PURPOSE}
                 placeholder="Select Purpose"
+                disabled={readOnly}
             />
             <FieldWrapper control={control} name={`${prefix}.chequeAmount`} label="Cheque Amount">
-                {(field) => <NumberInput {...field} placeholder="Leave blank for blank cheque" />}
+                {(field) => <NumberInput {...field} placeholder="Leave blank for blank cheque" disabled={readOnly} />}
             </FieldWrapper>
             <FieldWrapper control={control} name={`${prefix}.chequeFavouring`} label="Cheque in Favour of">
                 {(field) => <Input {...field} value={field.value || ''} placeholder="e.g., Individual or Company Name" />}

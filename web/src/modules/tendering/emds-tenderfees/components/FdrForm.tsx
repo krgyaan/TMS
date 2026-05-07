@@ -10,9 +10,10 @@ import DateInput from '@/components/form/DateInput';
 interface PaymentFormBaseProps {
     amount?: number;
     prefix?: string;
+    readOnly?: boolean;
 }
 
-export function FdrForm({ amount, prefix = 'emd.details' }: PaymentFormBaseProps) {
+export function FdrForm({ amount, prefix = 'emd.details', readOnly = false }: PaymentFormBaseProps) {
     const { control } = useFormContext();
 
     return (
@@ -23,12 +24,14 @@ export function FdrForm({ amount, prefix = 'emd.details' }: PaymentFormBaseProps
                 label="Purpose *"
                 options={PURPOSE_OPTIONS}
                 placeholder="Select Purpose"
+                disabled={readOnly}
             />
             <FieldWrapper control={control} name={`${prefix}.fdrAmount`} label="FDR Amount *">
                 {(field) => (
                     <NumberInput
                         value={field.value ?? amount}
                         onChange={field.onChange}
+                        disabled={readOnly}
                     />
                 )}
             </FieldWrapper>
