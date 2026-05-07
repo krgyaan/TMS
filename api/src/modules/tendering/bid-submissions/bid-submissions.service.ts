@@ -695,7 +695,7 @@ export class BidSubmissionsService {
             case 'emd':
                 validStatusIds = [8]; // TODO: Add valid status IDs for emd
             case 'costing-sheet':
-                validStatusIds = [8 ,14 ,34 ]; // TODO: Add valid status IDs for costing-sheet
+                validStatusIds = [8 ,10 ,14 ,34 ]; // TODO: Add valid status IDs for costing-sheet
                 break;
             case 'costing-approval':
                 validStatusIds = [8]; // TODO: Add valid status IDs for costing-approval
