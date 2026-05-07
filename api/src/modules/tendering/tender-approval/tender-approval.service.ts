@@ -1,29 +1,30 @@
-import { Inject, Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { DRIZZLE } from '@db/database.module';
-import type { DbInstance } from '@db';
-import type { TenderApprovalPayload } from '@/modules/tendering/tender-approval/dto/tender-approval.dto';
-import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
-import { eq, and, asc, desc, sql, or, inArray, isNull, SQL } from 'drizzle-orm';
-import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
-import { users } from '@db/schemas/auth/users.schema';
-import { statuses } from '@db/schemas/master/statuses.schema';
-import { items } from '@db/schemas/master/items.schema';
-import { tenderIncompleteFields } from '@db/schemas/tendering/tender-incomplete-fields.schema';
-import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
-import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
-import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
-import { EmailService } from '@/modules/email/email.service';
-import { RecipientResolver } from '@/modules/email/recipient.resolver';
-import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
-import { Logger } from '@nestjs/common';
-import { wrapPaginatedResponse } from '@/utils/responseWrapper';
-import { TimersService } from '@/modules/timers/timers.service';
-import { TenderInfoSheetsService } from '../info-sheets/info-sheets.service';
-import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { pqrDocuments } from '@db/schemas/shared/pqr.schema';
-import { financeDocuments } from '@db/schemas/shared/finance_docs.schema';
-import { vendorOrganizations } from '@db/schemas/vendors/vendor-organizations.schema';
+import { Inject, Injectable, BadRequestException, NotFoundException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { DRIZZLE } from "@db/database.module";
+import type { DbInstance } from "@db";
+import type { TenderApprovalPayload } from "@/modules/tendering/tender-approval/dto/tender-approval.dto";
+import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
+import { eq, and, asc, desc, sql, or, inArray, isNull, SQL, ne } from "drizzle-orm";
+import { tenderInformation } from "@db/schemas/tendering/tender-info-sheet.schema";
+import { users } from "@db/schemas/auth/users.schema";
+import { statuses } from "@db/schemas/master/statuses.schema";
+import { items } from "@db/schemas/master/items.schema";
+import { tenderIncompleteFields } from "@db/schemas/tendering/tender-incomplete-fields.schema";
+import { TenderInfosService } from "@/modules/tendering/tenders/tenders.service";
+import type { PaginatedResult } from "@/modules/tendering/types/shared.types";
+import { TenderStatusHistoryService } from "@/modules/tendering/tender-status-history/tender-status-history.service";
+import { EmailService } from "@/modules/email/email.service";
+import { RecipientResolver } from "@/modules/email/recipient.resolver";
+import type { RecipientSource } from "@/modules/email/dto/send-email.dto";
+import { Logger } from "@nestjs/common";
+import { wrapPaginatedResponse } from "@/utils/responseWrapper";
+import { TimersService } from "@/modules/timers/timers.service";
+import { TenderInfoSheetsService } from "../info-sheets/info-sheets.service";
+import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
+import { pqrDocuments } from "@db/schemas/shared/pqr.schema";
+import { financeDocuments } from "@db/schemas/shared/finance_docs.schema";
+import { vendorOrganizations } from "@db/schemas/vendors/vendor-organizations.schema";
+import { bidSubmissions } from "@/db/schemas";
 
 export type TenderApprovalFilters = {
     tlStatus?: "0" | "1" | "2" | "3" | number;
@@ -67,8 +68,8 @@ export class TenderApprovalService {
         private readonly recipientResolver: RecipientResolver,
         private readonly timersService: TimersService,
         private readonly tenderInfoSheetsService: TenderInfoSheetsService,
-        private readonly configService: ConfigService,
-    ) { }
+        private readonly configService: ConfigService
+    ) {}
 
     private buildRoleFilterConditions(user?: ValidatedUser, teamId?: number): any[] {
         const roleFilterConditions: any[] = [];
@@ -156,13 +157,17 @@ export class TenderApprovalService {
         let tabConditions: any[] = [];
         tabConditions.push(...roleFilterConditions);
         if (activeTab === "pending") {
-            tabConditions.push(or(eq(tenderInfos.tlStatus, 0), eq(tenderInfos.tlStatus, 3), isNull(tenderInfos.tlStatus)));
+            tabConditions.push(
+                or(eq(tenderInfos.tlStatus, 0), eq(tenderInfos.tlStatus, 3), isNull(tenderInfos.tlStatus)),
+                or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.id))
+            );
         } else if (activeTab === "accepted") {
-            tabConditions.push(eq(tenderInfos.tlStatus, 1));
+            tabConditions.push(eq(tenderInfos.tlStatus, 1), or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.id)));
         } else if (activeTab === "rejected") {
-            tabConditions.push(eq(tenderInfos.tlStatus, 2));
+            tabConditions.push(eq(tenderInfos.tlStatus, 2), or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.id)));
         } else if (activeTab === "tender-dnb") {
-            tabConditions.push(inArray(tenderInfos.status, [8, 34]), inArray(tenderInfos.tlStatus, [1, 2, 3]));
+            // tabConditions.push(inArray(tenderInfos.status, [8, 34]), inArray(tenderInfos.tlStatus, [1, 2, 3]));
+            tabConditions.push(eq(bidSubmissions.status, "Tender Missed"));
         }
 
         // Search conditions
@@ -248,6 +253,7 @@ export class TenderApprovalService {
             .leftJoin(users, eq(tenderInfos.teamMember, users.id))
             .leftJoin(statuses, eq(tenderInfos.status, statuses.id))
             .leftJoin(items, eq(tenderInfos.item, items.id))
+            .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
             .innerJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
             .where(whereClause)
             .orderBy(orderByClause)
@@ -262,6 +268,7 @@ export class TenderApprovalService {
             .from(tenderInfos)
             .leftJoin(users, eq(tenderInfos.teamMember, users.id))
             .leftJoin(statuses, eq(tenderInfos.status, statuses.id))
+            .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
             .leftJoin(items, eq(tenderInfos.item, items.id))
             .innerJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id));
 
@@ -287,13 +294,20 @@ export class TenderApprovalService {
         ];
 
         // Build conditions for each tab
-        const pendingConditions = [...baseConditions, or(eq(tenderInfos.tlStatus, 0), eq(tenderInfos.tlStatus, 3), isNull(tenderInfos.tlStatus))];
+        const pendingConditions = [
+            ...baseConditions,
+            or(eq(tenderInfos.tlStatus, 0), eq(tenderInfos.tlStatus, 3), isNull(tenderInfos.tlStatus)),
+            or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.id)),
+            ,
+        ];
 
-        const acceptedConditions = [...baseConditions, eq(tenderInfos.tlStatus, 1)];
+        const acceptedConditions = [...baseConditions, eq(tenderInfos.tlStatus, 1), or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.id))];
 
-        const rejectedConditions = [...baseConditions, eq(tenderInfos.tlStatus, 2)];
+        const rejectedConditions = [...baseConditions, eq(tenderInfos.tlStatus, 2), or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.id))];
 
-        const tenderDnbConditions = [...baseConditions, inArray(tenderInfos.status, [8, 34]), inArray(tenderInfos.tlStatus, [1, 2, 3])];
+        // const tenderDnbConditions = [...baseConditions, inArray(tenderInfos.status, [8, 34]), inArray(tenderInfos.tlStatus, [1, 2, 3])];
+        // ---------------------------- NEW LOGIC TO GET MISSED BIDS -------------------------------//
+        const tenderDnbConditions = [...baseConditions, eq(bidSubmissions.status, "Tender Missed")];
 
         // Count for each tab
         const [pendingCount, acceptedCount, rejectedCount, tenderDnbCount] = await Promise.all([
@@ -318,6 +332,7 @@ export class TenderApprovalService {
             .from(tenderInfos)
             .leftJoin(users, eq(tenderInfos.teamMember, users.id))
             .leftJoin(statuses, eq(tenderInfos.status, statuses.id))
+            .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
             .leftJoin(items, eq(tenderInfos.item, items.id))
             .innerJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
             .where(whereClause);
@@ -419,15 +434,10 @@ export class TenderApprovalService {
         // Fetch OEM names for oemNotAllowed array
         let oemNotAllowedNames: string[] = [];
         if (data.oemNotAllowed && data.oemNotAllowed.length > 0) {
-            const oemOrgIds = data.oemNotAllowed
-                .map(id => parseInt(id, 10))
-                .filter(id => Number.isInteger(id) && id > 0);
-            
+            const oemOrgIds = data.oemNotAllowed.map(id => parseInt(id, 10)).filter(id => Number.isInteger(id) && id > 0);
+
             if (oemOrgIds.length > 0) {
-                const oemNames = await this.db
-                    .select({ name: vendorOrganizations.name })
-                    .from(vendorOrganizations)
-                    .where(inArray(vendorOrganizations.id, oemOrgIds));
+                const oemNames = await this.db.select({ name: vendorOrganizations.name }).from(vendorOrganizations).where(inArray(vendorOrganizations.id, oemOrgIds));
                 oemNotAllowedNames = oemNames.map(o => o.name);
             }
         }
@@ -435,11 +445,11 @@ export class TenderApprovalService {
         return {
             ...data,
             rfqTo: vendorOrganizationIds,
-            rfqToName: vendorOrganizationNames.map(v => v.name).join(', '),
+            rfqToName: vendorOrganizationNames.map(v => v.name).join(", "),
             quotationFiles: quotationFilesArray,
             incompleteFields: incompleteFieldsResult,
             oemNotAllowed: data.oemNotAllowed || [],
-            oemNotAllowedName: oemNotAllowedNames.length > 0 ? oemNotAllowedNames.join(', ') : null,
+            oemNotAllowedName: oemNotAllowedNames.length > 0 ? oemNotAllowedNames.join(", ") : null,
         };
     }
 
@@ -485,7 +495,7 @@ export class TenderApprovalService {
             updateData.emdMode = payload.emdMode ?? null;
             updateData.approvePqrSelection = payload.approvePqrSelection ?? null;
             updateData.approveFinanceDocSelection = payload.approveFinanceDocSelection ?? null;
-            
+
             updateData.tlApprovalRemarks = payload.tlApprovalRemarks ?? null;
             updateData.tlRejectionRemarks = null;
             updateData.tlIncompleteRemarks = null;
@@ -509,8 +519,6 @@ export class TenderApprovalService {
                 if (infoSheet.emdAmount !== null && infoSheet.emdAmount !== undefined) {
                     updateData.emd = String(infoSheet.emdAmount);
                 }
-
-
             }
         } else if (payload.tlStatus === "2") {
             // Rejected - Use tenderStatus from payload (contains rejection reason status ID)
@@ -535,7 +543,6 @@ export class TenderApprovalService {
             updateData.approveFinanceDocSelection = null;
 
             updateData.tlApprovalTimestamp = new Date(); // tl approval timestamp
-
         } else if (payload.tlStatus === "3") {
             // Incomplete - Status 29
             // Incomplete status - clear approval/rejection fields
@@ -594,11 +601,11 @@ export class TenderApprovalService {
             // 1. Stop the tender_approval timer
             try {
                 await this.timersService.stopTimer({
-                    entityType: 'TENDER',
+                    entityType: "TENDER",
                     entityId: tenderId,
-                    stage: 'tender_approval',
+                    stage: "tender_approval",
                     userId: changedBy,
-                    reason: 'Tender approved'
+                    reason: "Tender approved",
                 });
                 this.logger.log(`Successfully stopped tender_approval timer for tender ${tenderId}`);
             } catch (error) {
@@ -616,29 +623,29 @@ export class TenderApprovalService {
             // 3. Determine which timers should be started based on tender configuration
             const stagesToStart: Array<{ stage: string; timerConfig?: any }> = [];
 
-            if (tender.rfqTo && tender.rfqTo !== '0' && tender.rfqTo !== '1') {
-                stagesToStart.push({ stage: 'rfq_sent' });
+            if (tender.rfqTo && tender.rfqTo !== "0" && tender.rfqTo !== "1") {
+                stagesToStart.push({ stage: "rfq_sent" });
             }
-            if (infoSheet.emdRequired === 'YES' || infoSheet.emdRequired === '1') {
-                stagesToStart.push({ stage: 'emd_requested' });
+            if (infoSheet.emdRequired === "YES" || infoSheet.emdRequired === "1") {
+                stagesToStart.push({ stage: "emd_requested" });
             }
-            if (infoSheet.physicalDocsRequired === 'YES') {
-                stagesToStart.push({ stage: 'physical_docs' });
+            if (infoSheet.physicalDocsRequired === "YES") {
+                stagesToStart.push({ stage: "physical_docs" });
             }
             // Always start these timers
-            stagesToStart.push({ stage: 'document_checklist' });
-            stagesToStart.push({ stage: 'costing_sheets' });
+            stagesToStart.push({ stage: "document_checklist" });
+            stagesToStart.push({ stage: "costing_sheets" });
 
             // 4. Configure negative countdown timers if due date exists
             if (tender.dueDate) {
                 const dueDate = new Date(tender.dueDate);
                 for (const item of stagesToStart) {
-                    if (item.stage === 'document_checklist' || item.stage === 'costing_sheets') {
+                    if (item.stage === "document_checklist" || item.stage === "costing_sheets") {
                         const hoursBeforeDeadline = -72;
                         const deadlineAt = new Date(dueDate.getTime() + hoursBeforeDeadline * 60 * 60 * 1000);
                         item.timerConfig = {
-                            type: 'NEGATIVE_COUNTDOWN',
-                            hoursBeforeDeadline: hoursBeforeDeadline
+                            type: "NEGATIVE_COUNTDOWN",
+                            hoursBeforeDeadline: hoursBeforeDeadline,
                         };
                         // Note: deadlineAt will be set when starting the timer
                     }
@@ -646,7 +653,7 @@ export class TenderApprovalService {
             }
 
             this.logger.log(`Found ${stagesToStart.length} timers to start after approval for tender ${tenderId}`, {
-                stages: stagesToStart.map(item => item.stage)
+                stages: stagesToStart.map(item => item.stage),
             });
 
             // 5. Start all eligible timers
@@ -654,18 +661,18 @@ export class TenderApprovalService {
                 try {
                     this.logger.log(`Starting timer for stage ${item.stage} for tender ${tenderId}`);
                     const timerInput: any = {
-                        entityType: 'TENDER',
+                        entityType: "TENDER",
                         entityId: tenderId,
                         stage: item.stage,
                         userId: changedBy,
                         timerConfig: item.timerConfig || {
-                            type: 'FIXED_DURATION',
-                            durationHours: 24
-                        }
+                            type: "FIXED_DURATION",
+                            durationHours: 24,
+                        },
                     };
 
                     // Set deadline for negative countdown timers
-                    if (tender.dueDate && item.timerConfig?.type === 'NEGATIVE_COUNTDOWN') {
+                    if (tender.dueDate && item.timerConfig?.type === "NEGATIVE_COUNTDOWN") {
                         const dueDate = new Date(tender.dueDate);
                         const hoursBeforeDeadline = item.timerConfig.hoursBeforeDeadline || -72;
                         timerInput.deadlineAt = new Date(dueDate.getTime() + hoursBeforeDeadline * 60 * 60 * 1000);
@@ -751,12 +758,9 @@ export class TenderApprovalService {
 
         // Get vendor names from rfqTo
         let vendor = "Selected Vendors";
-        if (payload.rfqRequired === 'yes' && payload.rfqTo && payload.rfqTo.length > 0) {
-            const vendorOrgs = await this.db
-                .select({ name: vendorOrganizations.name })
-                .from(vendorOrganizations)
-                .where(inArray(vendorOrganizations.id, payload.rfqTo));
-            vendor = vendorOrgs.map(org => org.name).join(', ') || 'Selected Vendors';
+        if (payload.rfqRequired === "yes" && payload.rfqTo && payload.rfqTo.length > 0) {
+            const vendorOrgs = await this.db.select({ name: vendorOrganizations.name }).from(vendorOrganizations).where(inArray(vendorOrganizations.id, payload.rfqTo));
+            vendor = vendorOrgs.map(org => org.name).join(", ") || "Selected Vendors";
         } else if (payload.rfqTo && payload.rfqTo.length > 0) {
             vendor = `${payload.rfqTo.length} vendor(s)`;
         }
@@ -771,17 +775,12 @@ export class TenderApprovalService {
         const phyDocs = courierAddress || "As per tender requirements";
 
         // Fetch all PQR and Finance documents for mapping
-        const [allPqrDocs, allFinanceDocs] = await Promise.all([
-            this.db.select().from(pqrDocuments).limit(1000),
-            this.db.select().from(financeDocuments).limit(1000),
-        ]);
+        const [allPqrDocs, allFinanceDocs] = await Promise.all([this.db.select().from(pqrDocuments).limit(1000), this.db.select().from(financeDocuments).limit(1000)]);
 
         // Create maps for document lookup
         const pqrMap = new Map<number, string>();
         allPqrDocs.forEach(pqr => {
-            const label = pqr.projectName
-                ? (pqr.item ? `${pqr.projectName} - ${pqr.item}` : pqr.projectName)
-                : `PQR ${pqr.id}`;
+            const label = pqr.projectName ? (pqr.item ? `${pqr.projectName} - ${pqr.item}` : pqr.projectName) : `PQR ${pqr.id}`;
             pqrMap.set(pqr.id, label);
         });
 
@@ -795,85 +794,97 @@ export class TenderApprovalService {
         // Map original technical documents from info sheet
         const mapTechnicalDocs = (docs: Array<{ id?: number; documentName: string }> | string[] | null | undefined): string[] => {
             if (!docs || !Array.isArray(docs) || docs.length === 0) return [];
-            return docs.map(doc => {
-                if (typeof doc === 'string') {
-                    const docId = parseInt(doc, 10);
+            return docs
+                .map(doc => {
+                    if (typeof doc === "string") {
+                        const docId = parseInt(doc, 10);
+                        if (!isNaN(docId) && pqrMap.has(docId)) {
+                            return pqrMap.get(docId)!;
+                        }
+                        return doc; // Return as-is if not a valid ID or not found
+                    }
+                    const docId = parseInt(doc.documentName, 10);
                     if (!isNaN(docId) && pqrMap.has(docId)) {
                         return pqrMap.get(docId)!;
                     }
-                    return doc; // Return as-is if not a valid ID or not found
-                }
-                const docId = parseInt(doc.documentName, 10);
-                if (!isNaN(docId) && pqrMap.has(docId)) {
-                    return pqrMap.get(docId)!;
-                }
-                return doc.documentName || '';
-            }).filter(Boolean);
+                    return doc.documentName || "";
+                })
+                .filter(Boolean);
         };
 
         // Map original financial documents from info sheet
         const mapFinancialDocs = (docs: Array<{ id?: number; documentName: string }> | string[] | null | undefined): string[] => {
             if (!docs || !Array.isArray(docs) || docs.length === 0) return [];
-            return docs.map(doc => {
-                if (typeof doc === 'string') {
-                    const docId = parseInt(doc, 10);
+            return docs
+                .map(doc => {
+                    if (typeof doc === "string") {
+                        const docId = parseInt(doc, 10);
+                        if (!isNaN(docId) && financeMap.has(docId)) {
+                            return financeMap.get(docId)!;
+                        }
+                        return doc; // Return as-is if not a valid ID or not found
+                    }
+                    const docId = parseInt(doc.documentName, 10);
                     if (!isNaN(docId) && financeMap.has(docId)) {
                         return financeMap.get(docId)!;
                     }
-                    return doc; // Return as-is if not a valid ID or not found
-                }
-                const docId = parseInt(doc.documentName, 10);
-                if (!isNaN(docId) && financeMap.has(docId)) {
-                    return financeMap.get(docId)!;
-                }
-                return doc.documentName || '';
-            }).filter(Boolean);
+                    return doc.documentName || "";
+                })
+                .filter(Boolean);
         };
 
         // Map alternative documents (using the same logic)
         const mapAlternativeTechnicalDocs = (ids: string[] | undefined): string[] => {
             if (!ids || !Array.isArray(ids)) return [];
-            return ids.map(id => {
-                const docId = parseInt(id, 10);
-                if (!isNaN(docId) && pqrMap.has(docId)) {
-                    return pqrMap.get(docId)!;
-                }
-                return id;
-            }).filter(Boolean);
+            return ids
+                .map(id => {
+                    const docId = parseInt(id, 10);
+                    if (!isNaN(docId) && pqrMap.has(docId)) {
+                        return pqrMap.get(docId)!;
+                    }
+                    return id;
+                })
+                .filter(Boolean);
         };
 
         const mapAlternativeFinancialDocs = (ids: string[] | undefined): string[] => {
             if (!ids || !Array.isArray(ids)) return [];
-            return ids.map(id => {
-                const docId = parseInt(id, 10);
-                if (!isNaN(docId) && financeMap.has(docId)) {
-                    return financeMap.get(docId)!;
-                }
-                return id;
-            }).filter(Boolean);
+            return ids
+                .map(id => {
+                    const docId = parseInt(id, 10);
+                    if (!isNaN(docId) && financeMap.has(docId)) {
+                        return financeMap.get(docId)!;
+                    }
+                    return id;
+                })
+                .filter(Boolean);
         };
 
         let techDocs = infoSheet?.technicalWorkOrders;
-        let pqrDocs:string[] = [];
+        let pqrDocs: string[] = [];
         if (techDocs && Array.isArray(techDocs)) {
-            pqrDocs = techDocs.map(doc => {
-                const docId = typeof doc === 'string' ? parseInt(doc, 10) : doc.id;
-                if (!isNaN(docId) && pqrMap.has(docId)) {
-                    return pqrMap.get(docId)!;
-                }
-                return typeof doc === 'string' ? doc : doc.projectName || '';
-            }).filter(Boolean);
+            pqrDocs = techDocs
+                .map(doc => {
+                    const docId = typeof doc === "string" ? parseInt(doc, 10) : doc.id;
+                    if (!isNaN(docId) && pqrMap.has(docId)) {
+                        return pqrMap.get(docId)!;
+                    }
+                    return typeof doc === "string" ? doc : doc.projectName || "";
+                })
+                .filter(Boolean);
         }
         let finDocs = infoSheet?.commercialDocuments;
-        let financeDocs:string[] = [];
+        let financeDocs: string[] = [];
         if (finDocs && Array.isArray(finDocs)) {
-            financeDocs = finDocs.map(doc => {
-                const docId = typeof doc === 'string' ? parseInt(doc, 10) : doc.id;
-                if (!isNaN(docId) && financeMap.has(docId)) {
-                    return financeMap.get(docId)!;
-                }
-                return typeof doc === 'string' ? doc : doc.documentName || '';
-            }).filter(Boolean);
+            financeDocs = finDocs
+                .map(doc => {
+                    const docId = typeof doc === "string" ? parseInt(doc, 10) : doc.id;
+                    if (!isNaN(docId) && financeMap.has(docId)) {
+                        return financeMap.get(docId)!;
+                    }
+                    return typeof doc === "string" ? doc : doc.documentName || "";
+                })
+                .filter(Boolean);
         }
         const originalTechnicalDocs = infoSheet ? mapTechnicalDocs(pqrDocs) : [];
         const originalFinancialDocs = infoSheet ? mapFinancialDocs(financeDocs) : [];
@@ -883,18 +894,14 @@ export class TenderApprovalService {
         // Get rejection reason if rejected
         let rejectionReasonLabel = "";
         if (isRejected && payload.tenderStatus) {
-            const rejectionResult = await this.db
-                .select({ name: statuses.name })
-                .from(statuses)
-                .where(eq(statuses.id, payload.tenderStatus))
-                .limit(1);
+            const rejectionResult = await this.db.select({ name: statuses.name }).from(statuses).where(eq(statuses.id, payload.tenderStatus)).limit(1);
             rejectionReasonLabel = rejectionResult[0]?.name || String(payload.tenderStatus);
         }
 
         // Get rejection proof URLs
         const rejectionProofs: string[] = [];
         if (infoSheet?.teRejectionProof && Array.isArray(infoSheet.teRejectionProof)) {
-            const apiUrl = this.configService.get<string>('app.apiUrl') || '';
+            const apiUrl = this.configService.get<string>("app.apiUrl") || "";
             infoSheet.teRejectionProof.forEach((path: string) => {
                 if (path) {
                     rejectionProofs.push(`${apiUrl}/tender-files/serve/${path}`);
@@ -914,39 +921,39 @@ export class TenderApprovalService {
                 .where(eq(tenderIncompleteFields.tenderId, tenderId));
 
             const fieldLabelMap: Record<string, string> = {
-                teRecommendation: 'TE Recommendation',
-                teRejectionReason: 'Rejection Reason',
-                teRejectionRemarks: 'Rejection Remarks',
-                processingFeeRequired: 'Processing Fee Required',
-                processingFeeModes: 'Processing Fee Mode',
-                processingFeeAmount: 'Processing Fee Amount',
-                tenderFeeRequired: 'Tender Fee Required',
-                tenderFeeModes: 'Tender Fee Mode',
-                tenderFeeAmount: 'Tender Fee Amount',
-                emdRequired: 'EMD Required',
-                emdModes: 'EMD Mode',
-                emdAmount: 'EMD Amount',
-                tenderValueGstInclusive: 'Tender Value (GST Inclusive)',
-                bidValidityDays: 'Bid Validity',
-                mafRequired: 'MAF Required',
-                commercialEvaluation: 'Commercial Evaluation',
-                reverseAuctionApplicable: 'Reverse Auction',
-                paymentTermsSupply: 'Payment Terms Supply',
-                paymentTermsInstallation: 'Payment Terms Installation',
-                deliveryTimeSupply: 'Delivery Time Supply',
-                deliveryTimeInstallation: 'Delivery Time Installation',
-                deliveryTimeInstallationInclusive: 'Installation Inclusive',
-                pbgRequired: 'PBG Required',
-                pbgForm: 'PBG Form',
-                pbgPercentage: 'PBG Percentage',
-                pbgDurationMonths: 'PBG Duration',
-                sdRequired: 'SD Required',
-                sdForm: 'SD Form',
-                securityDepositPercentage: 'SD Percentage',
-                sdDurationMonths: 'SD Duration',
-                ldRequired: 'LD Applicable',
-                ldPercentagePerWeek: 'LD Per Week',
-                maxLdPercentage: 'Max LD Percentage',
+                teRecommendation: "TE Recommendation",
+                teRejectionReason: "Rejection Reason",
+                teRejectionRemarks: "Rejection Remarks",
+                processingFeeRequired: "Processing Fee Required",
+                processingFeeModes: "Processing Fee Mode",
+                processingFeeAmount: "Processing Fee Amount",
+                tenderFeeRequired: "Tender Fee Required",
+                tenderFeeModes: "Tender Fee Mode",
+                tenderFeeAmount: "Tender Fee Amount",
+                emdRequired: "EMD Required",
+                emdModes: "EMD Mode",
+                emdAmount: "EMD Amount",
+                tenderValueGstInclusive: "Tender Value (GST Inclusive)",
+                bidValidityDays: "Bid Validity",
+                mafRequired: "MAF Required",
+                commercialEvaluation: "Commercial Evaluation",
+                reverseAuctionApplicable: "Reverse Auction",
+                paymentTermsSupply: "Payment Terms Supply",
+                paymentTermsInstallation: "Payment Terms Installation",
+                deliveryTimeSupply: "Delivery Time Supply",
+                deliveryTimeInstallation: "Delivery Time Installation",
+                deliveryTimeInstallationInclusive: "Installation Inclusive",
+                pbgRequired: "PBG Required",
+                pbgForm: "PBG Form",
+                pbgPercentage: "PBG Percentage",
+                pbgDurationMonths: "PBG Duration",
+                sdRequired: "SD Required",
+                sdForm: "SD Form",
+                securityDepositPercentage: "SD Percentage",
+                sdDurationMonths: "SD Duration",
+                ldRequired: "LD Applicable",
+                ldPercentagePerWeek: "LD Per Week",
+                maxLdPercentage: "Max LD Percentage",
             };
 
             for (const field of incompleteFieldsData) {
@@ -955,14 +962,12 @@ export class TenderApprovalService {
 
                 const fieldLabel = fieldLabelMap[fieldName] || fieldName;
                 const infoSheetAny = infoSheet as Record<string, unknown>;
-                const currentValue = infoSheetAny[fieldName] !== undefined && infoSheetAny[fieldName] !== null 
-                    ? String(infoSheetAny[fieldName]) 
-                    : 'Not filled';
+                const currentValue = infoSheetAny[fieldName] !== undefined && infoSheetAny[fieldName] !== null ? String(infoSheetAny[fieldName]) : "Not filled";
 
                 reviewFields.push({
                     field: fieldLabel,
                     value: currentValue,
-                    remark: field.comment || '',
+                    remark: field.comment || "",
                 });
             }
         }
@@ -970,8 +975,8 @@ export class TenderApprovalService {
         const status = parseInt(payload.tlStatus, 10);
 
         // Get document URLs for email
-        const apiUrl = this.configService.get<string>('app.apiUrl') || '';
-        
+        const apiUrl = this.configService.get<string>("app.apiUrl") || "";
+
         const technicalDocUrls: Array<{ name: string; url: string }> = [];
         if (infoSheet?.technicalWorkOrders) {
             infoSheet.technicalWorkOrders.forEach((doc: any) => {
@@ -1037,7 +1042,6 @@ export class TenderApprovalService {
 
         console.log("Email Data: ", emailData);
 
-
         const template = "tender-approved-by-tl";
         let subject: string;
         let eventType: string;
@@ -1055,7 +1059,7 @@ export class TenderApprovalService {
 
         await this.sendEmail(eventType, tenderId, tlId, subject, template, emailData, {
             // to: [{ type: "emails", emails: ['gyan@volksenergie.in'] }],
-            to: [{ type: 'user', userId: tender.teamMember }],
+            to: [{ type: "user", userId: tender.teamMember }],
             cc: [
                 { type: "role", role: "Admin", teamId: tender.team },
                 { type: "role", role: "Coordinator", teamId: tender.team },
