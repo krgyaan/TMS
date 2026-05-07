@@ -1,24 +1,25 @@
-import { Inject, Injectable, BadRequestException } from '@nestjs/common';
-import { and, eq, asc, desc, sql, isNull, isNotNull, inArray, notInArray } from 'drizzle-orm';
-import { DRIZZLE } from '@db/database.module';
-import type { DbInstance } from '@db';
-import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
-import { statuses } from '@db/schemas/master/statuses.schema';
-import { users } from '@db/schemas/auth/users.schema';
-import { items } from '@db/schemas/master/items.schema';
-import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
-import { tenderDocumentChecklists } from '@db/schemas/tendering/tender-document-checklists.schema';
-import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
-import { CreateDocumentChecklistDto, UpdateDocumentChecklistDto } from '@/modules/tendering/checklists/dto/document-checklist.dto';
-import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
-import { EmailService } from '@/modules/email/email.service';
-import { RecipientResolver } from '@/modules/email/recipient.resolver';
-import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
-import { Logger } from '@nestjs/common';
-import { StatusCache } from '@/utils/status-cache';
-import { wrapPaginatedResponse } from '@/utils/responseWrapper';
-import { TimersService } from '@/modules/timers/timers.service';
-import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { Inject, Injectable, BadRequestException } from "@nestjs/common";
+import { and, eq, asc, desc, sql, isNull, isNotNull, inArray, notInArray, ne } from "drizzle-orm";
+import { DRIZZLE } from "@db/database.module";
+import type { DbInstance } from "@db";
+import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
+import { statuses } from "@db/schemas/master/statuses.schema";
+import { users } from "@db/schemas/auth/users.schema";
+import { items } from "@db/schemas/master/items.schema";
+import { tenderInformation } from "@db/schemas/tendering/tender-info-sheet.schema";
+import { tenderDocumentChecklists } from "@db/schemas/tendering/tender-document-checklists.schema";
+import { TenderInfosService } from "@/modules/tendering/tenders/tenders.service";
+import { CreateDocumentChecklistDto, UpdateDocumentChecklistDto } from "@/modules/tendering/checklists/dto/document-checklist.dto";
+import type { PaginatedResult } from "@/modules/tendering/types/shared.types";
+import { EmailService } from "@/modules/email/email.service";
+import { RecipientResolver } from "@/modules/email/recipient.resolver";
+import type { RecipientSource } from "@/modules/email/dto/send-email.dto";
+import { Logger } from "@nestjs/common";
+import { StatusCache } from "@/utils/status-cache";
+import { wrapPaginatedResponse } from "@/utils/responseWrapper";
+import { TimersService } from "@/modules/timers/timers.service";
+import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
+import { bidSubmissions } from "@/db/schemas";
 
 type TenderDocumentChecklistDashboardRow = {
     tenderId: number;
@@ -51,14 +52,14 @@ export class DocumentChecklistsService {
         private readonly recipientResolver: RecipientResolver,
         private readonly tenderInfosService: TenderInfosService,
         private readonly timersService: TimersService
-    ) { }
+    ) {}
 
     /**
      * Get dashboard data by tab
      */
     async getDashboardData(
-        tab?: 'pending' | 'submitted' | 'tender-dnb',
-        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; search?: string },
+        tab?: "pending" | "submitted" | "tender-dnb",
+        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: "asc" | "desc"; search?: string },
         user?: ValidatedUser,
         teamId?: number
     ): Promise<PaginatedResult<TenderDocumentChecklistDashboardRow>> {
@@ -69,11 +70,7 @@ export class DocumentChecklistsService {
         const activeTab = tab || "pending";
 
         // Build base conditions
-        const baseConditions = [
-            TenderInfosService.getActiveCondition(),
-            TenderInfosService.getApprovedCondition(),
-            // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-        ];
+        const baseConditions = [TenderInfosService.getActiveCondition(), TenderInfosService.getApprovedCondition(), TenderInfosService.getExcludeStatusCondition(["lost"])];
 
         // Apply role-based filtering
         const roleFilterConditions: any[] = [];
@@ -110,18 +107,21 @@ export class DocumentChecklistsService {
         const conditions = [...baseConditions, ...roleFilterConditions];
 
         if (activeTab === "pending") {
-            conditions.push(TenderInfosService.getExcludeStatusCondition(["dnb", "lost"]));
+            conditions.push(TenderInfosService.getExcludeStatusCondition(["dnb"]));
+            conditions.push(ne(bidSubmissions.status, "Tender Missed"));
             conditions.push(isNull(tenderDocumentChecklists.id));
         } else if (activeTab === "submitted") {
-            conditions.push(TenderInfosService.getExcludeStatusCondition(["dnb", "lost"]));
+            conditions.push(TenderInfosService.getExcludeStatusCondition(["dnb"]));
+            conditions.push(ne(bidSubmissions.status, "Tender Missed"));
             conditions.push(isNotNull(tenderDocumentChecklists.id));
         } else if (activeTab === "tender-dnb") {
-            const dnbStatusIds = StatusCache.getIds("dnb");
-            if (dnbStatusIds.length > 0) {
-                conditions.push(inArray(tenderInfos.status, dnbStatusIds));
-            } else {
-                return wrapPaginatedResponse([], 0, page, limit);
-            }
+            // const dnbStatusIds = StatusCache.getIds("dnb");
+            // if (dnbStatusIds.length > 0) {
+            //     conditions.push(inArray(tenderInfos.status, dnbStatusIds));
+            // } else {
+            //     return wrapPaginatedResponse([], 0, page, limit);
+            // }
+            conditions.push(eq(bidSubmissions.status, "Tender Missed"));
         } else {
             throw new BadRequestException(`Invalid tab: ${activeTab}`);
         }
@@ -184,8 +184,9 @@ export class DocumentChecklistsService {
         const [countResult] = await this.db
             .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
             .from(tenderInfos)
+            .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
             .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
-            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
             .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(tenderDocumentChecklists, eq(tenderDocumentChecklists.tenderId, tenderInfos.id))
@@ -206,8 +207,9 @@ export class DocumentChecklistsService {
                 checklistId: tenderDocumentChecklists.id,
             })
             .from(tenderInfos)
+            .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
             .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
-            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
             .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(tenderDocumentChecklists, eq(tenderDocumentChecklists.tenderId, tenderInfos.id))
@@ -231,88 +233,91 @@ export class DocumentChecklistsService {
         return wrapPaginatedResponse(data, total, page, limit);
     }
 
-    async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<{ pending: number; submitted: number; 'tender-dnb': number; total: number }> {
-        const baseCondition = TenderInfosService.getActiveCondition();
-
-        // Apply role-based filtering
+    async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<{ pending: number; submitted: number; "tender-dnb": number; total: number }> {
+        // Build role-based conditions
         const roleFilterConditions: any[] = [];
         if (user && user.roleId) {
-            // Role ID 1 = Super User, 2 = Admin: Show all tenders, respect teamId filter if provided
             if (user.roleId === 1 || user.roleId === 2) {
-                // Super User or Admin: Show all, respect teamId filter if provided
                 if (teamId !== undefined && teamId !== null) {
                     roleFilterConditions.push(eq(tenderInfos.team, teamId));
                 }
-                // If no teamId filter, show all (no additional condition added)
             } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
-                // Role ID 3 = Team Leader, 4 = Coordinator, 6 = Engineer: Filter by primary_team_id
                 if (user.teamId) {
                     roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
                 } else {
-                    // If no teamId, return empty results (user has no team assigned)
-                    roleFilterConditions.push(sql`1 = 0`); // Always false condition
+                    roleFilterConditions.push(sql`1 = 0`);
                 }
             } else {
-                // All other roles: Show only own tenders
                 if (user.sub) {
                     roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
                 } else {
-                    // If no user ID, return empty results
-                    roleFilterConditions.push(sql`1 = 0`); // Always false condition
+                    roleFilterConditions.push(sql`1 = 0`);
                 }
             }
         } else {
-            // No user provided - return empty results for security
-            roleFilterConditions.push(sql`1 = 0`); // Always false condition
+            roleFilterConditions.push(sql`1 = 0`);
         }
 
-        const filteredBaseCondition = roleFilterConditions.length > 0
-            ? and(baseCondition, ...roleFilterConditions)
-            : baseCondition;
-
         const baseConditions = [
-            filteredBaseCondition,
+            TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
+            TenderInfosService.getExcludeStatusCondition(["lost"]),
+            ...roleFilterConditions,
         ];
 
-        // Count pending: exclude dnb/lost, checklistId IS NULL
-        const pendingConditions = [...baseConditions, TenderInfosService.getExcludeStatusCondition(["dnb", "lost"]), isNull(tenderDocumentChecklists.id)];
+        // Count pending: exclude dnb/lost, checklistId IS NULL, status not Tender Missed
+        const pendingConditions = [
+            ...baseConditions,
+            TenderInfosService.getExcludeStatusCondition(["dnb"]),
+            ne(bidSubmissions.status, "Tender Missed"),
+            isNull(tenderDocumentChecklists.id),
+        ];
 
-        // Count submitted: exclude dnb/lost, checklistId IS NOT NULL
-        const submittedConditions = [...baseConditions, TenderInfosService.getExcludeStatusCondition(["dnb", "lost"]), isNotNull(tenderDocumentChecklists.id)];
+        // Count submitted: exclude dnb/lost, checklistId IS NOT NULL, status not Tender Missed
+        const submittedConditions = [
+            ...baseConditions,
+            TenderInfosService.getExcludeStatusCondition(["dnb"]),
+            ne(bidSubmissions.status, "Tender Missed"),
+            isNotNull(tenderDocumentChecklists.id),
+        ];
 
-        // Count tender-dnb: status in dnb category
-        const dnbStatusIds = StatusCache.getIds('dnb');
+        // Count tender-dnb: bid status is Tender Missed
         const tenderDnbConditions = [
-            filteredBaseCondition,
-            TenderInfosService.getApprovedCondition(),
-            ...(dnbStatusIds.length > 0 ? [inArray(tenderInfos.status, dnbStatusIds)] : []),
+            ...baseConditions,
+            eq(bidSubmissions.status, "Tender Missed"),
         ];
 
         const [pendingResult, submittedResult, tenderDnbResult] = await Promise.all([
             this.db
                 .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
                 .from(tenderInfos)
+                .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
                 .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
+                .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+                .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
                 .leftJoin(tenderDocumentChecklists, eq(tenderDocumentChecklists.tenderId, tenderInfos.id))
                 .where(and(...pendingConditions))
                 .then(r => Number(r[0]?.count || 0)),
             this.db
                 .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
                 .from(tenderInfos)
+                .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
                 .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
+                .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+                .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
                 .leftJoin(tenderDocumentChecklists, eq(tenderDocumentChecklists.tenderId, tenderInfos.id))
                 .where(and(...submittedConditions))
                 .then(r => Number(r[0]?.count || 0)),
-            dnbStatusIds.length > 0
-                ? this.db
-                    .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
-                    .from(tenderInfos)
-                    .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
-                    .leftJoin(tenderDocumentChecklists, eq(tenderDocumentChecklists.tenderId, tenderInfos.id))
-                    .where(and(...tenderDnbConditions))
-                    .then(r => Number(r[0]?.count || 0))
-                : Promise.resolve(0),
+            this.db
+                .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
+                .from(tenderInfos)
+                .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+                .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
+                .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+                .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
+                .leftJoin(tenderDocumentChecklists, eq(tenderDocumentChecklists.tenderId, tenderInfos.id))
+                .where(and(...tenderDnbConditions))
+                .then(r => Number(r[0]?.count || 0)),
         ]);
 
         return {
@@ -337,9 +342,9 @@ export class DocumentChecklistsService {
                 selectedDocuments: createDocumentChecklistDto.selectedDocuments || null,
                 extraDocuments: createDocumentChecklistDto.extraDocuments
                     ? createDocumentChecklistDto.extraDocuments.map(doc => ({
-                        name: doc.name ?? "",
-                        path: doc.path ?? "",
-                    }))
+                          name: doc.name ?? "",
+                          path: doc.path ?? "",
+                      }))
                     : null,
             })
             .returning();
@@ -363,11 +368,11 @@ export class DocumentChecklistsService {
             const userId = tender?.teamMember || 1; // Use team member or default to 1
 
             await this.timersService.stopTimer({
-                entityType: 'TENDER',
+                entityType: "TENDER",
                 entityId: createDocumentChecklistDto.tenderId,
-                stage: 'document_checklist',
+                stage: "document_checklist",
                 userId: userId,
-                reason: 'Document checklist submitted'
+                reason: "Document checklist submitted",
             });
             this.logger.log(`Successfully stopped document_checklist timer for tender ${createDocumentChecklistDto.tenderId}`);
         } catch (error) {
@@ -385,9 +390,9 @@ export class DocumentChecklistsService {
                 selectedDocuments: updateDocumentChecklistDto.selectedDocuments || null,
                 extraDocuments: updateDocumentChecklistDto.extraDocuments
                     ? updateDocumentChecklistDto.extraDocuments.map(doc => ({
-                        name: doc.name ?? "",
-                        path: doc.path ?? "",
-                    }))
+                          name: doc.name ?? "",
+                          path: doc.path ?? "",
+                      }))
                     : null,
                 updatedAt: new Date(),
             })
