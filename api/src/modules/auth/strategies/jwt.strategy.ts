@@ -9,8 +9,9 @@ import { DataScope } from "@/common/constants/roles.constant";
 
 // What gets attached to request.user
 export type ValidatedUser = {
-    id: number,
+    id: number;
     sub: number;
+    name: string;
     email: string;
     role: string | null;
     roleId: number | null;
@@ -18,7 +19,7 @@ export type ValidatedUser = {
     dataScope: DataScope;
     canSwitchTeams: boolean | null;
     isActive: boolean | null;
-    permissions : string[];
+    permissions: string[];
 };
 
 @Injectable()
@@ -72,6 +73,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         return {
             id: payload.id,
             sub: payload.sub,
+            name: user.name,
             email: payload.email,
             role: payload.role,
             roleId: payload.roleId,
