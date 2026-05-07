@@ -237,8 +237,9 @@ export class PaymentRequestsNotificationService {
                 .limit(1);            
 
             try {
-                await this.emailService.sendTenderEmail({
-                    tenderId: tenderId || 0,
+                const result = await this.emailService.sendPaymentEmail({
+                    requestId: instrument.requestId,
+                    tenderId: tenderId || undefined,
                     eventType: 'BANK_TRANSFER_REQUEST',
                     // fromUserId: requestedBy,
                     fromUserId: 13,
@@ -252,7 +253,7 @@ export class PaymentRequestsNotificationService {
                         btAcc: btDetails?.accountNumber || 'Not specified',
                         btIfsc: btDetails?.ifsc || 'Not specified',
                         amount: formatCurrency(Number(instrument.amount) || 0),
-                        isOthersPurpose: tenderId > 0 ? false : true,
+                        isOthersPurpose: !(tenderId > 0),
                         link: `#/tendering/emds/${instrument.requestId}`,
                         tlName: tlUser?.name || 'Team Leader',
                     },
@@ -262,7 +263,11 @@ export class PaymentRequestsNotificationService {
                     //     { type: 'emails', emails: ['accounts@volksenergie.in']}
                     // ]
                 });
-                this.logger.log(`Bank transfer email sent for instrument ${instrumentId}`);
+                if (result.success) {
+                    this.logger.log(`Bank transfer email sent for instrument ${instrumentId} (logId: ${result.emailLogId})`);
+                } else {
+                    this.logger.warn(`Bank transfer email failed for instrument ${instrumentId}: ${result.error}`);
+                }
             } catch (error) {
                 this.logger.error(`Failed to send bank transfer email for instrument ${instrumentId}:`, error);
             }
@@ -276,8 +281,9 @@ export class PaymentRequestsNotificationService {
             console.log("Portal: ", portalDetails);
                 
             try {
-                await this.emailService.sendTenderEmail({
-                    tenderId: tenderId || 0,
+                const result = await this.emailService.sendPaymentEmail({
+                    requestId: instrument.requestId,
+                    tenderId: tenderId || undefined,
                     eventType: 'PORTAL_PAYMENT_REQUEST',
                     // fromUserId: requestedBy,
                     fromUserId: 13,
@@ -288,7 +294,7 @@ export class PaymentRequestsNotificationService {
                         netbanking: portalDetails?.isNetbanking || 'Not specified',
                         debit: portalDetails?.isDebit || 'Not specified',
                         amount: formatCurrency(Number(instrument.amount) || 0),
-                        isOthersPurpose: tenderId > 0 ? false : true,
+                        isOthersPurpose: !(tenderId > 0),
                         tender_no: tender?.tenderNo || 'NA',
                         tender_name: tender?.tenderName || 'Not specified',
                         dueDate: formatDateTime(tender?.dueDate),
@@ -301,7 +307,11 @@ export class PaymentRequestsNotificationService {
                     //     { type: 'emails', emails: ['accounts@volksenergie.in']}
                     // ]
                 });
-                this.logger.log(`Portal payment email sent for instrument ${instrumentId}`);
+                if (result.success) {
+                    this.logger.log(`Portal payment email sent for instrument ${instrumentId} (logId: ${result.emailLogId})`);
+                } else {
+                    this.logger.warn(`Portal payment email failed for instrument ${instrumentId}: ${result.error}`);
+                }
             } catch (error) {
                 this.logger.error(`Failed to send portal payment email for instrument ${instrumentId}:`, error);
             }
@@ -327,8 +337,9 @@ export class PaymentRequestsNotificationService {
             }
 
             try {
-                await this.emailService.sendTenderEmail({
-                    tenderId: tenderId || 0,
+                const result = await this.emailService.sendPaymentEmail({
+                    requestId: instrument.requestId,
+                    tenderId: tenderId || undefined,
                     eventType: 'CHEQUE_REQUEST',
                     fromUserId: requestedBy,
                     subject: `Cheque Request - ${finalPurpose}`,
@@ -348,7 +359,11 @@ export class PaymentRequestsNotificationService {
                     //     { type: 'emails', emails: ['accounts@volksenergie.in']}
                     // ],
                 });
-                this.logger.log(`Cheque email sent for instrument ${instrumentId}`);
+                if (result.success) {
+                    this.logger.log(`Cheque email sent for instrument ${instrumentId} (logId: ${result.emailLogId})`);
+                } else {
+                    this.logger.warn(`Cheque email failed for instrument ${instrumentId}: ${result.error}`);
+                }
             } catch (error) {
                 this.logger.error(`Failed to send cheque email for instrument ${instrumentId}:`, error);
             }
