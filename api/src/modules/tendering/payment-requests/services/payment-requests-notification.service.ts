@@ -234,10 +234,7 @@ export class PaymentRequestsNotificationService {
                 .select()
                 .from(instrumentTransferDetails)
                 .where(eq(instrumentTransferDetails.instrumentId, instrumentId))
-                .limit(1);
-
-            console.log("BT: ", btDetails);
-            
+                .limit(1);            
 
             try {
                 await this.emailService.sendTenderEmail({
@@ -315,23 +312,41 @@ export class PaymentRequestsNotificationService {
                 .where(eq(instrumentChequeDetails.instrumentId, instrumentId))
                 .limit(1);
 
+            let finalPurpose = purpose || 'Payment';
+            let finalPartyName = instrument.favouring || 'Not specified';
+            let finalChequeDate = instrument.issueDate || new Date().toISOString().split('T')[0];
+
+            if (chequeDetails?.linkedDdId) {
+                finalPurpose = 'DD';
+                finalPartyName = 'Yourself for DD';
+                finalChequeDate = new Date().toISOString().split('T')[0];
+            } else if (chequeDetails?.linkedFdrId) {
+                finalPurpose = 'FDR';
+                finalPartyName = 'Yourself for FDR';
+                finalChequeDate = new Date().toISOString().split('T')[0];
+            }
+
             try {
                 await this.emailService.sendTenderEmail({
                     tenderId: tenderId || 0,
                     eventType: 'CHEQUE_REQUEST',
                     fromUserId: requestedBy,
-                    subject: `Cheque Request - ${purpose}`,
+                    subject: `Cheque Request - ${finalPurpose}`,
                     template: 'cheque-request',
                     data: {
-                        purpose: purpose || 'Payment',
-                        partyName: instrument.favouring || 'Not specified',
-                        chequeDate: instrument.issueDate || new Date().toISOString().split('T')[0],
+                        purpose: finalPurpose,
+                        partyName: finalPartyName,
+                        chequeDate: finalChequeDate,
                         amount: formatCurrency(Number(instrument.amount) || 0),
                         chequeNeeds: instrument.courierDeadline || 24,
                         link: `#/tendering/emds/${instrument.requestId}`,
                         tlName: tlUser?.name || 'Team Leader',
                     },
-                    to: [{ type: 'role', role: 'accounts', teamId: tenderTeamId }],
+                    to: [{ type: 'emails', emails: ['gyan@volksenergie.in'] }],
+                    // cc: [
+                    //     { type: 'role', role: 'admin', teamId: tenderTeamId },
+                    //     { type: 'emails', emails: ['accounts@volksenergie.in']}
+                    // ],
                 });
                 this.logger.log(`Cheque email sent for instrument ${instrumentId}`);
             } catch (error) {
