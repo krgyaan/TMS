@@ -69,7 +69,7 @@ export const CHEQUE_DELIVERY_OPTIONS = [
     { value: '24', label: '24 Hours' },
 ];
 
-export const CHEQUE_TYPE_OPTIONS = [
+export const CHEQUE_PURPOSE = [
     { value: 'PAYABLE', label: 'Payable' },
     { value: 'SECURITY', label: 'Security' },
     { value: 'DD', label: 'DD' },

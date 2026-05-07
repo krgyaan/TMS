@@ -11,6 +11,8 @@ export const CommonInstrumentFields = z.object({
   amount: z.string(),
   favouring: nullishString,
   payableAt: nullishString,
+  courierAddress: nullishString,
+  courierDeadline: z.number().nullable().optional(),
   status: z.string(),
   isActive: z.boolean(),
 });
@@ -22,6 +24,8 @@ export const DdDetailsResponse = z.object({
   ddNeeds: nullishString,
   ddPurpose: nullishString,
   ddRemarks: nullishString,
+  courierAddress: nullishString,
+  courierDeadline: nullishString,
 }).nullable();
 
 export const FdrDetailsResponse = z.object({
@@ -31,6 +35,8 @@ export const FdrDetailsResponse = z.object({
   fdrExpiryDate: nullishDate,
   fdrNeeds: nullishString,
   fdrRemark: nullishString,
+  courierAddress: nullishString,
+  courierDeadline: nullishString,
 }).nullable();
 
 export const BgDetailsResponse = z.object({
