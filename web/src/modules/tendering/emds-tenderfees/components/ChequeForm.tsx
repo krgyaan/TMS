@@ -3,7 +3,7 @@ import { SelectField } from '@/components/form/SelectField';
 import { NumberInput } from '@/components/form/NumberInput';
 import { Input } from '@/components/ui/input';
 import { useFormContext } from 'react-hook-form';
-import { PURPOSE_OPTIONS, CHEQUE_DELIVERY_OPTIONS, CHEQUE_TYPE_OPTIONS, BANKS } from '../constants';
+import { CHEQUE_DELIVERY_OPTIONS, CHEQUE_PURPOSE, BANKS } from '../constants';
 import DateInput from '@/components/form/DateInput';
 
 interface PaymentFormBaseProps {
@@ -19,14 +19,14 @@ export function ChequeForm({ prefix = 'emd.details' }: PaymentFormBaseProps) {
             <SelectField
                 control={control}
                 name={`${prefix}.chequePurpose`}
-                label="Purpose *"
-                options={PURPOSE_OPTIONS}
+                label="Purpose"
+                options={CHEQUE_PURPOSE}
                 placeholder="Select Purpose"
             />
             <FieldWrapper control={control} name={`${prefix}.chequeAmount`} label="Cheque Amount">
                 {(field) => <NumberInput {...field} placeholder="Leave blank for blank cheque" />}
             </FieldWrapper>
-            <FieldWrapper control={control} name={`${prefix}.chequeFavouring`} label="Cheque in Favour of *">
+            <FieldWrapper control={control} name={`${prefix}.chequeFavouring`} label="Cheque in Favour of">
                 {(field) => <Input {...field} value={field.value || ''} placeholder="e.g., Individual or Company Name" />}
             </FieldWrapper>
             <FieldWrapper control={control} name={`${prefix}.chequeDate`} label="Cheque Date">
@@ -35,21 +35,14 @@ export function ChequeForm({ prefix = 'emd.details' }: PaymentFormBaseProps) {
             <SelectField
                 control={control}
                 name={`${prefix}.chequeNeededIn`}
-                label="Cheque Needed In *"
+                label="Cheque Needed In"
                 options={CHEQUE_DELIVERY_OPTIONS}
                 placeholder="Select"
             />
             <SelectField
                 control={control}
-                name={`${prefix}.chequeType`}
-                label="Cheque Type *"
-                options={CHEQUE_TYPE_OPTIONS}
-                placeholder="Select Type"
-            />
-            <SelectField
-                control={control}
                 name={`${prefix}.chequeAccount`}
-                label="Account to be debited from *"
+                label="Account to be debited from"
                 options={BANKS}
                 placeholder="Select Bank"
             />

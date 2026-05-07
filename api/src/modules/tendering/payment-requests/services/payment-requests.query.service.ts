@@ -807,6 +807,8 @@ async findByIdWithTender(requestId: number) {
                 instrumentType: paymentInstruments.instrumentType,
                 purpose: paymentInstruments.purpose,
                 amount: paymentInstruments.amount,
+                courierAddress: paymentInstruments.courierAddress,
+                courierDeadline: paymentInstruments.courierDeadline,
                 favouring: paymentInstruments.favouring,
                 payableAt: paymentInstruments.payableAt,
                 status: paymentInstruments.status,
@@ -944,6 +946,8 @@ async findByIdWithTender(requestId: number) {
             amount: instrument.amount?.toString() || '0',
             favouring: instrument.favouring,
             payableAt: instrument.payableAt,
+            courierAddress: instrument.courierAddress,
+            courierDeadline: instrument.courierDeadline,
             status: instrument.status,
             isActive: instrument.isActive,
         };
@@ -959,11 +963,13 @@ async findByIdWithTender(requestId: number) {
                     instrumentType: 'DD' as const,
                     details: details ? {
                         ddNo: details.ddNo,
-                        ddDate: details.ddDate ? details.ddDate.toISOString() : null,
+                        ddDate: details.ddDate,
                         reqNo: details.reqNo,
                         ddNeeds: details.ddNeeds,
                         ddPurpose: details.ddPurpose,
                         ddRemarks: details.ddRemarks,
+                        courierAddress: details.courierAddress,
+                        courierDeadline: details.courierDeadline,
                     } : null,
                 };
             case 'FDR':
@@ -972,11 +978,13 @@ async findByIdWithTender(requestId: number) {
                     instrumentType: 'FDR' as const,
                     details: details ? {
                         fdrNo: details.fdrNo,
-                        fdrDate: details.fdrDate ? details.fdrDate.toISOString() : null,
+                        fdrDate: details.fdrDate,
                         fdrSource: details.fdrSource,
-                        fdrExpiryDate: details.fdrExpiryDate ? details.fdrExpiryDate.toISOString() : null,
+                        fdrExpiryDate: details.fdrExpiryDate,
                         fdrNeeds: details.fdrNeeds,
                         fdrRemark: details.fdrRemark,
+                        courierAddress: details.courierAddress,
+                        courierDeadline: details.courierDeadline,
                     } : null,
                 };
             case 'BG':
@@ -985,9 +993,9 @@ async findByIdWithTender(requestId: number) {
                     instrumentType: 'BG' as const,
                     details: details ? {
                         bgNo: details.bgNo,
-                        bgDate: details.bgDate ? details.bgDate.toISOString() : null,
-                        validityDate: details.validityDate ? details.validityDate.toISOString() : null,
-                        claimExpiryDate: details.claimExpiryDate ? details.claimExpiryDate.toISOString() : null,
+                        bgDate: details.bgDate,
+                        validityDate: details.validityDate,
+                        claimExpiryDate: details.claimExpiryDate,
                         beneficiaryName: details.beneficiaryName,
                         beneficiaryAddress: details.beneficiaryAddress,
                         bankName: details.bankName,
@@ -1001,7 +1009,7 @@ async findByIdWithTender(requestId: number) {
                     instrumentType: 'Cheque' as const,
                     details: details ? {
                         chequeNo: details.chequeNo,
-                        chequeDate: details.chequeDate ? details.chequeDate.toISOString() : null,
+                        chequeDate: details.chequeDate,
                         bankName: details.bankName,
                         chequeNeeds: details.chequeNeeds,
                         chequeReason: details.chequeReason,
