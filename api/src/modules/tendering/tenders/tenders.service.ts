@@ -768,7 +768,7 @@ export class TenderInfosService {
         });
 
         // Send email notification for status update
-        await this.sendTenderStatusUpdateEmail(tenderId, oldStatusName, newStatusName, comment, changedBy);
+        // await this.sendTenderStatusUpdateEmail(tenderId, oldStatusName, newStatusName, comment, changedBy);
 
         return updated;
     }
