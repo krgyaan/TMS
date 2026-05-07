@@ -220,29 +220,27 @@ export class PaymentRequestsCommandService {
     ): Promise<void> {
         try {
             // Send email notifications for each instrument
-            if (tender) {
-                for (const { request, instrument, isAutoCreatedCheque } of results) {
-                    try {
-                        const mode = instrument.instrumentType;
-                        
-                        // Skip email for DD/FDR (auto-created Cheque will send its own email)
-                        if (!isAutoCreatedCheque && (mode === 'DD' || mode === 'FDR')) {
-                            continue;
-                        }
-                        
-                        await this.notificationService.sendPaymentInstrumentEmail(
-                            instrument.id,
-                            mode,
-                            request.purpose,
-                            tenderId,
-                            tender,
-                            userId || 0
-                        );
-                    } catch (error) {
-                        this.logger.error(
-                            `Failed to send email for instrument ${instrument?.id} (${instrument?.instrumentType}): ${error instanceof Error ? error.message : String(error)}`
-                        );
+            for (const { request, instrument, isAutoCreatedCheque } of results) {
+                try {
+                    const mode = instrument.instrumentType;
+                    
+                    // Skip email for DD/FDR (auto-created Cheque will send its own email)
+                    if (!isAutoCreatedCheque && (mode === 'DD' || mode === 'FDR')) {
+                        continue;
                     }
+                    
+                    await this.notificationService.sendPaymentInstrumentEmail(
+                        instrument.id,
+                        mode,
+                        request.purpose,
+                        tenderId,
+                        tender,
+                        userId || 0
+                    );
+                } catch (error) {
+                    this.logger.error(
+                        `Failed to send email for instrument ${instrument?.id} (${instrument?.instrumentType}): ${error instanceof Error ? error.message : String(error)}`
+                    );
                 }
             }
 
