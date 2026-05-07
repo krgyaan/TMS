@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
-import { and, eq, isNotNull, ne, sql, asc, desc, isNull, inArray, SQL } from "drizzle-orm";
+import { and, eq, isNotNull, ne, sql, asc, desc, isNull, inArray, SQL, or } from "drizzle-orm";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
 import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
@@ -21,6 +21,7 @@ import { StatusCache } from "@/utils/status-cache";
 import { wrapPaginatedResponse } from "@/utils/responseWrapper";
 import { TimersService } from "@/modules/timers/timers.service";
 import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
+import { bidSubmissions } from "@/db/schemas";
 
 export type RfqFilters = {
     rfqStatus?: "pending" | "sent";
@@ -181,11 +182,7 @@ export class RfqsService {
         const activeTab = tab || "pending";
 
         // Build base conditions
-        const baseConditions = [
-            TenderInfosService.getActiveCondition(),
-            TenderInfosService.getApprovedCondition(),
-            inArray(tenderInfos.rfqRequired, ['yes', 'Yes', 'YES']),
-        ];
+        const baseConditions = [TenderInfosService.getActiveCondition(), TenderInfosService.getApprovedCondition(), inArray(tenderInfos.rfqRequired, ["yes", "Yes", "YES"])];
 
         // Apply role-based filtering
         const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
@@ -195,23 +192,28 @@ export class RfqsService {
 
         if (activeTab === "pending") {
             conditions.push(isNull(rfqs.id));
-            conditions.push(TenderInfosService.getExcludeStatusCondition(["dnb", "lost"]));
+            // conditions.push(TenderInfosService.getExcludeStatusCondition(["dnb", "lost"]));
+            conditions.push(ne(bidSubmissions.status, "Tender Missed"));
         } else if (activeTab === "sent") {
             conditions.push(isNotNull(rfqs.id));
-            conditions.push(TenderInfosService.getExcludeStatusCondition(["dnb", "lost"]));
+            // conditions.push(TenderInfosService.getExcludeStatusCondition(["dnb", "lost"]));
+            conditions.push(ne(bidSubmissions.status, "Tender Missed"));
         } else if (activeTab === "responses") {
             conditions.push(isNotNull(rfqs.id));
             conditions.push(sql`EXISTS (SELECT 1 FROM ${rfqResponses} WHERE ${rfqResponses.rfqId} = ${rfqs.id})`);
+            conditions.push(ne(bidSubmissions.status, "Tender Missed"));
         } else if (activeTab === "rfq-rejected") {
             conditions.push(inArray(tenderInfos.status, [10, 14, 35]));
+            conditions.push(ne(bidSubmissions.status, "Tender Missed"));
         } else if (activeTab === "tender-dnb") {
-            const dnbStatusIds = StatusCache.getIds("dnb");
-            if (dnbStatusIds.length > 0) {
-                const filteredDnbIds = dnbStatusIds.filter(id => [8, 34].includes(id));
-                if (filteredDnbIds.length > 0) {
-                    conditions.push(inArray(tenderInfos.status, filteredDnbIds));
-                }
-            }
+            // const dnbStatusIds = StatusCache.getIds("dnb");
+            // if (dnbStatusIds.length > 0) {
+            //     const filteredDnbIds = dnbStatusIds.filter(id => [8, 34].includes(id));
+            //     if (filteredDnbIds.length > 0) {
+            //         conditions.push(inArray(tenderInfos.status, filteredDnbIds));
+            //     }
+            // }
+            conditions.push(eq(bidSubmissions.status, "Tender Missed"));
         } else {
             throw new BadRequestException(`Invalid tab: ${activeTab}`);
         }
@@ -282,6 +284,7 @@ export class RfqsService {
             .from(tenderInfos)
             .leftJoin(rfqs, eq(rfqs.tenderId, tenderInfos.id))
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .where(whereClause);
@@ -311,6 +314,7 @@ export class RfqsService {
             .leftJoin(rfqs, eq(rfqs.tenderId, tenderInfos.id))
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .where(whereClause)
             .orderBy(orderByClause)
@@ -399,7 +403,7 @@ export class RfqsService {
 
             vendorRows.forEach(v => {
                 vendorNames.push(v.name);
-                
+
                 const orgId = v.orgId || 0; // Use 0 for "No Organization"
                 const orgName = v.organizationName || "Other";
 
@@ -410,7 +414,7 @@ export class RfqsService {
                         vendors: [],
                     });
                 }
-                
+
                 orgMap.get(orgId)!.vendors.push({
                     id: v.id,
                     name: v.name,
@@ -435,11 +439,8 @@ export class RfqsService {
                 .filter(id => !isNaN(id));
 
             if (orgIds.length > 0) {
-                const orgRows = await this.db
-                    .select({ name: vendorOrganizations.name })
-                    .from(vendorOrganizations)
-                    .where(inArray(vendorOrganizations.id, orgIds));
-                
+                const orgRows = await this.db.select({ name: vendorOrganizations.name }).from(vendorOrganizations).where(inArray(vendorOrganizations.id, orgIds));
+
                 orgRows.forEach(org => {
                     if (!organizationNames.includes(org.name)) {
                         organizationNames.push(org.name);
@@ -512,7 +513,7 @@ export class RfqsService {
         }
 
         const result: RfqDetails[] = await Promise.all(
-            rfqRows.map(async (rfqRow) => {
+            rfqRows.map(async rfqRow => {
                 const [rfqItemsData, rfqDocumentsData, { vendorNames, organizationNames, requestedGroups }] = await Promise.all([
                     this.db.select().from(rfqItems).where(eq(rfqItems.rfqId, rfqRow.id)),
                     this.db.select().from(rfqDocuments).where(eq(rfqDocuments.rfqId, rfqRow.id)),
@@ -719,8 +720,6 @@ export class RfqsService {
         return result;
     }
 
-
-
     async delete(id: number): Promise<void> {
         const result = await this.db.delete(rfqs).where(eq(rfqs.id, id)).returning();
         if (!result[0]) {
@@ -731,37 +730,45 @@ export class RfqsService {
     /**
      * Get counts for all RFQ dashboard tabs
      */
-    async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<{ pending: number; sent: number; "rfq-rejected": number; "tender-dnb": number; responses: number; total: number }> {
+    async getDashboardCounts(
+        user?: ValidatedUser,
+        teamId?: number
+    ): Promise<{ pending: number; sent: number; "rfq-rejected": number; "tender-dnb": number; responses: number; total: number }> {
         const [pending, sent, rejected, dnb, responses] = await Promise.all([
             this.db
                 .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
                 .from(tenderInfos)
                 .leftJoin(rfqs, eq(rfqs.tenderId, tenderInfos.id))
-                .where(and(...this.buildDashboardConditions(user, teamId, 'pending')))
+                .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+                .where(and(...this.buildDashboardConditions(user, teamId, "pending")))
                 .then(([result]) => Number(result?.count || 0)),
             this.db
                 .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
                 .from(tenderInfos)
                 .innerJoin(rfqs, eq(rfqs.tenderId, tenderInfos.id))
-                .where(and(...this.buildDashboardConditions(user, teamId, 'sent')))
+                .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+                .where(and(...this.buildDashboardConditions(user, teamId, "sent")))
                 .then(([result]) => Number(result?.count || 0)),
             this.db
                 .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
                 .from(tenderInfos)
                 .leftJoin(rfqs, eq(rfqs.tenderId, tenderInfos.id))
-                .where(and(...this.buildDashboardConditions(user, teamId, 'rfq-rejected')))
+                .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+                .where(and(...this.buildDashboardConditions(user, teamId, "rfq-rejected")))
                 .then(([result]) => Number(result?.count || 0)),
             this.db
                 .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
                 .from(tenderInfos)
                 .leftJoin(rfqs, eq(rfqs.tenderId, tenderInfos.id))
-                .where(and(...this.buildDashboardConditions(user, teamId, 'tender-dnb')))
+                .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+                .where(and(...this.buildDashboardConditions(user, teamId, "tender-dnb")))
                 .then(([result]) => Number(result?.count || 0)),
             this.db
                 .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
                 .from(tenderInfos)
                 .innerJoin(rfqs, eq(rfqs.tenderId, tenderInfos.id))
-                .where(and(...this.buildDashboardConditions(user, teamId, 'responses')))
+                .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+                .where(and(...this.buildDashboardConditions(user, teamId, "responses")))
                 .then(([result]) => Number(result?.count || 0)),
         ]);
 
@@ -776,15 +783,10 @@ export class RfqsService {
     }
 
     private buildDashboardConditions(user?: ValidatedUser, teamId?: number, tab?: string): any[] {
-        const baseConditions = [
-            TenderInfosService.getActiveCondition(),
-            TenderInfosService.getApprovedCondition(),
-        ];
+        const baseConditions = [TenderInfosService.getActiveCondition(), TenderInfosService.getApprovedCondition()];
 
-        if (tab === 'pending' || tab === 'sent' || tab === 'responses') {
-            baseConditions.push(
-                inArray(tenderInfos.rfqRequired, ['yes', 'Yes', 'YES']),
-            );
+        if (tab === "pending" || tab === "sent" || tab === "responses") {
+            baseConditions.push(inArray(tenderInfos.rfqRequired, ["yes", "Yes", "YES"]));
         }
 
         const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
@@ -792,21 +794,26 @@ export class RfqsService {
 
         if (tab === "pending") {
             conditions.push(isNull(rfqs.id));
-            conditions.push(TenderInfosService.getExcludeStatusCondition(["dnb", "lost"]));
+            // conditions.push(TenderInfosService.getExcludeStatusCondition(["dnb", "lost"]));
+            conditions.push(ne(bidSubmissions.status, "Tender Missed"));
         } else if (tab === "sent") {
             conditions.push(isNotNull(rfqs.id));
-            conditions.push(TenderInfosService.getExcludeStatusCondition(["dnb", "lost"]));
+            // conditions.push(TenderInfosService.getExcludeStatusCondition(["dnb", "lost"]));
+            conditions.push(ne(bidSubmissions.status, "Tender Missed"));
         } else if (tab === "responses") {
             conditions.push(isNotNull(rfqs.id));
             conditions.push(sql`EXISTS (SELECT 1 FROM ${rfqResponses} WHERE ${rfqResponses.rfqId} = ${rfqs.id})`);
+            conditions.push(ne(bidSubmissions.status, "Tender Missed"));
         } else if (tab === "rfq-rejected") {
             conditions.push(inArray(tenderInfos.status, [10, 14, 35]));
+            conditions.push(ne(bidSubmissions.status, "Tender Missed"));
         } else if (tab === "tender-dnb") {
-            const dnbStatusIds = StatusCache.getIds("dnb");
-            const filteredDnbIds = dnbStatusIds.filter(id => [8, 34].includes(id));
-            if (filteredDnbIds.length > 0) {
-                conditions.push(inArray(tenderInfos.status, filteredDnbIds));
-            }
+            // const dnbStatusIds = StatusCache.getIds("dnb");
+            // const filteredDnbIds = dnbStatusIds.filter(id => [8, 34].includes(id));
+            // if (filteredDnbIds.length > 0) {
+            //     conditions.push(inArray(tenderInfos.status, filteredDnbIds));
+            // }
+            conditions.push(eq(bidSubmissions.status, "Tender Missed"));
         }
 
         return conditions;
