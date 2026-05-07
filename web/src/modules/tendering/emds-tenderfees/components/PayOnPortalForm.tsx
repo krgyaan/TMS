@@ -8,9 +8,10 @@ import { PURPOSE_OPTIONS, YES_NO_OPTIONS } from '../constants';
 interface PaymentFormBaseProps {
     amount?: number;
     prefix?: string;
+    readOnly?: boolean;
 }
 
-export function PayOnPortalForm({ amount, prefix = 'emd.details' }: PaymentFormBaseProps) {
+export function PayOnPortalForm({ amount, prefix = 'emd.details', readOnly = false }: PaymentFormBaseProps) {
     const { control } = useFormContext();
 
     return (
@@ -21,12 +22,14 @@ export function PayOnPortalForm({ amount, prefix = 'emd.details' }: PaymentFormB
                 label="Purpose *"
                 options={PURPOSE_OPTIONS}
                 placeholder="Select Purpose"
+                disabled={readOnly}
             />
             <FieldWrapper control={control} name={`${prefix}.portalAmount`} label="Amount *">
                 {(field) => (
                     <NumberInput
                         value={field.value ?? amount}
                         onChange={field.onChange}
+                        disabled={readOnly}
                     />
                 )}
             </FieldWrapper>

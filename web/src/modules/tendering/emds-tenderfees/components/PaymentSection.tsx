@@ -123,12 +123,12 @@ export function PaymentSection({
                         Fill in the details for <strong>{MODE_LABELS[selectedMode] || selectedMode}</strong>
                     </p>
 
-                    {selectedMode === 'PORTAL' && <PayOnPortalForm amount={isEditMode ? undefined : amount} prefix={prefix} />}
-                    {(selectedMode === 'BANK_TRANSFER' || selectedMode === 'BT') && <BankTransferForm amount={isEditMode ? undefined : amount} prefix={prefix} />}
-                    {selectedMode === 'DD' && <DemandDraftForm amount={isEditMode ? undefined : amount} prefix={prefix} />}
-                    {selectedMode === 'BG' && <BankGuaranteeForm amount={isEditMode ? undefined : amount} prefix={prefix} />}
-                    {selectedMode === 'FDR' && <FdrForm amount={isEditMode ? undefined : amount} prefix={prefix} />}
-                    {selectedMode === 'CHEQUE' && <ChequeForm prefix={prefix} />}
+                    {selectedMode === 'PORTAL' && <PayOnPortalForm amount={isEditMode ? undefined : amount} prefix={prefix} readOnly={!isEditMode && amount > 0} />}
+                    {(selectedMode === 'BANK_TRANSFER' || selectedMode === 'BT') && <BankTransferForm amount={isEditMode ? undefined : amount} prefix={prefix} readOnly={!isEditMode && amount > 0} />}
+                    {selectedMode === 'DD' && <DemandDraftForm amount={isEditMode ? undefined : amount} prefix={prefix} readOnly={!isEditMode && amount > 0} />}
+                    {selectedMode === 'BG' && <BankGuaranteeForm amount={isEditMode ? undefined : amount} prefix={prefix} readOnly={!isEditMode && amount > 0} />}
+                    {selectedMode === 'FDR' && <FdrForm amount={isEditMode ? undefined : amount} prefix={prefix} readOnly={!isEditMode && amount > 0} />}
+                    {selectedMode === 'CHEQUE' && <ChequeForm prefix={prefix} readOnly={!isEditMode && amount > 0} />}
                 </div>
             )}
         </div>

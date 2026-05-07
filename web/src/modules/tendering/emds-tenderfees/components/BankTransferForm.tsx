@@ -8,9 +8,10 @@ import { PURPOSE_OPTIONS } from '../constants';
 interface PaymentFormBaseProps {
     amount?: number;
     prefix?: string;
+    readOnly?: boolean;
 }
 
-export function BankTransferForm({ amount, prefix = 'emd.details' }: PaymentFormBaseProps) {
+export function BankTransferForm({ amount, prefix = 'emd.details', readOnly = false }: PaymentFormBaseProps) {
     const { control } = useFormContext();
 
     return (
@@ -21,6 +22,7 @@ export function BankTransferForm({ amount, prefix = 'emd.details' }: PaymentForm
                 label="Purpose *"
                 options={PURPOSE_OPTIONS}
                 placeholder="Select Purpose"
+                disabled={readOnly}
             />
             <FieldWrapper control={control} name={`${prefix}.btAmount`} label="Amount *">
                 {(field) => (
@@ -28,6 +30,7 @@ export function BankTransferForm({ amount, prefix = 'emd.details' }: PaymentForm
                         value={field.value ?? amount}
                         placeholder={amount ? String(amount) : "Enter amount"}
                         onChange={field.onChange}
+                        disabled={readOnly}
                     />
                 )}
             </FieldWrapper>

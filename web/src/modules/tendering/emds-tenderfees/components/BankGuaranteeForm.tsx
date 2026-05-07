@@ -11,9 +11,10 @@ import { TenderFileUploader } from '@/components/tender-file-upload';
 interface PaymentFormBaseProps {
     amount?: number;
     prefix?: string;
+    readOnly?: boolean;
 }
 
-export function BankGuaranteeForm({ amount, prefix = 'emd.details' }: PaymentFormBaseProps) {
+export function BankGuaranteeForm({ amount, prefix = 'emd.details', readOnly = false }: PaymentFormBaseProps) {
     const { control, setValue } = useFormContext();
     const bgFormatFiles = useWatch({ control, name: `${prefix}.bgFormatFiles` });
     const bgPoFiles = useWatch({ control, name: `${prefix}.bgPoFiles` });
@@ -27,12 +28,14 @@ export function BankGuaranteeForm({ amount, prefix = 'emd.details' }: PaymentFor
                     label="Purpose *"
                     options={BG_PURPOSE_OPTIONS}
                     placeholder="Select Purpose"
+                    disabled={readOnly}
                 />
                 <FieldWrapper control={control} name={`${prefix}.bgAmount`} label="Amount *">
                     {(field) => (
                         <NumberInput
                             value={field.value ?? amount}
                             onChange={field.onChange}
+                            disabled={readOnly}
                         />
                     )}
                 </FieldWrapper>
