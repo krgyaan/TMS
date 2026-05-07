@@ -67,7 +67,6 @@ export class FollowUpController {
 
     @Get()
     async findAll(@Query() query: FollowUpQueryDto, @CurrentUser() user) {
-
         let data = await this.service.findAll(query, user);
         return data;
     }
@@ -119,8 +118,7 @@ export class FollowUpController {
     @Put(":id/status")
     @UseInterceptors(FileInterceptor("proofImage", proofImageMulterConfig))
     async updateStatus(@Param("id", ParseIntPipe) id: number, @Body() dto: UpdateFollowUpStatusDto, @Req() req, @UploadedFile() proofImage: Express.Multer.File) {
-        console.log("Entering API Call");
-        console.log({ id, dto, proofImage });
+        console.log(req.user);
         return this.service.updateStatus(id, dto, req.user, proofImage);
     }
 

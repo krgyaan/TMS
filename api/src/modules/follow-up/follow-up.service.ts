@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, Inject, LoggerService, InternalServerErrorException } from "@nestjs/common";
-import { eq, ne, and, or, isNull, sql, desc, asc, like, SQL, inArray, ilike } from "drizzle-orm";
+import { eq, ne, and, or, isNull, sql, desc, asc, like, SQL, inArray, ilike, lte, gt } from "drizzle-orm";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 
@@ -46,7 +46,6 @@ export const STOP_REASON_LABELS: Record<number, string> = {
     3: "Not Reachable",
     4: "Other",
 };
-
 
 const UPLOAD_DIR = path.join(process.cwd(), "uploads", "accounts");
 
@@ -269,15 +268,10 @@ export class FollowUpService {
             const offset = (page - 1) * limit;
             const conditions: SQL[] = [isNull(followUps.deletedAt)];
 
-            if(currentUser.roleId != "1" && currentUser.roleId != "2"){
-                this.logger.debug({message: "Is not admin"});
+            if (currentUser.roleId != "1" && currentUser.roleId != "2") {
+                this.logger.debug({ message: "Is not admin" });
 
-                    conditions.push(
-                        or(
-                            eq(followUps.assignedToId, currentUser.id),
-                            eq(followUps.createdById, currentUser.id)
-                        )!
-                    );
+                conditions.push(or(eq(followUps.assignedToId, currentUser.id), eq(followUps.createdById, currentUser.id))!);
             }
 
             if (search) {
@@ -291,22 +285,26 @@ export class FollowUpService {
                         ilike(followUps.partyName, pattern),
                         ilike(followUps.area, pattern),
                         sql`CAST(${followUps.amount} AS TEXT) ILIKE ${pattern}`,
-                        inArray(followUps.assignedToId, matchingUserIds) 
+                        inArray(followUps.assignedToId, matchingUserIds)
                     )!
                 );
             }
 
             const today = new Date().toLocaleDateString("en-CA");
 
-            if (tab === "ongoing") conditions.push(ne(followUps.frequency, 6));
-            else if (tab === "achieved") {
+            if (tab === "ongoing") {
+                conditions.push(ne(followUps.frequency, 6));
+                if (followUps.startFrom) {
+                    conditions.push(lte(followUps.startFrom, today));
+                }
+            } else if (tab === "achieved") {
                 conditions.push(eq(followUps.frequency, 6));
                 conditions.push(eq(followUps.stopReason, 2));
             } else if (tab === "angry") {
                 conditions.push(eq(followUps.frequency, 6));
                 conditions.push(inArray(followUps.stopReason, [1, 3, 4]));
             } else if (tab === "future") {
-                conditions.push(sql`${followUps.startFrom} > ${today}`);
+                conditions.push(gt(followUps.startFrom, today));
             }
 
             const orderDirection = sortOrder === "asc" ? asc : desc;
@@ -593,9 +591,7 @@ export class FollowUpService {
                             followUpId: id,
                         });
                     } else {
-                        const [assigneeUser] = existing.assignedToId 
-                            ? await this.db.select().from(users).where(eq(users.id, existing.assignedToId))
-                            : [undefined];
+                        const [assigneeUser] = existing.assignedToId ? await this.db.select().from(users).where(eq(users.id, existing.assignedToId)) : [undefined];
                         const [creatorUser] = existing.createdById ? await this.db.select().from(users).where(eq(users.id, existing.createdById)) : [undefined];
 
                         const admin = await this.mailAudience.getAdmin();
@@ -753,9 +749,12 @@ export class FollowUpService {
         if (data.stopReason) updateData.stopReason = data.stopReason;
         if (data.proofText) updateData.proofText = data.proofText;
         if (data.stopRemarks) updateData.stopRemarks = data.stopRemarks;
-        if (proofImage) {
-            updateData.proofImagePath = proofImage.filename;
+        if (data.nextFollowUpDate !== undefined) {
+            updateData.nextFollowUpDate = data.nextFollowUpDate;
+            updateData.startFrom = data.nextFollowUpDate;
         }
+        if (proofImage) updateData.proofImagePath = proofImage.filename;
+
         const [updated] = await this.db.update(followUps).set(updateData).where(eq(followUps.id, id)).returning();
 
         this.logger.info("Follow-up status updated", {
@@ -763,7 +762,7 @@ export class FollowUpService {
             newStatus: updated.assignmentStatus,
         });
 
-        // ✅ NEW: Send stop mail when follow-up is being stopped
+        // Send stop mail when follow-up is being stopped
         if (Number(data.frequency) === 6) {
             try {
                 const googleConnection = await this.resolveGoogleConnection(existing.assignedToId, {
@@ -776,9 +775,7 @@ export class FollowUpService {
                         followUpId: id,
                     });
                 } else {
-                    const [assigneeUser] = existing.assignedToId 
-                        ? await this.db.select().from(users).where(eq(users.id, existing.assignedToId))
-                        : [undefined];
+                    const [assigneeUser] = existing.assignedToId ? await this.db.select().from(users).where(eq(users.id, existing.assignedToId)) : [undefined];
                     const [creatorUser] = existing.createdById ? await this.db.select().from(users).where(eq(users.id, existing.createdById)) : [undefined];
 
                     const admin = await this.mailAudience.getAdmin();
@@ -884,13 +881,13 @@ export class FollowUpService {
         if (fallbackStr && !isNaN(parseInt(fallbackStr))) {
             const FALLBACK_MAIL_USER_ID = parseInt(fallbackStr);
             googleConnection = await this.googleService.getSanitizedGoogleConnection(FALLBACK_MAIL_USER_ID);
-            
+
             if (googleConnection) {
-                 this.logger.info("Google connection for fallback id being used", {
+                this.logger.info("Google connection for fallback id being used", {
                     ...contextData,
                     fallbackUserId: FALLBACK_MAIL_USER_ID,
-                 });
-                 return googleConnection;
+                });
+                return googleConnection;
             }
         }
 
