@@ -800,6 +800,8 @@ async findByIdWithTender(requestId: number) {
 
         if (!request) return null;
 
+        console.log("request in findByIdWithTender", request);
+
         const instruments = await this.db
             .select({
                 id: paymentInstruments.id,
@@ -820,6 +822,8 @@ async findByIdWithTender(requestId: number) {
                 eq(paymentInstruments.isActive, true)
             ));
 
+        console.log("instruments in findByIdWithTender", instruments);
+
         const instrumentsWithDetails = await Promise.all(instruments.map(async (instrument) => {
             let details: any = null;
             if (instrument.instrumentType === 'DD') {
@@ -836,6 +840,7 @@ async findByIdWithTender(requestId: number) {
                     fdrNo: instrumentFdrDetails.fdrNo,
                     fdrDate: instrumentFdrDetails.fdrDate,
                     fdrSource: instrumentFdrDetails.fdrSource,
+                    fdrPurpose: instrumentFdrDetails.fdrPurpose,
                     fdrExpiryDate: instrumentFdrDetails.fdrExpiryDate,
                     fdrNeeds: instrumentFdrDetails.fdrNeeds,
                     fdrRemark: instrumentFdrDetails.fdrRemark,
@@ -883,6 +888,8 @@ async findByIdWithTender(requestId: number) {
             }
             return this.mapInstrumentResponse(instrument, details);
         }));
+
+        console.log("instrumentsWithDetails in findByIdWithTender", instrumentsWithDetails);
         
         return {
             ...this.mapPaymentRequest(request),
@@ -946,8 +953,6 @@ async findByIdWithTender(requestId: number) {
             amount: instrument.amount?.toString() || '0',
             favouring: instrument.favouring,
             payableAt: instrument.payableAt,
-            courierAddress: instrument.courierAddress,
-            courierDeadline: instrument.courierDeadline,
             status: instrument.status,
             isActive: instrument.isActive,
         };
@@ -955,6 +960,9 @@ async findByIdWithTender(requestId: number) {
 
     private mapInstrumentResponse(instrument: any, details: any): InstrumentResponse {
         const base = this.mapInstrumentBase(instrument);
+
+        console.log("instrument in mapInstrumentResponse", instrument);
+        console.log("details in mapInstrumentResponse", details);
         
         switch (instrument.instrumentType) {
             case 'DD':
@@ -980,6 +988,7 @@ async findByIdWithTender(requestId: number) {
                         fdrNo: details.fdrNo,
                         fdrDate: details.fdrDate,
                         fdrSource: details.fdrSource,
+                        fdrPurpose: details.fdrPurpose,
                         fdrExpiryDate: details.fdrExpiryDate,
                         fdrNeeds: details.fdrNeeds,
                         fdrRemark: details.fdrRemark,
