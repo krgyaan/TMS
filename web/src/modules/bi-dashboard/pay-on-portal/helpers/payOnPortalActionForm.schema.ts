@@ -122,6 +122,17 @@ export const PayOnPortalActionFormSchema = BaseActionFormSchema.extend({
         message: 'Transfer date and UTR number are required',
         path: ['transfer_date'],
     }
+).refine(
+    (data) => {
+        if (data.action === 'settled') {
+            return !!data.settle_remarks;
+        }
+        return true;
+    },
+    {
+        message: 'Settlement remarks are required',
+        path: ['settle_remarks'],
+    }
 );
 
 export type PayOnPortalActionFormValues = z.infer<typeof PayOnPortalActionFormSchema>;

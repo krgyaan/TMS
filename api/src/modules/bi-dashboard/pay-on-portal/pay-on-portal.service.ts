@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { eq, and, inArray, isNull, sql, asc, desc, or } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
@@ -354,27 +354,36 @@ export class PayOnPortalService {
         }
 
         if (Object.keys(transferDetailsUpdate).length > 0) {
-            transferDetailsUpdate.updatedAt = new Date();
+            try {
+                transferDetailsUpdate.updatedAt = new Date();
 
-            // Check if transfer details record exists
-            const [existingDetails] = await this.db
-                .select()
-                .from(instrumentTransferDetails)
-                .where(eq(instrumentTransferDetails.instrumentId, instrumentId))
-                .limit(1);
+                const [existingDetails] = await this.db
+                    .select()
+                    .from(instrumentTransferDetails)
+                    .where(eq(instrumentTransferDetails.instrumentId, instrumentId))
+                    .limit(1);
 
-            if (existingDetails) {
-                await this.db
-                    .update(instrumentTransferDetails)
-                    .set(transferDetailsUpdate)
-                    .where(eq(instrumentTransferDetails.instrumentId, instrumentId));
-            } else {
-                // Create new transfer details record
-                await this.db.insert(instrumentTransferDetails).values({
-                    instrumentId,
-                    ...transferDetailsUpdate,
-                    createdAt: new Date(),
-                });
+                if (existingDetails) {
+                    const result = await this.db
+                        .update(instrumentTransferDetails)
+                        .set(transferDetailsUpdate)
+                        .where(eq(instrumentTransferDetails.instrumentId, instrumentId));
+                    
+                    if (!result) {
+                        throw new Error('Update operation failed - no rows affected');
+                    }
+                    this.logger.log(`Updated transfer details for instrument ${instrumentId}`);
+                } else {
+                    await this.db.insert(instrumentTransferDetails).values({
+                        instrumentId,
+                        ...transferDetailsUpdate,
+                        createdAt: new Date(),
+                    });
+                    this.logger.log(`Created new transfer details for instrument ${instrumentId}`);
+                }
+            } catch (error) {
+                this.logger.error(`Failed to save transfer details: ${error.message}`);
+                throw new InternalServerErrorException('Failed to save transfer details. Please try again.');
             }
         }
 
