@@ -31,11 +31,11 @@ export class DemandDraftService {
             [DD_STATUSES.ACCOUNTS_FORM_ACCEPTED]: 'Accepted',
             [DD_STATUSES.ACCOUNTS_FORM_REJECTED]: 'Rejected',
             [DD_STATUSES.FOLLOWUP_INITIATED]: 'Followup Initiated',
-            [DD_STATUSES.COURIER_RETURN_RECEIVED]: 'Returned',
+            [DD_STATUSES.RETURN_VIA_COURIER]: 'Returned',
             [DD_STATUSES.CANCELLATION_REQUESTED]: 'Cancellation Requested',
-            [DD_STATUSES.CANCELLED_AT_BRANCH]: 'Cancelled at Branch',
-            [DD_STATUSES.BANK_RETURN_COMPLETED]: 'Returned',
-            [DD_STATUSES.PROJECT_SETTLEMENT_COMPLETED]: 'Settled with Project',
+            [DD_STATUSES.CANCELLED]: 'Cancelled at Branch',
+            [DD_STATUSES.RETURN_VIA_BANK_TRANSFER]: 'Returned',
+            [DD_STATUSES.SETTLED_WITH_PROJECT]: 'Settled with Project',
         };
     }
 
@@ -345,7 +345,7 @@ export class DemandDraftService {
         } else if (body.action === 'initiate-followup') {
             updateData.status = DD_STATUSES.FOLLOWUP_INITIATED;
         } else if (body.action === 'returned-courier') {
-            updateData.status = DD_STATUSES.COURIER_RETURN_RECEIVED;
+            updateData.status = DD_STATUSES.RETURN_VIA_COURIER;
             // Handle docket_slip file or path
             const docketSlipFile = getFileForField('docket_slip', files, body, fileIndexTracker);
             const docketSlipPath = getFilePathFromBody('docket_slip', body);
@@ -357,15 +357,15 @@ export class DemandDraftService {
                 updateData.docketSlip = filePaths[0];
             }
         } else if (body.action === 'returned-bank-transfer') {
-            updateData.status = DD_STATUSES.BANK_RETURN_COMPLETED;
+            updateData.status = DD_STATUSES.RETURN_VIA_BANK_TRANSFER;
             if (body.transfer_date) updateData.transferDate = body.transfer_date;
             if (body.utr) updateData.utr = body.utr;
         } else if (body.action === 'settled' || body.action === 'settled-with-project') {
-            updateData.status = DD_STATUSES.PROJECT_SETTLEMENT_COMPLETED;
+            updateData.status = DD_STATUSES.SETTLED_WITH_PROJECT;
         } else if (body.action === 'request-cancellation') {
             updateData.status = DD_STATUSES.CANCELLATION_REQUESTED;
         } else if (body.action === 'dd-cancellation-confirmation') {
-            updateData.status = DD_STATUSES.CANCELLED_AT_BRANCH;
+            updateData.status = DD_STATUSES.CANCELLED;
             if (body.dd_cancellation_date) updateData.creditDate = body.dd_cancellation_date;
             if (body.dd_cancellation_amount) updateData.creditAmount = body.dd_cancellation_amount;
             if (body.dd_cancellation_reference_no) updateData.referenceNo = body.dd_cancellation_reference_no;
