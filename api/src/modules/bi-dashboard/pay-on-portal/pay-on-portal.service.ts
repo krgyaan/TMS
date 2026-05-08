@@ -346,15 +346,11 @@ export class PayOnPortalService {
             if (body.return_remarks) transferDetailsUpdate.remarks = body.return_remarks;
             if (body.utr_no) transferDetailsUpdate.returnUtr = body.utr_no;
         } else if (body.action === 'settled') {
-            if (body.settlement_date) {
-                const settlementDate = new Date(body.settlement_date);
-                if (isNaN(settlementDate.getTime())) {
-                    throw new BadRequestException('Invalid settlement date');
-                }
-                transferDetailsUpdate.transactionDate = settlementDate;
+            this.logger.log(`Settled action - body: ${JSON.stringify(body)}`);
+            if (body.settle_remarks) {
+                this.logger.log(`Settle remarks received: ${body.settle_remarks}`);
+                transferDetailsUpdate.remarks = body.settle_remarks;
             }
-            if (body.settlement_amount) transferDetailsUpdate.amount = body.settlement_amount;
-            if (body.settlement_reference_no) transferDetailsUpdate.transactionId = body.settlement_reference_no;
         }
 
         if (Object.keys(transferDetailsUpdate).length > 0) {
