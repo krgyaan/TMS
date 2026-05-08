@@ -19,22 +19,19 @@ import { useWatch } from 'react-hook-form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { FileText, Users, Banknote, CheckCircle2, Info, History } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { FileText, Users, Banknote, CheckCircle, CheckCircle2, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 interface ActionOption {
     value: string;
     label: string;
-    icon: React.ReactNode;
-    description: string;
 }
 
 const ALL_ACTION_OPTIONS: ActionOption[] = [
-    { value: 'accounts-form', label: 'Accounts Form', icon: <FileText className="h-4 w-4" />, description: 'Process payment request through accounts' },
-    { value: 'initiate-followup', label: 'Initiate Followup', icon: <Users className="h-4 w-4" />, description: 'Start follow-up process with contacts' },
-    { value: 'returned', label: 'Returned via Bank Transfer', icon: <Banknote className="h-4 w-4" />, description: 'Mark as returned through bank transfer' },
-    { value: 'settled', label: 'Settled with Project Account', icon: <CheckCircle2 className="h-4 w-4" />, description: 'Settle payment with project account' },
+    { value: 'accounts-form', label: 'Accounts Form' },
+    { value: 'initiate-followup', label: 'Initiate Followup' },
+    { value: 'returned', label: 'Returned via Bank Transfer' },
+    { value: 'settled', label: 'Settled with Project Account' },
 ];
 
 interface AccountsFormHistory {
@@ -84,7 +81,7 @@ interface PayOnPortalActionFormProps {
     formHistory?: FormHistory;
 }
 
-export function PayOnPortalActionForm({ instrumentId, action, instrumentData, formHistory }: PayOnPortalActionFormProps) {
+export function PayOnPortalActionForm({ instrumentId, action, formHistory }: PayOnPortalActionFormProps) {
     const navigate = useNavigate();
     const updateMutation = useUpdatePayOnPortalAction();
 
@@ -93,11 +90,12 @@ export function PayOnPortalActionForm({ instrumentId, action, instrumentData, fo
     const hasReturnedData = !!(formHistory?.returned?.transferDate);
 
     const getSubmittedBadge = (hasData: boolean) => {
-        if (!hasData) return null;
+        if (!hasData) return <Badge variant={'secondary'} className="rounded-full p-2">
+            <Info className="h-3 w-3" />
+        </Badge>;
         return (
-            <Badge variant="outline" className="ml-2 bg-amber-50 text-amber-700 border-amber-200">
-                <History className="h-3 w-3 mr-1" />
-                Previously Submitted
+            <Badge variant={'success'} className="rounded-full p-2">
+                <CheckCircle className="h-3 w-3" />
             </Badge>
         );
     };
@@ -249,52 +247,13 @@ export function PayOnPortalActionForm({ instrumentId, action, instrumentData, fo
     return (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                {instrumentData && (
-                    <Card className="bg-muted/50">
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium flex items-center gap-2">
-                                <Info className="h-4 w-4" />
-                                Instrument Details
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="pt-0">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                                {instrumentData.tenderNo && (
-                                    <div>
-                                        <span className="text-muted-foreground">Tender No:</span>
-                                        <p className="font-medium">{instrumentData.tenderNo}</p>
-                                    </div>
-                                )}
-                                {instrumentData.tenderName && (
-                                    <div>
-                                        <span className="text-muted-foreground">Tender Name:</span>
-                                        <p className="font-medium truncate">{instrumentData.tenderName}</p>
-                                    </div>
-                                )}
-                                {instrumentData.amount !== undefined && (
-                                    <div>
-                                        <span className="text-muted-foreground">Amount:</span>
-                                        <p className="font-medium">₹{instrumentData.amount.toLocaleString()}</p>
-                                    </div>
-                                )}
-                                {instrumentData.portalName && (
-                                    <div>
-                                        <span className="text-muted-foreground">Portal:</span>
-                                        <p className="font-medium">{instrumentData.portalName}</p>
-                                    </div>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
-
                 <div className="space-y-3">
                     <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                         Choose What to do
                     </label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                         {availableActions.map((option) => {
-                            const hasHistory = 
+                            const hasHistory =
                                 (option.value === 'accounts-form' && hasAccountsFormData) ||
                                 (option.value === 'initiate-followup' && hasFollowupData) ||
                                 (option.value === 'returned' && hasReturnedData);
@@ -302,26 +261,14 @@ export function PayOnPortalActionForm({ instrumentId, action, instrumentData, fo
                             return (
                                 <div
                                     key={option.value}
-                                    className={`relative flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all hover:bg-muted/50 ${
-                                        selectedAction === option.value
-                                            ? 'border-primary bg-primary/5'
-                                            : 'border-border'
-                                    }`}
+                                    className={`relative flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all hover:bg-muted/50`}
                                     onClick={() => form.setValue('action', option.value, { shouldValidate: true })}
                                 >
-                                    <div className={`mt-0.5 p-2 rounded-full ${
-                                        selectedAction === option.value
-                                            ? 'bg-primary text-primary-foreground'
-                                            : 'bg-muted'
-                                    }`}>
-                                        {option.icon}
-                                    </div>
-                                    <div className="flex-1">
-                                        <p className="font-medium text-sm flex items-center">
+                                    <div className="flex items-center gap-2">
+                                        {getSubmittedBadge(hasHistory)}
+                                        <div className="font-medium text-sm flex items-center">
                                             {option.label}
-                                            {getSubmittedBadge(hasHistory)}
-                                        </p>
-                                        <p className="text-xs text-muted-foreground mt-1">{option.description}</p>
+                                        </div>
                                     </div>
                                 </div>
                             );
