@@ -141,7 +141,8 @@ export default function PayOnPortalActionPage() {
                     instrumentData={instrumentData}
                     formHistory={{
                         accountsForm: actionFormData ? {
-                            popReq: actionFormData.rejectionReason ? 'Rejected' : (actionFormData.utrNo ? 'Accepted' : undefined),
+                            popReq: actionFormData.rejectionReason ? 'Rejected' : 
+                                    (actionFormData.utrNo || actionFormData.transactionDate || actionFormData.utrMsg || actionFormData.paymentDateTime) ? 'Accepted' : undefined,
                             reasonReq: actionFormData.rejectionReason ?? undefined,
                             paymentDatetime: actionFormData.paymentDateTime ?? undefined,
                             utrNo: actionFormData.utrNo ?? undefined,

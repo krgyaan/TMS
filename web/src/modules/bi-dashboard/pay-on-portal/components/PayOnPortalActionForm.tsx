@@ -261,7 +261,7 @@ export function PayOnPortalActionForm({ instrumentId, action, formHistory }: Pay
                             return (
                                 <div
                                     key={option.value}
-                                    className={`relative flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all hover:bg-muted/50`}
+                                    className={`relative flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all hover:bg-muted/50 ${selectedAction === option.value ? 'border-primary' : '' }`}
                                     onClick={() => form.setValue('action', option.value, { shouldValidate: true })}
                                 >
                                     <div className="flex items-center gap-2">

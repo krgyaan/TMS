@@ -235,7 +235,6 @@ export class PayOnPortalService {
     private mapActionToNumber(action: string): number {
         const actionMap: Record<string, number> = {
             'accounts-form': 1,
-            'accounts-form-1': 1,
             'initiate-followup': 2,
             'returned': 3,
             'settled': 4,
@@ -286,7 +285,7 @@ export class PayOnPortalService {
             updatedAt: new Date(),
         };
 
-        if (body.action === 'accounts-form-1') {
+        if (body.action === 'accounts-form') {
             if (body.pop_req === 'Accepted') {
                 updateData.status = PORTAL_STATUSES.ACCOUNTS_FORM_ACCEPTED;
             } else if (body.pop_req === 'Rejected') {
@@ -316,7 +315,7 @@ export class PayOnPortalService {
 
         // Handle transfer details update or creation
         const transferDetailsUpdate: any = {};
-        if (body.action === 'accounts-form-1') {
+        if (body.action === 'accounts-form') {
             if (body.utr_no) transferDetailsUpdate.utrNum = body.utr_no;
             if (body.portal_name) transferDetailsUpdate.portalName = body.portal_name;
             if (body.amount) transferDetailsUpdate.amount = body.amount;
@@ -519,6 +518,7 @@ export class PayOnPortalService {
             returnTransferDate: result.returnTransferDate ? new Date(result.returnTransferDate) : null,
             returnUtr: result.returnUtr,
             reason: result.reason,
+            
             remarks: result.remarks,
             rejectionReason: result.rejectionReason,
             paymentDateTime: legacyData?.date_time || null,

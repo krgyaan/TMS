@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Put, Param, ParseIntPipe, UseInterceptors, UploadedFiles, Body, Req, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Query, Put, Patch, Param, ParseIntPipe, UseInterceptors, UploadedFiles, Body, Req, BadRequestException } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
@@ -58,7 +58,7 @@ export class PayOnPortalController {
         return this.payOnPortalService.getFollowupData(id);
     }
 
-    @Put('instruments/:id/action')
+    @Patch('instruments/:id/action')
     @UseInterceptors(FilesInterceptor('files', 20, biDashboardMulterConfig))
     async updateAction(
         @Param('id', ParseIntPipe) id: number,
