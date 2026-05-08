@@ -4,6 +4,7 @@ import type {
     PayOnPortalDashboardRow,
     PayOnPortalDashboardCounts,
     PayOnPortalDashboardFilters,
+    PayOnPortalActionFormData,
 } from '@/modules/bi-dashboard/pay-on-portal/helpers/payOnPortal.types';
 import type { PaginatedResult } from '@/types/api.types';
 
@@ -14,6 +15,7 @@ export const payOnPortalsKey = {
     details: () => [...payOnPortalsKey.all, 'detail'] as const,
     detail: (id: number) => [...payOnPortalsKey.details(), id] as const,
     counts: () => [...payOnPortalsKey.all, 'counts'] as const,
+    actionForm: (id: number) => [...payOnPortalsKey.all, 'action-form', id] as const,
 };
 
 export const usePayOnPortalDashboard = (
@@ -74,6 +76,19 @@ export const usePayOnPortalDetails = (id: number) => {
     return query;
 };
 
+export const usePayOnPortalActionFormData = (id: number) => {
+    const query = useQuery<PayOnPortalActionFormData>({
+        queryKey: payOnPortalsKey.actionForm(id),
+        queryFn: async () => {
+            const result = await payOnPortalsService.getActionFormData(id);
+            return result;
+        },
+        enabled: !!id,
+    });
+
+    return query;
+};
+
 export const useUpdatePayOnPortalAction = () => {
     const queryClient = useQueryClient();
 
@@ -87,4 +102,4 @@ export const useUpdatePayOnPortalAction = () => {
     });
 };
 
-export type { PayOnPortalDashboardRow, PayOnPortalDashboardCounts };
+export type { PayOnPortalDashboardRow, PayOnPortalDashboardCounts, PayOnPortalActionFormData };

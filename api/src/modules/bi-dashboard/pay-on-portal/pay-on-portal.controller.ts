@@ -48,6 +48,11 @@ export class PayOnPortalController {
         return this.payOnPortalService.getById(id);
     }
 
+    @Get('instruments/:id/action-form')
+    async getActionFormData(@Param('id', ParseIntPipe) id: number) {
+        return this.payOnPortalService.getActionFormData(id);
+    }
+
     @Put('instruments/:id/action')
     @UseInterceptors(FilesInterceptor('files', 20, biDashboardMulterConfig))
     async updateAction(

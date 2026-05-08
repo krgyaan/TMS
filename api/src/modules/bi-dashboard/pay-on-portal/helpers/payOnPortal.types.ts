@@ -12,6 +12,7 @@ export interface PayOnPortalDashboardRow {
     tenderStatus: string | null;
     amount: number | null;
     popStatus: string | null;
+    action: number | null;
 }
 
 export interface PayOnPortalDashboardCounts {
@@ -21,4 +22,24 @@ export interface PayOnPortalDashboardCounts {
     returned: number;
     settled: number;
     total: number;
+}
+
+export interface PayOnPortalActionFormData {
+    id: number;
+    action: number | null;
+    popStatus: string | null;
+    tenderNo: string | null;
+    tenderName: string | null;
+    amount: number | null;
+    portalName: string | null;
+    utrNo: string | null;
+    transactionDate: Date | null;
+    paymentMethod: string | null;
+    utrMsg: string | null;
+    isNetbanking: string | null;
+    isDebit: string | null;
+    returnTransferDate: Date | null;
+    returnUtr: string | null;
+    reason: string | null;
+    remarks: string | null;
 }
