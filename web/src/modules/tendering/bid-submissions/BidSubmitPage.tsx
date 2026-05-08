@@ -50,8 +50,8 @@ export default function BidSubmitPage() {
         {
             id: 'rfq-quotation',
             label: 'RFQ Quotation',
-            status: !rfqRequired ? (rfqs && rfqs.length > 0 ? 'fulfilled' : 'pending') : 'na',
-            description: !rfqRequired ? 'Upload quotation in approval' : 'Ensure RFQs are sent and quotations updated'
+            status: rfqRequired ? (rfqs && rfqs.length > 0 ? 'fulfilled' : 'pending') : 'na',
+            description: rfqRequired ? 'Upload quotation in approval' : 'Ensure RFQs are sent and quotations updated'
         },
         {
             id: 'emd',
