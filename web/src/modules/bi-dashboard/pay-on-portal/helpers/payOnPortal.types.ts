@@ -49,7 +49,7 @@ export interface PayOnPortalActionFormData {
     utrMsg: string | null;
     isNetbanking: string | null;
     isDebit: string | null;
-    returnTransferDate: Date | null;
+    returnTransferDate: string | null;
     returnUtr: string | null;
     reason: string | null;
     remarks: string | null;
