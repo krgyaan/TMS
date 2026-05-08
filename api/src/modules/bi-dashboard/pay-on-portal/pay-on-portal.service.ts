@@ -13,6 +13,7 @@ import type { PayOnPortalDashboardRow, PayOnPortalDashboardCounts } from '@/modu
 import { FollowUpService } from '@/modules/follow-up/follow-up.service';
 import { PORTAL_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
 import type { CreateFollowUpDto } from '@/modules/follow-up/zod';
+import { PaymentRequestsNotificationService } from '@/modules/tendering/payment-requests/services/payment-requests-notification.service';
 
 @Injectable()
 export class PayOnPortalService {
@@ -21,6 +22,7 @@ export class PayOnPortalService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly followUpService: FollowUpService,
+        private readonly notificationService: PaymentRequestsNotificationService,
     ) { }
 
     private statusMap() {
@@ -374,16 +376,27 @@ export class PayOnPortalService {
                     }
                     this.logger.log(`Updated transfer details for instrument ${instrumentId}`);
                 } else {
-                    await this.db.insert(instrumentTransferDetails).values({
-                        instrumentId,
-                        ...transferDetailsUpdate,
-                        createdAt: new Date(),
-                    });
-                    this.logger.log(`Created new transfer details for instrument ${instrumentId}`);
+                    throw new Error('Update operation failed - no existing transfer details found');
                 }
             } catch (error) {
                 this.logger.error(`Failed to save transfer details: ${error.message}`);
                 throw new InternalServerErrorException('Failed to save transfer details. Please try again.');
+            }
+        }
+
+        // Send email notification for accounts-form action
+        if (body.action === 'accounts-form' && body.pop_req) {
+            try {
+                await this.notificationService.sendPopActionEmail(
+                    instrumentId,
+                    body.pop_req,
+                    body.payment_datetime ? new Date(body.payment_datetime).toISOString() : undefined,
+                    body.utr_no || undefined,
+                    body.utr_message || undefined,
+                    body.reason_req || undefined
+                );
+            } catch (error) {
+                this.logger.warn(`Failed to send POP action email: ${error.message}`);
             }
         }
 

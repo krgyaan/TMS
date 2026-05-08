@@ -2,21 +2,21 @@
     <p>Dear Accounts Team,</p>
 
     <p>
-        Please make the following payment via the payment gateway on the {{data.portal}} portal against {{data.purpose}}
-        {{#unless data.isOthersPurpose}}
-            for Tender No. {{data.tender_no}}, Project Name {{data.tender_name}}. The due date and time of this tender is {{data.dueDate}}.
-        {{/unless}}
+        Please make the following payment via the payment gateway on the {{data.portal}} portal against {{data.purpose}} for:
     </p>
-    <p>Payment options on the portal are:</p>
+    {{#unless data.isOthersPurpose}}
+        <p>Tender No. {{data.tender_no}}</p>
+        <p>Project Name {{data.tender_name}}</p>
+    {{/unless}}
     <ul>
         <li>Amount: {{data.amount}}</li>
         <li>Net Banking Available: {{data.netbanking}}</li>
         <li>Debit Card allowed: {{data.debit}}</li>
     </ul>
+    <p>The due date and time of this tender is {{data.dueDate}}.</p>
 
     <p>
-        Please make the payment before the due date and time and share the UTR with us on time using the link below or your dashboard:
-        <a href="{{data.link}}">Click Here</a>
+        Please make the payment before the due date and time and share the UTR with us on time using the <a href="{{data.link}}">link</a> below or your dashboard.
     </p>
     <p>"Ensuring timely operations is the only source of growth"</p>
     Approved by,<br>

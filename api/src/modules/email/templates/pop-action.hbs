@@ -1,0 +1,22 @@
+<div>
+    <p>Dear {{data.tenderExecutive}},</p>
+
+    <p>The EMD payment request via Pay on Portal has been {{data.status}}.</p>
+
+
+    {{#if (eq data.status "accepted")}}
+    <p>Date and Time of Payment: {{data.paymentDateTime}}</p>
+    <p>UTR for the payment: {{data.utr}}</p>
+    <p>UTR Message: {{data.utrMessage}}</p>
+    {{/if}}
+
+    {{#if (eq data.status "rejected")}}
+    <p>Reason for rejection: {{data.rejectionReason}}</p>
+    {{/if}}
+
+    <p>Best of luck for {{#if (eq data.status "accepted")}}the tender{{else}}the next tenders{{/if}}.</p>
+
+    <p>Regards,</p>
+    <p>{{data.senderName}},</p>
+    <p>Accounts team.</p>
+</div>
