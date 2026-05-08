@@ -291,9 +291,6 @@ export function PayOnPortalActionForm({ instrumentId, action, instrumentData, fo
                 <div className="space-y-3">
                     <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                         Choose What to do
-                        {hasAccountsFormData && <span className="ml-2 text-xs text-amber-600">(Accounts form previously submitted)</span>}
-                        {hasFollowupData && <span className="ml-2 text-xs text-amber-600">(Followup previously initiated)</span>}
-                        {hasReturnedData && <span className="ml-2 text-xs text-amber-600">(Return previously recorded)</span>}
                     </label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {availableActions.map((option) => {
@@ -340,7 +337,6 @@ export function PayOnPortalActionForm({ instrumentId, action, instrumentData, fo
                         <div className="flex items-center gap-2 pb-3 border-b">
                             <FileText className="h-5 w-5 text-primary" />
                             <h4 className="font-semibold text-base">Accounts Form</h4>
-                            {getSubmittedBadge(hasAccountsFormData)}
                         </div>
                         <p className="text-sm text-muted-foreground -mt-2">
                             Process the payment request through accounts department
@@ -406,7 +402,6 @@ export function PayOnPortalActionForm({ instrumentId, action, instrumentData, fo
                         <div className="flex items-center gap-2 pb-3 border-b">
                             <Users className="h-5 w-5 text-primary" />
                             <h4 className="font-semibold text-base">Initiate Followup</h4>
-                            {getSubmittedBadge(hasFollowupData)}
                         </div>
                         <p className="text-sm text-muted-foreground -mt-2">
                             Start a follow-up process with organisation contacts
@@ -447,7 +442,6 @@ export function PayOnPortalActionForm({ instrumentId, action, instrumentData, fo
                         <div className="flex items-center gap-2 pb-3 border-b">
                             <Banknote className="h-5 w-5 text-primary" />
                             <h4 className="font-semibold text-base">Returned via Bank Transfer</h4>
-                            {getSubmittedBadge(hasReturnedData)}
                         </div>
                         <p className="text-sm text-muted-foreground -mt-2">
                             Record return of payment through bank transfer

@@ -141,14 +141,14 @@ export default function PayOnPortalActionPage() {
                         initiateFollowup: followupData ? {
                             organisationName: followupData.organisationName ?? undefined,
                             contacts: followupData.contacts ?? [],
-                            followupStartDate: followupData.followupStartDate ? followupData.followupStartDate.toISOString() : undefined,
+                            followupStartDate: followupData.followupStartDate ? new Date(followupData.followupStartDate).toISOString() : undefined,
                             frequency: followupData.frequency ?? undefined,
                             stopReason: followupData.stopReason ?? undefined,
                             proofText: followupData.proofText ?? undefined,
                             stopRemarks: followupData.stopRemarks ?? undefined,
                         } : undefined,
                         returned: actionFormData ? {
-                            transferDate: actionFormData.returnTransferDate ? actionFormData.returnTransferDate.toISOString() : undefined,
+                            transferDate: actionFormData.returnTransferDate ? new Date(actionFormData.returnTransferDate).toISOString() : undefined,
                             utrNo: actionFormData.returnUtr ?? undefined,
                         } : undefined,
                     }}
