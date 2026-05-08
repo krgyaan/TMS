@@ -17,7 +17,7 @@ export interface IncompleteField {
 export interface SaveTenderApprovalDto {
     tlStatus: "0" | "1" | "2" | "3" | number;
     rfqRequired?: "yes" | "no";
-    quotationFiles?: string[];
+    // quotationFiles?: string[];
     rfqTo?: number[];
     processingFeeMode?: string;
     tenderFeeMode?: string;
@@ -40,7 +40,7 @@ export interface TenderApproval {
     tlStatus?: "0" | "1" | "2" | "3" | number;
     tlDecision?: "0" | "1" | "2" | "3" | number;
     rfqRequired?: "yes" | "no" | null;
-    quotationFiles?: string[] | null;
+    // quotationFiles?: string[] | null;
     // IDs for edit
     rfqTo: number[] | null;
     // Names for display
