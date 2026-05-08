@@ -13,6 +13,7 @@ export const tenderApprovalsKey = {
     detail: (id: number) => [...tenderApprovalsKey.details(), id] as const,
     byTender: (tenderId: number) => [...tenderApprovalsKey.all, 'by-tender', tenderId] as const,
     dashboardCounts: () => [...tenderApprovalsKey.all, 'dashboard-counts'] as const,
+    rejectedStatuses: [ 'rejected-statuses'] as const,
 }
 
 export const useTenderApprovals = (
@@ -105,5 +106,12 @@ export const useTenderApprovalsDashboardCounts = () => {
         queryKey,
         queryFn: () => tenderApprovalsService.getDashboardCounts(teamIdParam),
         staleTime: 0,
+    });  
+};
+
+export const useTenderRejectionStatuses = () => {
+    return useQuery({
+        queryKey : tenderApprovalsKey.rejectedStatuses,
+        queryFn: () => tenderApprovalsService.getTenderRejectedStatuses(),
     });
 };
