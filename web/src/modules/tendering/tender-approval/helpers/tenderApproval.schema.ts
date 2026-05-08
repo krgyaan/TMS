@@ -69,13 +69,4 @@ export const TenderApprovalFormSchema = z.object({
 }, {
     message: "Please select at least one vendor for RFQ",
     path: ["rfqTo"],
-}).refine((data) => {
-    // If approved and RFQ required is no, must upload at least one quotation file
-    if (data.tlDecision === '1' && data.rfqRequired === 'no') {
-        return Array.isArray(data.quotationFiles) && data.quotationFiles.length > 0;
-    }
-    return true;
-}, {
-    message: "Please upload at least one quotation file",
-    path: ["quotationFiles"],
 });
