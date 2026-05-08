@@ -587,7 +587,7 @@ export class BidSubmissionsService {
         return result;
     }
 
-    async markAsMissedGlobal(data : {tenderId: number, rejectionStatus : number, preventionMeasures : string, tmsImprovements: string, submittedBy: number}){
+    async markAsMissedGlobal(data : {tenderId: number, rejectionStatus : number, preventionMeasures? : string, tmsImprovements?: string, submittedBy: number}){
         try{
 
             //checking the tender entry
@@ -608,6 +608,25 @@ export class BidSubmissionsService {
 
             //marking the db value as missed
             const result = await this.db.transaction(async (tx) => {
+                // Update tender status
+                await tx
+                    .update(tenderInfos)
+                    .set({ status: newStatus, updatedAt: new Date() })
+                    .where(eq(tenderInfos.id, data.tenderId));
+
+                // track status change
+                await this.tenderStatusHistoryService.trackStatusChange(
+                    data.tenderId,
+                    newStatus,
+                    data.submittedBy,
+                    prevStatus,
+                    'Tender missed',
+                    tx
+                );
+
+                // Fetch the full status history for this tender
+                const statusHistory = await this.tenderStatusHistoryService.findByTenderId(data.tenderId, tx);
+
                 let bidSubmission;
                 if (existing) {
                     // Update existing
@@ -616,9 +635,11 @@ export class BidSubmissionsService {
                         .set({
                             status: 'Tender Missed',
                             reasonForMissing: status.name,
+                            reasonStatus: status.id,
                             preventionMeasures: data.preventionMeasures,
                             tmsImprovements: data.tmsImprovements,
                             submittedBy: data.submittedBy,
+                            statusHistoryMetatag: statusHistory,
                             updatedAt: new Date(),
                         })
                         .where(eq(bidSubmissions.id, existing.id))
@@ -633,36 +654,22 @@ export class BidSubmissionsService {
                             tenderId: data.tenderId,
                             status: 'Tender Missed',
                             reasonForMissing: status.name,
+                            reasonStatus: status.id,
                             preventionMeasures: data.preventionMeasures,
                             tmsImprovements: data.tmsImprovements,
                             submittedBy: data.submittedBy,
+                            statusHistoryMetatag: statusHistory,
                         })
                         .returning();
 
                     bidSubmission = created;
                 }
 
-                // Update tender status
-                await tx
-                    .update(tenderInfos)
-                    .set({ status: newStatus, updatedAt: new Date() })
-                    .where(eq(tenderInfos.id, data.tenderId));
-
-                //creating entry inside tender status history
-
-                await this.tenderStatusHistoryService.trackStatusChange(
-                    data.tenderId,
-                    newStatus,
-                    data.submittedBy,
-                    prevStatus,
-                    'Tender missed'
-                );
-
                 return bidSubmission;
             });
 
             // Send email notification
-            await this.sendBidMissedEmail(data.tenderId, result, data.submittedBy);
+            // await this.sendBidMissedEmail(data.tenderId, result, data.submittedBy);
 
             //stopping all the timers running for this tender
             //for the time being stopping all the running timers
@@ -683,22 +690,31 @@ export class BidSubmissionsService {
 
         // Define valid status IDs for each stage
         switch (stage) {
-            case 'phy-doc':
-                validStatusIds = [8]; // TODO: Add valid status IDs for phy-doc
+            case 'tender-info':
+                validStatusIds = [9, 10, 11, 12, 13, 14, 15, 31, 32];
                 break;
-            case 'checklist':
-                validStatusIds = [8]; // TODO: Add valid status IDs for checklist
+            case 'tender-info-approval':
+                validStatusIds = [9, 10, 11, 12, 13, 14, 15, 31, 32]; 
+                break;
+            case 'phy-doc':
+                validStatusIds = []; 
                 break;
             case 'rfq':
-                validStatusIds = [8 ,14 ,35]; // TODO: Add valid status IDs for rfq
+                validStatusIds = [14 ,35]; 
                 break;
             case 'emd':
-                validStatusIds = [8]; // TODO: Add valid status IDs for emd
+                validStatusIds = [8]; 
+            case 'checklist':
+                validStatusIds = [];
+                break;
             case 'costing-sheet':
-                validStatusIds = [8 ,10 ,14 ,34 ]; // TODO: Add valid status IDs for costing-sheet
+                validStatusIds = [8 ,10, 14 ,34 ]; 
                 break;
             case 'costing-approval':
-                validStatusIds = [8]; // TODO: Add valid status IDs for costing-approval
+                validStatusIds = []; 
+                break;
+            case 'bid-submission':
+                validStatusIds = [8 , 10, 16 , 33 , 34, 35 ,36];
                 break;
         }
 

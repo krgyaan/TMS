@@ -25,6 +25,7 @@ const stageNameKeys: Record<TenderStage, string> = {
     "checklist": "Checklists",
     "costing-sheet": "Costing Sheet",
     "costing-approval": "Costing Approval",
+    "bid-submission" : "Bid Submission"
 };
 
 export default function GlobalBidMissedForm({
@@ -66,7 +67,7 @@ export default function GlobalBidMissedForm({
                 tenderId: data.tenderId,
                 rejectionStatus: data.rejectionStatus,
                 preventionMeasures: data.preventionMeasures,
-                tmsImprovements: data.tmsImprovements,
+                // tmsImprovements: data.tmsImprovements,
             });
             // Map stages to their respective list page paths
             const stagePaths: Record<TenderStage, string> = {
@@ -76,6 +77,7 @@ export default function GlobalBidMissedForm({
                 "checklist": paths.tendering.checklists,
                 "costing-sheet": paths.tendering.costingSheets,
                 "costing-approval": paths.tendering.costingApprovals,
+                "bid-submission": paths.tendering.bidSubmissions,
             };
 
             const targetPath = stagePaths[stage];
@@ -192,7 +194,7 @@ export default function GlobalBidMissedForm({
                                 )}
                             </FieldWrapper>
 
-                            <FieldWrapper
+                            {/* <FieldWrapper
                                 control={form.control}
                                 name="tmsImprovements"
                                 label="Any Improvements Needed in the TMS System?"
@@ -205,7 +207,7 @@ export default function GlobalBidMissedForm({
                                         className="border-destructive/50 focus:ring-destructive/50"
                                     />
                                 )}
-                            </FieldWrapper>
+                            </FieldWrapper> */}
                         </div>
 
                         {/* Form Actions */}

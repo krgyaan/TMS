@@ -19,6 +19,7 @@ import type { BidSubmissionDashboardRowWithTimer } from './helpers/bidSubmission
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { QuickFilter } from '@/components/ui/quick-filter';
 import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
+import { useTenderingPermissions } from '../hooks/useTenderingPermissions';
 
 type TabKey = 'pending' | 'submitted' | 'disqualified' | 'tender-dnb';
 
@@ -33,6 +34,7 @@ const BidSubmissionListPage = () => {
         tenderId: null
     });
     const navigate = useNavigate();
+    const {hasTenderingPermission} = useTenderingPermissions();
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
@@ -94,10 +96,10 @@ const BidSubmissionListPage = () => {
         {
             label: 'Mark as Missed',
             onClick: (row: BidSubmissionDashboardRow) => {
-                navigate(paths.tendering.bidMarkMissed(row.tenderId));
+                navigate(paths.tendering.bidMissedGlobal(row.tenderId, 'bid-submission'));
             },
             icon: <XCircle className="h-4 w-4" />,
-            visible: (row) => row.bidStatus === 'Submission Pending',
+            visible: (row) => hasTenderingPermission && row.bidStatus === 'Submission Pending',
         },
         {
             label: 'Edit Bid',
@@ -110,7 +112,7 @@ const BidSubmissionListPage = () => {
         {
             label: 'Edit Missed',
             onClick: (row: BidSubmissionDashboardRow) => {
-                navigate(paths.tendering.bidEditMissed(row.bidSubmissionId!));
+                navigate(paths.tendering.bidMissedGlobal(row.tenderId!, "bid-submission"));
             },
             icon: <Edit className="h-4 w-4" />,
             visible: (row) => row.bidStatus === 'Tender Missed' && row.bidSubmissionId !== null,
