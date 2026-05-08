@@ -73,6 +73,11 @@ export class TenderApprovalController {
         return this.tenderApprovalService.getByTenderId(id);
     }
 
+    @Get('rejected-statuses')
+    async getRejectStatuses(){
+        return this.tenderApprovalService.getRejectionStatuses();
+    }
+
     @Put(':tenderId/approval')
     async createOrUpdateApproval(
         @Param('tenderId', ParseIntPipe) tenderId: number,

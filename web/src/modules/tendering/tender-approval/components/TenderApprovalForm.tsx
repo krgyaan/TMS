@@ -16,7 +16,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { ArrowLeft, Save, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { paths } from '@/app/routes/paths';
-import { useCreateTenderApproval, useUpdateTenderApproval } from '@/hooks/api/useTenderApprovals';
+import { useCreateTenderApproval, useTenderRejectionStatuses, useUpdateTenderApproval } from '@/hooks/api/useTenderApprovals';
 import { useVendorOrganizations } from '@/hooks/api/useVendorOrganizations';
 import { useStatuses } from '@/hooks/api/useStatuses';
 import { tlDecisionOptions, documentApprovalOptions, infoSheetFieldOptions } from '@/modules/tendering/tender-approval/helpers/tenderApproval.types';
@@ -72,7 +72,7 @@ const InfoSheetMissingAlert = ({ tenderId, onBack }: { tenderId: number, onBack:
 export function TenderApprovalForm({ tenderId, relationships, isLoading: isParentLoading }: TenderApprovalFormProps) {
     const navigate = useNavigate();
     const { data: vendorOrganizations, isLoading: isVendorOrgsLoading } = useVendorOrganizations();
-    const { data: statuses, isLoading: isStatusesLoading } = useStatuses();
+    const { data: statuses, isLoading: isStatusesLoading } = useTenderRejectionStatuses();
     const createApproval = useCreateTenderApproval();
     const updateApproval = useUpdateTenderApproval();
     const pqrOptions = usePqrOptions();
@@ -244,10 +244,11 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
     const tenderStatusOptions = useMemo(() =>{
         if(!statuses) return [];
 
-        return statuses
-            .filter(s => s.tenderCategory === 'dnb' && Number(s.id) !== 43)
-            .map(s => ({ value: String(s.id), label: s.name }))    
-        }, [statuses]);
+        return statuses.map((s: any) => ({
+            value: String(s.id),
+            label: s.name
+        }));
+    }, [statuses]);
 
     const rfqRequiredOptions = useMemo(() => [
         { value: 'yes', label: 'Yes' },

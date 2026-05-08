@@ -55,6 +55,8 @@ type TenderRow = {
     teRecommendation: string | null;
 };
 
+export const rejectedStatuses = [9, 10, 11, 12, 13, 14, 15, 31, 32];
+
 @Injectable()
 export class TenderApprovalService {
     private readonly logger = new Logger(TenderApprovalService.name);
@@ -685,6 +687,15 @@ export class TenderApprovalService {
         }
 
         return this.getByTenderId(tenderId);
+    }
+
+    async getRejectionStatuses(){
+        let result = this.db
+            .select({id : statuses.id, name : statuses.name})
+            .from(statuses)
+            .where(inArray(statuses.id, rejectedStatuses));
+
+            return result;
     }
 
     /**
