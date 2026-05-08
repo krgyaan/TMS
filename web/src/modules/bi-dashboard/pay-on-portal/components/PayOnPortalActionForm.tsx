@@ -234,13 +234,13 @@ export function PayOnPortalActionForm({ instrumentId, action, formHistory }: Pay
             });
 
             await updateMutation.mutateAsync({ id: instrumentId, formData });
-            toast.success('Action submitted successfully');
+            toast.success('Payment data updated successfully');
             localStorage.removeItem('pay_on_portal_action_data');
             navigate(-1);
             form.reset();
         } catch (error: any) {
-            toast.error(error?.message || 'Failed to submit action');
-            console.error('Error submitting action:', error);
+            toast.error(error?.message || 'Failed to update payment data');
+            console.error('Error updating payment data:', error);
         }
     };
 
