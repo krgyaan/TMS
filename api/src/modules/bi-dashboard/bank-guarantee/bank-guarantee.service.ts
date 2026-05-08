@@ -36,7 +36,7 @@ export class BankGuaranteeService {
             [BG_STATUSES.FDR_DETAILS_CAPTURED]: 'FDR Details Captured',
             [BG_STATUSES.FOLLOWUP_INITIATED]: 'Followup Initiated',
             [BG_STATUSES.EXTENSION_REQUESTED]: 'Extension Requested',
-            [BG_STATUSES.COURIER_RETURN_RECEIVED]: 'Courier Returned',
+            [BG_STATUSES.RETURN_VIA_COURIER]: 'Courier Returned',
             [BG_STATUSES.CANCELLATION_REQUESTED]: 'Cancellation Request',
             [BG_STATUSES.BG_CANCELLATION_CONFIRMED]: 'Cancelled at Branch',
             [BG_STATUSES.FDR_CANCELLED_CONFIRMED]: 'FDR Cancellation Confirmed',

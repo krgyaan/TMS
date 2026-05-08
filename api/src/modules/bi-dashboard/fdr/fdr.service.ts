@@ -29,11 +29,11 @@ export class FdrService {
             [FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED]: "Accepted",
             [FDR_STATUSES.ACCOUNTS_FORM_REJECTED]: "Rejected",
             [FDR_STATUSES.FOLLOWUP_INITIATED]: "Followup Initiated",
-            [FDR_STATUSES.COURIER_RETURN_RECEIVED]: "Courier Return",
-            [FDR_STATUSES.BANK_RETURN_COMPLETED]: "Bank Return",
-            [FDR_STATUSES.PROJECT_SETTLEMENT_COMPLETED]: "Project Settlement",
+            [FDR_STATUSES.RETURN_VIA_COURIER]: "Courier Return",
+            [FDR_STATUSES.RETURN_VIA_BANK_TRANSFER]: "Bank Return",
+            [FDR_STATUSES.SETTLED_WITH_PROJECT]: "Project Settlement",
             [FDR_STATUSES.CANCELLATION_REQUESTED]: "Cancellation Request",
-            [FDR_STATUSES.CANCELLED_AT_BRANCH]: "Cancelled",
+            [FDR_STATUSES.CANCELLED]: "Cancelled",
         };
     }
 
@@ -382,7 +382,7 @@ export class FdrService {
         } else if (body.action === "initiate-followup") {
             updateData.status = FDR_STATUSES.FOLLOWUP_INITIATED;
         } else if (body.action === "returned-courier") {
-            updateData.status = FDR_STATUSES.COURIER_RETURN_RECEIVED;
+            updateData.status = FDR_STATUSES.RETURN_VIA_COURIER;
             // Handle docket_slip file or path
             const docketSlipFile = this.getFileForField("docket_slip", files, body, fileIndexTracker);
             const docketSlipPath = this.getFilePathFromBody("docket_slip", body);
@@ -394,11 +394,11 @@ export class FdrService {
                 updateData.docketSlip = filePaths[0];
             }
         } else if (body.action === "returned-bank-transfer") {
-            updateData.status = FDR_STATUSES.BANK_RETURN_COMPLETED;
+            updateData.status = FDR_STATUSES.RETURN_VIA_BANK_TRANSFER;
             if (body.transfer_date) updateData.transferDate = body.transfer_date;
             if (body.utr) updateData.utr = body.utr;
         } else if (body.action === "settled" || body.action === "settled-with-project") {
-            updateData.status = FDR_STATUSES.PROJECT_SETTLEMENT_COMPLETED;
+            updateData.status = FDR_STATUSES.SETTLED_WITH_PROJECT;
         } else if (body.action === "request-cancellation") {
             updateData.status = FDR_STATUSES.CANCELLATION_REQUESTED;
             // Handle covering letter file or path
@@ -425,7 +425,7 @@ export class FdrService {
                 };
             }
         } else if (body.action === "fdr-cancellation-confirmation" || body.action === "cancelled-at-branch") {
-            updateData.status = FDR_STATUSES.CANCELLED_AT_BRANCH;
+            updateData.status = FDR_STATUSES.CANCELLED;
             // Store cancellation details in legacyData
             if (body.fdr_cancellation_date || body.fdr_cancellation_amount || body.fdr_cancellation_reference_no) {
                 updateData.legacyData = {
