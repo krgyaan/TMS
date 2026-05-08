@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
@@ -18,8 +19,9 @@ import { useWatch } from 'react-hook-form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { FileText, Users, Banknote, CheckCircle2, Info } from 'lucide-react';
+import { FileText, Users, Banknote, CheckCircle2, Info, History } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 
 interface ActionOption {
     value: string;
@@ -35,6 +37,40 @@ const ALL_ACTION_OPTIONS: ActionOption[] = [
     { value: 'settled', label: 'Settled with Project Account', icon: <CheckCircle2 className="h-4 w-4" />, description: 'Settle payment with project account' },
 ];
 
+interface AccountsFormHistory {
+    popReq?: 'Accepted' | 'Rejected';
+    reasonReq?: string;
+    paymentDatetime?: string;
+    utrNo?: string;
+    utrMessage?: string;
+}
+
+interface FollowupHistory {
+    organisationName?: string;
+    contacts?: Array<{
+        name: string;
+        email: string | null;
+        phone: string | null;
+        org: string | null;
+    }>;
+    followupStartDate?: string;
+    frequency?: number;
+    stopReason?: number;
+    proofText?: string;
+    stopRemarks?: string;
+}
+
+interface ReturnedHistory {
+    transferDate?: string;
+    utrNo?: string;
+}
+
+interface FormHistory {
+    accountsForm?: AccountsFormHistory;
+    initiateFollowup?: FollowupHistory;
+    returned?: ReturnedHistory;
+}
+
 interface PayOnPortalActionFormProps {
     instrumentId: number;
     action?: number | null;
@@ -45,26 +81,121 @@ interface PayOnPortalActionFormProps {
         tenderName?: string;
         tenderNo?: string;
     };
+    formHistory?: FormHistory;
 }
 
-export function PayOnPortalActionForm({ instrumentId, action, instrumentData }: PayOnPortalActionFormProps) {
+export function PayOnPortalActionForm({ instrumentId, action, instrumentData, formHistory }: PayOnPortalActionFormProps) {
     const navigate = useNavigate();
     const updateMutation = useUpdatePayOnPortalAction();
+
+    const hasAccountsFormData = !!(formHistory?.accountsForm?.popReq);
+    const hasFollowupData = !!(formHistory?.initiateFollowup?.organisationName);
+    const hasReturnedData = !!(formHistory?.returned?.transferDate);
+
+    const getSubmittedBadge = (hasData: boolean) => {
+        if (!hasData) return null;
+        return (
+            <Badge variant="outline" className="ml-2 bg-amber-50 text-amber-700 border-amber-200">
+                <History className="h-3 w-3 mr-1" />
+                Previously Submitted
+            </Badge>
+        );
+    };
 
     const availableActions = action === 0
         ? ALL_ACTION_OPTIONS.filter(opt => opt.value === 'accounts-form')
         : ALL_ACTION_OPTIONS;
 
+    const defaultValues: PayOnPortalActionFormValues = {
+        action: '',
+        contacts: [],
+    };
+
+    if (formHistory?.accountsForm) {
+        defaultValues.pop_req = formHistory.accountsForm.popReq;
+        defaultValues.reason_req = formHistory.accountsForm.reasonReq;
+        defaultValues.payment_datetime = formHistory.accountsForm.paymentDatetime;
+        defaultValues.utr_no = formHistory.accountsForm.utrNo;
+        defaultValues.utr_message = formHistory.accountsForm.utrMessage;
+    }
+
+    if (formHistory?.initiateFollowup) {
+        defaultValues.organisation_name = formHistory.initiateFollowup.organisationName;
+        defaultValues.contacts = formHistory.initiateFollowup.contacts?.map(c => ({
+            name: c.name,
+            phone: c.phone ?? '',
+            email: c.email ?? '',
+        })) || [];
+        defaultValues.followup_start_date = formHistory.initiateFollowup.followupStartDate;
+        defaultValues.frequency = formHistory.initiateFollowup.frequency;
+        defaultValues.stop_reason = formHistory.initiateFollowup.stopReason;
+        defaultValues.proof_text = formHistory.initiateFollowup.proofText;
+        defaultValues.stop_remarks = formHistory.initiateFollowup.stopRemarks;
+    }
+
+    if (formHistory?.returned) {
+        defaultValues.transfer_date = formHistory.returned.transferDate;
+        defaultValues.utr_no = formHistory.returned.utrNo;
+    }
+
     const form = useForm<PayOnPortalActionFormValues>({
         resolver: zodResolver(PayOnPortalActionFormSchema) as Resolver<PayOnPortalActionFormValues>,
-        defaultValues: {
-            action: '',
-            contacts: [],
-        },
+        defaultValues,
     });
 
     const selectedAction = useWatch({ control: form.control, name: 'action' });
     const popReq = useWatch({ control: form.control, name: 'pop_req' });
+
+    useEffect(() => {
+        if (formHistory?.accountsForm?.popReq) {
+            form.setValue('pop_req', formHistory.accountsForm.popReq, { shouldValidate: false });
+        }
+        if (formHistory?.accountsForm?.reasonReq) {
+            form.setValue('reason_req', formHistory.accountsForm.reasonReq, { shouldValidate: false });
+        }
+        if (formHistory?.accountsForm?.paymentDatetime) {
+            form.setValue('payment_datetime', formHistory.accountsForm.paymentDatetime, { shouldValidate: false });
+        }
+        if (formHistory?.accountsForm?.utrNo) {
+            form.setValue('utr_no', formHistory.accountsForm.utrNo, { shouldValidate: false });
+        }
+        if (formHistory?.accountsForm?.utrMessage) {
+            form.setValue('utr_message', formHistory.accountsForm.utrMessage, { shouldValidate: false });
+        }
+
+        if (formHistory?.initiateFollowup?.organisationName) {
+            form.setValue('organisation_name', formHistory.initiateFollowup.organisationName, { shouldValidate: false });
+        }
+        if (formHistory?.initiateFollowup?.contacts) {
+            form.setValue('contacts', formHistory.initiateFollowup.contacts.map(c => ({
+                name: c.name,
+                phone: c.phone ?? '',
+                email: c.email ?? '',
+            })), { shouldValidate: false });
+        }
+        if (formHistory?.initiateFollowup?.followupStartDate) {
+            form.setValue('followup_start_date', formHistory.initiateFollowup.followupStartDate, { shouldValidate: false });
+        }
+        if (formHistory?.initiateFollowup?.frequency) {
+            form.setValue('frequency', formHistory.initiateFollowup.frequency, { shouldValidate: false });
+        }
+        if (formHistory?.initiateFollowup?.stopReason) {
+            form.setValue('stop_reason', formHistory.initiateFollowup.stopReason, { shouldValidate: false });
+        }
+        if (formHistory?.initiateFollowup?.proofText) {
+            form.setValue('proof_text', formHistory.initiateFollowup.proofText, { shouldValidate: false });
+        }
+        if (formHistory?.initiateFollowup?.stopRemarks) {
+            form.setValue('stop_remarks', formHistory.initiateFollowup.stopRemarks, { shouldValidate: false });
+        }
+
+        if (formHistory?.returned?.transferDate) {
+            form.setValue('transfer_date', formHistory.returned.transferDate, { shouldValidate: false });
+        }
+        if (formHistory?.returned?.utrNo) {
+            form.setValue('utr_no', formHistory.returned.utrNo, { shouldValidate: false });
+        }
+    }, [formHistory, form]);
 
     const isSubmitting = form.formState.isSubmitting || updateMutation.isPending;
 
@@ -152,12 +283,6 @@ export function PayOnPortalActionForm({ instrumentId, action, instrumentData }: 
                                         <p className="font-medium">{instrumentData.portalName}</p>
                                     </div>
                                 )}
-                                {instrumentData.utrNo && (
-                                    <div>
-                                        <span className="text-muted-foreground">UTR:</span>
-                                        <p className="font-medium">{instrumentData.utrNo}</p>
-                                    </div>
-                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -166,31 +291,44 @@ export function PayOnPortalActionForm({ instrumentId, action, instrumentData }: 
                 <div className="space-y-3">
                     <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                         Choose What to do
+                        {hasAccountsFormData && <span className="ml-2 text-xs text-amber-600">(Accounts form previously submitted)</span>}
+                        {hasFollowupData && <span className="ml-2 text-xs text-amber-600">(Followup previously initiated)</span>}
+                        {hasReturnedData && <span className="ml-2 text-xs text-amber-600">(Return previously recorded)</span>}
                     </label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {availableActions.map((option) => (
-                            <div
-                                key={option.value}
-                                className={`relative flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all hover:bg-muted/50 ${
-                                    selectedAction === option.value
-                                        ? 'border-primary bg-primary/5'
-                                        : 'border-border'
-                                }`}
-                                onClick={() => form.setValue('action', option.value, { shouldValidate: true })}
-                            >
-                                <div className={`mt-0.5 p-2 rounded-full ${
-                                    selectedAction === option.value
-                                        ? 'bg-primary text-primary-foreground'
-                                        : 'bg-muted'
-                                }`}>
-                                    {option.icon}
+                        {availableActions.map((option) => {
+                            const hasHistory = 
+                                (option.value === 'accounts-form' && hasAccountsFormData) ||
+                                (option.value === 'initiate-followup' && hasFollowupData) ||
+                                (option.value === 'returned' && hasReturnedData);
+
+                            return (
+                                <div
+                                    key={option.value}
+                                    className={`relative flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all hover:bg-muted/50 ${
+                                        selectedAction === option.value
+                                            ? 'border-primary bg-primary/5'
+                                            : 'border-border'
+                                    }`}
+                                    onClick={() => form.setValue('action', option.value, { shouldValidate: true })}
+                                >
+                                    <div className={`mt-0.5 p-2 rounded-full ${
+                                        selectedAction === option.value
+                                            ? 'bg-primary text-primary-foreground'
+                                            : 'bg-muted'
+                                    }`}>
+                                        {option.icon}
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="font-medium text-sm flex items-center">
+                                            {option.label}
+                                            {getSubmittedBadge(hasHistory)}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground mt-1">{option.description}</p>
+                                    </div>
                                 </div>
-                                <div className="flex-1">
-                                    <p className="font-medium text-sm">{option.label}</p>
-                                    <p className="text-xs text-muted-foreground mt-1">{option.description}</p>
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                     {form.formState.errors.action && (
                         <p className="text-sm text-destructive mt-1">{form.formState.errors.action.message}</p>
@@ -202,6 +340,7 @@ export function PayOnPortalActionForm({ instrumentId, action, instrumentData }: 
                         <div className="flex items-center gap-2 pb-3 border-b">
                             <FileText className="h-5 w-5 text-primary" />
                             <h4 className="font-semibold text-base">Accounts Form</h4>
+                            {getSubmittedBadge(hasAccountsFormData)}
                         </div>
                         <p className="text-sm text-muted-foreground -mt-2">
                             Process the payment request through accounts department
@@ -267,6 +406,7 @@ export function PayOnPortalActionForm({ instrumentId, action, instrumentData }: 
                         <div className="flex items-center gap-2 pb-3 border-b">
                             <Users className="h-5 w-5 text-primary" />
                             <h4 className="font-semibold text-base">Initiate Followup</h4>
+                            {getSubmittedBadge(hasFollowupData)}
                         </div>
                         <p className="text-sm text-muted-foreground -mt-2">
                             Start a follow-up process with organisation contacts
@@ -307,6 +447,7 @@ export function PayOnPortalActionForm({ instrumentId, action, instrumentData }: 
                         <div className="flex items-center gap-2 pb-3 border-b">
                             <Banknote className="h-5 w-5 text-primary" />
                             <h4 className="font-semibold text-base">Returned via Bank Transfer</h4>
+                            {getSubmittedBadge(hasReturnedData)}
                         </div>
                         <p className="text-sm text-muted-foreground -mt-2">
                             Record return of payment through bank transfer

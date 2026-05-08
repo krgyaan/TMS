@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
 import { PayOnPortalActionForm } from './components/PayOnPortalActionForm';
-import { usePayOnPortalActionFormData } from '@/hooks/api/usePayOnPortals';
+import { usePayOnPortalActionFormData, usePayOnPortalFollowupData } from '@/hooks/api/usePayOnPortals';
 
 const STORAGE_KEY = 'pay_on_portal_action_data';
 
@@ -24,7 +24,8 @@ export default function PayOnPortalActionPage() {
     const navigate = useNavigate();
     const instrumentId = id ? Number(id) : 0;
 
-    const { data: actionFormData, isLoading } = usePayOnPortalActionFormData(instrumentId);
+    const { data: actionFormData, isLoading: isLoadingActionForm } = usePayOnPortalActionFormData(instrumentId);
+    const { data: followupData, isLoading: isLoadingFollowup } = usePayOnPortalFollowupData(instrumentId);
 
     const action = actionFormData?.action ?? null;
 
@@ -93,7 +94,7 @@ export default function PayOnPortalActionPage() {
         );
     }
 
-    if (isLoading) {
+    if (isLoadingActionForm || isLoadingFollowup) {
         return (
             <Card>
                 <CardContent className="pt-6">
@@ -129,6 +130,28 @@ export default function PayOnPortalActionPage() {
                     instrumentId={instrumentId}
                     action={currentAction}
                     instrumentData={instrumentData}
+                    formHistory={{
+                        accountsForm: actionFormData ? {
+                            popReq: actionFormData.rejectionReason ? 'Rejected' : (actionFormData.utrNo ? 'Accepted' : undefined),
+                            reasonReq: actionFormData.rejectionReason ?? undefined,
+                            paymentDatetime: actionFormData.paymentDateTime ?? undefined,
+                            utrNo: actionFormData.utrNo ?? undefined,
+                            utrMessage: actionFormData.utrMsg ?? undefined,
+                        } : undefined,
+                        initiateFollowup: followupData ? {
+                            organisationName: followupData.organisationName ?? undefined,
+                            contacts: followupData.contacts ?? [],
+                            followupStartDate: followupData.followupStartDate ? followupData.followupStartDate.toISOString() : undefined,
+                            frequency: followupData.frequency ?? undefined,
+                            stopReason: followupData.stopReason ?? undefined,
+                            proofText: followupData.proofText ?? undefined,
+                            stopRemarks: followupData.stopRemarks ?? undefined,
+                        } : undefined,
+                        returned: actionFormData ? {
+                            transferDate: actionFormData.returnTransferDate ? actionFormData.returnTransferDate.toISOString() : undefined,
+                            utrNo: actionFormData.returnUtr ?? undefined,
+                        } : undefined,
+                    }}
                 />
             </CardContent>
         </Card>

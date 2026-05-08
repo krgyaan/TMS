@@ -3,9 +3,10 @@ import { eq, and, inArray, isNull, sql, asc, desc, or } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { paymentRequests, paymentInstruments, instrumentTransferDetails } from '@db/schemas/tendering/payment-requests.schema';
-import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
-import { users } from '@db/schemas/auth/users.schema';
-import { statuses } from '@db/schemas/master/statuses.schema';
+import { tenderInfos } from '@/db/schemas/tendering/tenders.schema';
+import { users } from '@/db/schemas/auth/users.schema';
+import { statuses } from '@/db/schemas/master/statuses.schema';
+import { followUps } from '@/db/schemas/shared/follow-ups.schema';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import type { PayOnPortalDashboardRow, PayOnPortalDashboardCounts } from '@/modules/bi-dashboard/pay-on-portal/helpers/payOnPortal.types';
@@ -468,6 +469,8 @@ export class PayOnPortalService {
                 status: paymentInstruments.status,
                 amount: paymentInstruments.amount,
                 utr: paymentInstruments.utr,
+                rejectionReason: paymentInstruments.rejectionReason,
+                legacyData: paymentInstruments.legacyData,
                 tenderNo: tenderInfos.tenderNo,
                 tenderName: tenderInfos.tenderName,
                 portalName: instrumentTransferDetails.portalName,
@@ -497,6 +500,8 @@ export class PayOnPortalService {
             throw new NotFoundException(`Payment Instrument with ID ${id} not found`);
         }
 
+        const legacyData = result.legacyData as Record<string, any> | null;
+
         return {
             id: result.id,
             action: result.action,
@@ -515,6 +520,57 @@ export class PayOnPortalService {
             returnUtr: result.returnUtr,
             reason: result.reason,
             remarks: result.remarks,
+            rejectionReason: result.rejectionReason,
+            paymentDateTime: legacyData?.date_time || null,
+        };
+    }
+
+    async getFollowupData(instrumentId: number) {
+        const [result] = await this.db
+            .select({
+                id: followUps.id,
+                emdId: followUps.emdId,
+                partyName: followUps.partyName,
+                area: followUps.area,
+                amount: followUps.amount,
+                contacts: followUps.contacts,
+                frequency: followUps.frequency,
+                startFrom: followUps.startFrom,
+                nextFollowUpDate: followUps.nextFollowUpDate,
+                stopReason: followUps.stopReason,
+                proofText: followUps.proofText,
+                stopRemarks: followUps.stopRemarks,
+                proofImagePath: followUps.proofImagePath,
+                assignmentStatus: followUps.assignmentStatus,
+                createdAt: followUps.createdAt,
+            })
+            .from(followUps)
+            .where(and(
+                eq(followUps.emdId, instrumentId),
+                isNull(followUps.deletedAt)
+            ))
+            .orderBy(desc(followUps.createdAt))
+            .limit(1);
+
+        if (!result) {
+            return null;
+        }
+
+        return {
+            id: result.id,
+            organisationName: result.partyName,
+            area: result.area,
+            amount: result.amount ? Number(result.amount) : null,
+            contacts: result.contacts,
+            frequency: result.frequency,
+            followupStartDate: result.startFrom ? new Date(result.startFrom) : null,
+            nextFollowUpDate: result.nextFollowUpDate ? new Date(result.nextFollowUpDate) : null,
+            stopReason: result.stopReason,
+            proofText: result.proofText,
+            stopRemarks: result.stopRemarks,
+            proofImagePath: result.proofImagePath,
+            assignmentStatus: result.assignmentStatus,
+            createdAt: result.createdAt,
         };
     }
 }
