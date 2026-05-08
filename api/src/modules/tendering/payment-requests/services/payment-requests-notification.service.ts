@@ -3,7 +3,7 @@ import { Inject } from '@nestjs/common';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { and, eq } from 'drizzle-orm';
-import { paymentInstruments, instrumentTransferDetails, instrumentChequeDetails } from '@db/schemas/tendering/payment-requests.schema';
+import { paymentInstruments, instrumentTransferDetails, instrumentChequeDetails, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import { PdfGeneratorService } from '@/modules/pdf/pdf-generator.service';
@@ -369,6 +369,96 @@ export class PaymentRequestsNotificationService {
             }
         } else {
             this.logger.log(`Email not supported for instrument type: ${instrumentType}, Mode: ${mode}`);
+        }
+    }
+
+    async sendPopActionEmail(
+        instrumentId: number,
+        popReq: 'Accepted' | 'Rejected',
+        paymentDateTime?: string,
+        utrNo?: string,
+        utrMessage?: string,
+        rejectionReason?: string
+    ): Promise<void> {
+        const [instrument] = await this.db
+            .select({ 
+                requestId: paymentInstruments.requestId,
+                tenderId: paymentRequests.tenderId,
+                requestedBy: paymentRequests.requestedBy 
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .where(eq(paymentInstruments.id, instrumentId))
+            .limit(1);
+
+        if (!instrument) {
+            this.logger.warn(`Instrument ${instrumentId} not found for POP action email`);
+            return;
+        }
+
+        if (!instrument.requestedBy) {
+            this.logger.warn(`RequestedBy not found for instrument ${instrumentId}`);
+            return;
+        }
+
+        const [requestedUser] = await this.db
+            .select({ name: users.name, email: users.email })
+            .from(users)
+            .where(eq(users.id, instrument.requestedBy))
+            .limit(1);
+
+        if (!requestedUser?.email) {
+            this.logger.warn(`RequestedBy user not found for instrument ${instrumentId}`);
+            return;
+        }
+
+        let tenderNo = 'NA';
+        let tenderName = 'Not specified';
+        if (instrument.tenderId) {
+            const [tender] = await this.db
+                .select({ tenderNo: tenderInfos.tenderNo, tenderName: tenderInfos.tenderName })
+                .from(tenderInfos)
+                .where(eq(tenderInfos.id, instrument.tenderId))
+                .limit(1);
+            if (tender) {
+                tenderNo = tender.tenderNo || 'NA';
+                tenderName = tender.tenderName || 'Not specified';
+            }
+        }
+
+        const status = popReq === 'Accepted' ? 'accepted' : 'rejected';
+        
+        try {
+            const result = await this.emailService.sendPaymentEmail({
+                requestId: instrument.requestId,
+                tenderId: instrument.tenderId || undefined,
+                eventType: 'POP_ACTION',
+                fromUserId: 13,
+                subject: `Pay on Portal - ${status === 'accepted' ? 'Accepted' : 'Rejected'}`,
+                template: 'pop-action',
+                data: {
+                    tenderExecutive: requestedUser.name,
+                    status,
+                    paymentDateTime: paymentDateTime || '',
+                    utr: utrNo || '',
+                    utrMessage: utrMessage || '',
+                    rejectionReason: rejectionReason || '',
+                    senderName: 'Accounts Team',
+                },
+                to: [{ type: 'emails', emails: ['gyan@volksenergie.in'] }],
+                // cc: [
+                //     { type: 'role', role: 'admin', teamId: tenderTeamId },
+                //     { type: 'emails', emails: ['accounts@volksenergie.in']}
+                // ],
+            });
+
+            if (result.success) {
+                this.logger.log(`POP action email sent for instrument ${instrumentId} (logId: ${result.emailLogId})`);
+            } else {
+                this.logger.warn(`POP action email failed for instrument ${instrumentId}: ${result.error}`);
+            }
+        } catch (error) {
+            this.logger.error(`Failed to send POP action email for instrument ${instrumentId}:`, error);
         }
     }
 }
