@@ -121,6 +121,9 @@ export const paymentInstruments = pgTable('payment_instruments', {
     // Legacy data storage for unmapped fields
     legacyData: jsonb('legacy_data'), // For any fields not directly mapped
 
+    // Rejection reason for portal payments
+    rejectionReason: text('rejection_reason'),
+
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 }, (table) => {

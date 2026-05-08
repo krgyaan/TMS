@@ -42,4 +42,29 @@ export interface PayOnPortalActionFormData {
     returnUtr: string | null;
     reason: string | null;
     remarks: string | null;
+    rejectionReason: string | null;
+    paymentDateTime: string | null;
+}
+
+export interface PayOnPortalFollowupData {
+    id: number;
+    organisationName: string | null;
+    area: string | null;
+    amount: number | null;
+    contacts: Array<{
+        name: string;
+        email: string | null;
+        phone: string | null;
+        org: string | null;
+        addedAt: string;
+    }>;
+    frequency: number | null;
+    followupStartDate: Date | null;
+    nextFollowUpDate: Date | null;
+    stopReason: number | null;
+    proofText: string | null;
+    stopRemarks: string | null;
+    proofImagePath: string | null;
+    assignmentStatus: string | null;
+    createdAt: Date;
 }

@@ -1,7 +1,7 @@
 import type { PayOnPortalDashboardFilters } from '@/modules/bi-dashboard/pay-on-portal/helpers/payOnPortal.types';
 import { BaseApiService } from './base.service';
 import type { PaginatedResult } from '@/types/api.types';
-import type { PayOnPortalDashboardRow, PayOnPortalActionFormData } from '@/modules/bi-dashboard/pay-on-portal/helpers/payOnPortal.types';
+import type { PayOnPortalDashboardRow, PayOnPortalActionFormData, PayOnPortalFollowupData } from '@/modules/bi-dashboard/pay-on-portal/helpers/payOnPortal.types';
 import type { PayOnPortalDashboardCounts } from '@/modules/bi-dashboard/pay-on-portal/helpers/payOnPortal.types';
 
 class PayOnPortalsService extends BaseApiService {
@@ -74,6 +74,17 @@ class PayOnPortalsService extends BaseApiService {
             return result;
         } catch (error) {
             console.error('=== payOnPortalsService.getActionFormData Error ===');
+            console.error('error:', error);
+            throw error;
+        }
+    }
+
+    async getFollowupData(id: number): Promise<PayOnPortalFollowupData | null> {
+        try {
+            const result = await this.get<PayOnPortalFollowupData | null>(`/instruments/${id}/followup`);
+            return result;
+        } catch (error) {
+            console.error('=== payOnPortalsService.getFollowupData Error ===');
             console.error('error:', error);
             throw error;
         }
