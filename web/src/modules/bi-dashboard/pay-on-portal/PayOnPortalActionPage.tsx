@@ -6,6 +6,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
 import { PayOnPortalActionForm } from './components/PayOnPortalActionForm';
 import { usePayOnPortalActionFormData, usePayOnPortalFollowupData } from '@/hooks/api/usePayOnPortals';
+import { formatINR } from '@/hooks/useINRFormatter';
 
 const STORAGE_KEY = 'pay_on_portal_action_data';
 
@@ -112,10 +113,18 @@ export default function PayOnPortalActionPage() {
                 <div className="flex items-center justify-between">
                     <div>
                         <CardTitle>Pay on Portal Action Form</CardTitle>
-                        <CardDescription>
-                            {instrumentData?.tenderNo && instrumentData?.tenderName
-                                ? `${instrumentData.tenderNo} - ${instrumentData.tenderName}`
-                                : `Instrument ID: ${instrumentId}`}
+                        <CardDescription className="text-sm text-muted-foreground">
+                            {[
+                                instrumentData?.tenderNo && instrumentData?.tenderName
+                                    ? `${instrumentData.tenderNo} - ${instrumentData.tenderName}`
+                                    : `Instrument ID: ${instrumentId}`,
+
+                                instrumentData?.amount && formatINR(instrumentData.amount),
+
+                                instrumentData?.portalName
+                            ]
+                                .filter(Boolean)
+                                .join(" / ")}
                         </CardDescription>
                     </div>
                     <CardAction>
