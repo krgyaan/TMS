@@ -62,10 +62,15 @@ interface ReturnedHistory {
     utrNo?: string;
 }
 
+interface SettledHistory {
+    remarks?: string;
+}
+
 interface FormHistory {
     accountsForm?: AccountsFormHistory;
     initiateFollowup?: FollowupHistory;
     returned?: ReturnedHistory;
+    settled?: SettledHistory;
 }
 
 interface PayOnPortalActionFormProps {
@@ -88,6 +93,7 @@ export function PayOnPortalActionForm({ instrumentId, action, formHistory }: Pay
     const hasAccountsFormData = !!(formHistory?.accountsForm?.popReq);
     const hasFollowupData = !!(formHistory?.initiateFollowup?.organisationName);
     const hasReturnedData = !!(formHistory?.returned?.transferDate);
+    const hasSettledData = !!(formHistory?.settled?.remarks);
 
     const getSubmittedBadge = (hasData: boolean) => {
         if (!hasData) return <Badge variant={'secondary'} className="rounded-full p-2">
@@ -134,6 +140,10 @@ export function PayOnPortalActionForm({ instrumentId, action, formHistory }: Pay
     if (formHistory?.returned) {
         defaultValues.transfer_date = formHistory.returned.transferDate;
         defaultValues.utr_no = formHistory.returned.utrNo;
+    }
+
+    if (formHistory?.settled) {
+        defaultValues.settle_remarks = formHistory.settled.remarks;
     }
 
     const form = useForm<PayOnPortalActionFormValues>({
@@ -193,15 +203,23 @@ export function PayOnPortalActionForm({ instrumentId, action, formHistory }: Pay
         if (formHistory?.returned?.utrNo) {
             form.setValue('utr_no', formHistory.returned.utrNo, { shouldValidate: false });
         }
+
+        if (formHistory?.settled?.remarks) {
+            form.setValue('settle_remarks', formHistory.settled.remarks, { shouldValidate: false });
+        }
     }, [formHistory, form]);
 
     const isSubmitting = form.formState.isSubmitting || updateMutation.isPending;
 
     const handleSubmit = async (values: PayOnPortalActionFormValues) => {
         try {
+            console.log('Form values:', values);
+            console.log('settle_remarks value:', values.settle_remarks);
+            
             const formData = new FormData();
 
             Object.entries(values).forEach(([key, value]) => {
+                console.log(`Key: ${key}, Value:`, value);
                 if (key === 'contacts' ||
                     key === 'organisation_name' ||
                     key === 'followup_start_date' ||
@@ -256,7 +274,8 @@ export function PayOnPortalActionForm({ instrumentId, action, formHistory }: Pay
                             const hasHistory =
                                 (option.value === 'accounts-form' && hasAccountsFormData) ||
                                 (option.value === 'initiate-followup' && hasFollowupData) ||
-                                (option.value === 'returned' && hasReturnedData);
+                                (option.value === 'returned' && hasReturnedData) ||
+                                (option.value === 'settled' && hasSettledData);
 
                             return (
                                 <div
@@ -410,10 +429,20 @@ export function PayOnPortalActionForm({ instrumentId, action, formHistory }: Pay
                         <div className="flex items-center gap-2 pb-3 border-b">
                             <CheckCircle2 className="h-5 w-5 text-primary" />
                             <h4 className="font-semibold text-base">Settled with Project Account</h4>
+                            {getSubmittedBadge(hasSettledData)}
                         </div>
                         <p className="text-sm text-muted-foreground -mt-2">
                             Mark payment as settled with project account
                         </p>
+                        <FieldWrapper control={form.control} name="settle_remarks" label="Remarks">
+                            {(field) => (
+                                <Textarea
+                                    {...field}
+                                    placeholder="Enter settlement remarks"
+                                    className="min-h-[80px]"
+                                />
+                            )}
+                        </FieldWrapper>
                     </div>
                 </ConditionalSection>
 

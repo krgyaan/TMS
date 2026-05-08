@@ -161,6 +161,9 @@ export default function PayOnPortalActionPage() {
                             transferDate: actionFormData.returnTransferDate ? new Date(actionFormData.returnTransferDate).toISOString() : undefined,
                             utrNo: actionFormData.returnUtr ?? undefined,
                         } : undefined,
+                        settled: actionFormData ? {
+                            remarks: actionFormData.remarks ?? undefined,
+                        } : undefined,
                     }}
                 />
             </CardContent>

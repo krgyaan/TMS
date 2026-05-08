@@ -36,6 +36,7 @@ export const PayOnPortalActionFormSchema = BaseActionFormSchema.extend({
     transfer_date: z.string().optional(),
 
     // Settled with Project Account
+    settle_remarks: z.string().optional(),
 }).refine(
     (data) => {
         // Action 1: status is required
