@@ -39,7 +39,7 @@ export const PayOnPortalActionFormSchema = BaseActionFormSchema.extend({
 }).refine(
     (data) => {
         // Action 1: status is required
-        if (data.action === 'accounts-form-1') {
+        if (data.action === 'accounts-form') {
             return !!data.pop_req;
         }
         return true;
@@ -50,7 +50,7 @@ export const PayOnPortalActionFormSchema = BaseActionFormSchema.extend({
     }
 ).refine(
     (data) => {
-        if (data.action === 'accounts-form-1' && data.pop_req === 'Rejected') {
+        if (data.action === 'accounts-form' && data.pop_req === 'Rejected') {
             return !!data.reason_req;
         }
         return true;
@@ -100,7 +100,7 @@ export const PayOnPortalActionFormSchema = BaseActionFormSchema.extend({
 ).refine(
     (data) => {
         // Action 1: When Accepted, payment_datetime, utr_no, utr_message, remarks are required
-        if (data.action === 'accounts-form-1' && data.pop_req === 'Accepted') {
+        if (data.action === 'accounts-form' && data.pop_req === 'Accepted') {
             return !!data.payment_datetime && !!data.utr_no && !!data.utr_message;
         }
         return true;

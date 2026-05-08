@@ -18,6 +18,7 @@ import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { paths } from '@/app/routes/paths';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { QuickFilter } from '@/components/ui/quick-filter';
 
 const TABS_CONFIG: Array<{ key: PayOnPortalDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -222,6 +223,16 @@ const PayOnPortalListPage = () => {
                 },
             },
             {
+                field: 'teamMember',
+                headerName: 'Member',
+                width: 140,
+                maxWidth: 140,
+                colId: 'teamMember',
+                valueGetter: (params) => params.data?.teamMember || '—',
+                sortable: true,
+                filter: true,
+            },
+            {
                 field: 'popStatus',
                 headerName: 'POP Status',
                 width: 110,
@@ -230,7 +241,7 @@ const PayOnPortalListPage = () => {
                 filter: true,
                 cellRenderer: (params: any) => {
                     const status = params.value;
-                    if (!status) return '—';
+                    if (!status) return <Badge variant={'secondary'}>Pending</Badge>;
                     return <Badge variant={getStatusVariant(status) as any}>{status}</Badge>;
                 },
             },
@@ -336,7 +347,15 @@ const PayOnPortalListPage = () => {
 
                         {/* Search Row: Quick Filters, Search Bar */}
                         <div className="flex items-center gap-4 px-6 pb-4">
-                            {/* Quick Filters (Left) - Optional, can be added per page */}
+                            {/* Quick Filters (Left) */}
+                            <QuickFilter options={[
+                                { label: 'AC Team', value: 'AC' },
+                                { label: 'DC Team', value: 'DC' },
+                                { label: 'All Team', value: 'All' },
+                            ]}
+                                value={search}
+                                onChange={(value) => setSearch(value)}
+                            />
 
                             {/* Search Bar (Center) - Flex grow */}
                             <div className="flex-1 flex justify-end">

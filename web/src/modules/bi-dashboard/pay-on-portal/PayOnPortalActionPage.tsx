@@ -1,19 +1,88 @@
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardAction } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, ArrowLeft } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
 import { PayOnPortalActionForm } from './components/PayOnPortalActionForm';
-import type { PayOnPortalDashboardRow } from './helpers/payOnPortal.types';
+import { usePayOnPortalActionFormData } from '@/hooks/api/usePayOnPortals';
+
+const STORAGE_KEY = 'pay_on_portal_action_data';
+
+interface StoredData {
+    action: number;
+    tenderNo: string | null;
+    tenderName: string | null;
+    amount: number | null;
+    portalName: string | null;
+    utrNo: string | null;
+    timestamp: number;
+}
 
 export default function PayOnPortalActionPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const location = useLocation();
     const instrumentId = id ? Number(id) : 0;
 
-    // Get instrument data from navigation state if available
-    const instrumentData = location.state as PayOnPortalDashboardRow | undefined;
+    const { data: actionFormData, isLoading } = usePayOnPortalActionFormData(instrumentId);
+
+    const action = actionFormData?.action ?? null;
+
+    useEffect(() => {
+        if (actionFormData) {
+            const storedData: StoredData = {
+                action: actionFormData.action ?? 0,
+                tenderNo: actionFormData.tenderNo,
+                tenderName: actionFormData.tenderName,
+                amount: actionFormData.amount,
+                portalName: actionFormData.portalName,
+                utrNo: actionFormData.utrNo,
+                timestamp: Date.now(),
+            };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(storedData));
+        }
+    }, [actionFormData]);
+
+    const getStoredData = (): StoredData | null => {
+        try {
+            const stored = localStorage.getItem(STORAGE_KEY);
+            if (stored) {
+                const parsed: StoredData = JSON.parse(stored);
+                if (Date.now() - parsed.timestamp < 3600000) {
+                    return parsed;
+                }
+            }
+        } catch (e) {
+            console.error('Error reading stored data:', e);
+        }
+        return null;
+    };
+
+    const getInstrumentData = () => {
+        if (actionFormData) {
+            return {
+                tenderNo: actionFormData.tenderNo ?? undefined,
+                tenderName: actionFormData.tenderName ?? undefined,
+                amount: actionFormData.amount ?? undefined,
+                portalName: actionFormData.portalName ?? undefined,
+                utrNo: actionFormData.utrNo ?? undefined,
+            };
+        }
+        const stored = getStoredData();
+        if (stored) {
+            return {
+                tenderNo: stored.tenderNo ?? undefined,
+                tenderName: stored.tenderName ?? undefined,
+                amount: stored.amount ?? undefined,
+                portalName: stored.portalName ?? undefined,
+                utrNo: stored.utrNo ?? undefined,
+            };
+        }
+        return undefined;
+    };
+
+    const currentAction = action ?? getStoredData()?.action ?? 0;
+    const instrumentData = getInstrumentData();
 
     if (!id || !instrumentId) {
         return (
@@ -21,6 +90,18 @@ export default function PayOnPortalActionPage() {
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>Invalid instrument ID</AlertDescription>
             </Alert>
+        );
+    }
+
+    if (isLoading) {
+        return (
+            <Card>
+                <CardContent className="pt-6">
+                    <div className="flex items-center justify-center py-12">
+                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    </div>
+                </CardContent>
+            </Card>
         );
     }
 
@@ -46,13 +127,8 @@ export default function PayOnPortalActionPage() {
             <CardContent>
                 <PayOnPortalActionForm
                     instrumentId={instrumentId}
-                    instrumentData={instrumentData ? {
-                        utrNo: instrumentData.utrNo || undefined,
-                        portalName: instrumentData.portalName || undefined,
-                        amount: instrumentData.amount || undefined,
-                        tenderName: instrumentData.tenderName || undefined,
-                        tenderNo: instrumentData.tenderNo || undefined,
-                    } : undefined}
+                    action={currentAction}
+                    instrumentData={instrumentData}
                 />
             </CardContent>
         </Card>

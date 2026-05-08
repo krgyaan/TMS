@@ -4,9 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
-import { SelectField } from '@/components/form/SelectField';
 import { Input } from '@/components/ui/input';
-import { NumberInput } from '@/components/form/NumberInput';
 import { ContactPersonFields } from '@/components/form/ContactPersonFields';
 import { FollowUpFrequencySelect } from '@/components/form/FollowUpFrequencySelect';
 import { StopReasonFields } from '@/components/form/StopReasonFields';
@@ -20,16 +18,26 @@ import { useWatch } from 'react-hook-form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { FileText, Users, Banknote, CheckCircle2, Info } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-const ACTION_OPTIONS = [
-    { value: 'accounts-form-1', label: 'Accounts Form' },
-    { value: 'initiate-followup', label: 'Initiate Followup' },
-    { value: 'returned', label: 'Returned via Bank Transfer' },
-    { value: 'settled', label: 'Settled with Project Account' },
+interface ActionOption {
+    value: string;
+    label: string;
+    icon: React.ReactNode;
+    description: string;
+}
+
+const ALL_ACTION_OPTIONS: ActionOption[] = [
+    { value: 'accounts-form', label: 'Accounts Form', icon: <FileText className="h-4 w-4" />, description: 'Process payment request through accounts' },
+    { value: 'initiate-followup', label: 'Initiate Followup', icon: <Users className="h-4 w-4" />, description: 'Start follow-up process with contacts' },
+    { value: 'returned', label: 'Returned via Bank Transfer', icon: <Banknote className="h-4 w-4" />, description: 'Mark as returned through bank transfer' },
+    { value: 'settled', label: 'Settled with Project Account', icon: <CheckCircle2 className="h-4 w-4" />, description: 'Settle payment with project account' },
 ];
 
 interface PayOnPortalActionFormProps {
     instrumentId: number;
+    action?: number | null;
     instrumentData?: {
         utrNo?: string;
         portalName?: string;
@@ -39,9 +47,13 @@ interface PayOnPortalActionFormProps {
     };
 }
 
-export function PayOnPortalActionForm({ instrumentId, instrumentData }: PayOnPortalActionFormProps) {
+export function PayOnPortalActionForm({ instrumentId, action, instrumentData }: PayOnPortalActionFormProps) {
     const navigate = useNavigate();
     const updateMutation = useUpdatePayOnPortalAction();
+
+    const availableActions = action === 0
+        ? ALL_ACTION_OPTIONS.filter(opt => opt.value === 'accounts-form')
+        : ALL_ACTION_OPTIONS;
 
     const form = useForm<PayOnPortalActionFormValues>({
         resolver: zodResolver(PayOnPortalActionFormSchema) as Resolver<PayOnPortalActionFormValues>,
@@ -51,7 +63,7 @@ export function PayOnPortalActionForm({ instrumentId, instrumentData }: PayOnPor
         },
     });
 
-    const action = useWatch({ control: form.control, name: 'action' });
+    const selectedAction = useWatch({ control: form.control, name: 'action' });
     const popReq = useWatch({ control: form.control, name: 'pop_req' });
 
     const isSubmitting = form.formState.isSubmitting || updateMutation.isPending;
@@ -61,7 +73,6 @@ export function PayOnPortalActionForm({ instrumentId, instrumentData }: PayOnPor
             const formData = new FormData();
 
             Object.entries(values).forEach(([key, value]) => {
-                // Skip follow-up fields - handled by different service
                 if (key === 'contacts' ||
                     key === 'organisation_name' ||
                     key === 'followup_start_date' ||
@@ -73,19 +84,16 @@ export function PayOnPortalActionForm({ instrumentId, instrumentData }: PayOnPor
                     return;
                 }
 
-                // Handle File objects (non-followup files)
                 if (value instanceof File) {
                     formData.append(key, value);
                     return;
                 }
 
-                // Handle arrays of Files
                 if (Array.isArray(value) && value.length > 0 && value[0] instanceof File) {
                     value.forEach((file) => formData.append(key, file));
                     return;
                 }
 
-                // Handle all other values (strings, numbers, dates, file paths, etc.)
                 if (value === undefined || value === null || value === '') return;
                 if (value instanceof Date) {
                     formData.append(key, value.toISOString());
@@ -98,6 +106,7 @@ export function PayOnPortalActionForm({ instrumentId, instrumentData }: PayOnPor
 
             await updateMutation.mutateAsync({ id: instrumentId, formData });
             toast.success('Action submitted successfully');
+            localStorage.removeItem('pay_on_portal_action_data');
             navigate(-1);
             form.reset();
         } catch (error: any) {
@@ -109,22 +118,96 @@ export function PayOnPortalActionForm({ instrumentId, instrumentData }: PayOnPor
     return (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
-                    <SelectField
-                        label="Choose What to do"
-                        control={form.control}
-                        name="action"
-                        options={ACTION_OPTIONS}
-                        placeholder="Select an option"
-                    />
+                {instrumentData && (
+                    <Card className="bg-muted/50">
+                        <CardHeader className="pb-3">
+                            <CardTitle className="text-sm font-medium flex items-center gap-2">
+                                <Info className="h-4 w-4" />
+                                Instrument Details
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-0">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                {instrumentData.tenderNo && (
+                                    <div>
+                                        <span className="text-muted-foreground">Tender No:</span>
+                                        <p className="font-medium">{instrumentData.tenderNo}</p>
+                                    </div>
+                                )}
+                                {instrumentData.tenderName && (
+                                    <div>
+                                        <span className="text-muted-foreground">Tender Name:</span>
+                                        <p className="font-medium truncate">{instrumentData.tenderName}</p>
+                                    </div>
+                                )}
+                                {instrumentData.amount !== undefined && (
+                                    <div>
+                                        <span className="text-muted-foreground">Amount:</span>
+                                        <p className="font-medium">₹{instrumentData.amount.toLocaleString()}</p>
+                                    </div>
+                                )}
+                                {instrumentData.portalName && (
+                                    <div>
+                                        <span className="text-muted-foreground">Portal:</span>
+                                        <p className="font-medium">{instrumentData.portalName}</p>
+                                    </div>
+                                )}
+                                {instrumentData.utrNo && (
+                                    <div>
+                                        <span className="text-muted-foreground">UTR:</span>
+                                        <p className="font-medium">{instrumentData.utrNo}</p>
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                <div className="space-y-3">
+                    <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                        Choose What to do
+                    </label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {availableActions.map((option) => (
+                            <div
+                                key={option.value}
+                                className={`relative flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all hover:bg-muted/50 ${
+                                    selectedAction === option.value
+                                        ? 'border-primary bg-primary/5'
+                                        : 'border-border'
+                                }`}
+                                onClick={() => form.setValue('action', option.value, { shouldValidate: true })}
+                            >
+                                <div className={`mt-0.5 p-2 rounded-full ${
+                                    selectedAction === option.value
+                                        ? 'bg-primary text-primary-foreground'
+                                        : 'bg-muted'
+                                }`}>
+                                    {option.icon}
+                                </div>
+                                <div className="flex-1">
+                                    <p className="font-medium text-sm">{option.label}</p>
+                                    <p className="text-xs text-muted-foreground mt-1">{option.description}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    {form.formState.errors.action && (
+                        <p className="text-sm text-destructive mt-1">{form.formState.errors.action.message}</p>
+                    )}
                 </div>
 
-                {/* Accounts Form (POP) 1 */}
-                <ConditionalSection show={action === 'accounts-form-1'}>
-                    <div className="space-y-4 border rounded-lg p-4">
-                        <h4 className="font-semibold text-base">Accounts Form (POP) 1 - Request to Portal</h4>
+                <ConditionalSection show={selectedAction === 'accounts-form'}>
+                    <div className="space-y-4 border rounded-lg p-4 bg-background">
+                        <div className="flex items-center gap-2 pb-3 border-b">
+                            <FileText className="h-5 w-5 text-primary" />
+                            <h4 className="font-semibold text-base">Accounts Form</h4>
+                        </div>
+                        <p className="text-sm text-muted-foreground -mt-2">
+                            Process the payment request through accounts department
+                        </p>
 
-                        <FieldWrapper control={form.control} name="pop_req" label="POP Request">
+                        <FieldWrapper control={form.control} name="pop_req" label="Pay On Portal Request">
                             {(field) => (
                                 <RadioGroup
                                     value={field.value}
@@ -156,8 +239,8 @@ export function PayOnPortalActionForm({ instrumentId, instrumentData }: PayOnPor
                         )}
 
                         {popReq === 'Accepted' && (
-                            <>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3 gap-y-4">
+                            <div className="space-y-4 pt-3">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <FieldWrapper control={form.control} name="payment_datetime" label="Date and Time of Payment">
                                         {(field) => (
                                             <DateTimeInput
@@ -174,34 +257,39 @@ export function PayOnPortalActionForm({ instrumentId, instrumentData }: PayOnPor
                                         {(field) => <Input {...field} placeholder="Enter UTR message" />}
                                     </FieldWrapper>
                                 </div>
-                            </>
+                            </div>
                         )}
                     </div>
                 </ConditionalSection>
 
-                {/* Initiate Followup */}
-                <ConditionalSection show={action === 'initiate-followup'}>
-                    <div className="space-y-4 border rounded-lg p-4">
-                        <h4 className="font-semibold text-base">Initiate Followup</h4>
+                <ConditionalSection show={selectedAction === 'initiate-followup'}>
+                    <div className="space-y-4 border rounded-lg p-4 bg-background">
+                        <div className="flex items-center gap-2 pb-3 border-b">
+                            <Users className="h-5 w-5 text-primary" />
+                            <h4 className="font-semibold text-base">Initiate Followup</h4>
+                        </div>
+                        <p className="text-sm text-muted-foreground -mt-2">
+                            Start a follow-up process with organisation contacts
+                        </p>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3 gap-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <FieldWrapper control={form.control} name="organisation_name" label="Organisation Name">
                                 {(field) => <Input {...field} placeholder="Enter organisation name" />}
                             </FieldWrapper>
                         </div>
 
-                        <div className="col-span-3">
+                        <div>
                             <ContactPersonFields control={form.control} name="contacts" />
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3 gap-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <FieldWrapper control={form.control} name="followup_start_date" label="Follow-up Start Date">
                                 {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                             </FieldWrapper>
                             <FollowUpFrequencySelect control={form.control} name="frequency" />
                         </div>
 
-                        <div className="col-span-3">
+                        <div>
                             <StopReasonFields
                                 control={form.control}
                                 frequencyFieldName="frequency"
@@ -214,12 +302,17 @@ export function PayOnPortalActionForm({ instrumentId, instrumentData }: PayOnPor
                     </div>
                 </ConditionalSection>
 
-                {/* Returned via Bank Transfer */}
-                <ConditionalSection show={action === 'returned'}>
-                    <div className="space-y-4 border rounded-lg p-4">
-                        <h4 className="font-semibold text-base">Returned via Bank Transfer</h4>
+                <ConditionalSection show={selectedAction === 'returned'}>
+                    <div className="space-y-4 border rounded-lg p-4 bg-background">
+                        <div className="flex items-center gap-2 pb-3 border-b">
+                            <Banknote className="h-5 w-5 text-primary" />
+                            <h4 className="font-semibold text-base">Returned via Bank Transfer</h4>
+                        </div>
+                        <p className="text-sm text-muted-foreground -mt-2">
+                            Record return of payment through bank transfer
+                        </p>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3 gap-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <FieldWrapper control={form.control} name="transfer_date" label="Transfer Date">
                                 {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                             </FieldWrapper>
@@ -230,14 +323,19 @@ export function PayOnPortalActionForm({ instrumentId, instrumentData }: PayOnPor
                     </div>
                 </ConditionalSection>
 
-                {/* Settled with Project Account */}
-                <ConditionalSection show={action === 'settled'}>
-                    <div className="space-y-4 border rounded-lg p-4">
-                        <h4 className="font-semibold text-base">Settled with Project Account</h4>
+                <ConditionalSection show={selectedAction === 'settled'}>
+                    <div className="space-y-4 border rounded-lg p-4 bg-background">
+                        <div className="flex items-center gap-2 pb-3 border-b">
+                            <CheckCircle2 className="h-5 w-5 text-primary" />
+                            <h4 className="font-semibold text-base">Settled with Project Account</h4>
+                        </div>
+                        <p className="text-sm text-muted-foreground -mt-2">
+                            Mark payment as settled with project account
+                        </p>
                     </div>
                 </ConditionalSection>
 
-                <div className="flex justify-end gap-4 pt-4">
+                <div className="flex justify-end gap-4 pt-4 border-t">
                     <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={isSubmitting}>
                         Cancel
                     </Button>

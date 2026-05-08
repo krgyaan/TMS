@@ -141,6 +141,7 @@ export class PayOnPortalService {
                 tenderStatus: statuses.name,
                 amount: paymentInstruments.amount,
                 popStatus: paymentInstruments.status,
+                action: paymentInstruments.action,
             })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
@@ -183,6 +184,7 @@ export class PayOnPortalService {
             tenderStatus: row.tenderStatus,
             amount: row.amount ? Number(row.amount) : null,
             popStatus: this.statusMap()[row.popStatus],
+            action: row.action,
         }));
 
         return wrapPaginatedResponse(data, total, page, limit);
@@ -397,24 +399,10 @@ export class PayOnPortalService {
                 instrumentType: paymentInstruments.instrumentType,
                 purpose: paymentInstruments.purpose,
                 amount: paymentInstruments.amount,
-                favouring: paymentInstruments.favouring,
-                payableAt: paymentInstruments.payableAt,
-                issueDate: paymentInstruments.issueDate,
-                expiryDate: paymentInstruments.expiryDate,
-                validityDate: paymentInstruments.validityDate,
-                claimExpiryDate: paymentInstruments.claimExpiryDate,
                 utr: paymentInstruments.utr,
-                docketNo: paymentInstruments.docketNo,
-                courierAddress: paymentInstruments.courierAddress,
-                courierDeadline: paymentInstruments.courierDeadline,
                 action: paymentInstruments.action,
                 status: paymentInstruments.status,
                 isActive: paymentInstruments.isActive,
-                generatedPdf: paymentInstruments.generatedPdf,
-                cancelPdf: paymentInstruments.cancelPdf,
-                docketSlip: paymentInstruments.docketSlip,
-                coveringLetter: paymentInstruments.coveringLetter,
-                extraPdfPaths: paymentInstruments.extraPdfPaths,
                 createdAt: paymentInstruments.createdAt,
                 updatedAt: paymentInstruments.updatedAt,
 
@@ -436,9 +424,6 @@ export class PayOnPortalService {
                 // Transfer Details (Portal Payment) - all fields
                 transferDetailsId: instrumentTransferDetails.id,
                 portalName: instrumentTransferDetails.portalName,
-                accountName: instrumentTransferDetails.accountName,
-                accountNumber: instrumentTransferDetails.accountNumber,
-                ifsc: instrumentTransferDetails.ifsc,
                 transactionDate: instrumentTransferDetails.transactionDate,
                 paymentMethod: instrumentTransferDetails.paymentMethod,
                 utrMsg: instrumentTransferDetails.utrMsg,
@@ -451,17 +436,6 @@ export class PayOnPortalService {
                 remarks: instrumentTransferDetails.remarks,
                 transferDetailsCreatedAt: instrumentTransferDetails.createdAt,
                 transferDetailsUpdatedAt: instrumentTransferDetails.updatedAt,
-
-                // Tender Info fields
-                tenderName: tenderInfos.tenderName,
-                tenderDueDate: tenderInfos.dueDate,
-                tenderStatusId: tenderInfos.status,
-                tenderOrganizationId: tenderInfos.organization,
-                tenderItemId: tenderInfos.item,
-                tenderTeamMember: tenderInfos.teamMember,
-
-                // Status fields
-                tenderStatusName: statuses.name,
 
                 // User fields
                 requestedByName: users.name,
@@ -484,5 +458,63 @@ export class PayOnPortalService {
         }
 
         return result;
+    }
+
+    async getActionFormData(id: number) {
+        const [result] = await this.db
+            .select({
+                id: paymentInstruments.id,
+                action: paymentInstruments.action,
+                status: paymentInstruments.status,
+                amount: paymentInstruments.amount,
+                utr: paymentInstruments.utr,
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                portalName: instrumentTransferDetails.portalName,
+                transactionDate: instrumentTransferDetails.transactionDate,
+                paymentMethod: instrumentTransferDetails.paymentMethod,
+                utrMsg: instrumentTransferDetails.utrMsg,
+                utrNum: instrumentTransferDetails.utrNum,
+                isNetbanking: instrumentTransferDetails.isNetbanking,
+                isDebit: instrumentTransferDetails.isDebit,
+                returnTransferDate: instrumentTransferDetails.returnTransferDate,
+                returnUtr: instrumentTransferDetails.returnUtr,
+                reason: instrumentTransferDetails.reason,
+                remarks: instrumentTransferDetails.remarks,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .where(and(
+                eq(paymentInstruments.id, id),
+                eq(paymentInstruments.instrumentType, 'Portal Payment'),
+                eq(paymentInstruments.isActive, true)
+            ))
+            .limit(1);
+
+        if (!result) {
+            throw new NotFoundException(`Payment Instrument with ID ${id} not found`);
+        }
+
+        return {
+            id: result.id,
+            action: result.action,
+            popStatus: this.statusMap()[result.status],
+            tenderNo: result.tenderNo,
+            tenderName: result.tenderName,
+            amount: result.amount ? Number(result.amount) : null,
+            portalName: result.portalName,
+            utrNo: result.utr || result.utrNum,
+            transactionDate: result.transactionDate ? new Date(result.transactionDate) : null,
+            paymentMethod: result.paymentMethod,
+            utrMsg: result.utrMsg,
+            isNetbanking: result.isNetbanking,
+            isDebit: result.isDebit,
+            returnTransferDate: result.returnTransferDate ? new Date(result.returnTransferDate) : null,
+            returnUtr: result.returnUtr,
+            reason: result.reason,
+            remarks: result.remarks,
+        };
     }
 }
