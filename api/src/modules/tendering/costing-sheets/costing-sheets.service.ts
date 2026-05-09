@@ -80,6 +80,56 @@ export class CostingSheetsService {
     /**
      * Get dashboard data by tab - Direct queries without config
      */
+    
+    private buildDashboardConditions(user?: ValidatedUser, teamId?: number, tab?: string): any[] {
+        const baseCondition = TenderInfosService.getActiveCondition();
+        const baseConditions = [baseCondition, TenderInfosService.getApprovedCondition()];
+
+        // Apply role-based filtering
+        const roleFilterConditions: any[] = [];
+        if (user && user.roleId) {
+            if (user.roleId === 1 || user.roleId === 2) {
+                if (teamId !== undefined && teamId !== null) {
+                    roleFilterConditions.push(eq(tenderInfos.team, teamId));
+                }
+            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+                if (user.teamId) {
+                    roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
+                } else {
+                    roleFilterConditions.push(sql`1 = 0`);
+                }
+            } else {
+                if (user.sub) {
+                    roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
+                } else {
+                    roleFilterConditions.push(sql`1 = 0`);
+                }
+            }
+        } else {
+            roleFilterConditions.push(sql`1 = 0`);
+        }
+
+        const conditions = [...baseConditions, ...roleFilterConditions];
+
+        if (tab === 'pending') {
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['lost']));
+            conditions.push(or(inArray(tenderCostingSheets.status, ['Pending', 'Rejected/Redo']),
+                isNull(tenderCostingSheets.submittedFinalPrice)) as any);
+            conditions.push(ne(bidSubmissions.status, 'Tender Missed'));
+        } else if (tab === 'submitted') {
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb']));
+            conditions.push(or(eq(tenderCostingSheets.status, 'Submitted'),
+                isNotNull(tenderCostingSheets.submittedFinalPrice)) as any);
+            conditions.push(ne(bidSubmissions.status, 'Tender Missed'));
+        } else if (tab === 'tender-dnb') {
+            conditions.push(eq(bidSubmissions.status, 'Tender Missed'));
+            conditions.push(isNotNull(tenderCostingSheets.id));
+        }
+
+        return conditions;
+    }
+
+
     async getDashboardData(
         tabKey?: 'pending' | 'submitted' | 'tender-dnb',
         filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; search?: string },
@@ -91,13 +141,6 @@ export class CostingSheetsService {
         const offset = (page - 1) * limit;
 
         const activeTab = tabKey || 'pending';
-
-        // Build base conditions
-        const baseConditions = [
-            TenderInfosService.getActiveCondition(),
-            TenderInfosService.getApprovedCondition(),
-            // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-        ];
         
         if (!['pending', 'submitted', 'tender-dnb'].includes(activeTab)) {
             throw new BadRequestException(`Invalid tab: ${activeTab}`);
@@ -269,54 +312,6 @@ export class CostingSheetsService {
             'tender-dnb': counts[2],
             total: counts.reduce((sum, count) => sum + count, 0),
         };
-    }
-
-    private buildDashboardConditions(user?: ValidatedUser, teamId?: number, tab?: string): any[] {
-        const baseCondition = TenderInfosService.getActiveCondition();
-        const baseConditions = [baseCondition, TenderInfosService.getApprovedCondition()];
-
-        // Apply role-based filtering
-        const roleFilterConditions: any[] = [];
-        if (user && user.roleId) {
-            if (user.roleId === 1 || user.roleId === 2) {
-                if (teamId !== undefined && teamId !== null) {
-                    roleFilterConditions.push(eq(tenderInfos.team, teamId));
-                }
-            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
-                if (user.teamId) {
-                    roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
-                } else {
-                    roleFilterConditions.push(sql`1 = 0`);
-                }
-            } else {
-                if (user.sub) {
-                    roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
-                } else {
-                    roleFilterConditions.push(sql`1 = 0`);
-                }
-            }
-        } else {
-            roleFilterConditions.push(sql`1 = 0`);
-        }
-
-        const conditions = [...baseConditions, ...roleFilterConditions];
-
-        if (tab === 'pending') {
-            conditions.push(TenderInfosService.getExcludeStatusCondition(['lost']));
-            conditions.push(or(inArray(tenderCostingSheets.status, ['Pending', 'Rejected/Redo']),
-                isNull(tenderCostingSheets.submittedFinalPrice)) as any);
-            conditions.push(ne(bidSubmissions.status, 'Tender Missed'));
-        } else if (tab === 'submitted') {
-            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb']));
-            conditions.push(or(eq(tenderCostingSheets.status, 'Submitted'),
-                isNotNull(tenderCostingSheets.submittedFinalPrice)) as any);
-            conditions.push(ne(bidSubmissions.status, 'Tender Missed'));
-        } else if (tab === 'tender-dnb') {
-            conditions.push(eq(bidSubmissions.status, 'Tender Missed'));
-            conditions.push(isNotNull(tenderCostingSheets.id));
-        }
-
-        return conditions;
     }
 
     async findByTenderId(tenderId: number) {
