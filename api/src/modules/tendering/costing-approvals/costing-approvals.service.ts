@@ -1,5 +1,5 @@
 import { Inject, Injectable, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
-import { and, eq, inArray, asc, desc, sql, isNull, notInArray, isNotNull } from 'drizzle-orm';
+import { and, eq, inArray, asc, desc, sql, isNull, notInArray, isNotNull, ne } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -19,6 +19,7 @@ import { Logger } from '@nestjs/common';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import { TimersService } from '@/modules/timers/timers.service';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { bidSubmissions } from '@/db/schemas';
 
 export type CostingApprovalDashboardRow = {
     tenderId: number;
@@ -73,6 +74,7 @@ export class CostingApprovalsService {
         return this.db
             .select(select)
             .from(tenderInfos)
+            .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
             .innerJoin(
                 tenderInformation,
                 eq(tenderInfos.id, tenderInformation.tenderId)
@@ -83,7 +85,7 @@ export class CostingApprovalsService {
                 tenderCostingSheets,
                 eq(tenderCostingSheets.tenderId, tenderInfos.id)
             )
-            .innerJoin(users, eq(users.id, tenderInfos.teamMember));
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember));
     }
 
     private getOrderBy(filters?: CostingApprovalFilters) {
@@ -112,6 +114,62 @@ export class CostingApprovalsService {
     /**
      * Get dashboard data by tab - Direct queries without config
      */
+
+    private buildDashboardConditions(user?: ValidatedUser, teamId?: number, activeTab?: string) : any[]{
+        //building the base condition
+        const conditions: any[] = [
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(), 
+            isNotNull(tenderCostingSheets.submittedFinalPrice)
+        ];
+
+        //building the role based filtering
+        const roleFilterConditions: any[] = [];
+        if (user && user.roleId) {
+            if (user.roleId === 1 || user.roleId === 2) {
+                if (teamId !== undefined && teamId !== null) {
+                    roleFilterConditions.push(eq(tenderInfos.team, teamId));
+                }
+            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+                if (user.teamId) {
+                    roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
+                } else {
+                    roleFilterConditions.push(sql`1 = 0`);
+                }
+            } else {
+                if (user.sub) {
+                    roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
+                } else {
+                    roleFilterConditions.push(sql`1 = 0`);
+                }
+            }
+        } else {
+            roleFilterConditions.push(sql`1 = 0`);
+        }
+
+        conditions.push(...roleFilterConditions);
+        
+        //building the tab conditions
+
+        if (activeTab === 'pending') {
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['lost']));
+            conditions.push(eq(tenderCostingSheets.status, 'Submitted'));
+            conditions.push(ne(bidSubmissions.status, "Tender Missed"));
+        } else if (activeTab === 'approved') {
+            // conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb']));
+            conditions.push(eq(tenderCostingSheets.status, 'Approved'));
+            conditions.push(ne(bidSubmissions.status, "Tender Missed"));
+        } else if (activeTab === 'tender-dnb') {
+            // conditions.push(inArray(tenderInfos.status, [8, 34]));
+            conditions.push(eq(bidSubmissions.status, "Tender Missed"));
+        } else {
+            throw new BadRequestException(`Invalid tab: ${activeTab}`);
+        }
+
+        //returning the conditions
+        return conditions;
+    }
+    
     async getDashboardData(
         tab?: 'pending' | 'approved' | 'tender-dnb',
         filters?: CostingApprovalFilters,
@@ -124,57 +182,24 @@ export class CostingApprovalsService {
 
         const activeTab = tab || 'pending';
 
-        // Build base conditions
-        const baseConditions = [
-            TenderInfosService.getActiveCondition(),
-            TenderInfosService.getApprovedCondition(),
-            // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-            isNotNull(tenderCostingSheets.submittedFinalPrice),
-        ];
-
-        // Apply role-based filtering
-        const roleFilterConditions: any[] = [];
-        if (user && user.roleId) {
-            // Role ID 1 = Super User, 2 = Admin: Show all tenders, respect teamId filter if provided
-            if (user.roleId === 1 || user.roleId === 2) {
-                // Super User or Admin: Show all, respect teamId filter if provided
-                if (teamId !== undefined && teamId !== null) {
-                    roleFilterConditions.push(eq(tenderInfos.team, teamId));
-                }
-                // If no teamId filter, show all (no additional condition added)
-            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
-                // Role ID 3 = Team Leader, 4 = Coordinator, 6 = Engineer: Filter by primary_team_id
-                if (user.teamId) {
-                    roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
-                } else {
-                    // If no teamId, return empty results (user has no team assigned)
-                    roleFilterConditions.push(sql`1 = 0`); // Always false condition
-                }
-            } else {
-                // All other roles: Show only own tenders
-                if (user.sub) {
-                    roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
-                } else {
-                    // If no user ID, return empty results
-                    roleFilterConditions.push(sql`1 = 0`); // Always false condition
-                }
-            }
-        } else {
-            // No user provided - return empty results for security
-            roleFilterConditions.push(sql`1 = 0`); // Always false condition
+        if(!['pending' , 'approved', 'tender-dnb'].includes(activeTab)){
+            throw new BadRequestException(`Invalid Tab: ${activeTab}`);
         }
 
-        // Build tab-specific conditions
-        const conditions = [...baseConditions, ...roleFilterConditions];
+        //building the final conditions
+        const conditions: any[] = this.buildDashboardConditions(user, teamId, activeTab);
 
         if (activeTab === 'pending') {
-            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['lost']));
             conditions.push(eq(tenderCostingSheets.status, 'Submitted'));
+            conditions.push(ne(bidSubmissions.status, "Tender Missed"));
         } else if (activeTab === 'approved') {
-            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb']));
+            // conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb']));
             conditions.push(eq(tenderCostingSheets.status, 'Approved'));
+            conditions.push(ne(bidSubmissions.status, "Tender Missed"));
         } else if (activeTab === 'tender-dnb') {
-            conditions.push(inArray(tenderInfos.status, [8, 34]));
+            // conditions.push(inArray(tenderInfos.status, [8, 34]));
+            conditions.push(eq(bidSubmissions.status, "Tender Missed"));
         } else {
             throw new BadRequestException(`Invalid tab: ${activeTab}`);
         }
@@ -250,90 +275,23 @@ export class CostingApprovalsService {
     }
 
     async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<CostingApprovalDashboardCounts> {
-        const baseCondition = TenderInfosService.getActiveCondition();
 
-        // Apply role-based filtering
-        const roleFilterConditions: any[] = [];
-        if (user && user.roleId) {
-            // Role ID 1 = Super User, 2 = Admin: Show all tenders, respect teamId filter if provided
-            if (user.roleId === 1 || user.roleId === 2) {
-                // Super User or Admin: Show all, respect teamId filter if provided
-                if (teamId !== undefined && teamId !== null) {
-                    roleFilterConditions.push(eq(tenderInfos.team, teamId));
-                }
-                // If no teamId filter, show all (no additional condition added)
-            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
-                // Role ID 3 = Team Leader, 4 = Coordinator, 6 = Engineer: Filter by primary_team_id
-                if (user.teamId) {
-                    roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
-                } else {
-                    // If no teamId, return empty results (user has no team assigned)
-                    roleFilterConditions.push(sql`1 = 0`); // Always false condition
-                }
-            } else {
-                // All other roles: Show only own tenders
-                if (user.sub) {
-                    roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
-                } else {
-                    // If no user ID, return empty results
-                    roleFilterConditions.push(sql`1 = 0`); // Always false condition
-                }
-            }
-        } else {
-            // No user provided - return empty results for security
-            roleFilterConditions.push(sql`1 = 0`); // Always false condition
-        }
-
-        const filteredBaseCondition = roleFilterConditions.length > 0
-            ? and(baseCondition, ...roleFilterConditions)
-            : baseCondition;
-
-        const baseConditions = [
-            filteredBaseCondition,
-            TenderInfosService.getApprovedCondition(),
-            isNotNull(tenderCostingSheets.submittedFinalPrice),
-        ];
-
-        // Count pending: costing_status IS NULL (or tenderCostingSheets.status IS NULL)
-        const pendingConditions = [
-            ...baseConditions,
-            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-            eq(tenderCostingSheets.status, 'Submitted'),
-        ];
-
-        // Count approved: costing_status = 'Approved'
-        const approvedConditions = [
-            ...baseConditions,
-            TenderInfosService.getExcludeStatusCondition(['dnb']),
-            eq(tenderCostingSheets.status, 'Approved'),
-        ];
-
-        // Count tender-dnb: status in [8, 9, 10, 11, 12, 13, 14, 15, 38, 39]
-        const tenderDnbBaseConditions = [
-            filteredBaseCondition,
-            TenderInfosService.getApprovedCondition(),
-            isNotNull(tenderCostingSheets.submittedFinalPrice),
-        ];
-        const tenderDnbConditions = [
-            ...tenderDnbBaseConditions,
-            inArray(tenderInfos.status, [8, 34]),
-        ];
 
         const counts = await Promise.all([
             this.costingApprovalBaseQuery({
                 count: sql<number>`count(distinct ${tenderInfos.id})`,
             })
-                .where(and(...pendingConditions))
+                .where(and(...this.buildDashboardConditions(user, teamId, 'pending')))
                 .then(([result]: any) => Number(result?.count || 0)),
             this.costingApprovalBaseQuery({
                 count: sql<number>`count(distinct ${tenderInfos.id})`,
             })
-                .where(and(...approvedConditions))
+                .where(and(...this.buildDashboardConditions(user, teamId, 'approved')))
                 .then(([result]: any) => Number(result?.count || 0)),
             this.costingApprovalBaseQuery({
                 count: sql<number>`count(distinct ${tenderInfos.id})`,
             })
-                .where(and(...tenderDnbConditions))
+                .where(and(...this.buildDashboardConditions(user, teamId, 'tender-dnb')))
                 .then(([result]: any) => Number(result?.count || 0)),
         ]);
 
@@ -344,6 +302,8 @@ export class CostingApprovalsService {
             total: counts.reduce((sum, count) => sum + count, 0),
         };
     }
+
+
 
     async findById(id: number, userTeam: number) {
         // Join with tenderInfos to verify team access
