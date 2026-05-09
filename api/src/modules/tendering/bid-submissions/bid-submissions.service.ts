@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { and, eq, isNotNull, isNull, or, asc, desc, sql, inArray, ilike } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, or, asc, desc, sql, inArray, ilike, ne, notInArray } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -54,7 +54,7 @@ export type BidSubmissionDashboardCounts = {
 };
 
 export const RFQActionStatuses = [10, 35, 14];
-export const EMDActionStatuses = [10, 35, 14];
+export const EMDActionStatuses = [10, 33 ,35, 14];
 
 @Injectable()
 export class BidSubmissionsService {
@@ -108,6 +108,48 @@ export class BidSubmissionsService {
     /**
      * Get dashboard data by tab - Direct queries without config
      */
+    private buildDashboardConditions(user?: ValidatedUser, teamId?: number, activeTab?: string ){
+        //building the base conditions
+        const conditions: any[] = [
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(),
+            // eq(tenderCostingSheets.status, 'Approved'),
+        ]
+
+        //building the role conditions
+        const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
+        conditions.push(...roleFilterConditions);
+        
+        //building the tab conditions
+        
+        if (activeTab === 'pending') {
+            conditions.push(isNull(bidSubmissions.id));
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['lost']));
+            conditions.push(ne(bidSubmissions.status, 'Tender Missed'));
+        } else if (activeTab === 'submitted') {
+            conditions.push(isNotNull(bidSubmissions.id), eq(bidSubmissions.status, 'Bid Submitted'));
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['lost']));
+            conditions.push(ne(bidSubmissions.status, 'Tender Missed'));
+        } else if (activeTab === 'disqualified') {
+            conditions.push(eq(bidSubmissions.status, "Tender Missed"));
+            conditions.push(inArray(bidSubmissions.reasonStatus,[33])); //33 -> EMD Not paid
+        } else if (activeTab === 'tender-dnb') {
+            conditions.push(eq(bidSubmissions.status, "Tender Missed"));
+            conditions.push(
+                or(
+                    notInArray(bidSubmissions.reasonStatus,[33]),
+                    isNull(bidSubmissions.reasonStatus)
+                )
+            )
+        } else {
+            throw new BadRequestException(`Invalid tab: ${activeTab}`);
+        }
+
+        //returning the tab conditions
+        return conditions;
+
+    }
+
     async getDashboardData(
         user?: ValidatedUser,
         teamId?: number,
@@ -120,51 +162,12 @@ export class BidSubmissionsService {
 
         const activeTab = tab ?? 'pending';
 
-        // Build base conditions
-        // Laravel entry condition: costing_status IS NOT NULL
-        // NestJS entry condition: status = 7 AND costingSheet.status = 'Approved'
-        const baseConditions = [
-            TenderInfosService.getActiveCondition(),
-            TenderInfosService.getApprovedCondition(),
-            // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-            eq(tenderCostingSheets.status, 'Approved'),
-        ];
-
-        // Build tab-specific conditions
-        const conditions = [...baseConditions];
-
-        // Apply role-based filtering
-        const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
-        conditions.push(...roleFilterConditions);
-
-        if (activeTab === 'pending') {
-            conditions.push(isNull(bidSubmissions.id));
-            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
-        } else if (activeTab === 'submitted') {
-            conditions.push(isNotNull(bidSubmissions.id), eq(bidSubmissions.status, 'Bid Submitted'));
-            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
-        } else if (activeTab === 'disqualified') {
-            conditions.push(isNotNull(bidSubmissions.id), eq(bidSubmissions.status, 'Tender Missed'));
-        } else if (activeTab === 'tender-dnb') {
-            conditions.push(inArray(tenderInfos.status, [8, 34]));
-        } else {
-            throw new BadRequestException(`Invalid tab: ${activeTab}`);
+        if(!['pending', 'submitted', 'disqualified' ,'tender-dnb'].includes(activeTab)){
+            throw new BadRequestException(`Invalid Status: ${tab}`);
         }
 
-        // Add search conditions
-        if (filters?.search) {
-            const searchStr = `%${filters.search}%`;
-            conditions.push(
-                sql`(
-                    ${tenderInfos.tenderName} ILIKE ${searchStr} OR
-                    ${tenderInfos.tenderNo} ILIKE ${searchStr} OR
-                    ${tenderInfos.dueDate}::text ILIKE ${searchStr} OR
-                    ${users.name} ILIKE ${searchStr} OR
-                    ${statuses.name} ILIKE ${searchStr}
-                )`
-            );
-        }
-
+        const conditions : any[] = this.buildDashboardConditions(user, teamId, tab);
+        
         const whereClause = and(...conditions);
 
         // Build orderBy clause
@@ -211,10 +214,10 @@ export class BidSubmissionsService {
         const [countResult] = await this.db
             .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
             .from(tenderInfos)
-            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-            .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(items, eq(items.id, tenderInfos.item))
-            .innerJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+            .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
             .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
             .where(whereClause);
         const total = Number(countResult?.count || 0);
@@ -238,10 +241,10 @@ export class BidSubmissionsService {
                 bidSubmissionStatus: bidSubmissions.status,
             })
             .from(tenderInfos)
-            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-            .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(items, eq(items.id, tenderInfos.item))
-            .innerJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+            .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
             .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
             .where(whereClause)
             .orderBy(orderByClause)
@@ -278,83 +281,47 @@ export class BidSubmissionsService {
     }
 
     async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<{ pending: number; submitted: number; disqualified: number; 'tender-dnb': number; total: number }> {
-        const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
-
-        const baseConditions = [
-            TenderInfosService.getActiveCondition(),
-            TenderInfosService.getApprovedCondition(),
-            // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-            eq(tenderCostingSheets.status, 'Approved'),
-            ...roleFilterConditions,
-        ];
-
-        const pendingConditions = [
-            ...baseConditions,
-            isNull(bidSubmissions.id),
-        ];
-
-        const submittedConditions = [
-            ...baseConditions,
-            isNotNull(bidSubmissions.id), eq(bidSubmissions.status, 'Bid Submitted'),
-        ];
-
-        const disqualifiedConditions = [
-            ...baseConditions,
-            isNotNull(bidSubmissions.id),
-            eq(bidSubmissions.status, 'Tender Missed'),
-        ];
-
-        const tenderDnbBaseConditions = [
-            TenderInfosService.getActiveCondition(),
-            TenderInfosService.getApprovedCondition(),
-            eq(tenderCostingSheets.status, 'Approved'),
-            ...roleFilterConditions,
-        ];
-        const tenderDnbConditions = [
-            ...tenderDnbBaseConditions,
-            inArray(tenderInfos.status, [8, 34]),
-        ];
 
         const counts = await Promise.all([
             this.db
                 .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
                 .from(tenderInfos)
-                .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-                .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
+                .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
                 .leftJoin(items, eq(items.id, tenderInfos.item))
-                .innerJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+                .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
                 .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
-                .where(and(...pendingConditions))
+                .where(and(...this.buildDashboardConditions(user, teamId, 'pending')))
                 .then(([result]) => Number(result?.count || 0)),
             this.db
                 .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
                 .from(tenderInfos)
-                .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-                .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
+                .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
                 .leftJoin(items, eq(items.id, tenderInfos.item))
-                .innerJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+                .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
                 .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
-                .where(and(...submittedConditions))
+                .where(and(...this.buildDashboardConditions(user, teamId, 'submitted')))
                 .then(([result]) => Number(result?.count || 0)),
             this.db
                 .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
                 .from(tenderInfos)
-                .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-                .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
+                .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
                 .leftJoin(items, eq(items.id, tenderInfos.item))
-                .innerJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+                .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
                 .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
-                .where(and(...disqualifiedConditions))
+                .where(and(...this.buildDashboardConditions(user, teamId, 'disqualified')))
                 .then(([result]) => Number(result?.count || 0)),
             this.db
                 .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
                 .from(tenderInfos)
-                .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-                .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
+                .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
                 .leftJoin(items, eq(items.id, tenderInfos.item))
-                .innerJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+                .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
                 .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
-                .where(and(...tenderDnbConditions))
+                .where(and(...this.buildDashboardConditions(user, teamId, 'tender-dnb')))
                 .then(([result]) => Number(result?.count || 0)),
         ]);
 
@@ -699,7 +666,7 @@ export class BidSubmissionsService {
     // Implementing actions for different statuses
     // Two actions required for now
     // RejectRFQ -> action for statuses ->10, 35, 14
-    // RejectEMD -> action for statuses ->10, 35, 14
+    // RejectEMD -> action for statuses ->10, 33, 35, 14 
 
     async rejectRFQ(tenderId : number){
         //not needed for now since we use tenderstatus already
