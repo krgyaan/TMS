@@ -1,11 +1,23 @@
 import { z } from 'zod';
 
+export interface InfoSheetCondition {
+    processingFeeRequired: 'YES' | 'NO' | null;
+    processingFeeAmount: number | string | null;
+    processingFeeMode: string[] | null;
+    tenderFeeRequired: 'YES' | 'NO' | null;
+    tenderFeeAmount: number | string | null;
+    tenderFeeMode: string[] | null;
+    emdRequired: 'YES' | 'NO' | 'EXEMPT' | null;
+    emdAmount: number | string | null;
+    emdMode: string[] | null;
+}
+
 export const TenderApprovalFormSchema = z.object({
     tlDecision: z.enum(['0', '1', '2', '3']),
 
     // RFQ Required (when approved)
     rfqRequired: z.enum(['yes', 'no']).optional(),
-    quotationFiles: z.array(z.string()).max(5).optional(),
+    // quotationFiles: z.array(z.string()).max(5).optional(),
 
     // Bidding Details (when approved)
     rfqTo: z.array(z.string()).optional(),
@@ -33,6 +45,17 @@ export const TenderApprovalFormSchema = z.object({
         fieldName: z.string(),
         comment: z.string().min(1, "Comment is required"),
     })).optional(),
+
+    // InfoSheet context fields (for conditional validation - not submitted to API)
+    processingFeeRequired: z.enum(['YES', 'NO']).optional(),
+    processingFeeAmount: z.number().optional(),
+    processingFeeModes: z.array(z.string()).optional(),
+    tenderFeeRequired: z.enum(['YES', 'NO']).optional(),
+    tenderFeeAmount: z.number().optional(),
+    tenderFeeModes: z.array(z.string()).optional(),
+    emdRequired: z.enum(['YES', 'NO', 'EXEMPT']).optional(),
+    emdAmount: z.number().optional(),
+    emdModes: z.array(z.string()).optional(),
 }).refine((data) => {
     // If incomplete status, must have at least 1 incomplete field
     if (data.tlDecision === '3') {
@@ -69,13 +92,53 @@ export const TenderApprovalFormSchema = z.object({
 }, {
     message: "Please select at least one vendor for RFQ",
     path: ["rfqTo"],
-}).refine((data) => {
-    // If approved and RFQ required is no, must upload at least one quotation file
-    if (data.tlDecision === '1' && data.rfqRequired === 'no') {
-        return Array.isArray(data.quotationFiles) && data.quotationFiles.length > 0;
+}).superRefine((data, ctx) => {
+    // Conditional validation for Processing Fee Mode
+    if (data.tlDecision === '1') {
+        const amount = Number(data.processingFeeAmount) || 0;
+        const hasAmount = amount > 0;
+        const hasModes = data.processingFeeModes && data.processingFeeModes.length > 0;
+        const required = data.processingFeeRequired === 'YES' && hasAmount && hasModes;
+
+        if (required && !data.processingFeeMode) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Processing Fee Mode is required",
+                path: ["processingFeeMode"],
+            });
+        }
     }
-    return true;
-}, {
-    message: "Please upload at least one quotation file",
-    path: ["quotationFiles"],
+}).superRefine((data, ctx) => {
+    // Conditional validation for Tender Fee Mode
+    if (data.tlDecision === '1') {
+        const amount = Number(data.tenderFeeAmount) || 0;
+        const hasAmount = amount > 0;
+        const hasModes = data.tenderFeeModes && data.tenderFeeModes.length > 0;
+        const required = data.tenderFeeRequired === 'YES' && hasAmount && hasModes;
+
+        if (required && !data.tenderFeeMode) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Tender Fee Mode is required",
+                path: ["tenderFeeMode"],
+            });
+        }
+    }
+}).superRefine((data, ctx) => {
+    // Conditional validation for EMD Mode
+    if (data.tlDecision === '1') {
+        const isExempt = data.emdRequired === 'EXEMPT';
+        const amount = Number(data.emdAmount) || 0;
+        const hasAmount = amount > 0;
+        const hasModes = data.emdModes && data.emdModes.length > 0;
+        const required = !isExempt && data.emdRequired === 'YES' && hasAmount && hasModes;
+
+        if (required && !data.emdMode) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "EMD Mode is required",
+                path: ["emdMode"],
+            });
+        }
+    }
 });

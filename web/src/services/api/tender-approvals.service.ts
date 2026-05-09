@@ -56,6 +56,10 @@ class TenderApprovalsService extends BaseApiService {
         const query = params.toString();
         return this.get<TenderApprovalDashboardCounts>(query ? `/dashboard/counts?${query}` : '/dashboard/counts');
     }
+
+    async getTenderRejectedStatuses(){
+        return this.get('/rejected-statuses');
+    }
 }
 
 export const tenderApprovalsService = new TenderApprovalsService();

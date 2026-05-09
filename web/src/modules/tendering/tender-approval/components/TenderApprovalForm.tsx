@@ -16,7 +16,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { ArrowLeft, Save, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 import { paths } from '@/app/routes/paths';
-import { useCreateTenderApproval, useUpdateTenderApproval } from '@/hooks/api/useTenderApprovals';
+import { useCreateTenderApproval, useTenderRejectionStatuses, useUpdateTenderApproval } from '@/hooks/api/useTenderApprovals';
 import { useVendorOrganizations } from '@/hooks/api/useVendorOrganizations';
 import { useStatuses } from '@/hooks/api/useStatuses';
 import { tlDecisionOptions, documentApprovalOptions, infoSheetFieldOptions } from '@/modules/tendering/tender-approval/helpers/tenderApproval.types';
@@ -25,7 +25,7 @@ import { TenderApprovalFormSchema } from '../helpers/tenderApproval.schema';
 import type { TenderApprovalFormValues } from '../helpers/tenderApproval.types';
 import { getInitialValues, mapFormToPayload } from '../helpers/tenderApproval.mappers';
 import { usePqrOptions, useFinanceDocumentOptions } from '@/hooks/useSelectOptions';
-import { TenderFileUploader } from '@/components/tender-file-upload/TenderFileUploader';
+// import { TenderFileUploader } from '@/components/tender-file-upload/TenderFileUploader';
 import { tenderFilesService } from '@/services/api/tender-files.service';
 import { formatINR } from '@/hooks/useINRFormatter';
 
@@ -72,7 +72,7 @@ const InfoSheetMissingAlert = ({ tenderId, onBack }: { tenderId: number, onBack:
 export function TenderApprovalForm({ tenderId, relationships, isLoading: isParentLoading }: TenderApprovalFormProps) {
     const navigate = useNavigate();
     const { data: vendorOrganizations, isLoading: isVendorOrgsLoading } = useVendorOrganizations();
-    const { data: statuses, isLoading: isStatusesLoading } = useStatuses();
+    const { data: statuses, isLoading: isStatusesLoading } = useTenderRejectionStatuses();
     const createApproval = useCreateTenderApproval();
     const updateApproval = useUpdateTenderApproval();
     const pqrOptions = usePqrOptions();
@@ -114,6 +114,48 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
         }
     }, [form.formState.errors]);
 
+    // Set infoSheet context fields for conditional validation
+    useEffect(() => {
+        if (infoSheet) {
+            form.setValue('processingFeeRequired', infoSheet.processingFeeRequired as 'YES' | 'NO');
+            form.setValue('processingFeeAmount', infoSheet.processingFeeAmount ? Number(infoSheet.processingFeeAmount) : undefined);
+            form.setValue('processingFeeModes', infoSheet.processingFeeMode || []);
+            form.setValue('tenderFeeRequired', infoSheet.tenderFeeRequired as 'YES' | 'NO');
+            form.setValue('tenderFeeAmount', infoSheet.tenderFeeAmount ? Number(infoSheet.tenderFeeAmount) : undefined);
+            form.setValue('tenderFeeModes', infoSheet.tenderFeeMode || []);
+            form.setValue('emdRequired', infoSheet.emdRequired as 'YES' | 'NO' | 'EXEMPT');
+            form.setValue('emdAmount', infoSheet.emdAmount ? Number(infoSheet.emdAmount) : undefined);
+            form.setValue('emdModes', infoSheet.emdMode || []);
+        }
+    }, [infoSheet, form]);
+
+    // Helper to determine if a field is required based on infoSheet data
+    const isFieldRequired = (field: 'processingFee' | 'tenderFee' | 'emd') => {
+        if (!infoSheet || tlDecision !== '1') return false;
+
+        const required = infoSheet.processingFeeRequired === 'YES';
+        const amount = Number(infoSheet.processingFeeAmount) || 0;
+        const hasModes = (infoSheet.processingFeeMode?.length || 0) > 0;
+
+        if (field === 'processingFee') {
+            return required && amount > 0 && hasModes;
+        }
+        if (field === 'tenderFee') {
+            const tenderRequired = infoSheet.tenderFeeRequired === 'YES';
+            const tenderAmount = Number(infoSheet.tenderFeeAmount) || 0;
+            const tenderHasModes = (infoSheet.tenderFeeMode?.length || 0) > 0;
+            return tenderRequired && tenderAmount > 0 && tenderHasModes;
+        }
+        if (field === 'emd') {
+            const emdRequired = infoSheet.emdRequired === 'YES';
+            const emdAmount = Number(infoSheet.emdAmount) || 0;
+            const emdHasModes = (infoSheet.emdMode?.length || 0) > 0;
+            const isExempt = infoSheet.emdRequired === 'EXEMPT';
+            return !isExempt && emdRequired && emdAmount > 0 && emdHasModes;
+        }
+        return false;
+    };
+
     const tlDecision = form.watch('tlDecision');
     const rfqRequired = form.watch('rfqRequired');
     const tenderStatus = form.watch('tenderStatus');
@@ -132,7 +174,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
         } else if (tlDecision === '2') {
             // Clear approval and incomplete fields
             form.setValue('rfqRequired', undefined);
-            form.setValue('quotationFiles', []);
+            // form.setValue('quotationFiles', []);
             form.setValue('rfqTo', []);
             form.setValue('processingFeeMode', undefined);
             form.setValue('tenderFeeMode', undefined);
@@ -147,7 +189,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
         } else if (tlDecision === '3') {
             // Clear approval and rejection fields
             form.setValue('rfqRequired', undefined);
-            form.setValue('quotationFiles', []);
+            // form.setValue('quotationFiles', []);
             form.setValue('rfqTo', []);
             form.setValue('processingFeeMode', undefined);
             form.setValue('tenderFeeMode', undefined);
@@ -163,7 +205,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
         } else if (tlDecision === '0') {
             // Clear all conditional fields
             form.setValue('rfqRequired', undefined);
-            form.setValue('quotationFiles', []);
+            // form.setValue('quotationFiles', []);
             form.setValue('rfqTo', []);
             form.setValue('processingFeeMode', undefined);
             form.setValue('tenderFeeMode', undefined);
@@ -186,7 +228,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
         if (tlDecision === '1') {
             if (rfqRequired === 'yes') {
                 // Clear quotation files when switching to RFQ required
-                form.setValue('quotationFiles', []);
+                // form.setValue('quotationFiles', []);
             } else if (rfqRequired === 'no') {
                 // Clear vendor selection when switching to quotation files
                 form.setValue('rfqTo', []);
@@ -202,10 +244,11 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
     const tenderStatusOptions = useMemo(() =>{
         if(!statuses) return [];
 
-        return statuses
-            .filter(s => s.tenderCategory === 'dnb' && Number(s.id) !== 43)
-            .map(s => ({ value: String(s.id), label: s.name }))    
-        }, [statuses]);
+        return statuses.map((s: any) => ({
+            value: String(s.id),
+            label: s.name
+        }));
+    }, [statuses]);
 
     const rfqRequiredOptions = useMemo(() => [
         { value: 'yes', label: 'Yes' },
@@ -333,7 +376,45 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
     };
 
     const handleSubmit: SubmitHandler<TenderApprovalFormValues> = async (values) => {
-        // Trigger validation
+        // Check conditional required fields based on infoSheet
+        if (values.tlDecision === '1' && infoSheet) {
+            const validationErrors: string[] = [];
+
+            // Processing Fee Mode validation
+            const pfRequired = infoSheet.processingFeeRequired === 'YES';
+            const pfAmount = Number(infoSheet.processingFeeAmount) || 0;
+            const pfHasModes = (infoSheet.processingFeeMode?.length || 0) > 0;
+            if (pfRequired && pfAmount > 0 && pfHasModes && !values.processingFeeMode) {
+                form.setError('processingFeeMode', { message: 'Processing Fee Mode is required' });
+                validationErrors.push('Processing Fee Mode is required');
+            }
+
+            // Tender Fee Mode validation
+            const tfRequired = infoSheet.tenderFeeRequired === 'YES';
+            const tfAmount = Number(infoSheet.tenderFeeAmount) || 0;
+            const tfHasModes = (infoSheet.tenderFeeMode?.length || 0) > 0;
+            if (tfRequired && tfAmount > 0 && tfHasModes && !values.tenderFeeMode) {
+                form.setError('tenderFeeMode', { message: 'Tender Fee Mode is required' });
+                validationErrors.push('Tender Fee Mode is required');
+            }
+
+            // EMD Mode validation
+            const emdIsExempt = infoSheet.emdRequired === 'EXEMPT';
+            const emdRequired = infoSheet.emdRequired === 'YES';
+            const emdAmount = Number(infoSheet.emdAmount) || 0;
+            const emdHasModes = (infoSheet.emdMode?.length || 0) > 0;
+            if (!emdIsExempt && emdRequired && emdAmount > 0 && emdHasModes && !values.emdMode) {
+                form.setError('emdMode', { message: 'EMD Mode is required' });
+                validationErrors.push('EMD Mode is required');
+            }
+
+            if (validationErrors.length > 0) {
+                toast.error(validationErrors.join(', '));
+                return;
+            }
+        }
+
+        // Trigger schema validation
         const isValid = await form.trigger();
         if (!isValid) {
             const errors = form.formState.errors;
@@ -463,7 +544,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                         />
                                     )}
 
-                                    {rfqRequired === 'no' && (
+                                    {/* {rfqRequired === 'no' && (
                                         <div className="space-y-2">
                                             <TenderFileUploader
                                                 context="rfq-response-quotation"
@@ -475,19 +556,27 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                                 <p className="text-sm text-destructive mt-1">{form.formState.errors.quotationFiles.message}</p>
                                             )}
                                         </div>
-                                    )}
+                                    )} */}
                                 </div>
                                 <div className="space-y-4">
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                        <div className="space-y-2">
+                                        <div className="space-y-2" id="processing-fee">
                                             <SelectField
                                                 key={`processing-fee-mode-${approval?.processingFeeMode || 'new'}`}
                                                 control={form.control}
                                                 name="processingFeeMode"
-                                                label="Processing Fee Mode"
+                                                label={
+                                                    <span>
+                                                        Processing Fee Mode
+                                                        {isFieldRequired('processingFee') && <span className="text-destructive ml-1">*</span>}
+                                                    </span>
+                                                }
                                                 options={processingFeeModeOptions}
                                                 placeholder="Select processing fee mode"
                                             />
+                                            {form.formState.errors.processingFeeMode && (
+                                                <p className="text-sm text-destructive mt-1">{form.formState.errors.processingFeeMode.message}</p>
+                                            )}
                                             {infoSheet && (infoSheet.processingFeeAmount || (infoSheet.processingFeeMode && infoSheet.processingFeeMode.length > 0)) && (
                                                 <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded space-y-1">
                                                     {infoSheet.processingFeeRequired == 'YES' ? (
@@ -500,14 +589,22 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                                 </div>
                                             )}
                                         </div>
-                                        <div className="space-y-2">
+                                        <div className="space-y-2" id="tender-fee">
                                             <SelectField
                                                 control={form.control}
                                                 name="tenderFeeMode"
-                                                label="Tender Fee Mode"
+                                                label={
+                                                    <span>
+                                                        Tender Fee Mode
+                                                        {isFieldRequired('tenderFee') && <span className="text-destructive ml-1">*</span>}
+                                                    </span>
+                                                }
                                                 options={tenderFeeModeOptions}
                                                 placeholder="Select tender fee mode"
                                             />
+                                            {form.formState.errors.tenderFeeMode && (
+                                                <p className="text-sm text-destructive mt-1">{form.formState.errors.tenderFeeMode.message}</p>
+                                            )}
                                             {infoSheet && (infoSheet.tenderFeeAmount || (infoSheet.tenderFeeMode && infoSheet.tenderFeeMode.length > 0)) && (
                                                 <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded space-y-1">
                                                     {infoSheet.tenderFeeRequired == 'YES' ? (
@@ -519,14 +616,22 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
                                                 </div>
                                             )}
                                         </div>
-                                        <div className="space-y-2">
+                                        <div className="space-y-2" id="emd">
                                             <SelectField
                                                 control={form.control}
                                                 name="emdMode"
-                                                label="EMD Mode"
+                                                label={
+                                                    <span>
+                                                        EMD Mode
+                                                        {isFieldRequired('emd') && <span className="text-destructive ml-1">*</span>}
+                                                    </span>
+                                                }
                                                 options={emdModeOptions}
                                                 placeholder="Select EMD mode"
                                             />
+                                            {form.formState.errors.emdMode && (
+                                                <p className="text-sm text-destructive mt-1">{form.formState.errors.emdMode.message}</p>
+                                            )}
                                             {infoSheet && (infoSheet.emdAmount || (infoSheet.emdMode && infoSheet.emdMode.length > 0)) && (
                                                 <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded space-y-1">
                                                     {infoSheet.emdRequired == 'YES' ? (

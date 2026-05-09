@@ -1,52 +1,53 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import DataTable from '@/components/ui/data-table';
-import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState, useEffect, useCallback } from 'react';
-import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
-import type { ActionItem } from '@/components/ui/ActionMenu';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { paths } from '@/app/routes/paths';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Eye, FileX2, Search, RefreshCw, Send, XCircle } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { useChecklistDashboardCounts, useDocumentChecklists } from '@/hooks/api/useDocumentChecklists';
-import type { TenderDocumentChecklistDashboardRow, TenderDocumentChecklistDashboardRowWithTimer } from './helpers/documentChecklist.types';
-import { currencyCol, dateCol, tenderNameCol } from '@/components/data-grid';
-import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
-import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
-import { QuickFilter } from '@/components/ui/quick-filter';
-import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
-import { useTenderingPermissions } from '../hooks/useTenderingPermissions';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import DataTable from "@/components/ui/data-table";
+import type { ColDef } from "ag-grid-community";
+import { useMemo, useState, useEffect, useCallback } from "react";
+import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
+import type { ActionItem } from "@/components/ui/ActionMenu";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { paths } from "@/app/routes/paths";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle, Eye, FileX2, Search, RefreshCw, Send, XCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { useChecklistDashboardCounts, useDocumentChecklists } from "@/hooks/api/useDocumentChecklists";
+import type { TenderDocumentChecklistDashboardRow, TenderDocumentChecklistDashboardRowWithTimer } from "./helpers/documentChecklist.types";
+import { currencyCol, dateCol, tenderNameCol } from "@/components/data-grid";
+import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
+import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
+import { QuickFilter } from "@/components/ui/quick-filter";
+import { ChangeStatusModal } from "../tenders/components/ChangeStatusModal";
+import { useTenderingPermissions } from "../hooks/useTenderingPermissions";
 
 const Checklists = () => {
     const [searchParams] = useSearchParams();
-    const initialTab = (searchParams.get('tab') as 'pending' | 'submitted' | 'tender-dnb') || 'pending';
-    const [activeTab, setActiveTab] = useState<'pending' | 'submitted' | 'tender-dnb'>(initialTab);
+    const initialTab = (searchParams.get("tab") as "pending" | "submitted" | "tender-dnb") || "pending";
+    const [activeTab, setActiveTab] = useState<"pending" | "submitted" | "tender-dnb">(initialTab);
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
-    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
-    const [search, setSearch] = useState<string>('');
+    const [sortModel, setSortModel] = useState<{ colId: string; sort: "asc" | "desc" }[]>([]);
+    const [search, setSearch] = useState<string>("");
     const debouncedSearch = useDebouncedSearch(search, 300);
     const navigate = useNavigate();
     const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({
         open: false,
-        tenderId: null
+        tenderId: null,
     });
 
-    const {hasTenderingPermission} = useTenderingPermissions();
+    const { hasTenderingPermission } = useTenderingPermissions();
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, [activeTab, debouncedSearch]);
 
     const handleSortChanged = useCallback((event: any) => {
-        const sortModel = event.api.getColumnState()
+        const sortModel = event.api
+            .getColumnState()
             .filter((col: any) => col.sort)
             .map((col: any) => ({
                 colId: col.colId,
-                sort: col.sort as 'asc' | 'desc'
+                sort: col.sort as "asc" | "desc",
             }));
         setSortModel(sortModel);
         setPagination(p => ({ ...p, pageIndex: 0 }));
@@ -58,7 +59,11 @@ const Checklists = () => {
 
     const { data: counts } = useChecklistDashboardCounts();
 
-    const { data: apiResponse, isLoading: loading, error } = useDocumentChecklists(
+    const {
+        data: apiResponse,
+        isLoading: loading,
+        error,
+    } = useDocumentChecklists(
         activeTab,
         { page: pagination.pageIndex + 1, limit: pagination.pageSize, search: debouncedSearch || undefined },
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
@@ -69,7 +74,7 @@ const Checklists = () => {
 
     const checklistActions: ActionItem<TenderDocumentChecklistDashboardRowWithTimer>[] = [
         {
-            label: 'Sumbit',
+            label: "Sumbit",
             onClick: (row: TenderDocumentChecklistDashboardRow) => {
                 if (row.checklistSubmitted) {
                     navigate(paths.tendering.documentChecklistEdit(row.tenderId));
@@ -80,131 +85,126 @@ const Checklists = () => {
             icon: <Send className="h-4 w-4" />,
         },
         {
-            label: 'View',
+            label: "View",
             onClick: (row: TenderDocumentChecklistDashboardRow) => {
                 navigate(paths.tendering.documentChecklistView(row.tenderId));
             },
             icon: <Eye className="h-4 w-4" />,
         },
-        {
-            label: 'Mark as Missed',
-            onClick: (row) => {
-                navigate(paths.tendering.bidMissedGlobal(row.tenderId, 'checklist'));
-            },
-            icon: <XCircle className="h-4 w-4" />,
-            visible: () => hasTenderingPermission && activeTab !== 'tender-dnb',
-        },
+        // {
+        //     label: 'Mark as Missed',
+        //     onClick: (row) => {
+        //         navigate(paths.tendering.bidMissedGlobal(row.tenderId, 'checklist'));
+        //     },
+        //     icon: <XCircle className="h-4 w-4" />,
+        //     visible: () => hasTenderingPermission && activeTab !== 'tender-dnb',
+        // },
     ];
 
     const tabsConfig = useMemo(() => {
         return [
             {
-                key: 'pending' as const,
-                name: 'Document Checklist Pending',
+                key: "pending" as const,
+                name: "Document Checklist Pending",
                 count: counts?.pending ?? 0,
             },
             {
-                key: 'submitted' as const,
-                name: 'Document Checklist Submitted',
+                key: "submitted" as const,
+                name: "Document Checklist Submitted",
                 count: counts?.submitted ?? 0,
             },
             {
-                key: 'tender-dnb' as const,
-                name: 'Tender DNB',
-                count: counts?.['tender-dnb'] ?? 0,
+                key: "tender-dnb" as const,
+                name: "Tender DNB",
+                count: counts?.["tender-dnb"] ?? 0,
             },
         ];
     }, [counts]);
 
-    const colDefs = useMemo<ColDef<TenderDocumentChecklistDashboardRowWithTimer>[]>(() => [
-        tenderNameCol<TenderDocumentChecklistDashboardRow>('tenderName', {
-            field: 'tenderName',
-            colId: 'tenderName',
-            headerName: 'Tender Details',
-            filter: true,
-            width: 250,
-        }),
-        {
-            field: 'teamMemberName',
-            colId: 'teamMemberName',
-            headerName: 'Member',
-            width: 150,
-            valueGetter: (params: any) => params.data?.teamMemberName || '—',
-            sortable: true,
-            filter: true,
-        },
-        dateCol<TenderDocumentChecklistDashboardRow>('dueDate', { includeTime: true }, {
-            headerName: 'Due Date',
-            width: 150,
-            colId: 'dueDate',
-        }),
-        {
-            field: 'itemName',
-            colId: 'itemName',
-            headerName: 'Item',
-            width: 150,
-            valueGetter: (params: any) => params.data?.itemName || '—',
-            sortable: true,
-            filter: true,
-        },
-        currencyCol<TenderDocumentChecklistDashboardRow>('gstValues', {
-            field: "gstValues",
-            colId: "gstValues",
-            headerName: 'Tender Value',
-            filter: true,
-            sortable: true,
-            width: 130,
-        }),
-        {
-            field: 'statusName',
-            colId: 'statusName',
-            headerName: 'Tender Status',
-            width: 160,
-            valueGetter: (params: any) => params.data?.statusName || '—',
-            sortable: true,
-            filter: true,
-            cellRenderer: (params: any) => {
-                const status = params.value;
-                if (!status) return '—';
-                return (
-                    <Badge variant="default">
-                        {status}
-                    </Badge>
-                );
+    const colDefs = useMemo<ColDef<TenderDocumentChecklistDashboardRowWithTimer>[]>(
+        () => [
+            tenderNameCol<TenderDocumentChecklistDashboardRow>("tenderName", {
+                field: "tenderName",
+                colId: "tenderName",
+                headerName: "Tender Details",
+                filter: true,
+                width: 250,
+            }),
+            {
+                field: "teamMemberName",
+                colId: "teamMemberName",
+                headerName: "Member",
+                width: 150,
+                valueGetter: (params: any) => params.data?.teamMemberName || "—",
+                sortable: true,
+                filter: true,
             },
-        },
-        {
-            field: 'timer',
-            headerName: 'Timer',
-            width: 110,
-            cellRenderer: (params: any) => {
-                const { data } = params;
-                const timer = data?.timer;
-
-                if (!timer) {
-                    return <TenderTimerDisplay
-                        remainingSeconds={0}
-                        status="NOT_STARTED"
-                    />;
+            dateCol<TenderDocumentChecklistDashboardRow>(
+                "dueDate",
+                { includeTime: true },
+                {
+                    headerName: "Due Date",
+                    width: 150,
+                    colId: "dueDate",
                 }
-
-                return (
-                    <TenderTimerDisplay
-                        remainingSeconds={timer.remainingSeconds}
-                        status={timer.status}
-                    />
-                );
+            ),
+            {
+                field: "itemName",
+                colId: "itemName",
+                headerName: "Item",
+                width: 150,
+                valueGetter: (params: any) => params.data?.itemName || "—",
+                sortable: true,
+                filter: true,
             },
-        },
-        {
-            headerName: '',
-            filter: false,
-            cellRenderer: createActionColumnRenderer(checklistActions),
-            sortable: false,
-            pinned: 'right',
-            width: 57,
-        },
-    ], [checklistActions]);
+            currencyCol<TenderDocumentChecklistDashboardRow>("gstValues", {
+                field: "gstValues",
+                colId: "gstValues",
+                headerName: "Tender Value",
+                filter: true,
+                sortable: true,
+                width: 130,
+            }),
+            {
+                field: "statusName",
+                colId: "statusName",
+                headerName: "Tender Status",
+                width: 160,
+                valueGetter: (params: any) => params.data?.statusName || "—",
+                sortable: true,
+                filter: true,
+                cellRenderer: (params: any) => {
+                    const status = params.value;
+                    if (!status) return "—";
+                    return <Badge variant="default">{status}</Badge>;
+                },
+            },
+            {
+                field: "timer",
+                headerName: "Timer",
+                width: 110,
+                cellRenderer: (params: any) => {
+                    const { data } = params;
+                    const timer = data?.timer;
+
+                    if (!timer) {
+                        return <TenderTimerDisplay remainingSeconds={0} status="NOT_STARTED" />;
+                    }
+
+                    return <TenderTimerDisplay remainingSeconds={timer.remainingSeconds} status={timer.status} />;
+                },
+            },
+            {
+                headerName: "",
+                filter: false,
+                cellRenderer: createActionColumnRenderer(checklistActions),
+                sortable: false,
+                pinned: "right",
+                width: 57,
+            },
+        ],
+        [checklistActions]
+    );
 
     if (loading) {
         return (
@@ -236,15 +236,12 @@ const Checklists = () => {
                 <CardContent className="p-6">
                     <Alert variant="destructive">
                         <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>
-                            Failed to load checklists. Please try again later.
-                        </AlertDescription>
+                        <AlertDescription>Failed to load checklists. Please try again later.</AlertDescription>
                     </Alert>
                 </CardContent>
             </Card>
         );
     }
-
 
     return (
         <Card>
@@ -252,21 +249,15 @@ const Checklists = () => {
                 <div className="flex items-center justify-between">
                     <div>
                         <CardTitle>Document Checklists</CardTitle>
-                        <CardDescription className="mt-2">
-                            Manage document checklists for approved tenders.
-                        </CardDescription>
+                        <CardDescription className="mt-2">Manage document checklists for approved tenders.</CardDescription>
                     </div>
                 </div>
             </CardHeader>
             <CardContent className="px-0">
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'pending' | 'submitted' | 'tender-dnb')}>
+                <Tabs value={activeTab} onValueChange={value => setActiveTab(value as "pending" | "submitted" | "tender-dnb")}>
                     <TabsList className="m-auto mb-4">
-                        {tabsConfig.map((tab) => (
-                            <TabsTrigger
-                                key={tab.key}
-                                value={tab.key}
-                                className="data-[state=active]:shadow-md flex items-center gap-1"
-                            >
+                        {tabsConfig.map(tab => (
+                            <TabsTrigger key={tab.key} value={tab.key} className="data-[state=active]:shadow-md flex items-center gap-1">
                                 <span className="font-semibold text-sm">{tab.name}</span>
                                 <Badge variant="secondary" className="text-xs">
                                     {tab.count}
@@ -278,37 +269,27 @@ const Checklists = () => {
                     {/* Search Row: Quick Filters, Search Bar, Sort Filter */}
                     <div className="flex items-center gap-4 px-6 pb-4">
                         {/* Quick Filters (Left) */}
-                        <QuickFilter options={[
-                            { label: 'This Week', value: 'this-week' },
-                            { label: 'This Month', value: 'this-month' },
-                            { label: 'This Year', value: 'this-year' },
-                        ]}
+                        <QuickFilter
+                            options={[
+                                { label: "This Week", value: "this-week" },
+                                { label: "This Month", value: "this-month" },
+                                { label: "This Year", value: "this-year" },
+                            ]}
                             value={search}
-                            onChange={(value) => setSearch(value)}
+                            onChange={value => setSearch(value)}
                         />
 
                         {/* Search Bar (Center) - Flex grow */}
                         <div className="flex-1 flex justify-end">
                             <div className="relative">
                                 <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    type="text"
-                                    placeholder="Search..."
-                                    value={search}
-                                    onChange={(e) => setSearch(e.target.value)}
-                                    className="pl-8 w-64"
-                                />
+                                <Input type="text" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} className="pl-8 w-64" />
                             </div>
                         </div>
-
                     </div>
 
-                    {tabsConfig.map((tab) => (
-                        <TabsContent
-                            key={tab.key}
-                            value={tab.key}
-                            className="px-0 m-0 data-[state=inactive]:hidden"
-                        >
+                    {tabsConfig.map(tab => (
+                        <TabsContent key={tab.key} value={tab.key} className="px-0 m-0 data-[state=inactive]:hidden">
                             {activeTab === tab.key && (
                                 <>
                                     {tabsData.length === 0 ? (
@@ -316,9 +297,7 @@ const Checklists = () => {
                                             <FileX2 className="h-12 w-12 mb-4" />
                                             <p className="text-lg font-medium">No {tab.name.toLowerCase()} checklists</p>
                                             <p className="text-sm mt-2">
-                                                {tab.key === 'pending'
-                                                    ? 'Tenders requiring checklist submission will appear here'
-                                                    : 'Submitted checklists will be shown here'}
+                                                {tab.key === "pending" ? "Tenders requiring checklist submission will appear here" : "Submitted checklists will be shown here"}
                                             </p>
                                         </div>
                                     ) : (
@@ -338,7 +317,7 @@ const Checklists = () => {
                                                     editable: false,
                                                     filter: true,
                                                     sortable: true,
-                                                    resizable: true
+                                                    resizable: true,
                                                 },
                                                 onSortChanged: handleSortChanged,
                                                 overlayNoRowsTemplate: '<span style="padding: 10px; text-align: center;">No checklists found</span>',
@@ -353,7 +332,7 @@ const Checklists = () => {
             </CardContent>
             <ChangeStatusModal
                 open={changeStatusModal.open}
-                onOpenChange={(open) => setChangeStatusModal({ ...changeStatusModal, open })}
+                onOpenChange={open => setChangeStatusModal({ ...changeStatusModal, open })}
                 tenderId={changeStatusModal.tenderId}
                 currentStatus={changeStatusModal.currentStatus}
                 onSuccess={() => {

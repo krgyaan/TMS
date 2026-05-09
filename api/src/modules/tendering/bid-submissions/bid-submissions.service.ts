@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { and, eq, isNotNull, isNull, or, asc, desc, sql, inArray } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, or, asc, desc, sql, inArray, ilike } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -19,6 +19,7 @@ import { Logger } from '@nestjs/common';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import { TimersService } from '@/modules/timers/timers.service';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { paymentInstruments, paymentRequestRelations, paymentRequests, tenderIncompleteFields } from '@/db/schemas';
 
 export type BidSubmissionDashboardRow = {
     tenderId: number;
@@ -51,6 +52,9 @@ export type BidSubmissionDashboardCounts = {
     missed: number;
     total: number;
 };
+
+export const RFQActionStatuses = [10, 35, 14];
+export const EMDActionStatuses = [10, 35, 14];
 
 @Injectable()
 export class BidSubmissionsService {
@@ -587,7 +591,7 @@ export class BidSubmissionsService {
         return result;
     }
 
-    async markAsMissedGlobal(data : {tenderId: number, rejectionStatus : number, preventionMeasures : string, tmsImprovements: string, submittedBy: number}){
+    async markAsMissedGlobal(data : {tenderId: number, rejectionStatus : number, preventionMeasures? : string, tmsImprovements?: string, submittedBy: number}){
         try{
 
             //checking the tender entry
@@ -601,6 +605,13 @@ export class BidSubmissionsService {
 
             const [status] = await this.db.select({name: statuses.name, id: statuses.id}).from(statuses).where(eq(statuses.id, data.rejectionStatus));
             const newStatus = status.id;
+
+
+            // checking for various actions to be performed
+            if (EMDActionStatuses.includes(data.rejectionStatus)) {
+                // applicable stage, we will perform EMD actions
+                await this.rejectEMD(tender.id, data.submittedBy, data.rejectionStatus);
+            }
             
 
             //checking bid submissionis
@@ -608,6 +619,25 @@ export class BidSubmissionsService {
 
             //marking the db value as missed
             const result = await this.db.transaction(async (tx) => {
+                // Update tender status
+                await tx
+                    .update(tenderInfos)
+                    .set({ status: newStatus, updatedAt: new Date() })
+                    .where(eq(tenderInfos.id, data.tenderId));
+
+                // track status change
+                await this.tenderStatusHistoryService.trackStatusChange(
+                    data.tenderId,
+                    newStatus,
+                    data.submittedBy,
+                    prevStatus,
+                    'Tender missed',
+                    tx
+                );
+
+                // Fetch the full status history for this tender
+                const statusHistory = await this.tenderStatusHistoryService.findByTenderId(data.tenderId, tx);
+
                 let bidSubmission;
                 if (existing) {
                     // Update existing
@@ -616,9 +646,11 @@ export class BidSubmissionsService {
                         .set({
                             status: 'Tender Missed',
                             reasonForMissing: status.name,
+                            reasonStatus: status.id,
                             preventionMeasures: data.preventionMeasures,
                             tmsImprovements: data.tmsImprovements,
                             submittedBy: data.submittedBy,
+                            statusHistoryMetatag: statusHistory,
                             updatedAt: new Date(),
                         })
                         .where(eq(bidSubmissions.id, existing.id))
@@ -633,36 +665,22 @@ export class BidSubmissionsService {
                             tenderId: data.tenderId,
                             status: 'Tender Missed',
                             reasonForMissing: status.name,
+                            reasonStatus: status.id,
                             preventionMeasures: data.preventionMeasures,
                             tmsImprovements: data.tmsImprovements,
                             submittedBy: data.submittedBy,
+                            statusHistoryMetatag: statusHistory,
                         })
                         .returning();
 
                     bidSubmission = created;
                 }
 
-                // Update tender status
-                await tx
-                    .update(tenderInfos)
-                    .set({ status: newStatus, updatedAt: new Date() })
-                    .where(eq(tenderInfos.id, data.tenderId));
-
-                //creating entry inside tender status history
-
-                await this.tenderStatusHistoryService.trackStatusChange(
-                    data.tenderId,
-                    newStatus,
-                    data.submittedBy,
-                    prevStatus,
-                    'Tender missed'
-                );
-
                 return bidSubmission;
             });
 
             // Send email notification
-            await this.sendBidMissedEmail(data.tenderId, result, data.submittedBy);
+            // await this.sendBidMissedEmail(data.tenderId, result, data.submittedBy);
 
             //stopping all the timers running for this tender
             //for the time being stopping all the running timers
@@ -678,27 +696,101 @@ export class BidSubmissionsService {
         }     
     }
 
+    // Implementing actions for different statuses
+    // Two actions required for now
+    // RejectRFQ -> action for statuses ->10, 35, 14
+    // RejectEMD -> action for statuses ->10, 35, 14
+
+    async rejectRFQ(tenderId : number){
+        //not needed for now since we use tenderstatus already
+        
+    }
+
+    async rejectEMD(tenderId: number , userId: number, statusId: number){
+        //reject the emd once these statuses are implemented
+        //need the rejection reason for rejecting the payment request
+
+        const pendingEmds = await this.db.
+                select({
+                    paymentRequests: paymentRequests,
+                    paymentInstruments: paymentInstruments,
+                    users: users,
+                })
+                .from(paymentRequests)
+                .where
+                (and(
+                    eq(paymentRequests.tenderId, tenderId),
+                    ilike(paymentInstruments.status, '%pending'),
+                ))
+                .leftJoin(paymentInstruments, eq(paymentInstruments.requestId, paymentRequests.id))
+                .leftJoin(users, eq(users.id, userId));
+
+
+        //no such pending entry found 
+
+        if(!pendingEmds){
+            return ;
+        }
+
+        const [status] = await this.db
+            .select()
+            .from(statuses)
+            .where(eq(statuses.id, statusId));
+
+        for (const emd of pendingEmds) {
+            // Updating each instrument and request in the table
+            if (emd.paymentInstruments?.id) {
+                // Stripping 'PENDING' from the end and replacing with 'REJECTED'
+                const newStatus = emd.paymentInstruments.status.replace(/PENDING$/i, 'REJECTED');
+
+                await this.db.update(paymentInstruments)
+                    .set({ 
+                        status: newStatus,
+                        action : 1
+                     })
+                    .where(eq(paymentInstruments.id, emd.paymentInstruments.id));
+            }
+
+            // 'remarks' exists in paymentRequests, not paymentInstruments
+            await this.db.update(paymentRequests)
+                .set({
+                    remarks: `Bid Missed - ${status?.name || 'Unknown'} - ${emd?.users?.name || 'Unknown'}`,
+                })
+                .where(eq(paymentRequests.id, emd.paymentRequests.id));
+        }
+
+    }
+
     async getValidMissedStatuses(stage: string) {
         let validStatusIds: number[] = [];
 
         // Define valid status IDs for each stage
         switch (stage) {
-            case 'phy-doc':
-                validStatusIds = [8]; // TODO: Add valid status IDs for phy-doc
+            case 'tender-info':
+                validStatusIds = [9, 10, 11, 12, 13, 14, 15, 31, 32];
                 break;
-            case 'checklist':
-                validStatusIds = [8]; // TODO: Add valid status IDs for checklist
+            case 'tender-info-approval':
+                validStatusIds = [9, 10, 11, 12, 13, 14, 15, 31, 32]; 
+                break;
+            case 'phy-doc':
+                validStatusIds = []; 
                 break;
             case 'rfq':
-                validStatusIds = [8 ,14 ,35]; // TODO: Add valid status IDs for rfq
+                validStatusIds = [14 ,35]; 
                 break;
             case 'emd':
-                validStatusIds = [8]; // TODO: Add valid status IDs for emd
+                validStatusIds = [8]; 
+            case 'checklist':
+                validStatusIds = [];
+                break;
             case 'costing-sheet':
-                validStatusIds = [8 ,14 ,34 ]; // TODO: Add valid status IDs for costing-sheet
+                validStatusIds = [8 ,10, 14 ,34 ]; 
                 break;
             case 'costing-approval':
-                validStatusIds = [8]; // TODO: Add valid status IDs for costing-approval
+                validStatusIds = []; 
+                break;
+            case 'bid-submission':
+                validStatusIds = [8 , 10, 16 , 33 , 34, 35 ,36];
                 break;
         }
 

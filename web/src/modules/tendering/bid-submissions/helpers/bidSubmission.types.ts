@@ -77,8 +77,8 @@ export type MarkAsMissedDto = {
 export type MarkAsMissedGlobalDto = {
     tenderId: number;
     rejectionStatus: number;
-    preventionMeasures: string;
-    tmsImprovements: string;
+    preventionMeasures?: string;
+    tmsImprovements?: string;
 };
 
 export type UpdateBidSubmissionDto = {
@@ -134,7 +134,7 @@ export interface MarkAsMissedFormProps {
     existingData?: BidSubmission;
 }
 
-export type TenderStage = 'phy-doc' | 'rfq' | 'emd' | 'checklist' | 'costing-sheet' | 'costing-approval';
+export type TenderStage = 'phy-doc' | 'rfq' | 'emd' | 'checklist' | 'costing-sheet' | 'costing-approval' | 'bid-submission';
 
 export interface GlobalMissedFormProps {
     tenderId: number;
