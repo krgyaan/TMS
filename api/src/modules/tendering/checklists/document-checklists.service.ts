@@ -107,11 +107,11 @@ export class DocumentChecklistsService {
         const conditions = [...baseConditions, ...roleFilterConditions];
 
         if (activeTab === "pending") {
-            conditions.push(TenderInfosService.getExcludeStatusCondition(["dnb"]));
-            conditions.push(ne(bidSubmissions.status, "Tender Missed"));
+            // conditions.push(TenderInfosService.getExcludeStatusCondition(["dnb"]));
             conditions.push(isNull(tenderDocumentChecklists.id));
+            conditions.push(ne(bidSubmissions.status, "Tender Missed"));
         } else if (activeTab === "submitted") {
-            conditions.push(TenderInfosService.getExcludeStatusCondition(["dnb"]));
+            // conditions.push(TenderInfosService.getExcludeStatusCondition(["dnb"]));
             conditions.push(ne(bidSubmissions.status, "Tender Missed"));
             conditions.push(isNotNull(tenderDocumentChecklists.id));
         } else if (activeTab === "tender-dnb") {
@@ -122,6 +122,7 @@ export class DocumentChecklistsService {
             //     return wrapPaginatedResponse([], 0, page, limit);
             // }
             conditions.push(eq(bidSubmissions.status, "Tender Missed"));
+            conditions.push(isNotNull(tenderDocumentChecklists.id));
         } else {
             throw new BadRequestException(`Invalid tab: ${activeTab}`);
         }
@@ -268,7 +269,7 @@ export class DocumentChecklistsService {
         // Count pending: exclude dnb/lost, checklistId IS NULL, status not Tender Missed
         const pendingConditions = [
             ...baseConditions,
-            TenderInfosService.getExcludeStatusCondition(["dnb"]),
+            // TenderInfosService.getExcludeStatusCondition(["dnb"]),
             ne(bidSubmissions.status, "Tender Missed"),
             isNull(tenderDocumentChecklists.id),
         ];
@@ -276,7 +277,7 @@ export class DocumentChecklistsService {
         // Count submitted: exclude dnb/lost, checklistId IS NOT NULL, status not Tender Missed
         const submittedConditions = [
             ...baseConditions,
-            TenderInfosService.getExcludeStatusCondition(["dnb"]),
+            // TenderInfosService.getExcludeStatusCondition(["dnb"]),
             ne(bidSubmissions.status, "Tender Missed"),
             isNotNull(tenderDocumentChecklists.id),
         ];
@@ -285,6 +286,7 @@ export class DocumentChecklistsService {
         const tenderDnbConditions = [
             ...baseConditions,
             eq(bidSubmissions.status, "Tender Missed"),
+            isNotNull(tenderDocumentChecklists.id)
         ];
 
         const [pendingResult, submittedResult, tenderDnbResult] = await Promise.all([
