@@ -38,14 +38,6 @@ const UploadResultSchema = z.object({
 }, {
     message: 'Disqualification reason is required when not qualified',
     path: ['disqualificationReason'],
-}).refine((data) => {
-    if (data.result && !data.resultReason) {
-        return false;
-    }
-    return true;
-}, {
-    message: 'Reason is required',
-    path: ['resultReason'],
 });
 
 type FormValues = z.infer<typeof UploadResultSchema>;
@@ -169,6 +161,14 @@ export default function UploadResultFormPage({
     };
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
+        if (showResultDetails && data.result && !data.resultReason) {
+            form.setError('resultReason', { message: 'Reason is required' });
+            return;
+        }
+        if (isEditMode && data.result && !data.resultReason) {
+            form.setError('resultReason', { message: 'Reason is required' });
+            return;
+        }
         try {
             const submitData: any = {
                 technicallyQualified: data.technicallyQualified,
