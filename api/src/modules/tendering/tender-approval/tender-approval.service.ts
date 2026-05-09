@@ -1,30 +1,31 @@
-import { Inject, Injectable, BadRequestException, NotFoundException } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import { DRIZZLE } from "@db/database.module";
-import type { DbInstance } from "@db";
-import type { TenderApprovalPayload } from "@/modules/tendering/tender-approval/dto/tender-approval.dto";
-import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
-import { eq, and, asc, desc, sql, or, inArray, isNull, SQL, ne, notInArray } from "drizzle-orm";
-import { tenderInformation } from "@db/schemas/tendering/tender-info-sheet.schema";
-import { users } from "@db/schemas/auth/users.schema";
-import { statuses } from "@db/schemas/master/statuses.schema";
-import { items } from "@db/schemas/master/items.schema";
-import { tenderIncompleteFields } from "@db/schemas/tendering/tender-incomplete-fields.schema";
-import { TenderInfosService } from "@/modules/tendering/tenders/tenders.service";
-import type { PaginatedResult } from "@/modules/tendering/types/shared.types";
-import { TenderStatusHistoryService } from "@/modules/tendering/tender-status-history/tender-status-history.service";
-import { EmailService } from "@/modules/email/email.service";
-import { RecipientResolver } from "@/modules/email/recipient.resolver";
-import type { RecipientSource } from "@/modules/email/dto/send-email.dto";
-import { Logger } from "@nestjs/common";
-import { wrapPaginatedResponse } from "@/utils/responseWrapper";
-import { TimersService } from "@/modules/timers/timers.service";
-import { TenderInfoSheetsService } from "../info-sheets/info-sheets.service";
-import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
-import { pqrDocuments } from "@db/schemas/shared/pqr.schema";
-import { financeDocuments } from "@db/schemas/shared/finance_docs.schema";
-import { vendorOrganizations } from "@db/schemas/vendors/vendor-organizations.schema";
-import { bidSubmissions } from "@/db/schemas";
+import { Inject, Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
+import type { TenderApprovalPayload } from '@/modules/tendering/tender-approval/dto/tender-approval.dto';
+import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
+import { eq, and, asc, desc, sql, or, inArray, isNull, SQL, ne, notInArray } from 'drizzle-orm';
+import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
+import { paymentRequests, paymentInstruments } from '@db/schemas/tendering/payment-requests.schema';
+import { users } from '@db/schemas/auth/users.schema';
+import { statuses } from '@db/schemas/master/statuses.schema';
+import { items } from '@db/schemas/master/items.schema';
+import { tenderIncompleteFields } from '@db/schemas/tendering/tender-incomplete-fields.schema';
+import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
+import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
+import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
+import { EmailService } from '@/modules/email/email.service';
+import { RecipientResolver } from '@/modules/email/recipient.resolver';
+import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
+import { Logger } from '@nestjs/common';
+import { wrapPaginatedResponse } from '@/utils/responseWrapper';
+import { TimersService } from '@/modules/timers/timers.service';
+import { TenderInfoSheetsService } from '../info-sheets/info-sheets.service';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { pqrDocuments } from '@db/schemas/shared/pqr.schema';
+import { financeDocuments } from '@db/schemas/shared/finance_docs.schema';
+import { vendorOrganizations } from '@db/schemas/vendors/vendor-organizations.schema';
+import { bidSubmissions } from '@/db/schemas';
 
 export type TenderApprovalFilters = {
     tlStatus?: "0" | "1" | "2" | "3" | number;
@@ -495,6 +496,7 @@ export class TenderApprovalService {
         // Get current tender status before update
         const currentTender = await this.tenderInfosService.findById(tenderId);
         const prevStatus = currentTender?.status ?? null;
+        const isEditMode = String(currentTender?.tlStatus) === payload.tlStatus;
 
         const updateData: any = {
             tlStatus: payload.tlStatus,
@@ -526,9 +528,11 @@ export class TenderApprovalService {
             updateData.tlRejectionRemarks = null;
             updateData.tlIncompleteRemarks = null;
             updateData.oemNotAllowed = null;
-            updateData.status = 3; // Tender Info approved
-            newStatus = 3;
-            statusComment = "Tender info approved";
+            if (!isEditMode) {
+                updateData.status = 3; // Tender Info approved
+                newStatus = 3;
+                statusComment = "Tender info approved";
+            }
 
             updateData.tlApprovalTimestamp = new Date(); // tl approval timestamp
 
@@ -552,7 +556,7 @@ export class TenderApprovalService {
             updateData.tlIncompleteRemarks = null;
             updateData.oemNotAllowed = payload.oemNotAllowed;
 
-            if (payload.tenderStatus) {
+            if (payload.tenderStatus && !isEditMode) {
                 updateData.status = payload.tenderStatus;
                 newStatus = payload.tenderStatus;
                 statusComment = "Tender rejected";
@@ -585,9 +589,11 @@ export class TenderApprovalService {
             updateData.tlRejectionRemarks = null;
             updateData.tlIncompleteRemarks = payload.tlIncompleteRemarks;
             updateData.oemNotAllowed = null;
-            updateData.status = 29; // Tender Info sheet Incomplete
-            newStatus = 29;
-            statusComment = "Tender info sheet incomplete";
+            if (!isEditMode) {
+                updateData.status = 29; // Tender Info sheet Incomplete
+                newStatus = 29;
+                statusComment = "Tender info sheet incomplete";
+            }
 
             // Delete existing incomplete fields
             await this.db.delete(tenderIncompleteFields).where(eq(tenderIncompleteFields.tenderId, tenderId));
@@ -609,6 +615,32 @@ export class TenderApprovalService {
         await this.db.transaction(async tx => {
             await tx.update(tenderInfos).set(updateData).where(eq(tenderInfos.id, tenderId)).returning();
 
+            // Handle exempt EMD mode - update payment instruments and tender information
+            if (payload.tlStatus === "1" && payload.emdMode === 'exempt') {
+                const requestIds = await tx
+                    .select({ id: paymentRequests.id })
+                    .from(paymentRequests)
+                    .where(eq(paymentRequests.tenderId, tenderId));
+
+                if (requestIds.length > 0) {
+                    const ids = requestIds.map(r => r.id);
+                    await tx
+                        .update(paymentInstruments)
+                        .set({ action: 1, status: 'ACCOUNT_FORM_REJECTED', rejectionReason: `EMD Exempted By TL on ${new Date().toISOString()}` })
+                        .where(
+                            and(
+                                inArray(paymentInstruments.requestId, ids),
+                                eq(paymentInstruments.action, 0)
+                            )
+                        );
+                }
+
+                await tx
+                    .update(tenderInformation)
+                    .set({ emdRequired: 'EXEMPT' })
+                    .where(eq(tenderInformation.tenderId, tenderId));
+            }
+
             // Track status change if status was updated
             if (newStatus !== null && newStatus !== prevStatus) {
                 await this.tenderStatusHistoryService.trackStatusChange(tenderId, newStatus, changedBy, prevStatus, statusComment, tx);
@@ -620,22 +652,24 @@ export class TenderApprovalService {
             await this.sendApprovalEmail(tenderId, payload, changedBy);
         }
 
-        try {
-            // TIMER TRANSITION
-            this.logger.log(`Transitioning timers for tender ${tenderId} after approval`);
-
-            // 1. Stop the tender_approval timer
+        // Skip timer transition for edit mode
+        if (!isEditMode) {
             try {
-                await this.timersService.stopTimer({
-                    entityType: "TENDER",
-                    entityId: tenderId,
-                    stage: "tender_approval",
-                    userId: changedBy,
-                    reason: "Tender approved",
-                });
-                this.logger.log(`Successfully stopped tender_approval timer for tender ${tenderId}`);
-            } catch (error) {
-                this.logger.warn(`Failed to stop tender_approval timer for tender ${tenderId}:`, error);
+                // TIMER TRANSITION
+                this.logger.log(`Transitioning timers for tender ${tenderId} after approval`);
+
+                // 1. Stop the tender_approval timer
+                try {
+                    await this.timersService.stopTimer({
+                        entityType: 'TENDER',
+                        entityId: tenderId,
+                        stage: 'tender_approval',
+                        userId: changedBy,
+                        reason: 'Tender approved'
+                    });
+                    this.logger.log(`Successfully stopped tender_approval timer for tender ${tenderId}`);
+                } catch (error) {
+                    this.logger.warn(`Failed to stop tender_approval timer for tender ${tenderId}:`, error);
             }
 
             // 2. Get tender and info sheet data
@@ -649,8 +683,8 @@ export class TenderApprovalService {
             // 3. Determine which timers should be started based on tender configuration
             const stagesToStart: Array<{ stage: string; timerConfig?: any }> = [];
 
-            if (tender.rfqTo && tender.rfqTo !== "0" && tender.rfqTo !== "1") {
-                stagesToStart.push({ stage: "rfq_sent" });
+            if (tender.rfqRequired === 'yes' && tender.rfqTo && tender.rfqTo !== '0' && tender.rfqTo !== '1') {
+                stagesToStart.push({ stage: 'rfq_sent' });
             }
             if (infoSheet.emdRequired === "YES" || infoSheet.emdRequired === "1") {
                 stagesToStart.push({ stage: "emd_requested" });
@@ -712,9 +746,10 @@ export class TenderApprovalService {
             }
 
             this.logger.log(`Successfully transitioned timers after approval for tender ${tenderId}`);
-        } catch (error) {
-            this.logger.error(`Failed to transition timers after approval for tender ${tenderId}:`, error);
-            // Don't fail the entire operation if timer transition fails
+            } catch (error) {
+                this.logger.error(`Failed to transition timers after approval for tender ${tenderId}:`, error);
+                // Don't fail the entire operation if timer transition fails
+            }
         }
 
         return this.getByTenderId(tenderId);

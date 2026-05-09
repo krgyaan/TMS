@@ -265,10 +265,14 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
         [infoSheet]
     );
 
-    const emdModeOptions = useMemo(() =>
-        infoSheet?.emdMode?.map(mode => ({ value: mode, label: mode })) ?? [],
-        [infoSheet]
-    );
+    const emdModeOptions = useMemo(() => {
+        const options = infoSheet?.emdMode?.map(mode => ({ value: mode, label: mode })) ?? [];
+        const hasExempt = options.some(o => o.value === 'exempt');
+        if (!hasExempt) {
+            options.push({ value: 'exempt', label: 'Exempt' });
+        }
+        return options;
+    }, [infoSheet]);
 
     const isNotAllowedByOem = useMemo(() => {
         if (!tenderStatus || !statuses) return false;
