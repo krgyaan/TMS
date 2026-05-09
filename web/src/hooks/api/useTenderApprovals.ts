@@ -17,7 +17,7 @@ export const tenderApprovalsKey = {
 }
 
 export const useTenderApprovals = (
-    tabKey?: 'pending' | 'accepted' | 'rejected' | 'tender-dnb',
+    tabKey?: 'pending' | 'accepted' | 'rejected' | 'rejected_later' | 'tender-dnb',
     pagination: { page: number; limit: number; search?: string } = { page: 1, limit: 50 },
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {

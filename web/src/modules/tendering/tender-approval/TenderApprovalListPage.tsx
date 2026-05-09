@@ -22,10 +22,10 @@ import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { QuickFilter } from '@/components/ui/quick-filter';
 import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
 
-type TenderApprovalTab = 'pending' | 'accepted' | 'rejected' | 'tender-dnb';
-type TenderApprovalTabName = 'Pending' | 'Approved' | 'Rejected' | 'Tender DNB';
+type TenderApprovalTab = 'pending' | 'accepted' | 'rejected' | 'rejected_later' |'tender-dnb';
+type TenderApprovalTabName = 'Pending' | 'Approved' | 'Rejected' | 'Rejected Later' | 'Tender DNB';
 const TABS_NAMES: Record<TenderApprovalTab, TenderApprovalTabName> = {
-    'pending': 'Pending', 'accepted': 'Approved', 'rejected': 'Rejected', 'tender-dnb': 'Tender DNB'
+    'pending': 'Pending', 'accepted': 'Approved', 'rejected': 'Rejected', 'rejected_later': 'Rejected Later','tender-dnb': 'Tender DNB'
 };
 
 const TL_STATUS_NAMES: Record<number, string> = { 0: 'Pending', 1: 'Accepted', 2: 'Rejected', 3: 'Incomplete' };
@@ -99,16 +99,6 @@ const TenderApprovalListPage = () => {
             },
             icon: <Eye className="h-4 w-4" />,
         },
-        // {
-        //     label: 'Change Status',
-        //     onClick: (row: any) => {
-        //         const tenderId = row.tenderId || row.id;
-        //         if (tenderId) {
-        //             setChangeStatusModal({ open: true, tenderId });
-        //         }
-        //     },
-        //     icon: <RefreshCw className="h-4 w-4" />,
-        // },
     ];
 
     const tabsConfig = useMemo(() => {
@@ -125,13 +115,16 @@ const TenderApprovalListPage = () => {
                     case 'rejected':
                         count = counts.rejected ?? 0;
                         break;
+                    case 'rejected_later':
+                        count = counts.rejected_later ?? 0;
+                        break;
                     case 'tender-dnb':
                         count = counts['tender-dnb'] ?? 0;
                         break;
                 }
             }
             return {
-                key: key as 'pending' | 'accepted' | 'rejected' | 'tender-dnb',
+                key: key as TenderApprovalTab,
                 name,
                 count,
             };
@@ -253,13 +246,6 @@ const TenderApprovalListPage = () => {
                 const { data } = params;
                 const timer = data.timer;
 
-                // if (!timer) {
-                //     return <TenderTimerDisplay
-                //         remainingSeconds={0}
-                //         status="NOT_STARTED"
-                //     />;
-                // }
-
                 return (
                     <TenderTimerDisplay
                         remainingSeconds={timer.remainingSeconds}
@@ -332,7 +318,7 @@ const TenderApprovalListPage = () => {
                     </div>
                 </CardHeader>
                 <CardContent className="px-0">
-                    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'pending' | 'accepted' | 'rejected' | 'tender-dnb')}>
+                    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TenderApprovalTab)}>
                         <TabsList className="m-auto mb-4">
                             {tabsConfig.map((tab) => (
                                 <TabsTrigger

@@ -4,7 +4,7 @@ import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
 import type { TenderApprovalPayload } from "@/modules/tendering/tender-approval/dto/tender-approval.dto";
 import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
-import { eq, and, asc, desc, sql, or, inArray, isNull, SQL, ne } from "drizzle-orm";
+import { eq, and, asc, desc, sql, or, inArray, isNull, SQL, ne, notInArray } from "drizzle-orm";
 import { tenderInformation } from "@db/schemas/tendering/tender-info-sheet.schema";
 import { users } from "@db/schemas/auth/users.schema";
 import { statuses } from "@db/schemas/master/statuses.schema";
@@ -120,6 +120,10 @@ export class TenderApprovalService {
                 // Latest due date first (most recently due rejected tenders)
                 return sql`${tenderInfos.dueDate} DESC NULLS LAST`;
 
+            case "rejected_later":
+                // Latest due date first (most recently due rejected tenders)
+                return sql`${tenderInfos.dueDate} DESC NULLS LAST`;
+
             case "tender-dnb":
                 // Latest due date first
                 return sql`${tenderInfos.dueDate} DESC NULLS LAST`;
@@ -132,7 +136,7 @@ export class TenderApprovalService {
     async getDashboardData(
         user?: ValidatedUser,
         teamId?: number,
-        tabKey?: "pending" | "accepted" | "rejected" | "tender-dnb",
+        tabKey?: "pending" | "accepted" | "rejected" | "rejected_later" |"tender-dnb",
         filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: "asc" | "desc"; search?: string }
     ): Promise<PaginatedResult<TenderRow>> {
         const page = filters?.page || 1;
@@ -142,7 +146,7 @@ export class TenderApprovalService {
         const activeTab = tabKey || "pending";
 
         // Validate tab key
-        if (!["pending", "accepted", "rejected", "tender-dnb"].includes(activeTab)) {
+        if (!["pending", "accepted", "rejected", "rejected_later" ,"tender-dnb" ].includes(activeTab)) {
             throw new BadRequestException(`Invalid tab: ${activeTab}`);
         }
 
@@ -167,9 +171,21 @@ export class TenderApprovalService {
             tabConditions.push(eq(tenderInfos.tlStatus, 1), or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.id)));
         } else if (activeTab === "rejected") {
             tabConditions.push(eq(tenderInfos.tlStatus, 2), or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.id)));
-        } else if (activeTab === "tender-dnb") {
+        } else if(activeTab === "rejected_later"){
+            tabConditions.push(and(
+                eq(bidSubmissions.status, "Tender Missed"),
+                inArray(bidSubmissions.reasonStatus, [10, 14, 35]) 
+            ))        
+        }
+        else if (activeTab === "tender-dnb") {
             // tabConditions.push(inArray(tenderInfos.status, [8, 34]), inArray(tenderInfos.tlStatus, [1, 2, 3]));
-            tabConditions.push(eq(bidSubmissions.status, "Tender Missed"));
+            tabConditions.push(and(
+                eq(bidSubmissions.status, "Tender Missed"),
+                or(
+                    notInArray(bidSubmissions.reasonStatus,[10, 14, 35]),
+                    isNull(bidSubmissions.reasonStatus)
+                )
+            ));
         }
 
         // Search conditions
@@ -302,20 +318,27 @@ export class TenderApprovalService {
             or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.id)),
             ,
         ];
-
+        
         const acceptedConditions = [...baseConditions, eq(tenderInfos.tlStatus, 1), or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.id))];
-
+        
         const rejectedConditions = [...baseConditions, eq(tenderInfos.tlStatus, 2), or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.id))];
+        
+        const tenderDnbConditions = [...baseConditions, eq(bidSubmissions.status, "Tender Missed") , or(notInArray(bidSubmissions.reasonStatus, [10,15,35]) , isNull(bidSubmissions.reasonStatus))];
+        
+        const tenderRejectedLaterCounts = [...baseConditions, eq(bidSubmissions.status, "Tender Missed"), inArray(bidSubmissions.reasonStatus, [10, 14, 35])];
+        
+        
+
 
         // const tenderDnbConditions = [...baseConditions, inArray(tenderInfos.status, [8, 34]), inArray(tenderInfos.tlStatus, [1, 2, 3])];
         // ---------------------------- NEW LOGIC TO GET MISSED BIDS -------------------------------//
-        const tenderDnbConditions = [...baseConditions, eq(bidSubmissions.status, "Tender Missed")];
 
         // Count for each tab
-        const [pendingCount, acceptedCount, rejectedCount, tenderDnbCount] = await Promise.all([
+        const [pendingCount, acceptedCount, rejectedCount, rejectedLaterCount, tenderDnbCount] = await Promise.all([
             this.countTabItems(and(...pendingConditions)),
             this.countTabItems(and(...acceptedConditions)),
             this.countTabItems(and(...rejectedConditions)),
+            this.countTabItems(and(...tenderRejectedLaterCounts)),
             this.countTabItems(and(...tenderDnbConditions)),
         ]);
 
@@ -323,6 +346,7 @@ export class TenderApprovalService {
             pending: pendingCount,
             accepted: acceptedCount,
             rejected: rejectedCount,
+            rejected_later: rejectedLaterCount,
             "tender-dnb": tenderDnbCount,
             total: pendingCount + acceptedCount + rejectedCount + tenderDnbCount,
         };
