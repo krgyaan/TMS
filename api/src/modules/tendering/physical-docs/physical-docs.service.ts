@@ -200,10 +200,12 @@ export class PhysicalDocsService {
 
         if (activeTab === "pending") {
             conditions.push(isNull(physicalDocs.id));
-            conditions.push(TenderInfosService.getExcludeStatusCondition(["dnb", "lost"]));
+            conditions.push(ne(bidSubmissions.status, 'Tender Missed'));
+            // conditions.push(TenderInfosService.getExcludeStatusCondition(["dnb", "lost"]));
         } else if (activeTab === "sent") {
             conditions.push(isNotNull(physicalDocs.id));
-            conditions.push(TenderInfosService.getExcludeStatusCondition(["dnb", "lost"]));
+            conditions.push(ne(bidSubmissions.status, 'Tender Missed'));
+            // conditions.push(TenderInfosService.getExcludeStatusCondition(["dnb", "lost"]));
         } else if (activeTab === "tender-dnb") {
             // const dnbStatusIds = StatusCache.getIds('dnb');
             // const excludeStatusIds = [30];
@@ -213,8 +215,11 @@ export class PhysicalDocsService {
             // conditions.push(notInArray(tenderInfos.status, excludeStatusIds));
 
             //--------------------  NEW BID MISSED SHOW LOGIC ---------------------//
-            //we will be getting all the tenders whose bid has been missed
-            conditions.push(eq(bidSubmissions.status, "Tender Missed"));
+            //we will be getting all the tenders whose phy doc sent and bid missed
+            conditions.push(and(
+                (eq(bidSubmissions.status, "Tender Missed")),
+                (isNotNull(physicalDocs.id))
+            ));
         } else {
             throw new BadRequestException(`Invalid tab: ${activeTab}`);
         }
@@ -352,15 +357,13 @@ export class PhysicalDocsService {
             ...roleFilterConditions,
         ];
 
+        const dnbCondition = [ne(bidSubmissions.status, "Tender Missed")];
+
         // Count pending: status = 3, physicalDocsId IS NULL
-        const pendingConditions = [...baseConditions, TenderInfosService.getExcludeStatusCondition(["dnb", "lost"]), isNull(physicalDocs.id)];
+        const pendingConditions = [...baseConditions, ne(bidSubmissions.status, "Tender Missed") ];
 
         // Count sent: status = 30, physicalDocsId IS NOT NULL
-        const sentConditions = [...baseConditions, TenderInfosService.getExcludeStatusCondition(["dnb", "lost"]), isNotNull(physicalDocs.id)];
-
-        // Count tender-dnb: status in dnb category, exclude status 30
-        const dnbStatusIds = StatusCache.getIds("dnb");
-        const tenderDnbConditions = [...baseConditions, ...(dnbStatusIds.length > 0 ? [inArray(tenderInfos.status, dnbStatusIds)] : []), notInArray(tenderInfos.status, [30])];
+        const sentConditions = [...baseConditions, ne(bidSubmissions.status, "Tender Missed"), isNotNull(physicalDocs.id)];
 
         const counts = await Promise.all([
             this.db
@@ -391,7 +394,10 @@ export class PhysicalDocsService {
                 .leftJoin(items, eq(items.id, tenderInfos.item))
                 .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
                 .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
-                .where(and(...tenderDnbConditions))
+                .where(and(
+                    eq(bidSubmissions.status, 'Tender Missed'),
+                    isNotNull(physicalDocs.id),
+                ))
                 .then(([result]) => Number(result?.count || 0)),
         ]);
 
