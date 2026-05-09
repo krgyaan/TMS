@@ -20,17 +20,19 @@ interface TenderResultViewProps {
 
 // Helper function to get file URL from stored path
 const getFileUrl = (filePath: string): string => {
-    // File paths are stored as "context/filename.ext" (e.g., "bid-submitted-docs/file.pdf")
-    // API expects: /tender-files/serve/:context/:fileName
-    const parts = filePath.split('/');
+    if (!filePath) return '';
+    let clean = filePath.replace(/[\[\]",]/g, '').trim();
+    if (!clean.includes('/')) {
+        clean = `result-screenshots/${clean}`;
+    }
+    const parts = clean.split('/');
     if (parts.length >= 2) {
         const context = parts[0];
         const fileName = parts.slice(1).join('/');
-        // Get base URL from axios instance
         const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
         return `${baseUrl}/tender-files/serve/${context}/${encodeURIComponent(fileName)}`;
     }
-    return tenderFilesService.getFileUrl(filePath);
+    return tenderFilesService.getFileUrl(clean);
 };
 
 export function TenderResultView({
