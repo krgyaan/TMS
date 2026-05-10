@@ -1,4 +1,4 @@
-import type { BankTransferDashboardFilters } from '@/modules/bi-dashboard/bank-tranfer/helpers/bankTransfer.types';
+import type { BankTransferDashboardFilters, BankTransferActionFormData, BankTransferFollowupData } from '@/modules/bi-dashboard/bank-tranfer/helpers/bankTransfer.types';
 import { BaseApiService } from './base.service';
 import type { PaginatedResult } from '@/types/api.types';
 import type { BankTransferDashboardRow } from '@/modules/bi-dashboard/bank-tranfer/helpers/bankTransfer.types';
@@ -68,9 +68,31 @@ class BankTransfersService extends BaseApiService {
         }
     }
 
+    async getActionFormData(id: number): Promise<BankTransferActionFormData> {
+        try {
+            const result = await this.get<BankTransferActionFormData>(`/instruments/${id}/action-form`);
+            return result;
+        } catch (error) {
+            console.error('=== bankTransfersService.getActionFormData Error ===');
+            console.error('error:', error);
+            throw error;
+        }
+    }
+
+    async getFollowupData(id: number): Promise<BankTransferFollowupData | null> {
+        try {
+            const result = await this.get<BankTransferFollowupData | null>(`/instruments/${id}/followup`);
+            return result;
+        } catch (error) {
+            console.error('=== bankTransfersService.getFollowupData Error ===');
+            console.error('error:', error);
+            throw error;
+        }
+    }
+
     async updateAction(id: number, formData: FormData): Promise<any> {
         console.log('Action Form Data:', formData);
-        return this.put<any, FormData>(`/instruments/${id}/action`, formData);
+        return this.patch<any, FormData>(`/instruments/${id}/action`, formData);
     }
 }
 

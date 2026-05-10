@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
@@ -19,16 +20,59 @@ import { useWatch } from 'react-hook-form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { FileText, Users, Banknote, CheckCircle, CheckCircle2, Info } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
-const ACTION_OPTIONS = [
+const ALL_ACTION_OPTIONS = [
     { value: 'accounts-form-1', label: 'Accounts Form' },
     { value: 'initiate-followup', label: 'Initiate Followup' },
     { value: 'returned', label: 'Returned via Bank Transfer' },
     { value: 'settled', label: 'Settled with Project Account' },
 ];
 
+interface AccountsFormHistory {
+    btReq?: 'Accepted' | 'Rejected';
+    reasonReq?: string;
+    paymentDatetime?: string;
+    utrNo?: string;
+    utrMessage?: string;
+    remarks?: string;
+}
+
+interface FollowupHistory {
+    organisationName?: string;
+    contacts?: Array<{
+        name: string;
+        email: string | null;
+        phone: string | null;
+        org: string | null;
+    }>;
+    followupStartDate?: string;
+    frequency?: number;
+    stopReason?: number;
+    proofText?: string;
+    stopRemarks?: string;
+}
+
+interface ReturnedHistory {
+    transferDate?: string;
+    utrNo?: string;
+}
+
+interface SettledHistory {
+    remarks?: string;
+}
+
+interface FormHistory {
+    accountsForm?: AccountsFormHistory;
+    initiateFollowup?: FollowupHistory;
+    returned?: ReturnedHistory;
+    settled?: SettledHistory;
+}
+
 interface BankTransferActionFormProps {
     instrumentId: number;
+    action?: number | null;
     instrumentData?: {
         utrNo?: string;
         accountName?: string;
@@ -36,31 +80,142 @@ interface BankTransferActionFormProps {
         tenderName?: string;
         tenderNo?: string;
     };
+    formHistory?: FormHistory;
 }
 
-export function BankTransferActionForm({ instrumentId, instrumentData }: BankTransferActionFormProps) {
+export function BankTransferActionForm({ instrumentId, action: propAction, instrumentData, formHistory }: BankTransferActionFormProps) {
     const navigate = useNavigate();
     const updateMutation = useUpdateBankTransferAction();
 
+    const hasAccountsFormData = !!(formHistory?.accountsForm?.btReq);
+    const hasFollowupData = !!(formHistory?.initiateFollowup?.organisationName);
+    const hasReturnedData = !!(formHistory?.returned?.transferDate);
+    const hasSettledData = !!(formHistory?.settled?.remarks);
+
+    const getSubmittedBadge = (hasData: boolean) => {
+        if (!hasData) return <Badge variant={'secondary'} className="rounded-full p-2">
+            <Info className="h-3 w-3" />
+        </Badge>;
+        return (
+            <Badge variant={'success'} className="rounded-full p-2">
+                <CheckCircle className="h-3 w-3" />
+            </Badge>
+        );
+    };
+
+    const availableActions = propAction === 0
+        ? ALL_ACTION_OPTIONS.filter(opt => opt.value === 'accounts-form-1')
+        : ALL_ACTION_OPTIONS;
+
+    const defaultValues: BankTransferActionFormValues = {
+        action: '',
+        contacts: [],
+    };
+
+    if (formHistory?.accountsForm) {
+        defaultValues.bt_req = formHistory.accountsForm.btReq;
+        defaultValues.reason_req = formHistory.accountsForm.reasonReq;
+        defaultValues.payment_datetime = formHistory.accountsForm.paymentDatetime;
+        defaultValues.utr_no = formHistory.accountsForm.utrNo;
+        defaultValues.utr_message = formHistory.accountsForm.utrMessage;
+    }
+
+    if (formHistory?.initiateFollowup) {
+        defaultValues.organisation_name = formHistory.initiateFollowup.organisationName;
+        defaultValues.contacts = formHistory.initiateFollowup.contacts?.map(c => ({
+            name: c.name,
+            phone: c.phone ?? '',
+            email: c.email ?? '',
+        })) || [];
+        defaultValues.followup_start_date = formHistory.initiateFollowup.followupStartDate;
+        defaultValues.frequency = formHistory.initiateFollowup.frequency;
+        defaultValues.stop_reason = formHistory.initiateFollowup.stopReason;
+        defaultValues.proof_text = formHistory.initiateFollowup.proofText;
+        defaultValues.stop_remarks = formHistory.initiateFollowup.stopRemarks;
+    }
+
+    if (formHistory?.returned) {
+        defaultValues.transfer_date = formHistory.returned.transferDate;
+        defaultValues.utr_no = formHistory.returned.utrNo;
+    }
+
+    if (formHistory?.settled) {
+        defaultValues.settle_remarks = formHistory.settled.remarks;
+    }
+
     const form = useForm<BankTransferActionFormValues>({
         resolver: zodResolver(BankTransferActionFormSchema) as Resolver<BankTransferActionFormValues>,
-        defaultValues: {
-            action: '',
-            contacts: [],
-        },
+        defaultValues,
     });
 
-    const action = useWatch({ control: form.control, name: 'action' });
+    const selectedAction = useWatch({ control: form.control, name: 'action' });
     const btReq = useWatch({ control: form.control, name: 'bt_req' });
+
+    useEffect(() => {
+        if (formHistory?.accountsForm?.btReq) {
+            form.setValue('bt_req', formHistory.accountsForm.btReq, { shouldValidate: false });
+        }
+        if (formHistory?.accountsForm?.reasonReq) {
+            form.setValue('reason_req', formHistory.accountsForm.reasonReq, { shouldValidate: false });
+        }
+        if (formHistory?.accountsForm?.paymentDatetime) {
+            form.setValue('payment_datetime', formHistory.accountsForm.paymentDatetime, { shouldValidate: false });
+        }
+        if (formHistory?.accountsForm?.utrNo) {
+            form.setValue('utr_no', formHistory.accountsForm.utrNo, { shouldValidate: false });
+        }
+        if (formHistory?.accountsForm?.utrMessage) {
+            form.setValue('utr_message', formHistory.accountsForm.utrMessage, { shouldValidate: false });
+        }
+
+        if (formHistory?.initiateFollowup?.organisationName) {
+            form.setValue('organisation_name', formHistory.initiateFollowup.organisationName, { shouldValidate: false });
+        }
+        if (formHistory?.initiateFollowup?.contacts) {
+            form.setValue('contacts', formHistory.initiateFollowup.contacts.map(c => ({
+                name: c.name,
+                phone: c.phone ?? '',
+                email: c.email ?? '',
+            })), { shouldValidate: false });
+        }
+        if (formHistory?.initiateFollowup?.followupStartDate) {
+            form.setValue('followup_start_date', formHistory.initiateFollowup.followupStartDate, { shouldValidate: false });
+        }
+        if (formHistory?.initiateFollowup?.frequency) {
+            form.setValue('frequency', formHistory.initiateFollowup.frequency, { shouldValidate: false });
+        }
+        if (formHistory?.initiateFollowup?.stopReason) {
+            form.setValue('stop_reason', formHistory.initiateFollowup.stopReason, { shouldValidate: false });
+        }
+        if (formHistory?.initiateFollowup?.proofText) {
+            form.setValue('proof_text', formHistory.initiateFollowup.proofText, { shouldValidate: false });
+        }
+        if (formHistory?.initiateFollowup?.stopRemarks) {
+            form.setValue('stop_remarks', formHistory.initiateFollowup.stopRemarks, { shouldValidate: false });
+        }
+
+        if (formHistory?.returned?.transferDate) {
+            form.setValue('transfer_date', formHistory.returned.transferDate, { shouldValidate: false });
+        }
+        if (formHistory?.returned?.utrNo) {
+            form.setValue('utr_no', formHistory.returned.utrNo, { shouldValidate: false });
+        }
+
+        if (formHistory?.settled?.remarks) {
+            form.setValue('settle_remarks', formHistory.settled.remarks, { shouldValidate: false });
+        }
+    }, [formHistory, form]);
 
     const isSubmitting = form.formState.isSubmitting || updateMutation.isPending;
 
     const handleSubmit = async (values: BankTransferActionFormValues) => {
         try {
+            console.log('Form values:', values);
+            console.log('settle_remarks value:', values.settle_remarks);
+            
             const formData = new FormData();
 
             Object.entries(values).forEach(([key, value]) => {
-                // Skip follow-up fields - handled by different service
                 if (key === 'contacts' ||
                     key === 'organisation_name' ||
                     key === 'followup_start_date' ||
@@ -72,19 +227,16 @@ export function BankTransferActionForm({ instrumentId, instrumentData }: BankTra
                     return;
                 }
 
-                // Handle File objects (non-followup files)
                 if (value instanceof File) {
                     formData.append(key, value);
                     return;
                 }
 
-                // Handle arrays of Files
                 if (Array.isArray(value) && value.length > 0 && value[0] instanceof File) {
                     value.forEach((file) => formData.append(key, file));
                     return;
                 }
 
-                // Handle all other values (strings, numbers, dates, file paths, etc.)
                 if (value === undefined || value === null || value === '') return;
                 if (value instanceof Date) {
                     formData.append(key, value.toISOString());
@@ -96,32 +248,61 @@ export function BankTransferActionForm({ instrumentId, instrumentData }: BankTra
             });
 
             await updateMutation.mutateAsync({ id: instrumentId, formData });
-            toast.success('Action submitted successfully');
+            toast.success('Payment data updated successfully');
+            localStorage.removeItem('bank_transfer_action_data');
             navigate(-1);
             form.reset();
         } catch (error: any) {
-            toast.error(error?.message || 'Failed to submit action');
-            console.error('Error submitting action:', error);
+            toast.error(error?.message || 'Failed to update payment data');
+            console.error('Error updating payment data:', error);
         }
     };
 
     return (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
-                    <SelectField
-                        label="Choose What to do"
-                        control={form.control}
-                        name="action"
-                        options={ACTION_OPTIONS}
-                        placeholder="Select an option"
-                    />
+                <div className="space-y-3">
+                    <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                        Choose What to do
+                    </label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                        {availableActions.map((option) => {
+                            const hasHistory =
+                                (option.value === 'accounts-form-1' && hasAccountsFormData) ||
+                                (option.value === 'initiate-followup' && hasFollowupData) ||
+                                (option.value === 'returned' && hasReturnedData) ||
+                                (option.value === 'settled' && hasSettledData);
+
+                            return (
+                                <div
+                                    key={option.value}
+                                    className={`relative flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all hover:bg-muted/50 ${selectedAction === option.value ? 'border-primary' : '' }`}
+                                    onClick={() => form.setValue('action', option.value, { shouldValidate: true })}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        {getSubmittedBadge(hasHistory)}
+                                        <div className="font-medium text-sm flex items-center">
+                                            {option.label}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    {form.formState.errors.action && (
+                        <p className="text-sm text-destructive mt-1">{form.formState.errors.action.message}</p>
+                    )}
                 </div>
 
-                {/* Accounts Form (BT) 1 */}
-                <ConditionalSection show={action === 'accounts-form-1'}>
-                    <div className="space-y-4 border rounded-lg p-4">
-                        <h4 className="font-semibold text-base">Accounts Form</h4>
+                <ConditionalSection show={selectedAction === 'accounts-form-1'}>
+                    <div className="space-y-4 border rounded-lg p-4 bg-background">
+                        <div className="flex items-center gap-2 pb-3 border-b">
+                            <FileText className="h-5 w-5 text-primary" />
+                            <h4 className="font-semibold text-base">Accounts Form</h4>
+                        </div>
+                        <p className="text-sm text-muted-foreground -mt-2">
+                            Process the payment request through accounts department
+                        </p>
 
                         <FieldWrapper control={form.control} name="bt_req" label="Bank Transfer Request">
                             {(field) => (
@@ -153,52 +334,59 @@ export function BankTransferActionForm({ instrumentId, instrumentData }: BankTra
                                 )}
                             </FieldWrapper>
                         )}
+
                         {btReq === 'Accepted' && (
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3 gap-y-4">
-                                <FieldWrapper control={form.control} name="payment_datetime" label="Date and Time of Payment">
-                                    {(field) => (
-                                        <DateTimeInput
-                                            value={field.value}
-                                            onChange={field.onChange}
-                                            placeholder="Select date and time"
-                                        />
-                                    )}
-                                </FieldWrapper>
-                                <FieldWrapper control={form.control} name="utr_no" label="UTR for the transaction">
-                                    {(field) => <Input {...field} placeholder="Enter UTR number" />}
-                                </FieldWrapper>
-                                <FieldWrapper control={form.control} name="utr_message" label="UTR Message">
-                                    {(field) => <Input {...field} placeholder="Enter UTR message" />}
-                                </FieldWrapper>
-                                <FieldWrapper control={form.control} name="remarks" label="Remarks">
-                                    {(field) => (
-                                        <Input {...field} placeholder="Enter remarks" />
-                                    )}
-                                </FieldWrapper>
+                            <div className="space-y-4 pt-3">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <FieldWrapper control={form.control} name="payment_datetime" label="Date and Time of Payment">
+                                        {(field) => (
+                                            <DateTimeInput
+                                                value={field.value}
+                                                onChange={field.onChange}
+                                                placeholder="Select date and time"
+                                            />
+                                        )}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="utr_no" label="UTR for the transaction">
+                                        {(field) => <Input {...field} placeholder="Enter UTR number" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="utr_message" label="UTR Message">
+                                        {(field) => <Input {...field} placeholder="Enter UTR message" />}
+                                    </FieldWrapper>
+                                </div>
                             </div>
                         )}
                     </div>
                 </ConditionalSection>
 
-                {/* Initiate Followup */}
-                <ConditionalSection show={action === 'initiate-followup'}>
-                    <div className="space-y-4 border rounded-lg p-4">
-                        <h4 className="font-semibold text-base">Initiate Followup</h4>
+                <ConditionalSection show={selectedAction === 'initiate-followup'}>
+                    <div className="space-y-4 border rounded-lg p-4 bg-background">
+                        <div className="flex items-center gap-2 pb-3 border-b">
+                            <Users className="h-5 w-5 text-primary" />
+                            <h4 className="font-semibold text-base">Initiate Followup</h4>
+                        </div>
+                        <p className="text-sm text-muted-foreground -mt-2">
+                            Start a follow-up process with organisation contacts
+                        </p>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3 gap-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <FieldWrapper control={form.control} name="organisation_name" label="Organisation Name">
                                 {(field) => <Input {...field} placeholder="Enter organisation name" />}
                             </FieldWrapper>
-                            <div className="col-span-3">
-                                <ContactPersonFields control={form.control} name="contacts" />
-                            </div>
+                        </div>
+
+                        <div>
+                            <ContactPersonFields control={form.control} name="contacts" />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <FieldWrapper control={form.control} name="followup_start_date" label="Follow-up Start Date">
                                 {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                             </FieldWrapper>
                             <FollowUpFrequencySelect control={form.control} name="frequency" />
                         </div>
 
-                        <div className="col-span-3">
+                        <div>
                             <StopReasonFields
                                 control={form.control}
                                 frequencyFieldName="frequency"
@@ -211,12 +399,17 @@ export function BankTransferActionForm({ instrumentId, instrumentData }: BankTra
                     </div>
                 </ConditionalSection>
 
-                {/* Returned via Bank Transfer */}
-                <ConditionalSection show={action === 'returned'}>
-                    <div className="space-y-4 border rounded-lg p-4">
-                        <h4 className="font-semibold text-base">Returned via Bank Transfer</h4>
+                <ConditionalSection show={selectedAction === 'returned'}>
+                    <div className="space-y-4 border rounded-lg p-4 bg-background">
+                        <div className="flex items-center gap-2 pb-3 border-b">
+                            <Banknote className="h-5 w-5 text-primary" />
+                            <h4 className="font-semibold text-base">Returned via Bank Transfer</h4>
+                        </div>
+                        <p className="text-sm text-muted-foreground -mt-2">
+                            Record return of payment through bank transfer
+                        </p>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3 gap-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <FieldWrapper control={form.control} name="transfer_date" label="Transfer Date">
                                 {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                             </FieldWrapper>
@@ -227,14 +420,29 @@ export function BankTransferActionForm({ instrumentId, instrumentData }: BankTra
                     </div>
                 </ConditionalSection>
 
-                {/* Settled with Project Account */}
-                <ConditionalSection show={action === 'settled'}>
-                    <div className="space-y-4 border rounded-lg p-4">
-                        <h4 className="font-semibold text-base">Settled with Project Account</h4>
+                <ConditionalSection show={selectedAction === 'settled'}>
+                    <div className="space-y-4 border rounded-lg p-4 bg-background">
+                        <div className="flex items-center gap-2 pb-3 border-b">
+                            <CheckCircle2 className="h-5 w-5 text-primary" />
+                            <h4 className="font-semibold text-base">Settled with Project Account</h4>
+                            {getSubmittedBadge(hasSettledData)}
+                        </div>
+                        <p className="text-sm text-muted-foreground -mt-2">
+                            Mark payment as settled with project account
+                        </p>
+                        <FieldWrapper control={form.control} name="settle_remarks" label="Remarks">
+                            {(field) => (
+                                <Textarea
+                                    {...field}
+                                    placeholder="Enter settlement remarks"
+                                    className="min-h-[80px]"
+                                />
+                            )}
+                        </FieldWrapper>
                     </div>
                 </ConditionalSection>
 
-                <div className="flex justify-end gap-4 pt-4">
+                <div className="flex justify-end gap-4 pt-4 border-t">
                     <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={isSubmitting}>
                         Cancel
                     </Button>
