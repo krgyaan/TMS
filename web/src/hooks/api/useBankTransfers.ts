@@ -4,6 +4,8 @@ import type {
     BankTransferDashboardRow,
     BankTransferDashboardCounts,
     BankTransferDashboardFilters,
+    BankTransferActionFormData,
+    BankTransferFollowupData,
 } from '@/modules/bi-dashboard/bank-tranfer/helpers/bankTransfer.types';
 import type { PaginatedResult } from '@/types/api.types';
 
@@ -14,6 +16,8 @@ export const bankTransfersKey = {
     details: () => [...bankTransfersKey.all, 'detail'] as const,
     detail: (id: number) => [...bankTransfersKey.details(), id] as const,
     counts: () => [...bankTransfersKey.all, 'counts'] as const,
+    actionForm: (id: number) => [...bankTransfersKey.all, 'action-form', id] as const,
+    followup: (id: number) => [...bankTransfersKey.all, 'followup', id] as const,
 };
 
 export const useBankTransferDashboard = (
@@ -74,6 +78,32 @@ export const useBankTransferDetails = (id: number) => {
     return query;
 };
 
+export const useBankTransferActionFormData = (id: number) => {
+    const query = useQuery<BankTransferActionFormData>({
+        queryKey: bankTransfersKey.actionForm(id),
+        queryFn: async () => {
+            const result = await bankTransfersService.getActionFormData(id);
+            return result;
+        },
+        enabled: !!id,
+    });
+
+    return query;
+};
+
+export const useBankTransferFollowupData = (id: number) => {
+    const query = useQuery<BankTransferFollowupData | null>({
+        queryKey: bankTransfersKey.followup(id),
+        queryFn: async () => {
+            const result = await bankTransfersService.getFollowupData(id);
+            return result;
+        },
+        enabled: !!id,
+    });
+
+    return query;
+};
+
 export const useUpdateBankTransferAction = () => {
     const queryClient = useQueryClient();
     console.log('Action Form called');
@@ -92,4 +122,4 @@ export const useUpdateBankTransferAction = () => {
     });
 };
 
-export type { BankTransferDashboardRow, BankTransferDashboardCounts };
+export type { BankTransferDashboardRow, BankTransferDashboardCounts, BankTransferActionFormData, BankTransferFollowupData };

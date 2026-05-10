@@ -20,7 +20,6 @@ export const BankTransferActionFormSchema = BaseActionFormSchema.extend({
     payment_datetime: z.string().optional(),
     utr_no: z.string().optional(),
     utr_message: z.string().optional(),
-    remarks: z.string().optional(),
 
     // Initiate Followup
     organisation_name: z.string().optional(),
@@ -34,6 +33,9 @@ export const BankTransferActionFormSchema = BaseActionFormSchema.extend({
 
     // Returned via Bank Transfer
     transfer_date: z.string().optional(),
+
+    // Settled with Project Account
+    settle_remarks: z.string().optional(),
 }).refine(
     (data) => {
         // Action 1: status is required
@@ -59,14 +61,14 @@ export const BankTransferActionFormSchema = BaseActionFormSchema.extend({
     }
 ).refine(
     (data) => {
-        // Action 1: When Accepted, payment_datetime, utr_no, utr_message, remarks are required
+        // Action 1: When Accepted, payment_datetime, utr_no, utr_message are required
         if (data.action === 'accounts-form-1' && data.bt_req === 'Accepted') {
-            return !!data.payment_datetime && !!data.utr_no && !!data.utr_message && !!data.remarks;
+            return !!data.payment_datetime && !!data.utr_no && !!data.utr_message;
         }
         return true;
     },
     {
-        message: 'Date and time of payment, UTR number, UTR message, and remarks are required when accepted',
+        message: 'Date and time of payment, UTR number, and UTR message are required when accepted',
         path: ['payment_datetime'],
     }
 ).refine(
@@ -118,6 +120,17 @@ export const BankTransferActionFormSchema = BaseActionFormSchema.extend({
     {
         message: 'Transfer date and UTR number are required',
         path: ['transfer_date'],
+    }
+).refine(
+    (data) => {
+        if (data.action === 'settled') {
+            return !!data.settle_remarks;
+        }
+        return true;
+    },
+    {
+        message: 'Settlement remarks are required',
+        path: ['settle_remarks'],
     }
 );
 

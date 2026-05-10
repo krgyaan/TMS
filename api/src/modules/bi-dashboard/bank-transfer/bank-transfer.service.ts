@@ -7,6 +7,7 @@ import {
     paymentInstruments,
     instrumentTransferDetails,
 } from '@db/schemas/tendering/payment-requests.schema';
+import { followUps } from '@/db/schemas/shared/follow-ups.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
@@ -339,7 +340,6 @@ export class BankTransferService {
                     }
                     transferDetailsUpdate.transactionDate = paymentDate;
                 }
-                if (body.remarks) transferDetailsUpdate.remarks = body.remarks;
                 // Support both utr_message (from form) and utr_mgs (legacy)
                 const utrMsg = body.utr_message || body.utr_mgs;
                 if (utrMsg) transferDetailsUpdate.utrMsg = utrMsg;
@@ -351,7 +351,7 @@ export class BankTransferService {
                 const returnUtr = body.utr_no || body.utr_num;
                 if (returnUtr) transferDetailsUpdate.returnUtr = returnUtr;
             } else if (body.action === 'settled') {
-                if (body.action === 'settled') transferDetailsUpdate.action = body.action;
+                if (body.settle_remarks) transferDetailsUpdate.remarks = body.settle_remarks;
             }
 
             if (Object.keys(transferDetailsUpdate).length > 0) {
@@ -492,5 +492,114 @@ export class BankTransferService {
         }
 
         return result;
+    }
+
+    async getActionFormData(id: number) {
+        const [result] = await this.db
+            .select({
+                id: paymentInstruments.id,
+                action: paymentInstruments.action,
+                status: paymentInstruments.status,
+                amount: paymentInstruments.amount,
+                utr: paymentInstruments.utr,
+                rejectionReason: paymentInstruments.rejectionReason,
+                legacyData: paymentInstruments.legacyData,
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                accountName: instrumentTransferDetails.accountName,
+                transactionDate: instrumentTransferDetails.transactionDate,
+                paymentMethod: instrumentTransferDetails.paymentMethod,
+                utrMsg: instrumentTransferDetails.utrMsg,
+                utrNum: instrumentTransferDetails.utrNum,
+                returnTransferDate: instrumentTransferDetails.returnTransferDate,
+                returnUtr: instrumentTransferDetails.returnUtr,
+                reason: instrumentTransferDetails.reason,
+                remarks: instrumentTransferDetails.remarks,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .where(and(
+                eq(paymentInstruments.id, id),
+                eq(paymentInstruments.instrumentType, 'Bank Transfer'),
+                eq(paymentInstruments.isActive, true)
+            ))
+            .limit(1);
+
+        if (!result) {
+            throw new NotFoundException(`Payment Instrument with ID ${id} not found`);
+        }
+
+        const legacyData = result.legacyData as Record<string, any> | null;
+
+        return {
+            id: result.id,
+            action: result.action,
+            btStatus: this.statusMap()[result.status],
+            tenderNo: result.tenderNo,
+            tenderName: result.tenderName,
+            amount: result.amount ? Number(result.amount) : null,
+            accountName: result.accountName,
+            utrNo: result.utr || result.utrNum,
+            transactionDate: result.transactionDate ? new Date(result.transactionDate) : null,
+            paymentMethod: result.paymentMethod,
+            utrMsg: result.utrMsg,
+            returnTransferDate: result.returnTransferDate ? new Date(result.returnTransferDate) : null,
+            returnUtr: result.returnUtr,
+            reason: result.reason,
+            remarks: result.remarks,
+            rejectionReason: result.rejectionReason,
+            paymentDateTime: legacyData?.date_time || null,
+        };
+    }
+
+    async getFollowupData(instrumentId: number) {
+        const [result] = await this.db
+            .select({
+                id: followUps.id,
+                emdId: followUps.emdId,
+                partyName: followUps.partyName,
+                area: followUps.area,
+                amount: followUps.amount,
+                contacts: followUps.contacts,
+                frequency: followUps.frequency,
+                startFrom: followUps.startFrom,
+                nextFollowUpDate: followUps.nextFollowUpDate,
+                stopReason: followUps.stopReason,
+                proofText: followUps.proofText,
+                stopRemarks: followUps.stopRemarks,
+                proofImagePath: followUps.proofImagePath,
+                assignmentStatus: followUps.assignmentStatus,
+                createdAt: followUps.createdAt,
+            })
+            .from(followUps)
+            .where(and(
+                eq(followUps.emdId, instrumentId),
+                isNull(followUps.deletedAt)
+            ))
+            .orderBy(desc(followUps.createdAt))
+            .limit(1);
+
+        if (!result) {
+            return null;
+        }
+
+        return {
+            id: result.id,
+            organisationName: result.partyName,
+            area: result.area,
+            amount: result.amount ? Number(result.amount) : null,
+            contacts: result.contacts || [],
+            frequency: result.frequency,
+            followupStartDate: result.startFrom ? new Date(result.startFrom) : null,
+            nextFollowUpDate: result.nextFollowUpDate ? new Date(result.nextFollowUpDate) : null,
+            stopReason: result.stopReason,
+            proofText: result.proofText,
+            stopRemarks: result.stopRemarks,
+            proofImagePath: result.proofImagePath,
+            assignmentStatus: result.assignmentStatus,
+            createdAt: result.createdAt,
+        };
     }
 }
