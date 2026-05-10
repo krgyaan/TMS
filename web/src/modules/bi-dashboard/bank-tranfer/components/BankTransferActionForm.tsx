@@ -23,7 +23,7 @@ import { FileText, Users, Banknote, CheckCircle, CheckCircle2, Info } from 'luci
 import { Badge } from '@/components/ui/badge';
 
 const ALL_ACTION_OPTIONS = [
-    { value: 'accounts-form-1', label: 'Accounts Form' },
+    { value: 'accounts-form', label: 'Accounts Form' },
     { value: 'initiate-followup', label: 'Initiate Followup' },
     { value: 'returned', label: 'Returned via Bank Transfer' },
     { value: 'settled', label: 'Settled with Project Account' },
@@ -103,7 +103,7 @@ export function BankTransferActionForm({ instrumentId, action: propAction, formH
     };
 
     const availableActions = propAction === 0
-        ? ALL_ACTION_OPTIONS.filter(opt => opt.value === 'accounts-form-1')
+        ? ALL_ACTION_OPTIONS.filter(opt => opt.value === 'accounts-form')
         : ALL_ACTION_OPTIONS;
 
     const defaultValues: BankTransferActionFormValues = {
@@ -267,7 +267,7 @@ export function BankTransferActionForm({ instrumentId, action: propAction, formH
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                         {availableActions.map((option) => {
                             const hasHistory =
-                                (option.value === 'accounts-form-1' && hasAccountsFormData) ||
+                                (option.value === 'accounts-form' && hasAccountsFormData) ||
                                 (option.value === 'initiate-followup' && hasFollowupData) ||
                                 (option.value === 'returned' && hasReturnedData) ||
                                 (option.value === 'settled' && hasSettledData);
@@ -293,7 +293,7 @@ export function BankTransferActionForm({ instrumentId, action: propAction, formH
                     )}
                 </div>
 
-                <ConditionalSection show={selectedAction === 'accounts-form-1'}>
+                <ConditionalSection show={selectedAction === 'accounts-form'}>
                     <div className="space-y-4 border rounded-lg p-4 bg-background">
                         <div className="flex items-center gap-2 pb-3 border-b">
                             <FileText className="h-5 w-5 text-primary" />
