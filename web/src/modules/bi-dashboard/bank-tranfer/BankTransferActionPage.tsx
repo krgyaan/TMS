@@ -149,11 +149,12 @@ export default function BankTransferActionPage() {
                 <BankTransferActionForm
                     instrumentId={instrumentId}
                     action={currentAction}
-                    instrumentData={instrumentData}
                     formHistory={{
                         accountsForm: actionFormData ? {
-                            btReq: actionFormData.rejectionReason ? 'Rejected' : 
-                                    (actionFormData.utrNo || actionFormData.transactionDate || actionFormData.utrMsg || actionFormData.paymentDateTime) ? 'Accepted' : undefined,
+                            btReq: actionFormData.btStatus === 'Rejected' ? 'Rejected' :
+                                   actionFormData.btStatus === 'Accepted' ? 'Accepted' :
+                                   actionFormData.rejectionReason ? 'Rejected' : 
+                                   (actionFormData.utrNo || actionFormData.transactionDate || actionFormData.utrMsg || actionFormData.paymentDateTime) ? 'Accepted' : undefined,
                             reasonReq: actionFormData.rejectionReason ?? undefined,
                             paymentDatetime: actionFormData.paymentDateTime ?? undefined,
                             utrNo: actionFormData.utrNo ?? undefined,
