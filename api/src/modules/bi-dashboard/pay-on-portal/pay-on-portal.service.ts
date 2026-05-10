@@ -486,7 +486,7 @@ export class PayOnPortalService {
                 status: paymentInstruments.status,
                 amount: paymentInstruments.amount,
                 utr: paymentInstruments.utr,
-                rejectionReason: paymentInstruments.rejectionReason,
+                rejectionReason: instrumentTransferDetails.reason,
                 legacyData: paymentInstruments.legacyData,
                 tenderNo: tenderInfos.tenderNo,
                 tenderName: tenderInfos.tenderName,
@@ -499,7 +499,6 @@ export class PayOnPortalService {
                 isDebit: instrumentTransferDetails.isDebit,
                 returnTransferDate: instrumentTransferDetails.returnTransferDate,
                 returnUtr: instrumentTransferDetails.returnUtr,
-                reason: instrumentTransferDetails.reason,
                 remarks: instrumentTransferDetails.remarks,
             })
             .from(paymentInstruments)
@@ -535,8 +534,6 @@ export class PayOnPortalService {
             isDebit: result.isDebit,
             returnTransferDate: result.returnTransferDate ? new Date(result.returnTransferDate) : null,
             returnUtr: result.returnUtr,
-            reason: result.reason,
-            
             remarks: result.remarks,
             rejectionReason: result.rejectionReason,
             paymentDateTime: legacyData?.date_time || null,

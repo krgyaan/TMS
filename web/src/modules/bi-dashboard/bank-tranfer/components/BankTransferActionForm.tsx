@@ -5,7 +5,6 @@ import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
-import { SelectField } from '@/components/form/SelectField';
 import { Input } from '@/components/ui/input';
 import { ContactPersonFields } from '@/components/form/ContactPersonFields';
 import { FollowUpFrequencySelect } from '@/components/form/FollowUpFrequencySelect';
@@ -74,16 +73,16 @@ interface BankTransferActionFormProps {
     instrumentId: number;
     action?: number | null;
     instrumentData?: {
-        utrNo?: string;
-        accountName?: string;
-        amount?: number;
-        tenderName?: string;
         tenderNo?: string;
+        tenderName?: string;
+        amount?: number;
+        accountName?: string;
+        utrNo?: string;
     };
     formHistory?: FormHistory;
 }
 
-export function BankTransferActionForm({ instrumentId, action: propAction, instrumentData, formHistory }: BankTransferActionFormProps) {
+export function BankTransferActionForm({ instrumentId, action: propAction, formHistory }: BankTransferActionFormProps) {
     const navigate = useNavigate();
     const updateMutation = useUpdateBankTransferAction();
 
