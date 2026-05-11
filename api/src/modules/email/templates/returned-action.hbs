@@ -1,7 +1,7 @@
 <div>
     <p>Dear {{data.tenderExecutive}},</p>
 
-    <p>The {{data.paymentInstrument}} payment request for tender no. {{data.tenderNo}} has been returned via Bank Transfer.</p>
+    <p>The EMD for {{data.tenderName}} (Tender No: {{data.tenderNo}}) paid via {{data.paymentInstrumentType}} ({{data.portalName}}) has been received back to our Bank Account.</p>
 
     <p>Return Details:</p>
     <ul>
@@ -9,7 +9,7 @@
         <li>Return UTR: {{data.returnUtr}}</li>
     </ul>
 
-    <p>Please follow up with the accounts team for further details.</p>
+    <p>Please stop the follow-up if initiated via TMS.</p>
 
     <p>Regards,</p>
     <p>{{data.senderName}},</p>

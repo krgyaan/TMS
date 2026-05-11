@@ -566,7 +566,9 @@ export class PaymentRequestsNotificationService {
             .select({
                 requestId: paymentInstruments.requestId,
                 tenderId: paymentRequests.tenderId,
-                requestedBy: paymentRequests.requestedBy
+                requestedBy: paymentRequests.requestedBy,
+                tenderNo: paymentRequests.tenderNo,
+                projectName: paymentRequests.projectName,
             })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
@@ -594,18 +596,6 @@ export class PaymentRequestsNotificationService {
             return;
         }
 
-        let tenderNo = 'NA';
-        if (instrument.tenderId) {
-            const [tender] = await this.db
-                .select({ tenderNo: tenderInfos.tenderNo })
-                .from(tenderInfos)
-                .where(eq(tenderInfos.id, instrument.tenderId))
-                .limit(1);
-            if (tender) {
-                tenderNo = tender.tenderNo || 'NA';
-            }
-        }
-
         try {
             const result = await this.emailService.sendPaymentEmail({
                 requestId: instrument.requestId,
@@ -616,8 +606,9 @@ export class PaymentRequestsNotificationService {
                 template: 'returned-action',
                 data: {
                     tenderExecutive: requestedUser.name,
-                    paymentInstrument: 'Bank Transfer',
-                    tenderNo,
+                    paymentInstrumentType: 'Bank Transfer',
+                    tenderName: instrument.projectName || 'NA',
+                    tenderNo: instrument.tenderNo || 'NA',
                     returnTransferDate: returnTransferDate || '',
                     returnUtr: returnUtr || '',
                     senderName: 'Accounts Team',
@@ -648,7 +639,9 @@ export class PaymentRequestsNotificationService {
             .select({
                 requestId: paymentInstruments.requestId,
                 tenderId: paymentRequests.tenderId,
-                requestedBy: paymentRequests.requestedBy
+                requestedBy: paymentRequests.requestedBy,
+                tenderNo: paymentRequests.tenderNo,
+                projectName: paymentRequests.projectName,
             })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
@@ -676,17 +669,11 @@ export class PaymentRequestsNotificationService {
             return;
         }
 
-        let tenderNo = 'NA';
-        if (instrument.tenderId) {
-            const [tender] = await this.db
-                .select({ tenderNo: tenderInfos.tenderNo })
-                .from(tenderInfos)
-                .where(eq(tenderInfos.id, instrument.tenderId))
-                .limit(1);
-            if (tender) {
-                tenderNo = tender.tenderNo || 'NA';
-            }
-        }
+        const [transferDetails] = await this.db
+            .select({ portalName: instrumentTransferDetails.portalName })
+            .from(instrumentTransferDetails)
+            .where(eq(instrumentTransferDetails.instrumentId, instrumentId))
+            .limit(1);
 
         try {
             const result = await this.emailService.sendPaymentEmail({
@@ -698,8 +685,10 @@ export class PaymentRequestsNotificationService {
                 template: 'returned-action',
                 data: {
                     tenderExecutive: requestedUser.name,
-                    paymentInstrument: 'Pay on Portal',
-                    tenderNo,
+                    paymentInstrumentType: 'Pay on Portal',
+                    portalName: transferDetails?.portalName || 'NA',
+                    tenderName: instrument.projectName || 'NA',
+                    tenderNo: instrument.tenderNo || 'NA',
                     returnTransferDate: returnTransferDate || '',
                     returnUtr: returnUtr || '',
                     senderName: 'Accounts Team',
