@@ -2,22 +2,18 @@ import { Inject, Injectable, Logger, NotFoundException, BadRequestException } fr
 import { eq, and, inArray, isNull, sql, asc, desc, or } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
-import {
-    paymentRequests,
-    paymentInstruments,
-    instrumentTransferDetails,
-} from '@db/schemas/tendering/payment-requests.schema';
+import { paymentRequests, paymentInstruments, instrumentTransferDetails } from '@db/schemas/tendering/payment-requests.schema';
 import { followUps } from '@/db/schemas/shared/follow-ups.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
-import { users } from '@db/schemas/auth/users.schema';
-import { statuses } from '@db/schemas/master/statuses.schema';
-import { teams } from '@db/schemas/master/teams.schema';
+import { users } from '@/db/schemas/auth/users.schema';
+import { statuses } from '@/db/schemas/master/statuses.schema';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import type { BankTransferDashboardRow, BankTransferDashboardCounts } from '@/modules/bi-dashboard/bank-transfer/helpers/bankTransfer.types';
 import { BT_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
 import { FollowUpService } from '@/modules/follow-up/follow-up.service';
 import type { CreateFollowUpDto } from '@/modules/follow-up/zod';
+import { PaymentRequestsNotificationService } from '@/modules/tendering/payment-requests/services/payment-requests-notification.service';
 
 @Injectable()
 export class BankTransferService {
@@ -26,6 +22,7 @@ export class BankTransferService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly followUpService: FollowUpService,
+        private readonly notificationService: PaymentRequestsNotificationService,
     ) { }
 
     private statusMap() {
@@ -242,7 +239,6 @@ export class BankTransferService {
     private mapActionToNumber(action: string): number {
         const actionMap: Record<string, number> = {
             'accounts-form': 1,
-            'accounts-form-1': 1,
             'initiate-followup': 2,
             'returned': 3,
             'settled': 4,
@@ -344,12 +340,8 @@ export class BankTransferService {
                 const utrMsg = body.utr_message || body.utr_mgs;
                 if (utrMsg) transferDetailsUpdate.utrMsg = utrMsg;
             } else if (body.action === 'returned') {
-                // Support both transfer_date (from form) and return_date (legacy)
-                const returnDate = body.transfer_date || body.return_date;
-                if (returnDate) transferDetailsUpdate.returnTransferDate = returnDate;
-                // Support both utr_no (from form) and utr_num (legacy)
-                const returnUtr = body.utr_no || body.utr_num;
-                if (returnUtr) transferDetailsUpdate.returnUtr = returnUtr;
+                if (body.transfer_date) transferDetailsUpdate.returnTransferDate = body.transfer_date;
+                if (body.return_utr) transferDetailsUpdate.returnUtr = body.return_utr;
             } else if (body.action === 'settled') {
                 if (body.settle_remarks) transferDetailsUpdate.remarks = body.settle_remarks;
             }
@@ -374,6 +366,35 @@ export class BankTransferService {
                         ...transferDetailsUpdate,
                         createdAt: new Date(),
                     });
+                }
+            }
+
+            // Send email notification for accounts-form action
+            if (body.action === 'accounts-form' && body.bt_req) {
+                try {
+                    await this.notificationService.sendBtActionEmail(
+                        instrumentId,
+                        body.bt_req,
+                        body.payment_datetime ? new Date(body.payment_datetime).toISOString() : undefined,
+                        body.utr_no || undefined,
+                        body.utr_message || undefined,
+                        body.reason_req || undefined
+                    );
+                } catch (error) {
+                    this.logger.warn(`Failed to send BT action email: ${error.message}`);
+                }
+            }
+
+            // Send email notification for returned action
+            if (body.action === 'returned' && body.return_utr) {
+                try {
+                    await this.notificationService.sendBtReturnEmail(
+                        instrumentId,
+                        body.transfer_date || undefined,
+                        body.return_utr
+                    );
+                } catch (error) {
+                    this.logger.warn(`Failed to send BT return email: ${error.message}`);
                 }
             }
 

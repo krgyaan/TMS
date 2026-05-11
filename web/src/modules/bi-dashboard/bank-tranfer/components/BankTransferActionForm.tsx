@@ -55,7 +55,7 @@ interface FollowupHistory {
 
 interface ReturnedHistory {
     transferDate?: string;
-    utrNo?: string;
+    returnUtr?: string;
 }
 
 interface SettledHistory {
@@ -135,7 +135,7 @@ export function BankTransferActionForm({ instrumentId, action: propAction, formH
 
     if (formHistory?.returned) {
         defaultValues.transfer_date = formHistory.returned.transferDate;
-        defaultValues.utr_no = formHistory.returned.utrNo;
+        defaultValues.return_utr = formHistory.returned.returnUtr;
     }
 
     if (formHistory?.settled) {
@@ -196,8 +196,8 @@ export function BankTransferActionForm({ instrumentId, action: propAction, formH
         if (formHistory?.returned?.transferDate) {
             form.setValue('transfer_date', formHistory.returned.transferDate, { shouldValidate: false });
         }
-        if (formHistory?.returned?.utrNo) {
-            form.setValue('utr_no', formHistory.returned.utrNo, { shouldValidate: false });
+        if (formHistory?.returned?.returnUtr) {
+            form.setValue('return_utr', formHistory.returned.returnUtr, { shouldValidate: false });
         }
 
         if (formHistory?.settled?.remarks) {
@@ -412,8 +412,8 @@ export function BankTransferActionForm({ instrumentId, action: propAction, formH
                             <FieldWrapper control={form.control} name="transfer_date" label="Transfer Date">
                                 {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                             </FieldWrapper>
-                            <FieldWrapper control={form.control} name="utr_no" label="UTR Number">
-                                {(field) => <Input {...field} placeholder="Enter UTR number" />}
+                            <FieldWrapper control={form.control} name="return_utr" label="Return UTR">
+                                {(field) => <Input {...field} placeholder="Enter Return UTR number" />}
                             </FieldWrapper>
                         </div>
                     </div>
