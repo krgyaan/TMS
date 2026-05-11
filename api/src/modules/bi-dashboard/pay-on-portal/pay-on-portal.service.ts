@@ -262,7 +262,6 @@ export class PayOnPortalService {
     async updateAction(
         instrumentId: number,
         body: any,
-        files: Express.Multer.File[],
         user: any,
     ) {
         const [instrument] = await this.db
@@ -290,12 +289,6 @@ export class PayOnPortalService {
         }
 
         const filePaths: string[] = [];
-        if (files && files.length > 0) {
-            for (const file of files) {
-                const relativePath = `bi-dashboard/${file.filename}`;
-                filePaths.push(relativePath);
-            }
-        }
 
         const updateData: any = {
             action: actionNumber,

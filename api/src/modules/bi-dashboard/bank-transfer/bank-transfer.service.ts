@@ -249,7 +249,6 @@ export class BankTransferService {
     async updateAction(
         instrumentId: number,
         body: any,
-        files: Express.Multer.File[],
         user: any,
     ) {
         this.logger.debug('BT updateAction start', {
@@ -279,14 +278,6 @@ export class BankTransferService {
                 contacts = typeof body.contacts === 'string' ? JSON.parse(body.contacts) : body.contacts;
             } catch (e) {
                 this.logger.warn('Failed to parse contacts', e);
-            }
-        }
-
-        const filePaths: string[] = [];
-        if (files && files.length > 0) {
-            for (const file of files) {
-                const relativePath = `bi-dashboard/${file.filename}`;
-                filePaths.push(relativePath);
             }
         }
 
