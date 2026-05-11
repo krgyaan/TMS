@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 
@@ -19,8 +19,7 @@ import html2pdf from "html2pdf.js";
 /* ---------------------------------- */
 
 const formatDate = (d?: string | null) =>
-    d
-        ? new Date(d).toLocaleDateString("en-GB", {
+    d ? new Date(d).toLocaleDateString("en-GB", {
               day: "2-digit",
               month: "short",
               year: "numeric",
@@ -48,10 +47,6 @@ const ImprestVoucherView: React.FC = () => {
     const location = useLocation();
     const stateProofs = location.state?.proofs as InvoiceProof[] | undefined;
 
-    if (!userId || !from || !to) {
-        return <div className="p-6">Invalid voucher link</div>;
-    }
-
     const isSigned = (v?: string | null) => v && v.trim().length > 0;
 
     const navigate = useNavigate();
@@ -61,15 +56,6 @@ const ImprestVoucherView: React.FC = () => {
 
     const isAuthorized = canRead("shared.imprests");
 
-    if (!canRead("shared.imprests")) {
-        return <div className="p-6">Access denied</div>;
-    }
-
-    const { data, isLoading, refetch } = useImprestVoucherView({
-        userId,
-        from,
-        to,
-    });
 
     const accountApproveMutation = useAccountApproveVoucher();
     const adminApproveMutation = useAdminApproveVoucher();
@@ -83,18 +69,40 @@ const ImprestVoucherView: React.FC = () => {
 
     const [preview, setPreview] = React.useState<InvoiceProof | null>(null);
 
-    if (isLoading) return <div className="p-6">Loading…</div>;
-    if (!data) return <div className="p-6">Voucher not found</div>;
+    const { data, isLoading, refetch } = useImprestVoucherView({
+        userId,
+        from,
+        to,
+    });
 
-    const { voucher, items } = data;
+    const voucher = data?.voucher;
+    const items = data?.items || [];
     
     // Merge proofs from state or voucher
     let proofs: InvoiceProof[] = [];
     if (stateProofs && stateProofs.length > 0) {
         proofs = stateProofs;
-    } else if (voucher.proofs && voucher.proofs.length > 0) {
+    } else if (voucher?.proofs && voucher.proofs.length > 0) {
         proofs = voucher.proofs;
     }
+
+    useEffect(() => {
+        if(proofs.length > 0 && !preview){
+            setPreview(proofs[0]);
+        }
+    }, [proofs, preview])
+
+    if (!canRead("shared.imprests")) {
+        return <div className="p-6">Access denied</div>;
+    }
+    
+    if (!userId || !from || !to) {
+        return <div className="p-6">Invalid voucher link</div>;
+    }
+    
+    if (isLoading) return <div className="p-6">Loading…</div>;
+    if (!data) return <div className="p-6">Voucher not found</div>;
+
 
     const totalAmount = items.reduce((sum, i) => sum + i.amount, 0);
 
