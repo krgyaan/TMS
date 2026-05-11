@@ -332,17 +332,17 @@ export class ProfileService {
       const profileStatus = obProfile?.status === 'submitted' ? 'submitted' : 'pending';
       const profileHrStatus = (obProfile?.hrStatus as any) || 'pending';
 
-      const bankStatus = bankAccounts.some((b: any) => b.status === 'submitted') ? 'submitted' : 'pending';
+      const bankStatus = bankAccounts.length > 0 ? 'submitted' : 'pending';
       const bankApproved = bankAccounts.some((b: any) => b.hrStatus === 'approved');
       const bankRejected = bankAccounts.some((b: any) => b.hrStatus === 'rejected');
       const bankHrStatus = bankApproved ? 'approved' : bankRejected ? 'rejected' : 'pending';
 
-      const educationStatus = education.some((e: any) => e.status === 'submitted') ? 'submitted' : 'pending';
+      const educationStatus = education.length > 0 ? 'submitted' : 'pending';
       const eduApproved = education.some((e: any) => e.hrStatus === 'approved');
       const eduRejected = education.some((e: any) => e.hrStatus === 'rejected');
       const educationHrStatus = eduApproved ? 'approved' : eduRejected ? 'rejected' : 'pending';
 
-      const experienceStatus = experience.some((e: any) => e.status === 'submitted') ? 'submitted' : 'pending';
+      const experienceStatus = experience.length > 0 ? 'submitted' : 'pending';
       const expApproved = experience.some((e: any) => e.hrStatus === 'approved');
       const expRejected = experience.some((e: any) => e.hrStatus === 'rejected');
       const experienceHrStatus = expApproved ? 'approved' : expRejected ? 'rejected' : 'pending';
@@ -690,7 +690,7 @@ export class ProfileService {
             branchAddress: b.branchAddress || null,
             upiId: b.upiId || null,
             isPrimary: b.isPrimary === true || b.isPrimary === 'true',
-            status: 'pending',
+            status: 'submitted',
           })));
         }
       }
@@ -709,6 +709,7 @@ export class ProfileService {
             startDate: e.startDate ? (e.startDate.length === 7 ? `${e.startDate}-01` : e.startDate) : null,
             endDate: e.endDate ? (e.endDate.length === 7 ? `${e.endDate}-01` : e.endDate) : null,
             grade: e.grade,
+            status: 'submitted',
           })));
         }
       }
@@ -725,6 +726,7 @@ export class ProfileService {
             toDate: e.currentlyWorking ? null : (e.toDate || null),
             currentlyWorking: e.currentlyWorking === true || e.currentlyWorking === 'true',
             responsibilities: e.responsibilities,
+            status: 'submitted',
           })));
         }
       }
