@@ -195,10 +195,6 @@ export type OnboardingStatus = {
 
 
 
-
-
-
-
 export type AssetData = {
   id: number;
   assetCode: string;
