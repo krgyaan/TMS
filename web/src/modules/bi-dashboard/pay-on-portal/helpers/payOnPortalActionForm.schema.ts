@@ -21,6 +21,7 @@ export const PayOnPortalActionFormSchema = BaseActionFormSchema.extend({
     utr_no: z.string().optional(),
     utr_message: z.string().optional(),
     amount: z.coerce.number().optional(),
+    payment_proof: z.any().optional(), // File(s) - TenderFileUploader returns string[] but also supports direct File upload
 
     // Initiate Followup
     organisation_name: z.string().optional(),

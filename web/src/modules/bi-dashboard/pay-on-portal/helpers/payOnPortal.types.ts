@@ -55,6 +55,7 @@ export interface PayOnPortalActionFormData {
     remarks: string | null;
     rejectionReason: string | null;
     paymentDateTime: string | null;
+    paymentProofPath: string | null;
 }
 
 export interface PayOnPortalFollowupData {
