@@ -377,9 +377,9 @@ const ImprestVoucherView: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="grid min-h-[560px] lg:grid-cols-[280px_minmax(0,1fr)]">
+                    <div className="grid h-[600px] lg:grid-cols-[280px_minmax(0,1fr)]">
                         {/* Sidebar */}
-                        <div className="border-b border-border bg-muted/20 p-4 lg:border-b-0 lg:border-r">
+                        <div className="border-b border-border bg-muted/20 p-4 lg:border-b-0 lg:border-r overflow-y-auto">
                             {proofs.length > 0 ? (
                                 <div className="space-y-2">
                                     {proofs.map((proof, index) => {
@@ -420,7 +420,7 @@ const ImprestVoucherView: React.FC = () => {
                         </div>
 
                         {/* Viewer */}
-                        <div className="flex min-w-0 flex-col bg-background">
+                        <div className="flex min-w-0 flex-col bg-background overflow-y-auto">
                             {preview ? (
                                 <>
                                     <div className="flex flex-col gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
@@ -453,7 +453,7 @@ const ImprestVoucherView: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    <div className="h-[72vh] min-h-[520px] p-4">
+                                    <div className="flex-1 p-4 h-full min-h-0">
                                         {preview.type === "pdf" ? (
                                             <div className="h-full overflow-hidden rounded-2xl border border-border bg-muted/20 shadow-sm">
                                                 <iframe
@@ -474,7 +474,7 @@ const ImprestVoucherView: React.FC = () => {
                                     </div>
                                 </>
                             ) : (
-                                <div className="flex h-full min-h-[520px] flex-col items-center justify-center px-6 text-center">
+                                <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
                                     <div className="mb-3 rounded-full border border-border bg-muted/40 px-3 py-1 text-xs font-medium text-muted-foreground">
                                         No file selected
                                     </div>
