@@ -34,6 +34,7 @@ export const PayOnPortalActionFormSchema = BaseActionFormSchema.extend({
 
     // Returned via Bank Transfer
     transfer_date: z.string().optional(),
+    return_utr: z.string().optional(),
 
     // Settled with Project Account
     settle_remarks: z.string().optional(),
@@ -112,14 +113,14 @@ export const PayOnPortalActionFormSchema = BaseActionFormSchema.extend({
     }
 ).refine(
     (data) => {
-        // Action 3: transfer_date and utr_no are required
+        // Action 3: transfer_date and return_utr are required
         if (data.action === 'returned') {
-            return !!data.transfer_date && !!data.utr_no;
+            return !!data.transfer_date && !!data.return_utr;
         }
         return true;
     },
     {
-        message: 'Transfer date and UTR number are required',
+        message: 'Transfer date and Return UTR are required',
         path: ['transfer_date'],
     }
 ).refine(

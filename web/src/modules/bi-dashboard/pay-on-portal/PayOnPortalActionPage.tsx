@@ -159,7 +159,7 @@ export default function PayOnPortalActionPage() {
                         } : undefined,
                         returned: actionFormData ? {
                             transferDate: actionFormData.returnTransferDate ? new Date(actionFormData.returnTransferDate).toISOString() : undefined,
-                            utrNo: actionFormData.returnUtr ?? undefined,
+                            returnUtr: actionFormData.returnUtr ?? undefined,
                         } : undefined,
                         settled: actionFormData ? {
                             remarks: actionFormData.remarks ?? undefined,

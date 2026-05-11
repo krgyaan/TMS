@@ -335,18 +335,14 @@ export class PayOnPortalService {
             const utrMsg = body.utr_message || body.utr_mgs;
             if (utrMsg) transferDetailsUpdate.utrMsg = utrMsg;
         } else if (body.action === 'returned') {
-            // Support both transfer_date (from form) and return_date (legacy)
-            const returnDateStr = body.transfer_date || body.return_date;
-            if (returnDateStr) {
-                const returnDate = new Date(returnDateStr);
+            if (body.transfer_date) {
+                const returnDate = new Date(body.transfer_date);
                 if (isNaN(returnDate.getTime())) {
                     throw new BadRequestException('Invalid return date');
                 }
                 transferDetailsUpdate.returnTransferDate = returnDate;
             }
-            if (body.return_reason) transferDetailsUpdate.reason = body.return_reason;
-            if (body.return_remarks) transferDetailsUpdate.remarks = body.return_remarks;
-            if (body.utr_no) transferDetailsUpdate.returnUtr = body.utr_no;
+            if (body.return_utr) transferDetailsUpdate.returnUtr = body.return_utr;
         } else if (body.action === 'settled') {
             this.logger.log(`Settled action - body: ${JSON.stringify(body)}`);
             if (body.settle_remarks) {
@@ -397,6 +393,19 @@ export class PayOnPortalService {
                 );
             } catch (error) {
                 this.logger.warn(`Failed to send POP action email: ${error.message}`);
+            }
+        }
+
+        // Send email notification for returned action
+        if (body.action === 'returned' && body.return_utr) {
+            try {
+                await this.notificationService.sendPopReturnEmail(
+                    instrumentId,
+                    body.transfer_date || undefined,
+                    body.return_utr
+                );
+            } catch (error) {
+                this.logger.warn(`Failed to send POP return email: ${error.message}`);
             }
         }
 
