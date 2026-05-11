@@ -415,15 +415,15 @@ export class RfqsService {
         if (tab === "pending") {
             conditions.push(isNull(rfqs.id));
             conditions.push(TenderInfosService.getExcludeStatusCondition(["lost"]));
-            conditions.push(ne(bidSubmissions.status, "Tender Missed"));
+            conditions.push(or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)));
         } else if (tab === "sent") {
             conditions.push(isNotNull(rfqs.id));
             conditions.push(TenderInfosService.getExcludeStatusCondition(["lost"]));
-            conditions.push(ne(bidSubmissions.status, "Tender Missed"));
+            conditions.push(or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)));
         } else if (tab === "responses") {
             conditions.push(isNotNull(rfqs.id));
             conditions.push(sql`EXISTS (SELECT 1 FROM ${rfqResponses} WHERE ${rfqResponses.rfqId} = ${rfqs.id})`);
-            conditions.push(ne(bidSubmissions.status, "Tender Missed"));
+            conditions.push(or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)));
         } else if (tab === "rfq-rejected") {
             conditions.push(
                 or(
