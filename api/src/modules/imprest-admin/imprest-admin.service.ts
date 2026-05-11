@@ -60,126 +60,80 @@ export class ImprestAdminService {
         this.logger.info("Fetching employee imprest summary");
 
         try {
-            // ==============================
-            // 1️⃣ Aggregate Imprests
-            // ==============================
-            const imprestAgg = this.db
-                .select({
-                    userId: employeeImprests.userId,
+            const rawQuery = sql`
+                WITH imprest_agg AS (
+                    SELECT
+                        user_id,
+                        COALESCE(SUM(amount), 0) AS amount_spent,
+                        COALESCE(
+                            SUM(CASE WHEN approval_status = 1 THEN amount ELSE 0 END),
+                            0
+                        ) AS amount_approved
+                    FROM employee_imprests
+                    GROUP BY user_id
+                ),
+                txn_agg AS (
+                    SELECT
+                        user_id,
+                        COALESCE(SUM(amount), 0) AS amount_received
+                    FROM employee_imprest_transactions
+                    GROUP BY user_id
+                ),
+                voucher_base AS (
+                    SELECT
+                        user_id,
+                        COALESCE(approved_date, created_at)::date AS effective_date
+                    FROM employee_imprests
+                    WHERE approval_status = 1
+                ),
+                voucher_amounts AS (
+                    SELECT
+                        user_id,
+                        EXTRACT(YEAR FROM effective_date)::int AS year,
+                        EXTRACT(WEEK FROM effective_date)::int AS week,
+                        MIN(effective_date) AS start_date,
+                        (
+                            MIN(effective_date)
+                            + (
+                                (6 - ((EXTRACT(DOW FROM MIN(effective_date)) + 6) % 7))
+                                * INTERVAL '1 day'
+                            )
+                        )::date AS end_date
+                    FROM voucher_base
+                    GROUP BY user_id, year, week
+                ),
+                voucher_agg AS (
+                    SELECT
+                        a.user_id,
+                        COUNT(a.year) AS total_vouchers,
+                        SUM(CASE WHEN v.accounts_signed_by IS NOT NULL THEN 1 ELSE 0 END) AS accounts_approved,
+                        SUM(CASE WHEN v.admin_signed_by IS NOT NULL THEN 1 ELSE 0 END) AS admin_approved
+                    FROM voucher_amounts a
+                    LEFT JOIN employee_imprest_vouchers v
+                        ON v.beneficiary_name = a.user_id::text
+                        AND v.valid_from::date = a.start_date
+                        AND v.valid_to::date   = a.end_date
+                    GROUP BY a.user_id
+                )
+                SELECT
+                    u.id AS "userId",
+                    u.name AS "userName",
+                    COALESCE(i.amount_spent, 0) AS "amountSpent",
+                    COALESCE(i.amount_approved, 0) AS "amountApproved",
+                    COALESCE(t.amount_received, 0) AS "amountReceived",
+                    COALESCE(v.total_vouchers, 0) AS "totalVouchers",
+                    COALESCE(v.accounts_approved, 0) AS "accountsApproved",
+                    COALESCE(v.admin_approved, 0) AS "adminApproved"
+                FROM users u
+                INNER JOIN imprest_agg i ON i.user_id = u.id
+                LEFT JOIN txn_agg t ON t.user_id = u.id
+                LEFT JOIN voucher_agg v ON v.user_id = u.id
+                ORDER BY u.name
+            `;
 
-                    amountSpent: sql<number>`
-          COALESCE(SUM(${employeeImprests.amount}), 0)
-        `.as("amountSpent"),
-
-                    amountApproved: sql<number>`
-          COALESCE(
-            SUM(
-              CASE 
-                WHEN ${employeeImprests.approvalStatus} = 1
-                THEN ${employeeImprests.amount}
-                ELSE 0
-              END
-            ),
-          0)
-        `.as("amountApproved"),
-                })
-                .from(employeeImprests)
-                .groupBy(employeeImprests.userId)
-                .as("imprest_agg");
-
-            this.logger.debug("Imprest aggregation prepared");
-
-            // ==============================
-            // 2️⃣ Aggregate Transactions
-            // ==============================
-            const txnAgg = this.db
-                .select({
-                    userId: employeeImprestTransactions.userId,
-
-                    amountReceived: sql<number>`
-          COALESCE(SUM(${employeeImprestTransactions.amount}), 0)
-        `.as("amountReceived"),
-                })
-                .from(employeeImprestTransactions)
-                .groupBy(employeeImprestTransactions.userId)
-                .as("txn_agg");
-
-            this.logger.debug("Transaction aggregation prepared");
-
-            // ==============================
-            // 3️⃣ Aggregate Vouchers
-            // ==============================
-            const voucherAgg = this.db
-                .select({
-                    userId: employeeImprestVouchers.beneficiaryName,
-
-                    totalVouchers: sql<number>`
-          COUNT(${employeeImprestVouchers.id})
-        `.as("totalVouchers"),
-
-                    accountsApproved: sql<number>`
-          SUM(
-            CASE 
-              WHEN ${employeeImprestVouchers.accountsSignedBy} IS NOT NULL 
-              THEN 1 ELSE 0
-            END
-          )
-        `.as("accountsApproved"),
-
-                    adminApproved: sql<number>`
-          SUM(
-            CASE 
-              WHEN ${employeeImprestVouchers.adminSignedBy} IS NOT NULL 
-              THEN 1 ELSE 0
-            END
-          )
-        `.as("adminApproved"),
-                })
-                .from(employeeImprestVouchers)
-                .groupBy(employeeImprestVouchers.beneficiaryName)
-                .as("voucher_agg");
-
-            this.logger.debug("Voucher aggregation prepared");
-
-            // ==============================
-            // 4️⃣ Final Join
-            // ==============================
             this.logger.debug("Executing final employee summary query");
-
-            const rows = await this.db
-                .select({
-                    userId: users.id,
-                    userName: users.name,
-
-                    amountSpent: sql<number>`
-          COALESCE(${imprestAgg.amountSpent}, 0)
-        `,
-
-                    amountApproved: sql<number>`
-          COALESCE(${imprestAgg.amountApproved}, 0)
-        `,
-
-                    amountReceived: sql<number>`
-          COALESCE(${txnAgg.amountReceived}, 0)
-        `,
-
-                    totalVouchers: sql<number>`
-          COALESCE(${voucherAgg.totalVouchers}, 0)
-        `,
-
-                    accountsApproved: sql<number>`
-          COALESCE(${voucherAgg.accountsApproved}, 0)
-        `,
-
-                    adminApproved: sql<number>`
-          COALESCE(${voucherAgg.adminApproved}, 0)
-        `,
-                })
-                .from(users)
-                .innerJoin(imprestAgg, eq(imprestAgg.userId, users.id)) // ensures user has imprests
-                .leftJoin(txnAgg, eq(txnAgg.userId, users.id))
-                .leftJoin(voucherAgg, eq(voucherAgg.userId, sql`${users.id}::text`))
-                .orderBy(users.name);
+            const queryResult = await this.db.execute(rawQuery);
+            const rows = queryResult.rows;
 
             this.logger.info("Employee summary query executed", {
                 rowsCount: rows.length,
@@ -188,7 +142,7 @@ export class ImprestAdminService {
             // ==============================
             // 5️⃣ Map Result
             // ==============================
-            const result = rows.map(row => ({
+            const result = rows.map((row: any) => ({
                 userId: row.userId!,
                 userName: row.userName,
 
