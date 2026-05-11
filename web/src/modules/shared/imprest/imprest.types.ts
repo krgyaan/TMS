@@ -75,6 +75,9 @@ export type ImprestVoucherView = {
         id: number;
         voucherCode: string;
         beneficiaryName: string;
+        beneficiaryId: number;
+        employeeName: string;
+        teamName: string;
         amount: number;
         validFrom: string;
         validTo: string;
@@ -85,6 +88,7 @@ export type ImprestVoucherView = {
         adminSignedAt: string | null;
         accountsRemark: string | null;
         adminRemark: string | null;
+        proofs: InvoiceProof[];
     };
     items: {
         id: number;
