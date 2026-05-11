@@ -110,8 +110,8 @@ const FollowUpEditPage: React.FC = () => {
 
     const removeNewPersonRow = (idx: number) => setPersons(p => p.filter((_, i) => i !== idx));
 
-    const removeExistingPerson = (personId: number) => {
-        setExistingPersons(prev => prev.filter(p => p.id !== personId));
+    const removeExistingPerson = (idx: number) => {
+        setExistingPersons(prev => prev.filter((_, i) => i !== idx));
     };
 
     const handleFiles = (items: any[]) => {
@@ -290,8 +290,8 @@ const FollowUpEditPage: React.FC = () => {
                                 <div className="space-y-3">
                                     <h4 className="font-medium">Existing Contacts</h4>
                                     <div className="space-y-2">
-                                        {existingPersons.map(p => (
-                                            <div key={p.id} className="flex items-center justify-between p-3 border rounded-md">
+                                        {existingPersons.map((p, idx) => (
+                                            <div key={idx} className="flex items-center justify-between p-3 border rounded-md">
                                                 <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
                                                     <div>
                                                         <div className="font-medium">{p.name}</div>
@@ -306,7 +306,7 @@ const FollowUpEditPage: React.FC = () => {
                                                         <div className="text-xs text-muted-foreground">Email</div>
                                                     </div>
                                                 </div>
-                                                <Button size="sm" variant="ghost" onClick={() => removeExistingPerson(p.id)} className="text-destructive">
+                                                <Button size="sm" variant="ghost" onClick={() => removeExistingPerson(idx)} className="text-destructive">
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             </div>
