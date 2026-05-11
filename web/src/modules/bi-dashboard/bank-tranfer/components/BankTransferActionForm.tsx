@@ -8,7 +8,6 @@ import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
 import { ContactPersonFields } from '@/components/form/ContactPersonFields';
 import { FollowUpFrequencySelect } from '@/components/form/FollowUpFrequencySelect';
-import { StopReasonFields } from '@/components/form/StopReasonFields';
 import { ConditionalSection } from '@/components/form/ConditionalSection';
 import DateInput from '@/components/form/DateInput';
 import DateTimeInput from '@/components/form/DateTimeInput';
@@ -215,11 +214,7 @@ export function BankTransferActionForm({ instrumentId, action: propAction, formH
             const formData = new FormData();
 
             Object.entries(values).forEach(([key, value]) => {
-                if (key === 'contacts' ||
-                    key === 'organisation_name' ||
-                    key === 'followup_start_date' ||
-                    key === 'frequency' ||
-                    key === 'stop_reason' ||
+                if (key === 'stop_reason' ||
                     key === 'proof_text' ||
                     key === 'stop_remarks' ||
                     key === 'proof_image') {
@@ -383,17 +378,6 @@ export function BankTransferActionForm({ instrumentId, action: propAction, formH
                                 {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                             </FieldWrapper>
                             <FollowUpFrequencySelect control={form.control} name="frequency" />
-                        </div>
-
-                        <div>
-                            <StopReasonFields
-                                control={form.control}
-                                frequencyFieldName="frequency"
-                                stopReasonFieldName="stop_reason"
-                                proofTextFieldName="proof_text"
-                                stopRemarksFieldName="stop_remarks"
-                                proofImageFieldName="proof_image"
-                            />
                         </div>
                     </div>
                 </ConditionalSection>
