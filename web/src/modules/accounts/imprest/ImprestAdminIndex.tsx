@@ -87,9 +87,14 @@ const ImprestAdminIndex: React.FC = () => {
                 acc.spent += e.amountSpent;
                 acc.approved += e.amountApproved;
                 acc.left += e.amountLeft;
+
+                acc.totalVouchers += e.voucherInfo?.totalVouchers || 0;
+                acc.accountsApproved += e.voucherInfo?.accountsApproved || 0;
+                acc.adminApproved += e.voucherInfo?.adminApproved || 0;
+
                 return acc;
             },
-            { received: 0, spent: 0, approved: 0, left: 0 }
+            { received: 0, spent: 0, approved: 0, left: 0, totalVouchers: 0, accountsApproved: 0, adminApproved: 0 }
         );
     }, [data]);
 
@@ -131,54 +136,25 @@ const ImprestAdminIndex: React.FC = () => {
                 valueFormatter: (p: any) => formatINR(p.value),
             },
             {
-                headerName: "Vouchers",
-                field: "voucherInfo",
-                autoHeight: true,
-                cellRenderer: (params: any) => {
-                    const v = params.value;
-                    if (!v) return "-";
-
-                    return (
-                        <TooltipProvider delayDuration={150}>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <div
-                                        className="
-                inline-flex items-center gap-2
-                rounded-full border px-3 py-1
-                text-sm font-medium
-                cursor-default
-              "
-                                    >
-                                        <span>{v.totalVouchers}</span>
-                                        <span className="text-xs opacity-60">vouchers</span>
-                                    </div>
-                                </TooltipTrigger>
-
-                                <TooltipContent side="right" align="center" className="w-52">
-                                    <div className="space-y-2">
-                                        <p className="text-sm font-semibold">Voucher Summary</p>
-
-                                        <div className="text-xs space-y-1">
-                                            <div className="flex justify-between">
-                                                <span>Total</span>
-                                                <span>{v.totalVouchers}</span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>Accounts Approved</span>
-                                                <span>{v.accountsApproved}</span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span>Admin Approved</span>
-                                                <span>{v.adminApproved}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </TooltipContent>
-                            </Tooltip>
-                        </TooltipProvider>
-                    );
-                },
+                headerName: "Total Vouchers",
+                field: "voucherInfo.totalVouchers",
+                filter: "agNumberColumnFilter",
+                width: 140,
+                cellStyle: { textAlign: "center" },
+            },
+            {
+                headerName: "Accounts Approved",
+                field: "voucherInfo.accountsApproved",
+                filter: "agNumberColumnFilter",
+                width: 160,
+                cellStyle: { textAlign: "center" },
+            },
+            {
+                headerName: "Admin Approved",
+                field: "voucherInfo.adminApproved",
+                filter: "agNumberColumnFilter",
+                width: 140,
+                cellStyle: { textAlign: "center" },
             },
 
             {
@@ -189,27 +165,6 @@ const ImprestAdminIndex: React.FC = () => {
                 width: 80,
                 pinned: "right",
             },
-            // {
-            //     headerName: "Action",
-            //     sortable: false,
-            //     filter: false,
-            //     cellRenderer: (p: any) => (
-            //         <div className="flex gap-2">
-            //             {/* <Button size="sm" onClick={() => navigate(paths.accounts.employeeImprestDashboard(p.data.userId))}> */}
-            //             <Button size="sm">Dashboard</Button>
-
-            //             {/* <Button size="sm" variant="secondary" onClick={() => navigate(paths.accounts.imprestPaymentHistory(p.data.userId))}> */}
-            //             <Button size="sm" variant="secondary">
-            //                 Payment History
-            //             </Button>
-
-            //             <Button size="sm" variant="outline">
-            //                 {/* <Button size="sm" variant="outline" onClick={() => navigate(paths.accounts.imprestVoucher(p.data.userId))}> */}
-            //                 Voucher
-            //             </Button>
-            //         </div>
-            //     ),
-            // },
         ],
         [navigate]
     );
@@ -234,27 +189,100 @@ const ImprestAdminIndex: React.FC = () => {
             {/* SUMMARY */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <Card>
-                    <CardContent>
-                        <h6>Amount Received</h6>
-                        <p>{formatINR(totals.received)}</p>
+                    <CardContent className="pt-6">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-muted-foreground mb-1">Amount Received</p>
+                                <h3 className="text-2xl font-bold text-foreground">{formatINR(totals.received)}</h3>
+                            </div>
+                            <div className="p-2 bg-chart-3/10 rounded-lg text-chart-3">
+                                <IndianRupee className="h-5 w-5" />
+                            </div>
+                        </div>
                     </CardContent>
                 </Card>
                 <Card>
-                    <CardContent>
-                        <h6>Amount Spent</h6>
-                        <p>{formatINR(totals.spent)}</p>
+                    <CardContent className="pt-6">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-muted-foreground mb-1">Amount Spent</p>
+                                <h3 className="text-2xl font-bold text-foreground">{formatINR(totals.spent)}</h3>
+                            </div>
+                            <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                                <Receipt className="h-5 w-5" />
+                            </div>
+                        </div>
                     </CardContent>
                 </Card>
                 <Card>
-                    <CardContent>
-                        <h6>Amount Approved</h6>
-                        <p>{formatINR(totals.approved)}</p>
+                    <CardContent className="pt-6">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-muted-foreground mb-1">Amount Approved</p>
+                                <h3 className="text-2xl font-bold text-foreground">{formatINR(totals.approved)}</h3>
+                            </div>
+                            <div className="p-2 bg-chart-2/10 rounded-lg text-chart-2">
+                                <FileText className="h-5 w-5" />
+                            </div>
+                        </div>
                     </CardContent>
                 </Card>
                 <Card>
-                    <CardContent>
-                        <h6>Amount Left</h6>
-                        <p>{formatINR(totals.left)}</p>
+                    <CardContent className="pt-6">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-medium text-muted-foreground mb-1">Amount Left</p>
+                                <h3 className="text-2xl font-bold text-foreground">{formatINR(totals.left)}</h3>
+                            </div>
+                            <div className="p-2 bg-chart-5/10 rounded-lg text-chart-5">
+                                <LayoutDashboard className="h-5 w-5" />
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* VOUCHER SUMMARY */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card>
+                    <CardContent className="pt-4 pb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-muted rounded-md text-muted-foreground">
+                                <FileText className="h-4 w-4" />
+                            </div>
+                            <div>
+                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Vouchers</p>
+                                <p className="text-xl font-bold text-foreground">{totals.totalVouchers}</p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardContent className="pt-4 pb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-primary/10 rounded-md text-primary">
+                                <FileText className="h-4 w-4" />
+                            </div>
+                            <div>
+                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Accounts Approved</p>
+                                <p className="text-xl font-bold text-foreground">{totals.accountsApproved}</p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardContent className="pt-4 pb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-chart-2/10 rounded-md text-chart-2">
+                                <FileText className="h-4 w-4" />
+                            </div>
+                            <div>
+                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Admin Approved</p>
+                                <p className="text-xl font-bold text-foreground">{totals.adminApproved}</p>
+                            </div>
+                        </div>
                     </CardContent>
                 </Card>
             </div>
