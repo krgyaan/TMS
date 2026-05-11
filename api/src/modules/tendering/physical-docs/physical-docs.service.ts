@@ -1,36 +1,35 @@
-import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { and, eq, asc, desc, sql, isNull, isNotNull, inArray, notInArray, SQL } from 'drizzle-orm';
-import { DRIZZLE } from '@db/database.module';
-import type { DbInstance } from '@db';
-import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
-import { statuses } from '@db/schemas/master/statuses.schema';
-import { users } from '@db/schemas/auth/users.schema';
-import { physicalDocs, physicalDocsPersons, type NewPhysicalDocs,
-} from '@db/schemas/tendering/physical-docs.schema';
-import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
-import type { CreatePhysicalDocDto, UpdatePhysicalDocDto } from '@/modules/tendering/physical-docs/dto/physical-docs.dto';
-import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
-import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
-import { items } from '@db/schemas/master/items.schema';
-import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
-import { EmailService } from '@/modules/email/email.service';
-import { RecipientResolver } from '@/modules/email/recipient.resolver';
-import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
-import { Logger } from '@nestjs/common';
-import { tenderClients } from '@db/schemas/tendering/tender-info-sheet.schema';
-import { StatusCache } from '@/utils/status-cache';
-import { wrapPaginatedResponse } from '@/utils/responseWrapper';
-import { TimersService } from '@/modules/timers/timers.service';
-import { couriers } from '@db/schemas/shared/couriers.schema';
-import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { documentsSubmitted } from '@/db/schemas';
+import { Inject, Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
+import { and, eq, asc, desc, sql, isNull, isNotNull, inArray, notInArray, SQL, ne } from "drizzle-orm";
+import { DRIZZLE } from "@db/database.module";
+import type { DbInstance } from "@db";
+import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
+import { statuses } from "@db/schemas/master/statuses.schema";
+import { users } from "@db/schemas/auth/users.schema";
+import { physicalDocs, physicalDocsPersons, type NewPhysicalDocs } from "@db/schemas/tendering/physical-docs.schema";
+import { tenderInformation } from "@db/schemas/tendering/tender-info-sheet.schema";
+import type { CreatePhysicalDocDto, UpdatePhysicalDocDto } from "@/modules/tendering/physical-docs/dto/physical-docs.dto";
+import { TenderInfosService } from "@/modules/tendering/tenders/tenders.service";
+import type { PaginatedResult } from "@/modules/tendering/types/shared.types";
+import { items } from "@db/schemas/master/items.schema";
+import { TenderStatusHistoryService } from "@/modules/tendering/tender-status-history/tender-status-history.service";
+import { EmailService } from "@/modules/email/email.service";
+import { RecipientResolver } from "@/modules/email/recipient.resolver";
+import type { RecipientSource } from "@/modules/email/dto/send-email.dto";
+import { Logger } from "@nestjs/common";
+import { tenderClients } from "@db/schemas/tendering/tender-info-sheet.schema";
+import { StatusCache } from "@/utils/status-cache";
+import { wrapPaginatedResponse } from "@/utils/responseWrapper";
+import { TimersService } from "@/modules/timers/timers.service";
+import { couriers } from "@db/schemas/shared/couriers.schema";
+import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
+import { bidSubmissions, documentsSubmitted } from "@/db/schemas";
 
 export type PhysicalDocFilters = {
     physicalDocsSent?: boolean;
     page?: number;
     limit?: number;
     sortBy?: string;
-    sortOrder?: 'asc' | 'desc';
+    sortOrder?: "asc" | "desc";
     search?: string;
 };
 
@@ -85,8 +84,8 @@ export class PhysicalDocsService {
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
-        private readonly timersService: TimersService,
-    ) { }
+        private readonly timersService: TimersService
+    ) {}
 
     /**
      * Build role-based filter conditions for tender queries
@@ -135,7 +134,7 @@ export class PhysicalDocsService {
                 }
             } catch (e) {
                 parsedSubmittedDocIds = submittedDocsString
-                    .split(',')
+                    .split(",")
                     .map(s => Number(s.trim()))
                     .filter(n => !isNaN(n));
             }
@@ -143,13 +142,10 @@ export class PhysicalDocsService {
 
         let submittedDocs: { id: number; name: string }[] = [];
         if (parsedSubmittedDocIds.length > 0) {
-            submittedDocs = await dbInstance
-                .select()
-                .from(documentsSubmitted)
-                .where(inArray(documentsSubmitted.id, parsedSubmittedDocIds));
+            submittedDocs = await dbInstance.select().from(documentsSubmitted).where(inArray(documentsSubmitted.id, parsedSubmittedDocIds));
         }
 
-        return submittedDocs.map((s) => ({
+        return submittedDocs.map(s => ({
             id: s.id,
             name: s.name,
         }));
@@ -157,15 +153,15 @@ export class PhysicalDocsService {
 
     private getDefaultSortByTab(tab: string): SQL<unknown> {
         switch (tab) {
-            case 'pending':
+            case "pending":
                 // Soonest due date first, NULLs last
                 return sql`${tenderInfos.dueDate} ASC NULLS LAST`;
 
-            case 'sent':
+            case "sent":
                 // Latest due date first
                 return sql`${tenderInfos.dueDate} DESC NULLS LAST`;
 
-            case 'tender-dnb':
+            case "tender-dnb":
                 // Latest due date first
                 return sql`${tenderInfos.dueDate} DESC NULLS LAST`;
 
@@ -180,20 +176,20 @@ export class PhysicalDocsService {
     async getDashboardData(
         user?: ValidatedUser,
         teamId?: number,
-        tabKey?: 'pending' | 'sent' | 'tender-dnb',
-        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; search?: string }
+        tabKey?: "pending" | "sent" | "tender-dnb",
+        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: "asc" | "desc"; search?: string }
     ): Promise<PaginatedResult<PhysicalDocDashboardRow>> {
         const page = filters?.page || 1;
         const limit = filters?.limit || 50;
         const offset = (page - 1) * limit;
 
-        const activeTab = tabKey || 'pending';
+        const activeTab = tabKey || "pending";
 
         // Build base conditions
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
-            inArray(tenderInformation.physicalDocsRequired, ['Yes', 'YES']),
+            inArray(tenderInformation.physicalDocsRequired, ["Yes", "YES"]),
         ];
 
         // Apply role-based filtering
@@ -202,19 +198,28 @@ export class PhysicalDocsService {
         // Build tab-specific conditions
         const conditions = [...baseConditions, ...roleFilterConditions];
 
-        if (activeTab === 'pending') {
+        if (activeTab === "pending") {
             conditions.push(isNull(physicalDocs.id));
-            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
-        } else if (activeTab === 'sent') {
+            conditions.push(ne(bidSubmissions.status, 'Tender Missed'));
+            // conditions.push(TenderInfosService.getExcludeStatusCondition(["dnb", "lost"]));
+        } else if (activeTab === "sent") {
             conditions.push(isNotNull(physicalDocs.id));
-            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
-        } else if (activeTab === 'tender-dnb') {
-            const dnbStatusIds = StatusCache.getIds('dnb');
-            const excludeStatusIds = [30];
-            if (dnbStatusIds.length > 0) {
-                conditions.push(inArray(tenderInfos.status, dnbStatusIds));
-            }
-            conditions.push(notInArray(tenderInfos.status, excludeStatusIds));
+            conditions.push(ne(bidSubmissions.status, 'Tender Missed'));
+            // conditions.push(TenderInfosService.getExcludeStatusCondition(["dnb", "lost"]));
+        } else if (activeTab === "tender-dnb") {
+            // const dnbStatusIds = StatusCache.getIds('dnb');
+            // const excludeStatusIds = [30];
+            // if (dnbStatusIds.length > 0) {
+            //     conditions.push(inArray(tenderInfos.status, dnbStatusIds));
+            // }
+            // conditions.push(notInArray(tenderInfos.status, excludeStatusIds));
+
+            //--------------------  NEW BID MISSED SHOW LOGIC ---------------------//
+            //we will be getting all the tenders whose phy doc sent and bid missed
+            conditions.push(and(
+                (eq(bidSubmissions.status, "Tender Missed")),
+                (isNotNull(physicalDocs.id))
+            ));
         } else {
             throw new BadRequestException(`Invalid tab: ${activeTab}`);
         }
@@ -243,27 +248,27 @@ export class PhysicalDocsService {
 
         if (filters?.sortBy) {
             // User-specified sorting takes priority
-            const sortFn = filters.sortOrder === 'desc' ? desc : asc;
+            const sortFn = filters.sortOrder === "desc" ? desc : asc;
             switch (filters.sortBy) {
-                case 'tenderNo':
+                case "tenderNo":
                     orderByClause = sortFn(tenderInfos.tenderNo);
                     break;
-                case 'tenderName':
+                case "tenderName":
                     orderByClause = sortFn(tenderInfos.tenderName);
                     break;
-                case 'teamMemberName':
+                case "teamMemberName":
                     orderByClause = sortFn(users.name);
                     break;
-                case 'dueDate':
+                case "dueDate":
                     orderByClause = sortFn(tenderInfos.dueDate);
                     break;
-                case 'physicalDocsDeadline':
+                case "physicalDocsDeadline":
                     orderByClause = sortFn(tenderInformation.physicalDocsDeadline);
                     break;
-                case 'courierDate':
+                case "courierDate":
                     orderByClause = sortFn(physicalDocs.createdAt);
                     break;
-                case 'statusName':
+                case "statusName":
                     orderByClause = sortFn(statuses.name);
                     break;
                 default:
@@ -282,6 +287,7 @@ export class PhysicalDocsService {
             .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
+            .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
             .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
             .where(whereClause);
         const total = Number(countResult?.count || 0);
@@ -311,23 +317,24 @@ export class PhysicalDocsService {
             .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
+            .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
             .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
             .where(whereClause)
             .orderBy(orderByClause)
             .limit(limit)
             .offset(offset);
 
-        const data: PhysicalDocDashboardRow[] = rows.map((row) => ({
+        const data: PhysicalDocDashboardRow[] = rows.map(row => ({
             tenderId: row.tenderId,
             tenderNo: row.tenderNo,
             tenderName: row.tenderName,
             dueDate: row.dueDate,
-            courierAddress: row.courierAddress || '',
-            physicalDocsRequired: row.physicalDocsRequired || '',
+            courierAddress: row.courierAddress || "",
+            physicalDocsRequired: row.physicalDocsRequired || "",
             physicalDocsDeadline: row.physicalDocsDeadline || new Date(),
-            teamMemberName: row.teamMemberName || '',
+            teamMemberName: row.teamMemberName || "",
             status: row.status,
-            statusName: row.statusName || '',
+            statusName: row.statusName || "",
             latestStatus: null,
             latestStatusName: null,
             statusRemark: null,
@@ -339,38 +346,24 @@ export class PhysicalDocsService {
         return wrapPaginatedResponse(data, total, page, limit);
     }
 
-    async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<{ pending: number; sent: number; 'tender-dnb': number; total: number }> {
+    async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<{ pending: number; sent: number; "tender-dnb": number; total: number }> {
         const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
 
         const baseConditions = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
             // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-            eq(tenderInformation.physicalDocsRequired, 'Yes'),
+            eq(tenderInformation.physicalDocsRequired, "Yes"),
             ...roleFilterConditions,
         ];
 
+        const dnbCondition = [ne(bidSubmissions.status, "Tender Missed")];
+
         // Count pending: status = 3, physicalDocsId IS NULL
-        const pendingConditions = [
-            ...baseConditions,
-            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-            isNull(physicalDocs.id),
-        ];
+        const pendingConditions = [...baseConditions, ne(bidSubmissions.status, "Tender Missed") ];
 
         // Count sent: status = 30, physicalDocsId IS NOT NULL
-        const sentConditions = [
-            ...baseConditions,
-            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-            isNotNull(physicalDocs.id),
-        ];
-
-        // Count tender-dnb: status in dnb category, exclude status 30
-        const dnbStatusIds = StatusCache.getIds('dnb');
-        const tenderDnbConditions = [
-            ...baseConditions,
-            ...(dnbStatusIds.length > 0 ? [inArray(tenderInfos.status, dnbStatusIds)] : []),
-            notInArray(tenderInfos.status, [30]),
-        ];
+        const sentConditions = [...baseConditions, ne(bidSubmissions.status, "Tender Missed"), isNotNull(physicalDocs.id)];
 
         const counts = await Promise.all([
             this.db
@@ -401,34 +394,30 @@ export class PhysicalDocsService {
                 .leftJoin(items, eq(items.id, tenderInfos.item))
                 .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
                 .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
-                .where(and(...tenderDnbConditions))
+                .where(and(
+                    eq(bidSubmissions.status, 'Tender Missed'),
+                    isNotNull(physicalDocs.id),
+                ))
                 .then(([result]) => Number(result?.count || 0)),
         ]);
 
         return {
             pending: counts[0],
             sent: counts[1],
-            'tender-dnb': counts[2],
+            "tender-dnb": counts[2],
             total: counts.reduce((sum, count) => sum + count, 0),
         };
     }
 
     async findById(id: number): Promise<PhysicalDocWithPersons | null> {
-        const [physicalDoc] = await this.db
-            .select()
-            .from(physicalDocs)
-            .where(eq(physicalDocs.id, id))
-            .limit(1);
+        const [physicalDoc] = await this.db.select().from(physicalDocs).where(eq(physicalDocs.id, id)).limit(1);
 
         if (!physicalDoc) {
             return null;
         }
 
         // Fetch persons for this physical doc
-        const persons = await this.db
-            .select()
-            .from(physicalDocsPersons)
-            .where(eq(physicalDocsPersons.physicalDocId, id));
+        const persons = await this.db.select().from(physicalDocsPersons).where(eq(physicalDocsPersons.physicalDocId, id));
 
         const submittedDocsList = await this.getSubmittedDocsDetails(physicalDoc.submittedDocs);
 
@@ -437,9 +426,9 @@ export class PhysicalDocsService {
             tenderId: physicalDoc.tenderId,
             courierNo: physicalDoc.courierNo,
             submittedDocs: submittedDocsList,
-            createdAt: physicalDoc.createdAt || '',
-            updatedAt: physicalDoc.updatedAt || '',
-            persons: persons.map((p) => ({
+            createdAt: physicalDoc.createdAt || "",
+            updatedAt: physicalDoc.updatedAt || "",
+            persons: persons.map(p => ({
                 id: p.id,
                 name: p.name,
                 email: p.email,
@@ -465,10 +454,7 @@ export class PhysicalDocsService {
             .from(tenderInfos)
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .leftJoin(
-                tenderInformation,
-                eq(tenderInfos.id, tenderInformation.tenderId)
-            )
+            .leftJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
             .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
             .where(eq(tenderInfos.id, tenderId))
             .limit(1);
@@ -476,24 +462,15 @@ export class PhysicalDocsService {
         return rows[0] as unknown as PhysicalDocDashboardRow;
     }
 
-    async findByTenderIdWithPersons(
-        tenderId: number
-    ): Promise<PhysicalDocWithPersons | null> {
-        const [physicalDoc] = await this.db
-            .select()
-            .from(physicalDocs)
-            .where(eq(physicalDocs.tenderId, tenderId))
-            .limit(1);
+    async findByTenderIdWithPersons(tenderId: number): Promise<PhysicalDocWithPersons | null> {
+        const [physicalDoc] = await this.db.select().from(physicalDocs).where(eq(physicalDocs.tenderId, tenderId)).limit(1);
 
         if (!physicalDoc) {
             return null;
         }
 
         // Fetch persons for this physical doc
-        const persons = await this.db
-            .select()
-            .from(physicalDocsPersons)
-            .where(eq(physicalDocsPersons.physicalDocId, physicalDoc.id));
+        const persons = await this.db.select().from(physicalDocsPersons).where(eq(physicalDocsPersons.physicalDocId, physicalDoc.id));
 
         const submittedDocsList = await this.getSubmittedDocsDetails(physicalDoc.submittedDocs);
 
@@ -502,9 +479,9 @@ export class PhysicalDocsService {
             tenderId: physicalDoc.tenderId,
             courierNo: physicalDoc.courierNo,
             submittedDocs: submittedDocsList,
-            createdAt: physicalDoc.createdAt || '',
-            updatedAt: physicalDoc.updatedAt || '',
-            persons: persons.map((p) => ({
+            createdAt: physicalDoc.createdAt || "",
+            updatedAt: physicalDoc.updatedAt || "",
+            persons: persons.map(p => ({
                 id: p.id,
                 name: p.name,
                 email: p.email,
@@ -519,9 +496,7 @@ export class PhysicalDocsService {
             throw new NotFoundException(`Physical doc with ID ${id} not found`);
         }
 
-        const tender = await this.tenderInfosService.getTenderForPhysicalDocs(
-            physicalDoc.tenderId
-        );
+        const tender = await this.tenderInfosService.getTenderForPhysicalDocs(physicalDoc.tenderId);
 
         return {
             ...physicalDoc,
@@ -531,9 +506,9 @@ export class PhysicalDocsService {
 
     async create(data: CreatePhysicalDocDto, changedBy: number): Promise<PhysicalDocWithPersons> {
         // Validate tender exists and is approved
-        let result : PhysicalDocWithPersons;
-        try{
-            result = await this.db.transaction(async (tx) => {
+        let result: PhysicalDocWithPersons;
+        try {
+            result = await this.db.transaction(async tx => {
                 await this.tenderInfosService.validateApproved(data.tenderId);
 
                 // Get current tender status before update
@@ -556,19 +531,16 @@ export class PhysicalDocsService {
                 // Insert persons if provided
                 let persons: PhysicalDocPerson[] = [];
                 if (data.physicalDocsPersons && data.physicalDocsPersons.length > 0) {
-                    const personsToInsert = data.physicalDocsPersons.map((person) => ({
+                    const personsToInsert = data.physicalDocsPersons.map(person => ({
                         physicalDocId: physicalDoc.id,
                         name: person.name,
                         email: person.email,
                         phone: person.phone,
                     }));
 
-                    const insertedPersons = await tx
-                        .insert(physicalDocsPersons)
-                        .values(personsToInsert)
-                        .returning();
+                    const insertedPersons = await tx.insert(physicalDocsPersons).values(personsToInsert).returning();
 
-                    persons = insertedPersons.map((p) => ({
+                    persons = insertedPersons.map(p => ({
                         id: p.id,
                         name: p.name,
                         email: p.email,
@@ -577,20 +549,10 @@ export class PhysicalDocsService {
                 }
 
                 // Update tender status
-                await tx
-                    .update(tenderInfos)
-                    .set({ status: newStatus, updatedAt: new Date() })
-                    .where(eq(tenderInfos.id, data.tenderId));
+                await tx.update(tenderInfos).set({ status: newStatus, updatedAt: new Date() }).where(eq(tenderInfos.id, data.tenderId));
 
                 // Track status change
-                await this.tenderStatusHistoryService.trackStatusChange(
-                    data.tenderId,
-                    newStatus,
-                    changedBy,
-                    prevStatus,
-                    'Physical docs submitted',
-                    tx
-                );
+                await this.tenderStatusHistoryService.trackStatusChange(data.tenderId, newStatus, changedBy, prevStatus, "Physical docs submitted", tx);
 
                 const submittedDocsList = await this.getSubmittedDocsDetails(physicalDoc.submittedDocs, tx);
 
@@ -599,66 +561,57 @@ export class PhysicalDocsService {
                     tenderId: physicalDoc.tenderId,
                     courierNo: physicalDoc.courierNo,
                     submittedDocs: submittedDocsList,
-                    createdAt: physicalDoc.createdAt || '',
-                    updatedAt: physicalDoc.updatedAt || '',
+                    createdAt: physicalDoc.createdAt || "",
+                    updatedAt: physicalDoc.updatedAt || "",
                     persons,
                 };
             });
-        }catch(err){
-            this.logger.error("Error Occured while creating physical docs. TRANSACTION FAILED" , err);
+        } catch (err) {
+            this.logger.error("Error Occured while creating physical docs. TRANSACTION FAILED", err);
             throw err;
         }
-    
+
         //SENDING MAIL
-        try{
-            this.logger.debug("Starting the mail")
+        try {
+            this.logger.debug("Starting the mail");
 
             // Send email notification after transaction
             await this.sendPhysicalDocsSentEmail(data.tenderId, result, changedBy);
 
             this.logger.debug("mail completed successfully");
-        } catch(err){
+        } catch (err) {
             this.logger.error("Mail sending failed", err);
         }
 
         //STOPPING TIMER
-        try{
-             // TIMER TRANSITION: Stop physical_docs timer
+        try {
+            // TIMER TRANSITION: Stop physical_docs timer
             this.logger.log(`Stopping timer for tender ${data.tenderId} after physical docs submitted`);
 
             await this.timersService.stopTimer({
-                entityType: 'TENDER',
+                entityType: "TENDER",
                 entityId: data.tenderId,
-                stage: 'physical_docs',
+                stage: "physical_docs",
                 userId: changedBy,
-                reason: 'Physical docs submitted'
+                reason: "Physical docs submitted",
             });
 
             this.logger.log(`Successfully stopped physical_docs timer for tender ${data.tenderId}`);
-
-        } catch(err){
-            this.logger.error("Error in stopping timer" , err);
+        } catch (err) {
+            this.logger.error("Error in stopping timer", err);
         }
         return result;
     }
 
-    async update(
-        id: number,
-        data: UpdatePhysicalDocDto
-    ): Promise<PhysicalDocWithPersons> {
-        return await this.db.transaction(async (tx) => {
+    async update(id: number, data: UpdatePhysicalDocDto): Promise<PhysicalDocWithPersons> {
+        return await this.db.transaction(async tx => {
             // Update physical doc
             const updateData: Partial<NewPhysicalDocs> = {};
             if (data.courierNo !== undefined) updateData.courierNo = data.courierNo;
-            if (data.submittedDocs !== undefined)
-                updateData.submittedDocs = data.submittedDocs;
+            if (data.submittedDocs !== undefined) updateData.submittedDocs = data.submittedDocs;
             updateData.updatedAt = new Date();
 
-            const [physicalDoc] = await tx
-                .update(physicalDocs)
-                .set(updateData)
-                .where(eq(physicalDocs.id, id))
-                .returning();
+            const [physicalDoc] = await tx.update(physicalDocs).set(updateData).where(eq(physicalDocs.id, id)).returning();
 
             if (!physicalDoc) {
                 throw new NotFoundException(`Physical doc with ID ${id} not found`);
@@ -668,30 +621,21 @@ export class PhysicalDocsService {
             let persons: PhysicalDocPerson[] = [];
             if (data.physicalDocsPersons !== undefined) {
                 // Fetch existing persons
-                const existingPersons = await tx
-                    .select()
-                    .from(physicalDocsPersons)
-                    .where(eq(physicalDocsPersons.physicalDocId, id));
+                const existingPersons = await tx.select().from(physicalDocsPersons).where(eq(physicalDocsPersons.physicalDocId, id));
 
                 const newPersons = data.physicalDocsPersons || [];
 
                 // Delete persons that are not in the new list
-                const newEmails = new Set(newPersons.map((p) => p.email));
-                const personsToDelete = existingPersons.filter(
-                    (p) => !newEmails.has(p.email)
-                );
+                const newEmails = new Set(newPersons.map(p => p.email));
+                const personsToDelete = existingPersons.filter(p => !newEmails.has(p.email));
 
                 for (const person of personsToDelete) {
-                    await tx
-                        .delete(physicalDocsPersons)
-                        .where(eq(physicalDocsPersons.id, person.id));
+                    await tx.delete(physicalDocsPersons).where(eq(physicalDocsPersons.id, person.id));
                 }
 
                 // Update or insert persons
                 for (const newPerson of newPersons) {
-                    const existingPerson = existingPersons.find(
-                        (p) => p.email === newPerson.email
-                    );
+                    const existingPerson = existingPersons.find(p => p.email === newPerson.email);
 
                     if (existingPerson) {
                         // Update existing person
@@ -715,12 +659,9 @@ export class PhysicalDocsService {
                 }
 
                 // Fetch updated persons list
-                const updatedPersons = await tx
-                    .select()
-                    .from(physicalDocsPersons)
-                    .where(eq(physicalDocsPersons.physicalDocId, id));
+                const updatedPersons = await tx.select().from(physicalDocsPersons).where(eq(physicalDocsPersons.physicalDocId, id));
 
-                persons = updatedPersons.map((p) => ({
+                persons = updatedPersons.map(p => ({
                     id: p.id,
                     name: p.name,
                     email: p.email,
@@ -728,12 +669,9 @@ export class PhysicalDocsService {
                 }));
             } else {
                 // If persons not provided, fetch existing ones
-                const existingPersons = await tx
-                    .select()
-                    .from(physicalDocsPersons)
-                    .where(eq(physicalDocsPersons.physicalDocId, id));
+                const existingPersons = await tx.select().from(physicalDocsPersons).where(eq(physicalDocsPersons.physicalDocId, id));
 
-                persons = existingPersons.map((p) => ({
+                persons = existingPersons.map(p => ({
                     id: p.id,
                     name: p.name,
                     email: p.email,
@@ -748,18 +686,15 @@ export class PhysicalDocsService {
                 tenderId: physicalDoc.tenderId,
                 courierNo: physicalDoc.courierNo,
                 submittedDocs: submittedDocsList,
-                createdAt: physicalDoc.createdAt || '',
-                updatedAt: physicalDoc.updatedAt || '',
+                createdAt: physicalDoc.createdAt || "",
+                updatedAt: physicalDoc.updatedAt || "",
                 persons,
             };
         });
     }
 
     async delete(id: number): Promise<void> {
-        const result = await this.db
-            .delete(physicalDocs)
-            .where(eq(physicalDocs.id, id))
-            .returning();
+        const result = await this.db.delete(physicalDocs).where(eq(physicalDocs.id, id)).returning();
         if (!result[0]) {
             throw new NotFoundException(`Physical doc with ID ${id} not found`);
         }
@@ -797,11 +732,7 @@ export class PhysicalDocsService {
     /**
      * Send physical docs sent email to clients
      */
-    private async sendPhysicalDocsSentEmail(
-        tenderId: number,
-        physicalDoc: PhysicalDocWithPersons,
-        sentBy: number
-    ) {
+    private async sendPhysicalDocsSentEmail(tenderId: number, physicalDoc: PhysicalDocWithPersons, sentBy: number) {
         const tender = await this.tenderInfosService.findById(tenderId);
         if (!tender || !tender.teamMember) return;
 
@@ -821,31 +752,33 @@ export class PhysicalDocsService {
         if (clients.length === 0) return;
 
         // Format due date
-        const dueDate = tender.dueDate ? new Date(tender.dueDate).toLocaleDateString('en-IN', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-        }) : 'Not specified';
+        const dueDate = tender.dueDate
+            ? new Date(tender.dueDate).toLocaleDateString("en-IN", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+              })
+            : "Not specified";
 
         // Fetch courier details if courierNo is available
-        const [courier] = physicalDoc.courierNo 
-            ? await this.db.select().from(couriers).where(eq(couriers.id, physicalDoc.courierNo)).limit(1)
-            : [null];
+        const [courier] = physicalDoc.courierNo ? await this.db.select().from(couriers).where(eq(couriers.id, physicalDoc.courierNo)).limit(1) : [null];
 
-        const courierProviderName = courier?.courierProvider || (physicalDoc.persons.length > 0 ? physicalDoc.persons[0].name : 'Courier Service');
-        const docketNumber = courier?.docketNo || (physicalDoc.courierNo ? physicalDoc.courierNo.toString() : 'N/A');
-        const expectedDelivery = courier?.deliveryDate ? new Date(courier.deliveryDate).toLocaleDateString('en-IN', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-        }) : 'As per courier service';
+        const courierProviderName = courier?.courierProvider || (physicalDoc.persons.length > 0 ? physicalDoc.persons[0].name : "Courier Service");
+        const docketNumber = courier?.docketNo || (physicalDoc.courierNo ? physicalDoc.courierNo.toString() : "N/A");
+        const expectedDelivery = courier?.deliveryDate
+            ? new Date(courier.deliveryDate).toLocaleDateString("en-IN", {
+                  year: "numeric",
+                  month: "long",
+                  day: "numeric",
+              })
+            : "As per courier service";
 
         // Send email to each client
         for (const client of clients) {
             if (!client.clientEmail) continue;
 
             const emailData = {
-                clientName: client.clientName || 'Sir/Madam',
+                clientName: client.clientName || "Sir/Madam",
                 tenderNo: tender.tenderNo,
                 dueDate,
                 courierProvider: courierProviderName,
@@ -854,23 +787,14 @@ export class PhysicalDocsService {
                 tenderExecutive: teUser.name,
             };
 
-            await this.sendEmail(
-                'physical-docs.sent',
-                tenderId,
-                sentBy,
-                `Physical Documents Courier - ${tender.tenderNo}`,
-                'physical-docs-sent',
-                emailData,
-                {
-                    to: [{ type: 'emails', emails: [client.clientEmail] }],
-                    cc: [
-                        { type: 'role', role: 'Admin', teamId: tender.team },
-                        { type: 'role', role: 'Team Leader', teamId: tender.team },
-                        { type: 'role', role: 'Coordinator', teamId: tender.team },
-                    ],
-                }
-            );
+            await this.sendEmail("physical-docs.sent", tenderId, sentBy, `Physical Documents Courier - ${tender.tenderNo}`, "physical-docs-sent", emailData, {
+                to: [{ type: "emails", emails: [client.clientEmail] }],
+                cc: [
+                    { type: "role", role: "Admin", teamId: tender.team },
+                    { type: "role", role: "Team Leader", teamId: tender.team },
+                    { type: "role", role: "Coordinator", teamId: tender.team },
+                ],
+            });
         }
     }
-
 }

@@ -88,7 +88,7 @@ export interface TenderApprovalRow {
 }
 
 export type TenderApprovalFilters = {
-    tabKey?: "pending" | "accepted" | "rejected" | "tender-dnb";
+    tabKey?: "pending" | "accepted" | "rejected" | "rejected_later" | "tender-dnb";
     tlStatus?: number;
     page?: number;
     limit?: number;
@@ -98,7 +98,7 @@ export type TenderApprovalFilters = {
 };
 
 export type TenderApprovalTabData = {
-    key: "pending" | "accepted" | "rejected" | "tender-dnb";
+    key: "pending" | "accepted" | "rejected" | "rejected_later" | "tender-dnb";
     name: string;
     count: number;
     data: TenderApprovalRow[];
@@ -108,6 +108,7 @@ export interface TenderApprovalDashboardCounts {
     pending: number;
     accepted: number;
     rejected: number;
+    rejected_later: number;
     "tender-dnb": number;
     total: number;
 }
