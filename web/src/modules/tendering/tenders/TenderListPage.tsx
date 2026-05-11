@@ -9,7 +9,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { useDeleteTender, useTenders, useTendersDashboardCounts } from "@/hooks/api/useTenders";
 import type { TenderInfoWithNames, TenderWithRelations, TenderWithTimer } from "./helpers/tenderInfo.types";
-import { Eye, FilePlus, Pencil, Plus, Search, RefreshCw, Clock, Archive } from "lucide-react";
+import { Eye, FilePlus, Pencil, Plus, Search, Clock, Archive, XCircle } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,7 @@ import { currencyCol, dateCol, tenderNameCol } from "@/components/data-grid/colu
 import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
 import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { QuickFilter } from "@/components/ui/quick-filter";
-import { ChangeStatusModal } from "./components/ChangeStatusModal";
+import { TenderRejectionModal } from "./components/TenderRejectionModal";
 import { useAuth } from "@/contexts/AuthContext";
 
 type TenderDashboardTab = 'under-preparation' | 'did-not-bid' | 'tenders-bid' | 'tender-won' | 'tender-lost' | 'unallocated';
@@ -29,7 +29,12 @@ const TenderListPage = () => {
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const debouncedSearch = useDebouncedSearch(search, 300);
 
-    const { canDelete } = useAuth();
+    const { isAdmin, isSuperUser, roleId, teamId, canDelete} = useAuth();
+
+    const isTeamLead = (teamId == 1 || teamId == 2) && roleId == 3;
+
+    const hasTenderingPermission = isAdmin || isSuperUser || isTeamLead;
+
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
@@ -39,6 +44,13 @@ const TenderListPage = () => {
         setPagination({ pageIndex: 0, pageSize: newPageSize });
     }, []);
 
+    const elligibleForRejection = (row): boolean => {
+        if (row.statusName && row.statusName == 'Read Tender'){
+            return true;
+        } else {
+            return false;
+        }  
+    }
 
     const handleSortChanged = useCallback((event: any) => {
         const sortModel = event.api.getColumnState()
@@ -75,7 +87,11 @@ const TenderListPage = () => {
 
     const deleteTender = useDeleteTender();
     const navigate = useNavigate();
-    const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({
+    // const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({
+    //     open: false,
+    //     tenderId: null
+    // });
+    const [rejectionModal, setRejectionModal] = useState<{ open: boolean; tenderId: number | null; tenderName?: string }>({
         open: false,
         tenderId: null
     });
@@ -128,6 +144,12 @@ const TenderListPage = () => {
             label: "Fill Info Sheet",
             onClick: (row: TenderWithRelations) => (row.infoSheet ? navigate(paths.tendering.infoSheetEdit(row.id)) : navigate(paths.tendering.infoSheetCreate(row.id))),
             icon: <FilePlus className="h-4 w-4" />,
+        },
+        {
+            label: "Reject Tender",
+            onClick: (row) => setRejectionModal({ open: true, tenderId: row.id, tenderName: row.tenderName }),
+            icon: <XCircle className="h-4 w-4" />,
+            visible:(row) => elligibleForRejection(row) && hasTenderingPermission,
         },
         // {
         //     label: "Change Status",
@@ -395,13 +417,13 @@ const TenderListPage = () => {
                 </Tabs>
             </CardContent>
 
-            <ChangeStatusModal
-                open={changeStatusModal.open}
-                onOpenChange={(open) => setChangeStatusModal({ ...changeStatusModal, open })}
-                tenderId={changeStatusModal.tenderId}
-                currentStatus={changeStatusModal.currentStatus}
+            <TenderRejectionModal
+                open={rejectionModal.open}
+                onOpenChange={(open) => setRejectionModal({ ...rejectionModal, open })}
+                tenderId={rejectionModal.tenderId}
+                tenderName={rejectionModal.tenderName}
                 onSuccess={() => {
-                    setChangeStatusModal({ open: false, tenderId: null });
+                    setRejectionModal({ open: false, tenderId: null });
                 }}
             />
         </Card>
