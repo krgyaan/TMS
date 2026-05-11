@@ -244,6 +244,21 @@ export class PayOnPortalService {
         return actionMap[action] || 1;
     }
 
+    /**
+     * Get file path from body if it's a string (from TenderFileUploader)
+     * Supports both single string path and JSON array of paths
+     */
+    private getFilePathFromBody(fieldname: string, body: any): string | null {
+        if (body[fieldname] === undefined) return null;
+        if (typeof body[fieldname] === 'string') {
+            return body[fieldname];
+        }
+        if (typeof body[fieldname] === 'object' && Array.isArray(body[fieldname])) {
+            return body[fieldname][0] || null;
+        }
+        return null;
+    }
+
     async updateAction(
         instrumentId: number,
         body: any,
@@ -294,12 +309,19 @@ export class PayOnPortalService {
                 updateData.status = PORTAL_STATUSES.ACCOUNTS_FORM_REJECTED;
                 updateData.rejectionReason = body.reason_req || null;
             }
-            // Support both payment_datetime (from form) and date_time/payment_date (legacy)
             const dateTime = body.payment_datetime || body.date_time || body.payment_date;
             if (dateTime) {
                 updateData.legacyData = {
                     ...(instrument.legacyData || {}),
                     date_time: dateTime,
+                };
+            }
+            const paymentProofPath = this.getFilePathFromBody('payment_proof', body);
+            if (paymentProofPath) {
+                updateData.legacyData = {
+                    ...(instrument.legacyData || {}),
+                    ...updateData.legacyData,
+                    payment_proof: paymentProofPath,
                 };
             }
         } else if (body.action === 'initiate-followup') {
