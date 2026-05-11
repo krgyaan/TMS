@@ -125,11 +125,11 @@ export class BidSubmissionsService {
         if (activeTab === 'pending') {
             conditions.push(isNull(bidSubmissions.id));
             conditions.push(TenderInfosService.getExcludeStatusCondition(['lost']));
-            conditions.push(ne(bidSubmissions.status, 'Tender Missed'));
+            conditions.push(or(ne(bidSubmissions.status, 'Tender Missed'), isNull(bidSubmissions.status)));
         } else if (activeTab === 'submitted') {
             conditions.push(isNotNull(bidSubmissions.id), eq(bidSubmissions.status, 'Bid Submitted'));
             conditions.push(TenderInfosService.getExcludeStatusCondition(['lost']));
-            conditions.push(ne(bidSubmissions.status, 'Tender Missed'));
+            conditions.push(or(ne(bidSubmissions.status, 'Tender Missed'), isNull(bidSubmissions.status)));
         } else if (activeTab === 'disqualified') {
             conditions.push(eq(bidSubmissions.status, "Tender Missed"));
             conditions.push(inArray(bidSubmissions.reasonStatus,[33])); //33 -> EMD Not paid

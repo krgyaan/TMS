@@ -1,5 +1,5 @@
 import { Inject, Injectable, BadRequestException } from "@nestjs/common";
-import { and, eq, asc, desc, sql, isNull, isNotNull, inArray, notInArray, ne } from "drizzle-orm";
+import { and, eq, asc, desc, sql, isNull, isNotNull, inArray, notInArray, ne, or } from "drizzle-orm";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
 import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
@@ -109,10 +109,10 @@ export class DocumentChecklistsService {
         if (activeTab === "pending") {
             // conditions.push(TenderInfosService.getExcludeStatusCondition(["dnb"]));
             conditions.push(isNull(tenderDocumentChecklists.id));
-            conditions.push(ne(bidSubmissions.status, "Tender Missed"));
+            conditions.push(or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)));
         } else if (activeTab === "submitted") {
             // conditions.push(TenderInfosService.getExcludeStatusCondition(["dnb"]));
-            conditions.push(ne(bidSubmissions.status, "Tender Missed"));
+            conditions.push(or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)));
             conditions.push(isNotNull(tenderDocumentChecklists.id));
         } else if (activeTab === "tender-dnb") {
             // const dnbStatusIds = StatusCache.getIds("dnb");
@@ -270,7 +270,7 @@ export class DocumentChecklistsService {
         const pendingConditions = [
             ...baseConditions,
             // TenderInfosService.getExcludeStatusCondition(["dnb"]),
-            ne(bidSubmissions.status, "Tender Missed"),
+            or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)),
             isNull(tenderDocumentChecklists.id),
         ];
 
@@ -278,7 +278,7 @@ export class DocumentChecklistsService {
         const submittedConditions = [
             ...baseConditions,
             // TenderInfosService.getExcludeStatusCondition(["dnb"]),
-            ne(bidSubmissions.status, "Tender Missed"),
+            or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)),
             isNotNull(tenderDocumentChecklists.id),
         ];
 
