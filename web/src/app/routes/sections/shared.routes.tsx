@@ -22,7 +22,6 @@ const ImprestCreatePage = lazy(() => import("@/modules/shared/imprest/create"));
 const ImprestEditPage = lazy(() => import("@/modules/shared/imprest/edit"));
 const ImprestPaymentHistoryPage = lazy(() => import("@/modules/shared/imprest/ImprestPaymentHistory"));
 const ImprestVoucherPage = lazy(() => import("@/modules/shared/imprest/ImprestVoucher"));
-const ImprestVoucherProofPage = lazy(() => import("@/modules/shared/imprest/ImprestVoucherProofs"));
 const ImprestVoucherViewPage = lazy(() => import("@/modules/shared/imprest/ImprestVoucherView"));
 
 export default function SharedRoutes() {
@@ -66,7 +65,6 @@ export default function SharedRoutes() {
             <Route path="imprests/create" element={<ImprestCreatePage />} />
             <Route path="imprests/payment-history" element={<ImprestPaymentHistoryPage />} />
             <Route path="imprests/voucher" element={<ImprestVoucherPage />} />
-            <Route path="imprests/voucher/proofs" element={<ImprestVoucherProofPage />} />
             <Route path="imprests/voucher/view" element={<ImprestVoucherViewPage />} />
             <Route path="imprests/:id/edit" element={<RouteWrapper><ImprestEditPage /></RouteWrapper>}/>
 

@@ -1,5 +1,5 @@
 import React from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Textarea } from "@/components/ui/textarea";
 
 import { useImprestVoucherView, useAccountApproveVoucher, useAdminApproveVoucher } from "./imprest.hooks";
+import type { InvoiceProof } from "./imprest.types";
+
+
 
 import { useAuth } from "@/contexts/AuthContext";
 import html2pdf from "html2pdf.js";
@@ -42,6 +45,9 @@ const ImprestVoucherView: React.FC = () => {
     const from = searchParams.get("from");
     const to = searchParams.get("to");
 
+    const location = useLocation();
+    const stateProofs = location.state?.proofs as InvoiceProof[] | undefined;
+
     if (!userId || !from || !to) {
         return <div className="p-6">Invalid voucher link</div>;
     }
@@ -75,10 +81,20 @@ const ImprestVoucherView: React.FC = () => {
     const [accApprove, setAccApprove] = React.useState(false);
     const [adminApprove, setAdminApprove] = React.useState(false);
 
+    const [preview, setPreview] = React.useState<InvoiceProof | null>(null);
+
     if (isLoading) return <div className="p-6">Loading…</div>;
     if (!data) return <div className="p-6">Voucher not found</div>;
 
     const { voucher, items } = data;
+    
+    // Merge proofs from state or voucher
+    let proofs: InvoiceProof[] = [];
+    if (stateProofs && stateProofs.length > 0) {
+        proofs = stateProofs;
+    } else if (voucher.proofs && voucher.proofs.length > 0) {
+        proofs = voucher.proofs;
+    }
 
     const totalAmount = items.reduce((sum, i) => sum + i.amount, 0);
 
@@ -344,6 +360,134 @@ const ImprestVoucherView: React.FC = () => {
 
                 <Button onClick={handleExportPDF}>Print</Button>
             </div>
+
+            {/* ---------------- Proofs ---------------- */}
+            {proofs.length > 0 && (
+                <div className="mt-10 overflow-hidden rounded-2xl border border-border bg-background shadow-sm voucher-proofs">
+                    <div className="flex flex-col gap-2 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <h3 className="text-base font-semibold text-foreground">Voucher Proofs</h3>
+                            <p className="text-sm text-muted-foreground">
+                                Preview uploaded images and PDF documents.
+                            </p>
+                        </div>
+
+                        <div className="inline-flex w-fit items-center rounded-full border border-border bg-muted/40 px-3 py-1 text-xs font-medium text-muted-foreground">
+                            {`${proofs.length} file${proofs.length === 1 ? "" : "s"}`}
+                        </div>
+                    </div>
+
+                    <div className="grid min-h-[560px] lg:grid-cols-[280px_minmax(0,1fr)]">
+                        {/* Sidebar */}
+                        <div className="border-b border-border bg-muted/20 p-4 lg:border-b-0 lg:border-r">
+                            {proofs.length > 0 ? (
+                                <div className="space-y-2">
+                                    {proofs.map((proof, index) => {
+                                        const active = preview?.id === proof.id;
+
+                                        return (
+                                            <button
+                                                key={proof.id}
+                                                type="button"
+                                                onClick={() => setPreview(proof)}
+                                                className={`w-full rounded-xl border p-3 text-left transition-all ${
+                                                    active
+                                                        ? "border-primary bg-primary/5 shadow-sm"
+                                                        : "border-border bg-background hover:border-primary/40 hover:bg-accent/40"
+                                                }`}
+                                            >
+                                                <div className="mb-2 flex items-center justify-between gap-2">
+                                                    <span className="text-sm font-medium text-foreground">
+                                                        Proof {index + 1}
+                                                    </span>
+                                                    <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                                        {proof.type}
+                                                    </span>
+                                                </div>
+
+                                                <p className="truncate text-xs text-muted-foreground">
+                                                    {proof.type === "pdf" ? "PDF document" : "Image attachment"}
+                                                </p>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <div className="flex min-h-[180px] items-center justify-center rounded-xl border border-dashed border-border bg-background px-4 text-center text-sm text-muted-foreground">
+                                    No proofs found for this voucher.
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Viewer */}
+                        <div className="flex min-w-0 flex-col bg-background">
+                            {preview ? (
+                                <>
+                                    <div className="flex flex-col gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                                        <div className="min-w-0">
+                                            <div className="mb-1 flex items-center gap-2">
+                                                <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                                                    {preview.type}
+                                                </span>
+                                                <span className="text-sm font-medium text-foreground">
+                                                    {preview.type === "pdf" ? "PDF Preview" : "Image Preview"}
+                                                </span>
+                                            </div>
+                                            <p className="truncate text-sm text-muted-foreground">
+                                                Use open/download if preview is limited in your browser.
+                                            </p>
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                            <Button asChild variant="outline" size="sm">
+                                                <a href={preview.url} target="_blank" rel="noreferrer">
+                                                    Open
+                                                </a>
+                                            </Button>
+
+                                            <Button asChild size="sm">
+                                                <a href={preview.url} download>
+                                                    Download
+                                                </a>
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    <div className="h-[72vh] min-h-[520px] p-4">
+                                        {preview.type === "pdf" ? (
+                                            <div className="h-full overflow-hidden rounded-2xl border border-border bg-muted/20 shadow-sm">
+                                                <iframe
+                                                    src={`${preview.url}#toolbar=0&navpanes=0&scrollbar=1`}
+                                                    title="PDF Preview"
+                                                    className="h-full w-full bg-white"
+                                                />
+                                            </div>
+                                        ) : (
+                                            <div className="flex h-full items-center justify-center rounded-2xl border border-border bg-muted/20 p-4 shadow-sm">
+                                                <img
+                                                    src={preview.url}
+                                                    alt="Voucher Proof"
+                                                    className="max-h-full max-w-full rounded-xl object-contain"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="flex h-full min-h-[520px] flex-col items-center justify-center px-6 text-center">
+                                    <div className="mb-3 rounded-full border border-border bg-muted/40 px-3 py-1 text-xs font-medium text-muted-foreground">
+                                        No file selected
+                                    </div>
+                                    <h4 className="text-sm font-medium text-foreground">Choose a proof to preview</h4>
+                                    <p className="mt-1 max-w-md text-sm text-muted-foreground">
+                                        Select any file from the left panel to view it here.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
             {/* ================= MODALS ================= */}
 
             {/* Accounts Modal */}
@@ -629,7 +773,8 @@ const ImprestVoucherView: React.FC = () => {
 
                 /* ---------- Hide UI-only elements in PDF ---------- */
                 html.pdf-export .voucher-actions,
-                html.pdf-export .voucher-toolbar {
+                html.pdf-export .voucher-toolbar,
+                html.pdf-export .voucher-proofs {
                     display: none !important;
                 }
 
@@ -637,6 +782,11 @@ const ImprestVoucherView: React.FC = () => {
                     white-space: nowrap;
                     word-break: keep-all;
                     font-size: 10px;
+                }
+                
+                .voucher-proofs {
+                    max-width: 1000px;
+                    margin: 24px auto;
                 }
             `}</style>
         </div>

@@ -45,23 +45,9 @@ const ImprestVoucherList: React.FC = () => {
                             userId: Number(row.beneficiaryId), // ✅ numeric
                             from: row.validFrom,
                             to: row.validTo,
-                        })
+                        }),
+                        { state: { proofs: row.proofs } }
                     ),
-            },
-            {
-                label: "View Proofs",
-                icon: <Eye className="h-4 w-4" />,
-                onClick: (row: ImprestVoucherRow) =>
-                    navigate("/shared/imprests/voucher/proofs", {
-                        state: {
-                            proofs: row.proofs,
-                            beneficiaryName: row.beneficiaryName,
-                            period: {
-                                from: row.validFrom,
-                                to: row.validTo,
-                            },
-                        },
-                    }),
             },
         ],
         [navigate]
