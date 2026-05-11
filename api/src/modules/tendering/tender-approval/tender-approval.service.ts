@@ -165,12 +165,12 @@ export class TenderApprovalService {
         if (activeTab === "pending") {
             tabConditions.push(
                 or(eq(tenderInfos.tlStatus, 0), eq(tenderInfos.tlStatus, 3), isNull(tenderInfos.tlStatus)),
-                or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.id))
+                or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status))
             );
         } else if (activeTab === "accepted") {
-            tabConditions.push(eq(tenderInfos.tlStatus, 1), or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.id)));
+            tabConditions.push(eq(tenderInfos.tlStatus, 1), or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)));
         } else if (activeTab === "rejected") {
-            tabConditions.push(eq(tenderInfos.tlStatus, 2), or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.id)));
+            tabConditions.push(eq(tenderInfos.tlStatus, 2), or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)));
         } else if(activeTab === "rejected_later"){
             tabConditions.push(and(
                 eq(bidSubmissions.status, "Tender Missed"),
@@ -315,13 +315,13 @@ export class TenderApprovalService {
         const pendingConditions = [
             ...baseConditions,
             or(eq(tenderInfos.tlStatus, 0), eq(tenderInfos.tlStatus, 3), isNull(tenderInfos.tlStatus)),
-            or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.id)),
+            or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)),
             ,
         ];
         
-        const acceptedConditions = [...baseConditions, eq(tenderInfos.tlStatus, 1), or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.id))];
+        const acceptedConditions = [...baseConditions, eq(tenderInfos.tlStatus, 1), or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status))];
         
-        const rejectedConditions = [...baseConditions, eq(tenderInfos.tlStatus, 2), or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.id))];
+        const rejectedConditions = [...baseConditions, eq(tenderInfos.tlStatus, 2), or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status))];
         
         const tenderDnbConditions = [...baseConditions, eq(bidSubmissions.status, "Tender Missed") , or(notInArray(bidSubmissions.reasonStatus, [10,15,35]) , isNull(bidSubmissions.reasonStatus))];
         

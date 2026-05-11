@@ -1,5 +1,5 @@
 import { Inject, Injectable, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
-import { and, eq, inArray, asc, desc, sql, isNull, notInArray, isNotNull, ne } from 'drizzle-orm';
+import { and, eq, inArray, asc, desc, sql, isNull, notInArray, isNotNull, ne , or} from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -154,11 +154,11 @@ export class CostingApprovalsService {
         if (activeTab === 'pending') {
             conditions.push(TenderInfosService.getExcludeStatusCondition(['lost']));
             conditions.push(eq(tenderCostingSheets.status, 'Submitted'));
-            conditions.push(ne(bidSubmissions.status, "Tender Missed"));
+            conditions.push(or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)));
         } else if (activeTab === 'approved') {
             // conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb']));
             conditions.push(eq(tenderCostingSheets.status, 'Approved'));
-            conditions.push(ne(bidSubmissions.status, "Tender Missed"));
+            conditions.push(or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)));
         } else if (activeTab === 'tender-dnb') {
             // conditions.push(inArray(tenderInfos.status, [8, 34]));
             conditions.push(eq(bidSubmissions.status, "Tender Missed"));
@@ -192,11 +192,11 @@ export class CostingApprovalsService {
         if (activeTab === 'pending') {
             conditions.push(TenderInfosService.getExcludeStatusCondition(['lost']));
             conditions.push(eq(tenderCostingSheets.status, 'Submitted'));
-            conditions.push(ne(bidSubmissions.status, "Tender Missed"));
+            conditions.push(or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)));
         } else if (activeTab === 'approved') {
             // conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb']));
             conditions.push(eq(tenderCostingSheets.status, 'Approved'));
-            conditions.push(ne(bidSubmissions.status, "Tender Missed"));
+            conditions.push(or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)));
         } else if (activeTab === 'tender-dnb') {
             // conditions.push(inArray(tenderInfos.status, [8, 34]));
             conditions.push(eq(bidSubmissions.status, "Tender Missed"));

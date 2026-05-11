@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
-import { and, eq, asc, desc, sql, isNull, isNotNull, inArray, notInArray, SQL, ne } from "drizzle-orm";
+import { and, eq, asc, desc, sql, isNull, isNotNull, inArray, notInArray, SQL, ne, or } from "drizzle-orm";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
 import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
@@ -200,11 +200,11 @@ export class PhysicalDocsService {
 
         if (activeTab === "pending") {
             conditions.push(isNull(physicalDocs.id));
-            conditions.push(ne(bidSubmissions.status, 'Tender Missed'));
+            conditions.push(or(ne(bidSubmissions.status, 'Tender Missed'), isNull(bidSubmissions.status)));
             // conditions.push(TenderInfosService.getExcludeStatusCondition(["dnb", "lost"]));
         } else if (activeTab === "sent") {
             conditions.push(isNotNull(physicalDocs.id));
-            conditions.push(ne(bidSubmissions.status, 'Tender Missed'));
+            conditions.push(or(ne(bidSubmissions.status, 'Tender Missed'), isNull(bidSubmissions.status)));
             // conditions.push(TenderInfosService.getExcludeStatusCondition(["dnb", "lost"]));
         } else if (activeTab === "tender-dnb") {
             // const dnbStatusIds = StatusCache.getIds('dnb');
@@ -360,10 +360,10 @@ export class PhysicalDocsService {
         const dnbCondition = [ne(bidSubmissions.status, "Tender Missed")];
 
         // Count pending: status = 3, physicalDocsId IS NULL
-        const pendingConditions = [...baseConditions, ne(bidSubmissions.status, "Tender Missed") ];
+        const pendingConditions = [...baseConditions, or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)) ];
 
         // Count sent: status = 30, physicalDocsId IS NOT NULL
-        const sentConditions = [...baseConditions, ne(bidSubmissions.status, "Tender Missed"), isNotNull(physicalDocs.id)];
+        const sentConditions = [...baseConditions, or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)), isNotNull(physicalDocs.id)];
 
         const counts = await Promise.all([
             this.db
