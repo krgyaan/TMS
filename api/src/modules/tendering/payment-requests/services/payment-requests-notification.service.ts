@@ -246,6 +246,7 @@ export class PaymentRequestsNotificationService {
                     subject: `Bank Transfer - ${purpose}`,
                     template: 'bank-transfer-request',
                     data: {
+                        paymentInstrumentType: instrumentType,
                         tenderNo: tender?.tenderNo || 'NA',
                         tenderName: tender?.tenderName || 'Not specified',
                         dueDateTime: formatDateTime(tender?.dueDate),
@@ -291,6 +292,7 @@ export class PaymentRequestsNotificationService {
                     template: 'pay-on-portal-request',
                     data: {
                         portal: portalDetails?.portalName || 'Payment Portal',
+                        purpose: purpose,
                         netbanking: portalDetails?.isNetbanking || 'Not specified',
                         debit: portalDetails?.isDebit || 'Not specified',
                         amount: formatCurrency(Number(instrument.amount) || 0),
@@ -369,6 +371,99 @@ export class PaymentRequestsNotificationService {
             }
         } else {
             this.logger.log(`Email not supported for instrument type: ${instrumentType}, Mode: ${mode}`);
+        }
+    }
+
+    async sendBtActionEmail(
+        instrumentId: number,
+        btReq: 'Accepted' | 'Rejected',
+        paymentDateTime?: string,
+        utrNo?: string,
+        utrMessage?: string,
+        rejectionReason?: string
+    ): Promise<void> {
+        const [instrument] = await this.db
+            .select({ 
+                requestId: paymentInstruments.requestId,
+                tenderId: paymentRequests.tenderId,
+                requestedBy: paymentRequests.requestedBy 
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .where(eq(paymentInstruments.id, instrumentId))
+            .limit(1);
+
+        if (!instrument) {
+            this.logger.warn(`Instrument ${instrumentId} not found for BT action email`);
+            return;
+        }
+
+        if (!instrument.requestedBy) {
+            this.logger.warn(`RequestedBy not found for instrument ${instrumentId}`);
+            return;
+        }
+
+        const [requestedUser] = await this.db
+            .select({ name: users.name, email: users.email })
+            .from(users)
+            .where(eq(users.id, instrument.requestedBy))
+            .limit(1);
+
+        if (!requestedUser?.email) {
+            this.logger.warn(`RequestedBy user not found for instrument ${instrumentId}`);
+            return;
+        }
+
+        let tenderNo = 'NA';
+        let tenderName = 'Not specified';
+        if (instrument.tenderId) {
+            const [tender] = await this.db
+                .select({ tenderNo: tenderInfos.tenderNo, tenderName: tenderInfos.tenderName })
+                .from(tenderInfos)
+                .where(eq(tenderInfos.id, instrument.tenderId))
+                .limit(1);
+            if (tender) {
+                tenderNo = tender.tenderNo || 'NA';
+                tenderName = tender.tenderName || 'Not specified';
+            }
+        }
+
+        const status = btReq === 'Accepted' ? 'accepted' : 'rejected';
+        
+        try {
+            const result = await this.emailService.sendPaymentEmail({
+                requestId: instrument.requestId,
+                tenderId: instrument.tenderId || undefined,
+                eventType: 'BT_ACTION',
+                fromUserId: 13,
+                subject: `Bank Transfer - ${status === 'accepted' ? 'Accepted' : 'Rejected'}`,
+                template: 'bt-action',
+                data: {
+                    tenderExecutive: requestedUser.name,
+                    paymentInstrument: 'Bank Transfer',
+                    tenderNo,
+                    tenderName,
+                    status,
+                    paymentDateTime: paymentDateTime || '',
+                    utr: utrNo || '',
+                    utrMessage: utrMessage || '',
+                    rejectionReason: rejectionReason || '',
+                    senderName: 'Accounts Team',
+                },
+                to: [{ type: 'emails', emails: ['gyan@volksenergie.in'] }],
+                // cc: [
+                //     { type: 'role', role: 'admin', teamId: tenderTeamId },
+                //     { type: 'emails', emails: ['accounts@volksenergie.in']}
+                // ],
+            });
+
+            if (result.success) {
+                this.logger.log(`BT action email sent for instrument ${instrumentId} (logId: ${result.emailLogId})`);
+            } else {
+                this.logger.warn(`BT action email failed for instrument ${instrumentId}: ${result.error}`);
+            }
+        } catch (error) {
+            this.logger.error(`Failed to send BT action email for instrument ${instrumentId}:`, error);
         }
     }
 
@@ -459,6 +554,170 @@ export class PaymentRequestsNotificationService {
             }
         } catch (error) {
             this.logger.error(`Failed to send POP action email for instrument ${instrumentId}:`, error);
+        }
+    }
+
+    async sendBtReturnEmail(
+        instrumentId: number,
+        returnTransferDate?: string,
+        returnUtr?: string
+    ): Promise<void> {
+        const [instrument] = await this.db
+            .select({
+                requestId: paymentInstruments.requestId,
+                tenderId: paymentRequests.tenderId,
+                requestedBy: paymentRequests.requestedBy
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .where(eq(paymentInstruments.id, instrumentId))
+            .limit(1);
+
+        if (!instrument) {
+            this.logger.warn(`Instrument ${instrumentId} not found for BT return email`);
+            return;
+        }
+
+        if (!instrument.requestedBy) {
+            this.logger.warn(`RequestedBy not found for instrument ${instrumentId}`);
+            return;
+        }
+
+        const [requestedUser] = await this.db
+            .select({ name: users.name, email: users.email })
+            .from(users)
+            .where(eq(users.id, instrument.requestedBy))
+            .limit(1);
+
+        if (!requestedUser?.email) {
+            this.logger.warn(`RequestedBy user not found for instrument ${instrumentId}`);
+            return;
+        }
+
+        let tenderNo = 'NA';
+        if (instrument.tenderId) {
+            const [tender] = await this.db
+                .select({ tenderNo: tenderInfos.tenderNo })
+                .from(tenderInfos)
+                .where(eq(tenderInfos.id, instrument.tenderId))
+                .limit(1);
+            if (tender) {
+                tenderNo = tender.tenderNo || 'NA';
+            }
+        }
+
+        try {
+            const result = await this.emailService.sendPaymentEmail({
+                requestId: instrument.requestId,
+                tenderId: instrument.tenderId || undefined,
+                eventType: 'BT_RETURN',
+                fromUserId: 13,
+                subject: `Bank Transfer - Payment Returned`,
+                template: 'returned-action',
+                data: {
+                    tenderExecutive: requestedUser.name,
+                    paymentInstrument: 'Bank Transfer',
+                    tenderNo,
+                    returnTransferDate: returnTransferDate || '',
+                    returnUtr: returnUtr || '',
+                    senderName: 'Accounts Team',
+                },
+                to: [{ type: 'emails', emails: ['gyan@volksenergie.in'] }],
+                // cc: [
+                //     { type: 'role', role: 'admin', teamId: tenderTeamId },
+                //     { type: 'emails', emails: ['accounts@volksenergie.in']}
+                // ],
+            });
+
+            if (result.success) {
+                this.logger.log(`BT return email sent for instrument ${instrumentId} (logId: ${result.emailLogId})`);
+            } else {
+                this.logger.warn(`BT return email failed for instrument ${instrumentId}: ${result.error}`);
+            }
+        } catch (error) {
+            this.logger.error(`Failed to send BT return email for instrument ${instrumentId}:`, error);
+        }
+    }
+
+    async sendPopReturnEmail(
+        instrumentId: number,
+        returnTransferDate?: string,
+        returnUtr?: string
+    ): Promise<void> {
+        const [instrument] = await this.db
+            .select({
+                requestId: paymentInstruments.requestId,
+                tenderId: paymentRequests.tenderId,
+                requestedBy: paymentRequests.requestedBy
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .where(eq(paymentInstruments.id, instrumentId))
+            .limit(1);
+
+        if (!instrument) {
+            this.logger.warn(`Instrument ${instrumentId} not found for POP return email`);
+            return;
+        }
+
+        if (!instrument.requestedBy) {
+            this.logger.warn(`RequestedBy not found for instrument ${instrumentId}`);
+            return;
+        }
+
+        const [requestedUser] = await this.db
+            .select({ name: users.name, email: users.email })
+            .from(users)
+            .where(eq(users.id, instrument.requestedBy))
+            .limit(1);
+
+        if (!requestedUser?.email) {
+            this.logger.warn(`RequestedBy user not found for instrument ${instrumentId}`);
+            return;
+        }
+
+        let tenderNo = 'NA';
+        if (instrument.tenderId) {
+            const [tender] = await this.db
+                .select({ tenderNo: tenderInfos.tenderNo })
+                .from(tenderInfos)
+                .where(eq(tenderInfos.id, instrument.tenderId))
+                .limit(1);
+            if (tender) {
+                tenderNo = tender.tenderNo || 'NA';
+            }
+        }
+
+        try {
+            const result = await this.emailService.sendPaymentEmail({
+                requestId: instrument.requestId,
+                tenderId: instrument.tenderId || undefined,
+                eventType: 'POP_RETURN',
+                fromUserId: 13,
+                subject: `Pay on Portal - Payment Returned`,
+                template: 'returned-action',
+                data: {
+                    tenderExecutive: requestedUser.name,
+                    paymentInstrument: 'Pay on Portal',
+                    tenderNo,
+                    returnTransferDate: returnTransferDate || '',
+                    returnUtr: returnUtr || '',
+                    senderName: 'Accounts Team',
+                },
+                to: [{ type: 'emails', emails: ['gyan@volksenergie.in'] }],
+                // cc: [
+                //     { type: 'role', role: 'admin', teamId: tenderTeamId },
+                //     { type: 'emails', emails: ['accounts@volksenergie.in']}
+                // ],
+            });
+
+            if (result.success) {
+                this.logger.log(`POP return email sent for instrument ${instrumentId} (logId: ${result.emailLogId})`);
+            } else {
+                this.logger.warn(`POP return email failed for instrument ${instrumentId}: ${result.error}`);
+            }
+        } catch (error) {
+            this.logger.error(`Failed to send POP return email for instrument ${instrumentId}:`, error);
         }
     }
 }
