@@ -44,8 +44,6 @@ const ImprestVoucherView: React.FC = () => {
     const userId = Number(searchParams.get("userId"));
     const from = searchParams.get("from");
     const to = searchParams.get("to");
-    const year = Number(searchParams.get("year"));
-    const week = Number(searchParams.get("week"));
 
     const location = useLocation();
     const stateProofs = location.state?.proofs as InvoiceProof[] | undefined;

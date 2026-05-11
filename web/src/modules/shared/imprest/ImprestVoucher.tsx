@@ -45,27 +45,10 @@ const ImprestVoucherList: React.FC = () => {
                             userId: Number(row.beneficiaryId), // ✅ numeric
                             from: row.validFrom,
                             to: row.validTo,
-                            year: row.year,
-                            week: row.week,
                         }),
                         { state: { proofs: row.proofs } }
                     ),
             },
-            // {
-            //     label: "View Proofs",
-            //     icon: <Eye className="h-4 w-4" />,
-            //     onClick: (row: ImprestVoucherRow) =>
-            //         navigate(
-            //             paths.shared.imprestVoucherView({
-            //                 userId: Number(row.beneficiaryId),
-            //                 from: row.validFrom,
-            //                 to: row.validTo,
-            //                 year: row.year,
-            //                 week: row.week,
-            //             }),
-            //             { state: { proofs: row.proofs } }
-            //         ),
-            // },
         ],
         [navigate]
     );

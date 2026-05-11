@@ -321,8 +321,8 @@ export const paths = {
         imprestVoucher: "/shared/imprests/voucher",
         imprestVoucherByUser: (id: number) => `/shared/imprests/voucher?userId=${id}`,
 
-        imprestVoucherView: (params: { userId: number; from: string; to: string; year?: number; week?: number }) =>
-            `/shared/imprests/voucher/view?userId=${params.userId}&from=${encodeURIComponent(params.from)}&to=${encodeURIComponent(params.to)}${params.year ? `&year=${params.year}` : ""}${params.week ? `&week=${params.week}` : ""}`,
+        imprestVoucherView: (params: { userId: number; from: string; to: string }) =>
+            `/shared/imprests/voucher/view?userId=${params.userId}&from=${encodeURIComponent(params.from)}&to=${encodeURIComponent(params.to)}`,
     },
 
     // ==================== DOCUMENT DASHBOARD ====================
