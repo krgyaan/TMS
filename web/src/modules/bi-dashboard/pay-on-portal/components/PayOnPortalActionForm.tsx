@@ -21,6 +21,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { FileText, Users, Banknote, CheckCircle, CheckCircle2, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { TenderFileUploader } from '@/components/tender-file-upload';
 
 interface ActionOption {
     value: string;
@@ -40,6 +41,7 @@ interface AccountsFormHistory {
     paymentDatetime?: string;
     utrNo?: string;
     utrMessage?: string;
+    paymentProof?: string[];
 }
 
 interface FollowupHistory {
@@ -121,6 +123,7 @@ export function PayOnPortalActionForm({ instrumentId, action, formHistory }: Pay
         defaultValues.payment_datetime = formHistory.accountsForm.paymentDatetime;
         defaultValues.utr_no = formHistory.accountsForm.utrNo;
         defaultValues.utr_message = formHistory.accountsForm.utrMessage;
+        defaultValues.payment_proof = formHistory.accountsForm.paymentProof;
     }
 
     if (formHistory?.initiateFollowup) {
@@ -358,6 +361,16 @@ export function PayOnPortalActionForm({ instrumentId, action, formHistory }: Pay
                                         {(field) => <Input {...field} placeholder="Enter UTR message" />}
                                     </FieldWrapper>
                                 </div>
+                                <FieldWrapper control={form.control} name="payment_proof" label="Payment Proof (Screenshot)">
+                                    {(field) => (
+                                        <TenderFileUploader
+                                            context="payment-request"
+                                            value={field.value || []}
+                                            onChange={field.onChange}
+                                            disabled={false}
+                                        />
+                                    )}
+                                </FieldWrapper>
                             </div>
                         )}
                     </div>
