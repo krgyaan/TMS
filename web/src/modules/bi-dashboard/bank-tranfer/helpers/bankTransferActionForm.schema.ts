@@ -132,3 +132,23 @@ export const BankTransferActionFormSchema = BaseActionFormSchema.extend({
 );
 
 export type BankTransferActionFormValues = z.infer<typeof BankTransferActionFormSchema>;
+
+export interface BankTransferActionPayload {
+    action: string;
+    bt_req?: 'Accepted' | 'Rejected';
+    reason_req?: string;
+    payment_datetime?: string;
+    utr_no?: string;
+    utr_message?: string;
+    organisation_name?: string;
+    contacts?: Array<{
+        name: string;
+        phone?: string | null;
+        email?: string | null;
+    }>;
+    followup_start_date?: string;
+    frequency?: number;
+    transfer_date?: string;
+    return_utr?: string;
+    settle_remarks?: string;
+}
