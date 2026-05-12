@@ -52,6 +52,10 @@ export interface BankTransferActionFormData {
     remarks: string | null;
     rejectionReason: string | null;
     paymentDateTime: string | null;
+    settledRemarks: string | null;
+    hasAccountsFormData: boolean;
+    hasReturnedData: boolean;
+    hasSettledData: boolean;
 }
 
 export interface BankTransferFollowupData {
@@ -75,4 +79,11 @@ export interface BankTransferFollowupData {
     proofImagePath: string | null;
     assignmentStatus: string | null;
     createdAt: Date;
+}
+
+export interface BankTransferViewProps {
+    data: BankTransferActionFormData;
+    followupData?: BankTransferFollowupData | null;
+    isLoading?: boolean;
+    className?: string;
 }
