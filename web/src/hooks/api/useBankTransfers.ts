@@ -7,6 +7,7 @@ import type {
     BankTransferActionFormData,
     BankTransferFollowupData,
 } from '@/modules/bi-dashboard/bank-tranfer/helpers/bankTransfer.types';
+import type { BankTransferActionPayload } from '@/modules/bi-dashboard/bank-tranfer/helpers/bankTransferActionForm.schema';
 import type { PaginatedResult } from '@/types/api.types';
 
 export const bankTransfersKey = {
@@ -106,18 +107,13 @@ export const useBankTransferFollowupData = (id: number) => {
 
 export const useUpdateBankTransferAction = () => {
     const queryClient = useQueryClient();
-    console.log('Action Form called');
 
     return useMutation({
-        mutationFn: ({ id, formData }: { id: number; formData: FormData }) =>
-            bankTransfersService.updateAction(id, formData),
+        mutationFn: ({ id, data }: { id: number; data: BankTransferActionPayload }) =>
+            bankTransfersService.updateAction(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: bankTransfersKey.all });
             queryClient.invalidateQueries({ queryKey: bankTransfersKey.counts() });
-            console.log('useUpdateBankTransferAction onSuccess called');
-        },
-        onError: (error: any) => {
-            console.log('useUpdateBankTransferAction onError called', error);
         },
     });
 };

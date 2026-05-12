@@ -11,7 +11,7 @@ import { FollowUpFrequencySelect } from '@/components/form/FollowUpFrequencySele
 import { ConditionalSection } from '@/components/form/ConditionalSection';
 import DateInput from '@/components/form/DateInput';
 import DateTimeInput from '@/components/form/DateTimeInput';
-import { BankTransferActionFormSchema, type BankTransferActionFormValues } from '../helpers/bankTransferActionForm.schema';
+import { BankTransferActionFormSchema, type BankTransferActionFormValues, type BankTransferActionPayload } from '../helpers/bankTransferActionForm.schema';
 import { useUpdateBankTransferAction } from '@/hooks/api/useBankTransfers';
 import { toast } from 'sonner';
 import { useWatch } from 'react-hook-form';
@@ -192,25 +192,24 @@ export function BankTransferActionForm({ instrumentId, action: propAction, formH
     const isSubmitting = form.formState.isSubmitting || updateMutation.isPending;
 
     const handleSubmit = async (values: BankTransferActionFormValues) => {
-        try {            
-            const formData = new FormData();
+        try {
+            const payload: BankTransferActionPayload = {
+                action: values.action,
+                ...(values.bt_req && { bt_req: values.bt_req }),
+                ...(values.reason_req && { reason_req: values.reason_req }),
+                ...(values.payment_datetime && { payment_datetime: values.payment_datetime }),
+                ...(values.utr_no && { utr_no: values.utr_no }),
+                ...(values.utr_message && { utr_message: values.utr_message }),
+                ...(values.organisation_name && { organisation_name: values.organisation_name }),
+                ...(values.contacts && { contacts: values.contacts }),
+                ...(values.followup_start_date && { followup_start_date: values.followup_start_date }),
+                ...(values.frequency && { frequency: values.frequency }),
+                ...(values.transfer_date && { transfer_date: values.transfer_date }),
+                ...(values.return_utr && { return_utr: values.return_utr }),
+                ...(values.settle_remarks && { settle_remarks: values.settle_remarks }),
+            };
 
-            Object.entries(values).forEach(([key, value]) => {                
-                if (value === undefined || value === null || value === '') return;
-
-                if (key === 'contacts' && Array.isArray(value)) {
-                    formData.append(key, JSON.stringify(value));
-                    return;
-                }
-
-                if (typeof value === 'object') {
-                    formData.append(key, JSON.stringify(value));
-                } else {
-                    formData.append(key, String(value));
-                }
-            });
-
-            await updateMutation.mutateAsync({ id: instrumentId, formData });
+            await updateMutation.mutateAsync({ id: instrumentId, data: payload });
             toast.success('Payment data updated successfully');
             localStorage.removeItem('bank_transfer_action_data');
             navigate(-1);

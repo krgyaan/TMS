@@ -90,8 +90,8 @@ class PayOnPortalsService extends BaseApiService {
         }
     }
 
-    async updateAction(id: number, formData: FormData): Promise<any> {
-        return this.patch<any, FormData>(`/instruments/${id}/action`, formData);
+    async updateAction(id: number, data: Record<string, unknown>): Promise<any> {
+        return this.patch<any>(`/instruments/${id}/action`, data);
     }
 }
 

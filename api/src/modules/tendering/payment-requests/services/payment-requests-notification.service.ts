@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { and, eq } from 'drizzle-orm';
@@ -18,6 +19,7 @@ export class PaymentRequestsNotificationService {
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
         private readonly pdfGenerator: PdfGeneratorService,
+        private readonly configService: ConfigService,
     ) {}
 
     /**
@@ -513,7 +515,9 @@ export class PaymentRequestsNotificationService {
             .select({ 
                 requestId: paymentInstruments.requestId,
                 tenderId: paymentRequests.tenderId,
-                requestedBy: paymentRequests.requestedBy 
+                requestedBy: paymentRequests.requestedBy,
+                legacyData: paymentInstruments.legacyData,
+                generatedPdf: paymentInstruments.generatedPdf,
             })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
@@ -557,6 +561,12 @@ export class PaymentRequestsNotificationService {
 
         const status = popReq === 'Accepted' ? 'accepted' : 'rejected';
 
+        // Get payment proof path (from legacyData or generatedPdf)
+        const legacyData = instrument.legacyData as Record<string, any> | null;
+        const paymentProofPath = legacyData?.payment_proof || instrument.generatedPdf || undefined;
+        const apiUrl = this.configService.get<string>('app.apiUrl') || '';
+        const paymentProofUrl = paymentProofPath ? `${apiUrl}/tender-files/serve/${paymentProofPath}` : '';
+
         // Format date with time
         const formatDateTime = (dateStr: string | null | undefined): string => {
             if (!dateStr) return '';
@@ -589,6 +599,7 @@ export class PaymentRequestsNotificationService {
                     utrMessage: utrMessage || '',
                     rejectionReason: rejectionReason || '',
                     senderName: 'Accounts Team',
+                    paymentProofUrl,
                 },
                 to: [{ type: 'emails', emails: ['gyan@volksenergie.in'] }],
                 // cc: [

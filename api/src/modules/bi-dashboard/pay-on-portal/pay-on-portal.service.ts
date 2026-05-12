@@ -329,11 +329,7 @@ export class PayOnPortalService {
             }
             const paymentProofPath = this.getFilePathFromBody('payment_proof', body);
             if (paymentProofPath) {
-                updateData.legacyData = {
-                    ...(instrument.legacyData || {}),
-                    ...updateData.legacyData,
-                    payment_proof: paymentProofPath,
-                };
+                updateData.generatedPdf = paymentProofPath;
             }
         } else if (body.action === 'initiate-followup') {
             updateData.status = PORTAL_STATUSES.FOLLOWUP_INITIATED;
@@ -530,6 +526,7 @@ export class PayOnPortalService {
                 utr: paymentInstruments.utr,
                 rejectionReason: instrumentTransferDetails.reason,
                 legacyData: paymentInstruments.legacyData,
+                generatedPdf: paymentInstruments.generatedPdf,
                 tenderNo: tenderInfos.tenderNo,
                 tenderName: tenderInfos.tenderName,
                 portalName: instrumentTransferDetails.portalName,
@@ -579,6 +576,7 @@ export class PayOnPortalService {
             remarks: result.remarks,
             rejectionReason: result.rejectionReason,
             paymentDateTime: legacyData?.date_time || null,
+            paymentProofPath: legacyData?.payment_proof || result.generatedPdf || null,
         };
     }
 
