@@ -21,68 +21,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { FileText, Users, Banknote, CheckCircle, CheckCircle2, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { TenderFileUploader } from '@/components/tender-file-upload';
-
-interface ActionOption {
-    value: string;
-    label: string;
-}
-
-const ALL_ACTION_OPTIONS: ActionOption[] = [
-    { value: 'accounts-form', label: 'Accounts Form' },
-    { value: 'initiate-followup', label: 'Initiate Followup' },
-    { value: 'returned', label: 'Returned via Bank Transfer' },
-    { value: 'settled', label: 'Settled with Project Account' },
-];
-
-interface AccountsFormHistory {
-    popReq?: 'Accepted' | 'Rejected';
-    reasonReq?: string;
-    paymentDatetime?: string;
-    utrNo?: string;
-    utrMessage?: string;
-    paymentProof?: string[];
-}
-
-interface FollowupHistory {
-    organisationName?: string;
-    contacts?: Array<{
-        name: string;
-        email: string | null;
-        phone: string | null;
-        org: string | null;
-    }>;
-    followupStartDate?: string;
-    frequency?: number;
-}
-
-interface ReturnedHistory {
-    transferDate?: string;
-    returnUtr?: string;
-}
-
-interface SettledHistory {
-    remarks?: string;
-}
-
-interface FormHistory {
-    accountsForm?: AccountsFormHistory;
-    initiateFollowup?: FollowupHistory;
-    returned?: ReturnedHistory;
-    settled?: SettledHistory;
-}
-
-interface PayOnPortalActionFormProps {
-    instrumentId: number;
-    action?: number | null;
-    instrumentData?: {
-        utrNo?: string;
-        portalName?: string;
-        amount?: number;
-        tenderName?: string;
-        tenderNo?: string;
-    };
-    formHistory?: FormHistory;
-}
+import { ALL_ACTION_OPTIONS, type PayOnPortalActionFormProps } from '../helpers/payOnPortal.types';
 
 export function PayOnPortalActionForm({ instrumentId, action, formHistory }: PayOnPortalActionFormProps) {
     const navigate = useNavigate();
