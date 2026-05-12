@@ -579,9 +579,9 @@ const ViewModal: React.FC<{
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-3xl md:w-full p-0 gap-0 overflow-hidden rounded-2xl">
+      <DialogContent className="sm:!max-w-[90vw] lg:!max-w-[1300px] p-0 gap-0 m-5 mt-0 mb-10 overflow-hidden rounded-2xl">
         {/* Header */}
-        <DialogHeader className="px-8 py-6 border-b">
+        <DialogHeader className="px-8 py-3 border-b">
           <div className="flex items-center gap-5">
             <Avatar className="h-14 w-14 rounded-2xl ring-2 ring-border/50">
               <AvatarFallback
@@ -618,7 +618,7 @@ const ViewModal: React.FC<{
         </DialogHeader>
 
         {/* Body */}
-        <div className="px-8 py-6 space-y-8 max-h-[68vh] overflow-y-auto">
+        <div className="px-8 py-6 space-y-8 max-h-[75vh] overflow-y-auto">
           {/* Progress Pipeline */}
           <div className="space-y-4">
             <SectionHeader icon={Activity} title="Onboarding Progress" />
@@ -1253,7 +1253,7 @@ const ViewModal: React.FC<{
         </div>
 
         {/* Footer */}
-        <DialogFooter className="px-8 py-5 border-t bg-muted/20">
+        <DialogFooter className="px-8 py-2 border-t bg-muted/20">
           <div className="flex items-center gap-3 w-full justify-end">
             <Button variant="outline" onClick={onClose} className="rounded-xl">
               Close
