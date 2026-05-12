@@ -108,7 +108,7 @@ export class BidSubmissionsService {
     /**
      * Get dashboard data by tab - Direct queries without config
      */
-    private buildDashboardConditions(user?: ValidatedUser, teamId?: number, activeTab?: string ){
+    private buildDashboardConditions(user?: ValidatedUser, teamId?: number, activeTab?: string, filters?: BidSubmissionFilters){
         //building the base conditions
         const conditions: any[] = [
             TenderInfosService.getActiveCondition(),
@@ -146,6 +146,20 @@ export class BidSubmissionsService {
             throw new BadRequestException(`Invalid tab: ${activeTab}`);
         }
 
+
+        if (filters?.search) {
+            const searchStr = `%${filters.search}%`;
+            const searchConditions: any[] = [
+                sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
+                sql`${tenderInfos.gstValues}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.dueDate}::text ILIKE ${searchStr}`,
+                sql`${users.name} ILIKE ${searchStr}`,
+                sql`${statuses.name} ILIKE ${searchStr}`,
+            ];
+            conditions.push(sql`(${sql.join(searchConditions, sql` OR `)})`);
+        }
+
         //returning the tab conditions
         return conditions;
 
@@ -155,7 +169,7 @@ export class BidSubmissionsService {
         user?: ValidatedUser,
         teamId?: number,
         tab?: 'pending' | 'submitted' | 'disqualified' | 'tender-dnb',
-        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; search?: string }
+        filters?: BidSubmissionFilters
     ): Promise<PaginatedResult<BidSubmissionDashboardRow>> {
         const page = filters?.page || 1;
         const limit = filters?.limit || 50;
@@ -167,7 +181,7 @@ export class BidSubmissionsService {
             throw new BadRequestException(`Invalid Status: ${tab}`);
         }
 
-        const conditions : any[] = this.buildDashboardConditions(user, teamId, tab);
+        const conditions : any[] = this.buildDashboardConditions(user, teamId, tab, filters);
         
         const whereClause = and(...conditions);
 
