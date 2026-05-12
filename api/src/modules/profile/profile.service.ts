@@ -989,29 +989,6 @@ export class ProfileService {
     throw new BadRequestException('Experience details can only be modified during onboarding.');
   }
 
-  async deletedEperience(userId: any, expId : number){
-    //check if if exists
-    const [exp] = this.db
-      .select()
-      .from(onboardingExperience)
-      .where(eq(onboardingExperience.id, expId));
-
-      if(exp.length == 0 ){
-        //return error 
-        throw new NotFoundException(`Experience entry not found : ${exp.id}`);
-      }
-
-      //check if onboarding
-      const [onboardingReq] = this.db
-        .select()
-        .from(onboardingRequests)
-        .where(eq(onboardingRequests.id , exp.onboardingId));
-
-      if(onboardingReq){
-
-      }
-  }
-
 
   // --- Bank Accounts ---
 
@@ -1064,21 +1041,7 @@ export class ProfileService {
     throw new BadRequestException('Bank details can only be modified during onboarding.');
   }
 
-  async deleteBankDetails(userId: number, bankId: number) {
-    const activeReqs = await this.db.select({ id: onboardingRequests.id, status: onboardingRequests.status })
-      .from(onboardingRequests).where(eq(onboardingRequests.userId, userId)).orderBy(desc(onboardingRequests.createdAt)).limit(1);
-    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
-
-    if (isOnboarding) {
-      const [existing] = await this.db.select().from(onboardingBankDetails).where(eq(onboardingBankDetails.id, bankId)).limit(1);
-      if (existing && existing.onboardingId === activeReqs[0].id) {
-        await this.db.delete(onboardingBankDetails).where(eq(onboardingBankDetails.id, bankId));
-      }
-      return;
-    }
-
-    throw new BadRequestException('Bank details can only be modified during onboarding.');
-  }
+  // --------- Experience Section -------------//
 
   async updateMyEducations(userId: number, body: any) {
     const activeReqs = await this.db
