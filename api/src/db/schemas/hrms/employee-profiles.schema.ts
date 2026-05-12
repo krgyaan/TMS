@@ -10,7 +10,7 @@ export const employeeProfiles = pgTable('hrms_employee_profiles', {
   employeeStatus:        varchar('employee_status', { length: 50 }).notNull().default('active'),
   workLocation:          varchar('work_location', { length: 255 }),
   officialEmail:         varchar('official_email', { length: 255 }),
-  reportingManagerId:    bigint('reporting_manager_id', { mode: 'number' }),
+  reportingTl:           bigint('reporting_tl', { mode: 'number' }),
   probationMonths:       integer('probation_months'),
   probationEndDate:      date('probation_end_date'),
   salaryType:            varchar('salary_type', { length: 20 }),
