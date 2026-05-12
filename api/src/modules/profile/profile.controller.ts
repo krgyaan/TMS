@@ -106,12 +106,6 @@ export class ProfileController {
     return this.profileService.updateEducation(req.user.id, eduId, body);
   }
 
-  @Delete('education/:id')
-  async deleteEducation(@Req() req: any, @Param('id', ParseIntPipe) eduId: number) {
-    await this.profileService.deleteEducation(req.user.id, eduId);
-    return { success: true };
-  }
-
   @Put('me/educations')
   async updateMyEducations(@Req() req: any, @Body() body: any) {
     return this.profileService.updateMyEducations(req.user.id, body);
@@ -129,11 +123,6 @@ export class ProfileController {
     return this.profileService.updateExperience(req.user.id, expId, body);
   }
 
-  @Delete('experience/:id')
-  async deleteExperience(@Req() req: any, @Param('id', ParseIntPipe) expId: number) {
-    await this.profileService.deleteExperience(req.user.id, expId);
-    return { success: true };
-  }
 
   @Put('me/experiences')
   async updateMyExperiences(@Req() req: any, @Body() body: any) {
@@ -150,12 +139,6 @@ export class ProfileController {
   @Patch('bank-accounts/:id')
   async updateBankDetails(@Req() req: any, @Param('id', ParseIntPipe) bankId: number, @Body() body: any) {
     return this.profileService.updateBankDetails(req.user.id, bankId, body);
-  }
-
-  @Delete('bank-accounts/:id')
-  async deleteBankDetails(@Req() req: any, @Param('id', ParseIntPipe) bankId: number) {
-    await this.profileService.deleteBankDetails(req.user.id, bankId);
-    return { success: true };
   }
 
   /**
