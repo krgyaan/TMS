@@ -21,6 +21,7 @@ import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { QuickFilter } from "@/components/ui/quick-filter";
 import { ChangeStatusModal } from "../tenders/components/ChangeStatusModal";
 import { useTenderingPermissions } from "../hooks/useTenderingPermissions";
+import { formatINR } from "@/hooks/useINRFormatter";
 
 const TABS = [
     { value: 'pending', label: 'EMD Request Pending' },
@@ -192,7 +193,14 @@ const EmdsAndTenderFeesPage = () => {
                     headerName: "EMD",
                     filter: true,
                     sortable: true,
-                    width: 100,
+                    width: 120,
+                    cellRenderer: (params: any) => {
+                        const emd = params.data?.emd;
+                        const emdMode = params.data?.emdMode;
+
+                        if (!emd) return <span className="text-gray-400">—</span>;
+                        return <p>{formatINR(emd)} {emdMode ? `(${emdMode})` : ''}</p>;
+                    },
                 }),
                 currencyCol<any>('tenderFee', {
                     field: "tenderFee",
@@ -200,7 +208,14 @@ const EmdsAndTenderFeesPage = () => {
                     headerName: "Tender Fee",
                     filter: true,
                     sortable: true,
-                    width: 100,
+                    width: 120,
+                    cellRenderer: (params: any) => {
+                        const tenderFee = params.data?.tenderFee;
+                        const tenderFeeMode = params.data?.tenderFeeMode;
+
+                        if (!tenderFee) return <span className="text-gray-400">—</span>;
+                        return <p>{formatINR(tenderFee)} {tenderFeeMode ? `(${tenderFeeMode})` : ''}</p>;
+                    },
                 }),
                 currencyCol<any>('processingFee', {
                     field: "processingFee",
@@ -208,7 +223,14 @@ const EmdsAndTenderFeesPage = () => {
                     headerName: "Processing Fee",
                     filter: true,
                     sortable: true,
-                    width: 100,
+                    width: 120,
+                    cellRenderer: (params: any) => {
+                        const processingFee = params.data?.processingFee;
+                        const processingFeeMode = params.data?.processingFeeMode;
+
+                        if (!processingFee) return <span className="text-gray-400">—</span>;
+                        return <p>{formatINR(processingFee)} {processingFeeMode ? `(${processingFeeMode})` : ''}</p>;
+                    },
                 }),
                 teamMemberCol,
                 {
@@ -290,7 +312,7 @@ const EmdsAndTenderFeesPage = () => {
             tenderDetailsCol,
             {
                 field: 'purpose',
-                headerName: 'Type',
+                headerName: 'Purpose',
                 width: 130,
                 cellRenderer: (params: any) => (
                     <Badge variant="outline" className={`${PURPOSE_COLORS[params.value] || ''} font-medium`}>
@@ -307,12 +329,6 @@ const EmdsAndTenderFeesPage = () => {
                 width: 100,
             }),
             {
-                field: 'requestType',
-                headerName: 'Request Type',
-                width: 100,
-                cellRenderer: (params: any) => <span>{params.value}</span>,
-            },
-            {
                 field: 'instrumentType',
                 headerName: 'Mode',
                 width: 120,
@@ -324,7 +340,7 @@ const EmdsAndTenderFeesPage = () => {
             {
                 field: 'displayStatus',
                 headerName: 'Status',
-                width: 90,
+                width: 110,
                 cellRenderer: (params: any) => (
                     <Badge variant="outline" className={STATUS_COLORS[params.value] || ''}>
                         {params.value}
