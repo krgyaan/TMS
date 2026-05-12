@@ -543,6 +543,16 @@ export class BankTransferService {
         }
 
         const legacyData = result.legacyData as Record<string, any> | null;
+        const hasAccountsFormData = !!(
+            (result.status === 'Accepted' || result.status === 'Rejected') ||
+            result.rejectionReason ||
+            result.utr ||
+            result.transactionDate ||
+            result.utrMsg ||
+            legacyData?.date_time
+        );
+        const hasReturnedData = !!(result.returnTransferDate || result.returnUtr);
+        const hasSettledData = result.action === 4;
 
         return {
             id: result.id,
@@ -561,6 +571,10 @@ export class BankTransferService {
             remarks: result.remarks,
             rejectionReason: result.rejectionReason,
             paymentDateTime: legacyData?.date_time || null,
+            settledRemarks: hasSettledData ? result.remarks : null,
+            hasAccountsFormData,
+            hasReturnedData,
+            hasSettledData,
         };
     }
 
