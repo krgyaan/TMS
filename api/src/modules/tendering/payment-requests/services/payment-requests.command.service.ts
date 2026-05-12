@@ -526,7 +526,6 @@ export class PaymentRequestsCommandService {
                     accountName: details.btAccountName || null,
                     accountNumber: details.btAccountNo || null,
                     ifsc: details.btIfsc || null,
-                    reason: details.btPurpose || null,
                     paymentMethod: 'Bank Transfer'
                 }).execute();
                 break;
@@ -537,7 +536,6 @@ export class PaymentRequestsCommandService {
                     portalName: details.portalName || null,
                     isNetbanking: details.portalNetBanking || null,
                     isDebit: details.portalDebitCard || null,
-                    reason: details.portalPurpose || null,
                     paymentMethod: 'Portal Payment'
                 }).execute();
                 break;
