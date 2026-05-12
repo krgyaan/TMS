@@ -123,6 +123,7 @@ export class BidSubmissionsService {
         //building the tab conditions
         
         if (activeTab === 'pending') {
+            conditions.push(eq(tenderCostingSheets.status, 'Approved'));
             conditions.push(isNull(bidSubmissions.id));
             conditions.push(TenderInfosService.getExcludeStatusCondition(['lost']));
             conditions.push(or(ne(bidSubmissions.status, 'Tender Missed'), isNull(bidSubmissions.status)));
