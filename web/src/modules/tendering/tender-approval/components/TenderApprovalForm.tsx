@@ -117,13 +117,13 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
     // Set infoSheet context fields for conditional validation
     useEffect(() => {
         if (infoSheet) {
-            form.setValue('processingFeeRequired', infoSheet.processingFeeRequired as 'YES' | 'NO');
+            form.setValue('processingFeeRequired', infoSheet.processingFeeRequired as 'YES' | 'NO' | null);
             form.setValue('processingFeeAmount', infoSheet.processingFeeAmount ? Number(infoSheet.processingFeeAmount) : undefined);
             form.setValue('processingFeeModes', infoSheet.processingFeeMode || []);
-            form.setValue('tenderFeeRequired', infoSheet.tenderFeeRequired as 'YES' | 'NO');
+            form.setValue('tenderFeeRequired', infoSheet.tenderFeeRequired as 'YES' | 'NO' | null);
             form.setValue('tenderFeeAmount', infoSheet.tenderFeeAmount ? Number(infoSheet.tenderFeeAmount) : undefined);
             form.setValue('tenderFeeModes', infoSheet.tenderFeeMode || []);
-            form.setValue('emdRequired', infoSheet.emdRequired as 'YES' | 'NO' | 'EXEMPT');
+            form.setValue('emdRequired', infoSheet.emdRequired as 'YES' | 'NO' | 'EXEMPT' | null);
             form.setValue('emdAmount', infoSheet.emdAmount ? Number(infoSheet.emdAmount) : undefined);
             form.setValue('emdModes', infoSheet.emdMode || []);
         }
@@ -384,6 +384,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
             const pfRequired = infoSheet.processingFeeRequired === 'YES';
             const pfAmount = Number(infoSheet.processingFeeAmount) || 0;
             const pfHasModes = (infoSheet.processingFeeMode?.length || 0) > 0;
+            //checking if the processing fee is required
             if (pfRequired && pfAmount > 0 && pfHasModes && !values.processingFeeMode) {
                 form.setError('processingFeeMode', { message: 'Processing Fee Mode is required' });
                 validationErrors.push('Processing Fee Mode is required');
@@ -393,6 +394,7 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
             const tfRequired = infoSheet.tenderFeeRequired === 'YES';
             const tfAmount = Number(infoSheet.tenderFeeAmount) || 0;
             const tfHasModes = (infoSheet.tenderFeeMode?.length || 0) > 0;
+            //checking for TF
             if (tfRequired && tfAmount > 0 && tfHasModes && !values.tenderFeeMode) {
                 form.setError('tenderFeeMode', { message: 'Tender Fee Mode is required' });
                 validationErrors.push('Tender Fee Mode is required');
