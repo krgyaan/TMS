@@ -47,9 +47,6 @@ interface FollowupHistory {
     }>;
     followupStartDate?: string;
     frequency?: number;
-    stopReason?: number;
-    proofText?: string;
-    stopRemarks?: string;
 }
 
 interface ReturnedHistory {
@@ -127,9 +124,6 @@ export function BankTransferActionForm({ instrumentId, action: propAction, formH
         })) || [];
         defaultValues.followup_start_date = formHistory.initiateFollowup.followupStartDate;
         defaultValues.frequency = formHistory.initiateFollowup.frequency;
-        defaultValues.stop_reason = formHistory.initiateFollowup.stopReason;
-        defaultValues.proof_text = formHistory.initiateFollowup.proofText;
-        defaultValues.stop_remarks = formHistory.initiateFollowup.stopRemarks;
     }
 
     if (formHistory?.returned) {
@@ -182,15 +176,6 @@ export function BankTransferActionForm({ instrumentId, action: propAction, formH
         if (formHistory?.initiateFollowup?.frequency) {
             form.setValue('frequency', formHistory.initiateFollowup.frequency, { shouldValidate: false });
         }
-        if (formHistory?.initiateFollowup?.stopReason) {
-            form.setValue('stop_reason', formHistory.initiateFollowup.stopReason, { shouldValidate: false });
-        }
-        if (formHistory?.initiateFollowup?.proofText) {
-            form.setValue('proof_text', formHistory.initiateFollowup.proofText, { shouldValidate: false });
-        }
-        if (formHistory?.initiateFollowup?.stopRemarks) {
-            form.setValue('stop_remarks', formHistory.initiateFollowup.stopRemarks, { shouldValidate: false });
-        }
 
         if (formHistory?.returned?.transferDate) {
             form.setValue('transfer_date', formHistory.returned.transferDate, { shouldValidate: false });
@@ -212,34 +197,6 @@ export function BankTransferActionForm({ instrumentId, action: propAction, formH
             console.log('settle_remarks value:', values.settle_remarks);
             
             const formData = new FormData();
-
-            Object.entries(values).forEach(([key, value]) => {
-                if (key === 'stop_reason' ||
-                    key === 'proof_text' ||
-                    key === 'stop_remarks' ||
-                    key === 'proof_image') {
-                    return;
-                }
-
-                if (value instanceof File) {
-                    formData.append(key, value);
-                    return;
-                }
-
-                if (Array.isArray(value) && value.length > 0 && value[0] instanceof File) {
-                    value.forEach((file) => formData.append(key, file));
-                    return;
-                }
-
-                if (value === undefined || value === null || value === '') return;
-                if (value instanceof Date) {
-                    formData.append(key, value.toISOString());
-                } else if (typeof value === 'object') {
-                    formData.append(key, JSON.stringify(value));
-                } else {
-                    formData.append(key, String(value));
-                }
-            });
 
             await updateMutation.mutateAsync({ id: instrumentId, formData });
             toast.success('Payment data updated successfully');
