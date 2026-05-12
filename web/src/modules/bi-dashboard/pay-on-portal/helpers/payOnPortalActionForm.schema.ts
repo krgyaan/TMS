@@ -134,3 +134,25 @@ export const PayOnPortalActionFormSchema = BaseActionFormSchema.extend({
 );
 
 export type PayOnPortalActionFormValues = z.infer<typeof PayOnPortalActionFormSchema>;
+
+export interface PayOnPortalActionPayload {
+    action: string;
+    pop_req?: 'Accepted' | 'Rejected';
+    reason_req?: string;
+    payment_datetime?: string;
+    utr_no?: string;
+    utr_message?: string;
+    amount?: number;
+    payment_proof?: string[];
+    organisation_name?: string;
+    contacts?: Array<{
+        name: string;
+        phone?: string | null;
+        email?: string | null;
+    }>;
+    followup_start_date?: string;
+    frequency?: number;
+    transfer_date?: string;
+    return_utr?: string;
+    settle_remarks?: string;
+}

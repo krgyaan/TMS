@@ -14,6 +14,10 @@
     <p>Reason for rejection: {{data.rejectionReason}}</p>
     {{/if}}
 
+    {{#if data.paymentProofUrl}}
+    <p>Payment Proof: <a href="{{data.paymentProofUrl}}" target="_blank" style="color: #0066cc; text-decoration: underline;">Open Payment Proof</a></p>
+    {{/if}}
+
     <p>Best of luck for {{#if (eq data.status "accepted")}}the tender{{else}}the next tenders{{/if}}.</p>
 
     <p>Regards,</p>
