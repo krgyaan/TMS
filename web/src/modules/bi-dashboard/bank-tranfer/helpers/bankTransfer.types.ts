@@ -40,6 +40,7 @@ export interface BankTransferActionFormData {
     btStatus: string | null;
     tenderNo: string | null;
     tenderName: string | null;
+    tenderId: number | null;
     amount: number | null;
     accountName: string | null;
     utrNo: string | null;

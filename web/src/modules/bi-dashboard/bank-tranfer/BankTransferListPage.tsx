@@ -113,7 +113,7 @@ const BankTransferListPage = () => {
             {
                 label: 'View Details',
                 icon: <Eye className="h-4 w-4" />,
-                onClick: (row: BankTransferDashboardRow) => navigate(paths.bi.bankTransferView(row.requestId)),
+                onClick: (row: BankTransferDashboardRow) => navigate(paths.bi.bankTransferView(row.id)),
             },
             {
                 label: 'Action Form',

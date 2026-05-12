@@ -3,16 +3,18 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useBankTransferDetails } from '@/hooks/api/useBankTransfers';
+import { useBankTransferActionFormData, useBankTransferFollowupData, type BankTransferActionFormData } from '@/hooks/api/useBankTransfers';
 import { BankTransferView } from './components/BantTransferView';
 import { paths } from '@/app/routes/paths';
+import { TenderView } from '@/modules/tendering/tenders/components/TenderView';
 
 const BankTransferDetailsPage = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const requestId = id ? parseInt(id, 10) : 0;
+    const instrumentId = id ? parseInt(id, 10) : 0;
 
-    const { data, isLoading, error } = useBankTransferDetails(requestId);
+    const { data, isLoading, error } = useBankTransferActionFormData(instrumentId);
+    const { data: followupData } = useBankTransferFollowupData(instrumentId);
 
     if (isLoading) {
         return (
@@ -49,7 +51,12 @@ const BankTransferDetailsPage = () => {
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back
             </Button>
-            <BankTransferView data={data} isLoading={isLoading} />
+            <BankTransferView data={data as BankTransferActionFormData} followupData={followupData} />
+            {data?.tenderId && (
+                <>
+                    <TenderView tenderId={data?.tenderId as number} />
+                </>
+            )}
         </div>
     );
 };
