@@ -28,7 +28,9 @@ import { employeeEducation } from '@/db/schemas/hrms/employee-education.schema';
 import { employeeExperience } from '@/db/schemas/hrms/employee-experience.schema';
 import { employeeDocuments } from '@/db/schemas/hrms/employee-documents.schema';
 import { employeeBankDetails } from '@/db/schemas/hrms/employee-bank-details.schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, aliasedTable } from 'drizzle-orm';
+import { designations } from '@/db/schemas/master/designations.schema';
+import { teams } from '@/db/schemas/master/teams.schema';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import { Logger } from 'winston';
 import * as crypto from 'crypto';
@@ -349,7 +351,7 @@ export class OnboardingService {
         workLocation: employeeProfile?.workLocation || null,
         designationId: userProfile?.designationId || null,
         departmentId: userProfile?.primaryTeamId || null,
-        reportingManagerId: employeeProfile?.reportingManagerId || null,
+        reportingTl: employeeProfile?.reportingTl || null,
         probationMonths: employeeProfile?.probationMonths || null,
         probationEndDate: employeeProfile?.probationEndDate || null,
         salaryType: employeeProfile?.salaryType || null,
@@ -683,13 +685,23 @@ export class OnboardingService {
    * Full profile for a single onboarding request.
    */
   async getProfile(id: number): Promise<any> {
-    const [profile] = await this.db
-      .select()
+    const reportingTl = aliasedTable(users, 'reportingTl');
+
+    const [profileRow] = await this.db
+      .select({
+        profile: onboardingProfiles,
+        designationName: designations.name,
+        departmentName: teams.name,
+        reportingTlName: reportingTl.name,
+      })
       .from(onboardingProfiles)
+      .leftJoin(designations, eq(onboardingProfiles.designationId, designations.id))
+      .leftJoin(teams, eq(onboardingProfiles.departmentId, teams.id))
+      .leftJoin(reportingTl, eq(onboardingProfiles.reportingTl, reportingTl.id))
       .where(eq(onboardingProfiles.onboardingId, id))
       .limit(1);
 
-    if (!profile) throw new NotFoundException(`Profile not found for onboarding #${id}`);
+    if (!profileRow) throw new NotFoundException(`Profile not found for onboarding #${id}`);
 
     const [request] = await this.db
       .select({
@@ -698,6 +710,11 @@ export class OnboardingService {
         phone: onboardingRequests.phone,
         status: onboardingRequests.status,
         profileStatus: onboardingRequests.profileStatus,
+        documentStatus: onboardingRequests.documentStatus,
+        educationStatus: onboardingRequests.educationStatus,
+        experienceStatus: onboardingRequests.experienceStatus,
+        bankStatus: onboardingRequests.bankStatus,
+        inductionStatus: onboardingRequests.inductionStatus,
         progress: onboardingRequests.progress,
         approvedAt: onboardingRequests.approvedAt,
         reviewedBy: users.name,
@@ -707,7 +724,45 @@ export class OnboardingService {
       .where(eq(onboardingRequests.id, id))
       .limit(1);
 
-    return { ...profile, ...request, onboardingId: id };
+    const education = await this.db
+      .select()
+      .from(onboardingEducation)
+      .where(eq(onboardingEducation.onboardingId, id))
+      .orderBy(desc(onboardingEducation.id));
+
+    const experience = await this.db
+      .select()
+      .from(onboardingExperience)
+      .where(eq(onboardingExperience.onboardingId, id))
+      .orderBy(desc(onboardingExperience.id));
+
+    const bankDetails = await this.db
+      .select()
+      .from(onboardingBankDetails)
+      .where(eq(onboardingBankDetails.onboardingId, id))
+      .orderBy(desc(onboardingBankDetails.id));
+
+    const documents = await this.db
+      .select()
+      .from(onboardingDocuments)
+      .where(eq(onboardingDocuments.onboardingId, id))
+      .orderBy(desc(onboardingDocuments.id));
+
+    return {
+      ...profileRow.profile,
+      ...request,
+      designation: profileRow.designationName,
+      department: profileRow.departmentName,
+      reportingTl: profileRow.reportingTlName,
+      education,
+      experience,
+      bankDetails,
+      documents: documents.map(d => ({
+        ...d,
+        fileName: d.fileUrl ? d.fileUrl.split('/').pop() : null,
+      })),
+      onboardingId: id,
+    };
   }
 
   /**
