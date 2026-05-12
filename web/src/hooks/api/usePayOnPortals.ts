@@ -7,6 +7,7 @@ import type {
     PayOnPortalActionFormData,
     PayOnPortalFollowupData,
 } from '@/modules/bi-dashboard/pay-on-portal/helpers/payOnPortal.types';
+import type { PayOnPortalActionPayload } from '@/modules/bi-dashboard/pay-on-portal/helpers/payOnPortalActionForm.schema';
 import type { PaginatedResult } from '@/types/api.types';
 
 export const payOnPortalsKey = {
@@ -108,8 +109,8 @@ export const useUpdatePayOnPortalAction = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, formData }: { id: number; formData: FormData }) =>
-            payOnPortalsService.updateAction(id, formData),
+        mutationFn: ({ id, data }: { id: number; data: PayOnPortalActionPayload }) =>
+            payOnPortalsService.updateAction(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: payOnPortalsKey.all });
             queryClient.invalidateQueries({ queryKey: payOnPortalsKey.counts() });

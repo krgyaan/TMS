@@ -11,7 +11,7 @@ import { FollowUpFrequencySelect } from '@/components/form/FollowUpFrequencySele
 import { ConditionalSection } from '@/components/form/ConditionalSection';
 import DateInput from '@/components/form/DateInput';
 import DateTimeInput from '@/components/form/DateTimeInput';
-import { PayOnPortalActionFormSchema, type PayOnPortalActionFormValues } from '../helpers/payOnPortalActionForm.schema';
+import { PayOnPortalActionFormSchema, type PayOnPortalActionFormValues, type PayOnPortalActionPayload } from '../helpers/payOnPortalActionForm.schema';
 import { useUpdatePayOnPortalAction } from '@/hooks/api/usePayOnPortals';
 import { toast } from 'sonner';
 import { useWatch } from 'react-hook-form';
@@ -200,30 +200,25 @@ export function PayOnPortalActionForm({ instrumentId, action, formHistory }: Pay
 
     const handleSubmit = async (values: PayOnPortalActionFormValues) => {
         try {
-            const formData = new FormData();
+            const payload: PayOnPortalActionPayload = {
+                action: values.action,
+                ...(values.pop_req && { pop_req: values.pop_req }),
+                ...(values.reason_req && { reason_req: values.reason_req }),
+                ...(values.payment_datetime && { payment_datetime: values.payment_datetime }),
+                ...(values.utr_no && { utr_no: values.utr_no }),
+                ...(values.utr_message && { utr_message: values.utr_message }),
+                ...(values.amount !== undefined && { amount: values.amount }),
+                ...(values.payment_proof && { payment_proof: values.payment_proof }),
+                ...(values.organisation_name && { organisation_name: values.organisation_name }),
+                ...(values.contacts && { contacts: values.contacts }),
+                ...(values.followup_start_date && { followup_start_date: values.followup_start_date }),
+                ...(values.frequency && { frequency: values.frequency }),
+                ...(values.transfer_date && { transfer_date: values.transfer_date }),
+                ...(values.return_utr && { return_utr: values.return_utr }),
+                ...(values.settle_remarks && { settle_remarks: values.settle_remarks }),
+            };
 
-            Object.entries(values).forEach(([key, value]) => {                
-                if (value === undefined || value === null || value === '') return;
-
-                // Special handling for payment_proof (array of file paths from TenderFileUploader)
-                if (key === 'payment_proof' && Array.isArray(value)) {
-                    formData.append(key, JSON.stringify(value));
-                    return;
-                }
-
-                if (key === 'contacts' && Array.isArray(value)) {
-                    formData.append(key, JSON.stringify(value));
-                    return;
-                }
-
-                if (typeof value === 'object') {
-                    formData.append(key, JSON.stringify(value));
-                } else {
-                    formData.append(key, String(value));
-                }
-            });
-
-            await updateMutation.mutateAsync({ id: instrumentId, formData });
+            await updateMutation.mutateAsync({ id: instrumentId, data: payload });
             toast.success('Payment data updated successfully');
             localStorage.removeItem('pay_on_portal_action_data');
             navigate(-1);
