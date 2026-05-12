@@ -45,6 +45,10 @@ export interface PayOnPortalActionFormData {
     rejectionReason: string | null;
     paymentDateTime: string | null;
     paymentProofPath: string | null;
+    settledRemarks: string | null;
+    hasAccountsFormData: boolean;
+    hasReturnedData: boolean;
+    hasSettledData: boolean;
 }
 
 export interface PayOnPortalFollowupData {
