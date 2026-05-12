@@ -2,7 +2,7 @@
 import { z } from "zod";
 
 export const CreateEmployeeImprestCreditSchema = z.object({
-    userId: z.number(),
+    userId: z.coerce.number(),
     txnDate: z.string(),
     teamMemberName: z.string(),
     amount: z.number(),
