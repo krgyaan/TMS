@@ -87,7 +87,7 @@ export const onboardingProfiles = pgTable('hrms_onboarding_profiles', {
   employeeStatus: varchar('employee_status', { length: 50 }).default('Active'),
   designationId: bigint('designation_id', { mode: 'number' }),
   departmentId: bigint('department_id', { mode: 'number' }),
-  reportingManagerId: bigint('reporting_manager_id', { mode: 'number' }),
+  reportingTl: bigint('reporting_tl', { mode: 'number' }),
 
   workLocation: varchar('work_location', { length: 255 }),
   dateOfJoining: date('date_of_joining'),

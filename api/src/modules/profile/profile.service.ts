@@ -7,13 +7,14 @@ import * as path from 'path';
 
 const EMPLOYEE_DOCS_UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'hrms', 'employee-documents');
 
+//final list of requires docs every employee needs to upload
 const REQUIRED_DOC_TYPES = [
   'Aadhar Card',
   'Graduation Certificate',
   'Resume / CV',
   'Passport Size Photo',
   'Bank Passbook / Cancelled Cheque',
-];
+]; 
 
 
 import { users } from '@/db/schemas/auth/users.schema';
@@ -99,14 +100,18 @@ export class ProfileService {
       .orderBy(desc(onboardingRequests.createdAt))
       .limit(1);
     
-    let isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
+    // this is the final check that will tell us the request has been completed or not
+    let isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed'; 
+
     let onboardingId = isOnboarding ? activeReqs[0].id : null;
 
     if (!isOnboarding) {
       const [userProfileRow] = await this.db.select({ profileCompleted: userProfiles.profileCompleted })
-        .from(userProfiles).where(eq(userProfiles.userId, userId)).limit(1);
+      .from(userProfiles).where(eq(userProfiles.userId, userId)).limit(1);
       
+      // if profile completed -> we donot reinitiate and consider the employee to be onboarded already
       const isComplete = userProfileRow?.profileCompleted === true;
+
       if (!isComplete) {
         await this.onboardingService.initializeEmployeeOnboarding(userId, 0); // 0 for system trigger
         
@@ -128,8 +133,12 @@ export class ProfileService {
           .orderBy(desc(onboardingRequests.createdAt))
           .limit(1);
         
-        isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
-        onboardingId = isOnboarding ? activeReqs[0].id : null;
+          if(!activeReqs){
+            throw new NotFoundException("Something went wrong. Couldn't create a re-onboarding request for the user.");
+          }
+        
+        isOnboarding = true;
+        onboardingId = activeReqs[0].id;
       }
     }
 
@@ -146,22 +155,25 @@ export class ProfileService {
 
     if (isOnboarding) {
       // 2 & 3. Fetch Onboarding Profile Data
-      const managerUsers = aliasedTable(users, 'manager');
+      const reportingTl = aliasedTable(users, 'reportingTl');
+
+      //fetching the onboarding profile row
       const [obProfileRow] = await this.db
         .select({
           profile: onboardingProfiles,
           designationName: designations.name,
           departmentName: teams.name,
-          managerName: managerUsers.name,
+          reportingTl: reportingTl.id,
         })
         .from(onboardingProfiles)
         .leftJoin(designations, eq(onboardingProfiles.designationId, designations.id))
         .leftJoin(teams, eq(onboardingProfiles.departmentId, teams.id))
-        .leftJoin(managerUsers, eq(onboardingProfiles.reportingManagerId, managerUsers.id))
+        .leftJoin(reportingTl, eq(onboardingProfiles.reportingTl, reportingTl.id))
         .where(eq(onboardingProfiles.onboardingId, onboardingId!))
         .limit(1);
 
       if (obProfileRow) {
+        //filling the data if already present else null
         const obProfile = obProfileRow.profile;
         profile = {
           firstName: obProfile.firstName || '',
@@ -178,6 +190,7 @@ export class ProfileService {
           panNumber: obProfile.panNumber || null,
           bloodGroup: obProfile.bloodGroup || null,
           linkedinProfile: obProfile.linkedinProfile || null,
+          status: obProfile.status ? obProfile.status : 'pending',
           employeeCode: null,
           altEmail: null,
         };
@@ -206,7 +219,7 @@ export class ProfileService {
           employeeType: obProfile.employeeType,
           employeeStatus: obProfile.employeeStatus,
           workLocation: obProfile.workLocation,
-          reportingManager: obProfileRow.managerName,
+          reportingTl: obProfileRow.reportingTl,
           probationMonths: obProfile.probationMonths,
           probationEndDate: obProfile.probationEndDate ? String(obProfile.probationEndDate).split('T')[0] : null,
           salaryType: obProfile.salaryType,
@@ -243,16 +256,16 @@ export class ProfileService {
         verificationDate: d.verificationDate || null,
         hrRemark: d.hrRemark || null,
         uploadedAt: d.createdAt?.toISOString() || null,
+        status: d.status ? d.status : "pending",
       }));
 
-      // 5. Fetch Onboarding Education (Active only - latest for each degree/inst or just all non-rejected)
+      // 5. Fetch Onboarding Education 
       const obEduRows = await this.db
         .select()
         .from(onboardingEducation)
         .where(eq(onboardingEducation.onboardingId, onboardingId!))
         .orderBy(desc(onboardingEducation.id));
 
-      // We only show records that are NOT rejected OR the latest resubmission
       // For simplicity, let's just group by degree/institution and take the latest
       education = obEduRows.reduce((acc: any[], curr) => {
         const exists = acc.find(e => e.degree === curr.degree && e.institution === curr.institution);
@@ -328,32 +341,46 @@ export class ProfileService {
       const obReq = activeReqs[0];
       const obProfile = obProfileRow?.profile;
 
-      // ── Status Derivations ──────────────────────────────────────────────────
+      // ── Status Derivations ────────────────────────────────────────────────── 
+      // we will derive the final request derivations
       const profileStatus = obProfile?.status === 'submitted' ? 'submitted' : 'pending';
       const profileHrStatus = (obProfile?.hrStatus as any) || 'pending';
 
       const bankStatus = bankAccounts.length > 0 ? 'submitted' : 'pending';
-      const bankApproved = bankAccounts.some((b: any) => b.hrStatus === 'approved');
-      const bankRejected = bankAccounts.some((b: any) => b.hrStatus === 'rejected');
-      const bankHrStatus = bankApproved ? 'approved' : bankRejected ? 'rejected' : 'pending';
+      const bankHrStatus = bankAccounts.some((b: any) => b.hrStatus === 'rejected')
+        ? 'rejected'
+        : (bankAccounts.length > 0 && bankAccounts.every((b: any) => b.hrStatus === 'approved'))
+          ? 'approved'
+          : 'pending';
 
       const educationStatus = education.length > 0 ? 'submitted' : 'pending';
-      const eduApproved = education.some((e: any) => e.hrStatus === 'approved');
-      const eduRejected = education.some((e: any) => e.hrStatus === 'rejected');
-      const educationHrStatus = eduApproved ? 'approved' : eduRejected ? 'rejected' : 'pending';
+      const educationHrStatus = education.some((e: any ) => e.status == 'rejected') 
+        ? 'rejected'
+        : (education.length > 0 && education.every((e : any ) => e.status == 'approved')) 
+          ? 'approved'
+          : 'pending';
 
       const experienceStatus = experience.length > 0 ? 'submitted' : 'pending';
-      const expApproved = experience.some((e: any) => e.hrStatus === 'approved');
-      const expRejected = experience.some((e: any) => e.hrStatus === 'rejected');
-      const experienceHrStatus = expApproved ? 'approved' : expRejected ? 'rejected' : 'pending';
+      const experienceHrStatus = experience.some((e : any) => e.status == 'rejected') 
+        ? 'rejected'
+        : (experience.length > 0 && experience.every((e : any) => e.status == 'approved'))
+          ? 'approved'
+          : 'pending';
 
       // Document status based on REQUIRED_DOC_TYPES
       const uploadedTypes = obDocsRows.map(d => d.docType);
-      const allDocsUploaded = REQUIRED_DOC_TYPES.every(type => uploadedTypes.includes(type));
-      const documentStatus = allDocsUploaded ? 'submitted' : 'pending';
-      const documentHrStatus = (documents.every((d: any) => d.hrStatus === 'approved') ? 'approved' : documents.some((d: any) => d.hrStatus === 'rejected') ? 'rejected' : 'pending') as any;
 
-      const inductionStatus = (inductionTasks?.some((t: any) => t.status === 'completed' || t.status === 'submitted') ? 'submitted' : 'pending') as any;
+      const missingDocs = REQUIRED_DOC_TYPES.filter(type => !uploadedTypes.includes(type));
+      const allDocsUploaded = missingDocs.length === 0;
+
+      const documentStatus = allDocsUploaded ? 'submitted' : 'pending';
+      const documentHrStatus = documents.some((d: any) => d.hrStatus === 'rejected')
+        ? 'rejected'
+        : (documents.length > 0 && documents.every((d: any) => d.hrStatus === 'approved'))
+          ? 'approved'
+          : 'pending';
+
+      const inductionStatus = inductionTasks.every((i : any) => i.status  == 'completed') ? 'completed' : 'pending';
 
       // Employee is only "completed" when all sections are submitted
       const employeeCompleted = 
@@ -392,14 +419,19 @@ export class ProfileService {
         createdAt: obReq.createdAt?.toISOString() || null,
         updatedAt: obReq.updatedAt?.toISOString() || null,
       };
+
     } else {
+      // -----------------------GETTING PERMANENT DETAILS OF THE EMPLOYEES ------------------------//
+
       // 2. Fetch User Profile Data (PERMANENT)
+
+      //will have to check, maybe we'll get rid of user profiles altogether later
       const [userProfileRow] = await this.db
         .select({
-          profile: userProfiles,
-          designationName: designations.name,
-          departmentName: teams.name,
-        })
+            profile: userProfiles,
+            designationName: designations.name,
+            departmentName: teams.name,
+          })
         .from(userProfiles)
         .leftJoin(designations, eq(userProfiles.designationId, designations.id))
         .leftJoin(teams, eq(userProfiles.primaryTeamId, teams.id))
@@ -407,6 +439,7 @@ export class ProfileService {
         .limit(1);
 
       const upr = userProfileRow?.profile;
+
       profile = upr ? {
         firstName: upr.firstName || '',
         middleName: upr.middleName || null,
@@ -472,7 +505,7 @@ export class ProfileService {
           idCardIssuedDate: employeeProfiles.idCardIssuedDate,
         })
         .from(employeeProfiles)
-        .leftJoin(managerUsers, eq(employeeProfiles.reportingManagerId, managerUsers.id))
+        .leftJoin(managerUsers, eq(employeeProfiles.reportingTl, managerUsers.id))
         .where(eq(employeeProfiles.userId, userId))
         .limit(1);
 
@@ -815,6 +848,10 @@ export class ProfileService {
 
   // --- Education ---
 
+  // request ->validate
+  //check if onboarding on
+  // if upddate -> check if rejected -> update
+
   async addEducation(userId: number, dto: any) {
     const activeReqs = await this.db.select({ id: onboardingRequests.id, status: onboardingRequests.status })
       .from(onboardingRequests).where(eq(onboardingRequests.userId, userId)).orderBy(desc(onboardingRequests.createdAt)).limit(1);
@@ -878,21 +915,6 @@ export class ProfileService {
     throw new BadRequestException('Education details can only be modified during onboarding.');
   }
 
-  async deleteEducation(userId: number, eduId: number) {
-    const activeReqs = await this.db.select({ id: onboardingRequests.id, status: onboardingRequests.status })
-      .from(onboardingRequests).where(eq(onboardingRequests.userId, userId)).orderBy(desc(onboardingRequests.createdAt)).limit(1);
-    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
-
-    if (isOnboarding) {
-      const [existing] = await this.db.select().from(onboardingEducation).where(eq(onboardingEducation.id, eduId)).limit(1);
-      if (existing && existing.onboardingId === activeReqs[0].id) {
-        await this.db.delete(onboardingEducation).where(eq(onboardingEducation.id, eduId));
-      }
-      return;
-    }
-
-    throw new BadRequestException('Education details can only be modified during onboarding.');
-  }
 
   // --- Experience ---
 
@@ -967,21 +989,6 @@ export class ProfileService {
     throw new BadRequestException('Experience details can only be modified during onboarding.');
   }
 
-  async deleteExperience(userId: number, expId: number) {
-    const activeReqs = await this.db.select({ id: onboardingRequests.id, status: onboardingRequests.status })
-      .from(onboardingRequests).where(eq(onboardingRequests.userId, userId)).orderBy(desc(onboardingRequests.createdAt)).limit(1);
-    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
-
-    if (isOnboarding) {
-      const [existing] = await this.db.select().from(onboardingExperience).where(eq(onboardingExperience.id, expId)).limit(1);
-      if (existing && existing.onboardingId === activeReqs[0].id) {
-        await this.db.delete(onboardingExperience).where(eq(onboardingExperience.id, expId));
-      }
-      return;
-    }
-
-    throw new BadRequestException('Experience details can only be modified during onboarding.');
-  }
 
   // --- Bank Accounts ---
 
@@ -1034,21 +1041,7 @@ export class ProfileService {
     throw new BadRequestException('Bank details can only be modified during onboarding.');
   }
 
-  async deleteBankDetails(userId: number, bankId: number) {
-    const activeReqs = await this.db.select({ id: onboardingRequests.id, status: onboardingRequests.status })
-      .from(onboardingRequests).where(eq(onboardingRequests.userId, userId)).orderBy(desc(onboardingRequests.createdAt)).limit(1);
-    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
-
-    if (isOnboarding) {
-      const [existing] = await this.db.select().from(onboardingBankDetails).where(eq(onboardingBankDetails.id, bankId)).limit(1);
-      if (existing && existing.onboardingId === activeReqs[0].id) {
-        await this.db.delete(onboardingBankDetails).where(eq(onboardingBankDetails.id, bankId));
-      }
-      return;
-    }
-
-    throw new BadRequestException('Bank details can only be modified during onboarding.');
-  }
+  // --------- Experience Section -------------//
 
   async updateMyEducations(userId: number, body: any) {
     const activeReqs = await this.db
