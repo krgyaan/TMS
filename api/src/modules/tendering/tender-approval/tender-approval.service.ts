@@ -490,271 +490,190 @@ export class TenderApprovalService {
     }
 
     async updateApproval(tenderId: number, payload: TenderApprovalPayload, changedBy: number) {
-        // Validate tender exists
-        await this.tenderInfosService.validateExists(tenderId);
-
-        // Get current tender status before update
         const currentTender = await this.tenderInfosService.findById(tenderId);
-        const prevStatus = currentTender?.status ?? null;
-        const isEditMode = String(currentTender?.tlStatus) === payload.tlStatus;
+        if (!currentTender) throw new Error("Tender not found");
+        const prevStatus = currentTender.status;
+        const isEditMode = String(currentTender.tlStatus) === payload.tlStatus;
 
-        const updateData: any = {
-            tlStatus: payload.tlStatus,
-            updatedAt: new Date(),
-        };
+        const { newStatus, statusComment, updateData } = await this.buildApprovalUpdateData(tenderId, payload, isEditMode);
 
-        let newStatus: number | null = null;
-        let statusComment: string = "";
-
-        // Clear incomplete fields for statuses other than '3'
-        if (payload.tlStatus !== "3") {
-            await this.db.delete(tenderIncompleteFields).where(eq(tenderIncompleteFields.tenderId, tenderId));
-        }
-
-        if (payload.tlStatus === "1") {
-            // Approved - Status 3
-            const rfqToString = payload.rfqTo?.join(",") || "";
-
-            updateData.rfqTo = rfqToString;
-            updateData.rfqRequired = payload.rfqRequired ?? null;
-            updateData.quotationFiles = payload.quotationFiles ? JSON.stringify(payload.quotationFiles) : null;
-            updateData.processingFeeMode = payload.processingFeeMode ?? null;
-            updateData.tenderFeeMode = payload.tenderFeeMode ?? null;
-            updateData.emdMode = payload.emdMode ?? null;
-            updateData.approvePqrSelection = payload.approvePqrSelection ?? null;
-            updateData.approveFinanceDocSelection = payload.approveFinanceDocSelection ?? null;
-
-            updateData.tlApprovalRemarks = payload.tlApprovalRemarks ?? null;
-            updateData.tlRejectionRemarks = null;
-            updateData.tlIncompleteRemarks = null;
-            updateData.oemNotAllowed = null;
-            if (!isEditMode) {
-                updateData.status = 3; // Tender Info approved
-                newStatus = 3;
-                statusComment = "Tender info approved";
-            }
-
-            updateData.tlApprovalTimestamp = new Date(); // tl approval timestamp
-
-            // Update tender values from info sheet
-            const infoSheet = await this.tenderInfoSheetsService.findByTenderId(tenderId);
-            if (infoSheet) {
-                // Convert numeric values to string for decimal fields
-                if (infoSheet.tenderValue !== null && infoSheet.tenderValue !== undefined) {
-                    updateData.gstValues = String(infoSheet.tenderValue);
-                }
-                if (infoSheet.tenderFeeAmount !== null && infoSheet.tenderFeeAmount !== undefined) {
-                    updateData.tenderFees = String(infoSheet.tenderFeeAmount);
-                }
-                if (infoSheet.emdAmount !== null && infoSheet.emdAmount !== undefined) {
-                    updateData.emd = String(infoSheet.emdAmount);
-                }
-            }
-        } else if (payload.tlStatus === "2") {
-            // Rejected - Use tenderStatus from payload (contains rejection reason status ID)
-            updateData.tlRejectionRemarks = payload.tlRejectionRemarks;
-            updateData.tlIncompleteRemarks = null;
-            updateData.oemNotAllowed = payload.oemNotAllowed;
-
-            if (payload.tenderStatus && !isEditMode) {
-                updateData.status = payload.tenderStatus;
-                newStatus = payload.tenderStatus;
-                statusComment = "Tender rejected";
-            }
-
-            updateData.rfqTo = null;
-            updateData.rfqRequired = null;
-            updateData.quotationFiles = null;
-            updateData.processingFeeMode = null;
-            updateData.tenderFeeMode = null;
-            updateData.emdMode = null;
-            updateData.approvePqrSelection = null;
-            updateData.tlApprovalRemarks = null;
-            updateData.approveFinanceDocSelection = null;
-
-            updateData.tlApprovalTimestamp = new Date(); // tl approval timestamp
-        } else if (payload.tlStatus === "3") {
-            // Incomplete - Status 29
-            // Incomplete status - clear approval/rejection fields
-            updateData.rfqTo = null;
-            updateData.rfqRequired = null;
-            updateData.quotationFiles = null;
-            updateData.processingFeeMode = null;
-            updateData.tenderFeeMode = null;
-            updateData.emdMode = null;
-            updateData.approvePqrSelection = null;
-            updateData.approveFinanceDocSelection = null;
-            updateData.tlApprovalRemarks = null;
-            updateData.tlApprovalTimestamp = null;
-            updateData.tlRejectionRemarks = null;
-            updateData.tlIncompleteRemarks = payload.tlIncompleteRemarks;
-            updateData.oemNotAllowed = null;
-            if (!isEditMode) {
-                updateData.status = 29; // Tender Info sheet Incomplete
-                newStatus = 29;
-                statusComment = "Tender info sheet incomplete";
-            }
-
-            // Delete existing incomplete fields
-            await this.db.delete(tenderIncompleteFields).where(eq(tenderIncompleteFields.tenderId, tenderId));
-
-            // Insert new incomplete fields
-            if (payload.incompleteFields && payload.incompleteFields.length > 0) {
-                const incompleteFieldsData = payload.incompleteFields.map(field => ({
-                    tenderId,
-                    fieldName: field.fieldName,
-                    comment: field.comment,
-                    status: "pending" as const,
-                }));
-
-                await this.db.insert(tenderIncompleteFields).values(incompleteFieldsData);
-            }
-        }
-
-        // Update tender and track status change in transaction
         await this.db.transaction(async tx => {
             await tx.update(tenderInfos).set(updateData).where(eq(tenderInfos.id, tenderId)).returning();
 
-            // Handle exempt EMD mode - update payment instruments and tender information
-            if (payload.tlStatus === "1" && payload.emdMode === 'exempt') {
-                const requestIds = await tx
-                    .select({ id: paymentRequests.id })
-                    .from(paymentRequests)
-                    .where(eq(paymentRequests.tenderId, tenderId));
-
-                if (requestIds.length > 0) {
-                    const ids = requestIds.map(r => r.id);
-                    await tx
-                        .update(paymentInstruments)
-                        .set({ action: 1, status: 'ACCOUNT_FORM_REJECTED', rejectionReason: `EMD Exempted By TL on ${new Date().toISOString()}` })
-                        .where(
-                            and(
-                                inArray(paymentInstruments.requestId, ids),
-                                eq(paymentInstruments.action, 0)
-                            )
-                        );
-                }
-
-                await tx
-                    .update(tenderInformation)
-                    .set({ emdRequired: 'EXEMPT' })
-                    .where(eq(tenderInformation.tenderId, tenderId));
+            if (isEditMode && payload.tlStatus === "1" && currentTender) {
+                await this.handlePaymentModeChanges(tx, tenderId, currentTender, payload);
             }
 
-            // Track status change if status was updated
+            if (payload.tlStatus === "1" && payload.emdMode === 'exempt') {
+                await this.handleExemptEmd(tx, tenderId);
+            }
+
             if (newStatus !== null && newStatus !== prevStatus) {
                 await this.tenderStatusHistoryService.trackStatusChange(tenderId, newStatus, changedBy, prevStatus, statusComment, tx);
             }
         });
-
-        // Send email notification for approval/rejection/review
-        if (payload.tlStatus === "1" || payload.tlStatus === "2" || payload.tlStatus === "3") {
-            await this.sendApprovalEmail(tenderId, payload, changedBy);
-        }
-
-        // Skip timer transition for edit mode
-        if (!isEditMode) {
-            try {
-                // TIMER TRANSITION
-                this.logger.log(`Transitioning timers for tender ${tenderId} after approval`);
-
-                // 1. Stop the tender_approval timer
-                try {
-                    await this.timersService.stopTimer({
-                        entityType: 'TENDER',
-                        entityId: tenderId,
-                        stage: 'tender_approval',
-                        userId: changedBy,
-                        reason: 'Tender approved'
-                    });
-                    this.logger.log(`Successfully stopped tender_approval timer for tender ${tenderId}`);
-                } catch (error) {
-                    this.logger.warn(`Failed to stop tender_approval timer for tender ${tenderId}:`, error);
-            }
-
-            // 2. Get tender and info sheet data
-            const tender = await this.tenderInfosService.findById(tenderId);
-            const infoSheet = await this.tenderInfoSheetsService.findByTenderId(tenderId);
-
-            if (!tender || !infoSheet) {
-                throw new NotFoundException(`Tender or info sheet not found for tender ${tenderId}`);
-            }
-
-            // 3. Determine which timers should be started based on tender configuration
-            const stagesToStart: Array<{ stage: string; timerConfig?: any }> = [];
-
-            if (tender.rfqRequired === 'yes' && tender.rfqTo && tender.rfqTo !== '0' && tender.rfqTo !== '1') {
-                stagesToStart.push({ stage: 'rfq_sent' });
-            }
-            if (infoSheet.emdRequired === "YES" || infoSheet.emdRequired === "1") {
-                stagesToStart.push({ stage: "emd_requested" });
-            }
-            if (infoSheet.physicalDocsRequired === "YES") {
-                stagesToStart.push({ stage: "physical_docs" });
-            }
-            // Always start these timers
-            stagesToStart.push({ stage: "document_checklist" });
-            stagesToStart.push({ stage: "costing_sheets" });
-
-            // 4. Configure negative countdown timers if due date exists
-            if (tender.dueDate) {
-                const dueDate = new Date(tender.dueDate);
-                for (const item of stagesToStart) {
-                    if (item.stage === "document_checklist" || item.stage === "costing_sheets") {
-                        const hoursBeforeDeadline = -72;
-                        const deadlineAt = new Date(dueDate.getTime() + hoursBeforeDeadline * 60 * 60 * 1000);
-                        item.timerConfig = {
-                            type: "NEGATIVE_COUNTDOWN",
-                            hoursBeforeDeadline: hoursBeforeDeadline,
-                        };
-                        // Note: deadlineAt will be set when starting the timer
-                    }
-                }
-            }
-
-            this.logger.log(`Found ${stagesToStart.length} timers to start after approval for tender ${tenderId}`, {
-                stages: stagesToStart.map(item => item.stage),
-            });
-
-            // 5. Start all eligible timers
-            for (const item of stagesToStart) {
-                try {
-                    this.logger.log(`Starting timer for stage ${item.stage} for tender ${tenderId}`);
-                    const timerInput: any = {
-                        entityType: "TENDER",
-                        entityId: tenderId,
-                        stage: item.stage,
-                        userId: changedBy,
-                        timerConfig: item.timerConfig || {
-                            type: "FIXED_DURATION",
-                            durationHours: 24,
-                        },
-                    };
-
-                    // Set deadline for negative countdown timers
-                    if (tender.dueDate && item.timerConfig?.type === "NEGATIVE_COUNTDOWN") {
-                        const dueDate = new Date(tender.dueDate);
-                        const hoursBeforeDeadline = item.timerConfig.hoursBeforeDeadline || -72;
-                        timerInput.deadlineAt = new Date(dueDate.getTime() + hoursBeforeDeadline * 60 * 60 * 1000);
-                    }
-
-                    await this.timersService.startTimer(timerInput);
-                    this.logger.log(`Successfully started timer for stage ${item.stage} for tender ${tenderId}`);
-                } catch (error) {
-                    this.logger.error(`Failed to start timer for stage ${item.stage} for tender ${tenderId}:`, error);
-                }
-            }
-
-            this.logger.log(`Successfully transitioned timers after approval for tender ${tenderId}`);
-            } catch (error) {
-                this.logger.error(`Failed to transition timers after approval for tender ${tenderId}:`, error);
-                // Don't fail the entire operation if timer transition fails
-            }
-        }
-
-        return this.getByTenderId(tenderId);
     }
 
+    private async buildApprovalUpdateData(tenderId: number, payload: TenderApprovalPayload, isEditMode: boolean) {
+        const updateData: any = { tlStatus: payload.tlStatus, updatedAt: new Date() };
+        let newStatus: number | null = null;
+        let statusComment = '';
+
+        if (payload.tlStatus !== "3") {
+            await this.db.delete(tenderIncompleteFields).where(eq(tenderIncompleteFields.tenderId, tenderId));
+        }
+
+        switch (payload.tlStatus) {
+            case "1":
+                Object.assign(updateData, {
+                    rfqTo: payload.rfqTo?.join(",") || "",
+                    rfqRequired: payload.rfqRequired ?? null,
+                    quotationFiles: payload.quotationFiles ? JSON.stringify(payload.quotationFiles) : null,
+                    processingFeeMode: payload.processingFeeMode ?? null,
+                    tenderFeeMode: payload.tenderFeeMode ?? null,
+                    emdMode: payload.emdMode ?? null,
+                    approvePqrSelection: payload.approvePqrSelection ?? null,
+                    approveFinanceDocSelection: payload.approveFinanceDocSelection ?? null,
+                    tlApprovalRemarks: payload.tlApprovalRemarks ?? null,
+                    tlRejectionRemarks: null,
+                    tlIncompleteRemarks: null,
+                    oemNotAllowed: null,
+                    tlApprovalTimestamp: new Date(),
+                });
+
+                if (!isEditMode) {
+                    updateData.status = 3;
+                    newStatus = 3;
+                    statusComment = "Tender info approved";
+                }
+
+                const infoSheet = await this.tenderInfoSheetsService.findByTenderId(tenderId);
+                if (infoSheet) {
+                    if (infoSheet.tenderValue != null) updateData.gstValues = String(infoSheet.tenderValue);
+                    if (infoSheet.tenderFeeAmount != null) updateData.tenderFees = String(infoSheet.tenderFeeAmount);
+                    if (infoSheet.emdAmount != null) updateData.emd = String(infoSheet.emdAmount);
+                }
+                break;
+
+            case "2":
+                Object.assign(updateData, this.getClearedApprovalFields(), {
+                    tlRejectionRemarks: payload.tlRejectionRemarks ?? null,
+                    oemNotAllowed: payload.oemNotAllowed,
+                    tlApprovalTimestamp: new Date(),
+                });
+
+                if (payload.tenderStatus && !isEditMode) {
+                    updateData.status = payload.tenderStatus;
+                    newStatus = payload.tenderStatus;
+                    statusComment = "Tender rejected";
+                }
+                break;
+
+            case "3":
+                Object.assign(updateData, this.getClearedApprovalFields(), {
+                    tlIncompleteRemarks: payload.tlIncompleteRemarks ?? null,
+                    tlApprovalTimestamp: null,
+                    oemNotAllowed: null,
+                });
+
+                if (!isEditMode) {
+                    updateData.status = 29;
+                    newStatus = 29;
+                    statusComment = "Tender info sheet incomplete";
+                }
+
+                await this.db.delete(tenderIncompleteFields).where(eq(tenderIncompleteFields.tenderId, tenderId));
+
+                if (payload.incompleteFields?.length) {
+                    const incompleteFieldsData = payload.incompleteFields.map(field => ({
+                        tenderId,
+                        fieldName: field.fieldName,
+                        comment: field.comment,
+                        status: "pending" as const,
+                    }));
+                    await this.db.insert(tenderIncompleteFields).values(incompleteFieldsData);
+                }
+                break;
+        }
+
+        return { newStatus, statusComment, updateData };
+    }
+
+    private getClearedApprovalFields() {
+        return {
+            rfqTo: null,
+            rfqRequired: null,
+            quotationFiles: null,
+            processingFeeMode: null,
+            tenderFeeMode: null,
+            emdMode: null,
+            approvePqrSelection: null,
+            tlApprovalRemarks: null,
+            approveFinanceDocSelection: null,
+        };
+    }
+
+    private async handlePaymentModeChanges(
+        tx: any,
+        tenderId: number,
+        currentTender: typeof tenderInfos.$inferSelect,
+        payload: TenderApprovalPayload
+    ) {
+        const changedModes: ('EMD' | 'Tender Fee' | 'Processing Fee')[] = [];
+
+        if (currentTender.emdMode !== payload.emdMode) changedModes.push('EMD');
+        if (currentTender.tenderFeeMode !== payload.tenderFeeMode) changedModes.push('Tender Fee');
+        if (currentTender.processingFeeMode !== payload.processingFeeMode) changedModes.push('Processing Fee');
+
+        if (!changedModes.length) return;
+
+        const rejectionReason = `Mode changed by TL on ${new Date().toISOString()}`;
+
+        const requestsToReject = await tx
+            .select({ id: paymentRequests.id })
+            .from(paymentRequests)
+            .where(and(
+                eq(paymentRequests.tenderId, tenderId),
+                or(...changedModes.map(mode => eq(paymentRequests.purpose, mode)))
+            ));
+
+        if (!requestsToReject.length) return;
+
+        const requestIds = requestsToReject.map(r => r.id);
+
+        await tx.update(paymentRequests)
+            .set({ status: 'Rejected', remarks: rejectionReason })
+            .where(inArray(paymentRequests.id, requestIds));
+
+        await tx.update(paymentInstruments)
+            .set({ action: 1, status: 'ACCOUNT_FORM_REJECTED', rejectionReason })
+            .where(and(
+                inArray(paymentInstruments.requestId, requestIds),
+                eq(paymentInstruments.action, 0)
+            ));
+    }
+
+    private async handleExemptEmd(tx: any, tenderId: number) {
+        const requestIds = await tx
+            .select({ id: paymentRequests.id })
+            .from(paymentRequests)
+            .where(eq(paymentRequests.tenderId, tenderId));
+
+        if (requestIds.length) {
+            const ids = requestIds.map(r => r.id);
+            await tx.update(paymentInstruments)
+                .set({ action: 1, status: 'ACCOUNT_FORM_REJECTED', rejectionReason: `EMD Exempted By TL on ${new Date().toISOString()}` })
+                .where(and(
+                    inArray(paymentInstruments.requestId, ids),
+                    eq(paymentInstruments.action, 0)
+                ));
+        }
+
+        await tx.update(tenderInformation)
+            .set({ emdRequired: 'EXEMPT' })
+            .where(eq(tenderInformation.tenderId, tenderId));
+    }
+    
     async getRejectionStatuses(){
         let result = this.db
             .select({id : statuses.id, name : statuses.name})
