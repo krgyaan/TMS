@@ -200,10 +200,28 @@ export function PayOnPortalActionForm({ instrumentId, action, formHistory }: Pay
 
     const handleSubmit = async (values: PayOnPortalActionFormValues) => {
         try {
-            console.log('Form values:', values);
-            console.log('settle_remarks value:', values.settle_remarks);
-            
             const formData = new FormData();
+
+            Object.entries(values).forEach(([key, value]) => {                
+                if (value === undefined || value === null || value === '') return;
+
+                // Special handling for payment_proof (array of file paths from TenderFileUploader)
+                if (key === 'payment_proof' && Array.isArray(value)) {
+                    formData.append(key, JSON.stringify(value));
+                    return;
+                }
+
+                if (key === 'contacts' && Array.isArray(value)) {
+                    formData.append(key, JSON.stringify(value));
+                    return;
+                }
+
+                if (typeof value === 'object') {
+                    formData.append(key, JSON.stringify(value));
+                } else {
+                    formData.append(key, String(value));
+                }
+            });
 
             await updateMutation.mutateAsync({ id: instrumentId, formData });
             toast.success('Payment data updated successfully');

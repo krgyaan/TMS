@@ -192,11 +192,23 @@ export function BankTransferActionForm({ instrumentId, action: propAction, formH
     const isSubmitting = form.formState.isSubmitting || updateMutation.isPending;
 
     const handleSubmit = async (values: BankTransferActionFormValues) => {
-        try {
-            console.log('Form values:', values);
-            console.log('settle_remarks value:', values.settle_remarks);
-            
+        try {            
             const formData = new FormData();
+
+            Object.entries(values).forEach(([key, value]) => {                
+                if (value === undefined || value === null || value === '') return;
+
+                if (key === 'contacts' && Array.isArray(value)) {
+                    formData.append(key, JSON.stringify(value));
+                    return;
+                }
+
+                if (typeof value === 'object') {
+                    formData.append(key, JSON.stringify(value));
+                } else {
+                    formData.append(key, String(value));
+                }
+            });
 
             await updateMutation.mutateAsync({ id: instrumentId, formData });
             toast.success('Payment data updated successfully');
