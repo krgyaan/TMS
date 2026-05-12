@@ -246,16 +246,34 @@ export class PayOnPortalService {
 
     /**
      * Get file path from body if it's a string (from TenderFileUploader)
-     * Supports both single string path and JSON array of paths
+     * Supports single string path, JSON string of array, and actual array of paths
      */
     private getFilePathFromBody(fieldname: string, body: any): string | null {
         if (body[fieldname] === undefined) return null;
-        if (typeof body[fieldname] === 'string') {
-            return body[fieldname];
+        
+        const value = body[fieldname];
+        
+        // Handle string (could be plain path or JSON string)
+        if (typeof value === 'string') {
+            // Try to parse as JSON array
+            try {
+                const parsed = JSON.parse(value);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    return parsed[0];
+                }
+                // If parsed but not array, return as is
+                return parsed;
+            } catch {
+                // Not JSON, return as plain string path
+                return value;
+            }
         }
-        if (typeof body[fieldname] === 'object' && Array.isArray(body[fieldname])) {
-            return body[fieldname][0] || null;
+        
+        // Handle actual array
+        if (typeof value === 'object' && Array.isArray(value) && value.length > 0) {
+            return value[0] || null;
         }
+        
         return null;
     }
 

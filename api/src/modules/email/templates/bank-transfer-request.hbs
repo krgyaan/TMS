@@ -2,10 +2,17 @@
     <p>Dear Accounts Team,</p>
 
     <p>
-        Please make the following payment via NEFT/RTGS against <strong>{{data.paymentInstrumentType}}</strong> for tender
-        no. <strong>{{data.tenderNo}}</strong>, Project Name <strong>{{data.tenderName}}</strong>, The due date and
-        time of this tender is <strong>{{data.dueDateTime}}</strong>.
+        Please make the following payment via NEFT/RTGS against <strong>{{data.paymentInstrumentType}}</strong> for:
     </p>
+    {{#if data.tenderNo}} 
+        <p>Tender No: {{data.tenderNo}}</p>
+    {{/if}}
+    {{#if data.tenderName}} 
+        <p>Project Name: {{data.tenderName}}</p>
+    {{/if}}
+    {{#if data.dueDateTime}} 
+        <p>Due Date and Time: {{data.dueDateTime}}</p>
+    {{/if}}
 
     <p>Please do the Maker using the details below:</p>
     <ul>
