@@ -20,63 +20,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { FileText, Users, Banknote, CheckCircle, CheckCircle2, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-
-const ALL_ACTION_OPTIONS = [
-    { value: 'accounts-form', label: 'Accounts Form' },
-    { value: 'initiate-followup', label: 'Initiate Followup' },
-    { value: 'returned', label: 'Returned via Bank Transfer' },
-    { value: 'settled', label: 'Settled with Project Account' },
-];
-
-interface AccountsFormHistory {
-    btReq?: 'Accepted' | 'Rejected';
-    reasonReq?: string;
-    paymentDatetime?: string;
-    utrNo?: string;
-    utrMessage?: string;
-    remarks?: string;
-}
-
-interface FollowupHistory {
-    organisationName?: string;
-    contacts?: Array<{
-        name: string;
-        email: string | null;
-        phone: string | null;
-        org: string | null;
-    }>;
-    followupStartDate?: string;
-    frequency?: number;
-}
-
-interface ReturnedHistory {
-    transferDate?: string;
-    returnUtr?: string;
-}
-
-interface SettledHistory {
-    remarks?: string;
-}
-
-interface FormHistory {
-    accountsForm?: AccountsFormHistory;
-    initiateFollowup?: FollowupHistory;
-    returned?: ReturnedHistory;
-    settled?: SettledHistory;
-}
-
-interface BankTransferActionFormProps {
-    instrumentId: number;
-    action?: number | null;
-    instrumentData?: {
-        tenderNo?: string;
-        tenderName?: string;
-        amount?: number;
-        accountName?: string;
-        utrNo?: string;
-    };
-    formHistory?: FormHistory;
-}
+import { ALL_ACTION_OPTIONS, type BankTransferActionFormProps } from '../helpers/bankTransfer.types';
 
 export function BankTransferActionForm({ instrumentId, action: propAction, formHistory }: BankTransferActionFormProps) {
     const navigate = useNavigate();

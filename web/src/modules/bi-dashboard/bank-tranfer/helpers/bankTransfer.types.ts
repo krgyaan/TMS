@@ -87,3 +87,60 @@ export interface BankTransferViewProps {
     isLoading?: boolean;
     className?: string;
 }
+
+export const ALL_ACTION_OPTIONS = [
+    { value: 'accounts-form', label: 'Accounts Form' },
+    { value: 'initiate-followup', label: 'Initiate Followup' },
+    { value: 'returned', label: 'Returned via Bank Transfer' },
+    { value: 'settled', label: 'Settled with Project Account' },
+];
+
+export interface AccountsFormHistory {
+    btReq?: 'Accepted' | 'Rejected';
+    reasonReq?: string;
+    paymentDatetime?: string;
+    utrNo?: string;
+    utrMessage?: string;
+    remarks?: string;
+}
+
+export interface FollowupHistory {
+    organisationName?: string;
+    contacts?: Array<{
+        name: string;
+        email: string | null;
+        phone: string | null;
+        org: string | null;
+    }>;
+    followupStartDate?: string;
+    frequency?: number;
+}
+
+export interface ReturnedHistory {
+    transferDate?: string;
+    returnUtr?: string;
+}
+
+export interface SettledHistory {
+    remarks?: string;
+}
+
+export interface FormHistory {
+    accountsForm?: AccountsFormHistory;
+    initiateFollowup?: FollowupHistory;
+    returned?: ReturnedHistory;
+    settled?: SettledHistory;
+}
+
+export interface BankTransferActionFormProps {
+    instrumentId: number;
+    action?: number | null;
+    instrumentData?: {
+        tenderNo?: string;
+        tenderName?: string;
+        amount?: number;
+        accountName?: string;
+        utrNo?: string;
+    };
+    formHistory?: FormHistory;
+}
