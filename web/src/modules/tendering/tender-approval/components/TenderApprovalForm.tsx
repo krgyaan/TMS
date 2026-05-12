@@ -18,7 +18,6 @@ import { ArrowLeft, Save, AlertCircle, CheckCircle, XCircle } from 'lucide-react
 import { paths } from '@/app/routes/paths';
 import { useCreateTenderApproval, useTenderRejectionStatuses, useUpdateTenderApproval } from '@/hooks/api/useTenderApprovals';
 import { useVendorOrganizations } from '@/hooks/api/useVendorOrganizations';
-import { useStatuses } from '@/hooks/api/useStatuses';
 import { tlDecisionOptions, documentApprovalOptions, infoSheetFieldOptions } from '@/modules/tendering/tender-approval/helpers/tenderApproval.types';
 import type { TenderWithRelations } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 import { TenderApprovalFormSchema } from '../helpers/tenderApproval.schema';
@@ -276,13 +275,13 @@ export function TenderApprovalForm({ tenderId, relationships, isLoading: isParen
 
     const isNotAllowedByOem = useMemo(() => {
         if (!tenderStatus || !statuses) return false;
-        const statusName = statuses.find(s => s.id === Number(tenderStatus))?.name.toLowerCase();
+        const statusName = statuses?.find((s: any) => s.id === Number(tenderStatus))?.name.toLowerCase();
         return statusName?.includes('not allowed by oem');
     }, [statuses, tenderStatus]);
 
     const getStatusName = (id: number | null | undefined) => {
         if (!id || !statuses) return 'N/A';
-        return statuses.find(s => s.id === id)?.name || 'N/A';
+        return statuses?.find((s: any) => s.id === id)?.name || 'N/A';
     };
 
     const getFieldValueFromSheet = (fieldName: string) => {
