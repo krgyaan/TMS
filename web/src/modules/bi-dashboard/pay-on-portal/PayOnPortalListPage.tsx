@@ -114,7 +114,7 @@ const PayOnPortalListPage = () => {
             {
                 label: 'View Details',
                 icon: <Eye className="h-4 w-4" />,
-                onClick: (row: PayOnPortalDashboardRow) => navigate(paths.bi.payOnPortalView(row.requestId)),
+                onClick: (row: PayOnPortalDashboardRow) => navigate(paths.bi.payOnPortalView(row.id)),
             },
             {
                 label: 'Action Form',

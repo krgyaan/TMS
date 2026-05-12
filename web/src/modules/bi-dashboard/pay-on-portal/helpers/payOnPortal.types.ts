@@ -41,6 +41,7 @@ export interface PayOnPortalActionFormData {
     popStatus: string | null;
     tenderNo: string | null;
     tenderName: string | null;
+    tenderId: number | null;
     amount: number | null;
     portalName: string | null;
     utrNo: string | null;
