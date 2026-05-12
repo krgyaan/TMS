@@ -208,21 +208,39 @@ export class PaymentRequestsNotificationService {
             )
             .limit(1);
 
+        // Format date with time
+        const formatDateTime = (dateStr: string | null | undefined): string => {
+            if (!dateStr) return '';
+            try {
+                return new Date(dateStr).toLocaleString('en-IN', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                });
+            } catch {
+                return dateStr;
+            }
+        };
+
+        // Format date only
+        const formatDate = (dateStr: string | null | undefined): string => {
+            if (!dateStr) return '';
+            try {
+                return new Date(dateStr).toLocaleDateString('en-IN', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                });
+            } catch {
+                return dateStr;
+            }
+        };
+
         // Format currency
         const formatCurrency = (amount: number) => {
             return `₹${amount.toLocaleString('en-IN')}`;
-        };
-
-        // Format date time
-        const formatDateTime = (date: Date | null) => {
-            if (!date) return 'Not specified';
-            return new Date(date).toLocaleString('en-IN', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-            });
         };
 
         const mode = instrumentType.toUpperCase();
@@ -429,7 +447,23 @@ export class PaymentRequestsNotificationService {
         }
 
         const status = btReq === 'Accepted' ? 'accepted' : 'rejected';
-        
+
+        // Format date with time
+        const formatDateTime = (dateStr: string | null | undefined): string => {
+            if (!dateStr) return '';
+            try {
+                return new Date(dateStr).toLocaleString('en-IN', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                });
+            } catch {
+                return dateStr;
+            }
+        };
+
         try {
             const result = await this.emailService.sendPaymentEmail({
                 requestId: instrument.requestId,
@@ -444,7 +478,7 @@ export class PaymentRequestsNotificationService {
                     tenderNo,
                     tenderName,
                     status,
-                    paymentDateTime: paymentDateTime || '',
+                    paymentDateTime: formatDateTime(paymentDateTime) || '',
                     utr: utrNo || '',
                     utrMessage: utrMessage || '',
                     rejectionReason: rejectionReason || '',
@@ -522,7 +556,23 @@ export class PaymentRequestsNotificationService {
         }
 
         const status = popReq === 'Accepted' ? 'accepted' : 'rejected';
-        
+
+        // Format date with time
+        const formatDateTime = (dateStr: string | null | undefined): string => {
+            if (!dateStr) return '';
+            try {
+                return new Date(dateStr).toLocaleString('en-IN', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                });
+            } catch {
+                return dateStr;
+            }
+        };
+
         try {
             const result = await this.emailService.sendPaymentEmail({
                 requestId: instrument.requestId,
@@ -534,7 +584,7 @@ export class PaymentRequestsNotificationService {
                 data: {
                     tenderExecutive: requestedUser.name,
                     status,
-                    paymentDateTime: paymentDateTime || '',
+                    paymentDateTime: formatDateTime(paymentDateTime) || '',
                     utr: utrNo || '',
                     utrMessage: utrMessage || '',
                     rejectionReason: rejectionReason || '',
@@ -596,6 +646,20 @@ export class PaymentRequestsNotificationService {
             return;
         }
 
+        // Format date only
+        const formatDate = (dateStr: string | null | undefined): string => {
+            if (!dateStr) return '';
+            try {
+                return new Date(dateStr).toLocaleDateString('en-IN', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                });
+            } catch {
+                return dateStr;
+            }
+        };
+
         try {
             const result = await this.emailService.sendPaymentEmail({
                 requestId: instrument.requestId,
@@ -609,7 +673,7 @@ export class PaymentRequestsNotificationService {
                     paymentInstrumentType: 'Bank Transfer',
                     tenderName: instrument.projectName || 'NA',
                     tenderNo: instrument.tenderNo || 'NA',
-                    returnTransferDate: returnTransferDate || '',
+                    returnTransferDate: formatDate(returnTransferDate) || '',
                     returnUtr: returnUtr || '',
                     senderName: 'Accounts Team',
                 },
@@ -675,6 +739,20 @@ export class PaymentRequestsNotificationService {
             .where(eq(instrumentTransferDetails.instrumentId, instrumentId))
             .limit(1);
 
+        // Format date only
+        const formatDate = (dateStr: string | null | undefined): string => {
+            if (!dateStr) return '';
+            try {
+                return new Date(dateStr).toLocaleDateString('en-IN', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                });
+            } catch {
+                return dateStr;
+            }
+        };
+
         try {
             const result = await this.emailService.sendPaymentEmail({
                 requestId: instrument.requestId,
@@ -689,7 +767,7 @@ export class PaymentRequestsNotificationService {
                     portalName: transferDetails?.portalName || 'NA',
                     tenderName: instrument.projectName || 'NA',
                     tenderNo: instrument.tenderNo || 'NA',
-                    returnTransferDate: returnTransferDate || '',
+                    returnTransferDate: formatDate(returnTransferDate) || '',
                     returnUtr: returnUtr || '',
                     senderName: 'Accounts Team',
                 },
