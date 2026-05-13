@@ -761,7 +761,7 @@ export class BidSubmissionsService {
                 validStatusIds = [14 ,35]; 
                 break;
             case 'emd':
-                validStatusIds = [8]; 
+                validStatusIds = [33];
             case 'checklist':
                 validStatusIds = [];
                 break;
