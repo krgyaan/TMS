@@ -16,6 +16,8 @@ export const bankGuaranteesKey = {
     detail: (id: number) => [...bankGuaranteesKey.details(), id] as const,
     counts: () => [...bankGuaranteesKey.all, 'counts'] as const,
     cardStats: () => [...bankGuaranteesKey.all, 'card-stats'] as const,
+    actionForm: (id: number) => [...bankGuaranteesKey.all, 'action-form', id] as const,
+    followup: (id: number) => [...bankGuaranteesKey.all, 'followup', id] as const,
 };
 
 export const useBankGuaranteeDashboard = (
@@ -86,6 +88,28 @@ export const useBankGuaranteeDetails = (id: number) => {
     });
 
     return query;
+};
+
+export const useBGActionFormData = (id: number) => {
+    return useQuery({
+        queryKey: bankGuaranteesKey.actionForm(id),
+        queryFn: async () => {
+            const result = await bankGuaranteesService.getActionFormData(id);
+            return result;
+        },
+        enabled: !!id,
+    });
+};
+
+export const useBGFollowupData = (id: number) => {
+    return useQuery({
+        queryKey: bankGuaranteesKey.followup(id),
+        queryFn: async () => {
+            const result = await bankGuaranteesService.getFollowupData(id);
+            return result;
+        },
+        enabled: !!id,
+    });
 };
 
 export const useUpdateBankGuarantee = () => {

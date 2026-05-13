@@ -2,15 +2,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { Shield, Eye, Loader2, AlertCircle } from 'lucide-react';
+import { Shield, Eye } from 'lucide-react';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDate } from '@/hooks/useFormatedDate';
 import { tenderFilesService } from '@/services/api/tender-files.service';
-import { TenderView } from '@/modules/tendering/tenders/components/TenderView';
-import { useTender } from '@/hooks/api/useTenders';
-import { useInfoSheet } from '@/hooks/api/useInfoSheets';
-import { InfoSheetView } from '@/modules/tendering/info-sheet/components/InfoSheetView';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const FileLink = ({ file }: { file?: string }) => {
     if (!file) return <span className="text-muted-foreground">Not Uploaded</span>;
@@ -149,14 +144,8 @@ export function BankGuaranteeView({
         data.bgCancellationConfirmation ||
         data.bankReferenceNo;
 
-    // If Tender Id exist
-    const tenderId = Number.isNaN(data.tenderId) ? null : data.tenderId;
-    const { data: tender, isLoading: isTenderLoading } = useTender(tenderId);
-    const { data: infoSheet, isLoading: infoSheetLoading, error: infoSheetError } = useInfoSheet(tenderId);
-
     return (
-        <>
-            <Card className={className}>
+        <Card className={className}>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <Shield className="h-5 w-5" />
@@ -454,37 +443,5 @@ export function BankGuaranteeView({
                     </Table>
                 </CardContent>
             </Card>
-            <div className='space-y-5'>
-                {isTenderLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    </div>
-                ) : tender ? (
-                    <TenderView tender={tender} />
-                ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                        No tender details found
-                    </div>
-                )}
-                {infoSheetLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    </div>
-                ) : infoSheetError ? (
-                    <Alert variant="destructive" className="mb-4">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>
-                            Failed to load info sheet details
-                        </AlertDescription>
-                    </Alert>
-                ) : infoSheet ? (
-                    <InfoSheetView infoSheet={infoSheet} />
-                ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                        No info sheet details found
-                    </div>
-                )}
-            </div>
-        </>
-    );
-}
+        );
+    }
