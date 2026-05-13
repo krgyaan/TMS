@@ -766,7 +766,7 @@ export class BidSubmissionsService {
                 validStatusIds = [];
                 break;
             case 'costing-sheet':
-                validStatusIds = [10, 14 ,34, 35, 44]; 
+                validStatusIds = [10, 14 ,34, 35, 44, 36]; 
                 break;
             case 'costing-approval':
                 validStatusIds = [10, 34, 44]; 
