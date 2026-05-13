@@ -104,7 +104,13 @@ export const usePaymentRequests = (statusFilter?: string) => {
 export const usePaymentRequestsByTender = (tenderId: number | null) => {
     return useQuery({
         queryKey: tenderId ? paymentRequestsKey.byTenderId(tenderId) : paymentRequestsKey.byTenderId(0),
-        queryFn: () => paymentRequestsService.getByTenderId(tenderId!),
+        queryFn: async () => {
+            const response = await paymentRequestsService.getByTenderId(tenderId!);
+            if (response && typeof response === 'object' && 'requests' in response) {
+                return response.requests;
+            }
+            return response;
+        },
         enabled: tenderId !== null && tenderId !== undefined,
     });
 };

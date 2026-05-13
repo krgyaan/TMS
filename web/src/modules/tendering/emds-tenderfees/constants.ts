@@ -467,6 +467,7 @@ export const BI_STATUSES = {
     'Portal Payment_SETTLED_WITH_PROJECT': 'SETTLED_WITH_PROJECT',
 } as const;
 
-export const getReadableStatusName = (status: keyof typeof BI_STATUSES) => {
-  return BI_STATUSES[status].replaceAll('_', ' ');
+export const getReadableStatusName = (status: string) => {
+  return BI_STATUSES[status as keyof typeof BI_STATUSES]?.replaceAll('_', ' ')
+    || status?.replaceAll('_', ' ') || '';
 };
