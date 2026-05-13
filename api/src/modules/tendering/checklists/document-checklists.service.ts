@@ -122,7 +122,7 @@ export class DocumentChecklistsService {
             //     return wrapPaginatedResponse([], 0, page, limit);
             // }
             conditions.push(eq(bidSubmissions.status, "Tender Missed"));
-            conditions.push(isNotNull(tenderDocumentChecklists.id));
+            // conditions.push(isNotNull(tenderDocumentChecklists.id));
         } else {
             throw new BadRequestException(`Invalid tab: ${activeTab}`);
         }
