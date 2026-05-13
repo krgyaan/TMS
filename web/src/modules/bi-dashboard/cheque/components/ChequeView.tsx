@@ -3,16 +3,11 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Receipt, ExternalLink, Loader2, AlertCircle, Eye } from 'lucide-react';
+import { Receipt, ExternalLink, Eye } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDate, formatDateTime } from '@/hooks/useFormatedDate';
 import { paths } from '@/app/routes/paths';
-import { useTender } from '@/hooks/api/useTenders';
-import { useInfoSheet } from '@/hooks/api/useInfoSheets';
-import { TenderView } from '@/modules/tendering/tenders/components/TenderView';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { InfoSheetView } from '@/modules/tendering/info-sheet/components/InfoSheetView';
 import { tenderFilesService } from '@/services/api/tender-files.service';
 
 interface ChequeViewProps {
@@ -64,11 +59,6 @@ export function ChequeView({
         return null;
     }
 
-    // If Tender Id exist
-    const tenderId = Number.isNaN(data.tenderId) ? null : data.tenderId;
-    const { data: tender, isLoading: isTenderLoading } = useTender(tenderId);
-    const { data: infoSheet, isLoading: infoSheetLoading, error: infoSheetError } = useInfoSheet(tenderId);
-
     const isExpired = (dueDate: Date | null): boolean => {
         if (!dueDate) return false;
         const expiryDate = new Date(dueDate.getTime() + 3 * 30 * 24 * 60 * 60 * 1000);
@@ -78,8 +68,7 @@ export function ChequeView({
     const expiryStatus = data.dueDate ? (isExpired(new Date(data.dueDate)) ? 'Expired' : 'Valid') : null;
 
     return (
-        <>
-            <Card className={className}>
+        <Card className={className}>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <Receipt className="h-5 w-5" />
@@ -403,37 +392,5 @@ export function ChequeView({
                     </Table>
                 </CardContent>
             </Card>
-            <div className='space-y-5'>
-                {isTenderLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    </div>
-                ) : tender ? (
-                    <TenderView tender={tender} />
-                ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                        No tender details found
-                    </div>
-                )}
-                {infoSheetLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    </div>
-                ) : infoSheetError ? (
-                    <Alert variant="destructive" className="mb-4">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>
-                            Failed to load info sheet details
-                        </AlertDescription>
-                    </Alert>
-                ) : infoSheet ? (
-                    <InfoSheetView infoSheet={infoSheet} />
-                ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                        No info sheet details found
-                    </div>
-                )}
-            </div>
-        </>
-    );
-}
+        );
+    }

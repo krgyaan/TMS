@@ -48,6 +48,16 @@ export class ChequeController {
         return this.chequeService.getById(id);
     }
 
+    @Get('instruments/:id/action-form')
+    async getActionFormData(@Param('id', ParseIntPipe) id: number) {
+        return this.chequeService.getActionFormData(id);
+    }
+
+    @Get('instruments/:id/followup')
+    async getFollowupData(@Param('id', ParseIntPipe) id: number) {
+        return this.chequeService.getFollowupData(id);
+    }
+
     @Put('instruments/:id/action')
     @UseInterceptors(FilesInterceptor('files', 20, biDashboardMulterConfig))
     async updateAction(
