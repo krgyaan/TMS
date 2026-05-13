@@ -55,6 +55,16 @@ export class BankGuaranteeController {
         return this.bankGuaranteeService.getById(id);
     }
 
+    @Get('instruments/:id/action-form')
+    async getActionFormData(@Param('id', ParseIntPipe) id: number) {
+        return this.bankGuaranteeService.getActionFormData(id);
+    }
+
+    @Get('instruments/:id/followup')
+    async getFollowupData(@Param('id', ParseIntPipe) id: number) {
+        return this.bankGuaranteeService.getFollowupData(id);
+    }
+
     @Put(':id')
     @UseInterceptors(FilesInterceptor('files', 20, biDashboardMulterConfig))
     async update(
