@@ -157,7 +157,7 @@ const EmdsAndTenderFeesPage = () => {
                             onClick: (r) => navigate(paths.tendering.tenderView(r.tenderId)),
                         },
                         {
-                            label: 'Mark As Missed',
+                            label: 'Mark As DNB',
                             icon: <XCircle className="h-4 w-4" />,
                             onClick: (r) => navigate(paths.tendering.bidMissedGlobal(r.tenderId, 'emd')),
                             visible: () => activeTab === 'pending',
