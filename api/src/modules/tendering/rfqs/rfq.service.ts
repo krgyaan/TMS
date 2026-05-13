@@ -442,7 +442,7 @@ export class RfqsService {
                 notInArray(bidSubmissions.reasonStatus,[10, 14, 35]),
                 isNull(bidSubmissions.reasonStatus)
             ));
-            conditions.push(isNotNull(rfqs.id));
+            // conditions.push(isNotNull(rfqs.id));
         }
 
         return conditions;
