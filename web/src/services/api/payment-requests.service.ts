@@ -46,7 +46,7 @@ class PaymentRequestsService extends BaseApiService {
     }
 
     async getByTenderId(tenderId: number) {
-        return this.get<any[]>(`/tenders/${tenderId}`);
+        return this.get<any>(`/tenders/${tenderId}`);
     }
 
     async getInstrumentsByPaymentRequestId(paymentRequestId: number) {
