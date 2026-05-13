@@ -68,6 +68,14 @@ class DemandDraftsService extends BaseApiService {
         }
     }
 
+    async getActionFormData(id: number): Promise<any> {
+        return this.get<any>(`/instruments/${id}/action-form`);
+    }
+
+    async getFollowupData(id: number): Promise<any> {
+        return this.get<any>(`/instruments/${id}/followup`);
+    }
+
     async updateAction(id: number, formData: FormData): Promise<any> {
         return this.put<any, FormData>(`/instruments/${id}/action`, formData);
     }

@@ -48,6 +48,16 @@ export class DemandDraftController {
         return this.demandDraftService.getById(id);
     }
 
+    @Get('instruments/:id/action-form')
+    async getActionFormData(@Param('id', ParseIntPipe) id: number) {
+        return this.demandDraftService.getActionFormData(id);
+    }
+
+    @Get('instruments/:id/followup')
+    async getFollowupData(@Param('id', ParseIntPipe) id: number) {
+        return this.demandDraftService.getFollowupData(id);
+    }
+
     @Put('instruments/:id/action')
     @UseInterceptors(FilesInterceptor('files', 20, biDashboardMulterConfig))
     async updateAction(
