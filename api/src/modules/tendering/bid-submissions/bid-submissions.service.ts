@@ -647,7 +647,7 @@ export class BidSubmissionsService {
             });
 
             // Send email notification
-            // await this.sendBidMissedEmail(data.tenderId, result, data.submittedBy);
+            await this.sendBidMissedEmail(data.tenderId, result, data.submittedBy);
 
             //stopping all the timers running for this tender
             //for the time being stopping all the running timers
