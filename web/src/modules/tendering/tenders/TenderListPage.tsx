@@ -149,7 +149,7 @@ const TenderListPage = () => {
             label: "Reject Tender",
             onClick: (row) => setRejectionModal({ open: true, tenderId: row.id, tenderName: row.tenderName }),
             icon: <XCircle className="h-4 w-4" />,
-            visible:(row) => elligibleForRejection(row) && hasTenderingPermission,
+            visible:(row) => elligibleForRejection(row) ,
         },
         // {
         //     label: "Change Status",

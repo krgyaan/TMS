@@ -156,12 +156,12 @@ const EmdsAndTenderFeesPage = () => {
                             icon: <EyeIcon className="w-4 h-4" />,
                             onClick: (r) => navigate(paths.tendering.tenderView(r.tenderId)),
                         },
-                        // {
-                        //     label: 'Mark As Missed',
-                        //     icon: <XCircle className="h-4 w-4" />,
-                        //     onClick: (r) => navigate(paths.tendering.bidMissedGlobal(r.tenderId, 'emd')),
-                        //     visible: () => hasTenderingPermission && activeTab === 'pending',
-                        // },
+                        {
+                            label: 'Mark As Missed',
+                            icon: <XCircle className="h-4 w-4" />,
+                            onClick: (r) => navigate(paths.tendering.bidMissedGlobal(r.tenderId, 'emd')),
+                            visible: () => activeTab === 'pending',
+                        },
                     ];
                     if (activeTab === 'pending') {
                         actions.unshift({
@@ -258,12 +258,12 @@ const EmdsAndTenderFeesPage = () => {
                         icon: <EyeIcon className="w-4 h-4" />,
                         onClick: (r) => navigate(paths.tendering.emdsTenderFeesView(r.tenderId)),
                     },
-                    // {
-                    //     label: 'Mark As Missed',
-                    //     icon: <XCircle className="h-4 w-4" />,
-                    //     onClick: (r) => navigate(paths.tendering.bidMissedGlobal(r.tenderId, 'emd')),
-                    //     visible: () => hasTenderingPermission,
-                    // },
+                    {
+                        label: 'Mark As Missed',
+                        icon: <XCircle className="h-4 w-4" />,
+                        onClick: (r) => navigate(paths.tendering.bidMissedGlobal(r.tenderId, 'emd')),
+                        visible: () => hasTenderingPermission,
+                    },
                 ];
 
                 if (activeTab === 'sent' || activeTab === 'rejected') {

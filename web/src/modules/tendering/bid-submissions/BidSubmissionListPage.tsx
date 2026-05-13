@@ -94,7 +94,7 @@ const BidSubmissionListPage = () => {
                 navigate(paths.tendering.bidMissedGlobal(row.tenderId, 'bid-submission'));
             },
             icon: <XCircle className="h-4 w-4" />,
-            visible: (row) => hasTenderingPermission && row.bidStatus === 'Submission Pending',
+            visible: (row) => row.bidStatus === 'Submission Pending',
         },
         {
             label: 'Edit Bid',
