@@ -123,4 +123,9 @@ export class PaymentRequestsController {
         const payload = UpdateStatusSchema.parse(body);
         return this.commandService.updateStatus(id, payload);
     }
+
+    @Get(':id/instruments')
+    async findInstrumentsByPaymentRequestId(@Param('id', ParseIntPipe) id: number) {
+        return this.queryService.findInstrumentsByPaymentRequestId(id);
+    }
 }
