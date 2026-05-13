@@ -123,7 +123,7 @@ export class CostingSheetsService {
             conditions.push(or(ne(bidSubmissions.status, 'Tender Missed'), isNull(bidSubmissions)));
         } else if (tab === 'tender-dnb') {
             conditions.push(eq(bidSubmissions.status, 'Tender Missed'));
-            conditions.push(isNotNull(tenderCostingSheets.id));
+            // conditions.push(isNotNull(tenderCostingSheets.id));
         }
 
         return conditions;
