@@ -25,7 +25,7 @@ function FieldRow({ label, value, fullWidth = false }: { label: string; value: R
             <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
                 {label}
             </TableCell>
-            <TableCell className={`text-sm ${fullWidth ? 'col-span-3' : 'w-3/4'} break-words`} colSpan={fullWidth ? undefined : 3}>
+            <TableCell className={`text-sm ${fullWidth ? 'col-span-3' : 'w-3/4'} whitespace-normal [overflow-wrap:anywhere]`} colSpan={fullWidth ? undefined : 3}>
                 {value || '—'}
             </TableCell>
         </TableRow>
