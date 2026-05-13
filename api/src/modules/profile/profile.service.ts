@@ -1,5 +1,5 @@
 import { Injectable, Inject, NotFoundException, ConflictException, ForbiddenException, BadRequestException } from '@nestjs/common';
-import { eq, desc, aliasedTable } from 'drizzle-orm';
+import { eq, desc, aliasedTable, and } from 'drizzle-orm';
 import { DRIZZLE } from '@/db/database.module';
 import type { DbInstance } from '@/db';
 import * as fs from 'fs';
@@ -852,10 +852,24 @@ export class ProfileService {
   //check if onboarding on
   // if upddate -> check if rejected -> update
 
+  //if an education is added we will consider it as submitted -> hence update it's status
+  //later maybe we can add checks for required educations
+
   async addEducation(userId: number, dto: any) {
-    const activeReqs = await this.db.select({ id: onboardingRequests.id, status: onboardingRequests.status })
-      .from(onboardingRequests).where(eq(onboardingRequests.userId, userId)).orderBy(desc(onboardingRequests.createdAt)).limit(1);
-    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
+    const activeReqs = await this.db.select(
+      { id: onboardingRequests.id, 
+        status: onboardingRequests.status,
+        progress: onboardingRequests.progress,
+        educationStatus : onboardingRequests.educationStatus
+      })
+      .from(onboardingRequests)
+      .where(and(
+        (eq(onboardingRequests.userId, userId)),
+        (eq(onboardingRequests.status, 'approved')),
+      ))
+      .orderBy(desc(onboardingRequests.createdAt)).limit(1);
+
+    const isOnboarding = activeReqs.length > 0 && activeReqs[0].progress == 'pending';
 
     if (isOnboarding) {
       const [inserted] = await this.db.insert(onboardingEducation).values({
@@ -869,6 +883,10 @@ export class ProfileService {
         status: 'submitted',
         hrStatus: 'pending',
       }).returning();
+
+      // updating the status -> of the request to updated
+      activeReqs[0].educationStatus = 'submitted';
+
       return inserted;
     }
 
