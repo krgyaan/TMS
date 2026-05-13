@@ -894,28 +894,29 @@ export class ProfileService {
   }
 
   async updateEducation(userId: number, eduId: number, dto: any) {
-    const activeReqs = await this.db.select({ id: onboardingRequests.id, status: onboardingRequests.status })
+    const activeReqs = await this.db.select({ id: onboardingRequests.id, status: onboardingRequests.status, progress : onboardingRequests.progress, educationStatus : onboardingRequests.educationStatus })
       .from(onboardingRequests).where(eq(onboardingRequests.userId, userId)).orderBy(desc(onboardingRequests.createdAt)).limit(1);
-    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
+
+    const isOnboarding = activeReqs.length > 0 && activeReqs[0].progress == 'pending';
 
     if (isOnboarding) {
       const [current] = await this.db.select().from(onboardingEducation).where(eq(onboardingEducation.id, eduId)).limit(1);
       
-      if (current?.hrStatus === 'rejected') {
-        // Create new record for resubmission
-        const [inserted] = await this.db.insert(onboardingEducation).values({
-          onboardingId: activeReqs[0].id,
-          degree: dto.degree,
-          institution: dto.institution,
-          fieldOfStudy: dto.fieldOfStudy,
-          startDate: dto.startDate ? (dto.startDate.length === 7 ? `${dto.startDate}-01` : dto.startDate) : null,
-          endDate: dto.endDate ? (dto.endDate.length === 7 ? `${dto.endDate}-01` : dto.endDate) : null,
-          grade: dto.grade,
-          status: 'submitted',
-          hrStatus: 'pending',
-        }).returning();
-        return inserted;
-      }
+      // if (current?.hrStatus === 'rejected') {
+      // // Create new record for resubmission
+      //   const [inserted] = await this.db.insert(onboardingEducation).values({
+      //     onboardingId: activeReqs[0].id,
+      //     degree: dto.degree,
+      //     institution: dto.institution,
+      //     fieldOfStudy: dto.fieldOfStudy,
+      //     startDate: dto.startDate ? (dto.startDate.length === 7 ? `${dto.startDate}-01` : dto.startDate) : null,
+      //     endDate: dto.endDate ? (dto.endDate.length === 7 ? `${dto.endDate}-01` : dto.endDate) : null,
+      //     grade: dto.grade,
+      //     status: 'submitted',
+      //     hrStatus: 'pending',
+      //   }).returning();
+      //   return inserted;
+      // }
 
       const [updated] = await this.db.update(onboardingEducation).set({
         degree: dto.degree,
@@ -925,10 +926,14 @@ export class ProfileService {
         endDate: dto.endDate ? (dto.endDate.length === 7 ? `${dto.endDate}-01` : dto.endDate) : null,
         grade: dto.grade,
         status: 'submitted',
+        hrStatus: 'pending',
         updatedAt: new Date(),
       }).where(eq(onboardingEducation.id, eduId)).returning();
       return updated;
     }
+
+    //udpating the req progress
+    activeReqs[0].educationStatus = 'submitted';
 
     throw new BadRequestException('Education details can only be modified during onboarding.');
   }
@@ -937,9 +942,10 @@ export class ProfileService {
   // --- Experience ---
 
   async addExperience(userId: number, dto: any) {
-    const activeReqs = await this.db.select({ id: onboardingRequests.id, status: onboardingRequests.status })
+    const activeReqs = await this.db.select({ id: onboardingRequests.id, status: onboardingRequests.status, progress: onboardingRequests.progress, experienceStatus : onboardingRequests.experienceStatus})
       .from(onboardingRequests).where(eq(onboardingRequests.userId, userId)).orderBy(desc(onboardingRequests.createdAt)).limit(1);
-    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
+
+    const isOnboarding = activeReqs.length > 0 && activeReqs[0].progress == 'pending';
 
     const parseDate = (d: any) => d ? new Date(d).toISOString().split('T')[0] : null;
 
@@ -955,16 +961,21 @@ export class ProfileService {
         status: 'submitted',
         hrStatus: 'pending',
       }).returning();
+
+      activeReqs[0].experienceStatus = 'submitted';
+
       return inserted;
     }
+
 
     throw new BadRequestException('Experience details can only be modified during onboarding.');
   }
 
   async updateExperience(userId: number, expId: number, dto: any) {
-    const activeReqs = await this.db.select({ id: onboardingRequests.id, status: onboardingRequests.status })
-      .from(onboardingRequests).where(eq(onboardingRequests.userId, userId)).orderBy(desc(onboardingRequests.createdAt)).limit(1);
-    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
+    const activeReqs = await this.db.select({ id: onboardingRequests.id, status: onboardingRequests.status, progress: onboardingRequests.progress, experienceStatus : onboardingRequests.experienceStatus})
+      .from(onboardingRequests).where(eq(onboardingRequests.userId, userId)).orderBy(desc(onboardingRequests.createdAt)).limit(1);\
+
+    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status == 'pending';
 
     const parseDate = (d: any) => d ? new Date(d).toISOString().split('T')[0] : undefined;
 
@@ -982,24 +993,25 @@ export class ProfileService {
     if (isOnboarding) {
       const [current] = await this.db.select().from(onboardingExperience).where(eq(onboardingExperience.id, expId)).limit(1);
 
-      if (current?.hrStatus === 'rejected') {
-        const [inserted] = await this.db.insert(onboardingExperience).values({
-          onboardingId: activeReqs[0].id,
-          companyName: dto.companyName,
-          designation: dto.designation,
-          fromDate: parseDate(dto.fromDate),
-          toDate: parseDate(dto.toDate),
-          currentlyWorking: dto.currentlyWorking,
-          responsibilities: dto.responsibilities,
-          status: 'submitted',
-          hrStatus: 'pending',
-        }).returning();
-        return inserted;
-      }
+      // if (current?.hrStatus === 'rejected') {
+      //   const [inserted] = await this.db.insert(onboardingExperience).values({
+      //     onboardingId: activeReqs[0].id,
+      //     companyName: dto.companyName,
+      //     designation: dto.designation,
+      //     fromDate: parseDate(dto.fromDate),
+      //     toDate: parseDate(dto.toDate),
+      //     currentlyWorking: dto.currentlyWorking,
+      //     responsibilities: dto.responsibilities,
+      //     status: 'submitted',
+      //     hrStatus: 'pending',
+      //   }).returning();
+      //   return inserted;
+      // }
 
       const [updated] = await this.db.update(onboardingExperience).set({
         ...payload,
         status: 'submitted',
+        hrStatus : 'pending'
       }).where(eq(onboardingExperience.id, expId)).returning();
       return updated;
     }
@@ -1011,7 +1023,7 @@ export class ProfileService {
   // --- Bank Accounts ---
 
   async addBankDetails(userId: number, dto: any) {
-    const activeReqs = await this.db.select({ id: onboardingRequests.id, status: onboardingRequests.status })
+    const activeReqs = await this.db.select({ id: onboardingRequests.id, status: onboardingRequests.status, progress: onboardingRequests.progress, bankStatus: onboardingRequests.bankStatus })
       .from(onboardingRequests).where(eq(onboardingRequests.userId, userId)).orderBy(desc(onboardingRequests.createdAt)).limit(1);
     const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
 
