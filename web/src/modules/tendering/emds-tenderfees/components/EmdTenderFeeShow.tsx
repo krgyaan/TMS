@@ -4,7 +4,7 @@ import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table";
 import { AlertCircle, FileText } from "lucide-react";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
-import { DemandDraftView, FdrView, BankGuaranteeView, ChequeView, BankTransferView, PortalPaymentView } from "./instrument-views";
+import { InstrumentBiView } from "./InstrumentBiView";
 
 interface PaymentRequest {
     id: number;
@@ -43,46 +43,6 @@ interface EmdTenderFeeShowProps {
     text: string;
 }
 
-type Instrument = NonNullable<PaymentRequest["instruments"]>[number];
-
-const renderInstrumentRows = (instruments: PaymentRequest["instruments"]) => {
-    if (!instruments || instruments.length === 0) return null;
-
-    const grouped = instruments.reduce((acc, inst) => {
-        const type = inst.instrumentType;
-        if (!acc[type]) acc[type] = [];
-        acc[type].push(inst);
-        return acc;
-    }, {} as Record<string, Instrument[]>);
-
-    return (
-        <TableRow>
-            <TableCell colSpan={4} className="p-0 border-0">
-                <div className="space-y-2">
-                    {Object.entries(grouped).map(([type, typeInstruments]) => {
-                        switch (type) {
-                            case 'DD':
-                                return <DemandDraftView key={type} instruments={typeInstruments} isNonTms={false} />;
-                            case 'FDR':
-                                return <FdrView key={type} instruments={typeInstruments} isNonTms={false} />;
-                            case 'BG':
-                                return <BankGuaranteeView key={type} instruments={typeInstruments} isNonTms={false} />;
-                            case 'Cheque':
-                                return <ChequeView key={type} instruments={typeInstruments} isNonTms={false} />;
-                            case 'Bank Transfer':
-                                return <BankTransferView key={type} instruments={typeInstruments} isNonTms={false} />;
-                            case 'Portal Payment':
-                                return <PortalPaymentView key={type} instruments={typeInstruments} isNonTms={false} />;
-                            default:
-                                return null;
-                        }
-                    })}
-                </div>
-            </TableCell>
-        </TableRow>
-    );
-};
-
 export const EmdTenderFeeShow = ({ paymentRequests, text }: EmdTenderFeeShowProps) => {
     if (!paymentRequests) return null;
 
@@ -102,7 +62,12 @@ export const EmdTenderFeeShow = ({ paymentRequests, text }: EmdTenderFeeShowProp
             <CardContent>
                 <Table>
                     <TableBody>
-                        {/* EMD Section */}
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                Payment Requests
+                            </TableCell>
+                        </TableRow>
+
                         {emdRequest && (
                             <>
                                 <TableRow className="bg-muted/50">
@@ -122,11 +87,9 @@ export const EmdTenderFeeShow = ({ paymentRequests, text }: EmdTenderFeeShowProp
                                     <TableCell className="text-sm font-medium text-muted-foreground">Requested By</TableCell>
                                     <TableCell className="text-sm">{emdRequest.requestedBy}</TableCell>
                                 </TableRow>
-                                {renderInstrumentRows(emdRequest.instruments)}
                             </>
                         )}
 
-                        {/* Tender Fee Section */}
                         {tenderFeeRequest && (
                             <>
                                 <TableRow className="bg-muted/50">
@@ -146,11 +109,9 @@ export const EmdTenderFeeShow = ({ paymentRequests, text }: EmdTenderFeeShowProp
                                     <TableCell className="text-sm font-medium text-muted-foreground">Requested By</TableCell>
                                     <TableCell className="text-sm">{tenderFeeRequest.requestedBy}</TableCell>
                                 </TableRow>
-                                {renderInstrumentRows(tenderFeeRequest.instruments)}
                             </>
                         )}
 
-                        {/* Processing Fee Section */}
                         {processingFeeRequest && (
                             <>
                                 <TableRow className="bg-muted/50">
@@ -170,11 +131,9 @@ export const EmdTenderFeeShow = ({ paymentRequests, text }: EmdTenderFeeShowProp
                                     <TableCell className="text-sm font-medium text-muted-foreground">Requested By</TableCell>
                                     <TableCell className="text-sm">{processingFeeRequest.requestedBy}</TableCell>
                                 </TableRow>
-                                {renderInstrumentRows(processingFeeRequest.instruments)}
                             </>
                         )}
 
-                        {/* Summary Row */}
                         <TableRow className="bg-primary/10">
                             <TableCell colSpan={2} className="font-bold text-sm">
                                 Total Amount Required
@@ -191,6 +150,16 @@ export const EmdTenderFeeShow = ({ paymentRequests, text }: EmdTenderFeeShowProp
                 </Table>
             </CardContent>
         </Card>
+
+            {emdRequest?.instruments?.map(inst => (
+                <InstrumentBiView key={inst.id} instrumentId={inst.id} instrumentType={inst.instrumentType} />
+            ))}
+            {tenderFeeRequest?.instruments?.map(inst => (
+                <InstrumentBiView key={inst.id} instrumentId={inst.id} instrumentType={inst.instrumentType} />
+            ))}
+            {processingFeeRequest?.instruments?.map(inst => (
+                <InstrumentBiView key={inst.id} instrumentId={inst.id} instrumentType={inst.instrumentType} />
+            ))}
         </div>
     );
 };
@@ -199,7 +168,6 @@ import { usePaymentRequestsByTender } from '@/hooks/api/usePaymentRequests';
 import { useInfoSheet } from "@/hooks/api/useInfoSheets";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-/** Self-fetching section for EMD & Tender Fees */
 export function EmdTenderFeeSection({ tenderId }: { tenderId: number | null }) {
     const { data: paymentRequests, isLoading: isLoadingPaymentRequests } = usePaymentRequestsByTender(tenderId);
     const { data: infoSheet, isLoading: isLoadingInfoSheet } = useInfoSheet(tenderId);
