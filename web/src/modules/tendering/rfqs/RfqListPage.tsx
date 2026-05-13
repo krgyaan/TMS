@@ -82,11 +82,6 @@ const Rfqs = () => {
             icon: <ClipboardList className="h-4 w-4" />,
             visible: (row: RfqDashboardRowWithTimer) => (activeTab === 'sent' || activeTab === 'responses') && row.rfqId != null,
         },
-        // {
-        //     label: 'Change Status',
-        //     onClick: (row: RfqDashboardRowWithTimer) => setChangeStatusModal({ open: true, tenderId: row.tenderId }),
-        //     icon: <RefreshCw className="h-4 w-4" />,
-        // },
         {
             label: 'Send',
             onClick: (row: RfqDashboardRowWithTimer) => navigate(paths.tendering.rfqsCreate(row.tenderId)),
@@ -99,14 +94,15 @@ const Rfqs = () => {
             },
             icon: <Eye className="h-4 w-4" />,
         },
-        {
-            label: 'Mark as Missed',
-            onClick: (row) => {
-                navigate(paths.tendering.bidMissedGlobal(row.tenderId, 'rfq'));
-            },
-            icon: <XCircle className="h-4 w-4" />,
-            visible: () => hasTenderingPermission && activeTab !== 'tender-dnb',
-        },
+        // NOT REQUIRED ANYMORE
+        // {
+        //     label: 'Mark as Missed',
+        //     onClick: (row) => {
+        //         navigate(paths.tendering.bidMissedGlobal(row.tenderId, 'rfq'));
+        //     },
+        //     icon: <XCircle className="h-4 w-4" />,
+        //     visible: () => hasTenderingPermission && activeTab !== 'tender-dnb',
+        // },
         {
             label: 'Delete',
             onClick: (row: RfqDashboardRowWithTimer) => {
