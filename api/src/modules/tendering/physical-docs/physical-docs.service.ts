@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
-import { and, eq, asc, desc, sql, isNull, isNotNull, inArray, notInArray, SQL, ne, or } from "drizzle-orm";
+import { and, eq, asc, desc, sql, isNull, isNotNull, inArray, notInArray, SQL, ne, or, ilike } from "drizzle-orm";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
 import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
@@ -218,7 +218,7 @@ export class PhysicalDocsService {
             //we will be getting all the tenders whose phy doc sent and bid missed
             conditions.push(and(
                 (eq(bidSubmissions.status, "Tender Missed")),
-                (isNotNull(physicalDocs.id))
+                (ilike(tenderInformation.physicalDocsRequired,'Yes'))
             ));
         } else {
             throw new BadRequestException(`Invalid tab: ${activeTab}`);
