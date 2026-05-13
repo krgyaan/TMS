@@ -5,6 +5,7 @@ import { TenderDetailsSection } from "@/modules/tendering/tenders/components/Ten
 import { PhysicalDocsSection } from "@/modules/tendering/physical-docs/components/PhysicalDocsView";
 import { RfqSection } from "@/modules/tendering/rfqs/components/RfqView";
 import { EmdTenderFeeSection } from "@/modules/tendering/emds-tenderfees/components/EmdTenderFeeShow";
+import { PaymentInstrumentView } from "@/modules/tendering/emds-tenderfees/components/PaymentInstrumentView";
 import { DocumentChecklistSection } from "@/modules/tendering/checklists/components/DocumentChecklistView";
 import { CostingSheetSection } from "@/modules/tendering/costing-sheets/components/CostingSheetView";
 import { BidSubmissionSection } from "@/modules/tendering/bid-submissions/components/BidSubmissionView";
@@ -21,7 +22,9 @@ export default function EmdShowPage() {
     const navigate = useNavigate();
     const tenderId = id ? Number(id) : null;
 
-    const { steps: tenderSteps } = useTenderStepStatuses(tenderId);
+    const isNonTmsEntry = tenderId === 0;
+
+    const { steps: tenderSteps } = useTenderStepStatuses(isNonTmsEntry ? null : tenderId);
 
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["emd-fees"]));
 
@@ -38,6 +41,13 @@ export default function EmdShowPage() {
     const collapseAll = useCallback(() => setExpandedSections(new Set()), []);
 
     const renderSectionContent = (stepId: string) => {
+        if (isNonTmsEntry) {
+            if (stepId === "emd-fees") {
+                return <PaymentInstrumentView paymentRequestId={tenderId!} />;
+            }
+            return null;
+        }
+
         if (!tenderId) return null;
         switch (stepId) {
             case "tender-details":   return <TenderDetailsSection tenderId={tenderId} />;
@@ -54,12 +64,34 @@ export default function EmdShowPage() {
         }
     };
 
-    if (!tenderId) {
+    if (tenderId === null || tenderId === undefined) {
         return (
             <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>Invalid Tender ID.</AlertDescription>
             </Alert>
+        );
+    }
+
+    if (isNonTmsEntry) {
+        return (
+            <ShowPageLayout
+                steps={[{
+                    id: 'emd-fees', label: 'Payment Request',
+                    shortLabel: "",
+                    stepNumber: 0,
+                    status: "completed",
+                    hasData: false,
+                    isLoading: false
+                }]}
+                expandedSections={expandedSections}
+                onToggleSection={toggleSection}
+                onExpandAll={() => setExpandedSections(new Set(['emd-fees']))}
+                onCollapseAll={() => setExpandedSections(new Set())}
+                onBack={() => navigate(paths.tendering.emdsTenderFees)}
+                backLabel="Back to EMD / Tender Fees"
+                renderSectionContent={renderSectionContent}
+            />
         );
     }
 

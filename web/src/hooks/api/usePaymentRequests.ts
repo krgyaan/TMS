@@ -40,6 +40,7 @@ export const paymentRequestsKey = {
     byTender: () => [...paymentRequestsKey.all, 'by-tender'] as const,
     byTenderId: (tenderId: number) => [...paymentRequestsKey.byTender(), tenderId] as const,
     tenderPaymentDetails: (tenderId: number) => ['tender', 'payment-details', tenderId] as const,
+    instrumentDetails: (id: number) => [...paymentRequestsKey.all, 'instrument-details', id] as const,
 };
 
 // Dashboard hook with counts
@@ -104,7 +105,15 @@ export const usePaymentRequestsByTender = (tenderId: number | null) => {
     return useQuery({
         queryKey: tenderId ? paymentRequestsKey.byTenderId(tenderId) : paymentRequestsKey.byTenderId(0),
         queryFn: () => paymentRequestsService.getByTenderId(tenderId!),
-        enabled: !!tenderId,
+        enabled: tenderId !== null && tenderId !== undefined,
+    });
+};
+
+export const useInstrumentDetails = (paymentRequestId: number | null) => {
+    return useQuery({
+        queryKey: paymentRequestsKey.instrumentDetails(paymentRequestId ?? 0),
+        queryFn: () => paymentRequestsService.getInstrumentsByPaymentRequestId(paymentRequestId!),
+        enabled: !!paymentRequestId,
     });
 };
 
