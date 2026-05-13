@@ -98,7 +98,7 @@ export default function GlobalBidMissedForm({
                 <div className="flex items-center justify-between">
                     <div>
                         <CardTitle className="text-destructive">
-                            Mark Tender as Missed ({stageNameKeys[stage] || stage})
+                            Mark Tender as DNB ({stageNameKeys[stage] || stage})
                         </CardTitle>
                         <CardDescription className="mt-2">
                             Provide details and select a status for why this tender was missed during the {stageNameKeys[stage] || stage} stage
@@ -235,7 +235,7 @@ export default function GlobalBidMissedForm({
                             >
                                 {isSubmitting && <span className="animate-spin mr-2">⏳</span>}
                                 <XCircle className="mr-2 h-4 w-4" />
-                                Mark as Missed
+                                Mark as DNB
                             </Button>
                         </div>
                     </form>
