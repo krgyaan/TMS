@@ -89,7 +89,7 @@ const BidSubmissionListPage = () => {
             visible: (row) => row.bidStatus === 'Submission Pending',
         },
         {
-            label: 'Mark as Missed',
+            label: 'Mark as DNB',
             onClick: (row: BidSubmissionDashboardRow) => {
                 navigate(paths.tendering.bidMissedGlobal(row.tenderId, 'bid-submission'));
             },
