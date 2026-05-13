@@ -278,7 +278,13 @@ const EmdsAndTenderFeesPage = () => {
                     {
                         label: 'View Details',
                         icon: <EyeIcon className="w-4 h-4" />,
-                        onClick: (r) => navigate(paths.tendering.emdsTenderFeesView(r.tenderId)),
+                        onClick: (r) => {
+                            if (r.tenderId > 0) {
+                                navigate(paths.tendering.emdsTenderFeesView(r.tenderId));
+                            } else {
+                                navigate(`${paths.tendering.emdsTenderFeesView(r.tenderId)}?pr=${r.id}`);
+                            }
+                        },
                     },
                     // {
                     //     label: 'Mark As Missed',

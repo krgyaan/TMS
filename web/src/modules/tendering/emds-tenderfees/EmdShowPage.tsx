@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useState, useCallback } from "react";
 import { paths } from "@/app/routes/paths";
 import { TenderDetailsSection } from "@/modules/tendering/tenders/components/TenderView";
@@ -19,12 +19,15 @@ import { useTenderStepStatuses } from "@/hooks/api/useTenderStepStatuses";
 
 export default function EmdShowPage() {
     const { id } = useParams<{ id: string }>();
+    const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const tenderId = id ? Number(id) : null;
+    const prParam = searchParams.get('pr');
+    const paymentRequestId = prParam ? Number(prParam) : null;
 
-    const isNonTmsEntry = tenderId === 0;
+    const isPaymentRequestView = tenderId === 0 && !!paymentRequestId;
 
-    const { steps: tenderSteps } = useTenderStepStatuses(isNonTmsEntry ? null : tenderId);
+    const { steps: tenderSteps } = useTenderStepStatuses(isPaymentRequestView ? null : tenderId);
 
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["emd-fees"]));
 
@@ -41,11 +44,8 @@ export default function EmdShowPage() {
     const collapseAll = useCallback(() => setExpandedSections(new Set()), []);
 
     const renderSectionContent = (stepId: string) => {
-        if (isNonTmsEntry) {
-            if (stepId === "emd-fees") {
-                return <PaymentInstrumentView paymentRequestId={tenderId!} />;
-            }
-            return null;
+        if (isPaymentRequestView && stepId === "emd-fees") {
+            return <PaymentInstrumentView paymentRequestId={paymentRequestId} />;
         }
 
         if (!tenderId) return null;
@@ -73,14 +73,14 @@ export default function EmdShowPage() {
         );
     }
 
-    if (isNonTmsEntry) {
+    if (isPaymentRequestView) {
         return (
             <ShowPageLayout
                 steps={[{
                     id: 'emd-fees', label: 'Payment Request',
                     shortLabel: "",
                     stepNumber: 0,
-                    status: "completed",
+                    status: "completed" as const,
                     hasData: false,
                     isLoading: false
                 }]}
