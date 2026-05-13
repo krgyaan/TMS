@@ -15,6 +15,7 @@ import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import type { DemandDraftDashboardRow, DemandDraftDashboardCounts } from '@/modules/bi-dashboard/demand-draft/helpers/demandDraft.types';
 import { DD_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
 import { FollowUpService } from '@/modules/follow-up/follow-up.service';
+import { followUps } from '@/db/schemas/shared/follow-ups.schema';
 
 @Injectable()
 export class DemandDraftService {
@@ -516,5 +517,131 @@ export class DemandDraftService {
         }
 
         return result;
+    }
+
+    async getActionFormData(id: number) {
+        const [result] = await this.db
+            .select({
+                id: paymentInstruments.id,
+                action: paymentInstruments.action,
+                status: paymentInstruments.status,
+                amount: paymentInstruments.amount,
+                favouring: paymentInstruments.favouring,
+                payableAt: paymentInstruments.payableAt,
+                issueDate: paymentInstruments.issueDate,
+                expiryDate: paymentInstruments.expiryDate,
+                utr: paymentInstruments.utr,
+                docketNo: paymentInstruments.docketNo,
+                courierAddress: paymentInstruments.courierAddress,
+                courierDeadline: paymentInstruments.courierDeadline,
+                generatedPdf: paymentInstruments.generatedPdf,
+                cancelPdf: paymentInstruments.cancelPdf,
+                docketSlip: paymentInstruments.docketSlip,
+                tenderNo: paymentRequests.tenderNo,
+                tenderName: paymentRequests.projectName,
+                tenderId: paymentRequests.tenderId,
+                ddNo: instrumentDdDetails.ddNo,
+                ddDate: instrumentDdDetails.ddDate,
+                reqNo: instrumentDdDetails.reqNo,
+                ddNeeds: instrumentDdDetails.ddNeeds,
+                ddPurpose: instrumentDdDetails.ddPurpose,
+                ddRemarks: instrumentDdDetails.ddRemarks,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(instrumentDdDetails, eq(instrumentDdDetails.instrumentId, paymentInstruments.id))
+            .where(and(
+                eq(paymentInstruments.id, id),
+                eq(paymentInstruments.instrumentType, 'DD'),
+                eq(paymentInstruments.isActive, true)
+            ))
+            .limit(1);
+
+        if (!result) {
+            throw new NotFoundException(`Payment Instrument with ID ${id} not found`);
+        }
+
+        const hasAccountsFormData = result.action != null && result.action >= 1;
+        const hasReturnedData = result.action != null && result.action >= 3;
+        const hasSettledData = result.action === 5 || result.action === 7;
+
+        return {
+            id: result.id,
+            action: result.action,
+            ddStatus: this.statusMap()[result.status] || result.status,
+            tenderNo: result.tenderNo,
+            tenderName: result.tenderName,
+            tenderId: result.tenderId,
+            amount: result.amount ? Number(result.amount) : null,
+            favouring: result.favouring,
+            payableAt: result.payableAt,
+            issueDate: result.issueDate ? new Date(result.issueDate) : null,
+            expiryDate: result.expiryDate ? new Date(result.expiryDate) : null,
+            ddNo: result.ddNo,
+            ddDate: result.ddDate ? new Date(result.ddDate) : null,
+            reqNo: result.reqNo,
+            ddNeeds: result.ddNeeds,
+            ddPurpose: result.ddPurpose,
+            ddRemarks: result.ddRemarks,
+            courierAddress: result.courierAddress,
+            courierDeadline: result.courierDeadline ? Number(result.courierDeadline) : null,
+            utr: result.utr,
+            docketNo: result.docketNo,
+            generatedPdf: result.generatedPdf,
+            cancelPdf: result.cancelPdf,
+            docketSlip: result.docketSlip,
+            hasAccountsFormData,
+            hasReturnedData,
+            hasSettledData,
+        };
+    }
+
+    async getFollowupData(instrumentId: number) {
+        const [result] = await this.db
+            .select({
+                id: followUps.id,
+                emdId: followUps.emdId,
+                partyName: followUps.partyName,
+                area: followUps.area,
+                amount: followUps.amount,
+                contacts: followUps.contacts,
+                frequency: followUps.frequency,
+                startFrom: followUps.startFrom,
+                nextFollowUpDate: followUps.nextFollowUpDate,
+                stopReason: followUps.stopReason,
+                proofText: followUps.proofText,
+                stopRemarks: followUps.stopRemarks,
+                proofImagePath: followUps.proofImagePath,
+                assignmentStatus: followUps.assignmentStatus,
+                createdAt: followUps.createdAt,
+            })
+            .from(followUps)
+            .where(and(
+                eq(followUps.emdId, instrumentId),
+                isNull(followUps.deletedAt)
+            ))
+            .orderBy(desc(followUps.createdAt))
+            .limit(1);
+
+        if (!result) {
+            return null;
+        }
+
+        return {
+            id: result.id,
+            organisationName: result.partyName,
+            area: result.area,
+            amount: result.amount ? Number(result.amount) : null,
+            contacts: result.contacts || [],
+            frequency: result.frequency,
+            followupStartDate: result.startFrom ? new Date(result.startFrom) : null,
+            nextFollowUpDate: result.nextFollowUpDate ? new Date(result.nextFollowUpDate) : null,
+            stopReason: result.stopReason,
+            proofText: result.proofText,
+            stopRemarks: result.stopRemarks,
+            proofImagePath: result.proofImagePath,
+            assignmentStatus: result.assignmentStatus,
+            createdAt: result.createdAt,
+        };
     }
 }

@@ -2,14 +2,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { AlertCircle, FileText, Loader2 } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDate } from '@/hooks/useFormatedDate';
-import { TenderView } from '@/modules/tendering/tenders/components/TenderView';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { InfoSheetView } from '@/modules/tendering/info-sheet/components/InfoSheetView';
-import { useTender } from '@/hooks/api/useTenders';
-import { useInfoSheet } from '@/hooks/api/useInfoSheets';
 
 interface DemandDraftViewProps {
     data: any;
@@ -43,235 +38,197 @@ export function DemandDraftView({
         return null;
     }
 
-    // If Tender Id exist
-    const tenderId = Number.isNaN(data.tenderId) ? null : data.tenderId;
-    const { data: tender, isLoading: isTenderLoading } = useTender(tenderId);
-    const { data: infoSheet, isLoading: infoSheetLoading, error: infoSheetError } = useInfoSheet(tenderId);
-
     return (
-        <>
-            <Card className={className}>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <FileText className="h-5 w-5" />
-                        Demand Draft Details
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableBody>
-                            {/* Basic Information */}
-                            <TableRow className="bg-muted/50">
-                                <TableCell colSpan={4} className="font-semibold text-sm">
-                                    Basic Information
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Request ID
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.requestId ?? '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Request Type
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.requestType || '—'}
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Status
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    <Badge variant="outline">{data.status || '—'}</Badge>
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Purpose
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.purpose || data.requestPurpose || '—'}
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Requested By
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.requestedByName || '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Courier Address
-                                </TableCell>
-                                <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
-                                    {data.courierAddress || '—'}
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Courier Request Number
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.reqNo || '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
-                                    DD No
-                                </TableCell>
-                                <TableCell className="text-sm font-semibold w-1/4">
-                                    {data.ddNo || '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
-                                    DD Date
-                                </TableCell>
-                                <TableCell className="text-sm w-1/4">
-                                    {data.ddDate ? formatDate(data.ddDate) : '—'}
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Amount
-                                </TableCell>
-                                <TableCell className="text-sm font-semibold">
-                                    {data.amount ? formatINR(Number(data.amount)) : '—'}
-                                </TableCell>
-                            </TableRow>
+        <Card className={className}>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Demand Draft Details
+                </CardTitle>
+            </CardHeader>
+            <CardContent>
+                <Table>
+                    <TableBody>
+                        {/* Basic Information */}
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                Basic Information
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Request ID
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.requestId ?? '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Request Type
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.requestType || '—'}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Status
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                <Badge variant="outline">{data.status || '—'}</Badge>
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Purpose
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.purpose || data.requestPurpose || '—'}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Requested By
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.requestedByName || '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Courier Address
+                            </TableCell>
+                            <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
+                                {data.courierAddress || '—'}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Courier Request Number
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.reqNo || '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                DD No
+                            </TableCell>
+                            <TableCell className="text-sm font-semibold w-1/4">
+                                {data.ddNo || '—'}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                DD Date
+                            </TableCell>
+                            <TableCell className="text-sm w-1/4">
+                                {data.ddDate ? formatDate(data.ddDate) : '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Amount
+                            </TableCell>
+                            <TableCell className="text-sm font-semibold">
+                                {data.amount ? formatINR(Number(data.amount)) : '—'}
+                            </TableCell>
+                        </TableRow>
 
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Docket No
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.docketNo || '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Issue Date
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.issueDate ? formatDate(data.issueDate) : '—'}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Expiry Date
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.expiryDate ? formatDate(data.expiryDate) : '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Request Status
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.requestStatus || '—'}
+                            </TableCell>
+                            <TableCell colSpan={2} />
+                        </TableRow>
+                        {data.requestRemarks && (
                             <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Docket No
+                                    Remarks
                                 </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.docketNo || '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Issue Date
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.issueDate ? formatDate(data.issueDate) : '—'}
+                                <TableCell className="text-sm break-words" colSpan={3}>
+                                    {data.requestRemarks}
                                 </TableCell>
                             </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Expiry Date
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.expiryDate ? formatDate(data.expiryDate) : '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Request Status
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.requestStatus || '—'}
-                                </TableCell>
-                                <TableCell colSpan={2} />
-                            </TableRow>
-                            {data.requestRemarks && (
+                        )}
+
+                        {/* DD Details */}
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                DD Details
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                DD Needs
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.ddNeeds || '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                DD Purpose
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.ddPurpose || '—'}
+                            </TableCell>
+                        </TableRow>
+
+                        {/* Payable At Information */}
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                Payable At Information
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Payable At
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.payableAt || '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground whitespace-normal [overflow-wrap:anywhere]">
+                                Favouring
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.favouring || '—'}
+                            </TableCell>
+                        </TableRow>
+
+                        {/* Remarks */}
+                        {data.ddRemarks && (
+                            <>
+                                <TableRow className="bg-muted/50">
+                                    <TableCell colSpan={4} className="font-semibold text-sm">
+                                        Additional Information
+                                    </TableCell>
+                                </TableRow>
                                 <TableRow className="hover:bg-muted/30 transition-colors">
                                     <TableCell className="text-sm font-medium text-muted-foreground">
                                         Remarks
                                     </TableCell>
                                     <TableCell className="text-sm break-words" colSpan={3}>
-                                        {data.requestRemarks}
+                                        {data.ddRemarks || '—'}
                                     </TableCell>
                                 </TableRow>
-                            )}
-
-                            {/* DD Details */}
-                            <TableRow className="bg-muted/50">
-                                <TableCell colSpan={4} className="font-semibold text-sm">
-                                    DD Details
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    DD Needs
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.ddNeeds || '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    DD Purpose
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.ddPurpose || '—'}
-                                </TableCell>
-                            </TableRow>
-
-                            {/* Payable At Information */}
-                            <TableRow className="bg-muted/50">
-                                <TableCell colSpan={4} className="font-semibold text-sm">
-                                    Payable At Information
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Payable At
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.payableAt || '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground whitespace-normal [overflow-wrap:anywhere]">
-                                    Favouring
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.favouring || '—'}
-                                </TableCell>
-                            </TableRow>
-
-                            {/* Remarks */}
-                            {data.ddRemarks && (
-                                <>
-                                    <TableRow className="bg-muted/50">
-                                        <TableCell colSpan={4} className="font-semibold text-sm">
-                                            Additional Information
-                                        </TableCell>
-                                    </TableRow>
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Remarks
-                                        </TableCell>
-                                        <TableCell className="text-sm break-words" colSpan={3}>
-                                            {data.ddRemarks || '—'}
-                                        </TableCell>
-                                    </TableRow>
-                                </>
-                            )}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
-            <div className='space-y-5'>
-                {isTenderLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    </div>
-                ) : tender ? (
-                    <TenderView tender={tender} />
-                ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                        No tender details found
-                    </div>
-                )}
-                {infoSheetLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    </div>
-                ) : infoSheetError ? (
-                    <Alert variant="destructive" className="mb-4">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>
-                            Failed to load info sheet details
-                        </AlertDescription>
-                    </Alert>
-                ) : infoSheet ? (
-                    <InfoSheetView infoSheet={infoSheet} />
-                ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                        No info sheet details found
-                    </div>
-                )}
-            </div>
-        </>
+                            </>
+                        )}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
     );
 }
