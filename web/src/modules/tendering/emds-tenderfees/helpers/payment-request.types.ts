@@ -19,7 +19,7 @@ export type EmdRequestFormValues = PaymentRequestFormValues;
 export type OldEmdRequestFormValues = OldEntryPaymentRequestFormValues;
 export type BiOtherThanEmdRequestFormValues = BiOtherThanTenderRequestFormValues;
 
-export type PaymentPurpose = "EMD" | "Tender Fee" | "Processing Fee";
+export type PaymentPurpose = "EMD" | "Tender Fee" | "Processing Fee" | "Security Deposit" | "Performance BG" | "Surety Bond" | "Other Payment";
 
 export type InstrumentType = "DD" | "FDR" | "BG" | "Cheque" | "Bank Transfer" | "Portal Payment";
 
@@ -44,11 +44,12 @@ export type DashboardStatus =
 export interface DashboardRow {
     id: number | null;
     type: DashboardRowType;
-    purpose: PaymentPurpose;
+    purpose: string;
     amountRequired: string;
     status: DashboardStatus;
     instrumentType: InstrumentType | null;
     instrumentStatus: string | null;
+    favouring: string | null;
     createdAt: string | null; // ISO string from API
     tenderId: number;
     tenderNo: string;
@@ -92,7 +93,7 @@ export type EmdDashboardFilters = {
 export interface EmdDashboardRow {
     id: number | null;
     type: "request" | "missing";
-    purpose: "EMD" | "Tender Fee" | "Processing Fee";
+    purpose: "EMD" | "Tender Fee" | "Processing Fee" | "Security Deposit" | "Performance BG" | "Surety Bond" | "Other Payment";
     amountRequired: string;
     status: string;
     instrumentType: string | null;
