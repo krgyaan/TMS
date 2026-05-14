@@ -129,7 +129,7 @@ const Rfqs = () => {
             },
             {
                 key: 'responses' as const,
-                name: 'Responses Recorded',
+                name: 'RFQ Quotations',
                 count: counts?.responses ?? 0,
             },
             {
