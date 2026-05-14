@@ -102,8 +102,8 @@ export const useUpdateDemandDraftAction = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, formData }: { id: number; formData: FormData }) =>
-            demandDraftsService.updateAction(id, formData),
+        mutationFn: ({ id, data }: { id: number; data: any }) =>
+            demandDraftsService.updateAction(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: demandDraftsKey.all });
             queryClient.invalidateQueries({ queryKey: demandDraftsKey.counts() });
