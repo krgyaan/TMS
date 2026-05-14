@@ -282,7 +282,7 @@ export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mod
                                 courierData={data ? {
                                     courierName: data.courierName,
                                     courierPhone: data.courierPhone,
-                                    courierAddressLine1: data.courierAddressLine1,
+                                    courierAddressLine1: data.courierAddressLine1 || data.courierAddress,
                                     courierAddressLine2: data.courierAddressLine2,
                                     courierCity: data.courierCity,
                                     courierState: data.courierState,
@@ -303,7 +303,7 @@ export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mod
                                 courierData={data ? {
                                     courierName: data.courierName,
                                     courierPhone: data.courierPhone,
-                                    courierAddressLine1: data.courierAddressLine1,
+                                    courierAddressLine1: data.courierAddressLine1 || data.courierAddress,
                                     courierAddressLine2: data.courierAddressLine2,
                                     courierCity: data.courierCity,
                                     courierState: data.courierState,
@@ -324,7 +324,7 @@ export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mod
                                 courierData={data ? {
                                     courierName: data.courierName,
                                     courierPhone: data.courierPhone,
-                                    courierAddressLine1: data.courierAddressLine1,
+                                    courierAddressLine1: data.courierAddressLine1 || data.courierAddress,
                                     courierAddressLine2: data.courierAddressLine2,
                                     courierCity: data.courierCity,
                                     courierState: data.courierState,

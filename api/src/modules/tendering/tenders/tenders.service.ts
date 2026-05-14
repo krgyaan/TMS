@@ -583,6 +583,7 @@ export class TenderInfosService {
                 emdMode: tenderInfos.emdMode,
                 tenderFees: tenderInfos.tenderFees,
                 tenderFeeMode: tenderInfos.tenderFeeMode,
+                processingFeeMode: tenderInfos.processingFeeMode,
             })
             .from(tenderInfos)
             .leftJoin(users, eq(tenderInfos.teamMember, users.id))
@@ -596,7 +597,6 @@ export class TenderInfosService {
         const infoSheet = await this.db
             .select({
                 processingFeeAmount: tenderInformation.processingFeeAmount,
-                processingFeeMode: tenderInformation.processingFeeMode,
                 courierName: tenderInformation.courierName,
                 courierPhone: tenderInformation.courierPhone,
                 courierAddress: tenderInformation.courierAddress,

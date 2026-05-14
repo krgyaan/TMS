@@ -764,7 +764,7 @@ export class PaymentRequestsQueryService {
         };
     }
 
-async findByIdWithTender(requestId: number) {
+    async findByIdWithTender(requestId: number) {
         const [request] = await this.db
             .select({
                 id: paymentRequests.id,
