@@ -53,7 +53,7 @@ const TenderListPage = () => {
     }
 
     const elligibleForEditing = (row) => {
-        if([0,1,2].includes(row.status)){
+        if([0,1,2,29].includes(row.status)){
             return true;
         } else {
             return false;
