@@ -76,8 +76,8 @@ class DemandDraftsService extends BaseApiService {
         return this.get<any>(`/instruments/${id}/followup`);
     }
 
-    async updateAction(id: number, formData: FormData): Promise<any> {
-        return this.put<any, FormData>(`/instruments/${id}/action`, formData);
+    async updateAction(id: number, data: any): Promise<any> {
+        return this.patch<any, any>(`/instruments/${id}/action`, data);
     }
 }
 

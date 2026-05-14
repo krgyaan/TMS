@@ -265,8 +265,7 @@ export class DemandDraftService {
 
     async updateAction(
         instrumentId: number,
-        body: any,
-        files: Express.Multer.File[],
+        body: Record<string, any>,
         user: any,
     ) {
         const [instrument] = await this.db
@@ -293,44 +292,6 @@ export class DemandDraftService {
             }
         }
 
-        // Track file index for processing files in order
-        const fileIndexTracker = { current: 0 };
-
-        const filePaths: string[] = [];
-        if (files && files.length > 0) {
-            for (const file of files) {
-                const relativePath = `bi-dashboard/${file.filename}`;
-                filePaths.push(relativePath);
-            }
-        }
-
-        /**
-         * Get single file for a field by checking if body field exists or if it's a file path string
-         */
-        const getFileForField = (
-            fieldname: string,
-            files: Express.Multer.File[],
-            body: any,
-            fileIndexTracker: { current: number }
-        ): Express.Multer.File | null => {
-            if (body[fieldname] !== undefined && files.length > fileIndexTracker.current) {
-                const file = files[fileIndexTracker.current];
-                fileIndexTracker.current++;
-                return file;
-            }
-            return null;
-        };
-
-        /**
-         * Get file path from body if it's a string (from TenderFileUploader)
-         */
-        const getFilePathFromBody = (fieldname: string, body: any): string | null => {
-            if (body[fieldname] && typeof body[fieldname] === 'string') {
-                return body[fieldname];
-            }
-            return null;
-        };
-
         const updateData: any = {
             action: actionNumber,
             updatedAt: new Date(),
@@ -347,16 +308,7 @@ export class DemandDraftService {
             updateData.status = DD_STATUSES.FOLLOWUP_INITIATED;
         } else if (body.action === 'returned-courier') {
             updateData.status = DD_STATUSES.RETURN_VIA_COURIER;
-            // Handle docket_slip file or path
-            const docketSlipFile = getFileForField('docket_slip', files, body, fileIndexTracker);
-            const docketSlipPath = getFilePathFromBody('docket_slip', body);
-            if (docketSlipFile) {
-                updateData.docketSlip = `bi-dashboard/${docketSlipFile.filename}`;
-            } else if (docketSlipPath) {
-                updateData.docketSlip = docketSlipPath;
-            } else if (filePaths.length > 0) {
-                updateData.docketSlip = filePaths[0];
-            }
+            updateData.docketSlip = body.docket_slip || null;
         } else if (body.action === 'returned-bank-transfer') {
             updateData.status = DD_STATUSES.RETURN_VIA_BANK_TRANSFER;
             if (body.transfer_date) updateData.transferDate = body.transfer_date;
