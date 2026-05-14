@@ -657,7 +657,7 @@ export class TenderInfoSheetsService {
                 );
             }
 
-            // await this.sendInfoSheetFilledEmail(tenderId, result, changedBy);
+            await this.sendInfoSheetFilledEmail(tenderId, result, changedBy);
 
             return result;
         } catch (error: any) {
