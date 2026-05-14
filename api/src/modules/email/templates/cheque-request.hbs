@@ -10,12 +10,17 @@
         <li>Cheque Date: {{data.chequeDate}}</li>
         <li>Amount: Rs. {{data.amount}}</li>
     </ul>
-    <p>This cheque is required within {{data.chequeNeeds}} Hrs.</p>
+    <p>This cheque is required within 3 Hrs.</p>
 
     <p>
-        Please make the cheque within the shared time limit and share the Soft copy of the cheque and the Positive pay confirmation, 
-        if applicable, with us on time using the link: <a href="{{data.link}}">Click here</a>
+        Please make the cheque within the time limit and share the Soft copy of the cheque and <br /> receiving (Format attached) with Sunil on time using the <a href="{{data.link}}">link</a>.
     </p>
+
+    {{#if data.receivingPdfUrl}}
+    <p>
+        Receiving Form: <a href="{{data.receivingPdfUrl}}">Download Receiving Form</a>
+    </p>
+    {{/if}}
 
     <p>"Ensuring timely operations is the only source of growth"</p>
     <br />

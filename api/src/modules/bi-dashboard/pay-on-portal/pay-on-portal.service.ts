@@ -415,6 +415,7 @@ export class PayOnPortalService {
                 await this.notificationService.sendPopActionEmail(
                     instrumentId,
                     body.pop_req,
+                    body.purpose,
                     body.payment_datetime ? new Date(body.payment_datetime).toISOString() : undefined,
                     body.utr_no || undefined,
                     body.utr_message || undefined,

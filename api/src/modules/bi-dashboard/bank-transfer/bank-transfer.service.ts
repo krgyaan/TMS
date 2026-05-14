@@ -366,6 +366,7 @@ export class BankTransferService {
                     await this.notificationService.sendBtActionEmail(
                         instrumentId,
                         body.bt_req,
+                        body.purpose,
                         body.payment_datetime ? new Date(body.payment_datetime).toISOString() : undefined,
                         body.utr_no || undefined,
                         body.utr_message || undefined,

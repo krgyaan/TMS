@@ -245,6 +245,20 @@ export class PaymentRequestsNotificationService {
             return `₹${amount.toLocaleString('en-IN')}`;
         };
 
+        // Format date as DD-MM-YYYY
+        const formatDateDDMMYYYY = (dateStr: string | null | undefined): string => {
+            if (!dateStr) return '';
+            try {
+                const d = new Date(dateStr);
+                const day = String(d.getDate()).padStart(2, '0');
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const year = d.getFullYear();
+                return `${day}-${month}-${year}`;
+            } catch {
+                return dateStr;
+            }
+        };
+
         const mode = instrumentType.toUpperCase();
 
         const toEmails = this.getResponsibleUserByMode(mode);
@@ -346,16 +360,40 @@ export class PaymentRequestsNotificationService {
 
             let finalPurpose = purpose || 'Payment';
             let finalPartyName = instrument.favouring || 'Not specified';
-            let finalChequeDate = instrument.issueDate || new Date().toISOString().split('T')[0];
+            let finalChequeDate = formatDateDDMMYYYY(instrument.issueDate) || formatDateDDMMYYYY(new Date().toISOString());
+            let receivingPdfUrl = '';
 
-            if (chequeDetails?.linkedDdId) {
-                finalPurpose = 'DD';
-                finalPartyName = 'Yourself for DD';
-                finalChequeDate = new Date().toISOString().split('T')[0];
-            } else if (chequeDetails?.linkedFdrId) {
-                finalPurpose = 'FDR';
-                finalPartyName = 'Yourself for FDR';
-                finalChequeDate = new Date().toISOString().split('T')[0];
+            if (chequeDetails?.linkedDdId || chequeDetails?.linkedFdrId) {
+                const linkedType = chequeDetails?.linkedDdId ? 'DD' : 'FDR';
+                finalPurpose = linkedType;
+                finalPartyName = `Yourself for ${linkedType}`;
+                finalChequeDate = formatDateDDMMYYYY(new Date().toISOString());
+
+                try {
+                    const pdfPaths = await this.pdfGenerator.generatePdfs(
+                        'chqCret',
+                        {
+                            cheque_date: finalChequeDate,
+                            cheque_amt: instrument.amount,
+                            cheque_favour: instrument.favouring || 'Not specified',
+                        },
+                        instrumentId,
+                        linkedType
+                    );
+
+                    if (pdfPaths.length > 0) {
+                        await this.db
+                            .update(paymentInstruments)
+                            .set({ generatedPdf: pdfPaths[0] })
+                            .where(eq(paymentInstruments.id, instrumentId));
+
+                        const apiUrl = this.configService.get<string>('app.apiUrl') || '';
+                        const baseUrl = apiUrl.replace('/api/v1', '');
+                        receivingPdfUrl = `${baseUrl}/uploads/tendering/${pdfPaths[0]}`;
+                    }
+                } catch (error) {
+                    this.logger.error(`Failed to generate receiving PDF for cheque ${instrumentId}:`, error);
+                }
             }
 
             try {
@@ -364,7 +402,7 @@ export class PaymentRequestsNotificationService {
                     tenderId: tenderId || undefined,
                     eventType: 'CHEQUE_REQUEST',
                     fromUserId: requestedBy,
-                    subject: `Cheque Request - ${finalPurpose}`,
+                    subject: `New Cheque - ${finalPurpose}`,
                     template: 'cheque-request',
                     data: {
                         purpose: finalPurpose,
@@ -374,6 +412,7 @@ export class PaymentRequestsNotificationService {
                         chequeNeeds: instrument.courierDeadline || 24,
                         link: `#/tendering/emds/${instrument.requestId}`,
                         tlName: tlUser?.name || 'Team Leader',
+                        receivingPdfUrl,
                     },
                     to: [{ type: 'emails', emails: ['gyan@volksenergie.in'] }],
                     // cc: [
@@ -396,6 +435,7 @@ export class PaymentRequestsNotificationService {
 
     async sendBtActionEmail(
         instrumentId: number,
+        purpose: string,
         btReq: 'Accepted' | 'Rejected',
         paymentDateTime?: string,
         utrNo?: string,
@@ -472,7 +512,7 @@ export class PaymentRequestsNotificationService {
                 tenderId: instrument.tenderId || undefined,
                 eventType: 'BT_ACTION',
                 fromUserId: 13,
-                subject: `Bank Transfer - ${status === 'accepted' ? 'Accepted' : 'Rejected'}`,
+                subject: `Payment via Bank Transfer ${purpose}`,
                 template: 'bt-action',
                 data: {
                     tenderExecutive: requestedUser.name,
@@ -505,6 +545,7 @@ export class PaymentRequestsNotificationService {
 
     async sendPopActionEmail(
         instrumentId: number,
+        purpose: string,
         popReq: 'Accepted' | 'Rejected',
         paymentDateTime?: string,
         utrNo?: string,
@@ -589,7 +630,7 @@ export class PaymentRequestsNotificationService {
                 tenderId: instrument.tenderId || undefined,
                 eventType: 'POP_ACTION',
                 fromUserId: 13,
-                subject: `Pay on Portal - ${status === 'accepted' ? 'Accepted' : 'Rejected'}`,
+                subject: `Payment on Portal - ${purpose}`,
                 template: 'pop-action',
                 data: {
                     tenderExecutive: requestedUser.name,
