@@ -24,12 +24,14 @@ import { useTenderingPermissions } from "../hooks/useTenderingPermissions";
 import { formatINR } from "@/hooks/useINRFormatter";
 
 const TABS = [
-    { value: 'pending', label: 'EMD Request Pending' },
-    { value: 'sent', label: 'EMD Request Sent' },
-    { value: 'approved', label: 'EMD Paid' },
-    { value: 'rejected', label: 'EMD Rejected' },
-    { value: 'returned', label: 'EMD Returned' },
-    { value: 'tender-dnb', label: 'Tender DNB' },
+    { value: 'pending', label: 'Request Pending' },
+    { value: 'sent', label: 'Request Sent' },
+    { value: 'paid', label: 'EMD Paid' },
+    { value: 'rejected', label: 'Rejected' },
+    { value: 'returned', label: 'Returned' },
+    { value: 'fees', label: 'Tender/Processing Fees' },
+    { value: 'others', label: 'Others' },
+    { value: 'dnb', label: 'DNB' },
 ] as const;
 
 type TabValue = typeof TABS[number]['value'];
@@ -105,7 +107,7 @@ const EmdsAndTenderFeesPage = () => {
     const totalRows = dashboardData?.meta?.total || dashboardData?.data?.length || 0;
 
     const columnDefs = useMemo<ColDef<any>[]>(() => {
-        const isPendingTab = activeTab === 'pending' || activeTab === 'tender-dnb';
+        const isPendingTab = activeTab === 'pending' || activeTab === 'dnb';
 
         // ─── Shared columns ───
         const tenderDetailsCol = tenderNameCol<any>('tenderName', {
@@ -301,7 +303,7 @@ const EmdsAndTenderFeesPage = () => {
                         onClick: (r) => navigate(paths.tendering.emdsTenderFeesEdit(r.id)),
                     });
                 }
-                if (activeTab === 'approved') {
+                if (activeTab === 'paid') {
                     actions.unshift({
                         label: 'Follow Up',
                         icon: <Send className="w-4 h-4" />,
@@ -380,8 +382,8 @@ const EmdsAndTenderFeesPage = () => {
                 case 'sent':
                     count = counts.sent ?? 0;
                     break;
-                case 'approved':
-                    count = counts.approved ?? 0;
+                case 'paid':
+                    count = counts.paid ?? 0;
                     break;
                 case 'rejected':
                     count = counts.rejected ?? 0;
@@ -389,8 +391,14 @@ const EmdsAndTenderFeesPage = () => {
                 case 'returned':
                     count = counts.returned ?? 0;
                     break;
-                case 'tender-dnb':
-                    count = counts.tenderDnb ?? 0;
+                case 'fees':
+                    count = counts.fees ?? 0;
+                    break;
+                case 'others':
+                    count = counts.others ?? 0;
+                    break;
+                case 'dnb':
+                    count = counts.dnb ?? 0;
                     break;
             }
         }

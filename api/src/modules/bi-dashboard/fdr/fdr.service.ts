@@ -14,6 +14,7 @@ import { FDR_STATUSES } from "@/modules/tendering/payment-requests/constants/pay
 import { FollowUpService } from "@/modules/follow-up/follow-up.service";
 import type { CreateFollowUpDto } from "@/modules/follow-up/zod/create-follow-up.dto";
 import { followUps } from "@/db/schemas/shared/follow-ups.schema";
+import { couriers } from "@/db/schemas/shared/couriers.schema";
 
 @Injectable()
 export class FdrService {
@@ -686,6 +687,7 @@ export class FdrService {
                 fdrExpiryDate: instrumentFdrDetails.fdrExpiryDate,
                 fdrNeeds: instrumentFdrDetails.fdrNeeds,
                 fdrRemark: instrumentFdrDetails.fdrRemark,
+                reqNo: paymentInstruments.reqNo,
             })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
@@ -704,6 +706,32 @@ export class FdrService {
         const hasAccountsFormData = result.action != null && result.action >= 1;
         const hasReturnedData = result.action != null && result.action >= 3;
         const hasSettledData = result.action === 4 || result.action === 7;
+
+        let courierDetails: any = null;
+        if (result.reqNo) {
+            const courierId = Number(result.reqNo);
+            if (!isNaN(courierId)) {
+                const [courier] = await this.db
+                    .select()
+                    .from(couriers)
+                    .where(eq(couriers.id, courierId))
+                    .limit(1);
+                if (courier) {
+                    courierDetails = {
+                        id: courier.id,
+                        toOrg: courier.toOrg,
+                        toName: courier.toName,
+                        toAddr: courier.toAddr,
+                        toPin: courier.toPin,
+                        toMobile: courier.toMobile,
+                        trackingNumber: courier.trackingNumber,
+                        courierProvider: courier.courierProvider,
+                        docketNo: courier.docketNo,
+                        status: courier.status,
+                    };
+                }
+            }
+        }
 
         return {
             id: result.id,
@@ -724,6 +752,8 @@ export class FdrService {
             fdrExpiryDate: result.fdrExpiryDate ? new Date(result.fdrExpiryDate) : null,
             fdrNeeds: result.fdrNeeds,
             fdrRemark: result.fdrRemark,
+            reqNo: result.reqNo,
+            courierDetails,
             courierAddress: result.courierAddress,
             courierAddressJson: result.courierAddressJson as Record<string, any> | null,
             courierDeadline: result.courierDeadline ? Number(result.courierDeadline) : null,

@@ -1,4 +1,4 @@
-import type { PaymentRequestFormValues, PaymentDetailsFormValues } from './payment-request.schema';
+import type { PaymentRequestFormValues, PaymentDetailsFormValues, OldEntryPaymentRequestFormValues, BiOtherThanTenderRequestFormValues } from './payment-request.schema';
 import type { TimerStatus } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
 
 /**
@@ -62,9 +62,12 @@ export interface DashboardRow {
 export interface DashboardCounts {
     pending: number;
     sent: number;
-    approved: number;
+    paid: number;
     rejected: number;
     returned: number;
+    fees: number;
+    others: number;
+    dnb: number;
     total: number;
 }
 
@@ -73,11 +76,11 @@ export interface DashboardResponse {
     counts: DashboardCounts;
 }
 
-export type DashboardTab = "pending" | "sent" | "approved" | "rejected" | "returned" | "all";
+export type DashboardTab = "pending" | "sent" | "paid" | "rejected" | "returned" | "fees" | "others" | "dnb";
 
 export type EmdDashboardFilters = {
     search?: string;
-    tab?: 'pending' | 'sent' | 'approved' | 'rejected' | 'returned' | 'tender-dnb';
+    tab?: 'pending' | 'sent' | 'paid' | 'rejected' | 'returned' | 'fees' | 'others' | 'dnb';
     userId?: number;
     teamId?: number;
     page?: number;
@@ -116,10 +119,12 @@ export interface EmdDashboardRowWithTimer extends EmdDashboardRow {
 export interface EmdDashboardCounts {
     pending: number;
     sent: number;
-    approved: number;
+    paid: number;
     rejected: number;
     returned: number;
-    tenderDnb: number;
+    fees: number;
+    others: number;
+    dnb: number;
     total: number;
 }
 

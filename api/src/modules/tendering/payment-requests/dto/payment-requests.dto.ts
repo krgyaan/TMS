@@ -262,15 +262,14 @@ export type UpdateStatusDto = z.infer<typeof UpdateStatusSchema>;
 export const DashboardQuerySchema = z.object({
     tab: z.enum([
         "pending",
-        "request-sent",
-        "paid",
         "sent",
-        "approved",
+        "paid",
         "rejected",
         "returned",
-        "all",
-        "tender-dnb",
-    ]).optional().default("all"),
+        "fees",
+        "others",
+        "dnb",
+    ]).optional().default("pending"),
     userId: z.coerce.number().optional(),
     page: z.coerce.number().int().positive().optional(),
     limit: z.coerce.number().int().positive().optional(),
@@ -318,10 +317,12 @@ export interface DashboardRow {
 export interface DashboardCounts {
     pending: number;
     sent: number;
-    approved: number;
+    paid: number;
     rejected: number;
     returned: number;
-    tenderDnb: number;
+    fees: number;
+    others: number;
+    dnb: number;
     total: number;
 }
 
@@ -364,13 +365,16 @@ export interface PaymentRequestRow {
 export interface DashboardCounts {
     pending: number;
     sent: number;
-    approved: number;
+    paid: number;
     rejected: number;
     returned: number;
+    fees: number;
+    others: number;
+    dnb: number;
     total: number;
 }
 
-export type DashboardTab = 'pending' | 'sent' | 'approved' | 'rejected' | 'returned' | 'tender-dnb';
+export type DashboardTab = 'pending' | 'sent' | 'paid' | 'rejected' | 'returned' | 'fees' | 'others' | 'dnb';
 
 export interface PendingTabResponse {
     data: PendingTenderRow[];

@@ -109,16 +109,19 @@ export function DemandDraftView({
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">
-                                Courier Request Number
+                                Courier Details
                             </TableCell>
-                            <TableCell className="text-sm">
-                                {data.reqNo || '—'}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
-                                DD No
-                            </TableCell>
-                            <TableCell className="text-sm font-semibold w-1/4">
-                                {data.ddNo || '—'}
+                            <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]" colSpan={3}>
+                                {data.courierDetails ? (
+                                    <div className="space-y-0.5">
+                                        <div><span className="font-medium">Organisation:</span> {data.courierDetails.toOrg || '—'}</div>
+                                        <div><span className="font-medium">Contact:</span> {data.courierDetails.toName || '—'} {data.courierDetails.toMobile ? `(${data.courierDetails.toMobile})` : ''}</div>
+                                        <div><span className="font-medium">Address:</span> {data.courierDetails.toAddr || '—'} {data.courierDetails.toPin ? `- ${data.courierDetails.toPin}` : ''}</div>
+                                        {data.courierDetails.trackingNumber && <div><span className="font-medium">Tracking:</span> {data.courierDetails.trackingNumber}</div>}
+                                        {data.courierDetails.courierProvider && <div><span className="font-medium">Provider:</span> {data.courierDetails.courierProvider}</div>}
+                                        {data.courierDetails.docketNo && <div><span className="font-medium">Docket No:</span> {data.courierDetails.docketNo}</div>}
+                                    </div>
+                                ) : (data.reqNo || '—')}
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -133,6 +136,20 @@ export function DemandDraftView({
                             </TableCell>
                             <TableCell className="text-sm font-semibold">
                                 {data.amount ? formatINR(Number(data.amount)) : '—'}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                DD No
+                            </TableCell>
+                            <TableCell className="text-sm font-semibold w-1/4">
+                                {data.ddNo || '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Docket No
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.docketNo || '—'}
                             </TableCell>
                         </TableRow>
 

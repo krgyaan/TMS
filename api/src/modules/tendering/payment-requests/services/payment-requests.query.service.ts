@@ -2,10 +2,11 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
-import { eq, and, or, inArray, gt, sql, desc, asc } from 'drizzle-orm';
+import { eq, and, or, inArray, gt, sql, desc, asc, not } from 'drizzle-orm';
 import { paymentRequests, paymentInstruments, instrumentDdDetails, instrumentFdrDetails, instrumentBgDetails, instrumentChequeDetails, instrumentTransferDetails } from '@db/schemas/tendering/payment-requests.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { tenderInformation } from '@/db/schemas/tendering/tender-info-sheet.schema';
+import { couriers } from '@/db/schemas/shared/couriers.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { statuses } from '@/db/schemas/master/statuses.schema';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
@@ -30,7 +31,7 @@ export class PaymentRequestsQueryService {
     // ============================================================================
 
     async getDashboardData(
-        tab: DashboardTab = 'pending',
+        tab: string = 'pending',
         user?: ValidatedUser,
         teamId?: number,
         pagination?: { page?: number; limit?: number },
@@ -40,7 +41,7 @@ export class PaymentRequestsQueryService {
         const counts = await this.getDashboardCounts(user, teamId);
 
         if (tab === 'pending') return this.getPendingTenders(user, teamId, pagination, sort, counts, search);
-        if (tab === 'tender-dnb') return this.getTenderDnbTenders(user, teamId, pagination, sort, counts, search);
+        if (tab === 'dnb') return this.getTenderDnbTenders(user, teamId, pagination, sort, counts, search);
 
         return this.getPaymentRequestsByTab(tab, user, teamId, pagination, sort, counts, search);
     }
@@ -53,11 +54,13 @@ export class PaymentRequestsQueryService {
         return {
             pending: pendingCount,
             sent: requestCounts.sent,
-            approved: requestCounts.approved,
+            paid: requestCounts.paid,
             rejected: requestCounts.rejected,
             returned: requestCounts.returned,
-            tenderDnb: tenderDnbCount,
-            total: pendingCount + requestCounts.sent + requestCounts.approved + requestCounts.rejected + requestCounts.returned + tenderDnbCount,
+            fees: requestCounts.fees,
+            others: requestCounts.others,
+            dnb: tenderDnbCount,
+            total: pendingCount + requestCounts.sent + requestCounts.paid + requestCounts.rejected + requestCounts.returned + requestCounts.fees + requestCounts.others + tenderDnbCount,
         };
     }
 
@@ -97,15 +100,17 @@ export class PaymentRequestsQueryService {
     private async countRequestsByStatus(
         user?: ValidatedUser, 
         teamId?: number
-    ): Promise<{ sent: number; approved: number; rejected: number; returned: number; }> {
+    ): Promise<{ sent: number; paid: number; rejected: number; returned: number; fees: number; others: number; }> {
         const roleFilterConditions = buildRequestRoleFilters(user, teamId);
 
         const [result] = await this.db
             .select({
                 sent: sql<number>`COALESCE(SUM(CASE WHEN ${getTabSqlCondition('sent')} THEN 1 ELSE 0 END), 0)`,
-                approved: sql<number>`COALESCE(SUM(CASE WHEN ${getTabSqlCondition('approved')} THEN 1 ELSE 0 END), 0)`,
+                paid: sql<number>`COALESCE(SUM(CASE WHEN ${getTabSqlCondition('paid')} THEN 1 ELSE 0 END), 0)`,
                 rejected: sql<number>`COALESCE(SUM(CASE WHEN ${getTabSqlCondition('rejected')} THEN 1 ELSE 0 END), 0)`,
                 returned: sql<number>`COALESCE(SUM(CASE WHEN ${getTabSqlCondition('returned')} THEN 1 ELSE 0 END), 0)`,
+                fees: sql<number>`COALESCE(SUM(CASE WHEN ${getTabSqlCondition('fees')} THEN 1 ELSE 0 END), 0)`,
+                others: sql<number>`COALESCE(SUM(CASE WHEN ${getTabSqlCondition('others')} THEN 1 ELSE 0 END), 0)`,
             })
             .from(paymentRequests)
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
@@ -113,14 +118,20 @@ export class PaymentRequestsQueryService {
                 eq(paymentInstruments.requestId, paymentRequests.id),
                 eq(paymentInstruments.isActive, true)
             ))
+            .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
             .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
-            .where(roleFilterConditions.length > 0 ? and(...roleFilterConditions) : undefined);
+            .where(and(
+                sql`NOT (${paymentInstruments.instrumentType} = 'Cheque' AND (${instrumentChequeDetails.linkedDdId} IS NOT NULL OR ${instrumentChequeDetails.linkedFdrId} IS NOT NULL))`,
+                ...(roleFilterConditions.length > 0 ? roleFilterConditions : [])
+            ));
 
         return {
             sent: Number(result?.sent || 0),
-            approved: Number(result?.approved || 0),
+            paid: Number(result?.paid || 0),
             rejected: Number(result?.rejected || 0),
             returned: Number(result?.returned || 0),
+            fees: Number(result?.fees || 0),
+            others: Number(result?.others || 0),
         };
     }
 
@@ -295,7 +306,7 @@ export class PaymentRequestsQueryService {
     // ============================================================================
 
     async getPaymentRequestsByTab(
-        tab: DashboardTab,
+        tab: string,
         user?: ValidatedUser,
         teamId?: number,
         pagination?: { page?: number; limit?: number },
@@ -357,9 +368,12 @@ export class PaymentRequestsQueryService {
             orderClause = getDefaultSortByTab(tab);
         }
 
+        const excludeAutoCheque = sql`NOT (${paymentInstruments.instrumentType} = 'Cheque' AND (${instrumentChequeDetails.linkedDdId} IS NOT NULL OR ${instrumentChequeDetails.linkedFdrId} IS NOT NULL))`;
+
         const whereClause = and(
             getTabSqlCondition(tab),
             eq(paymentInstruments.isActive, true),
+            excludeAutoCheque,
             ...roleFilterConditions,
             searchConditions.length > 0 ? sql`(${sql.join(searchConditions, sql` OR `)})` : undefined
         );
@@ -372,6 +386,7 @@ export class PaymentRequestsQueryService {
                 eq(paymentInstruments.requestId, paymentRequests.id),
                 eq(paymentInstruments.isActive, true)
             ))
+            .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
             .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
             .where(whereClause);
 
@@ -396,6 +411,7 @@ export class PaymentRequestsQueryService {
                 instrumentId: paymentInstruments.id,
                 instrumentType: paymentInstruments.instrumentType,
                 instrumentStatus: paymentInstruments.status,
+                favouring: paymentInstruments.favouring,
                 createdAt: paymentRequests.createdAt,
             })
             .from(paymentRequests)
@@ -406,6 +422,7 @@ export class PaymentRequestsQueryService {
                 eq(paymentInstruments.requestId, paymentRequests.id),
                 eq(paymentInstruments.isActive, true)
             ))
+            .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
             .where(whereClause)
             .orderBy(orderClause)
             .limit(limit)
@@ -525,10 +542,10 @@ export class PaymentRequestsQueryService {
                     orderClause = direction(tenderInfos.emd);
                     break;
                 default:
-                    orderClause = getDefaultSortByTab('tender-dnb');
+                    orderClause = getDefaultSortByTab('dnb');
             }
         } else {
-            orderClause = getDefaultSortByTab('tender-dnb');
+            orderClause = getDefaultSortByTab('dnb');
         }
 
         const rows = await this.db
@@ -860,6 +877,8 @@ export class PaymentRequestsQueryService {
                     bankName: instrumentChequeDetails.bankName,
                     chequeNeeds: instrumentChequeDetails.chequeNeeds,
                     chequeReason: instrumentChequeDetails.chequeReason,
+                    linkedDdId: instrumentChequeDetails.linkedDdId,
+                    linkedFdrId: instrumentChequeDetails.linkedFdrId,
                 }).from(instrumentChequeDetails).where(eq(instrumentChequeDetails.instrumentId, instrument.id)).limit(1);
             } else if (instrument.instrumentType === 'Bank Transfer' || instrument.instrumentType === 'Portal Payment') {
                 [details] = await this.db.select({
@@ -996,6 +1015,8 @@ export class PaymentRequestsQueryService {
                     bankName: instrumentChequeDetails.bankName,
                     chequeNeeds: instrumentChequeDetails.chequeNeeds,
                     chequeReason: instrumentChequeDetails.chequeReason,
+                    linkedDdId: instrumentChequeDetails.linkedDdId,
+                    linkedFdrId: instrumentChequeDetails.linkedFdrId,
                 }).from(instrumentChequeDetails).where(eq(instrumentChequeDetails.instrumentId, instrument.id)).limit(1);
             } else if (instrument.instrumentType === 'Bank Transfer' || instrument.instrumentType === 'Portal Payment') {
                 [details] = await this.db.select({
@@ -1014,6 +1035,37 @@ export class PaymentRequestsQueryService {
             return this.mapInstrumentResponse(instrument, details);
         }));
 
+        const instrumentsWithCourier = await Promise.all(instrumentsWithDetails.map(async (inst: any) => {
+            if ((inst.instrumentType === 'DD' || inst.instrumentType === 'FDR') && inst.details?.reqNo) {
+                const courierId = Number(inst.details.reqNo);
+                if (!isNaN(courierId)) {
+                    const [courier] = await this.db
+                        .select()
+                        .from(couriers)
+                        .where(eq(couriers.id, courierId))
+                        .limit(1);
+                    if (courier) {
+                        return {
+                            ...inst,
+                            courierDetails: {
+                                id: courier.id,
+                                toOrg: courier.toOrg,
+                                toName: courier.toName,
+                                toAddr: courier.toAddr,
+                                toPin: courier.toPin,
+                                toMobile: courier.toMobile,
+                                trackingNumber: courier.trackingNumber,
+                                courierProvider: courier.courierProvider,
+                                docketNo: courier.docketNo,
+                                status: courier.status,
+                            },
+                        };
+                    }
+                }
+            }
+            return inst;
+        }));
+
         return {
             request: this.mapPaymentRequest(request),
             tenderId: request.tenderId,
@@ -1024,7 +1076,7 @@ export class PaymentRequestsQueryService {
             amountRequired: request.amountRequired?.toString() || '0',
             status: request.status,
             createdAt: request.createdAt ? request.createdAt.toISOString() : null,
-            instruments: instrumentsWithDetails,
+            instruments: instrumentsWithCourier,
         };
     }
 
@@ -1122,6 +1174,7 @@ export class PaymentRequestsQueryService {
                         fdrExpiryDate: details.fdrExpiryDate,
                         fdrNeeds: details.fdrNeeds,
                         fdrRemark: details.fdrRemark,
+                        reqNo: instrument.reqNo,
                     } : null,
                 };
             case 'BG':
