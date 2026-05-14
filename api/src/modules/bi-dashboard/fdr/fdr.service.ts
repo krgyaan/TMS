@@ -279,31 +279,9 @@ export class FdrService {
         return actionMap[action] || 1;
     }
 
-    /**
-     * Get single file for a field by checking if body field exists or if it's a file path string
-     * Files are processed in order as they appear in the files array
-     */
-    private getFileForField(fieldname: string, files: Express.Multer.File[], body: any, fileIndexTracker: { current: number }): Express.Multer.File | null {
-        // Check if body has this field (indicating a file was uploaded)
-        if (body[fieldname] !== undefined && files.length > fileIndexTracker.current) {
-            const file = files[fileIndexTracker.current];
-            fileIndexTracker.current++;
-            return file;
-        }
-        return null;
-    }
 
-    /**
-     * Get file path from body if it's a string (from TenderFileUploader)
-     */
-    private getFilePathFromBody(fieldname: string, body: any): string | null {
-        if (body[fieldname] && typeof body[fieldname] === "string") {
-            return body[fieldname];
-        }
-        return null;
-    }
 
-    async updateAction(instrumentId: number, body: any, files: Express.Multer.File[], user: any) {
+    async updateAction(instrumentId: number, body: Record<string, any>, user: any) {
         const [instrument] = await this.db.select().from(paymentInstruments).where(eq(paymentInstruments.id, instrumentId)).limit(1);
 
         if (!instrument) {
@@ -324,17 +302,6 @@ export class FdrService {
             }
         }
 
-        // Track file index for processing files in order
-        const fileIndexTracker = { current: 0 };
-
-        const filePaths: string[] = [];
-        if (files && files.length > 0) {
-            for (const file of files) {
-                const relativePath = `bi-dashboard/${file.filename}`;
-                filePaths.push(relativePath);
-            }
-        }
-
         const updateData: any = {
             action: actionNumber,
             updatedAt: new Date(),
@@ -347,18 +314,10 @@ export class FdrService {
                 updateData.status = FDR_STATUSES.ACCOUNTS_FORM_REJECTED;
                 updateData.rejectionReason = body.reason_req || null;
             }
-            // Store file paths from TenderFileUploader (strings) or files
-            const fdrFormatImranFile = this.getFileForField("fdr_format_imran", files, body, fileIndexTracker);
-            const fdrFormatImranPath = this.getFilePathFromBody("fdr_format_imran", body);
-            if (fdrFormatImranFile) {
+            if (body.fdr_format_imran && typeof body.fdr_format_imran === "string") {
                 updateData.legacyData = {
                     ...(instrument.legacyData || {}),
-                    fdr_format_imran: `bi-dashboard/${fdrFormatImranFile.filename}`,
-                };
-            } else if (fdrFormatImranPath) {
-                updateData.legacyData = {
-                    ...(instrument.legacyData || {}),
-                    fdr_format_imran: fdrFormatImranPath,
+                    fdr_format_imran: body.fdr_format_imran,
                 };
             }
             // Store prefilled_signed_fdr files (can be array of paths or files)
@@ -384,15 +343,8 @@ export class FdrService {
             updateData.status = FDR_STATUSES.FOLLOWUP_INITIATED;
         } else if (body.action === "returned-courier") {
             updateData.status = FDR_STATUSES.RETURN_VIA_COURIER;
-            // Handle docket_slip file or path
-            const docketSlipFile = this.getFileForField("docket_slip", files, body, fileIndexTracker);
-            const docketSlipPath = this.getFilePathFromBody("docket_slip", body);
-            if (docketSlipFile) {
-                updateData.docketSlip = `bi-dashboard/${docketSlipFile.filename}`;
-            } else if (docketSlipPath) {
-                updateData.docketSlip = docketSlipPath;
-            } else if (filePaths.length > 0) {
-                updateData.docketSlip = filePaths[0];
+            if (body.docket_slip && typeof body.docket_slip === "string") {
+                updateData.docketSlip = body.docket_slip;
             }
         } else if (body.action === "returned-bank-transfer") {
             updateData.status = FDR_STATUSES.RETURN_VIA_BANK_TRANSFER;
@@ -402,21 +354,11 @@ export class FdrService {
             updateData.status = FDR_STATUSES.SETTLED_WITH_PROJECT;
         } else if (body.action === "request-cancellation") {
             updateData.status = FDR_STATUSES.CANCELLATION_REQUESTED;
-            // Handle covering letter file or path
-            const coveringLetterFile = this.getFileForField("covering_letter", files, body, fileIndexTracker);
-            const coveringLetterPath = this.getFilePathFromBody("covering_letter", body);
-            if (coveringLetterFile) {
-                updateData.coveringLetter = `bi-dashboard/${coveringLetterFile.filename}`;
-            } else if (coveringLetterPath) {
-                updateData.coveringLetter = coveringLetterPath;
+            if (body.covering_letter && typeof body.covering_letter === "string") {
+                updateData.coveringLetter = body.covering_letter;
             }
-            // Handle req_receive file or path
-            const reqReceiveFile = this.getFileForField("req_receive", files, body, fileIndexTracker);
-            const reqReceivePath = this.getFilePathFromBody("req_receive", body);
-            if (reqReceiveFile) {
-                updateData.reqReceive = `bi-dashboard/${reqReceiveFile.filename}`;
-            } else if (reqReceivePath) {
-                updateData.reqReceive = reqReceivePath;
+            if (body.req_receive && typeof body.req_receive === "string") {
+                updateData.reqReceive = body.req_receive;
             }
             // Store cancellation remarks
             if (body.cancellation_remarks) {
@@ -469,18 +411,10 @@ export class FdrService {
             if (body.fdr_percentage) fdrDetailsUpdate.marginPercent = body.fdr_percentage;
             if (body.fdr_amount) fdrDetailsUpdate.fdrAmt = body.fdr_amount;
             if (body.fdr_roi) fdrDetailsUpdate.roi = body.fdr_roi;
-            // Handle sfms_confirmation file or path
-            const sfmsConfFile = this.getFileForField("sfms_confirmation", files, body, fileIndexTracker);
-            const sfmsConfPath = this.getFilePathFromBody("sfms_confirmation", body);
-            if (sfmsConfFile) {
+            if (body.sfms_confirmation && typeof body.sfms_confirmation === "string") {
                 updateData.legacyData = {
                     ...(instrument.legacyData || {}),
-                    sfms_confirmation: `bi-dashboard/${sfmsConfFile.filename}`,
-                };
-            } else if (sfmsConfPath) {
-                updateData.legacyData = {
-                    ...(instrument.legacyData || {}),
-                    sfms_confirmation: sfmsConfPath,
+                    sfms_confirmation: body.sfms_confirmation,
                 };
             }
             // Store charges in legacyData
@@ -495,18 +429,10 @@ export class FdrService {
                 };
             }
         } else if (body.action === "request-extension") {
-            // Store request letter/email file or path
-            const requestLetterFile = this.getFileForField("request_letter_email", files, body, fileIndexTracker);
-            const requestLetterPath = this.getFilePathFromBody("request_letter_email", body);
-            if (requestLetterFile) {
+            if (body.request_letter_email && typeof body.request_letter_email === "string") {
                 updateData.legacyData = {
                     ...(instrument.legacyData || {}),
-                    request_letter_email: `bi-dashboard/${requestLetterFile.filename}`,
-                };
-            } else if (requestLetterPath) {
-                updateData.legacyData = {
-                    ...(instrument.legacyData || {}),
-                    request_letter_email: requestLetterPath,
+                    request_letter_email: body.request_letter_email,
                 };
             }
             // Store modification fields if provided
@@ -581,14 +507,9 @@ export class FdrService {
                             area = `${team.name} Team`;
                         }
 
-                        // Identify proof image from files
                         let proofImagePath: string | null = null;
-                        const proofImageFile = this.getFileForField("proof_image", files, body, fileIndexTracker);
-                        const proofImagePathFromBody = this.getFilePathFromBody("proof_image", body);
-                        if (proofImageFile) {
-                            proofImagePath = proofImageFile.filename;
-                        } else if (proofImagePathFromBody) {
-                            proofImagePath = proofImagePathFromBody;
+                        if (body.proof_image && typeof body.proof_image === "string") {
+                            proofImagePath = body.proof_image;
                         }
 
                         // Map contacts to ContactPersonDto format and filter out invalid ones

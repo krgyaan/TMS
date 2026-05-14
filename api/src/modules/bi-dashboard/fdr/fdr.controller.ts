@@ -1,20 +1,5 @@
-import { Controller, Get, Query, Put, Param, ParseIntPipe, UseInterceptors, UploadedFiles, Body, Req, BadRequestException } from '@nestjs/common';
-import { FilesInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { Controller, Get, Patch, Query, Put, Param, ParseIntPipe, Body, Req } from '@nestjs/common';
 import { FdrService } from './fdr.service';
-
-const biDashboardMulterConfig = {
-    storage: diskStorage({
-        destination: './uploads/bi-dashboard',
-        filename: (req, file, callback) => {
-            const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-            const ext = extname(file.originalname);
-            callback(null, `fdr-${uniqueSuffix}${ext}`);
-        },
-    }),
-    limits: { fileSize: 25 * 1024 * 1024 },
-};
 
 @Controller('fdrs')
 export class FdrController {
@@ -58,17 +43,12 @@ export class FdrController {
         return this.fdrService.getFollowupData(id);
     }
 
-    @Put('instruments/:id/action')
-    @UseInterceptors(FilesInterceptor('files', 20, biDashboardMulterConfig))
+    @Patch('instruments/:id/action')
     async updateAction(
         @Param('id', ParseIntPipe) id: number,
-        @Body() body: any,
-        @UploadedFiles() files: Express.Multer.File[],
+        @Body() body: Record<string, any>,
         @Req() req: any,
     ) {
-        if (!body.action) {
-            throw new BadRequestException('Action is required');
-        }
-        return this.fdrService.updateAction(id, body, files || [], req.user);
+        return this.fdrService.updateAction(id, body, req.user);
     }
 }
