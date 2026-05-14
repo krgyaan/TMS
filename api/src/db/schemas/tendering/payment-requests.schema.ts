@@ -85,6 +85,7 @@ export const paymentInstruments = pgTable('payment_instruments', {
     utr: varchar('utr', { length: 255 }), // bank_transfers.utr, pay_on_portals.utr, emd_cheques.utr
     docketNo: varchar('docket_no', { length: 255 }), // emd_fdrs.docket_no, emd_demand_drafts.docket_no, emd_bgs.docket_no
     courierAddress: text('courier_address'), // emd_fdrs.courier_add, emd_bgs.bg_courier_addr
+    courierAddressJson: jsonb('courier_address_json'), // Structured courier address for DD/FDR
     courierDeadline: integer('courier_deadline'), // emd_fdrs.courier_deadline, emd_demand_drafts.courier_deadline, emd_bgs.bg_courier_deadline
 
     action: integer('action').default(0), // emd_fdrs.action, emd_demand_drafts.action, emd_bgs.action, emd_cheques.action

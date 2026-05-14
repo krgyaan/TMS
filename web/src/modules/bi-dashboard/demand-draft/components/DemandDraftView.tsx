@@ -94,7 +94,17 @@ export function DemandDraftView({
                                 Courier Address
                             </TableCell>
                             <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
-                                {data.courierAddress || '—'}
+                                {data.courierAddressJson ? (
+                                    <div className="space-y-0.5">
+                                        <div><span className="font-medium">Name:</span> {data.courierAddressJson.name || '—'}</div>
+                                        {data.courierAddressJson.phone && <div><span className="font-medium">Phone:</span> {data.courierAddressJson.phone}</div>}
+                                        <div><span className="font-medium">Address:</span> {[data.courierAddressJson.line1, data.courierAddressJson.line2].filter(Boolean).join(', ') || '—'}</div>
+                                        <div>
+                                            {[data.courierAddressJson.city, data.courierAddressJson.state].filter(Boolean).join(', ')}
+                                            {data.courierAddressJson.pincode ? ` - ${data.courierAddressJson.pincode}` : ''}
+                                        </div>
+                                    </div>
+                                ) : (data.courierAddress || '—')}
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">

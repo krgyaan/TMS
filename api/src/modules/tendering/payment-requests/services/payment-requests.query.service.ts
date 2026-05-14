@@ -619,6 +619,7 @@ export class PaymentRequestsQueryService {
                 favouring: paymentInstruments.favouring,
                 payableAt: paymentInstruments.payableAt,
                 courierAddress: paymentInstruments.courierAddress,
+                courierAddressJson: paymentInstruments.courierAddressJson,
                 courierDeadline: paymentInstruments.courierDeadline,
                 status: paymentInstruments.status,
                 isActive: paymentInstruments.isActive,
@@ -693,6 +694,7 @@ export class PaymentRequestsQueryService {
                 favouring: paymentInstruments.favouring,
                 payableAt: paymentInstruments.payableAt,
                 courierAddress: paymentInstruments.courierAddress,
+                courierAddressJson: paymentInstruments.courierAddressJson,
                 courierDeadline: paymentInstruments.courierDeadline,
                 status: paymentInstruments.status,
                 isActive: paymentInstruments.isActive,
@@ -745,6 +747,7 @@ export class PaymentRequestsQueryService {
                 favouring: paymentInstruments.favouring,
                 payableAt: paymentInstruments.payableAt,
                 courierAddress: paymentInstruments.courierAddress,
+                courierAddressJson: paymentInstruments.courierAddressJson,
                 courierDeadline: paymentInstruments.courierDeadline,
                 status: paymentInstruments.status,
                 isActive: paymentInstruments.isActive,
@@ -795,6 +798,7 @@ async findByIdWithTender(requestId: number) {
                 purpose: paymentInstruments.purpose,
                 amount: paymentInstruments.amount,
                 courierAddress: paymentInstruments.courierAddress,
+                courierAddressJson: paymentInstruments.courierAddressJson,
                 courierDeadline: paymentInstruments.courierDeadline,
                 favouring: paymentInstruments.favouring,
                 payableAt: paymentInstruments.payableAt,
@@ -920,6 +924,7 @@ async findByIdWithTender(requestId: number) {
                 utr: paymentInstruments.utr,
                 docketNo: paymentInstruments.docketNo,
                 courierAddress: paymentInstruments.courierAddress,
+                courierAddressJson: paymentInstruments.courierAddressJson,
                 courierDeadline: paymentInstruments.courierDeadline,
                 action: paymentInstruments.action,
                 status: paymentInstruments.status,
@@ -1230,6 +1235,7 @@ async findByIdWithTender(requestId: number) {
     }
 
     private mapDdDetails(details: any, amount: string, instrument?: any) {
+        const addrJson = instrument?.courierAddressJson as Record<string, any> | null;
         return {
             ddFavouring: instrument?.favouring || '',
             ddPayableAt: instrument?.payableAt || '',
@@ -1237,6 +1243,13 @@ async findByIdWithTender(requestId: number) {
             ddPurpose: details?.ddPurpose || '',
             ddAmount: amount,
             ddCourierAddress: instrument?.courierAddress || '',
+            ddCourierName: addrJson?.name || '',
+            ddCourierPhone: addrJson?.phone || '',
+            ddCourierAddressLine1: addrJson?.line1 || '',
+            ddCourierAddressLine2: addrJson?.line2 || '',
+            ddCourierCity: addrJson?.city || '',
+            ddCourierState: addrJson?.state || '',
+            ddCourierPincode: addrJson?.pincode || '',
             ddCourierHours: instrument?.courierDeadline || null,
             ddDate: details?.ddDate || instrument?.issueDate || null,
             ddRemarks: details?.ddRemarks || '',
@@ -1244,6 +1257,7 @@ async findByIdWithTender(requestId: number) {
     }
 
     private mapFdrDetails(details: any, amount: string, instrument?: any) {
+        const addrJson = instrument?.courierAddressJson as Record<string, any> | null;
         return {
             fdrFavouring: instrument?.favouring || '',
             fdrAmount: amount,
@@ -1251,6 +1265,13 @@ async findByIdWithTender(requestId: number) {
             fdrDeliverBy: details?.fdrNeeds || '',
             fdrPurpose: details?.fdrPurpose || '',
             fdrCourierAddress: instrument?.courierAddress || '',
+            fdrCourierName: addrJson?.name || '',
+            fdrCourierPhone: addrJson?.phone || '',
+            fdrCourierAddressLine1: addrJson?.line1 || '',
+            fdrCourierAddressLine2: addrJson?.line2 || '',
+            fdrCourierCity: addrJson?.city || '',
+            fdrCourierState: addrJson?.state || '',
+            fdrCourierPincode: addrJson?.pincode || '',
             fdrCourierHours: instrument?.courierDeadline || null,
             fdrDate: details?.fdrDate || instrument?.issueDate || null,
         };

@@ -436,6 +436,17 @@ export class PaymentRequestsCommandService {
 
         const shorthand = mode === 'BANK_TRANSFER' ? 'bt' : mode === 'PORTAL' ? 'portal' : mode.toLowerCase();
 
+        // Build structured courier address JSONB for DD/FDR
+        const courierAddressJson = (mode === 'DD' || mode === 'FDR') ? {
+            name: details[`${shorthand}CourierName`] || null,
+            phone: details[`${shorthand}CourierPhone`] || null,
+            line1: details[`${shorthand}CourierAddressLine1`] || null,
+            line2: details[`${shorthand}CourierAddressLine2`] || null,
+            city: details[`${shorthand}CourierCity`] || null,
+            state: details[`${shorthand}CourierState`] || null,
+            pincode: details[`${shorthand}CourierPincode`] || null,
+        } : null;
+
         const [instrument] = await tx
             .insert(paymentInstruments)
             .values({
@@ -448,6 +459,7 @@ export class PaymentRequestsCommandService {
                 issueDate: (details[`${shorthand}Date`] || details.bgDate) || null,
                 expiryDate: (details[`${shorthand}ExpiryDate`] || details.bgExpiryDate || details.fdrExpiryDate) || null,
                 courierAddress: (details[`${shorthand}CourierAddress`] || details.bgCourierAddress || details.ddCourierAddress || details.fdrCourierAddress) || null,
+                courierAddressJson,
                 courierDeadline: (details[`${shorthand}CourierHours`] || details.bgCourierDays || details.ddCourierHours || details.fdrCourierHours) || null,
                 isActive: true,
                 createdBy: userId,
@@ -636,6 +648,15 @@ export class PaymentRequestsCommandService {
                 issueDate: (details[`${shorthand}Date`] || details.bgDate || details.ddDate || details.fdrDate || details.btDate || details.portalDate || details.chequeDate) || null,
                 expiryDate: (details[`${shorthand}ExpiryDate`] || details.bgExpiryDate || details.fdrExpiryDate) || null,
                 courierAddress: (details[`${shorthand}CourierAddress`] || details.bgCourierAddress || details.ddCourierAddress || details.fdrCourierAddress) || null,
+                courierAddressJson: (normalizedMode === 'DD' || normalizedMode === 'FDR') ? {
+                    name: details[`${shorthand}CourierName`] || null,
+                    phone: details[`${shorthand}CourierPhone`] || null,
+                    line1: details[`${shorthand}CourierAddressLine1`] || null,
+                    line2: details[`${shorthand}CourierAddressLine2`] || null,
+                    city: details[`${shorthand}CourierCity`] || null,
+                    state: details[`${shorthand}CourierState`] || null,
+                    pincode: details[`${shorthand}CourierPincode`] || null,
+                } : null,
                 courierDeadline: (details[`${shorthand}CourierHours`] || details.bgCourierDays || details.ddCourierHours || details.fdrCourierHours) || null,
             })
             .where(eq(paymentInstruments.id, instrumentId));

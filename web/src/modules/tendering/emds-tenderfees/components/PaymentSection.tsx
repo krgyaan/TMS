@@ -14,12 +14,24 @@ import { ChequeForm } from './ChequeForm';
 
 export type RequestType = 'TMS' | 'OTHER_THAN_TMS' | 'OTHER_THAN_TENDER' | 'OLD_ENTRY';
 
+interface CourierAddressData {
+    courierAddress?: string | null;
+    courierName?: string | null;
+    courierPhone?: string | null;
+    courierAddressLine1?: string | null;
+    courierAddressLine2?: string | null;
+    courierCity?: string | null;
+    courierState?: string | null;
+    courierPincode?: string | null;
+}
+
 interface PaymentSectionProps {
     purpose: 'EMD' | 'TENDER_FEES' | 'PROCESSING_FEES';
     allowedModes: string[];
     amount: number;
     type?: RequestType;
     courierAddress?: string;
+    courierData?: CourierAddressData;
     defaultPurpose?: string;
     isEditMode?: boolean;
 }
@@ -32,12 +44,12 @@ export function PaymentSection({
     amount,
     type = 'TMS',
     courierAddress,
+    courierData,
     defaultPurpose = purpose,
     isEditMode = false,
 }: PaymentSectionProps) {
     const { control, watch, setValue } = useFormContext();
     const selectedMode = watch(`${purpose}.mode`);
-    const currentDdCourierAddress = watch(`${purpose}.details.ddCourierAddress`);
 
     const filteredModes = useMemo(() => {
         if (type === 'OLD_ENTRY') {
@@ -70,10 +82,31 @@ export function PaymentSection({
     }, [selectedMode, setValue, defaultPurpose, purpose, amount, isEditMode]);
 
     useEffect(() => {
-        if (selectedMode === 'DD' && courierAddress && !currentDdCourierAddress) {
-            setValue(`${purpose}.details.ddCourierAddress`, courierAddress);
+        if (isEditMode || !courierData) return;
+        const detailsPath = `${purpose}.details`;
+        const fp = selectedMode === 'DD' ? 'dd' : selectedMode === 'FDR' ? 'fdr' : null;
+        if (!fp) return;
+
+        const fields: Array<{ key: string; field: string }> = [
+            { key: 'courierName', field: 'CourierName' },
+            { key: 'courierPhone', field: 'CourierPhone' },
+            { key: 'courierAddressLine1', field: 'CourierAddressLine1' },
+            { key: 'courierAddressLine2', field: 'CourierAddressLine2' },
+            { key: 'courierCity', field: 'CourierCity' },
+            { key: 'courierState', field: 'CourierState' },
+            { key: 'courierPincode', field: 'CourierPincode' },
+        ];
+
+        for (const { key, field } of fields) {
+            const value = courierData[key as keyof CourierAddressData];
+            if (value) {
+                const current = watch(`${detailsPath}.${fp}${field}`);
+                if (!current) {
+                    setValue(`${detailsPath}.${fp}${field}`, value, { shouldValidate: false });
+                }
+            }
         }
-    }, [selectedMode, courierAddress, currentDdCourierAddress, setValue, purpose]);
+    }, [selectedMode, courierData, setValue, purpose, isEditMode, watch]);
 
     if (filteredModes.length === 0) {
         return (

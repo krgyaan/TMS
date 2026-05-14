@@ -35,6 +35,13 @@ export const PaymentDetailsSchema = z.object({
     ddDeliverBy: deliveryEnumField(),
     ddPurpose: z.string().optional(),
     ddCourierAddress: z.string().optional(),
+    ddCourierName: z.string().optional(),
+    ddCourierPhone: z.string().optional(),
+    ddCourierAddressLine1: z.string().optional(),
+    ddCourierAddressLine2: z.string().optional(),
+    ddCourierCity: z.string().optional(),
+    ddCourierState: z.string().optional(),
+    ddCourierPincode: z.string().optional(),
     ddCourierHours: z.coerce.number().optional(),
     ddDate: z.string().optional(),
     ddRemarks: z.string().optional(),
@@ -45,6 +52,13 @@ export const PaymentDetailsSchema = z.object({
     fdrDeliverBy: deliveryEnumField(),
     fdrPurpose: z.string().optional(),
     fdrCourierAddress: z.string().optional(),
+    fdrCourierName: z.string().optional(),
+    fdrCourierPhone: z.string().optional(),
+    fdrCourierAddressLine1: z.string().optional(),
+    fdrCourierAddressLine2: z.string().optional(),
+    fdrCourierCity: z.string().optional(),
+    fdrCourierState: z.string().optional(),
+    fdrCourierPincode: z.string().optional(),
     fdrCourierHours: z.coerce.number().optional(),
     fdrDate: z.string().optional(),
 
@@ -176,6 +190,25 @@ export const PayOnPortalSchema = z.object({
     }
 });
 
+const REQUIRED_COURIER_FIELDS = ['CourierName', 'CourierAddressLine1', 'CourierState', 'CourierPincode'] as const;
+
+const validateCourierFields = (data: any, ctx: z.RefinementCtx, prefix: string) => {
+    for (const field of REQUIRED_COURIER_FIELDS) {
+        const key = `${prefix}${field}`;
+        if (!data[key] || (typeof data[key] === 'string' && data[key].trim() === '')) {
+            const label = field === 'CourierName' ? 'Courier Name'
+                : field === 'CourierAddressLine1' ? 'Address Line 1'
+                : field === 'CourierState' ? 'State'
+                : 'Pin Code';
+            ctx.addIssue({
+                code: 'custom',
+                message: `${label} is required`,
+                path: [key],
+            });
+        }
+    }
+};
+
 export const DemandDraftSchema = z.object({
     ddPurpose: z.string().optional(),
     ddAmount: z.coerce.number().optional(),
@@ -183,6 +216,13 @@ export const DemandDraftSchema = z.object({
     ddPayableAt: z.string().optional(),
     ddDeliverBy: z.string().optional(),
     ddCourierAddress: z.string().optional(),
+    ddCourierName: z.string().optional(),
+    ddCourierPhone: z.string().optional(),
+    ddCourierAddressLine1: z.string().optional(),
+    ddCourierAddressLine2: z.string().optional(),
+    ddCourierCity: z.string().optional(),
+    ddCourierState: z.string().optional(),
+    ddCourierPincode: z.string().optional(),
     ddCourierHours: z.coerce.number().optional(),
     ddDate: z.string().optional(),
     ddRemarks: z.string().optional(),
@@ -215,13 +255,7 @@ export const DemandDraftSchema = z.object({
             path: ['ddPurpose'],
         });
     }
-    if (!data.ddCourierAddress || (typeof data.ddCourierAddress === 'string' && data.ddCourierAddress.trim() === '')) {
-        ctx.addIssue({
-            code: 'custom',
-            message: 'Courier Address is required',
-            path: ['ddCourierAddress'],
-        });
-    }
+    validateCourierFields(data, ctx, 'dd');
     if (!data.ddCourierHours) {
         ctx.addIssue({
             code: 'custom',
@@ -345,6 +379,13 @@ export const FdrSchema = z.object({
     fdrExpiryDate: z.string().optional(),
     fdrDeliverBy: z.string().optional(),
     fdrCourierAddress: z.string().optional(),
+    fdrCourierName: z.string().optional(),
+    fdrCourierPhone: z.string().optional(),
+    fdrCourierAddressLine1: z.string().optional(),
+    fdrCourierAddressLine2: z.string().optional(),
+    fdrCourierCity: z.string().optional(),
+    fdrCourierState: z.string().optional(),
+    fdrCourierPincode: z.string().optional(),
     fdrCourierHours: z.coerce.number().optional(),
     fdrDate: z.string().optional(),
 }).superRefine((data, ctx) => {
@@ -376,13 +417,7 @@ export const FdrSchema = z.object({
             path: ['fdrPurpose'],
         });
     }
-    if (!data.fdrCourierAddress || (typeof data.fdrCourierAddress === 'string' && data.fdrCourierAddress.trim() === '')) {
-        ctx.addIssue({
-            code: 'custom',
-            message: 'Courier Address is required',
-            path: ['fdrCourierAddress'],
-        });
-    }
+    validateCourierFields(data, ctx, 'fdr');
     if (!data.fdrCourierHours) {
         ctx.addIssue({
             code: 'custom',
