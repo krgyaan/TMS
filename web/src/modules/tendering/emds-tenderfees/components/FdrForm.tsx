@@ -1,11 +1,11 @@
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { SelectField } from '@/components/form/SelectField';
 import { NumberInput } from '@/components/form/NumberInput';
-import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { useFormContext } from 'react-hook-form';
 import { PURPOSE_OPTIONS, DELIVERY_OPTIONS } from '../constants';
 import DateInput from '@/components/form/DateInput';
+import { CourierAddressFields } from './CourierAddressFields';
 
 interface PaymentFormBaseProps {
     amount?: number;
@@ -38,6 +38,9 @@ export function FdrForm({ amount, prefix = 'emd.details', readOnly = false }: Pa
             <FieldWrapper control={control} name={`${prefix}.fdrFavouring`} label="FDR in Favour of *">
                 {(field) => <Input {...field} placeholder="e.g., Individual or Company Name" />}
             </FieldWrapper>
+            <FieldWrapper control={control} name={`${prefix}.fdrDate`} label="FDR Date">
+                {(field) => <DateInput value={field.value || null} onChange={field.onChange} />}
+            </FieldWrapper>
             <FieldWrapper control={control} name={`${prefix}.fdrExpiryDate`} label="FDR Expiry Date *">
                 {(field) => <DateInput value={field.value || null} onChange={field.onChange} />}
             </FieldWrapper>
@@ -48,14 +51,11 @@ export function FdrForm({ amount, prefix = 'emd.details', readOnly = false }: Pa
                 options={DELIVERY_OPTIONS}
                 placeholder="Select"
             />
-            <FieldWrapper control={control} name={`${prefix}.fdrCourierAddress`} label="Courier Address">
-                {(field) => <Textarea rows={2} {...field} placeholder="e.g., Bank Name or Address" />}
-            </FieldWrapper>
+            <div className="col-span-full p-4 border-dashed border-1 border-gray-400/50 rounded-lg">
+                <CourierAddressFields prefix={prefix} control={control} fieldPrefix="fdr" />
+            </div>
             <FieldWrapper control={control} name={`${prefix}.fdrCourierHours`} label="Courier Time (Hours)" description="Enter the number of hours required for the courier to deliver the FDR.">
                 {(field) => <NumberInput min={1} {...field} />}
-            </FieldWrapper>
-            <FieldWrapper control={control} name={`${prefix}.fdrDate`} label="FDR Date">
-                {(field) => <DateInput value={field.value || null} onChange={field.onChange} />}
             </FieldWrapper>
         </div>
     );

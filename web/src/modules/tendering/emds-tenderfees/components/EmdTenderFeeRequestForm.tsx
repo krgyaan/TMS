@@ -279,6 +279,15 @@ export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mod
                                 amount={emdAmount}
                                 type="TMS"
                                 courierAddress={data?.courierAddress || undefined}
+                                courierData={data ? {
+                                    courierName: data.courierName,
+                                    courierPhone: data.courierPhone,
+                                    courierAddressLine1: data.courierAddressLine1,
+                                    courierAddressLine2: data.courierAddressLine2,
+                                    courierCity: data.courierCity,
+                                    courierState: data.courierState,
+                                    courierPincode: data.courierPincode,
+                                } : undefined}
                                 defaultPurpose="EMD"
                                 isEditMode={isEditMode}
                             />
@@ -291,6 +300,15 @@ export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mod
                                 amount={tenderFeeAmount}
                                 type="TMS"
                                 courierAddress={data?.courierAddress || undefined}
+                                courierData={data ? {
+                                    courierName: data.courierName,
+                                    courierPhone: data.courierPhone,
+                                    courierAddressLine1: data.courierAddressLine1,
+                                    courierAddressLine2: data.courierAddressLine2,
+                                    courierCity: data.courierCity,
+                                    courierState: data.courierState,
+                                    courierPincode: data.courierPincode,
+                                } : undefined}
                                 defaultPurpose="TENDER_FEES"
                                 isEditMode={isEditMode}
                             />
@@ -303,6 +321,15 @@ export function EmdTenderFeeRequestForm({ tenderId, requestIds, initialData, mod
                                 amount={processingFeeAmount}
                                 type="TMS"
                                 courierAddress={data?.courierAddress || undefined}
+                                courierData={data ? {
+                                    courierName: data.courierName,
+                                    courierPhone: data.courierPhone,
+                                    courierAddressLine1: data.courierAddressLine1,
+                                    courierAddressLine2: data.courierAddressLine2,
+                                    courierCity: data.courierCity,
+                                    courierState: data.courierState,
+                                    courierPincode: data.courierPincode,
+                                } : undefined}
                                 isEditMode={isEditMode}
                             />
                         )}
