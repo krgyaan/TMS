@@ -102,8 +102,8 @@ export const useUpdateFdrAction = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, formData }: { id: number; formData: FormData }) =>
-            fdrsService.updateAction(id, formData),
+        mutationFn: ({ id, data }: { id: number; data: any }) =>
+            fdrsService.updateAction(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: fdrsKey.all });
             queryClient.invalidateQueries({ queryKey: fdrsKey.counts() });
