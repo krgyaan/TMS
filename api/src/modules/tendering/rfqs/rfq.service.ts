@@ -350,7 +350,7 @@ export class RfqsService {
                 .leftJoin(items, eq(items.id, tenderInfos.item))
                 .where(and(...this.buildDashboardConditions(user, teamId, "pending")))
                 .then(([result]) => Number(result?.count || 0)),
-            this.db
+            this.db // 
                 .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
                 .from(tenderInfos)
                 .leftJoin(rfqs, eq(rfqs.tenderId, tenderInfos.id))
@@ -360,7 +360,7 @@ export class RfqsService {
                 .leftJoin(items, eq(items.id, tenderInfos.item))
                 .where(and(...this.buildDashboardConditions(user, teamId, "sent")))
                 .then(([result]) => Number(result?.count || 0)),
-            this.db
+            this.db //rejected
                 .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
                 .from(tenderInfos)
                 .leftJoin(rfqs, eq(rfqs.tenderId, tenderInfos.id))
@@ -370,7 +370,7 @@ export class RfqsService {
                 .leftJoin(items, eq(items.id, tenderInfos.item))
                 .where(and(...this.buildDashboardConditions(user, teamId, "rfq-rejected")))
                 .then(([result]) => Number(result?.count || 0)),
-            this.db
+            this.db //dnb
                 .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
                 .from(tenderInfos)
                 .leftJoin(rfqs, eq(rfqs.tenderId, tenderInfos.id))
@@ -380,7 +380,7 @@ export class RfqsService {
                 .leftJoin(items, eq(items.id, tenderInfos.item))
                 .where(and(...this.buildDashboardConditions(user, teamId, "tender-dnb")))
                 .then(([result]) => Number(result?.count || 0)),
-            this.db
+            this.db //responses
                 .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
                 .from(tenderInfos)
                 .leftJoin(rfqs, eq(rfqs.tenderId, tenderInfos.id))
@@ -442,7 +442,7 @@ export class RfqsService {
                 notInArray(bidSubmissions.reasonStatus,[10, 14, 35]),
                 isNull(bidSubmissions.reasonStatus)
             ));
-            // conditions.push(isNotNull(rfqs.id));
+            conditions.push(isNotNull(rfqs.id));
         }
 
         return conditions;
