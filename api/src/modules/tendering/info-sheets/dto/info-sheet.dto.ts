@@ -188,6 +188,10 @@ export const TenderInfoSheetPayloadSchema = z
         courierState: optionalString,
         courierPincode: optionalString,
 
+        clientDetailsPresent: z.enum(['YES', 'NO']).optional().nullable(),
+        customerInContact: z.enum(['YES', 'NO']).optional().nullable(),
+        courierDetailsPresent: z.enum(['YES', 'NO']).optional().nullable(),
+
         // Final Remark
         teFinalRemark: optionalString,
     })
