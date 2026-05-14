@@ -583,7 +583,12 @@ export class BidSubmissionsService {
                 throw new Error("tender not found.");
             }
 
-            const prevStatus = tender?.status ?? null; 
+            let prevStatus: any = null;
+            
+            if(tender?.status){
+                const [statusRow] = await this.db.select().from(statuses).where(eq(statuses.id, tender.status));
+                prevStatus = statusRow;
+            }
 
             const [status] = await this.db.select({name: statuses.name, id: statuses.id}).from(statuses).where(eq(statuses.id, data.rejectionStatus));
             const newStatus = status.id;
@@ -612,7 +617,7 @@ export class BidSubmissionsService {
                     data.tenderId,
                     newStatus,
                     data.submittedBy,
-                    prevStatus,
+                    prevStatus?.id,
                     'Tender missed',
                     tx
                 );
@@ -661,8 +666,14 @@ export class BidSubmissionsService {
                 return bidSubmission;
             });
 
-            // Send email notification
-            await this.sendBidMissedEmail(data.tenderId, result, data.submittedBy);
+            if(data.rejectionStatus == 8){
+                //send bid missed email
+                await this.sendBidMissedEmail(data.tenderId, result, data.submittedBy);
+
+            } else {
+                // Send DNB email
+                await this.sendDNBEmail(data.tenderId, {reasonForMissing : result.reasonForMissing, fromStatus: prevStatus?.name || 'Unknown'}, data.submittedBy);
+            }
 
             //stopping all the timers running for this tender
             //for the time being stopping all the running timers
@@ -1050,6 +1061,80 @@ export class BidSubmissionsService {
             submittedBy,
             `Bid Submission deadline Missed - ${tender.tenderName}`,
             'bid-missed',
+            emailData,
+            {
+                to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
+                cc: ccRecipients,
+            }
+        );
+    }
+
+    /**
+     * Send dnb  email
+     */
+    private async sendDNBEmail(
+        tenderId: number,
+        bidSubmission: { reasonForMissing: string, fromStatus : string },
+        submittedBy: number
+    ) {
+        const tender = await this.tenderInfosService.findById(tenderId);
+        if (!tender || !tender.teamMember) return;
+
+        // Get Team Leader name
+        const teamLeaderEmails = await this.recipientResolver.getEmailsByRole('Team Leader', tender.team);
+        let tlName = 'Team Leader';
+        if (teamLeaderEmails.length > 0) {
+            const [tlUser] = await this.db
+                .select({ name: users.name })
+                .from(users)
+                .where(eq(users.email, teamLeaderEmails[0]))
+                .limit(1);
+            if (tlUser?.name) {
+                tlName = tlUser.name;
+            }
+        }
+
+        // Get TE name
+        const teUser = await this.recipientResolver.getUserById(tender.teamMember);
+        const teName = teUser?.name || 'Tender Executive';
+
+        // Format due date and time
+        const dueDateTime = tender.dueDate ? new Date(tender.dueDate).toLocaleString('en-IN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        }) : 'Not specified';
+
+        const emailData = {
+            tl_name: tlName,
+            tender_name: tender.tenderName,
+            due_date_time: dueDateTime,
+            reason: bidSubmission.reasonForMissing || 'Not specified',
+            from_status_name : bidSubmission.fromStatus,
+            te_name: teName,
+        };
+
+        // Get accounts team ID for CC
+        const accountsTeamId = await this.getAccountsTeamId();
+
+        const ccRecipients: RecipientSource[] = [
+            { type: 'role', role: 'Admin', teamId: tender.team },
+            { type: 'role', role: 'Coordinator', teamId: tender.team },
+        ];
+
+        // Add accounts team admin if accounts team exists
+        if (accountsTeamId) {
+            ccRecipients.push({ type: 'role', role: 'Admin', teamId: accountsTeamId });
+        }
+
+        await this.sendEmail(
+            'tender.dnb',
+            tenderId,
+            submittedBy,
+            `Tender moved to DNB - ${tender.tenderName}`,
+            'bid-dnb',
             emailData,
             {
                 to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
