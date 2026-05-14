@@ -145,9 +145,9 @@ export const buildDefaultValues = (tender?: TenderInfoWithNames | null): TenderI
     courierState: '',
     courierPincode: '',
 
-    clientDetailsPresent: '',
-    customerInContact: '',
-    courierDetailsPresent: '',
+    clientDetailsPresent: 'YES',
+    customerInContact: 'YES',
+    courierDetailsPresent: 'YES',
     // Default to one empty client box
     clients: [
         {
