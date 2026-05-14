@@ -331,12 +331,12 @@ const Rfqs = () => {
                             Review and approve RFQs.
                         </CardDescription>
                     </div>
-                    <CardAction>
+                    {/* <CardAction>
                         <Button variant="outline" onClick={() => navigate(paths.tendering.rfqsResponses)}>
                             <List className="h-4 w-4" />
                             View All Responses
                         </Button>
-                    </CardAction>
+                    </CardAction> */}
                 </div>
             </CardHeader>
             <CardContent className="px-0">
