@@ -99,6 +99,11 @@ export interface SaveTenderInfoSheetDto {
     courierCity: string | null;
     courierState: string | null;
     courierPincode: string | null;
+    
+    clientDetailsPresent: 'YES' | 'NO' | null;
+    customerInContact: 'YES' | 'NO' | null;
+    courierDetailsPresent: 'YES' | 'NO' | null;
+
     clients: TenderClientDto[];
 
     teFinalRemark: string | null;
@@ -186,6 +191,10 @@ export interface TenderInfoSheetResponse {
     courierCity: string | null;
     courierState: string | null;
     courierPincode: string | null;
+
+    clientDetailsPresent: 'YES' | 'NO' | null;
+    customerInContact: 'YES' | 'NO' | null;
+    courierDetailsPresent: 'YES' | 'NO' | null;
 
     clients: Array<{
         id?: number;

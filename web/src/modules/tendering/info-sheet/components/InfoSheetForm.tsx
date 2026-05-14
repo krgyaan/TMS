@@ -1473,25 +1473,63 @@ export function TenderInformationForm({
 
                                     {/* Client Details */}
                                     <div className="space-y-4 mt-6">
-                                        <div className="flex items-center justify-between">
+                                        <div className="">
                                             <h4 className="font-medium text-sm text-primary border-b pb-2">
                                                 Client Details
                                             </h4>
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() =>
-                                                    appendClient({
-                                                        clientName: '',
-                                                        clientDesignation: '',
-                                                        clientMobile: '',
-                                                        clientEmail: '',
-                                                    })
-                                                }
-                                            >
-                                                <Plus className="mr-2 h-4 w-4" /> Add Client
-                                            </Button>
+                                            <div className='flex justify-between items-center'>  
+                                                <div className='flex align-center'>
+                                                {/* dropdowns for client details present and in contact*/}
+                                                    <div className='p-3'>
+                                                        <SelectField
+                                                            control={form.control}
+                                                            name="clientDetailsPresent"
+                                                            label="Client Details Present"
+                                                            options={yesNoOptions}
+                                                            placeholder="Select option"
+                                                        />
+                                                        {getIncompleteFieldComment('clientDetailsPresent') && (
+                                                            <IncompleteFieldAlert
+                                                                comment={getIncompleteFieldComment('clientDetailsPresent')!}
+                                                            />
+                                                        )}
+                                                    </div>
+
+                                                    <div className='p-3'>
+                                                        <SelectField
+                                                            control={form.control}
+                                                            name="customerInContact"
+                                                            label="Customer In Contact"
+                                                            options={yesNoOptions}
+                                                            placeholder="Select option"
+                                                        />
+                                                        {getIncompleteFieldComment('customerInContact') && (
+                                                            <IncompleteFieldAlert
+                                                                comment={getIncompleteFieldComment('customerInContact')!}
+                                                            />
+                                                        )}
+                                                    </div>
+
+                                                </div>
+
+                                                <div className='p-3 pt-5'>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            appendClient({
+                                                                clientName: '',
+                                                                clientDesignation: '',
+                                                                clientMobile: '',
+                                                                clientEmail: '',
+                                                            })
+                                                        }
+                                                    >
+                                                        <Plus className="mr-2 h-4 w-4" /> Add Client
+                                                    </Button>
+                                                </div>
+                                            </div>
                                         </div>
 
                                         {clientFields.map((field, index) => (
@@ -1503,7 +1541,7 @@ export function TenderInformationForm({
                                                     <h5 className="font-medium text-sm">
                                                         Client {index + 1}
                                                     </h5>
-                                                    {clientFields.length > 1 && (
+                                                    {clientFields.length > 0 && (
                                                         <Button
                                                             type="button"
                                                             variant="ghost"
@@ -1616,6 +1654,23 @@ export function TenderInformationForm({
 
                                     <div className="space-y-4 mt-6">
                                         <h3 className="text-lg font-semibold border-b pb-2">Courier Delivery Address</h3>
+
+                                        <div className='w-1/5'>
+                                            <div>
+                                                <SelectField
+                                                    control={form.control}
+                                                    name="courierDetailsPresent"
+                                                    label="Courier Details Present"
+                                                    options={yesNoOptions}
+                                                    placeholder="Select option"
+                                                />
+                                                {getIncompleteFieldComment('courierDetailsPresent') && (
+                                                    <IncompleteFieldAlert
+                                                        comment={getIncompleteFieldComment('courierDetailsPresent')!}
+                                                    />
+                                                )}
+                                            </div>
+                                        </div>
                                         
                                         {form.watch('courierAddress') && (
                                             <div className="bg-amber-50 dark:bg-amber-950/50 p-4 rounded-md mb-4">

@@ -159,6 +159,11 @@ export const TenderInformationFormSchema = z.object({
     courierCity: z.string().max(100).optional(),
     courierState: z.string().max(100).optional(),
     courierPincode: z.string().max(20).optional(),
+    
+    clientDetailsPresent: z.enum(['YES', 'NO'], { required_error: 'Please select an option' }),
+    customerInContact: z.enum(['YES', 'NO'], { required_error: 'Please select an option' }),
+    courierDetailsPresent: z.enum(['YES', 'NO'], { required_error: 'Please select an option' }),
+
     teRemark: z.string().max(1000).optional(),
 }).superRefine((data, ctx) => {
     if (data.teRecommendation === 'NO') {

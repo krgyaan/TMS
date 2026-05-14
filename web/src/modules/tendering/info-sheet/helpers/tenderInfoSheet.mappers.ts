@@ -144,8 +144,19 @@ export const buildDefaultValues = (tender?: TenderInfoWithNames | null): TenderI
     courierCity: '',
     courierState: '',
     courierPincode: '',
-    // Allow zero clients by default; user can add as needed
-    clients: [],
+
+    clientDetailsPresent: '',
+    customerInContact: '',
+    courierDetailsPresent: '',
+    // Default to one empty client box
+    clients: [
+        {
+            clientName: '',
+            clientDesignation: '',
+            clientMobile: '',
+            clientEmail: '',
+        },
+    ],
 
     teRemark: '',
     teRejectionProof: [],
@@ -262,7 +273,11 @@ export const mapResponseToForm = (
         courierState: data.courierState ?? '',
         courierPincode: data.courierPincode ?? '',
 
-        // Map existing clients, otherwise use an empty array (0 or more)
+        clientDetailsPresent: (data.clientDetailsPresent?.trim().toUpperCase() as 'YES' | 'NO') ?? undefined,
+        customerInContact: (data.customerInContact?.trim().toUpperCase() as 'YES' | 'NO') ?? undefined,
+        courierDetailsPresent: (data.courierDetailsPresent?.trim().toUpperCase() as 'YES' | 'NO') ?? undefined,
+
+        // Map existing clients, otherwise use one default empty client
         clients: data.clients && data.clients.length > 0
             ? data.clients.map(client => ({
                 clientName: client.clientName ?? '',
@@ -270,7 +285,14 @@ export const mapResponseToForm = (
                 clientMobile: client.clientMobile ?? '',
                 clientEmail: client.clientEmail ?? '',
             }))
-            : [],
+            : [
+                {
+                    clientName: '',
+                    clientDesignation: '',
+                    clientMobile: '',
+                    clientEmail: '',
+                },
+            ],
 
         teRemark: data.teFinalRemark ?? '',
         teRejectionProof: toStringArray(data.teRejectionProof)
@@ -323,6 +345,9 @@ const cleanPayload = (payload: SaveTenderInfoSheetDto): SaveTenderInfoSheetDto =
         'physicalDocsRequired',
         'reverseAuctionApplicable',
         'oemExperience',
+        'clientDetailsPresent',
+        'customerInContact',
+        'courierDetailsPresent',
     ];
 
     // Validate and clean YES/NO fields
@@ -411,6 +436,9 @@ export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderI
             courierCity: null,
             courierState: null,
             courierPincode: null,
+            clientDetailsPresent: null,
+            customerInContact: null,
+            courierDetailsPresent: null,
             clients: [],
             teFinalRemark: null,
         });
@@ -593,6 +621,10 @@ export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderI
         courierCity: values.courierCity || null,
         courierState: values.courierState || null,
         courierPincode: values.courierPincode || null,
+
+        clientDetailsPresent: safeYesNoValue(values.clientDetailsPresent),
+        customerInContact: safeYesNoValue(values.customerInContact),
+        courierDetailsPresent: safeYesNoValue(values.courierDetailsPresent),
 
         clients: values.clients.map((client) => ({
             clientName: client.clientName,

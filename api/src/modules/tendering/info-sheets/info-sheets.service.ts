@@ -199,6 +199,9 @@ export class TenderInfoSheetsService {
             { name: 'physicalDocsRequired', value: payload.physicalDocsRequired },
             { name: 'reverseAuctionApplicable', value: payload.reverseAuctionApplicable },
             { name: 'oemExperience', value: payload.oemExperience },
+            { name: 'clientDetailsPresent', value: payload.clientDetailsPresent },
+            { name: 'customerInContact', value: payload.customerInContact },
+            { name: 'courierDetailsPresent', value: payload.courierDetailsPresent },
         ];
 
         const invalidFields: string[] = [];
@@ -536,6 +539,17 @@ export class TenderInfoSheetsService {
                         courierPincode: isRejection
                             ? null
                             : (payload.courierPincode ?? null),
+
+                        clientDetailsPresent: isRejection
+                            ? null
+                            : (payload.clientDetailsPresent ?? null),
+                        customerInContact: isRejection
+                            ? null
+                            : (payload.customerInContact ?? null),
+                        courierDetailsPresent: isRejection
+                            ? null
+                            : (payload.courierDetailsPresent ?? null),
+
                         teFinalRemark: isRejection
                             ? null
                             : (payload.teFinalRemark ?? null),
@@ -643,7 +657,7 @@ export class TenderInfoSheetsService {
                 );
             }
 
-            await this.sendInfoSheetFilledEmail(tenderId, result, changedBy);
+            // await this.sendInfoSheetFilledEmail(tenderId, result, changedBy);
 
             return result;
         } catch (error: any) {
@@ -935,6 +949,17 @@ export class TenderInfoSheetsService {
                         courierPincode: isRejection
                             ? null
                             : (payload.courierPincode ?? null),
+
+                        clientDetailsPresent: isRejection
+                            ? null
+                            : (payload.clientDetailsPresent ?? null),
+                        customerInContact: isRejection
+                            ? null
+                            : (payload.customerInContact ?? null),
+                        courierDetailsPresent: isRejection
+                            ? null
+                            : (payload.courierDetailsPresent ?? null),
+
                         teFinalRemark: isRejection
                             ? null
                             : (payload.teFinalRemark ?? null),

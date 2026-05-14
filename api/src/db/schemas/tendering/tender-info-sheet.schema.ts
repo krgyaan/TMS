@@ -79,6 +79,10 @@ export const tenderInformation = pgTable("tender_information", {
     courierCity: varchar("courier_city", { length: 100 }),
     courierState: varchar("courier_state", { length: 100 }),
     courierPincode: varchar("courier_pincode", { length: 20 }),
+    
+    clientDetailsPresent: varchar("client_details_present", { length: 5 }),
+    customerInContact: varchar("customer_in_contact", { length: 5 }),
+    courierDetailsPresent: varchar("courier_details_present", { length: 5 }),
 
     teFinalRemark: text("te_final_remark"),
     teRejectionProof: text("te_rejection_proof").array(),
