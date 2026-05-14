@@ -1,4 +1,4 @@
-import type { FdrDashboardFilters } from '@/modules/bi-dashboard/fdr/helpers/fdr.types';
+import type { DashboardFilters } from '@/modules/bi-dashboard/fdr/helpers/fdr.types';
 import { BaseApiService } from './base.service';
 import type { PaginatedResult } from '@/types/api.types';
 import type { FdrDashboardRow } from '@/modules/bi-dashboard/fdr/helpers/fdr.types';
@@ -9,7 +9,7 @@ class FdrsService extends BaseApiService {
         super('/fdrs');
     }
 
-    async getAll(params?: FdrDashboardFilters): Promise<PaginatedResult<FdrDashboardRow>> {
+    async getAll(params?: DashboardFilters): Promise<PaginatedResult<FdrDashboardRow>> {
         const search = new URLSearchParams();
 
         if (params) {

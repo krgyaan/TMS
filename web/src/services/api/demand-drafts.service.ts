@@ -1,4 +1,4 @@
-import type { DemandDraftDashboardFilters } from '@/modules/bi-dashboard/demand-draft/helpers/demandDraft.types';
+import type { DashboardFilters } from '@/modules/bi-dashboard/demand-draft/helpers/demandDraft.types';
 import { BaseApiService } from './base.service';
 import type { PaginatedResult } from '@/types/api.types';
 import type { DemandDraftDashboardRow } from '@/modules/bi-dashboard/demand-draft/helpers/demandDraft.types';
@@ -9,7 +9,7 @@ class DemandDraftsService extends BaseApiService {
         super('/demand-drafts');
     }
 
-    async getAll(params?: DemandDraftDashboardFilters): Promise<PaginatedResult<DemandDraftDashboardRow>> {
+    async getAll(params?: DashboardFilters): Promise<PaginatedResult<DemandDraftDashboardRow>> {
         const search = new URLSearchParams();
 
         if (params) {

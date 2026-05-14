@@ -335,7 +335,8 @@ export class PaymentRequestsQueryService {
                 sql`${paymentRequests.dueDate}::text ILIKE ${searchStr}`,
                 sql`${users.name} ILIKE ${searchStr}`,
                 sql`${paymentInstruments.instrumentType}::text ILIKE ${searchStr}`,
-                sql`${paymentInstruments.status} ILIKE ${searchStr}`
+                sql`${paymentInstruments.status} ILIKE ${searchStr}`,
+                sql`${paymentInstruments.favouring} ILIKE ${searchStr}`
             );
         }
 
@@ -451,6 +452,7 @@ export class PaymentRequestsQueryService {
                 instrumentId: row.instrumentId,
                 instrumentType: row.instrumentType as any,
                 instrumentStatus: row.instrumentStatus,
+                favouring: row.favouring,
                 displayStatus: deriveDisplayStatus(row.instrumentStatus),
                 createdAt: row.createdAt,
             };
