@@ -36,6 +36,7 @@ export const FdrDetailsResponse = z.object({
   fdrExpiryDate: nullishDate,
   fdrNeeds: nullishString,
   fdrRemark: nullishString,
+  reqNo: nullishString,
   courierAddress: nullishString,
   courierDeadline: nullishString,
 }).nullable();

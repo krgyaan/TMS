@@ -98,7 +98,13 @@ export const PaymentInstrumentView = ({ paymentRequestId }: PaymentInstrumentVie
                 </CardContent>
             </Card>
 
-            {instruments?.map((instrument: any) => (
+            {instruments
+                ?.filter((inst: any) => {
+                    if (inst.instrumentType !== 'Cheque') return true;
+                    const details = inst.details as any;
+                    return !details?.linkedDdId && !details?.linkedFdrId;
+                })
+                .map((instrument: any) => (
                 <InstrumentBiView
                     key={instrument.id}
                     instrumentId={instrument.id}

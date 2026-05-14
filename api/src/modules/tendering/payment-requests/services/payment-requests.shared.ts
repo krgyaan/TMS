@@ -1,4 +1,4 @@
-import { eq, and, inArray, isNull, sql, not, or, SQL } from 'drizzle-orm';
+import { eq, and, inArray, isNull, sql, not, or, SQL, gt } from 'drizzle-orm';
 import { paymentRequests, paymentInstruments } from '@db/schemas/tendering/payment-requests.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { users } from '@db/schemas/auth/users.schema';
@@ -134,12 +134,14 @@ export function buildRequestRoleFilters(user?: ValidatedUser, teamId?: number): 
 export function getDefaultSortByTab(tab: string): SQL<unknown> {
     switch (tab) {
         case 'pending':
-        case 'tender-dnb':
+        case 'dnb':
             return sql`${tenderInfos.dueDate} ASC NULLS LAST`;
         case 'sent':
-        case 'approved':
+        case 'paid':
         case 'rejected':
         case 'returned':
+        case 'fees':
+        case 'others':
             return sql`${tenderInfos.dueDate} DESC NULLS LAST`;
         default:
             return sql`${tenderInfos.dueDate} ASC NULLS LAST`;
@@ -147,20 +149,51 @@ export function getDefaultSortByTab(tab: string): SQL<unknown> {
 }
 
 export function getTabSqlCondition(tab: string) {
-    const isRejected = sql`${paymentInstruments.status} LIKE ${'%' + REJECTED_STATUS_PATTERN}`;
-    const isReturned = inArray(paymentInstruments.status, RETURNED_STATUSES);
-    const isApproved = inArray(paymentInstruments.status, APPROVED_STATUSES);
-    const isSent = or(
-        isNull(paymentInstruments.status),
-        and(not(isRejected), not(isReturned), not(isApproved))
+    const tenderExistsAndAmountPositive = and(
+        gt(paymentRequests.tenderId, 0),
+        sql`CAST(${paymentRequests.amountRequired} AS DECIMAL) > 0`
     );
 
+    const rejectedStatus = sql`${paymentInstruments.status} LIKE '%REJECTED%'`;
+
     switch (tab) {
-        case 'rejected': return isRejected;
-        case 'returned': return isReturned;
-        case 'approved': return isApproved;
-        case 'sent': return isSent;
-        default: return isSent;
+        case 'sent':
+            return and(
+                eq(paymentInstruments.action, 0),
+                eq(paymentRequests.purpose, 'EMD'),
+                tenderExistsAndAmountPositive
+            );
+        case 'paid':
+            return and(
+                eq(paymentInstruments.action, 1),
+                eq(paymentInstruments.status, 'ACCOUNTS_FORM_ACCEPTED'),
+                eq(paymentRequests.purpose, 'EMD'),
+                tenderExistsAndAmountPositive
+            );
+        case 'rejected':
+            return rejectedStatus;
+        case 'returned':
+            return or(
+                and(inArray(paymentInstruments.instrumentType, ['Bank Transfer', 'Portal Payment', 'DD', 'FDR']), inArray(paymentInstruments.action, [3, 4])),
+                and(eq(paymentInstruments.instrumentType, 'BG'), eq(paymentInstruments.action, 6))
+            );
+        case 'fees':
+            return and(
+                sql`${paymentRequests.purpose} IN ('Tender Fee', 'Processing Fee')`,
+                tenderExistsAndAmountPositive,
+                not(rejectedStatus)
+            );
+        case 'others':
+            return and(
+                eq(paymentRequests.tenderId, 0),
+                not(rejectedStatus)
+            );
+        default:
+            return and(
+                eq(paymentInstruments.action, 0),
+                eq(paymentRequests.purpose, 'EMD'),
+                tenderExistsAndAmountPositive
+            );
     }
 }
 

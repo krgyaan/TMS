@@ -16,6 +16,7 @@ import type { DemandDraftDashboardRow, DemandDraftDashboardCounts } from '@/modu
 import { DD_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
 import { FollowUpService } from '@/modules/follow-up/follow-up.service';
 import { followUps } from '@/db/schemas/shared/follow-ups.schema';
+import { couriers } from '@/db/schemas/shared/couriers.schema';
 
 @Injectable()
 export class DemandDraftService {
@@ -519,6 +520,32 @@ export class DemandDraftService {
         const hasReturnedData = result.action != null && result.action >= 3;
         const hasSettledData = result.action === 5 || result.action === 7;
 
+        let courierDetails: any = null;
+        if (result.reqNo) {
+            const courierId = Number(result.reqNo);
+            if (!isNaN(courierId)) {
+                const [courier] = await this.db
+                    .select()
+                    .from(couriers)
+                    .where(eq(couriers.id, courierId))
+                    .limit(1);
+                if (courier) {
+                    courierDetails = {
+                        id: courier.id,
+                        toOrg: courier.toOrg,
+                        toName: courier.toName,
+                        toAddr: courier.toAddr,
+                        toPin: courier.toPin,
+                        toMobile: courier.toMobile,
+                        trackingNumber: courier.trackingNumber,
+                        courierProvider: courier.courierProvider,
+                        docketNo: courier.docketNo,
+                        status: courier.status,
+                    };
+                }
+            }
+        }
+
         return {
             id: result.id,
             action: result.action,
@@ -537,6 +564,7 @@ export class DemandDraftService {
             ddNeeds: result.ddNeeds,
             ddPurpose: result.ddPurpose,
             ddRemarks: result.ddRemarks,
+            courierDetails,
             courierAddress: result.courierAddress,
             courierAddressJson: result.courierAddressJson as Record<string, any> | null,
             courierDeadline: result.courierDeadline ? Number(result.courierDeadline) : null,
