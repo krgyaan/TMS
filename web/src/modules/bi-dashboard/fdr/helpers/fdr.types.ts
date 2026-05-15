@@ -145,5 +145,6 @@ export const ALL_FDR_ACTION_OPTIONS = [
 export interface FDRActionFormProps {
     instrumentId: number;
     action?: number | null;
+    tenderId?: number | null;
     formHistory?: FDRFormHistory;
 }

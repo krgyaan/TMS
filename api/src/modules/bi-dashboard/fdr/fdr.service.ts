@@ -529,12 +529,13 @@ export class FdrService {
 
                         // Create followup DTO
                         const followUpDto: CreateFollowUpDto = {
-                            area,
+                            area: (body.area || 'Accounts'),
                             partyName: body.organisation_name || "",
                             amount: instrument.amount ? Number(instrument.amount) : 0,
-                            followupFor: "FDR",
+                            followupFor: "EMD Refund",
                             assignedToId: tenderInfo.teamMemberId || null,
                             emdId: paymentRequest.requestId,
+                            details: body.emailBody || null,
                             contacts: mappedContacts,
                             frequency: body.frequency ? Number(body.frequency) : 1,
                             startFrom: body.followup_start_date || undefined,
