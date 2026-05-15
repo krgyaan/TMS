@@ -143,5 +143,12 @@ export interface DDActionFormProps {
     instrumentId: number;
     action?: number | null;
     tenderId?: number | null;
+    instrumentData?: {
+        tenderNo?: string;
+        tenderName?: string;
+        amount?: number;
+        utrNo?: string;
+        ddNo?: string;
+    };
     formHistory?: DDFormHistory;
 }

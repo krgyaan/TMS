@@ -135,6 +135,7 @@ export default function FdrActionPage() {
                     instrumentId={instrumentId}
                     action={currentAction}
                     tenderId={actionFormData?.tenderId ?? null}
+                    instrumentData={instrumentData}
                     formHistory={{
                         accountsForm: actionFormData ? {
                             fdrReq: actionFormData.fdrStatus === 'Rejected' ? 'Rejected' :

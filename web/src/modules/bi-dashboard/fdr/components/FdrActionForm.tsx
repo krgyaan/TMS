@@ -26,7 +26,7 @@ import { Badge } from '@/components/ui/badge';
 import { ALL_FDR_ACTION_OPTIONS, type FDRActionFormProps } from '../helpers/fdr.types';
 import { useCourierOptions } from '@/modules/shared/courier/courier.hooks';
 
-export function FdrActionForm({ instrumentId, action: propAction, tenderId, formHistory }: FDRActionFormProps) {
+export function FdrActionForm({ instrumentId, action: propAction, tenderId, formHistory, instrumentData }: FDRActionFormProps) {
     const navigate = useNavigate();
     const updateMutation = useUpdateFdrAction();
     const courierOptions = useCourierOptions();
@@ -356,9 +356,13 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
 
                         <div className="pt-4 border-t">
                             <FollowupEmailEditor
-                                instrumentId={instrumentId}
-                                tenderId={tenderId}
                                 instrumentType="FDR"
+                                templateData={{
+                                    tenderNo: instrumentData?.tenderNo,
+                                    projectName: instrumentData?.tenderName,
+                                    amount: instrumentData?.amount,
+                                    fdrNo: instrumentData?.fdrNo,
+                                }}
                                 onEmailBodyChange={(html) => form.setValue('emailBody', html, { shouldValidate: false })}
                                 initialEmailBody={formHistory?.initiateFollowup ? undefined : emailBody}
                             />

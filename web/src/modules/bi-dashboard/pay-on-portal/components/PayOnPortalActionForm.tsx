@@ -25,7 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { TenderFileUploader } from '@/components/tender-file-upload';
 import { ALL_ACTION_OPTIONS, type PayOnPortalActionFormProps } from '../helpers/payOnPortal.types';
 
-export function PayOnPortalActionForm({ instrumentId, action, formHistory, tenderId }: PayOnPortalActionFormProps) {
+export function PayOnPortalActionForm({ instrumentId, action, formHistory, tenderId, instrumentData }: PayOnPortalActionFormProps) {
     const navigate = useNavigate();
     const updateMutation = useUpdatePayOnPortalAction();
 
@@ -340,9 +340,13 @@ export function PayOnPortalActionForm({ instrumentId, action, formHistory, tende
 
                         <div className="pt-4 border-t">
                             <FollowupEmailEditor
-                                instrumentId={instrumentId}
-                                tenderId={tenderId}
                                 instrumentType="Portal Payment"
+                                templateData={{
+                                    tenderNo: instrumentData?.tenderNo,
+                                    projectName: instrumentData?.tenderName,
+                                    amount: instrumentData?.amount,
+                                    utrNo: instrumentData?.utrNo,
+                                }}
                                 onEmailBodyChange={(html) => form.setValue('emailBody', html, { shouldValidate: false })}
                                 initialEmailBody={formHistory?.initiateFollowup ? undefined : emailBody}
                             />

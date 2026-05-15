@@ -25,7 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { ALL_DD_ACTION_OPTIONS, type DDActionFormProps } from '../helpers/demandDraft.types';
 import { useCourierOptions } from '@/modules/shared/courier/courier.hooks';
 
-export function DemandDraftActionForm({ instrumentId, action: propAction, tenderId, formHistory }: DDActionFormProps) {
+export function DemandDraftActionForm({ instrumentId, action: propAction, tenderId, formHistory, instrumentData }: DDActionFormProps) {
     const navigate = useNavigate();
     const updateMutation = useUpdateDemandDraftAction();
     const courierOptions = useCourierOptions();
@@ -352,9 +352,13 @@ export function DemandDraftActionForm({ instrumentId, action: propAction, tender
 
                         <div className="pt-4 border-t">
                             <FollowupEmailEditor
-                                instrumentId={instrumentId}
-                                tenderId={tenderId}
                                 instrumentType="DD"
+                                templateData={{
+                                    tenderNo: instrumentData?.tenderNo,
+                                    projectName: instrumentData?.tenderName,
+                                    amount: instrumentData?.amount,
+                                    ddNo: instrumentData?.ddNo,
+                                }}
                                 onEmailBodyChange={(html) => form.setValue('emailBody', html, { shouldValidate: false })}
                                 initialEmailBody={formHistory?.initiateFollowup ? undefined : emailBody}
                             />

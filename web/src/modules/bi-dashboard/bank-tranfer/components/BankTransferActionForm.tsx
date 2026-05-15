@@ -24,7 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { ALL_ACTION_OPTIONS, type BankTransferActionFormProps } from '../helpers/bankTransfer.types';
 import { infoSheetsService } from '@/services/api/info-sheet.service';
 
-export function BankTransferActionForm({ instrumentId, action: propAction, formHistory, tenderId }: BankTransferActionFormProps) {
+export function BankTransferActionForm({ instrumentId, action: propAction, formHistory, tenderId, instrumentData }: BankTransferActionFormProps) {
     const navigate = useNavigate();
     const updateMutation = useUpdateBankTransferAction();
 
@@ -326,9 +326,13 @@ export function BankTransferActionForm({ instrumentId, action: propAction, formH
 
                         <div className="pt-4 border-t">
                             <FollowupEmailEditor
-                                instrumentId={instrumentId}
-                                tenderId={tenderId}
                                 instrumentType="Bank Transfer"
+                                templateData={{
+                                    tenderNo: instrumentData?.tenderNo,
+                                    projectName: instrumentData?.tenderName,
+                                    amount: instrumentData?.amount,
+                                    utrNo: instrumentData?.utrNo,
+                                }}
                                 onEmailBodyChange={(html) => form.setValue('emailBody', html, { shouldValidate: false })}
                                 initialEmailBody={formHistory?.initiateFollowup ? undefined : emailBody}
                             />
