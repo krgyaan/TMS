@@ -145,12 +145,6 @@ export interface FormHistory {
 export interface PayOnPortalActionFormProps {
     instrumentId: number;
     action?: number | null;
-    instrumentData?: {
-        utrNo?: string;
-        portalName?: string;
-        amount?: number;
-        tenderName?: string;
-        tenderNo?: string;
-    };
+    tenderId?: number | null;
     formHistory?: FormHistory;
 }

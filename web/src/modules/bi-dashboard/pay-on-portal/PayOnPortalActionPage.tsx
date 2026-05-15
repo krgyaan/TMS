@@ -139,6 +139,7 @@ export default function PayOnPortalActionPage() {
                     instrumentId={instrumentId}
                     action={currentAction}
                     instrumentData={instrumentData}
+                    tenderId={actionFormData?.tenderId ?? null}
                     formHistory={{
                         accountsForm: actionFormData ? {
                             popReq: actionFormData.rejectionReason ? 'Rejected' : 
