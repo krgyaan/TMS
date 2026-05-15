@@ -61,6 +61,10 @@ export default function FdrActionPage() {
                 tenderNo: actionFormData.tenderNo ?? undefined,
                 tenderName: actionFormData.tenderName ?? undefined,
                 amount: actionFormData.amount ?? undefined,
+                tenderStatusName: actionFormData.tenderStatusName ?? undefined,
+                fdrNo: actionFormData.fdrNo ?? undefined,
+                fdrDate: actionFormData.fdrDate ?? undefined,
+                fdrExpiryDate: actionFormData.fdrExpiryDate ?? undefined,
             };
         }
         const stored = getStoredData();
