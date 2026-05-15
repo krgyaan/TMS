@@ -146,5 +146,11 @@ export interface FDRActionFormProps {
     instrumentId: number;
     action?: number | null;
     tenderId?: number | null;
+    instrumentData?: {
+        tenderNo?: string;
+        tenderName?: string;
+        amount?: number;
+        fdrNo?: string;
+    };
     formHistory?: FDRFormHistory;
 }

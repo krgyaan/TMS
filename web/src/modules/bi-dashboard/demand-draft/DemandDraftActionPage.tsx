@@ -134,6 +134,7 @@ export default function DemandDraftActionPage() {
                 <DemandDraftActionForm
                     instrumentId={instrumentId}
                     action={currentAction}
+                    instrumentData={instrumentData}
                     tenderId={actionFormData?.tenderId ?? null}
                     formHistory={{
                         accountsForm: actionFormData ? {
