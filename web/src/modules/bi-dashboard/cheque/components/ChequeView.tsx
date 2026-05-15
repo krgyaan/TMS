@@ -65,7 +65,7 @@ export function ChequeView({
         return expiryDate < new Date();
     };
 
-    const expiryStatus = data.dueDate ? (isExpired(new Date(data.dueDate)) ? 'Expired' : 'Valid') : null;
+    const expiryStatus = data.chequeDate ? (isExpired(new Date(data.chequeDate)) ? 'Expired' : 'Valid') : null;
 
     return (
         <Card className={className}>
@@ -86,24 +86,24 @@ export function ChequeView({
                             </TableRow>
                             <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Request ID
+                                    Tender Number
                                 </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.requestId ?? '—'}
+                                <TableCell className="text-sm font-semibold">
+                                    {data.tenderNo}
                                 </TableCell>
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Tender Name
+                                </TableCell>
+                                <TableCell className="text-sm font-semibold">
+                                    {data.tenderName}
+                                </TableCell>
+                            </TableRow>
+                            <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     Requested By
                                 </TableCell>
                                 <TableCell className="text-sm">
                                     {data.requestedByName || '—'}
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Request Type
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.requestType ?? '—'}
                                 </TableCell>
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     Requeste Date
@@ -131,13 +131,13 @@ export function ChequeView({
                                     Status
                                 </TableCell>
                                 <TableCell className="text-sm">
-                                    <Badge variant="outline">{data.status || '—'}</Badge>
+                                    <Badge variant="outline">{data.chequeStatus == 'Accepted' ? 'Paid' : data.chequeStatus || '—'}</Badge>
                                 </TableCell>
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     Purpose
                                 </TableCell>
                                 <TableCell className="text-sm">
-                                    {data.purpose || '—'}
+                                    {data.chequeReason || '—'}
                                 </TableCell>
                             </TableRow>
 
@@ -177,11 +177,19 @@ export function ChequeView({
                             </TableRow>
                             <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Due Date
+                                    Cheque Image
                                 </TableCell>
                                 <TableCell className="text-sm">
-                                    {data.dueDate ? formatDate(data.dueDate) : '—'}
+                                    {data.chequeImage ? <FileLink file={data.chequeImage} /> : '—'}
                                 </TableCell>
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Handover Image
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                    {data.handoverImage ? <FileLink file={data.handoverImage} /> : '—'}
+                                </TableCell>
+                            </TableRow>
+                            <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     Expiry Status
                                 </TableCell>
@@ -192,6 +200,7 @@ export function ChequeView({
                                         </Badge>
                                     ) : '—'}
                                 </TableCell>
+                                <TableCell colSpan={2} />
                             </TableRow>
                             {data.btTransferDate && (
                                 <TableRow className="hover:bg-muted/30 transition-colors">
