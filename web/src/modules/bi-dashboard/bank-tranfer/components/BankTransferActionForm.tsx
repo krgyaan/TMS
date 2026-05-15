@@ -178,7 +178,7 @@ export function BankTransferActionForm({ instrumentId, action: propAction, formH
                 ...(values.organisation_name && { organisation_name: values.organisation_name }),
                 ...(values.contacts && { contacts: values.contacts }),
                 ...(values.followup_start_date && { followup_start_date: values.followup_start_date }),
-                ...(values.frequency && { frequency: values.frequency }),
+                ...(values.frequency && { frequency: Number(values.frequency) }),
                 ...(values.transfer_date && { transfer_date: values.transfer_date }),
                 ...(values.return_utr && { return_utr: values.return_utr }),
                 ...(values.settle_remarks && { settle_remarks: values.settle_remarks }),

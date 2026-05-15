@@ -182,7 +182,7 @@ export function PayOnPortalActionForm({ instrumentId, action, formHistory, tende
                 ...(values.organisation_name && { organisation_name: values.organisation_name }),
                 ...(values.contacts && { contacts: values.contacts }),
                 ...(values.followup_start_date && { followup_start_date: values.followup_start_date }),
-                ...(values.frequency && { frequency: values.frequency }),
+                ...(values.frequency && { frequency: Number(values.frequency) }),
                 ...(values.emailBody && { emailBody: values.emailBody }),
                 ...(values.transfer_date && { transfer_date: values.transfer_date }),
                 ...(values.return_utr && { return_utr: values.return_utr }),
