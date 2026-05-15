@@ -536,10 +536,13 @@ export class DemandDraftService {
                 ddNeeds: instrumentDdDetails.ddNeeds,
                 ddPurpose: instrumentDdDetails.ddPurpose,
                 ddRemarks: instrumentDdDetails.ddRemarks,
+                tenderStatusName: statuses.name,
             })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
             .leftJoin(instrumentDdDetails, eq(instrumentDdDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .where(and(
                 eq(paymentInstruments.id, id),
                 eq(paymentInstruments.instrumentType, 'DD'),
@@ -595,6 +598,7 @@ export class DemandDraftService {
             expiryDate: result.expiryDate ? new Date(result.expiryDate) : null,
             ddNo: result.ddNo,
             ddDate: result.ddDate ? new Date(result.ddDate) : null,
+            tenderStatusName: result.tenderStatusName,
             reqNo: result.reqNo,
             ddNeeds: result.ddNeeds,
             ddPurpose: result.ddPurpose,

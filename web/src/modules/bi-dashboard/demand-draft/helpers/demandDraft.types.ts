@@ -149,6 +149,8 @@ export interface DDActionFormProps {
         amount?: number;
         utrNo?: string;
         ddNo?: string;
+        ddDate?: string | Date;
+        tenderStatusName?: string;
     };
     formHistory?: DDFormHistory;
 }
