@@ -177,6 +177,22 @@ export class TenderInfoSheetsService {
         };
     }
 
+    async getTenderContacts(tenderId: number) {
+        const clients = await this.db
+            .select()
+            .from(tenderClients)
+            .where(eq(tenderClients.tenderId, tenderId));
+
+        return {
+            organisationName: clients.length > 0 ? clients[0].clientName || "" : "",
+            contacts: clients.map(c => ({
+                name: c.clientName || "",
+                phone: c.clientMobile || null,
+                email: c.clientEmail || null,
+            })),
+        };
+    }
+
     async findByTenderIdWithTender(tenderId: number) {
         const [infoSheet, tender] = await Promise.all([
             this.findByTenderId(tenderId),
