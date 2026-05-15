@@ -9,7 +9,9 @@ import { Input } from '@/components/ui/input';
 import { SelectField } from '@/components/form/SelectField';
 import { ContactPersonFields } from '@/components/form/ContactPersonFields';
 import { FollowUpFrequencySelect } from '@/components/form/FollowUpFrequencySelect';
+import { FollowupEmailEditor } from '@/components/form/FollowupEmailEditor';
 import { ConditionalSection } from '@/components/form/ConditionalSection';
+import { infoSheetsService } from '@/services/api/info-sheet.service';
 import { TenderFileUploader } from '@/components/form/TenderFileUploader';
 import DateInput from '@/components/form/DateInput';
 import { FdrActionFormSchema, type FdrActionFormValues } from '../helpers/fdrActionForm.schema';
@@ -24,7 +26,7 @@ import { Badge } from '@/components/ui/badge';
 import { ALL_FDR_ACTION_OPTIONS, type FDRActionFormProps } from '../helpers/fdr.types';
 import { useCourierOptions } from '@/modules/shared/courier/courier.hooks';
 
-export function FdrActionForm({ instrumentId, action: propAction, formHistory }: FDRActionFormProps) {
+export function FdrActionForm({ instrumentId, action: propAction, tenderId, formHistory }: FDRActionFormProps) {
     const navigate = useNavigate();
     const updateMutation = useUpdateFdrAction();
     const courierOptions = useCourierOptions();
@@ -99,6 +101,7 @@ export function FdrActionForm({ instrumentId, action: propAction, formHistory }:
 
     const selectedAction = useWatch({ control: form.control, name: 'action' });
     const fdrReq = useWatch({ control: form.control, name: 'fdr_req' });
+    const emailBody = useWatch({ control: form.control, name: 'emailBody' });
 
     useEffect(() => {
         if (formHistory?.accountsForm?.fdrReq) {
@@ -159,6 +162,34 @@ export function FdrActionForm({ instrumentId, action: propAction, formHistory }:
         }
     }, [formHistory, form]);
 
+    useEffect(() => {
+        if (selectedAction === 'initiate-followup' && tenderId && tenderId > 0) {
+            (async () => {
+                try {
+                    const result = await infoSheetsService.getTenderContacts(tenderId);
+                    if (result?.organisationName) {
+                        const currentOrg = form.getValues('organisation_name');
+                        if (!currentOrg) {
+                            form.setValue('organisation_name', result.organisationName, { shouldValidate: false });
+                        }
+                    }
+                    if (result?.contacts?.length > 0) {
+                        const currentContacts = form.getValues('contacts');
+                        if (!currentContacts || currentContacts.length === 0) {
+                            form.setValue('contacts', result.contacts.map(c => ({
+                                name: c.name,
+                                phone: c.phone ?? '',
+                                email: c.email ?? '',
+                            })), { shouldValidate: false });
+                        }
+                    }
+                } catch (err) {
+                    console.error('Failed to load tender contacts:', err);
+                }
+            })();
+        }
+    }, [selectedAction, tenderId, form]);
+
     const isSubmitting = form.formState.isSubmitting || updateMutation.isPending;
 
     const handleSubmit = async (values: FdrActionFormValues) => {
@@ -188,6 +219,7 @@ export function FdrActionForm({ instrumentId, action: propAction, formHistory }:
             if (values.cancellation_date) payload.fdr_cancellation_date = values.cancellation_date;
             if (values.cancellation_amount) payload.fdr_cancellation_amount = values.cancellation_amount;
             if (values.cancellation_reference_no) payload.fdr_cancellation_reference_no = values.cancellation_reference_no;
+            if (values.emailBody) payload.emailBody = values.emailBody;
 
             await updateMutation.mutateAsync({ id: instrumentId, data: payload });
             toast.success('Action updated successfully');
@@ -320,6 +352,16 @@ export function FdrActionForm({ instrumentId, action: propAction, formHistory }:
                                 {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                             </FieldWrapper>
                             <FollowUpFrequencySelect control={form.control} name="frequency" />
+                        </div>
+
+                        <div className="pt-4 border-t">
+                            <FollowupEmailEditor
+                                instrumentId={instrumentId}
+                                tenderId={tenderId}
+                                instrumentType="FDR"
+                                onEmailBodyChange={(html) => form.setValue('emailBody', html, { shouldValidate: false })}
+                                initialEmailBody={formHistory?.initiateFollowup ? undefined : emailBody}
+                            />
                         </div>
                     </div>
                 </ConditionalSection>
