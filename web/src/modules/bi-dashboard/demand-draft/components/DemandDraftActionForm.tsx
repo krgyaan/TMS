@@ -358,6 +358,8 @@ export function DemandDraftActionForm({ instrumentId, action: propAction, tender
                                     projectName: instrumentData?.tenderName,
                                     amount: instrumentData?.amount,
                                     ddNo: instrumentData?.ddNo,
+                                    date: instrumentData?.ddDate ? new Date(instrumentData.ddDate).toISOString() : undefined,
+                                    status: instrumentData?.tenderStatusName,
                                 }}
                                 onEmailBodyChange={(html) => form.setValue('emailBody', html, { shouldValidate: false })}
                                 initialEmailBody={formHistory?.initiateFollowup ? undefined : emailBody}

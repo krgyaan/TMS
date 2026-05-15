@@ -61,6 +61,9 @@ export default function DemandDraftActionPage() {
                 tenderNo: actionFormData.tenderNo ?? undefined,
                 tenderName: actionFormData.tenderName ?? undefined,
                 amount: actionFormData.amount ?? undefined,
+                tenderStatusName: actionFormData.tenderStatusName ?? undefined,
+                ddNo: actionFormData.ddNo ?? undefined,
+                ddDate: actionFormData.ddDate ?? undefined,
             };
         }
         const stored = getStoredData();
@@ -69,6 +72,9 @@ export default function DemandDraftActionPage() {
                 tenderNo: stored.tenderNo ?? undefined,
                 tenderName: stored.tenderName ?? undefined,
                 amount: stored.amount ?? undefined,
+                tenderStatusName: undefined,
+                ddNo: undefined,
+                ddDate: undefined,
             };
         }
         const locationData = location.state as { tenderNo?: string; tenderName?: string; amount?: number } | undefined;
@@ -77,6 +83,9 @@ export default function DemandDraftActionPage() {
                 tenderNo: locationData.tenderNo,
                 tenderName: locationData.tenderName,
                 amount: locationData.amount,
+                tenderStatusName: undefined,
+                ddNo: undefined,
+                ddDate: undefined,
             };
         }
         return undefined;
