@@ -178,13 +178,20 @@ export class TenderInfoSheetsService {
     }
 
     async getTenderContacts(tenderId: number) {
+        const [tender] = await this.db
+            .select({ organisationName: organizations.name })
+            .from(tenderInfos)
+            .leftJoin(organizations, eq(organizations.id, tenderInfos.organization))
+            .where(eq(tenderInfos.id, tenderId))
+            .limit(1);
+
         const clients = await this.db
             .select()
             .from(tenderClients)
             .where(eq(tenderClients.tenderId, tenderId));
 
         return {
-            organisationName: clients.length > 0 ? clients[0].clientName || "" : "",
+            organisationName: tender?.organisationName || "",
             contacts: clients.map(c => ({
                 name: c.clientName || "",
                 phone: c.clientMobile || null,
