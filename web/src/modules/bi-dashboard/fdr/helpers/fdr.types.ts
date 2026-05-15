@@ -151,6 +151,9 @@ export interface FDRActionFormProps {
         tenderName?: string;
         amount?: number;
         fdrNo?: string;
+        fdrDate?: string | Date;
+        fdrExpiryDate?: string | Date;
+        tenderStatusName?: string;
     };
     formHistory?: FDRFormHistory;
 }

@@ -689,10 +689,13 @@ export class FdrService {
                 fdrNeeds: instrumentFdrDetails.fdrNeeds,
                 fdrRemark: instrumentFdrDetails.fdrRemark,
                 reqNo: paymentInstruments.reqNo,
+                tenderStatusName: statuses.name,
             })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
             .leftJoin(instrumentFdrDetails, eq(instrumentFdrDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .where(and(
                 eq(paymentInstruments.id, id),
                 eq(paymentInstruments.instrumentType, 'FDR'),
@@ -748,6 +751,7 @@ export class FdrService {
             expiryDate: result.expiryDate ? new Date(result.expiryDate) : null,
             fdrNo: result.fdrNo,
             fdrDate: result.fdrDate ? new Date(result.fdrDate) : null,
+            tenderStatusName: result.tenderStatusName,
             fdrSource: result.fdrSource,
             fdrPurpose: result.fdrPurpose,
             fdrExpiryDate: result.fdrExpiryDate ? new Date(result.fdrExpiryDate) : null,

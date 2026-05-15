@@ -12,7 +12,6 @@ import { FollowUpFrequencySelect } from '@/components/form/FollowUpFrequencySele
 import { FollowupEmailEditor } from '@/components/form/FollowupEmailEditor';
 import { ConditionalSection } from '@/components/form/ConditionalSection';
 import { infoSheetsService } from '@/services/api/info-sheet.service';
-import { TenderFileUploader } from '@/components/form/TenderFileUploader';
 import DateInput from '@/components/form/DateInput';
 import { FdrActionFormSchema, type FdrActionFormValues } from '../helpers/fdrActionForm.schema';
 import { useUpdateFdrAction } from '@/hooks/api/useFdrs';
@@ -25,6 +24,7 @@ import { FileText, Users, Package, Banknote, CheckCircle2, XCircle, CheckSquare,
 import { Badge } from '@/components/ui/badge';
 import { ALL_FDR_ACTION_OPTIONS, type FDRActionFormProps } from '../helpers/fdr.types';
 import { useCourierOptions } from '@/modules/shared/courier/courier.hooks';
+import { TenderFileUploader } from '@/components/tender-file-upload';
 
 export function FdrActionForm({ instrumentId, action: propAction, tenderId, formHistory, instrumentData }: FDRActionFormProps) {
     const navigate = useNavigate();
@@ -362,6 +362,9 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
                                     projectName: instrumentData?.tenderName,
                                     amount: instrumentData?.amount,
                                     fdrNo: instrumentData?.fdrNo,
+                                    date: instrumentData?.fdrDate ? new Date(instrumentData.fdrDate).toISOString() : undefined,
+                                    expiryDate: instrumentData?.fdrExpiryDate ? new Date(instrumentData.fdrExpiryDate).toISOString() : undefined,
+                                    status: instrumentData?.tenderStatusName,
                                 }}
                                 onEmailBodyChange={(html) => form.setValue('emailBody', html, { shouldValidate: false })}
                                 initialEmailBody={formHistory?.initiateFollowup ? undefined : emailBody}
@@ -387,10 +390,9 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
                             <FieldWrapper control={form.control} name="docket_slip" label="Upload Docket Slip">
                                 {(field) => (
                                     <TenderFileUploader
-                                        context="dd-docket-slip"
+                                        context="fdr-docket-slip"
                                         value={field.value ? [field.value] : []}
                                         onChange={(paths) => field.onChange(paths[0] || '')}
-                                        maxFiles={1}
                                     />
                                 )}
                             </FieldWrapper>
@@ -445,10 +447,9 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
                             <FieldWrapper control={form.control} name="covering_letter" label="Upload Signed Stamped Covering Letter from the Client">
                                 {(field) => (
                                     <TenderFileUploader
-                                        context="dd-covering-letter"
+                                        context="fdr-covering-letter"
                                         value={field.value ? [field.value] : []}
                                         onChange={(paths) => field.onChange(paths[0] || '')}
-                                        maxFiles={1}
                                     />
                                 )}
                             </FieldWrapper>
@@ -458,7 +459,6 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
                                         context="fdr-req-receive"
                                         value={field.value ? [field.value] : []}
                                         onChange={(paths) => field.onChange(paths[0] || '')}
-                                        maxFiles={1}
                                     />
                                 )}
                             </FieldWrapper>
