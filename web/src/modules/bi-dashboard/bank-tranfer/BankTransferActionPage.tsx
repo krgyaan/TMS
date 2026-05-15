@@ -17,6 +17,8 @@ interface StoredData {
     amount: number | null;
     accountName: string | null;
     utrNo: string | null;
+    tenderStatusName: string | null;
+    transactionDate: string | null;
     timestamp: number;
 }
 
@@ -40,6 +42,8 @@ export default function BankTransferActionPage() {
                 amount: actionFormData.amount,
                 accountName: actionFormData.accountName,
                 utrNo: actionFormData.utrNo,
+                tenderStatusName: actionFormData.tenderStatusName,
+                transactionDate: actionFormData.transactionDate,
                 timestamp: Date.now(),
             };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(storedData));
@@ -69,6 +73,8 @@ export default function BankTransferActionPage() {
                 amount: actionFormData.amount ?? undefined,
                 accountName: actionFormData.accountName ?? undefined,
                 utrNo: actionFormData.utrNo ?? undefined,
+                tenderStatusName: actionFormData.tenderStatusName ?? undefined,
+                transactionDate: actionFormData.transactionDate ?? undefined,
             };
         }
         const stored = getStoredData();
@@ -79,9 +85,11 @@ export default function BankTransferActionPage() {
                 amount: stored.amount ?? undefined,
                 accountName: stored.accountName ?? undefined,
                 utrNo: stored.utrNo ?? undefined,
+                tenderStatusName: stored.tenderStatusName ?? undefined,
+                transactionDate: stored.transactionDate ?? undefined,
             };
         }
-        const locationData = location.state as { tenderNo?: string; tenderName?: string; amount?: number; accountName?: string; utrNo?: string } | undefined;
+        const locationData = location.state as { tenderNo?: string; tenderName?: string; amount?: number; accountName?: string; utrNo?: string; tenderStatusName?: string; transactionDate?: string | Date } | undefined;
         if (locationData) {
             return {
                 tenderNo: locationData.tenderNo,
@@ -89,6 +97,8 @@ export default function BankTransferActionPage() {
                 amount: locationData.amount,
                 accountName: locationData.accountName,
                 utrNo: locationData.utrNo,
+                tenderStatusName: locationData.tenderStatusName,
+                transactionDate: locationData.transactionDate,
             };
         }
         return undefined;

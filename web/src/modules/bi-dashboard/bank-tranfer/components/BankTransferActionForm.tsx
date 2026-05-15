@@ -332,6 +332,8 @@ export function BankTransferActionForm({ instrumentId, action: propAction, formH
                                     projectName: instrumentData?.tenderName,
                                     amount: instrumentData?.amount,
                                     utrNo: instrumentData?.utrNo,
+                                    status: instrumentData?.tenderStatusName,
+                                    transactionDate: instrumentData?.transactionDate ? new Date(instrumentData.transactionDate).toISOString() : undefined,
                                 }}
                                 onEmailBodyChange={(html) => form.setValue('emailBody', html, { shouldValidate: false })}
                                 initialEmailBody={formHistory?.initiateFollowup ? undefined : emailBody}

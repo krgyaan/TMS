@@ -143,6 +143,8 @@ export interface BankTransferActionFormProps {
         amount?: number;
         accountName?: string;
         utrNo?: string;
+        tenderStatusName?: string;
+        transactionDate?: string | Date;
     };
     formHistory?: FormHistory;
 }
