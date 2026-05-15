@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { ContactPersonFields } from '@/components/form/ContactPersonFields';
 import { FollowUpFrequencySelect } from '@/components/form/FollowUpFrequencySelect';
 import { ConditionalSection } from '@/components/form/ConditionalSection';
+import { FollowupEmailEditor } from '@/components/form/FollowupEmailEditor';
 import DateInput from '@/components/form/DateInput';
 import DateTimeInput from '@/components/form/DateTimeInput';
 import { BankTransferActionFormSchema, type BankTransferActionFormValues, type BankTransferActionPayload } from '../helpers/bankTransferActionForm.schema';
@@ -21,8 +22,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { FileText, Users, Banknote, CheckCircle, CheckCircle2, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ALL_ACTION_OPTIONS, type BankTransferActionFormProps } from '../helpers/bankTransfer.types';
+import { infoSheetsService } from '@/services/api/info-sheet.service';
 
-export function BankTransferActionForm({ instrumentId, action: propAction, formHistory }: BankTransferActionFormProps) {
+export function BankTransferActionForm({ instrumentId, action: propAction, formHistory, tenderId }: BankTransferActionFormProps) {
     const navigate = useNavigate();
     const updateMutation = useUpdateBankTransferAction();
 
@@ -86,6 +88,7 @@ export function BankTransferActionForm({ instrumentId, action: propAction, formH
 
     const selectedAction = useWatch({ control: form.control, name: 'action' });
     const btReq = useWatch({ control: form.control, name: 'bt_req' });
+    const emailBody = useWatch({ control: form.control, name: 'emailBody' });
 
     useEffect(() => {
         if (formHistory?.accountsForm?.btReq) {
@@ -133,6 +136,34 @@ export function BankTransferActionForm({ instrumentId, action: propAction, formH
         }
     }, [formHistory, form]);
 
+    useEffect(() => {
+        if (selectedAction === 'initiate-followup' && tenderId && tenderId > 0) {
+            (async () => {
+                try {
+                    const result = await infoSheetsService.getTenderContacts(tenderId);
+                    if (result?.organisationName) {
+                        const currentOrg = form.getValues('organisation_name');
+                        if (!currentOrg) {
+                            form.setValue('organisation_name', result.organisationName, { shouldValidate: false });
+                        }
+                    }
+                    if (result?.contacts?.length > 0) {
+                        const currentContacts = form.getValues('contacts');
+                        if (!currentContacts || currentContacts.length === 0) {
+                            form.setValue('contacts', result.contacts.map(c => ({
+                                name: c.name,
+                                phone: c.phone ?? '',
+                                email: c.email ?? '',
+                            })), { shouldValidate: false });
+                        }
+                    }
+                } catch (err) {
+                    console.error('Failed to load tender contacts:', err);
+                }
+            })();
+        }
+    }, [selectedAction, tenderId, form]);
+
     const isSubmitting = form.formState.isSubmitting || updateMutation.isPending;
 
     const handleSubmit = async (values: BankTransferActionFormValues) => {
@@ -151,6 +182,7 @@ export function BankTransferActionForm({ instrumentId, action: propAction, formH
                 ...(values.transfer_date && { transfer_date: values.transfer_date }),
                 ...(values.return_utr && { return_utr: values.return_utr }),
                 ...(values.settle_remarks && { settle_remarks: values.settle_remarks }),
+                ...(values.emailBody && { emailBody: values.emailBody }),
             };
 
             await updateMutation.mutateAsync({ id: instrumentId, data: payload });
@@ -290,6 +322,16 @@ export function BankTransferActionForm({ instrumentId, action: propAction, formH
                                 {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                             </FieldWrapper>
                             <FollowUpFrequencySelect control={form.control} name="frequency" />
+                        </div>
+
+                        <div className="pt-4 border-t">
+                            <FollowupEmailEditor
+                                instrumentId={instrumentId}
+                                tenderId={tenderId}
+                                instrumentType="Bank Transfer"
+                                onEmailBodyChange={(html) => form.setValue('emailBody', html, { shouldValidate: false })}
+                                initialEmailBody={formHistory?.initiateFollowup ? undefined : emailBody}
+                            />
                         </div>
                     </div>
                 </ConditionalSection>
