@@ -28,6 +28,7 @@ export const PayOnPortalActionFormSchema = BaseActionFormSchema.extend({
     contacts: z.array(ContactPersonSchema).optional(),
     followup_start_date: z.string().optional(),
     frequency: z.number().int().min(1).max(6).optional(),
+    emailBody: z.string().optional(),
 
     // Returned via Bank Transfer
     transfer_date: z.string().optional(),
@@ -155,4 +156,5 @@ export interface PayOnPortalActionPayload {
     transfer_date?: string;
     return_utr?: string;
     settle_remarks?: string;
+    emailBody?: string;
 }

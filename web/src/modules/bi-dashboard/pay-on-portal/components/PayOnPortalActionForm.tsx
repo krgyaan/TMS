@@ -8,6 +8,8 @@ import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
 import { ContactPersonFields } from '@/components/form/ContactPersonFields';
 import { FollowUpFrequencySelect } from '@/components/form/FollowUpFrequencySelect';
+import { FollowupEmailEditor } from '@/components/form/FollowupEmailEditor';
+import { infoSheetsService } from '@/services/api/info-sheet.service';
 import { ConditionalSection } from '@/components/form/ConditionalSection';
 import DateInput from '@/components/form/DateInput';
 import DateTimeInput from '@/components/form/DateTimeInput';
@@ -23,7 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { TenderFileUploader } from '@/components/tender-file-upload';
 import { ALL_ACTION_OPTIONS, type PayOnPortalActionFormProps } from '../helpers/payOnPortal.types';
 
-export function PayOnPortalActionForm({ instrumentId, action, formHistory }: PayOnPortalActionFormProps) {
+export function PayOnPortalActionForm({ instrumentId, action, formHistory, tenderId }: PayOnPortalActionFormProps) {
     const navigate = useNavigate();
     const updateMutation = useUpdatePayOnPortalAction();
 
@@ -88,6 +90,7 @@ export function PayOnPortalActionForm({ instrumentId, action, formHistory }: Pay
 
     const selectedAction = useWatch({ control: form.control, name: 'action' });
     const popReq = useWatch({ control: form.control, name: 'pop_req' });
+    const emailBody = useWatch({ control: form.control, name: 'emailBody' });
 
     useEffect(() => {
         if (formHistory?.accountsForm?.popReq) {
@@ -135,6 +138,34 @@ export function PayOnPortalActionForm({ instrumentId, action, formHistory }: Pay
         }
     }, [formHistory, form]);
 
+    useEffect(() => {
+        if (selectedAction === 'initiate-followup' && tenderId && tenderId > 0) {
+            (async () => {
+                try {
+                    const result = await infoSheetsService.getTenderContacts(tenderId);
+                    if (result?.organisationName) {
+                        const currentOrg = form.getValues('organisation_name');
+                        if (!currentOrg) {
+                            form.setValue('organisation_name', result.organisationName, { shouldValidate: false });
+                        }
+                    }
+                    if (result?.contacts?.length > 0) {
+                        const currentContacts = form.getValues('contacts');
+                        if (!currentContacts || currentContacts.length === 0) {
+                            form.setValue('contacts', result.contacts.map(c => ({
+                                name: c.name,
+                                phone: c.phone ?? '',
+                                email: c.email ?? '',
+                            })), { shouldValidate: false });
+                        }
+                    }
+                } catch (err) {
+                    console.error('Failed to load tender contacts:', err);
+                }
+            })();
+        }
+    }, [selectedAction, tenderId, form]);
+
     const isSubmitting = form.formState.isSubmitting || updateMutation.isPending;
 
     const handleSubmit = async (values: PayOnPortalActionFormValues) => {
@@ -152,6 +183,7 @@ export function PayOnPortalActionForm({ instrumentId, action, formHistory }: Pay
                 ...(values.contacts && { contacts: values.contacts }),
                 ...(values.followup_start_date && { followup_start_date: values.followup_start_date }),
                 ...(values.frequency && { frequency: values.frequency }),
+                ...(values.emailBody && { emailBody: values.emailBody }),
                 ...(values.transfer_date && { transfer_date: values.transfer_date }),
                 ...(values.return_utr && { return_utr: values.return_utr }),
                 ...(values.settle_remarks && { settle_remarks: values.settle_remarks }),
@@ -304,6 +336,16 @@ export function PayOnPortalActionForm({ instrumentId, action, formHistory }: Pay
                                 {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                             </FieldWrapper>
                             <FollowUpFrequencySelect control={form.control} name="frequency" />
+                        </div>
+
+                        <div className="pt-4 border-t">
+                            <FollowupEmailEditor
+                                instrumentId={instrumentId}
+                                tenderId={tenderId}
+                                instrumentType="Portal Payment"
+                                onEmailBodyChange={(html) => form.setValue('emailBody', html, { shouldValidate: false })}
+                                initialEmailBody={formHistory?.initiateFollowup ? undefined : emailBody}
+                            />
                         </div>
                     </div>
                 </ConditionalSection>
