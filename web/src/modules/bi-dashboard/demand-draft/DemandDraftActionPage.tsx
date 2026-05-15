@@ -134,6 +134,7 @@ export default function DemandDraftActionPage() {
                 <DemandDraftActionForm
                     instrumentId={instrumentId}
                     action={currentAction}
+                    tenderId={actionFormData?.tenderId ?? null}
                     formHistory={{
                         accountsForm: actionFormData ? {
                             ddReq: actionFormData.ddStatus === 'Rejected' ? 'Rejected' :

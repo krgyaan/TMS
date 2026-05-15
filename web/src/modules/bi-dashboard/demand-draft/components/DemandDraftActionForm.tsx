@@ -2,6 +2,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
+import { FollowupEmailEditor } from '@/components/form/FollowupEmailEditor';
+import { infoSheetsService } from '@/services/api/info-sheet.service';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
@@ -20,10 +22,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { FileText, Users, Package, Banknote, CheckCircle2, XCircle, CheckSquare, Info } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { ALL_DD_ACTION_OPTIONS, type DDActionFormProps, type DDFormHistory } from '../helpers/demandDraft.types';
+import { ALL_DD_ACTION_OPTIONS, type DDActionFormProps } from '../helpers/demandDraft.types';
 import { useCourierOptions } from '@/modules/shared/courier/courier.hooks';
 
-export function DemandDraftActionForm({ instrumentId, action: propAction, formHistory }: DDActionFormProps) {
+export function DemandDraftActionForm({ instrumentId, action: propAction, tenderId, formHistory }: DDActionFormProps) {
     const navigate = useNavigate();
     const updateMutation = useUpdateDemandDraftAction();
     const courierOptions = useCourierOptions();
@@ -98,6 +100,7 @@ export function DemandDraftActionForm({ instrumentId, action: propAction, formHi
 
     const selectedAction = useWatch({ control: form.control, name: 'action' });
     const ddReq = useWatch({ control: form.control, name: 'dd_req' });
+    const emailBody = useWatch({ control: form.control, name: 'emailBody' });
 
     useEffect(() => {
         if (formHistory?.accountsForm?.ddReq) {
@@ -158,6 +161,34 @@ export function DemandDraftActionForm({ instrumentId, action: propAction, formHi
         }
     }, [formHistory, form]);
 
+    useEffect(() => {
+        if (selectedAction === 'initiate-followup' && tenderId && tenderId > 0) {
+            (async () => {
+                try {
+                    const result = await infoSheetsService.getTenderContacts(tenderId);
+                    if (result?.organisationName) {
+                        const currentOrg = form.getValues('organisation_name');
+                        if (!currentOrg) {
+                            form.setValue('organisation_name', result.organisationName, { shouldValidate: false });
+                        }
+                    }
+                    if (result?.contacts?.length > 0) {
+                        const currentContacts = form.getValues('contacts');
+                        if (!currentContacts || currentContacts.length === 0) {
+                            form.setValue('contacts', result.contacts.map(c => ({
+                                name: c.name,
+                                phone: c.phone ?? '',
+                                email: c.email ?? '',
+                            })), { shouldValidate: false });
+                        }
+                    }
+                } catch (err) {
+                    console.error('Failed to load tender contacts:', err);
+                }
+            })();
+        }
+    }, [selectedAction, tenderId, form]);
+
     const isSubmitting = form.formState.isSubmitting || updateMutation.isPending;
 
     const handleSubmit = async (values: DemandDraftActionFormValues) => {
@@ -184,6 +215,7 @@ export function DemandDraftActionForm({ instrumentId, action: propAction, formHi
             if (values.cancellation_date) payload.dd_cancellation_date = values.cancellation_date;
             if (values.cancellation_amount) payload.dd_cancellation_amount = values.cancellation_amount;
             if (values.cancellation_reference_no) payload.dd_cancellation_reference_no = values.cancellation_reference_no;
+            if (values.emailBody) payload.emailBody = values.emailBody;
 
             await updateMutation.mutateAsync({ id: instrumentId, data: payload });
             toast.success('Action updated successfully');
@@ -316,6 +348,16 @@ export function DemandDraftActionForm({ instrumentId, action: propAction, formHi
                                 {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                             </FieldWrapper>
                             <FollowUpFrequencySelect control={form.control} name="frequency" />
+                        </div>
+
+                        <div className="pt-4 border-t">
+                            <FollowupEmailEditor
+                                instrumentId={instrumentId}
+                                tenderId={tenderId}
+                                instrumentType="DD"
+                                onEmailBodyChange={(html) => form.setValue('emailBody', html, { shouldValidate: false })}
+                                initialEmailBody={formHistory?.initiateFollowup ? undefined : emailBody}
+                            />
                         </div>
                     </div>
                 </ConditionalSection>

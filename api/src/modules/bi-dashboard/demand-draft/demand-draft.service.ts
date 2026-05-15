@@ -15,6 +15,7 @@ import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import type { DemandDraftDashboardRow, DemandDraftDashboardCounts } from '@/modules/bi-dashboard/demand-draft/helpers/demandDraft.types';
 import { DD_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
 import { FollowUpService } from '@/modules/follow-up/follow-up.service';
+import type { CreateFollowUpDto } from '@/modules/follow-up/zod';
 import { followUps } from '@/db/schemas/shared/follow-ups.schema';
 import { couriers } from '@/db/schemas/shared/couriers.schema';
 
@@ -373,7 +374,41 @@ export class DemandDraftService {
             }
         }
 
-        // Follow-up creation will be handled by a different service class
+        if (body.action === 'initiate-followup' && body.emailBody) {
+            try {
+                let contacts: any[] = [];
+                if (body.contacts) {
+                    try {
+                        contacts = typeof body.contacts === 'string' ? JSON.parse(body.contacts) : body.contacts;
+                    } catch (e) {
+                        this.logger.warn('Failed to parse contacts for followup', e);
+                    }
+                }
+                const followupDto: CreateFollowUpDto = {
+                    area: (body.area || 'Accounts'),
+                    partyName: body.organisation_name || 'Unknown',
+                    details: body.emailBody,
+                    contacts: contacts.map((c: any) => ({
+                        name: c.name,
+                        email: c.email || null,
+                        phone: c.phone || null,
+                        org: body.organisation_name || null,
+                    })),
+                    frequency: body.frequency || null,
+                    startFrom: body.followup_start_date || undefined,
+                    emdId: instrumentId,
+                    followupFor: 'EMD Refund',
+                    assignedToId: null,
+                    createdById: null,
+                    amount: 0,
+                    attachments: [],
+                    followUpHistory: []
+                };
+                await this.followUpService.create(followupDto, user.id || user.sub);
+            } catch (error) {
+                this.logger.warn(`Failed to create followup for DD instrument ${instrumentId}: ${error.message}`);
+            }
+        }
 
         return {
             success: true,

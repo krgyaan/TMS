@@ -142,5 +142,6 @@ export const ALL_DD_ACTION_OPTIONS = [
 export interface DDActionFormProps {
     instrumentId: number;
     action?: number | null;
+    tenderId?: number | null;
     formHistory?: DDFormHistory;
 }
