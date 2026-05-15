@@ -34,6 +34,11 @@ export const APPROVED_STATUSES = [
     CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED,
     BT_STATUSES.ACCOUNTS_FORM_ACCEPTED,
     PORTAL_STATUSES.ACCOUNTS_FORM_ACCEPTED,
+    DD_STATUSES.FOLLOWUP_INITIATED,
+    FDR_STATUSES.FOLLOWUP_INITIATED,
+    CHEQUE_STATUSES.FOLLOWUP_INITIATED,
+    BT_STATUSES.FOLLOWUP_INITIATED,
+    PORTAL_STATUSES.FOLLOWUP_INITIATED,
     BT_STATUSES.SETTLED_WITH_PROJECT,
     PORTAL_STATUSES.SETTLED_WITH_PROJECT,
     BG_STATUSES.BG_CREATED,
@@ -165,10 +170,13 @@ export function getTabSqlCondition(tab: string) {
             );
         case 'paid':
             return and(
-                eq(paymentInstruments.action, 1),
-                eq(paymentInstruments.status, 'ACCOUNTS_FORM_ACCEPTED'),
                 eq(paymentRequests.purpose, 'EMD'),
-                tenderExistsAndAmountPositive
+                tenderExistsAndAmountPositive,
+                or(
+                    and(eq(paymentInstruments.action, 1), eq(paymentInstruments.status, 'ACCOUNTS_FORM_ACCEPTED')),
+                    and(eq(paymentInstruments.action, 2), eq(paymentInstruments.status, 'FOLLOWUP_INITIATED'), inArray(paymentInstruments.instrumentType, ['DD', 'FDR', 'Cheque', 'Bank Transfer', 'Portal Payment'])),
+                    and(eq(paymentInstruments.action, 4), eq(paymentInstruments.status, 'FOLLOWUP_INITIATED'), eq(paymentInstruments.instrumentType, 'BG'))
+                )
             );
         case 'rejected':
             return rejectedStatus;
@@ -204,6 +212,7 @@ export function getTabSqlCondition(tab: string) {
 function deriveDisplayStatus(instrumentStatus: string | null): string {
     if (!instrumentStatus) return 'Pending';
     
+    if (instrumentStatus === 'FOLLOWUP_INITIATED') return 'Followup';
     if (APPROVED_STATUSES.some(s => instrumentStatus === s)) return 'Approved';
     if (RETURNED_STATUSES.some(s => instrumentStatus === s)) return 'Returned';
     if (instrumentStatus.includes('REJECTED')) return 'Rejected';
