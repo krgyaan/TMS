@@ -40,7 +40,7 @@ export function buildEmailTemplate(instrumentType: string, data: EmailTemplateDa
     const utr = formatVal(data.utr || data.utrNo);
     const ddNo = formatVal(data.ddNo);
     const fdrNo = formatVal(data.fdrNo);
-    const expiryDate = formatVal(data.expiryDate || data.fdrExpiryDate);
+    const expiryDate = formatDateTime(data.expiryDate || data.fdrExpiryDate);
     const orgName = formatVal(data.organisationName);
 
     switch (instrumentType) {
