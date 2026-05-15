@@ -149,6 +149,8 @@ export default function BankTransferActionPage() {
                 <BankTransferActionForm
                     instrumentId={instrumentId}
                     action={currentAction}
+                    tenderId={actionFormData?.tenderId ?? null}
+                    instrumentData={instrumentData}
                     formHistory={{
                         accountsForm: actionFormData ? {
                             btReq: actionFormData.btStatus === 'Rejected' ? 'Rejected' :
@@ -166,9 +168,6 @@ export default function BankTransferActionPage() {
                             contacts: followupData.contacts ?? [],
                             followupStartDate: followupData.followupStartDate ? new Date(followupData.followupStartDate).toISOString() : undefined,
                             frequency: followupData.frequency ?? undefined,
-                            stopReason: followupData.stopReason ?? undefined,
-                            proofText: followupData.proofText ?? undefined,
-                            stopRemarks: followupData.stopRemarks ?? undefined,
                         } : undefined,
                         returned: actionFormData ? {
                             transferDate: actionFormData.returnTransferDate ? new Date(actionFormData.returnTransferDate).toISOString() : undefined,

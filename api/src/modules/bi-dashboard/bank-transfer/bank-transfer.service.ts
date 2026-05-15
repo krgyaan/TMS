@@ -390,7 +390,41 @@ export class BankTransferService {
                 }
             }
 
-            // Follow-up creation will be handled by a different service class
+            if (body.action === 'initiate-followup' && body.emailBody) {
+                try {
+                    let contacts: any[] = [];
+                    if (body.contacts) {
+                        try {
+                            contacts = typeof body.contacts === 'string' ? JSON.parse(body.contacts) : body.contacts;
+                        } catch (e) {
+                            this.logger.warn('Failed to parse contacts for followup', e);
+                        }
+                    }
+                    const followupDto: CreateFollowUpDto = {
+                        area: (body.area || 'Accounts'),
+                        partyName: body.organisation_name || 'Unknown',
+                        details: body.emailBody,
+                        contacts: contacts.map((c: any) => ({
+                            name: c.name,
+                            email: c.email || null,
+                            phone: c.phone || null,
+                            org: body.organisation_name || null,
+                        })),
+                        frequency: body.frequency || null,
+                        startFrom: body.followup_start_date || undefined,
+                        emdId: instrumentId,
+                        followupFor: 'EMD Refund',
+                        assignedToId: null,
+                        createdById: null,
+                        amount: 0,
+                        attachments: [],
+                        followUpHistory: []
+                    };
+                    await this.followUpService.create(followupDto, user.id || user.sub);
+                } catch (error) {
+                    this.logger.warn(`Failed to create followup for BT instrument ${instrumentId}: ${error.message}`);
+                }
+            }
 
             this.logger.debug('BT updateAction success', {
                 instrumentId,

@@ -136,6 +136,7 @@ export interface FormHistory {
 export interface BankTransferActionFormProps {
     instrumentId: number;
     action?: number | null;
+    tenderId?: number | null;
     instrumentData?: {
         tenderNo?: string;
         tenderName?: string;
