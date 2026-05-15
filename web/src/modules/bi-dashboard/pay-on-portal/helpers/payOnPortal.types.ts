@@ -151,6 +151,8 @@ export interface PayOnPortalActionFormProps {
         tenderName?: string;
         amount?: number;
         utrNo?: string;
+        tenderStatusName?: string;
+        transactionDate?: string | Date;
     };
     formHistory?: FormHistory;
 }

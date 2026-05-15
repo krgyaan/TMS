@@ -68,6 +68,8 @@ export default function PayOnPortalActionPage() {
                 amount: actionFormData.amount ?? undefined,
                 portalName: actionFormData.portalName ?? undefined,
                 utrNo: actionFormData.utrNo ?? undefined,
+                tenderStatusName: actionFormData.tenderStatusName ?? undefined,
+                transactionDate: actionFormData.transactionDate ?? undefined,
             };
         }
         const stored = getStoredData();
@@ -78,6 +80,8 @@ export default function PayOnPortalActionPage() {
                 amount: stored.amount ?? undefined,
                 portalName: stored.portalName ?? undefined,
                 utrNo: stored.utrNo ?? undefined,
+                tenderStatusName: undefined,
+                transactionDate: undefined,
             };
         }
         return undefined;
