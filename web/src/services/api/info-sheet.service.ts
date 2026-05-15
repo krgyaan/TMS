@@ -10,6 +10,10 @@ class InfoSheetsService extends BaseApiService {
         return this.get<TenderInfoSheetResponse>(`/${tenderId}`)
     }
 
+    async getTenderContacts(tenderId: number): Promise<{ organisationName: string; contacts: Array<{ name: string; phone: string | null; email: string | null }> }> {
+        return this.get(`/${tenderId}/contacts`)
+    }
+
     async create(tenderId: number, data: SaveTenderInfoSheetDto): Promise<TenderInfoSheetResponse> {
         return this.post<TenderInfoSheetResponse, SaveTenderInfoSheetDto>(`/${tenderId}`, data)
     }
