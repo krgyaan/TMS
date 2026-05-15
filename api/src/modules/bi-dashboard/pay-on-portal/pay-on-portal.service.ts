@@ -576,11 +576,13 @@ export class PayOnPortalService {
                 returnTransferDate: instrumentTransferDetails.returnTransferDate,
                 returnUtr: instrumentTransferDetails.returnUtr,
                 remarks: instrumentTransferDetails.remarks,
+                tenderStatusName: statuses.name,
             })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
             .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id))
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .where(and(
                 eq(paymentInstruments.id, id),
                 eq(paymentInstruments.instrumentType, 'Portal Payment'),
@@ -615,6 +617,7 @@ export class PayOnPortalService {
             portalName: result.portalName,
             utrNo: result.utr || result.utrNum,
             transactionDate: result.transactionDate ? new Date(result.transactionDate) : null,
+            tenderStatusName: result.tenderStatusName,
             paymentMethod: result.paymentMethod,
             utrMsg: result.utrMsg,
             isNetbanking: result.isNetbanking,

@@ -1,3 +1,6 @@
+import { formatDateTime } from "@/hooks/useFormatedDate";
+import { formatINR } from "@/hooks/useINRFormatter";
+
 interface EmailTemplateData {
     tenderNo?: string | null;
     projectName?: string | null;
@@ -13,21 +16,32 @@ interface EmailTemplateData {
     accountNo?: string | null;
     ifsc?: string | null;
     name?: string;
+    organisationName?: string | null;
+    tenderStatusName?: string | null;
+    ddDate?: string | null;
+    fdrDate?: string | null;
+    fdrExpiryDate?: string | null;
 }
 
 const formatVal = (v: string | number | null | undefined) => v != null ? String(v) : "";
 
+const renderTenderNo = (tenderNo: string) => {
+    if (!tenderNo || tenderNo === "NA" || tenderNo.trim() === "") return "";
+    return `Tender no. ${tenderNo}`;
+};
+
 export function buildEmailTemplate(instrumentType: string, data: EmailTemplateData): string {
     const n = "Sir/Madam";
     const projectName = formatVal(data.projectName || data.tenderNo || "N/A");
-    const amount = formatVal(data.amount);
-    const tenderNo = formatVal(data.tenderNo);
-    const status = formatVal(data.status);
-    const date = formatVal(data.date || data.transactionDate);
+    const amount = formatINR(data.amount || 0);
+    const tenderNoStr = renderTenderNo(formatVal(data.tenderNo));
+    const status = formatVal(data.tenderStatusName || data.status);
+    const date = formatDateTime(data.date || data.transactionDate);
     const utr = formatVal(data.utr || data.utrNo);
     const ddNo = formatVal(data.ddNo);
     const fdrNo = formatVal(data.fdrNo);
-    const expiryDate = formatVal(data.expiryDate);
+    const expiryDate = formatVal(data.expiryDate || data.fdrExpiryDate);
+    const orgName = formatVal(data.organisationName);
 
     switch (instrumentType) {
         case 'Bank Transfer':
@@ -35,7 +49,10 @@ export function buildEmailTemplate(instrumentType: string, data: EmailTemplateDa
 <html><body>
 <div>
     <p>Dear ${n},</p>
-    <p>The status of the Tender no. ${tenderNo}, tender name ${projectName}, is ${status}. Please initiate the process of releasing the EMD, Rs. ${amount} submitted against the tender. The details of the EMD submitted are as follows:</p>
+    ${tenderNoStr || projectName ? `<p>The status of the ${tenderNoStr ? `${tenderNoStr}, ` : ""}${projectName ? `project ${projectName}` : ""} is ${status}.</p>` : ""}
+    ${orgName ? `<p>Organisation: ${orgName}</p>` : ""}
+    <p>Please initiate the process of releasing the EMD, Rs. ${amount} submitted against the tender.</p>
+    <p>The details of the EMD submitted are as follows:</p>
     <ul>
         <li>Date: ${date}</li>
         <li>UTR no.: ${utr}</li>
@@ -57,7 +74,8 @@ export function buildEmailTemplate(instrumentType: string, data: EmailTemplateDa
 <html><body>
 <div>
     <p>Dear ${n},</p>
-    <p>The status of the Tender no. ${tenderNo}, project name ${projectName}, is ${status}. Please initiate the process of releasing the EMD, Rs. ${amount} submitted against the tender.</p>
+    ${tenderNoStr || projectName ? `<p>The status of the ${tenderNoStr ? `${tenderNoStr}, ` : ""}${projectName ? `project ${projectName}` : ""} is ${status}.</p>` : ""}
+    <p>Please initiate the process of releasing the EMD, Rs. ${amount} submitted against the tender.</p>
     <p>The details of the EMD submitted are as follows:</p>
     <ul>
         <li>Date: ${date}</li>
@@ -80,10 +98,11 @@ export function buildEmailTemplate(instrumentType: string, data: EmailTemplateDa
 <html><body>
 <div>
     <p>Dear ${n},</p>
-    <p>The status of the Tender no. ${tenderNo}, project name ${projectName}, is ${status}. Please initiate the process of releasing the EMD, Rs. ${amount} submitted against the tender. The details of the EMD submitted are as follows:</p>
+    ${tenderNoStr || projectName ? `<p>The status of the ${tenderNoStr ? `${tenderNoStr}, ` : ""}${projectName ? `project ${projectName}` : ""} is ${status}. Please initiate the process of releasing the EMD, Rs. ${amount} submitted against the tender.</p>` : `<p>Please initiate the process of releasing the EMD, Rs. ${amount} submitted against the tender.</p>`}
+    <p>The details of the EMD submitted are as follows:</p>
     <ul>
         <li>Date: ${date}</li>
-        <li>DD no.: ${ddNo}</li>
+        ${ddNo ? `<li>DD no.: ${ddNo}</li>` : ""}
         <li>Amount: Rs. ${amount}</li>
     </ul>
     <p>Please transfer the amount to the below-mentioned account details:</p>
@@ -110,12 +129,11 @@ export function buildEmailTemplate(instrumentType: string, data: EmailTemplateDa
 <html><body>
 <div>
     <p>Dear ${n},</p>
-    <p>${status ? `The FDR submitted against Wo no. ${tenderNo}, Project name ${projectName}, has expired.` : `The status of the Tender no. ${tenderNo}, project name ${projectName}, is ${status}.`}
-    </p>
+    ${tenderNoStr || projectName ? `<p>The FDR submitted against ${tenderNoStr ? `${tenderNoStr}, ` : ""}${projectName ? `Project ${projectName}` : ""}${status ? `, is ${status}` : ""}.</p>` : ""}
     <p>Please initiate the process of releasing the EMD in the form of FDR for Rs. ${amount} submitted against the tender.</p>
     <p>The details of the EMD in the form of FDR submitted are as follows:</p>
     <ul>
-        <li>FDR no.: ${fdrNo}</li>
+        ${fdrNo ? `<li>FDR no.: ${fdrNo}</li>` : ""}
         <li>FDR Date: ${date}</li>
         <li>FDR Expiry Date: ${expiryDate}</li>
         <li>Amount: Rs. ${amount}</li>
