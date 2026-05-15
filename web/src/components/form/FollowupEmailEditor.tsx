@@ -1,63 +1,51 @@
 import { useEffect, useState, useRef } from "react";
-import { getEmdMailPreview } from "@/modules/shared/follow-up/follow-up.api";
 import { TiptapEditor } from "@/components/tiptapeditor";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { FileText, Upload, X } from "lucide-react";
+import { buildEmailTemplate } from "@/modules/shared/follow-up/emailTemplateBuilder";
 
 interface FollowupEmailEditorProps {
-    instrumentId: number;
-    tenderId?: number | null;
     instrumentType: string;
+    templateData: {
+        tenderNo?: string | null;
+        projectName?: string | null;
+        status?: string | null;
+        amount?: string | number | null;
+        date?: string | null;
+        utr?: string | null;
+        utrNo?: string | null;
+        ddNo?: string | null;
+        fdrNo?: string | null;
+        expiryDate?: string | null;
+        transactionDate?: string | null;
+    };
     onEmailBodyChange: (html: string) => void;
     initialEmailBody?: string;
     onFilesChange?: (files: File[]) => void;
-    prefilledOrganisationName?: string;
-    onOrganisationNameChange?: (name: string) => void;
-    prefilledContacts?: Array<{ name: string; phone?: string | null; email?: string | null }>;
-    onContactsChange?: (contacts: Array<{ name: string; phone?: string; email?: string }>) => void;
 }
 
 export function FollowupEmailEditor({
-    instrumentId,
-    tenderId,
     instrumentType,
+    templateData,
     onEmailBodyChange,
     initialEmailBody,
     onFilesChange,
 }: FollowupEmailEditorProps) {
     const [htmlContent, setHtmlContent] = useState(initialEmailBody || "");
-    const [isLoading, setIsLoading] = useState(!initialEmailBody);
     const [files, setFiles] = useState<File[]>([]);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
         if (initialEmailBody) {
             setHtmlContent(initialEmailBody);
-            setIsLoading(false);
             return;
         }
-
-        let cancelled = false;
-        setIsLoading(true);
-
-        (async () => {
-            try {
-                const result = await getEmdMailPreview(instrumentId);
-                if (!cancelled && result?.html) {
-                    setHtmlContent(result.html);
-                    onEmailBodyChange(result.html);
-                }
-            } catch (err) {
-                console.error("Failed to load email preview:", err);
-            } finally {
-                if (!cancelled) setIsLoading(false);
-            }
-        })();
-
-        return () => { cancelled = true; };
-    }, [instrumentId, initialEmailBody, onEmailBodyChange]);
+        const html = buildEmailTemplate(instrumentType, templateData);
+        setHtmlContent(html);
+        onEmailBodyChange(html);
+    }, []);
 
     const handleAddFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newFiles = Array.from(e.target.files || []);
@@ -71,16 +59,6 @@ export function FollowupEmailEditor({
         setFiles(updated);
         onFilesChange?.(updated);
     };
-
-    if (isLoading) {
-        return (
-            <div className="space-y-4">
-                <div className="h-48 bg-muted/30 rounded-lg flex items-center justify-center">
-                    <p className="text-sm text-muted-foreground">Loading email template...</p>
-                </div>
-            </div>
-        );
-    }
 
     return (
         <div className="space-y-4">
