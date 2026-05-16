@@ -6,6 +6,7 @@ import {
     paymentRequests,
     paymentInstruments,
     instrumentDdDetails,
+    instrumentChequeDetails,
 } from '@db/schemas/tendering/payment-requests.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { users } from '@db/schemas/auth/users.schema';
@@ -505,7 +506,32 @@ export class DemandDraftService {
             throw new NotFoundException(`Payment Request with ID ${id} not found`);
         }
 
-        return result;
+        let linkedCheque: any = null;
+        if (result.ddDetailsId) {
+            const [cheque] = await this.db
+                .select({
+                    chequeNo: instrumentChequeDetails.chequeNo,
+                    chequeDate: instrumentChequeDetails.chequeDate,
+                    bankName: instrumentChequeDetails.bankName,
+                    amount: paymentInstruments.amount,
+                    status: paymentInstruments.status,
+                    favouring: paymentInstruments.favouring,
+                    requestId: paymentRequests.id,
+                })
+                .from(instrumentChequeDetails)
+                .innerJoin(paymentInstruments, eq(paymentInstruments.id, instrumentChequeDetails.instrumentId))
+                .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+                .where(eq(instrumentChequeDetails.linkedDdId, result.ddDetailsId))
+                .limit(1);
+            if (cheque) {
+                linkedCheque = {
+                    ...cheque,
+                    chequeDate: cheque.chequeDate ? new Date(cheque.chequeDate) : null,
+                };
+            }
+        }
+
+        return { ...result, linkedCheque };
     }
 
     async getActionFormData(id: number) {

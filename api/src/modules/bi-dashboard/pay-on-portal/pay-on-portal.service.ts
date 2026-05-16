@@ -531,6 +531,7 @@ export class PayOnPortalService {
 
                 // User fields
                 requestedByName: users.name,
+                tenderName: tenderInfos.tenderName,
             })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))

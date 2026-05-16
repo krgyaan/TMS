@@ -1,9 +1,6 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableRow, TableCell } from "@/components/ui/table";
 import { AlertCircle, FileText } from "lucide-react";
-import { formatDate } from "@/hooks/useFormatedDate";
-import { formatINR } from "@/hooks/useINRFormatter";
 import { InstrumentBiView } from "./InstrumentBiView";
 
 interface PaymentRequest {
@@ -58,98 +55,6 @@ export const EmdTenderFeeShow = ({ paymentRequests, text }: EmdTenderFeeShowProp
                     <AlertDescription>{text} {text.split(",").length > 1 ? "are" : "is"} not applicable for this tender.</AlertDescription>
                 </Alert>
             )}
-            <Card>
-            <CardContent>
-                <Table>
-                    <TableBody>
-                        <TableRow className="bg-muted/50">
-                            <TableCell colSpan={4} className="font-semibold text-sm">
-                                Payment Requests
-                            </TableCell>
-                        </TableRow>
-
-                        {emdRequest && (
-                            <>
-                                <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={4} className="font-semibold text-sm">
-                                        EMD Payment
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">Amount Required</TableCell>
-                                    <TableCell className="text-sm font-semibold">{formatINR(emdRequest.amountRequired)}</TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">Request On</TableCell>
-                                    <TableCell className="text-sm font-semibold">{formatDate(emdRequest.createdAt)}</TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">Due Date</TableCell>
-                                    <TableCell className="text-sm">{formatDate(emdRequest.dueDate)}</TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">Requested By</TableCell>
-                                    <TableCell className="text-sm">{emdRequest.requestedBy}</TableCell>
-                                </TableRow>
-                            </>
-                        )}
-
-                        {tenderFeeRequest && (
-                            <>
-                                <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={4} className="font-semibold text-sm">
-                                        Tender Fee Payment
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">Amount Required</TableCell>
-                                    <TableCell className="text-sm font-semibold">{formatINR(tenderFeeRequest.amountRequired)}</TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">Request On</TableCell>
-                                    <TableCell className="text-sm font-semibold">{formatDate(tenderFeeRequest.createdAt)}</TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">Due Date</TableCell>
-                                    <TableCell className="text-sm">{formatDate(tenderFeeRequest.dueDate)}</TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">Requested By</TableCell>
-                                    <TableCell className="text-sm">{tenderFeeRequest.requestedBy}</TableCell>
-                                </TableRow>
-                            </>
-                        )}
-
-                        {processingFeeRequest && (
-                            <>
-                                <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={4} className="font-semibold text-sm">
-                                        Processing Fee Payment
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">Amount</TableCell>
-                                    <TableCell className="text-sm font-semibold">{formatINR(processingFeeRequest.amountRequired)}</TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">Request On</TableCell>
-                                    <TableCell className="text-sm font-semibold">{formatDate(processingFeeRequest.createdAt)}</TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">Due Date</TableCell>
-                                    <TableCell className="text-sm">{formatDate(processingFeeRequest.dueDate)}</TableCell>
-                                    <TableCell className="text-sm font-medium text-muted-foreground">Requested By</TableCell>
-                                    <TableCell className="text-sm">{processingFeeRequest.requestedBy}</TableCell>
-                                </TableRow>
-                            </>
-                        )}
-
-                        <TableRow className="bg-primary/10">
-                            <TableCell colSpan={2} className="font-bold text-sm">
-                                Total Amount Required
-                            </TableCell>
-                            <TableCell colSpan={2} className="font-bold text-sm">
-                                {formatINR(
-                                    (Number(emdRequest?.amountRequired) || 0) +
-                                    (Number(tenderFeeRequest?.amountRequired) || 0) +
-                                    (Number(processingFeeRequest?.amountRequired) || 0)
-                                )}
-                            </TableCell>
-                        </TableRow>
-                    </TableBody>
-                </Table>
-            </CardContent>
-        </Card>
 
             {emdRequest?.instruments?.map(inst => (
                 <InstrumentBiView key={inst.id} instrumentId={inst.id} instrumentType={inst.instrumentType} />
