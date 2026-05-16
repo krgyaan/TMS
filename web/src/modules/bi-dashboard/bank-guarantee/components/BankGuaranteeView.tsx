@@ -121,28 +121,27 @@ export function BankGuaranteeView({
     };
 
     const bgClaimPeriod =
-        data.bgExpiryDate && data.claimExpiryDateBg
+        data.expiryDate && data.claimExpiryDateBg
             ? calculateBgClaimPeriod(
-                new Date(data.bgExpiryDate),
+                new Date(data.expiryDate),
                 new Date(data.claimExpiryDateBg)
             )
             : null;
 
     // Check if sections have data
-    const hasFdrDetails = data.fdrNo || data.fdrAmt || data.fdrCopy || data.fdrCancellationDate;
+    const hasFdrDetails = data.fdrNo || data.fdrAmt || data.fdrCopy || data.bgFdrCancelDate;
     const hasBankInfo = data.bankName || data.bgBankAcc || data.bgBankIfsc;
     const hasExtensionDetails = data.extendedAmount || data.extendedValidityDate;
     const hasCourierInfo =
-        data.bgCourierAddress ||
-        data.courierRequestNo ||
-        data.courierDocketNo ||
+        data.courierAddress ||
+        data.reqNo ||
         data.courierNo ||
         data.courierAddress;
     const hasReturnInfo =
-        data.returnCourierDocketNo ||
-        data.returnCourierSlip ||
-        data.bgCancellationConfirmation ||
-        data.bankReferenceNo;
+        data.docketNo ||
+        data.docketSlip ||
+        data.cancellConfirm ||
+        data.bgFdrCancelRefNo;
 
     return (
         <Card className={className}>
@@ -192,23 +191,23 @@ export function BankGuaranteeView({
                                 label1="Requested By"
                                 value1={data.requestedByName || '—'}
                                 label2="Rejection Reasons"
-                                value2={data.rejectionReasons || '—'}
+                                value2={data.reasonReq || '—'}
                             />
                             <DataRow
                                 label1="Prefilled Forms (Unsigned)"
-                                value1={<FileLink file={data.prefilledFormsUnsigned} />}
+                                value1={<FileLink file={data.bgFormatTe} />}
                                 label2="Prefilled Forms (Signed)"
-                                value2={<FileLink file={data.prefilledFormsSigned} />}
+                                value2={<FileLink file={data.prefilledSignedBg} />}
                             />
                             <DataRow
                                 label1="BG Format by TE"
                                 value1={<FileLink file={data.bgFormatTe} />}
                                 label2="BG Format by Accounts"
-                                value2={<FileLink file={data.bgFormatAccounts} />}
+                                value2={<FileLink file={data.bgFormatTl} />}
                             />
                             <DataRow
                                 label1="PO / Request Letter / Tender Name"
-                                value1={<FileLink file={data.poRequestLetter} />}
+                                value1={<FileLink file={data.bgPo} />}
                             />
 
                             {/* Section 3: Tender/Project Information */}
@@ -248,7 +247,7 @@ export function BankGuaranteeView({
                             />
                             <DataRow
                                 label1="Client Bank IFSC"
-                                value1={data.ifsc || '—'}
+                                value1={data.bgBankIfsc || '—'}
                             />
 
                             {/* Section 5: BG Validity & Dates */}
@@ -257,7 +256,7 @@ export function BankGuaranteeView({
                                 label1="Validity Date"
                                 value1={data.validityDate ? formatDate(data.validityDate) : '—'}
                                 label2="Expiry Date"
-                                value2={data.bgExpiryDate ? formatDate(data.bgExpiryDate) : '—'}
+                                value2={data.expiryDate ? formatDate(data.expiryDate) : '—'}
                             />
                             <DataRow
                                 label1="Claim Expiry Date"
@@ -269,7 +268,7 @@ export function BankGuaranteeView({
                                 label1="Soft Copy of BG"
                                 value1={<FileLink file={data.bgSoftCopy} />}
                                 label2="SFMS File"
-                                value2={<FileLink file={data.sfmsFile} />}
+                                value2={<FileLink file={data.sfmsConf} />}
                             />
 
                             {/* Section 6: BG Issuing Bank Information */}
@@ -347,8 +346,19 @@ export function BankGuaranteeView({
                                         value1={<FileLink file={data.fdrCopy} />}
                                         label2="FDR Cancellation Date"
                                         value2={
-                                            data.fdrCancellationDate
-                                                ? formatDate(data.fdrCancellationDate)
+                                            data.bgFdrCancelDate
+                                                ? formatDate(data.bgFdrCancelDate)
+                                                : '—'
+                                        }
+                                    />
+                                    <DataRow
+                                        label1="Cancelled FDR Amount"
+                                        value1={data.bgFdrCancelAmount
+                                            ? formatINR(Number(data.bgFdrCancelAmount))
+                                            : '—'}
+                                        value2={
+                                            data.bgFdrCancelAmount
+                                                ? formatINR(Number(data.bgFdrCancelAmount))
                                                 : '—'
                                         }
                                     />
@@ -369,15 +379,15 @@ export function BankGuaranteeView({
                                     <SectionHeader title="Courier & Dispatch Information" />
                                     <DataRow
                                         label1="BG Courier Address"
-                                        value1={data.bgCourierAddress || data.courierAddress || '—'}
+                                        value1={data.courierAddress || '—'}
                                         label2="Courier Request No"
-                                        value2={data.courierRequestNo || '—'}
+                                        value2={data.reqNo || '—'}
                                     />
                                     <DataRow
                                         label1="Courier Docket No"
-                                        value1={data.courierDocketNo || data.courierNo || '—'}
+                                        value1={data.courierNo || '—'}
                                         label2="Courier Docket Slip"
-                                        value2={<FileLink file={data.courierDocketSlip} />}
+                                        value2={<FileLink file={data.docketSlip} />}
                                     />
                                 </>
                             )}
@@ -394,9 +404,9 @@ export function BankGuaranteeView({
                                     />
                                     <DataRow
                                         label1="BG Cancellation Confirmation"
-                                        value1={<FileLink file={data.bgCancellationConfirmation} />}
+                                        value1={<FileLink file={data.cancellConfirm} />}
                                         label2="Bank Reference No"
-                                        value2={data.bankReferenceNo || '—'}
+                                        value2={data.bgFdrCancelRefNo || '—'}
                                     />
                                     <DataRow
                                         label1="Followup Proof"

@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger, NotFoundException, BadRequestException } fr
 import { eq, and, inArray, isNull, sql, asc, desc, like } from "drizzle-orm";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
-import { paymentRequests, paymentInstruments, instrumentFdrDetails } from "@db/schemas/tendering/payment-requests.schema";
+import { paymentRequests, paymentInstruments, instrumentFdrDetails, instrumentChequeDetails } from "@db/schemas/tendering/payment-requests.schema";
 import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
 import { users } from "@db/schemas/auth/users.schema";
 import { statuses } from "@db/schemas/master/statuses.schema";
@@ -593,6 +593,7 @@ export class FdrService {
                 docketSlip: paymentInstruments.docketSlip,
                 coveringLetter: paymentInstruments.coveringLetter,
                 extraPdfPaths: paymentInstruments.extraPdfPaths,
+                reqNo: paymentInstruments.reqNo,
                 createdAt: paymentInstruments.createdAt,
                 updatedAt: paymentInstruments.updatedAt,
 
@@ -656,7 +657,32 @@ export class FdrService {
             throw new NotFoundException(`Payment Request with ID ${id} not found`);
         }
 
-        return result;
+        let linkedCheque: any = null;
+        if (result.instrumentId) {
+            const [cheque] = await this.db
+                .select({
+                    chequeNo: instrumentChequeDetails.chequeNo,
+                    chequeDate: instrumentChequeDetails.chequeDate,
+                    bankName: instrumentChequeDetails.bankName,
+                    amount: paymentInstruments.amount,
+                    status: paymentInstruments.status,
+                    favouring: paymentInstruments.favouring,
+                    requestId: paymentRequests.id,
+                })
+                .from(instrumentChequeDetails)
+                .innerJoin(paymentInstruments, eq(paymentInstruments.id, instrumentChequeDetails.instrumentId))
+                .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+                .where(eq(instrumentChequeDetails.linkedFdrId, result.instrumentId))
+                .limit(1);
+            if (cheque) {
+                linkedCheque = {
+                    ...cheque,
+                    chequeDate: cheque.chequeDate ? new Date(cheque.chequeDate) : null,
+                };
+            }
+        }
+
+        return { ...result, linkedCheque };
     }
 
     async getActionFormData(id: number) {

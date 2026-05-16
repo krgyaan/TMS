@@ -109,7 +109,7 @@ export function ChequeView({
                                     Requeste Date
                                 </TableCell>
                                 <TableCell className="text-sm">
-                                    {formatDateTime(data.createdAt)}
+                                    {formatDateTime(data.requestCreatedAt)}
                                 </TableCell>
                             </TableRow>
                             <TableRow className="hover:bg-muted/30 transition-colors">
@@ -131,13 +131,13 @@ export function ChequeView({
                                     Status
                                 </TableCell>
                                 <TableCell className="text-sm">
-                                    <Badge variant="outline">{data.chequeStatus == 'Accepted' ? 'Paid' : data.chequeStatus || '—'}</Badge>
+                                    <Badge variant="outline">{data.status == 'Accepted' ? 'Paid' : data.status || '—'}</Badge>
                                 </TableCell>
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     Purpose
                                 </TableCell>
                                 <TableCell className="text-sm">
-                                    {data.chequeReason || '—'}
+                                    {data.chequeReason || data.purpose || data.requestPurpose || '—'}
                                 </TableCell>
                             </TableRow>
 
@@ -180,13 +180,13 @@ export function ChequeView({
                                     Cheque Image
                                 </TableCell>
                                 <TableCell className="text-sm">
-                                    {data.chequeImage ? <FileLink file={data.chequeImage} /> : '—'}
+                                    {data.chequeImagePath ? <FileLink file={data.chequeImagePath} /> : '—'}
                                 </TableCell>
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     Handover Image
                                 </TableCell>
                                 <TableCell className="text-sm">
-                                    {data.handoverImage ? <FileLink file={data.handoverImage} /> : '—'}
+                                    {data.handover ? <FileLink file={data.handover} /> : '—'}
                                 </TableCell>
                             </TableRow>
                             <TableRow className="hover:bg-muted/30 transition-colors">

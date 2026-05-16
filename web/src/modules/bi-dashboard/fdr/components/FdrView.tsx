@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { Wallet } from 'lucide-react';
+import { Wallet, Receipt } from 'lucide-react';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDate } from '@/hooks/useFormatedDate';
 
@@ -84,15 +84,15 @@ export function FdrView({
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Purpose
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.purpose || data.requestPurpose || '—'}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground whitespace-normal [overflow-wrap:anywhere]">
-                                Favouring
-                            </TableCell>
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Purpose
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                    {data.fdrPurpose || data.purpose || data.requestPurpose || '—'}
+                                </TableCell>
+                                <TableCell className="text-sm font-medium text-muted-foreground whitespace-normal [overflow-wrap:anywhere]">
+                                    Favouring
+                                </TableCell>
                             <TableCell className="text-sm">
                                 {data.favouring || '—'}
                             </TableCell>
@@ -319,6 +319,37 @@ export function FdrView({
                         )}
                     </TableBody>
                 </Table>
+
+                {data.linkedCheque && (
+                    <div className="mt-6 border-t pt-4">
+                        <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                            <Receipt className="h-4 w-4" />
+                            Linked Cheque
+                        </h4>
+                        <Table>
+                            <TableBody>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Cheque No</TableCell>
+                                    <TableCell className="text-sm font-semibold">{data.linkedCheque.chequeNo || '—'}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Cheque Date</TableCell>
+                                    <TableCell className="text-sm">{data.linkedCheque.chequeDate ? formatDate(data.linkedCheque.chequeDate) : '—'}</TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Bank Name</TableCell>
+                                    <TableCell className="text-sm">{data.linkedCheque.bankName || '—'}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Amount</TableCell>
+                                    <TableCell className="text-sm font-semibold">{data.linkedCheque.amount ? formatINR(Number(data.linkedCheque.amount)) : '—'}</TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Status</TableCell>
+                                    <TableCell><Badge variant="outline">{data.linkedCheque.status || '—'}</Badge></TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Favouring</TableCell>
+                                    <TableCell className="text-sm">{data.linkedCheque.favouring || '—'}</TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
+                    </div>
+                )}
             </CardContent>
         </Card>
     );
