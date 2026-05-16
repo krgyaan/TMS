@@ -99,10 +99,10 @@ export function PayOnPortalView({ data, followupData }: PayOnPortalViewProps) {
                                 <Badge variant="outline">{data.popStatus || '—'}</Badge>
                             </TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">
-                                Tender No
+                                Purpose
                             </TableCell>
                             <TableCell className="text-sm">
-                                {data.tenderNo || '—'}
+                                {data.purpose || '—'}
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
