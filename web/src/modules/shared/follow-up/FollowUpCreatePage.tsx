@@ -20,6 +20,7 @@ import { useFollowupCategories } from "@/hooks/api/useFollowupCategories";
 import { paths } from "@/app/routes/paths";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 /* -----------------------
    Mock Data (same as yours)
@@ -37,6 +38,7 @@ const AREAS = [
 const FollowUpCreatePage = () => {
     const { mutateAsync, isPending } = useCreateFollowUp();
     const navigate = useNavigate();
+    const { user } = useAuth();
 
     const form = useForm<CreateFollowUpFormValues>({
         resolver: zodResolver(CreateFollowUpFormSchema),
@@ -77,6 +79,7 @@ const FollowUpCreatePage = () => {
                 amount: values.amount ? Number(values.amount) : undefined,
                 assignedToId: Number(values.assignedTo),
                 comment: values.comment,
+                followupFor: values.followupFor,
                 contacts: values.contacts.map(c => ({
                     name: c.name,
                     email: c.email || null,
@@ -186,7 +189,7 @@ const FollowUpCreatePage = () => {
                                     </SelectTrigger>
                                     <SelectContent>
                                         {followUpCategories.map(r => (
-                                            <SelectItem key={r.id} value={String(r.id)}>
+                                            <SelectItem key={r.id} value={String(r.name)}>
                                                 {r.name}
                                             </SelectItem>
                                         ))}

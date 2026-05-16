@@ -4,6 +4,8 @@ export const getInitialValues = (approval?: TenderApproval | null): TenderApprov
     if (!approval) {
         return {
             tlDecision: '0',
+            rfqRequired: undefined,
+            quotationFiles: [],
             rfqTo: [],
             processingFeeMode: undefined,
             tenderFeeMode: undefined,
@@ -14,7 +16,9 @@ export const getInitialValues = (approval?: TenderApproval | null): TenderApprov
             alternativeFinancialDocs: [],
             tenderStatus: undefined,
             oemNotAllowed: undefined,
-            remarks: undefined,
+            tlApprovalRemarks: undefined,
+            tlRejectionRemarks: undefined,
+            tlIncompleteRemarks: undefined,
             incompleteFields: [],
         };
     }
@@ -26,6 +30,8 @@ export const getInitialValues = (approval?: TenderApproval | null): TenderApprov
 
     return {
         tlDecision: String(approval.tlStatus ?? approval.tlDecision ?? '0') as '0' | '1' | '2' | '3',
+        rfqRequired: approval.rfqRequired as 'yes' | 'no' | undefined,
+        quotationFiles: approval.quotationFiles ?? [],
         rfqTo: approval.rfqTo?.map(id => String(id)) ?? [],
         processingFeeMode: toOptionalString(approval.processingFeeMode),
         tenderFeeMode: toOptionalString(approval.tenderFeeMode),
@@ -35,8 +41,10 @@ export const getInitialValues = (approval?: TenderApproval | null): TenderApprov
         alternativeTechnicalDocs: approval.alternativeTechnicalDocs ?? [],
         alternativeFinancialDocs: approval.alternativeFinancialDocs ?? [],
         tenderStatus: approval.tenderStatus ? String(approval.tenderStatus) : undefined,
-        oemNotAllowed: approval.oemNotAllowed ? String(approval.oemNotAllowed) : undefined,
-        remarks: approval.tlRejectionRemarks ?? undefined,
+        oemNotAllowed: approval.oemNotAllowed?.map((item) => String(item)) ?? [],
+        tlApprovalRemarks: toOptionalString(approval.tlApprovalRemarks),
+        tlRejectionRemarks: toOptionalString(approval.tlRejectionRemarks),
+        tlIncompleteRemarks: toOptionalString(approval.tlIncompleteRemarks),
         incompleteFields: approval.incompleteFields ?? [],
     };
 };
@@ -51,6 +59,12 @@ export const mapFormToPayload = (values: TenderApprovalFormValues): SaveTenderAp
         const payload: SaveTenderApprovalDto = {
             ...basePayload,
         };
+        if (values.rfqRequired) {
+            payload.rfqRequired = values.rfqRequired;
+        }
+        if (values.quotationFiles && values.quotationFiles.length > 0) {
+            payload.quotationFiles = values.quotationFiles;
+        }
         if (values.rfqTo && values.rfqTo.length > 0) {
             payload.rfqTo = values.rfqTo.map(id => Number(id));
         }
@@ -69,8 +83,15 @@ export const mapFormToPayload = (values: TenderApprovalFormValues): SaveTenderAp
         if (values.approveFinanceDocSelection) {
             payload.approveFinanceDocSelection = values.approveFinanceDocSelection as '1' | '2';
         }
-        // Note: alternativeTechnicalDocs and alternativeFinancialDocs are not yet supported by backend
-        // They are kept in the form for validation but not sent in the payload
+        if (values.alternativeTechnicalDocs && values.alternativeTechnicalDocs.length > 0) {
+            payload.alternativeTechnicalDocs = values.alternativeTechnicalDocs;
+        }
+        if (values.alternativeFinancialDocs && values.alternativeFinancialDocs.length > 0) {
+            payload.alternativeFinancialDocs = values.alternativeFinancialDocs;
+        }
+        if (values.tlApprovalRemarks) {
+            payload.tlApprovalRemarks = values.tlApprovalRemarks;
+        }
         return payload;
     }
 
@@ -85,8 +106,8 @@ export const mapFormToPayload = (values: TenderApprovalFormValues): SaveTenderAp
         if (values.oemNotAllowed) {
             payload.oemNotAllowed = values.oemNotAllowed;
         }
-        if (values.remarks) {
-            payload.tlRejectionRemarks = values.remarks;
+        if (values.tlRejectionRemarks) {
+            payload.tlRejectionRemarks = values.tlRejectionRemarks;
         }
         return payload;
     }
@@ -98,6 +119,9 @@ export const mapFormToPayload = (values: TenderApprovalFormValues): SaveTenderAp
         };
         if (values.incompleteFields && values.incompleteFields.length > 0) {
             payload.incompleteFields = values.incompleteFields;
+        }
+        if (values.tlIncompleteRemarks) {
+            payload.tlIncompleteRemarks = values.tlIncompleteRemarks;
         }
         return payload;
     }

@@ -12,41 +12,19 @@ import { NumberInput } from '@/components/form/NumberInput';
 import { SelectField } from '@/components/form/SelectField';
 import { MultiSelectField } from '@/components/form/MultiSelectField';
 import { DateTimeInput } from '@/components/form/DateTimeInput';
+import { TenderFileUploader } from '@/components/tender-file-upload';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
 import { Badge } from '@/components/ui/badge';
-import {
-    Accordion,
-    AccordionContent,
-    AccordionItem,
-    AccordionTrigger,
-} from '@/components/ui/accordion';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { ArrowLeft, Plus, Trash2, Save, AlertCircle } from 'lucide-react';
 import { paths } from '@/app/routes/paths';
 import { useCreateInfoSheet, useUpdateInfoSheet } from '@/hooks/api/useInfoSheets';
 import { handleInfoSheetFormErrors } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.errors';
 import type { TenderInfoWithNames } from '@/modules/tendering/tenders/helpers/tenderInfo.types';
-import {
-    yesNoOptions,
-    emdRequiredOptions,
-    processingFeeOptions,
-    tenderFeeOptions,
-    paymentModeOptions,
-    bidValidityOptions,
-    commercialEvaluationOptions,
-    mafRequiredOptions,
-    pbgFormOptions,
-    sdFormOptions,
-    pbgDurationOptions,
-    aatOptions,
-    scOptions,
-    wcOptions,
-    nwOptions,
-    rejectionReasonOptions,
-    dummyTechnicalDocuments,
-    dummyFinancialDocuments,
-} from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types';
+import { yesNoOptions, emdRequiredOptions, processingFeeOptions, tenderFeeOptions, paymentModeOptions, bidValidityOptions, commercialEvaluationOptions, mafRequiredOptions, pbgFormOptions, sdFormOptions, pbgDurationOptions, aatOptions, scOptions, wcOptions, nwOptions, physicalDocTypeOptions } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types';
+import { useDnbStatusOptions, usePqrOptions, useFinanceDocumentOptions } from '@/hooks/useSelectOptions';
 import type { TenderInfoSheetFormValues, TenderInfoSheetResponse } from '@/modules/tendering/info-sheet/helpers/tenderInfoSheet.types';
 import { TenderView } from '@/modules/tendering/tenders/components/TenderView';
 import { infoSheetFieldOptions } from '@/modules/tendering/tender-approval/helpers/tenderApproval.types';
@@ -81,10 +59,15 @@ export function TenderInformationForm({
 }: TenderInformationFormProps) {
     const navigate = useNavigate();
     const { data: approvalData } = useTenderApproval(tenderId);
+    const rejectionReasonOptions = useDnbStatusOptions();
+    const pqrOptions = usePqrOptions();
+    const financeDocumentOptions = useFinanceDocumentOptions();
 
     const initialFormValues = useMemo(() => {
         if (mode === 'create') {
-            return buildDefaultValues(tender);
+            // Set default teRecommendation to 'YES'
+            const defaults = buildDefaultValues(tender);
+            return { ...defaults, teRecommendation: defaults.teRecommendation || 'YES' };
         }
         return mapResponseToForm(initialData ?? null, tender);
     }, [initialData, tender, mode]);
@@ -126,6 +109,9 @@ export function TenderInformationForm({
     const solvencyCertificateCriteria = form.watch('solvencyCertificateCriteria');
     const netWorthCriteria = form.watch('netWorthCriteria');
 
+    // Derived: is the recommendation YES (show full form) or NO (show rejection only)
+    const isRecommended = teRecommendation !== 'NO';
+
     // Clear deliveryTimeInstallation when inclusive is true
     useEffect(() => {
         if (deliveryTimeInstallationInclusive) {
@@ -133,10 +119,20 @@ export function TenderInformationForm({
         }
     }, [deliveryTimeInstallationInclusive, form]);
 
+    // Clear rejection fields when switching to YES
+    useEffect(() => {
+        if (isRecommended) {
+            form.setValue('teRejectionReason', undefined, { shouldValidate: false });
+            form.setValue('teRejectionRemarks', undefined, { shouldValidate: false });
+            form.setValue('teRejectionProof', [], { shouldValidate: false });
+        }
+    }, [isRecommended, form]);
+
     const isLoading = isTenderLoading || (mode === 'edit' && isInfoSheetLoading);
     const createInfoSheet = useCreateInfoSheet();
     const updateInfoSheet = useUpdateInfoSheet();
     const isSubmitting = createInfoSheet.isPending || updateInfoSheet.isPending;
+    const teRejectionProof = form.watch('teRejectionProof');
 
     const handleSubmit: SubmitHandler<TenderInfoSheetFormValues> = async (values) => {
         try {
@@ -150,8 +146,6 @@ export function TenderInformationForm({
 
             navigate(paths.tendering.tenders);
         } catch (error) {
-            // Error is already handled by the mutation's onError callback
-            // Only log for debugging
             console.error('Info sheet submission error:', error);
         }
     };
@@ -175,12 +169,16 @@ export function TenderInformationForm({
             <Card className="max-w-3xl mx-auto">
                 <CardHeader>
                     <CardTitle>Info Sheet Not Found</CardTitle>
-                    <CardDescription>The selected tender does not have an info sheet yet.</CardDescription>
+                    <CardDescription>
+                        The selected tender does not have an info sheet yet.
+                    </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <Alert>
                         <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>Create a new info sheet to continue.</AlertDescription>
+                        <AlertDescription>
+                            Create a new info sheet to continue.
+                        </AlertDescription>
                     </Alert>
                     <div className="mt-6 flex gap-3">
                         <Button variant="outline" onClick={() => navigate(-1)}>
@@ -200,11 +198,14 @@ export function TenderInformationForm({
             <CardHeader>
                 <div className="flex items-center justify-between">
                     <div>
-                        <CardTitle>{mode === 'create' ? 'Create' : 'Edit'} Tender Information</CardTitle>
+                        <CardTitle>
+                            {mode === 'create' ? 'Create' : 'Edit'} Tender Information
+                        </CardTitle>
                         <CardDescription className="mt-2">
                             {tender ? (
                                 <>
-                                    <span className="font-medium">{tender.tenderName}</span> • Tender No: {tender.tenderNo}
+                                    <span className="font-medium">{tender.tenderName}</span>{' '}
+                                    • Tender No: {tender.tenderNo}
                                 </>
                             ) : (
                                 'Linked tender details'
@@ -240,14 +241,19 @@ export function TenderInformationForm({
                                     This info sheet has been marked as incomplete by the TL.
                                 </p>
                                 <p className="text-sm">
-                                    Please review and correct the following {incompleteFields.length} field(s) marked below:
+                                    Please review and correct the following{' '}
+                                    {incompleteFields.length} field(s) marked below:
                                 </p>
                                 <div className="flex flex-wrap gap-2 mt-2">
-                                    {incompleteFields.map((field: { fieldName: string; comment?: string }, idx: number) => (
-                                        <Badge key={idx} variant="outline" className="border-amber-600">
-                                            {infoSheetFieldOptions.find((opt: { value: string }) => opt.value === field.fieldName)?.label || field.fieldName}
-                                        </Badge>
-                                    ))}
+                                    {incompleteFields.map(
+                                        (field: { fieldName: string; comment?: string }, idx: number) => (
+                                            <Badge key={idx} variant="outline" className="border-amber-600">
+                                                {infoSheetFieldOptions.find(
+                                                    (opt: { value: string }) => opt.value === field.fieldName
+                                                )?.label || field.fieldName}
+                                            </Badge>
+                                        )
+                                    )}
                                 </div>
                             </div>
                         </AlertDescription>
@@ -257,31 +263,50 @@ export function TenderInformationForm({
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit, handleInfoSheetFormErrors)}>
                         <div className="space-y-6 pt-4">
-                            {/* TE Recommendation */}
+                            {/* ──────────────────────────────────────────────
+                                TE Recommendation Toggle (always visible)
+                               ────────────────────────────────────────────── */}
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <SelectField
-                                    control={form.control}
-                                    name="teRecommendation"
-                                    label="Recommendation by TE"
-                                    options={yesNoOptions}
-                                    placeholder="Select recommendation"
-                                />
-                                {teRecommendation === 'NO' && (
-                                    <>
+                                <div>
+                                    <SelectField
+                                        control={form.control}
+                                        name="teRecommendation"
+                                        label="Recommendation by TE"
+                                        options={yesNoOptions}
+                                        placeholder="Select recommendation"
+                                    />
+                                    {getIncompleteFieldComment('teRecommendation') && (
+                                        <IncompleteFieldAlert
+                                            comment={getIncompleteFieldComment('teRecommendation')!}
+                                        />
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* ──────────────────────────────────────────────
+                                REJECTION SECTION (only when NO)
+                               ────────────────────────────────────────────── */}
+                            {!isRecommended && (
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <div>
                                         <SelectField
                                             control={form.control}
                                             name="teRejectionReason"
-                                            label="Reason of Rejection"
-                                            options={rejectionReasonOptions.map(option => ({
-                                                value: String(option.value),
-                                                label: option.label
-                                            }))}
+                                            label="Reason of Rejection *"
+                                            options={rejectionReasonOptions}
                                             placeholder="Select rejection reason"
                                         />
+                                        {getIncompleteFieldComment('teRejectionReason') && (
+                                            <IncompleteFieldAlert
+                                                comment={getIncompleteFieldComment('teRejectionReason')!}
+                                            />
+                                        )}
+                                    </div>
+                                    <div>
                                         <FieldWrapper
                                             control={form.control}
                                             name="teRejectionRemarks"
-                                            label="Rejection Remarks"
+                                            label="Rejection Remarks *"
                                         >
                                             {(field) => (
                                                 <textarea
@@ -292,705 +317,1442 @@ export function TenderInformationForm({
                                                 />
                                             )}
                                         </FieldWrapper>
-                                    </>
-                                )}
-                                <SelectField
-                                    control={form.control}
-                                    name="processingFeeRequired"
-                                    label="Processing Fees Required"
-                                    options={yesNoOptions}
-                                    placeholder="Select option"
-                                />
-                                {processingFeeRequired === 'YES' && (
-                                    <>
-                                        <MultiSelectField
-                                            control={form.control}
-                                            name="processingFeeModes"
-                                            label="Processing Fees Mode"
-                                            options={processingFeeOptions.map(option => ({
-                                                value: String(option.value),
-                                                label: option.label
-                                            }))}
-                                            placeholder="Select payment modes"
-                                        />
-                                        <FieldWrapper
-                                            control={form.control}
-                                            name="processingFeeAmount"
-                                            label="Processing Fees Amount"
-                                        >
-                                            {(field) => (
-                                                <NumberInput
-                                                    step={0.01}
-                                                    placeholder="0.00"
-                                                    value={typeof field.value === "number" ? field.value : null}
-                                                    onChange={field.onChange}
-                                                />
-                                            )}
-                                        </FieldWrapper>
-                                    </>
-                                )}
-                                <SelectField
-                                    control={form.control}
-                                    name="tenderFeeRequired"
-                                    label="Tender Fees Required"
-                                    options={yesNoOptions}
-                                    placeholder="Select option"
-                                />
-                                {tenderFeeRequired === 'YES' && (
-                                    <>
-                                        <MultiSelectField
-                                            control={form.control}
-                                            name="tenderFeeModes"
-                                            label="Tender Fees Mode"
-                                            options={tenderFeeOptions.map(option => ({
-                                                value: String(option.value),
-                                                label: option.label
-                                            }))}
-                                            placeholder="Select payment modes"
-                                        />
-                                        <FieldWrapper
-                                            control={form.control}
-                                            name="tenderFeeAmount"
-                                            label="Tender Fees Amount"
-                                        >
-                                            {(field) => (
-                                                <NumberInput
-                                                    step={0.01}
-                                                    placeholder="0.00"
-                                                    value={typeof field.value === "number" ? field.value : null}
-                                                    onChange={field.onChange}
-                                                />
-                                            )}
-                                        </FieldWrapper>
-                                    </>
-                                )}
-                                <SelectField
-                                    control={form.control}
-                                    name="emdRequired"
-                                    label="EMD Required"
-                                    options={emdRequiredOptions}
-                                    placeholder="Select option"
-                                />
-                                {emdRequired === 'YES' && (
-                                    <>
-                                        <MultiSelectField
-                                            control={form.control}
-                                            name="emdModes"
-                                            label="EMD Mode"
-                                            options={paymentModeOptions.map(option => ({
-                                                value: String(option.value),
-                                                label: option.label
-                                            }))}
-                                            placeholder="Select payment modes"
-                                        />
-                                        <FieldWrapper
-                                            control={form.control}
-                                            name="emdAmount"
-                                            label="EMD Amount"
-                                        >
-                                            {(field) => (
-                                                <NumberInput
-                                                    step={0.01}
-                                                    placeholder="0.00"
-                                                    value={typeof field.value === "number" ? field.value : null}
-                                                    onChange={field.onChange}
-                                                />
-                                            )}
-                                        </FieldWrapper>
-                                    </>
-                                )}
-                                <FieldWrapper
-                                    control={form.control}
-                                    name="tenderValue"
-                                    label="Tender Value (GST Inclusive)"
-                                >
-                                    {(field) => (
-                                        <NumberInput
-                                            step={0.01}
-                                            placeholder="0.00"
-                                            value={typeof field.value === "number" ? field.value : null}
-                                            onChange={field.onChange}
-                                        />
-                                    )}
-                                </FieldWrapper>
-                                <SelectField
-                                    control={form.control}
-                                    name="bidValidityDays"
-                                    label="Bid Validity (Days)"
-                                    options={bidValidityOptions.map(option => ({
-                                        value: String(option.value),
-                                        label: option.label
-                                    }))}
-                                    placeholder="Select days"
-                                />
-                                <SelectField
-                                    control={form.control}
-                                    name="mafRequired"
-                                    label="MAF Required"
-                                    options={mafRequiredOptions.map(option => ({
-                                        value: String(option.value),
-                                        label: option.label
-                                    }))}
-                                    placeholder="Select option"
-                                />
-                                <SelectField
-                                    control={form.control}
-                                    name="pbgRequired"
-                                    label="PBG Required"
-                                    options={yesNoOptions}
-                                    placeholder="Select option"
-                                />
-                                {pbgRequired === 'YES' && (
-                                    <>
-                                        <MultiSelectField
-                                            control={form.control}
-                                            name="pbgForm"
-                                            label="PBG (in form of)"
-                                            options={pbgFormOptions.map(option => ({
-                                                value: String(option.value),
-                                                label: option.label
-                                            }))}
-                                            placeholder="Select forms"
-                                        />
-                                        <FieldWrapper
-                                            control={form.control}
-                                            name="pbgPercentage"
-                                            label="PBG %age"
-                                        >
-                                            {(field) => (
-                                                <NumberInput
-                                                    step={0.01}
-                                                    min={0}
-                                                    max={100}
-                                                    placeholder="Enter percentage (0-100)"
-                                                    value={typeof field.value === "number" ? field.value : null}
-                                                    onChange={field.onChange}
-                                                />
-                                            )}
-                                        </FieldWrapper>
-                                        <SelectField
-                                            control={form.control}
-                                            name="pbgDurationMonths"
-                                            label="PBG Duration (Months)"
-                                            options={pbgDurationOptions.map(option => ({
-                                                value: String(option.value),
-                                                label: option.label
-                                            }))}
-                                            placeholder="Select duration"
-                                        />
-                                    </>
-                                )}
-                                <SelectField
-                                    control={form.control}
-                                    name="sdRequired"
-                                    label="SD Required"
-                                    options={yesNoOptions}
-                                    placeholder="Select option"
-                                />
-                                {sdRequired === 'YES' && (
-                                    <>
-                                        <MultiSelectField
-                                            control={form.control}
-                                            name="sdForm"
-                                            label="SD (in form of)"
-                                            options={sdFormOptions.map(option => ({
-                                                value: String(option.value),
-                                                label: option.label
-                                            }))}
-                                            placeholder="Select forms"
-                                        />
-                                        <FieldWrapper
-                                            control={form.control}
-                                            name="securityDepositPercentage"
-                                            label="SD %age"
-                                        >
-                                            {(field) => (
-                                                <NumberInput
-                                                    step={0.01}
-                                                    min={0}
-                                                    max={100}
-                                                    placeholder="Enter percentage (0-100)"
-                                                    value={typeof field.value === "number" ? field.value : null}
-                                                    onChange={field.onChange}
-                                                />
-                                            )}
-                                        </FieldWrapper>
-                                        <FieldWrapper
-                                            control={form.control}
-                                            name="sdDurationMonths"
-                                            label="SD Duration (Months)"
-                                        >
-                                            {(field) => (
-                                                <NumberInput
-                                                    step={1}
-                                                    placeholder="Enter months"
-                                                    value={typeof field.value === "number" ? field.value : null}
-                                                    onChange={(value) => {
-                                                        // Convert 0 to null before setting
-                                                        field.onChange(value === 0 ? null : value);
-                                                    }}
-                                                />
-                                            )}
-                                        </FieldWrapper>
-                                    </>
-                                )}
-                                <SelectField
-                                    control={form.control}
-                                    name="commercialEvaluation"
-                                    label="Commercial Evaluation"
-                                    options={commercialEvaluationOptions.map(option => ({
-                                        value: String(option.value),
-                                        label: option.label
-                                    }))}
-                                    placeholder="Select evaluation type"
-                                />
-                                <SelectField
-                                    control={form.control}
-                                    name="reverseAuctionApplicable"
-                                    label="Reverse Auction Applicable"
-                                    options={yesNoOptions}
-                                    placeholder="Select option"
-                                />
-                                <FieldWrapper
-                                    control={form.control}
-                                    name="paymentTermsSupply"
-                                    label="Payment Terms on Supply (%)"
-                                >
-                                    {(field) => (
-                                        <NumberInput
-                                            step={0.01}
-                                            min={0}
-                                            max={100}
-                                            placeholder="Enter percentage (0-100)"
-                                            value={typeof field.value === "number" ? field.value : null}
-                                            onChange={field.onChange}
-                                        />
-                                    )}
-                                </FieldWrapper>
-                                <FieldWrapper
-                                    control={form.control}
-                                    name="paymentTermsInstallation"
-                                    label="Payment Terms on Installation (%)"
-                                >
-                                    {(field) => (
-                                        <NumberInput
-                                            step={0.01}
-                                            min={0}
-                                            max={100}
-                                            placeholder="Enter percentage (0-100)"
-                                            value={typeof field.value === "number" ? field.value : null}
-                                            onChange={field.onChange}
-                                        />
-                                    )}
-                                </FieldWrapper>
-                                <FieldWrapper
-                                    control={form.control}
-                                    name="deliveryTimeSupply"
-                                    label="Delivery Time (Supply/Total) - Days"
-                                >
-                                    {(field) => (
-                                        <NumberInput
-                                            step={1}
-                                            placeholder="Enter number of days"
-                                            value={typeof field.value === "number" ? field.value : null}
-                                            onChange={(value) => {
-                                                // Convert 0 to null before setting
-                                                field.onChange(value === 0 ? null : value);
-                                            }}
-                                        />
-                                    )}
-                                </FieldWrapper>
-                                <FieldWrapper
-                                    control={form.control}
-                                    name="deliveryTimeInstallationInclusive"
-                                    label="Delivery Time for Installation"
-                                >
-                                    {(field) => (
-                                        <div className="flex items-center space-x-2 h-10">
-                                            <Checkbox
-                                                id="deliveryTimeInstallationInclusive"
-                                                checked={field.value}
-                                                onCheckedChange={field.onChange}
-                                            />
-                                            <label
-                                                htmlFor="deliveryTimeInstallationInclusive"
-                                                className="text-sm font-medium cursor-pointer"
-                                            >
-                                                Inclusive in Supply/Total time
-                                            </label>
-                                        </div>
-                                    )}
-                                </FieldWrapper>
-                                {!deliveryTimeInstallationInclusive && (
-                                    <FieldWrapper
-                                        control={form.control}
-                                        name="deliveryTimeInstallation"
-                                        label="Installation Days (if not inclusive)"
-                                    >
-                                        {(field) => (
-                                            <NumberInput
-                                                step={1}
-                                                placeholder="Enter number of days"
-                                                value={typeof field.value === "number" ? field.value : null}
-                                                onChange={(value) => {
-                                                    // Convert 0 to null before setting
-                                                    field.onChange(value === 0 ? null : value);
-                                                }}
+                                        {getIncompleteFieldComment('teRejectionRemarks') && (
+                                            <IncompleteFieldAlert
+                                                comment={getIncompleteFieldComment('teRejectionRemarks')!}
                                             />
                                         )}
-                                    </FieldWrapper>
-                                )}
-                                <SelectField
-                                    control={form.control}
-                                    name="ldRequired"
-                                    label="LD Applicable"
-                                    options={yesNoOptions}
-                                    placeholder="Select option"
-                                />
-                                <FieldWrapper
-                                    control={form.control}
-                                    name="ldPercentagePerWeek"
-                                    label="LD/PRS Percentage (per week)"
-                                >
-                                    {(field) => (
-                                        <NumberInput
-                                            step={0.01}
-                                            min={0}
-                                            max={5}
-                                            placeholder="Enter percentage (0-5)"
-                                            value={typeof field.value === "number" ? field.value : null}
-                                            onChange={field.onChange}
+                                    </div>
+                                    <div>
+                                        <TenderFileUploader
+                                            context="tender-rejection-proof"
+                                            value={teRejectionProof}
+                                            onChange={(paths) =>
+                                                form.setValue('teRejectionProof', paths, {
+                                                    shouldValidate: true,
+                                                })
+                                            }
+                                            label="Proof of Rejection *"
+                                            disabled={isSubmitting}
                                         />
-                                    )}
-                                </FieldWrapper>
-                                <FieldWrapper
-                                    control={form.control}
-                                    name="maxLdPercentage"
-                                    label="Maximum LD Percentage"
-                                >
-                                    {(field) => (
-                                        <NumberInput
-                                            step={0.01}
-                                            min={0}
-                                            max={100}
-                                            placeholder="Enter percentage (0-100)"
-                                            value={typeof field.value === "number" ? field.value : null}
-                                            onChange={field.onChange}
-                                        />
-                                    )}
-                                </FieldWrapper>
-                                <SelectField
-                                    control={form.control}
-                                    name="physicalDocsRequired"
-                                    label="Physical Docs Submission Required"
-                                    options={yesNoOptions}
-                                    placeholder="Select option"
-                                />
-                                {physicalDocsRequired === 'YES' && (
-                                    <FieldWrapper
-                                        control={form.control}
-                                        name="physicalDocsDeadline"
-                                        label="Physical Docs Submission Deadline"
-                                    >
-                                        {(field) => (
-                                            <DateTimeInput
-                                                value={typeof field.value === "string" ? field.value : null}
-                                                onChange={field.onChange}
-                                                className="bg-background"
+                                        {getIncompleteFieldComment('teRejectionProof') && (
+                                            <IncompleteFieldAlert
+                                                comment={getIncompleteFieldComment('teRejectionProof')!}
                                             />
                                         )}
-                                    </FieldWrapper>
-                                )}
-
-                                <FieldWrapper
-                                    control={form.control}
-                                    name="techEligibilityAgeYears"
-                                    label="Eligibility Criterion (Years)"
-                                >
-                                    {(field) => (
-                                        <NumberInput
-                                            step={1}
-                                            placeholder="Enter number of years"
-                                            value={typeof field.value === "number" ? field.value : null}
-                                            onChange={field.onChange}
-                                        />
-                                    )}
-                                </FieldWrapper>
-                                <SelectField
-                                    control={form.control}
-                                    name="oemExperience"
-                                    label="OEM Experience"
-                                    options={yesNoOptions.map(option => ({
-                                        value: option.value,
-                                        label: option.label
-                                    }))}
-                                    placeholder="Select type"
-                                />
-                                <SelectField
-                                    control={form.control}
-                                    name="workValueType"
-                                    label="Work Value Type"
-                                    options={workValueTypeOptions.map(option => ({
-                                        value: option.value,
-                                        label: option.label
-                                    }))}
-                                    placeholder="Select type"
-                                />
-
-                                {/* Work Values */}
-                                {workValueType === 'WORKS_VALUES' && (
-                                    <>
-                                        <FieldWrapper control={form.control} name="orderValue1" label="1 Work Value">
-                                            {(field) => (
-                                                <NumberInput
-                                                    step={0.01}
-                                                    placeholder="0.00"
-                                                    value={typeof field.value === "number" ? field.value : null}
-                                                    onChange={field.onChange}
-                                                />
-                                            )}
-                                        </FieldWrapper>
-                                        <FieldWrapper control={form.control} name="orderValue2" label="2 Works Value">
-                                            {(field) => (
-                                                <NumberInput
-                                                    step={0.01}
-                                                    placeholder="0.00"
-                                                    value={typeof field.value === "number" ? field.value : null}
-                                                    onChange={field.onChange}
-                                                />
-                                            )}
-                                        </FieldWrapper>
-                                        <FieldWrapper control={form.control} name="orderValue3" label="3 Works Value">
-                                            {(field) => (
-                                                <NumberInput
-                                                    step={0.01}
-                                                    placeholder="0.00"
-                                                    value={typeof field.value === "number" ? field.value : null}
-                                                    onChange={field.onChange}
-                                                />
-                                            )}
-                                        </FieldWrapper>
-                                    </>
-                                )}
-
-                                {/* Custom Eligibility */}
-                                {workValueType === 'CUSTOM' && (
-                                    <>
-                                        <FieldWrapper
-                                            control={form.control}
-                                            name="customEligibilityCriteria"
-                                            label="Custom Eligibility Criteria"
-                                        >
-                                            {(field) => (
-                                                <textarea
-                                                    className="border-input placeholder:text-muted-foreground h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                                    placeholder="Enter custom eligibility criteria..."
-                                                    maxLength={1000}
-                                                    {...field}
-                                                />
-                                            )}
-                                        </FieldWrapper>
-                                    </>
-                                )}
-
-                                <MultiSelectField
-                                    control={form.control}
-                                    name="technicalWorkOrders"
-                                    label="PO Selected for Technical Eligibility"
-                                    options={dummyTechnicalDocuments}
-                                    placeholder="Select documents"
-                                />
-                                <MultiSelectField
-                                    control={form.control}
-                                    name="commercialDocuments"
-                                    label="Financial PQC Documents"
-                                    options={dummyFinancialDocuments}
-                                    placeholder="Select documents"
-                                />
-                                <SelectField
-                                    control={form.control}
-                                    name="avgAnnualTurnoverCriteria"
-                                    label="Average Annual Turnover"
-                                    options={aatOptions}
-                                    placeholder="Select criteria"
-                                />
-                                {avgAnnualTurnoverCriteria === 'AMOUNT' && (
-                                    <FieldWrapper control={form.control} name="avgAnnualTurnoverValue" label="Amount">
-                                        {(field) => (
-                                            <NumberInput
-                                                step={0.01}
-                                                placeholder="0.00"
-                                                value={typeof field.value === "number" ? field.value : null}
-                                                onChange={field.onChange}
-                                            />
-                                        )}
-                                    </FieldWrapper>
-                                )}
-
-                                <SelectField
-                                    control={form.control}
-                                    name="workingCapitalCriteria"
-                                    label="Working Capital"
-                                    options={wcOptions}
-                                    placeholder="Select criteria"
-                                />
-                                {workingCapitalCriteria === 'AMOUNT' && (
-                                    <FieldWrapper control={form.control} name="workingCapitalValue" label="Amount">
-                                        {(field) => (
-                                            <NumberInput
-                                                step={0.01}
-                                                placeholder="0.00"
-                                                value={typeof field.value === "number" ? field.value : null}
-                                                onChange={field.onChange}
-                                            />
-                                        )}
-                                    </FieldWrapper>
-                                )}
-                                <SelectField
-                                    control={form.control}
-                                    name="solvencyCertificateCriteria"
-                                    label="Solvency Certificate"
-                                    options={scOptions}
-                                    placeholder="Select criteria"
-                                />
-                                {solvencyCertificateCriteria === 'AMOUNT' && (
-                                    <FieldWrapper control={form.control} name="solvencyCertificateValue" label="Amount">
-                                        {(field) => (
-                                            <NumberInput
-                                                step={0.01}
-                                                placeholder="0.00"
-                                                value={typeof field.value === "number" ? field.value : null}
-                                                onChange={field.onChange}
-                                            />
-                                        )}
-                                    </FieldWrapper>
-                                )}
-                                <SelectField
-                                    control={form.control}
-                                    name="netWorthCriteria"
-                                    label="Net Worth"
-                                    options={nwOptions}
-                                    placeholder="Select criteria"
-                                />
-                                {netWorthCriteria === 'AMOUNT' && (
-                                    <FieldWrapper control={form.control} name="netWorthValue" label="Amount">
-                                        {(field) => (
-                                            <NumberInput
-                                                step={0.01}
-                                                placeholder="0.00"
-                                                value={typeof field.value === "number" ? field.value : null}
-                                                onChange={field.onChange}
-                                            />
-                                        )}
-                                    </FieldWrapper>
-                                )}
-                            </div>
-
-                            {/* Client Details */}
-                            <div className="space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <h4 className="font-medium text-sm text-primary border-b pb-2">Client Details</h4>
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() =>
-                                            appendClient({
-                                                clientName: '',
-                                                clientDesignation: '',
-                                                clientMobile: '',
-                                                clientEmail: '',
-                                            })
-                                        }
-                                    >
-                                        <Plus className="mr-2 h-4 w-4" /> Add Client
-                                    </Button>
+                                    </div>
                                 </div>
+                            )}
 
-                                {clientFields.map((field, index) => (
-                                    <div key={field.id} className="p-4 border rounded-lg space-y-4 bg-muted/20">
-                                        <div className="flex items-center justify-between">
-                                            <h5 className="font-medium text-sm">Client {index + 1}</h5>
-                                            {clientFields.length > 1 && (
-                                                <Button
-                                                    type="button"
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => removeClient(index)}
-                                                >
-                                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                                </Button>
+                            {/* ──────────────────────────────────────────────
+                                FULL FORM SECTION (only when YES / recommended)
+                               ────────────────────────────────────────────── */}
+                            {isRecommended && (
+                                <>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        {/* Processing Fee */}
+                                        <div>
+                                            <SelectField
+                                                control={form.control}
+                                                name="processingFeeRequired"
+                                                label="Processing Fees Required"
+                                                options={yesNoOptions}
+                                                placeholder="Select option"
+                                            />
+                                            {getIncompleteFieldComment('processingFeeRequired') && (
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('processingFeeRequired')!}
+                                                />
+                                            )}
+                                        </div>
+                                        {processingFeeRequired === 'YES' && (
+                                            <>
+                                                <div>
+                                                    <MultiSelectField
+                                                        control={form.control}
+                                                        name="processingFeeModes"
+                                                        label="Processing Fees Mode"
+                                                        options={processingFeeOptions.map((option) => ({
+                                                            value: String(option.value),
+                                                            label: option.label,
+                                                        }))}
+                                                        placeholder="Select payment modes"
+                                                    />
+                                                    {getIncompleteFieldComment('processingFeeModes') && (
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment('processingFeeModes')!}
+                                                        />
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <FieldWrapper
+                                                        control={form.control}
+                                                        name="processingFeeAmount"
+                                                        label="Processing Fees Amount"
+                                                    >
+                                                        {(field) => (
+                                                            <NumberInput
+                                                                step={0.01}
+                                                                placeholder="0.00"
+                                                                value={
+                                                                    typeof field.value === 'number'
+                                                                        ? field.value
+                                                                        : null
+                                                                }
+                                                                onChange={field.onChange}
+                                                            />
+                                                        )}
+                                                    </FieldWrapper>
+                                                    {getIncompleteFieldComment('processingFeeAmount') && (
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment('processingFeeAmount')!}
+                                                        />
+                                                    )}
+                                                </div>
+                                            </>
+                                        )}
+
+                                        {/* Tender Fee */}
+                                        <div>
+                                            <SelectField
+                                                control={form.control}
+                                                name="tenderFeeRequired"
+                                                label="Tender Fees Required"
+                                                options={yesNoOptions}
+                                                placeholder="Select option"
+                                            />
+                                            {getIncompleteFieldComment('tenderFeeRequired') && (
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('tenderFeeRequired')!}
+                                                />
+                                            )}
+                                        </div>
+                                        {tenderFeeRequired === 'YES' && (
+                                            <>
+                                                <div>
+                                                    <MultiSelectField
+                                                        control={form.control}
+                                                        name="tenderFeeModes"
+                                                        label="Tender Fees Mode"
+                                                        options={tenderFeeOptions.map((option) => ({
+                                                            value: String(option.value),
+                                                            label: option.label,
+                                                        }))}
+                                                        placeholder="Select payment modes"
+                                                    />
+                                                    {getIncompleteFieldComment('tenderFeeModes') && (
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment('tenderFeeModes')!}
+                                                        />
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <FieldWrapper
+                                                        control={form.control}
+                                                        name="tenderFeeAmount"
+                                                        label="Tender Fees Amount"
+                                                    >
+                                                        {(field) => (
+                                                            <NumberInput
+                                                                step={0.01}
+                                                                placeholder="0.00"
+                                                                value={
+                                                                    typeof field.value === 'number'
+                                                                        ? field.value
+                                                                        : null
+                                                                }
+                                                                onChange={field.onChange}
+                                                            />
+                                                        )}
+                                                    </FieldWrapper>
+                                                    {getIncompleteFieldComment('tenderFeeAmount') && (
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment('tenderFeeAmount')!}
+                                                        />
+                                                    )}
+                                                </div>
+                                            </>
+                                        )}
+
+                                        {/* EMD */}
+                                        <div>
+                                            <SelectField
+                                                control={form.control}
+                                                name="emdRequired"
+                                                label="EMD Required"
+                                                options={emdRequiredOptions}
+                                                placeholder="Select option"
+                                            />
+                                            {getIncompleteFieldComment('emdRequired') && (
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('emdRequired')!}
+                                                />
+                                            )}
+                                        </div>
+                                        {emdRequired === 'YES' && (
+                                            <>
+                                                <div>
+                                                    <MultiSelectField
+                                                        control={form.control}
+                                                        name="emdModes"
+                                                        label="EMD Mode"
+                                                        options={paymentModeOptions.map((option) => ({
+                                                            value: String(option.value),
+                                                            label: option.label,
+                                                        }))}
+                                                        placeholder="Select payment modes"
+                                                    />
+                                                    {getIncompleteFieldComment('emdModes') && (
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment('emdModes')!}
+                                                        />
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <FieldWrapper
+                                                        control={form.control}
+                                                        name="emdAmount"
+                                                        label="EMD Amount"
+                                                    >
+                                                        {(field) => (
+                                                            <NumberInput
+                                                                step={0.01}
+                                                                placeholder="0.00"
+                                                                value={
+                                                                    typeof field.value === 'number'
+                                                                        ? field.value
+                                                                        : null
+                                                                }
+                                                                onChange={field.onChange}
+                                                            />
+                                                        )}
+                                                    </FieldWrapper>
+                                                    {getIncompleteFieldComment('emdAmount') && (
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment('emdAmount')!}
+                                                        />
+                                                    )}
+                                                </div>
+                                            </>
+                                        )}
+
+                                        {/* Tender Value */}
+                                        <div>
+                                            <FieldWrapper
+                                                control={form.control}
+                                                name="tenderValue"
+                                                label="Tender Value (GST Inclusive)"
+                                            >
+                                                {(field) => (
+                                                    <NumberInput
+                                                        step={0.01}
+                                                        placeholder="0.00"
+                                                        value={
+                                                            typeof field.value === 'number' ? field.value : null
+                                                        }
+                                                        onChange={field.onChange}
+                                                    />
+                                                )}
+                                            </FieldWrapper>
+                                            {getIncompleteFieldComment('tenderValue') && (
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('tenderValue')!}
+                                                />
                                             )}
                                         </div>
 
-                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                        {/* Bid Validity */}
+                                        <div>
+                                            <SelectField
+                                                control={form.control}
+                                                name="bidValidityDays"
+                                                label="Bid Validity (Days)"
+                                                options={bidValidityOptions.map((option) => ({
+                                                    value: String(option.value),
+                                                    label: option.label,
+                                                }))}
+                                                placeholder="Select days"
+                                            />
+                                            {getIncompleteFieldComment('bidValidityDays') && (
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('bidValidityDays')!}
+                                                />
+                                            )}
+                                        </div>
+
+                                        {/* MAF */}
+                                        <div>
+                                            <SelectField
+                                                control={form.control}
+                                                name="mafRequired"
+                                                label="MAF Required"
+                                                options={mafRequiredOptions.map((option) => ({
+                                                    value: String(option.value),
+                                                    label: option.label,
+                                                }))}
+                                                placeholder="Select option"
+                                            />
+                                            {getIncompleteFieldComment('mafRequired') && (
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('mafRequired')!}
+                                                />
+                                            )}
+                                        </div>
+
+                                        {/* PBG */}
+                                        <div>
+                                            <SelectField
+                                                control={form.control}
+                                                name="pbgRequired"
+                                                label="PBG Required"
+                                                options={yesNoOptions}
+                                                placeholder="Select option"
+                                            />
+                                            {getIncompleteFieldComment('pbgRequired') && (
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('pbgRequired')!}
+                                                />
+                                            )}
+                                        </div>
+                                        {pbgRequired === 'YES' && (
+                                            <>
+                                                <div>
+                                                    <MultiSelectField
+                                                        control={form.control}
+                                                        name="pbgForm"
+                                                        label="PBG (in form of)"
+                                                        options={pbgFormOptions.map((option) => ({
+                                                            value: String(option.value),
+                                                            label: option.label,
+                                                        }))}
+                                                        placeholder="Select forms"
+                                                    />
+                                                    {getIncompleteFieldComment('pbgForm') && (
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment('pbgForm')!}
+                                                        />
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <FieldWrapper
+                                                        control={form.control}
+                                                        name="pbgPercentage"
+                                                        label="PBG %age"
+                                                    >
+                                                        {(field) => (
+                                                            <NumberInput
+                                                                step={0.01}
+                                                                min={0}
+                                                                max={100}
+                                                                placeholder="Enter percentage (0-100)"
+                                                                value={
+                                                                    typeof field.value === 'number'
+                                                                        ? field.value
+                                                                        : null
+                                                                }
+                                                                onChange={field.onChange}
+                                                            />
+                                                        )}
+                                                    </FieldWrapper>
+                                                    {getIncompleteFieldComment('pbgPercentage') && (
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment('pbgPercentage')!}
+                                                        />
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <SelectField
+                                                        control={form.control}
+                                                        name="pbgDurationMonths"
+                                                        label="PBG Duration (Months)"
+                                                        options={pbgDurationOptions.map((option) => ({
+                                                            value: String(option.value),
+                                                            label: option.label,
+                                                        }))}
+                                                        placeholder="Select duration"
+                                                    />
+                                                    {getIncompleteFieldComment('pbgDurationMonths') && (
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment('pbgDurationMonths')!}
+                                                        />
+                                                    )}
+                                                </div>
+                                            </>
+                                        )}
+
+                                        {/* SD */}
+                                        <div>
+                                            <SelectField
+                                                control={form.control}
+                                                name="sdRequired"
+                                                label="SD Required"
+                                                options={yesNoOptions}
+                                                placeholder="Select option"
+                                            />
+                                            {getIncompleteFieldComment('sdRequired') && (
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('sdRequired')!}
+                                                />
+                                            )}
+                                        </div>
+                                        {sdRequired === 'YES' && (
+                                            <>
+                                                <div>
+                                                    <MultiSelectField
+                                                        control={form.control}
+                                                        name="sdForm"
+                                                        label="SD (in form of)"
+                                                        options={sdFormOptions.map((option) => ({
+                                                            value: String(option.value),
+                                                            label: option.label,
+                                                        }))}
+                                                        placeholder="Select forms"
+                                                    />
+                                                    {getIncompleteFieldComment('sdForm') && (
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment('sdForm')!}
+                                                        />
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <FieldWrapper
+                                                        control={form.control}
+                                                        name="securityDepositPercentage"
+                                                        label="SD %age"
+                                                    >
+                                                        {(field) => (
+                                                            <NumberInput
+                                                                step={0.01}
+                                                                min={0}
+                                                                max={100}
+                                                                placeholder="Enter percentage (0-100)"
+                                                                value={
+                                                                    typeof field.value === 'number'
+                                                                        ? field.value
+                                                                        : null
+                                                                }
+                                                                onChange={field.onChange}
+                                                            />
+                                                        )}
+                                                    </FieldWrapper>
+                                                    {getIncompleteFieldComment('securityDepositPercentage') && (
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment(
+                                                                'securityDepositPercentage'
+                                                            )!}
+                                                        />
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <FieldWrapper
+                                                        control={form.control}
+                                                        name="sdDurationMonths"
+                                                        label="SD Duration (Months)"
+                                                    >
+                                                        {(field) => (
+                                                            <NumberInput
+                                                                step={1}
+                                                                placeholder="Enter months"
+                                                                value={
+                                                                    typeof field.value === 'number'
+                                                                        ? field.value
+                                                                        : null
+                                                                }
+                                                                onChange={(value) => {
+                                                                    field.onChange(value === 0 ? null : value);
+                                                                }}
+                                                            />
+                                                        )}
+                                                    </FieldWrapper>
+                                                    {getIncompleteFieldComment('sdDurationMonths') && (
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment('sdDurationMonths')!}
+                                                        />
+                                                    )}
+                                                </div>
+                                            </>
+                                        )}
+
+                                        {/* Commercial Evaluation */}
+                                        <div>
+                                            <SelectField
+                                                control={form.control}
+                                                name="commercialEvaluation"
+                                                label="Commercial Evaluation"
+                                                options={commercialEvaluationOptions.map((option) => ({
+                                                    value: String(option.value),
+                                                    label: option.label,
+                                                }))}
+                                                placeholder="Select evaluation type"
+                                            />
+                                            {getIncompleteFieldComment('commercialEvaluation') && (
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('commercialEvaluation')!}
+                                                />
+                                            )}
+                                        </div>
+
+                                        {/* Reverse Auction */}
+                                        <div>
+                                            <SelectField
+                                                control={form.control}
+                                                name="reverseAuctionApplicable"
+                                                label="Reverse Auction Applicable"
+                                                options={yesNoOptions}
+                                                placeholder="Select option"
+                                            />
+                                            {getIncompleteFieldComment('reverseAuctionApplicable') && (
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment(
+                                                        'reverseAuctionApplicable'
+                                                    )!}
+                                                />
+                                            )}
+                                        </div>
+
+                                        {/* Payment Terms */}
+                                        <div>
                                             <FieldWrapper
                                                 control={form.control}
-                                                name={`clients.${index}.clientName`}
-                                                label="Name"
+                                                name="paymentTermsSupply"
+                                                label="Payment Terms on Supply (%)"
                                             >
-                                                {(field) => <Input placeholder="Enter name" {...field} />}
+                                                {(field) => (
+                                                    <NumberInput
+                                                        step={0.01}
+                                                        min={0}
+                                                        max={100}
+                                                        placeholder="Enter percentage (0-100)"
+                                                        value={
+                                                            typeof field.value === 'number'
+                                                                ? field.value
+                                                                : null
+                                                        }
+                                                        onChange={field.onChange}
+                                                    />
+                                                )}
                                             </FieldWrapper>
+                                            {getIncompleteFieldComment('paymentTermsSupply') && (
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('paymentTermsSupply')!}
+                                                />
+                                            )}
+                                        </div>
+                                        <div>
                                             <FieldWrapper
                                                 control={form.control}
-                                                name={`clients.${index}.clientDesignation`}
-                                                label="Designation"
+                                                name="paymentTermsInstallation"
+                                                label="Payment Terms on Installation (%)"
                                             >
-                                                {(field) => <Input placeholder="Enter designation" {...field} />}
+                                                {(field) => (
+                                                    <NumberInput
+                                                        step={0.01}
+                                                        min={0}
+                                                        max={100}
+                                                        placeholder="Enter percentage (0-100)"
+                                                        value={
+                                                            typeof field.value === 'number'
+                                                                ? field.value
+                                                                : null
+                                                        }
+                                                        onChange={field.onChange}
+                                                    />
+                                                )}
                                             </FieldWrapper>
+                                            {getIncompleteFieldComment('paymentTermsInstallation') && (
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment(
+                                                        'paymentTermsInstallation'
+                                                    )!}
+                                                />
+                                            )}
+                                        </div>
+
+                                        {/* Delivery Time */}
+                                        <div>
                                             <FieldWrapper
                                                 control={form.control}
-                                                name={`clients.${index}.clientEmail`}
-                                                label="Email"
+                                                name="deliveryTimeSupply"
+                                                label="Delivery Time (Supply/Total) - Days"
                                             >
-                                                {(field) => <Input type="email" placeholder="Enter email" {...field} />}
+                                                {(field) => (
+                                                    <NumberInput
+                                                        step={1}
+                                                        placeholder="Enter number of days"
+                                                        value={
+                                                            typeof field.value === 'number'
+                                                                ? field.value
+                                                                : null
+                                                        }
+                                                        onChange={(value) => {
+                                                            field.onChange(value === 0 ? null : value);
+                                                        }}
+                                                    />
+                                                )}
                                             </FieldWrapper>
+                                            {getIncompleteFieldComment('deliveryTimeSupply') && (
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('deliveryTimeSupply')!}
+                                                />
+                                            )}
+                                        </div>
+                                        <div>
                                             <FieldWrapper
                                                 control={form.control}
-                                                name={`clients.${index}.clientMobile`}
-                                                label="Number"
+                                                name="deliveryTimeInstallationInclusive"
+                                                label="Delivery Time for Installation"
                                             >
-                                                {(field) => <Input placeholder="Enter number" {...field} />}
+                                                {(field) => (
+                                                    <div className="flex items-center space-x-2 h-10">
+                                                        <Checkbox
+                                                            id="deliveryTimeInstallationInclusive"
+                                                            checked={field.value}
+                                                            onCheckedChange={field.onChange}
+                                                        />
+                                                        <label
+                                                            htmlFor="deliveryTimeInstallationInclusive"
+                                                            className="text-sm font-medium cursor-pointer"
+                                                        >
+                                                            Inclusive in Supply/Total time
+                                                        </label>
+                                                    </div>
+                                                )}
                                             </FieldWrapper>
+                                            {getIncompleteFieldComment(
+                                                'deliveryTimeInstallationInclusive'
+                                            ) && (
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment(
+                                                        'deliveryTimeInstallationInclusive'
+                                                    )!}
+                                                />
+                                            )}
+                                        </div>
+                                        {!deliveryTimeInstallationInclusive && (
+                                            <>
+                                                <FieldWrapper
+                                                    control={form.control}
+                                                    name="deliveryTimeInstallation"
+                                                    label="Installation Days (if not inclusive)"
+                                                >
+                                                    {(field) => (
+                                                        <NumberInput
+                                                            step={1}
+                                                            placeholder="Enter number of days"
+                                                            value={
+                                                                typeof field.value === 'number'
+                                                                    ? field.value
+                                                                    : null
+                                                            }
+                                                            onChange={(value) => {
+                                                                field.onChange(value === 0 ? null : value);
+                                                            }}
+                                                        />
+                                                    )}
+                                                </FieldWrapper>
+                                                {getIncompleteFieldComment('deliveryTimeInstallation') && (
+                                                    <IncompleteFieldAlert
+                                                        comment={getIncompleteFieldComment(
+                                                            'deliveryTimeInstallation'
+                                                        )!}
+                                                    />
+                                                )}
+                                            </>
+                                        )}
+
+                                        {/* LD */}
+                                        <div>
+                                            <SelectField
+                                                control={form.control}
+                                                name="ldRequired"
+                                                label="LD Applicable"
+                                                options={yesNoOptions}
+                                                placeholder="Select option"
+                                            />
+                                            {getIncompleteFieldComment('ldRequired') && (
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('ldRequired')!}
+                                                />
+                                            )}
+                                        </div>
+                                        <div>
+                                            <FieldWrapper
+                                                control={form.control}
+                                                name="ldPercentagePerWeek"
+                                                label="LD/PRS Percentage (per week)"
+                                            >
+                                                {(field) => (
+                                                    <NumberInput
+                                                        step={0.01}
+                                                        min={0}
+                                                        max={5}
+                                                        placeholder="Enter percentage (0-5)"
+                                                        value={
+                                                            typeof field.value === 'number'
+                                                                ? field.value
+                                                                : null
+                                                        }
+                                                        onChange={field.onChange}
+                                                    />
+                                                )}
+                                            </FieldWrapper>
+                                            {getIncompleteFieldComment('ldPercentagePerWeek') && (
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('ldPercentagePerWeek')!}
+                                                />
+                                            )}
+                                        </div>
+                                        <div>
+                                            <FieldWrapper
+                                                control={form.control}
+                                                name="maxLdPercentage"
+                                                label="Maximum LD Percentage"
+                                            >
+                                                {(field) => (
+                                                    <NumberInput
+                                                        step={0.01}
+                                                        min={0}
+                                                        max={100}
+                                                        placeholder="Enter percentage (0-100)"
+                                                        value={
+                                                            typeof field.value === 'number'
+                                                                ? field.value
+                                                                : null
+                                                        }
+                                                        onChange={field.onChange}
+                                                    />
+                                                )}
+                                            </FieldWrapper>
+                                            {getIncompleteFieldComment('maxLdPercentage') && (
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('maxLdPercentage')!}
+                                                />
+                                            )}
+                                        </div>
+
+                                        {/* Physical Docs */}
+                                        <div>
+                                            <SelectField
+                                                control={form.control}
+                                                name="physicalDocsRequired"
+                                                label="Physical Docs Submission Required"
+                                                options={yesNoOptions}
+                                                placeholder="Select option"
+                                            />
+                                            {getIncompleteFieldComment('physicalDocsRequired') && (
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('physicalDocsRequired')!}
+                                                />
+                                            )}
+                                        </div>
+                                        {physicalDocsRequired === 'YES' && (
+                                            <>
+                                                <div>
+                                                    <SelectField
+                                                        control={form.control}
+                                                        name="physicalDocType"
+                                                        label="Physical Document Type"
+                                                        options={physicalDocTypeOptions}
+                                                        placeholder="Select type"
+                                                    />
+                                                    {getIncompleteFieldComment('physicalDocType') && (
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment('physicalDocType')!}
+                                                        />
+                                                    )}
+                                                </div>
+                                                <FieldWrapper
+                                                    control={form.control}
+                                                    name="physicalDocsDeadline"
+                                                    label="Physical Docs Submission Deadline"
+                                                >
+                                                    {(field) => (
+                                                        <DateTimeInput
+                                                            value={
+                                                                typeof field.value === 'string'
+                                                                    ? field.value
+                                                                    : null
+                                                            }
+                                                            onChange={field.onChange}
+                                                            className="bg-background"
+                                                        />
+                                                    )}
+                                                </FieldWrapper>
+                                                {getIncompleteFieldComment('physicalDocsDeadline') && (
+                                                    <IncompleteFieldAlert
+                                                        comment={getIncompleteFieldComment(
+                                                            'physicalDocsDeadline'
+                                                        )!}
+                                                    />
+                                                )}
+                                            </>
+                                        )}
+
+                                        {/* Eligibility */}
+                                        <div>
+                                            <FieldWrapper
+                                                control={form.control}
+                                                name="techEligibilityAgeYears"
+                                                label="Eligibility Criterion (Years)"
+                                            >
+                                                {(field) => (
+                                                    <NumberInput
+                                                        step={1}
+                                                        placeholder="Enter number of years"
+                                                        value={
+                                                            typeof field.value === 'number'
+                                                                ? field.value
+                                                                : null
+                                                        }
+                                                        onChange={field.onChange}
+                                                    />
+                                                )}
+                                            </FieldWrapper>
+                                            {getIncompleteFieldComment('techEligibilityAgeYears') && (
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment(
+                                                        'techEligibilityAgeYears'
+                                                    )!}
+                                                />
+                                            )}
+                                        </div>
+                                        <div>
+                                            <SelectField
+                                                control={form.control}
+                                                name="oemExperience"
+                                                label="OEM Experience"
+                                                options={yesNoOptions.map((option) => ({
+                                                    value: option.value,
+                                                    label: option.label,
+                                                }))}
+                                                placeholder="Select type"
+                                            />
+                                            {getIncompleteFieldComment('oemExperience') && (
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('oemExperience')!}
+                                                />
+                                            )}
+                                        </div>
+                                        <div>
+                                            <SelectField
+                                                control={form.control}
+                                                name="workValueType"
+                                                label="Work Value Type"
+                                                options={workValueTypeOptions.map((option) => ({
+                                                    value: option.value,
+                                                    label: option.label,
+                                                }))}
+                                                placeholder="Select type"
+                                            />
+                                            {getIncompleteFieldComment('workValueType') && (
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('workValueType')!}
+                                                />
+                                            )}
+                                        </div>
+
+                                        {/* Work Values */}
+                                        {workValueType === 'WORKS_VALUES' && (
+                                            <>
+                                                <div>
+                                                    <FieldWrapper
+                                                        control={form.control}
+                                                        name="orderValue1"
+                                                        label="1 Work Value"
+                                                    >
+                                                        {(field) => (
+                                                            <NumberInput
+                                                                step={0.01}
+                                                                placeholder="0.00"
+                                                                value={
+                                                                    typeof field.value === 'number'
+                                                                        ? field.value
+                                                                        : null
+                                                                }
+                                                                onChange={field.onChange}
+                                                            />
+                                                        )}
+                                                    </FieldWrapper>
+                                                    {getIncompleteFieldComment('orderValue1') && (
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment('orderValue1')!}
+                                                        />
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <FieldWrapper
+                                                        control={form.control}
+                                                        name="orderValue2"
+                                                        label="2 Works Value"
+                                                    >
+                                                        {(field) => (
+                                                            <NumberInput
+                                                                step={0.01}
+                                                                placeholder="0.00"
+                                                                value={
+                                                                    typeof field.value === 'number'
+                                                                        ? field.value
+                                                                        : null
+                                                                }
+                                                                onChange={field.onChange}
+                                                            />
+                                                        )}
+                                                    </FieldWrapper>
+                                                    {getIncompleteFieldComment('orderValue2') && (
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment('orderValue2')!}
+                                                        />
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <FieldWrapper
+                                                        control={form.control}
+                                                        name="orderValue3"
+                                                        label="3 Works Value"
+                                                    >
+                                                        {(field) => (
+                                                            <NumberInput
+                                                                step={0.01}
+                                                                placeholder="0.00"
+                                                                value={
+                                                                    typeof field.value === 'number'
+                                                                        ? field.value
+                                                                        : null
+                                                                }
+                                                                onChange={field.onChange}
+                                                            />
+                                                        )}
+                                                    </FieldWrapper>
+                                                    {getIncompleteFieldComment('orderValue3') && (
+                                                        <IncompleteFieldAlert
+                                                            comment={getIncompleteFieldComment('orderValue3')!}
+                                                        />
+                                                    )}
+                                                </div>
+                                            </>
+                                        )}
+
+                                        {/* Custom Eligibility */}
+                                        {workValueType === 'CUSTOM' && (
+                                            <div>
+                                                <FieldWrapper
+                                                    control={form.control}
+                                                    name="customEligibilityCriteria"
+                                                    label="Custom Eligibility Criteria"
+                                                >
+                                                    {(field) => (
+                                                        <textarea
+                                                            className="border-input placeholder:text-muted-foreground h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                                            placeholder="Enter custom eligibility criteria..."
+                                                            maxLength={1000}
+                                                            {...field}
+                                                        />
+                                                    )}
+                                                </FieldWrapper>
+                                                {getIncompleteFieldComment('customEligibilityCriteria') && (
+                                                    <IncompleteFieldAlert
+                                                        comment={getIncompleteFieldComment(
+                                                            'customEligibilityCriteria'
+                                                        )!}
+                                                    />
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Technical & Commercial Documents */}
+                                        <div>
+                                            <MultiSelectField
+                                                control={form.control}
+                                                name="technicalWorkOrders"
+                                                label="PO Selected for Technical Eligibility"
+                                                options={pqrOptions}
+                                                placeholder="Select documents"
+                                            />
+                                            {getIncompleteFieldComment('technicalWorkOrders') && (
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('technicalWorkOrders')!}
+                                                />
+                                            )}
+                                        </div>
+                                        <div>
+                                            <MultiSelectField
+                                                control={form.control}
+                                                name="commercialDocuments"
+                                                label="Financial PQC Documents"
+                                                options={financeDocumentOptions}
+                                                placeholder="Select documents"
+                                            />
+                                            {getIncompleteFieldComment('commercialDocuments') && (
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('commercialDocuments')!}
+                                                />
+                                            )}
+                                        </div>
+
+                                        {/* Financial Criteria */}
+                                        <div>
+                                            <SelectField
+                                                control={form.control}
+                                                name="avgAnnualTurnoverCriteria"
+                                                label="Average Annual Turnover"
+                                                options={aatOptions}
+                                                placeholder="Select criteria"
+                                            />
+                                            {getIncompleteFieldComment('avgAnnualTurnoverCriteria') && (
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment(
+                                                        'avgAnnualTurnoverCriteria'
+                                                    )!}
+                                                />
+                                            )}
+                                        </div>
+                                        {avgAnnualTurnoverCriteria === 'AMOUNT' && (
+                                            <>
+                                                <FieldWrapper
+                                                    control={form.control}
+                                                    name="avgAnnualTurnoverValue"
+                                                    label="Amount"
+                                                >
+                                                    {(field) => (
+                                                        <NumberInput
+                                                            step={0.01}
+                                                            placeholder="0.00"
+                                                            value={
+                                                                typeof field.value === 'number'
+                                                                    ? field.value
+                                                                    : null
+                                                            }
+                                                            onChange={field.onChange}
+                                                        />
+                                                    )}
+                                                </FieldWrapper>
+                                                {getIncompleteFieldComment('avgAnnualTurnoverValue') && (
+                                                    <IncompleteFieldAlert
+                                                        comment={getIncompleteFieldComment(
+                                                            'avgAnnualTurnoverValue'
+                                                        )!}
+                                                    />
+                                                )}
+                                            </>
+                                        )}
+
+                                        <div>
+                                            <SelectField
+                                                control={form.control}
+                                                name="workingCapitalCriteria"
+                                                label="Working Capital"
+                                                options={wcOptions}
+                                                placeholder="Select criteria"
+                                            />
+                                            {getIncompleteFieldComment('workingCapitalCriteria') && (
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment(
+                                                        'workingCapitalCriteria'
+                                                    )!}
+                                                />
+                                            )}
+                                        </div>
+                                        {workingCapitalCriteria === 'AMOUNT' && (
+                                            <div>
+                                                <FieldWrapper
+                                                    control={form.control}
+                                                    name="workingCapitalValue"
+                                                    label="Amount"
+                                                >
+                                                    {(field) => (
+                                                        <NumberInput
+                                                            step={0.01}
+                                                            placeholder="0.00"
+                                                            value={
+                                                                typeof field.value === 'number'
+                                                                    ? field.value
+                                                                    : null
+                                                            }
+                                                            onChange={field.onChange}
+                                                        />
+                                                    )}
+                                                </FieldWrapper>
+                                                {getIncompleteFieldComment('workingCapitalValue') && (
+                                                    <IncompleteFieldAlert
+                                                        comment={getIncompleteFieldComment(
+                                                            'workingCapitalValue'
+                                                        )!}
+                                                    />
+                                                )}
+                                            </div>
+                                        )}
+
+                                        <div>
+                                            <SelectField
+                                                control={form.control}
+                                                name="solvencyCertificateCriteria"
+                                                label="Solvency Certificate"
+                                                options={scOptions}
+                                                placeholder="Select criteria"
+                                            />
+                                            {getIncompleteFieldComment('solvencyCertificateCriteria') && (
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment(
+                                                        'solvencyCertificateCriteria'
+                                                    )!}
+                                                />
+                                            )}
+                                        </div>
+                                        {solvencyCertificateCriteria === 'AMOUNT' && (
+                                            <div>
+                                                <FieldWrapper
+                                                    control={form.control}
+                                                    name="solvencyCertificateValue"
+                                                    label="Amount"
+                                                >
+                                                    {(field) => (
+                                                        <NumberInput
+                                                            step={0.01}
+                                                            placeholder="0.00"
+                                                            value={
+                                                                typeof field.value === 'number'
+                                                                    ? field.value
+                                                                    : null
+                                                            }
+                                                            onChange={field.onChange}
+                                                        />
+                                                    )}
+                                                </FieldWrapper>
+                                                {getIncompleteFieldComment('solvencyCertificateValue') && (
+                                                    <IncompleteFieldAlert
+                                                        comment={getIncompleteFieldComment(
+                                                            'solvencyCertificateValue'
+                                                        )!}
+                                                    />
+                                                )}
+                                            </div>
+                                        )}
+
+                                        <div>
+                                            <SelectField
+                                                control={form.control}
+                                                name="netWorthCriteria"
+                                                label="Net Worth"
+                                                options={nwOptions}
+                                                placeholder="Select criteria"
+                                            />
+                                            {getIncompleteFieldComment('netWorthCriteria') && (
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('netWorthCriteria')!}
+                                                />
+                                            )}
+                                        </div>
+                                        {netWorthCriteria === 'AMOUNT' && (
+                                            <div>
+                                                <FieldWrapper
+                                                    control={form.control}
+                                                    name="netWorthValue"
+                                                    label="Amount"
+                                                >
+                                                    {(field) => (
+                                                        <NumberInput
+                                                            step={0.01}
+                                                            placeholder="0.00"
+                                                            value={
+                                                                typeof field.value === 'number'
+                                                                    ? field.value
+                                                                    : null
+                                                            }
+                                                            onChange={field.onChange}
+                                                        />
+                                                    )}
+                                                </FieldWrapper>
+                                                {getIncompleteFieldComment('netWorthValue') && (
+                                                    <IncompleteFieldAlert
+                                                        comment={getIncompleteFieldComment('netWorthValue')!}
+                                                    />
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Client Details */}
+                                    <div className="space-y-4 mt-6">
+                                        <div className="">
+                                            <h4 className="font-medium text-sm text-primary border-b pb-2">
+                                                Client Details
+                                            </h4>
+                                            <div className='flex justify-between items-center'>  
+                                                <div className='flex align-center'>
+                                                {/* dropdowns for client details present and in contact*/}
+                                                    <div className='p-3'>
+                                                        <SelectField
+                                                            control={form.control}
+                                                            name="clientDetailsPresent"
+                                                            label="Client Details Present"
+                                                            options={yesNoOptions}
+                                                            placeholder="Select option"
+                                                        />
+                                                        {getIncompleteFieldComment('clientDetailsPresent') && (
+                                                            <IncompleteFieldAlert
+                                                                comment={getIncompleteFieldComment('clientDetailsPresent')!}
+                                                            />
+                                                        )}
+                                                    </div>
+
+                                                    <div className='p-3'>
+                                                        <SelectField
+                                                            control={form.control}
+                                                            name="customerInContact"
+                                                            label="Customer In Contact"
+                                                            options={yesNoOptions}
+                                                            placeholder="Select option"
+                                                        />
+                                                        {getIncompleteFieldComment('customerInContact') && (
+                                                            <IncompleteFieldAlert
+                                                                comment={getIncompleteFieldComment('customerInContact')!}
+                                                            />
+                                                        )}
+                                                    </div>
+
+                                                </div>
+
+                                                <div className='p-3 pt-5'>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            appendClient({
+                                                                clientName: '',
+                                                                clientDesignation: '',
+                                                                clientMobile: '',
+                                                                clientEmail: '',
+                                                            })
+                                                        }
+                                                    >
+                                                        <Plus className="mr-2 h-4 w-4" /> Add Client
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {clientFields.map((field, index) => (
+                                            <div
+                                                key={field.id}
+                                                className="p-4 border rounded-lg space-y-4 bg-muted/20"
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <h5 className="font-medium text-sm">
+                                                        Client {index + 1}
+                                                    </h5>
+                                                    {clientFields.length > 0 && (
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => removeClient(index)}
+                                                        >
+                                                            <Trash2 className="h-4 w-4 text-destructive" />
+                                                        </Button>
+                                                    )}
+                                                </div>
+
+                                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                                    <div>
+                                                        <FieldWrapper
+                                                            control={form.control}
+                                                            name={`clients.${index}.clientName`}
+                                                            label="Name"
+                                                        >
+                                                            {(field) => (
+                                                                <Input placeholder="Enter name" {...field} />
+                                                            )}
+                                                        </FieldWrapper>
+                                                        {getIncompleteFieldComment(
+                                                            `clients.${index}.clientName`
+                                                        ) && (
+                                                            <IncompleteFieldAlert
+                                                                comment={getIncompleteFieldComment(
+                                                                    `clients.${index}.clientName`
+                                                                )!}
+                                                            />
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <FieldWrapper
+                                                            control={form.control}
+                                                            name={`clients.${index}.clientDesignation`}
+                                                            label="Designation"
+                                                        >
+                                                            {(field) => (
+                                                                <Input
+                                                                    placeholder="Enter designation"
+                                                                    {...field}
+                                                                />
+                                                            )}
+                                                        </FieldWrapper>
+                                                        {getIncompleteFieldComment(
+                                                            `clients.${index}.clientDesignation`
+                                                        ) && (
+                                                            <IncompleteFieldAlert
+                                                                comment={getIncompleteFieldComment(
+                                                                    `clients.${index}.clientDesignation`
+                                                                )!}
+                                                            />
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <FieldWrapper
+                                                            control={form.control}
+                                                            name={`clients.${index}.clientEmail`}
+                                                            label="Email"
+                                                        >
+                                                            {(field) => (
+                                                                <Input
+                                                                    type="email"
+                                                                    placeholder="Enter email"
+                                                                    {...field}
+                                                                />
+                                                            )}
+                                                        </FieldWrapper>
+                                                        {getIncompleteFieldComment(
+                                                            `clients.${index}.clientEmail`
+                                                        ) && (
+                                                            <IncompleteFieldAlert
+                                                                comment={getIncompleteFieldComment(
+                                                                    `clients.${index}.clientEmail`
+                                                                )!}
+                                                            />
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <FieldWrapper
+                                                            control={form.control}
+                                                            name={`clients.${index}.clientMobile`}
+                                                            label="Number"
+                                                            description="e.g., 1234567890, 9876543210"
+                                                        >
+                                                            {(field) => (
+                                                                <div>
+                                                                    <Input
+                                                                        placeholder="Enter phone number(s), separated by comma"
+                                                                        {...field}
+                                                                    />
+                                                                </div>
+                                                            )}
+                                                        </FieldWrapper>
+                                                        {getIncompleteFieldComment(
+                                                            `clients.${index}.clientMobile`
+                                                        ) && (
+                                                            <IncompleteFieldAlert
+                                                                comment={getIncompleteFieldComment(
+                                                                    `clients.${index}.clientMobile`
+                                                                )!}
+                                                            />
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <div className="space-y-4 mt-6">
+                                        <h3 className="text-lg font-semibold border-b pb-2">Courier Delivery Address</h3>
+
+                                        <div className='w-1/5'>
+                                            <div>
+                                                <SelectField
+                                                    control={form.control}
+                                                    name="courierDetailsPresent"
+                                                    label="Courier Details Present"
+                                                    options={yesNoOptions}
+                                                    placeholder="Select option"
+                                                />
+                                                {getIncompleteFieldComment('courierDetailsPresent') && (
+                                                    <IncompleteFieldAlert
+                                                        comment={getIncompleteFieldComment('courierDetailsPresent')!}
+                                                    />
+                                                )}
+                                            </div>
+                                        </div>
+                                        
+                                        {form.watch('courierAddress') && (
+                                            <div className="bg-amber-50 dark:bg-amber-950/50 p-4 rounded-md mb-4">
+                                                <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 mb-2">
+                                                    <AlertCircle className="h-4 w-4" />
+                                                    <span className="text-sm font-semibold">Legacy Address Found</span>
+                                                </div>
+                                                <p className="text-sm text-amber-700 dark:text-amber-400 whitespace-pre-wrap">
+                                                    {form.watch('courierAddress')}
+                                                </p>
+                                                <p className="text-xs text-amber-600 dark:text-amber-500 mt-2 italic">
+                                                    Note: Please migrate this to the structured fields below.
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                <FieldWrapper control={form.control} name="courierName" label="Name">
+                                                    {(field) => <Input placeholder="Contact person name" {...field} value={field.value || ''} />}
+                                                </FieldWrapper>
+                                                <FieldWrapper control={form.control} name="courierPhone" label="Phone No">
+                                                    {(field) => <Input placeholder="Contact phone number" {...field} value={field.value || ''} />}
+                                                </FieldWrapper>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                <FieldWrapper control={form.control} name="courierAddressLine1" label="Address Line 1">
+                                                    {(field) => <Input placeholder="Building, Street, etc." {...field} value={field.value || ''} />}
+                                                </FieldWrapper>
+                                                <FieldWrapper control={form.control} name="courierAddressLine2" label="Address Line 2">
+                                                    {(field) => <Input placeholder="Area, Landmark, etc." {...field} value={field.value || ''} />}
+                                                </FieldWrapper>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:col-span-2">
+                                                <FieldWrapper control={form.control} name="courierCity" label="City">
+                                                    {(field) => <Input placeholder="City" {...field} value={field.value || ''} />}
+                                                </FieldWrapper>
+                                                <FieldWrapper control={form.control} name="courierState" label="State">
+                                                    {(field) => <Input placeholder="State" {...field} value={field.value || ''} />}
+                                                </FieldWrapper>
+                                                <FieldWrapper control={form.control} name="courierPincode" label="Pin Code">
+                                                    {(field) => <Input placeholder="Pin Code" {...field} value={field.value || ''} />}
+                                                </FieldWrapper>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 gap-6 mt-2">
+                                            <FieldWrapper
+                                                control={form.control}
+                                                name="teRemark"
+                                                label="TE Final Remark"
+                                            >
+                                                {(field) => (
+                                                    <textarea
+                                                        className="border-input placeholder:text-muted-foreground h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+                                                        placeholder="Enter final remarks..."
+                                                        maxLength={1000}
+                                                        {...field}
+                                                    />
+                                                )}
+                                            </FieldWrapper>
+                                            {getIncompleteFieldComment('teRemark') && (
+                                                <IncompleteFieldAlert
+                                                    comment={getIncompleteFieldComment('teRemark')!}
+                                                />
+                                            )}
                                         </div>
                                     </div>
-                                ))}
-                            </div>
-
-                            {/* Courier & TE Remark */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <FieldWrapper control={form.control} name="courierAddress" label="Courier Delivery Address">
-                                    {(field) => (
-                                        <textarea
-                                            className="border-input placeholder:text-muted-foreground h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                            placeholder="Enter courier delivery address..."
-                                            maxLength={1000}
-                                            {...field}
-                                        />
-                                    )}
-                                </FieldWrapper>
-                                <FieldWrapper control={form.control} name="teRemark" label="TE Final Remark">
-                                    {(field) => (
-                                        <textarea
-                                            className="border-input placeholder:text-muted-foreground h-24 w-full rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
-                                            placeholder="Enter final remarks..."
-                                            maxLength={1000}
-                                            {...field}
-                                        />
-                                    )}
-                                </FieldWrapper>
-                                {getIncompleteFieldComment('teRemark') && (
-                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('teRemark')!} />
-                                )}
-                                {getIncompleteFieldComment('courierAddress') && (
-                                    <IncompleteFieldAlert comment={getIncompleteFieldComment('courierAddress')!} />
-                                )}
-                            </div>
+                                </>
+                            )}
                         </div>
 
                         {/* Submit Buttons */}
                         <div className="flex items-center justify-end gap-2 pt-6 border-t mt-6">
-                            <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={isSubmitting}>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => navigate(-1)}
+                                disabled={isSubmitting}
+                            >
                                 Cancel
                             </Button>
                             <Button
@@ -1001,10 +1763,7 @@ export function TenderInformationForm({
                             >
                                 Reset
                             </Button>
-                            <Button
-                                type="submit"
-                                disabled={isSubmitting}
-                            >
+                            <Button type="submit" disabled={isSubmitting}>
                                 {isSubmitting ? (
                                     <>
                                         <span className="animate-spin mr-2">⏳</span>

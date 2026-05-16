@@ -1,9 +1,10 @@
-﻿import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { lazy } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PublicOnlyRoute from "@/components/PublicOnlyRoute";
 import DashboardLayout from "@/app/layout/DashboardLayout";
 import Login from "@/modules/auth/login";
+import SignUp from "@/modules/auth/sign-up"
 import Dashboard from "@/modules/dashboard";
 import { RouteWrapper } from "./components/RouteWrapper";
 import { paths } from "./paths";
@@ -22,7 +23,11 @@ const CRMRoutes = lazy(() => import("./sections/crm.routes"));
 const PerformanceRoutes = lazy(() => import("./sections/performance.routes"));
 const IntegrationsRoutes = lazy(() => import("./sections/integrations.routes"));
 const SharedRoutes = lazy(() => import("./sections/shared.routes"));
+const DocumentDashboardRoutes = lazy(() => import("./sections/document-dashboard.routes"));
+const HrmsRoutes = lazy(() => import("./sections/hrms.routes"));
 const Profile = lazy(() => import("@/modules/profile"));
+
+import { ProfileProvider } from "@/modules/profile/contexts/ProfileContext";
 
 export default function AppRoutes() {
     return (
@@ -39,11 +44,12 @@ export default function AppRoutes() {
 
             <Route element={<PublicOnlyRoute />}>
                 <Route path="/login" element={<Login />} />
+                <Route path="/sign-up" element={<SignUp />} />
             </Route>
 
             {/* ==================== PROTECTED ROUTES ==================== */}
             <Route element={<ProtectedRoute />}>
-                <Route element={<DashboardLayout />}>
+                <Route element={<ProfileProvider><DashboardLayout /></ProfileProvider>}>
                     {/* Dashboard */}
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/dashboard" element={<Navigate to="/" replace />} />
@@ -154,6 +160,26 @@ export default function AppRoutes() {
                         element={
                             <RouteWrapper>
                                 <SharedRoutes />
+                            </RouteWrapper>
+                        }
+                    />
+
+                    {/* Document Dashboard */}
+                    <Route
+                        path="document-dashboard/*"
+                        element={
+                            <RouteWrapper>
+                                <DocumentDashboardRoutes />
+                            </RouteWrapper>
+                        }
+                    />
+
+                    {/* HRMS Dashboard */}
+                    <Route
+                        path="hrms/*"
+                        element={
+                            <RouteWrapper>
+                                <HrmsRoutes />
                             </RouteWrapper>
                         }
                     />

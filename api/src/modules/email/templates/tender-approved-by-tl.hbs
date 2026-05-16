@@ -1,52 +1,103 @@
 <div>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-        }
-    </style>
-    <p>Dear {{data.assignee}},</p>
+    <p>Dear {{data.te_name}},</p>
 
-    <p>
-        I have reviewed the Tender Info sheet and the Tender documents and decided
-        {{#if data.isBidApproved}}
-            to bid for the tender
-        {{else if data.isRejected}}
-            to not bid for this tender
-        {{else if data.isReview}}
-            to review the Tender info sheet again.
-        {{/if}}
-    </p>
+    <p>I have reviewed the Tender Info sheet and the Tender documents.</p>
 
-    <p>
-        <b>Remarks: </b><br />
-        {{#if data.isReview}}
-            {{data.remarks}}
-        {{/if}}
-        {{#if data.isRejected}}
-            {{data.rej_remark}}
-        {{/if}}
-    </p>
-
-    {{#if data.isBidApproved}}
-        <p>Please do the necessary next steps:</p>
+    {{#if (eq data.status 1)}}
+        <p><b style="font-size: 14px;">Decision: Approved (Bid for Tender)</b></p>
+        
+        <p>Please proceed with the next steps:</p>
         <ul>
-            <li>Request Processing Fee, EMD and Tender fees from - <a href="{{data.emdLink}}">EMD Link</a> and <a href="{{data.tenderFeesLink}}">Tender Fees Link</a>.</li>
-            <li>The selected mode of Processing Fee: {{data.processingFeeMode}}</li>
-            <li>The selected mode of Tender Fees: {{data.tenderFeesMode}}</li>
-            <li>The selected mode of EMD: {{data.emdMode}}</li>
-            <li>Raise RFQ <a href="{{data.rfqLink}}">Here</a> to {{data.vendor}}</li>
-            <li>Courier Physical Documents: {{data.phyDocs}}</li>
+            <li>Request Processing Fee, EMD and Tender fees from – <a href="{{data.emdLink}}">EMD Link</a> and <a href="{{data.tenderFeesLink}}">Tender Fees Link</a></li>
+            <li>Selected mode of Processing Fee: {{data.processingFeeMode}}</li>
+            <li>Selected mode of Tender Fees: {{data.tenderFeesMode}}</li>
+            <li>Selected mode of EMD: {{data.emdMode}}</li>
+            <li>RFQ Required: {{data.rfqRequired}}</li>
+            {{#if (eq data.rfqRequired "yes")}}
+            <li>RFQ send to Vendor(s): {{data.vendor}}</li>
+            {{/if}}
         </ul>
-        <p>PQR Selection is {{#if data.pqrApproved}}approved{{else}}Rejected, please use the revised PQR documents{{/if}}.</p>
-        <p>Finance Doc Selection is {{#if data.finApproved}}approved{{else}}Rejected, please use the revised Finance Docs{{/if}}.</p>
-    {{else if data.isReview}}
-        <p>Please complete the tender info form and resend it.</p>
-    {{else if data.isRejected}}
-        <p>Please avoid this tender and move on to the next available tender.</p>
+        
+        <p><b>Courier Physical Documents:</b><br/>
+        {{data.courier_address}}</p>
+        
+        <p><b>Selected Technical Documents (PQR):</b></p>
+        <ul>
+            {{#each data.technical_doc_urls}}
+                <li><a href="{{this.url}}" target="_blank" style="color: #0066cc; text-decoration: underline;">{{this.name}}</a></li>
+            {{else}}
+                <li>None</li>
+            {{/each}}
+        </ul>
+        <p>PQR Selection is {{#if data.pqrApproved}}approved{{else}}rejected, please use the revised PQR documents{{/if}}.</p>
+        
+        <p><b>Selected Financial Documents:</b></p>
+        <ul>
+            {{#each data.financial_doc_urls}}
+                <li><a href="{{this.url}}" target="_blank" style="color: #0066cc; text-decoration: underline;">{{this.name}}</a></li>
+            {{else}}
+                <li>None</li>
+            {{/each}}
+        </ul>
+        <p>Finance Doc Selection is {{#if data.finApproved}}approved{{else}}rejected, please use the revised Finance Docs{{/if}}.</p>
+
+        {{#if data.quotation_file_urls}}
+        <p><b>Quotation Files (instead of RFQ):</b></p>
+        <ul>
+            {{#each data.quotation_file_urls}}
+                <li><a href="{{this}}" target="_blank" style="color: #0066cc; text-decoration: underline;">Open File</a></li>
+            {{/each}}
+        </ul>
+        {{/if}}
+
+        <p><b>Remarks:</b><br/>
+        {{data.tl_approval_remark}}</p>
+    {{/if}}
+
+    {{#if (eq data.status 2)}}
+        <p><b style="font-size: 14px;">Decision: Rejected (Do Not Bid)</b></p>
+        <p><b>Reason of Rejection:</b> {{data.rejection_reason}}</p>
+        <p><b>Remark of Rejection:</b> {{data.rejection_remark}}</p>
+        <p><b>Proof:</b> {{data.rejection_proof}}</p>
+        
+        <p>Please avoid this tender and move on to the next available one.</p>
+    {{/if}}
+
+    {{#if (eq data.status 3)}}
+        <p><b style="font-size: 14px;">Decision: Incomplete (Needs Rework)</b></p>
+        
+        <p><b>Fields Need Review:</b></p>
+        <table width="100%" cellpadding="6" cellspacing="0" style="border: 1px solid #444; border-collapse: collapse; margin-bottom: 16px;">
+            <thead>
+                <tr>
+                    <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Field</th>
+                    <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">You Filled</th>
+                    <th style="border: 1px solid #444; text-align: left; background-color: #e8e8e8; font-weight: bold; padding: 8px;">Remark</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each data.review_fields}}
+                    <tr>
+                        <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{this.field}}</td>
+                        <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{this.value}}</td>
+                        <td style="border: 1px solid #444; text-align: left; padding: 8px;">{{this.remark}}</td>
+                    </tr>
+                {{else}}
+                    <tr>
+                        <td colspan="3">None</td>
+                    </tr>
+                {{/each}}
+            </tbody>
+        </table>
+        
+        <p><b>Final Remarks:</b><br/>
+        {{data.final_remarks}}</p>
     {{/if}}
 
     <p>
         <b>Regards,</b><br />
-        {{data.tlName}}
+        {{data.tl_name}},<br />
+        Team Leader, <br />
+        Volksenergie Pvt. Ltd.
     </p>
 </div>

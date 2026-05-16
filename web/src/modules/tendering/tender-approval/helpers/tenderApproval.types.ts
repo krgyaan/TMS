@@ -16,25 +16,35 @@ export interface IncompleteField {
 // Save DTO - what we send to API
 export interface SaveTenderApprovalDto {
     tlStatus: "0" | "1" | "2" | "3" | number;
+    rfqRequired?: "yes" | "no";
+    // quotationFiles?: string[];
     rfqTo?: number[];
     processingFeeMode?: string;
     tenderFeeMode?: string;
     emdMode?: string;
     approvePqrSelection?: "1" | "2";
     approveFinanceDocSelection?: "1" | "2";
+    alternativeTechnicalDocs?: string[];
+    alternativeFinancialDocs?: string[];
     tenderStatus?: number;
-    oemNotAllowed?: string;
+    oemNotAllowed?: string[];
     tlRejectionRemarks?: string;
+    tlIncompleteRemarks?: string;
+    tlApprovalRemarks?: string;
     incompleteFields?: IncompleteField[];
 }
 
-// Response from API
 export interface TenderApproval {
     id?: number;
     tenderId?: number;
     tlStatus?: "0" | "1" | "2" | "3" | number;
     tlDecision?: "0" | "1" | "2" | "3" | number;
+    rfqRequired?: "yes" | "no" | null;
+    // quotationFiles?: string[] | null;
+    // IDs for edit
     rfqTo: number[] | null;
+    // Names for display
+    rfqToName: string | null;
     processingFeeMode: string | null;
     tenderFeeMode: string | null;
     emdMode: string | null;
@@ -43,8 +53,14 @@ export interface TenderApproval {
     alternativeTechnicalDocs?: string[] | null;
     alternativeFinancialDocs?: string[] | null;
     tenderStatus: number | null;
-    oemNotAllowed: string | null;
+    statusName: string | null;
+    // IDs for edit
+    oemNotAllowed: string[] | null;
+    // Names for display
+    oemNotAllowedName: string | null;
     tlRejectionRemarks: string | null;
+    tlIncompleteRemarks: string | null;
+    tlApprovalRemarks: string | null;
     incompleteFields?: IncompleteField[];
     createdAt?: string;
     updatedAt?: string;
@@ -68,10 +84,11 @@ export interface TenderApprovalRow {
     itemName: string;
     statusName: string;
     tlStatus: number;
+    teRecommendation: string;
 }
 
 export type TenderApprovalFilters = {
-    tabKey?: "pending" | "accepted" | "rejected" | "tender-dnb";
+    tabKey?: "pending" | "accepted" | "rejected" | "rejected_later" | "tender-dnb";
     tlStatus?: number;
     page?: number;
     limit?: number;
@@ -81,7 +98,7 @@ export type TenderApprovalFilters = {
 };
 
 export type TenderApprovalTabData = {
-    key: "pending" | "accepted" | "rejected" | "tender-dnb";
+    key: "pending" | "accepted" | "rejected" | "rejected_later" | "tender-dnb";
     name: string;
     count: number;
     data: TenderApprovalRow[];
@@ -91,6 +108,7 @@ export interface TenderApprovalDashboardCounts {
     pending: number;
     accepted: number;
     rejected: number;
+    rejected_later: number;
     "tender-dnb": number;
     total: number;
 }
@@ -157,12 +175,13 @@ export const infoSheetFieldOptions = [
     { value: 'sdDurationMonths', label: 'SD Duration' },
 
     // LD
-    { value: 'ldRequired', label: 'LD Required' },
+    { value: 'ldRequired', label: 'LD Applicable' },
     { value: 'ldPercentagePerWeek', label: 'LD Per Week' },
     { value: 'maxLdPercentage', label: 'Max LD Percentage' },
 
     // Physical Docs
     { value: 'physicalDocsRequired', label: 'Physical Docs Required' },
+    { value: 'physicalDocType', label: 'Physical Document Type' },
     { value: 'physicalDocsDeadline', label: 'Physical Docs Deadline' },
 
     // Technical Eligibility

@@ -15,7 +15,7 @@ import { GstSection } from './components/GstSection';
 import { AccountSection } from './components/AccountSection';
 import { PersonSection } from './components/PersonSection';
 import { FileSection } from './components/FileSection';
-import { Plus } from 'lucide-react';
+import { AlertCircle, Plus } from 'lucide-react';
 
 const VendorFormSchema = z.object({
     organization: z.object({
@@ -36,9 +36,9 @@ const VendorFormSchema = z.object({
     accounts: z
         .array(
             z.object({
-                accountName: z.string().min(1, 'Account name is required'),
+                bankAccountName: z.string().min(1, 'Account name is required'),
                 accountNum: z.string().min(1, 'Account number is required'),
-                accountIfsc: z.string().min(1, 'IFSC code is required'),
+                ifscCode: z.string().min(1, 'IFSC code is required'),
                 status: z.boolean().default(true),
             }),
         )
@@ -48,7 +48,8 @@ const VendorFormSchema = z.object({
         .array(
             z.object({
                 name: z.string().min(1, 'Person name is required'),
-                email: z.string().email('Invalid email').optional().or(z.literal('')),
+                email: z.string().email('Invalid email').min(1, 'Email is required'),
+                mobile: z.string().min(1, 'Mobile number is required'),
                 address: z.string().optional(),
                 status: z.boolean().default(true),
                 files: z
@@ -216,18 +217,26 @@ const CreateVendorPage = () => {
                     <FileSection />
 
                     {/* Submit Buttons */}
-                    <div className="flex items-center justify-end gap-4 pt-4 border-t">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => navigate(paths.master.vendors)}
-                            disabled={createVendor.isPending}
-                        >
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={createVendor.isPending}>
-                            {createVendor.isPending ? 'Creating...' : 'Create Vendor Organization'}
-                        </Button>
+                    <div className="flex flex-col items-end gap-4 pt-4 border-t">
+                        {Object.keys(form.formState.errors).length > 0 && (
+                            <div className="text-sm text-destructive flex items-center gap-2">
+                                <AlertCircle className="h-4 w-4" />
+                                Please fix the validation errors (check organization details and ensure all added persons have a valid email and mobile number).
+                            </div>
+                        )}
+                        <div className="flex items-center gap-4">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => navigate(paths.master.vendors)}
+                                disabled={createVendor.isPending}
+                            >
+                                Cancel
+                            </Button>
+                            <Button type="submit" disabled={createVendor.isPending}>
+                                {createVendor.isPending ? 'Creating...' : 'Create Organization'}
+                            </Button>
+                        </div>
                     </div>
                 </form>
             </Form>

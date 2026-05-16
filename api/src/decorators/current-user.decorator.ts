@@ -1,16 +1,17 @@
 // src/decorators/current-user.decorator.ts
 import { createParamDecorator, ExecutionContext } from "@nestjs/common";
 
-// Define the shape of your user object
 export type CurrentUserType = {
     id: number;
-    name: string;
+    sub: number;
     email: string;
-    username: string | null;
-    mobile: string | null;
-    isActive: boolean;
-    createdAt: Date;
-    updatedAt: Date;
+    role: string | null;
+    roleId: number | null;
+    teamId: number | null;
+    dataScope: string;
+    canSwitchTeams: boolean | null;
+    isActive: boolean | null;
+    permissions: string[];
 };
 
 export const CurrentUser = createParamDecorator((data: keyof CurrentUserType | undefined, ctx: ExecutionContext) => {

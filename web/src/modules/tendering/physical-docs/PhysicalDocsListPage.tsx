@@ -1,50 +1,70 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import DataTable from '@/components/ui/data-table';
-import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState, useEffect, useCallback } from 'react';
-import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
-import type { ActionItem } from '@/components/ui/ActionMenu';
-import { useNavigate } from 'react-router-dom';
-import { paths } from '@/app/routes/paths';
-import type { PhysicalDocsDashboardRow, PhysicalDocsDashboardRowWithTimer } from './helpers/physicalDocs.types';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle, Eye, FileX2, Search } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { formatDateTime } from '@/hooks/useFormatedDate';
-import { usePhysicalDocs, usePhysicalDocsDashboardCounts } from '@/hooks/api/usePhysicalDocs';
-import { tenderNameCol } from '@/components/data-grid';
-import { Input } from '@/components/ui/input';
-import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import DataTable from "@/components/ui/data-table";
+import type { ColDef } from "ag-grid-community";
+import { useMemo, useState, useEffect, useCallback } from "react";
+import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
+import type { ActionItem } from "@/components/ui/ActionMenu";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { paths } from "@/app/routes/paths";
+import type { PhysicalDocsDashboardRowWithTimer } from "./helpers/physicalDocs.types";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle, CheckCircle, Eye, FileX2, Search, RefreshCw, XCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { usePhysicalDocs, usePhysicalDocsDashboardCounts } from "@/hooks/api/usePhysicalDocs";
+import { dateCol, tenderNameCol } from "@/components/data-grid";
+import { Input } from "@/components/ui/input";
+import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
+import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
+import { QuickFilter } from "@/components/ui/quick-filter";
+import { ChangeStatusModal } from "../tenders/components/ChangeStatusModal";
+import { useTenderingPermissions } from "../hooks/useTenderingPermissions";
 
 const PhysicalDocsListPage = () => {
-    const [activeTab, setActiveTab] = useState<'pending' | 'sent' | 'tender-dnb'>('pending');
+    const [searchParams] = useSearchParams();
+    const initialTab = (searchParams.get("tab") as "pending" | "sent" | "tender-dnb") || "pending";
+    const [activeTab, setActiveTab] = useState<"pending" | "sent" | "tender-dnb">(initialTab);
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
-    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
-    const [search, setSearch] = useState<string>('');
+    const [sortModel, setSortModel] = useState<{ colId: string; sort: "asc" | "desc" }[]>([]);
+    const [search, setSearch] = useState<string>("");
+    const debouncedSearch = useDebouncedSearch(search, 300);
+    const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({
+        open: false,
+        tenderId: null,
+    });
     const navigate = useNavigate();
+    const { hasTenderingPermission } = useTenderingPermissions();
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, search]);
+    }, [activeTab, debouncedSearch]);
+
+    const handlePageSizeChange = useCallback((newPageSize: number) => {
+        setPagination({ pageIndex: 0, pageSize: newPageSize });
+    }, []);
 
     const handleSortChanged = useCallback((event: any) => {
-        const sortModel = event.api.getColumnState()
+        const sortModel = event.api
+            .getColumnState()
             .filter((col: any) => col.sort)
             .map((col: any) => ({
                 colId: col.colId,
-                sort: col.sort as 'asc' | 'desc'
+                sort: col.sort as "asc" | "desc",
             }));
         setSortModel(sortModel);
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, []);
 
-    const { data: apiResponse, isLoading: loading, error } = usePhysicalDocs(
+    const {
+        data: apiResponse,
+        isLoading: loading,
+        error,
+    } = usePhysicalDocs(
         activeTab,
         { page: pagination.pageIndex + 1, limit: pagination.pageSize },
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort },
-        search || undefined
+        debouncedSearch || undefined
     );
 
     const { data: counts } = usePhysicalDocsDashboardCounts();
@@ -54,127 +74,136 @@ const PhysicalDocsListPage = () => {
 
     const physicalDocsActions: ActionItem<PhysicalDocsDashboardRowWithTimer>[] = [
         {
-            label: 'Send',
-            onClick: (row: PhysicalDocsDashboardRowWithTimer) => row.physicalDocs ? navigate(paths.tendering.physicalDocsEdit(row.tenderId)) : navigate(paths.tendering.physicalDocsCreate(row.tenderId)),
+            label: "Send",
+            onClick: (row: PhysicalDocsDashboardRowWithTimer) =>
+                row.physicalDocs ? navigate(paths.tendering.physicalDocsEdit(row.tenderId)) : navigate(paths.tendering.physicalDocsCreate(row.tenderId)),
             icon: <CheckCircle className="h-4 w-4" />,
+            visible: () => activeTab !== "tender-dnb",
         },
         {
-            label: 'View',
+            label: "View",
             onClick: (row: PhysicalDocsDashboardRowWithTimer) => {
                 navigate(paths.tendering.physicalDocsView(row.tenderId));
             },
             icon: <Eye className="h-4 w-4" />,
-        }
+        },
+        // {
+        //     label: 'Mark as Missed',
+        //     onClick: (row) => {
+        //         navigate(paths.tendering.bidMissedGlobal(row.tenderId, 'phy-doc'));
+        //     },
+        //     icon: <XCircle className="h-4 w-4" />,
+        //     visible: () => hasTenderingPermission && activeTab !== 'tender-dnb',
+        // },
     ];
 
     const tabsConfig = useMemo(() => {
         return [
             {
-                key: 'pending' as const,
-                name: 'Physical Docs Pending',
+                key: "pending" as const,
+                name: "Physical Docs Pending",
                 count: counts?.pending ?? 0,
             },
             {
-                key: 'sent' as const,
-                name: 'Physical Docs Sent',
+                key: "sent" as const,
+                name: "Physical Docs Sent",
                 count: counts?.sent ?? 0,
             },
             {
-                key: 'tender-dnb' as const,
-                name: 'Tender DNB',
-                count: counts?.['tender-dnb'] ?? 0,
+                key: "tender-dnb" as const,
+                name: "Tender DNB",
+                count: counts?.["tender-dnb"] ?? 0,
             },
         ];
     }, [counts]);
 
-    const colDefs = useMemo<ColDef<PhysicalDocsDashboardRowWithTimer>[]>(() => [
-        tenderNameCol<PhysicalDocsDashboardRowWithTimer>('tenderNo', {
-            headerName: 'Tender Details',
-            filter: true,
-            width: 250,
-        }),
-        {
-            field: 'teamMemberName',
-            colId: 'teamMemberName',
-            headerName: 'Member',
-            width: 120,
-            valueGetter: (params: any) => params.data?.teamMemberName ? params.data.teamMemberName : '—',
-            sortable: true,
-            filter: true,
-        },
-        {
-            field: 'physicalDocsDeadline',
-            colId: 'physicalDocsDeadline',
-            headerName: 'Physical Docs Deadline',
-            width: 160,
-            valueGetter: (params: any) => params.data?.physicalDocsDeadline ? formatDateTime(params.data.physicalDocsDeadline) : '—',
-            sortable: true,
-            filter: true,
-        },
-        {
-            field: 'courierAddress',
-            colId: 'courierAddress',
-            headerName: 'Courier Address',
-            width: 200,
-            valueGetter: (params: any) => params.data?.courierAddress ? params.data.courierAddress : '—',
-            sortable: true,
-            filter: true,
-        },
-        {
-            field: 'statusName',
-            colId: 'statusName',
-            headerName: 'Status',
-            width: 170,
-            valueGetter: (params: any) => params.data?.statusName ? params.data.statusName : '—',
-            cellRenderer: (params: any) => (
-                <Badge variant={params.value ? 'default' : 'secondary'}>
-                    {params.value}
-                </Badge>
-            ),
-            sortable: true,
-            filter: true,
-        },
-        {
-            field: 'courierNo',
-            colId: 'courierNo',
-            headerName: 'Courier Number',
-            width: 100,
-            valueGetter: (params: any) => params.data?.courierNo ? params.data.courierNo : '—',
-            sortable: true,
-            filter: true,
-        },
-        {
-            field: 'timer',
-            headerName: 'Timer',
-            width: 150,
-            cellRenderer: (params: any) => {
-                const { data } = params;
-                const timer = data?.timer;
-
-                if (!timer) {
-                    return <TenderTimerDisplay
-                        remainingSeconds={0}
-                        status="NOT_STARTED"
-                    />;
-                }
-
-                return (
-                    <TenderTimerDisplay
-                        remainingSeconds={timer.remainingSeconds}
-                        status={timer.status}
-                    />
-                );
+    const colDefs = useMemo<ColDef<PhysicalDocsDashboardRowWithTimer>[]>(
+        () => [
+            tenderNameCol<PhysicalDocsDashboardRowWithTimer>("tenderName", {
+                field: "tenderName",
+                colId: "tenderName",
+                headerName: "Tender Details",
+                filter: true,
+                width: 250,
+            }),
+            {
+                field: "teamMemberName",
+                colId: "teamMemberName",
+                headerName: "Member",
+                width: 120,
+                valueGetter: (params: any) => (params.data?.teamMemberName ? params.data.teamMemberName : "—"),
+                sortable: true,
+                filter: true,
             },
-        },
-        {
-            headerName: 'Actions',
-            filter: false,
-            cellRenderer: createActionColumnRenderer(physicalDocsActions),
-            sortable: false,
-            pinned: 'right',
-            width: 80,
-        },
-    ], [physicalDocsActions]);
+            dateCol<PhysicalDocsDashboardRowWithTimer>(
+                "physicalDocsDeadline",
+                { includeTime: true },
+                {
+                    field: "physicalDocsDeadline",
+                    colId: "physicalDocsDeadline",
+                    headerName: "Physical Docs Deadline",
+                    filter: true,
+                    sortable: true,
+                    width: 150,
+                }
+            ),
+            {
+                field: "courierAddress",
+                colId: "courierAddress",
+                headerName: "Courier Address",
+                width: 200,
+                valueGetter: (params: any) => (params.data?.courierAddress ? params.data.courierAddress : "—"),
+                sortable: true,
+                filter: true,
+            },
+            {
+                field: "statusName",
+                colId: "statusName",
+                headerName: "Status",
+                width: 170,
+                valueGetter: (params: any) => (params.data?.statusName ? params.data.statusName : "—"),
+                cellRenderer: (params: any) => <Badge variant={params.value ? "default" : "secondary"}>{params.value}</Badge>,
+                sortable: true,
+                filter: true,
+            },
+            {
+                field: "courierNo",
+                colId: "courierNo",
+                headerName: "Courier Number",
+                width: 100,
+                valueGetter: (params: any) => (params.data?.courierNo ? params.data.courierNo : "—"),
+                sortable: true,
+                filter: true,
+            },
+            {
+                field: "timer",
+                headerName: "Timer",
+                width: 150,
+                cellRenderer: (params: any) => {
+                    const { data } = params;
+                    const timer = data?.timer;
+
+                    // if (!timer) {
+                    //     return <TenderTimerDisplay
+                    //         remainingSeconds={0}
+                    //         status="NOT_STARTED"
+                    //     />;
+                    // }
+
+                    return <TenderTimerDisplay remainingSeconds={timer.remainingSeconds} status={timer.status} deadline={timer.deadline} />;
+                },
+            },
+            {
+                headerName: "Actions",
+                filter: false,
+                cellRenderer: createActionColumnRenderer(physicalDocsActions),
+                sortable: false,
+                pinned: "right",
+                width: 80,
+            },
+        ],
+        [physicalDocsActions]
+    );
 
     if (loading) {
         return (
@@ -206,9 +235,7 @@ const PhysicalDocsListPage = () => {
                 <CardContent className="p-6">
                     <Alert variant="destructive">
                         <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>
-                            Failed to load physical docs. Please try again later.
-                        </AlertDescription>
+                        <AlertDescription>Failed to load physical docs. Please try again later.</AlertDescription>
                     </Alert>
                 </CardContent>
             </Card>
@@ -221,33 +248,15 @@ const PhysicalDocsListPage = () => {
                 <div className="flex items-center justify-between">
                     <div>
                         <CardTitle>Physical Docs</CardTitle>
-                        <CardDescription className="mt-2">
-                            Review and approve physical docs.
-                        </CardDescription>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div className="relative">
-                            <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                type="text"
-                                placeholder="Search..."
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                className="pl-8 w-64"
-                            />
-                        </div>
+                        <CardDescription className="mt-2">Review and approve physical docs.</CardDescription>
                     </div>
                 </div>
             </CardHeader>
             <CardContent className="px-0">
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'pending' | 'sent' | 'tender-dnb')}>
-                    <TabsList className="m-auto">
-                        {tabsConfig.map((tab) => (
-                            <TabsTrigger
-                                key={tab.key}
-                                value={tab.key}
-                                className="data-[state=active]:shadow-md flex items-center gap-1"
-                            >
+                <Tabs value={activeTab} onValueChange={value => setActiveTab(value as "pending" | "sent" | "tender-dnb")}>
+                    <TabsList className="m-auto mb-4">
+                        {tabsConfig.map(tab => (
+                            <TabsTrigger key={tab.key} value={tab.key} className="data-[state=active]:shadow-md flex items-center gap-1">
                                 <span className="font-semibold text-sm">{tab.name}</span>
                                 {tab.count > 0 && (
                                     <Badge variant="secondary" className="text-xs">
@@ -258,12 +267,30 @@ const PhysicalDocsListPage = () => {
                         ))}
                     </TabsList>
 
-                    {tabsConfig.map((tab) => (
-                        <TabsContent
-                            key={tab.key}
-                            value={tab.key}
-                            className="px-0 m-0 data-[state=inactive]:hidden"
-                        >
+                    {/* Search Row: Quick Filters, Search Bar, Sort Filter */}
+                    <div className="flex items-center gap-4 px-6 pb-4">
+                        {/* Quick Filters (Left) */}
+                        <QuickFilter
+                            options={[
+                                { label: "This Week", value: "this-week" },
+                                { label: "This Month", value: "this-month" },
+                                { label: "This Year", value: "this-year" },
+                            ]}
+                            value={search}
+                            onChange={value => setSearch(value)}
+                        />
+
+                        {/* Search Bar (Center) - Flex grow */}
+                        <div className="flex-1 flex justify-end">
+                            <div className="relative">
+                                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input type="text" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} className="pl-8 w-64" />
+                            </div>
+                        </div>
+                    </div>
+
+                    {tabsConfig.map(tab => (
+                        <TabsContent key={tab.key} value={tab.key} className="px-0 m-0 data-[state=inactive]:hidden">
                             {activeTab === tab.key && (
                                 <>
                                     {tabsData.length === 0 ? (
@@ -271,9 +298,7 @@ const PhysicalDocsListPage = () => {
                                             <FileX2 className="h-12 w-12 mb-4" />
                                             <p className="text-lg font-medium">No {tab.name.toLowerCase()} physical docs</p>
                                             <p className="text-sm mt-2">
-                                                {tab.key === 'pending'
-                                                    ? 'Tenders requiring physical documents will appear here'
-                                                    : 'Sent physical documents will be shown here'}
+                                                {tab.key === "pending" ? "Tenders requiring physical documents will appear here" : "Sent physical documents will be shown here"}
                                             </p>
                                         </div>
                                     ) : (
@@ -285,12 +310,15 @@ const PhysicalDocsListPage = () => {
                                             rowCount={totalRows}
                                             paginationState={pagination}
                                             onPaginationChange={setPagination}
+                                            onPageSizeChange={handlePageSizeChange}
+                                            showTotalCount={true}
+                                            showLengthChange={true}
                                             gridOptions={{
                                                 defaultColDef: {
                                                     editable: false,
                                                     filter: true,
                                                     sortable: true,
-                                                    resizable: true
+                                                    resizable: true,
                                                 },
                                                 onSortChanged: handleSortChanged,
                                                 overlayNoRowsTemplate: '<span style="padding: 10px; text-align: center;">No physical docs found</span>',
@@ -303,6 +331,15 @@ const PhysicalDocsListPage = () => {
                     ))}
                 </Tabs>
             </CardContent>
+            <ChangeStatusModal
+                open={changeStatusModal.open}
+                onOpenChange={open => setChangeStatusModal({ ...changeStatusModal, open })}
+                tenderId={changeStatusModal.tenderId}
+                currentStatus={changeStatusModal.currentStatus}
+                onSuccess={() => {
+                    setChangeStatusModal({ open: false, tenderId: null });
+                }}
+            />
         </Card>
     );
 };

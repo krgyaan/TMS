@@ -1,5 +1,5 @@
 import { Inject, Injectable, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
-import { and, eq, inArray, asc, desc, sql, isNull, notInArray, isNotNull } from 'drizzle-orm';
+import { and, eq, inArray, asc, desc, sql, isNull, notInArray, isNotNull, ne , or} from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -17,6 +17,9 @@ import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
+import { TimersService } from '@/modules/timers/timers.service';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { bidSubmissions } from '@/db/schemas';
 
 export type CostingApprovalDashboardRow = {
     tenderId: number;
@@ -64,12 +67,14 @@ export class CostingApprovalsService {
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
+        private readonly timersService: TimersService,
     ) { }
 
     private costingApprovalBaseQuery(select: any): any {
         return this.db
             .select(select)
             .from(tenderInfos)
+            .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
             .innerJoin(
                 tenderInformation,
                 eq(tenderInfos.id, tenderInformation.tenderId)
@@ -80,7 +85,7 @@ export class CostingApprovalsService {
                 tenderCostingSheets,
                 eq(tenderCostingSheets.tenderId, tenderInfos.id)
             )
-            .innerJoin(users, eq(users.id, tenderInfos.teamMember));
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember));
     }
 
     private getOrderBy(filters?: CostingApprovalFilters) {
@@ -109,10 +114,67 @@ export class CostingApprovalsService {
     /**
      * Get dashboard data by tab - Direct queries without config
      */
+
+    private buildDashboardConditions(user?: ValidatedUser, teamId?: number, activeTab?: string) : any[]{
+        //building the base condition
+        const conditions: any[] = [
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(), 
+            isNotNull(tenderCostingSheets.submittedFinalPrice)
+        ];
+
+        //building the role based filtering
+        const roleFilterConditions: any[] = [];
+        if (user && user.roleId) {
+            if (user.roleId === 1 || user.roleId === 2) {
+                if (teamId !== undefined && teamId !== null) {
+                    roleFilterConditions.push(eq(tenderInfos.team, teamId));
+                }
+            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+                if (user.teamId) {
+                    roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
+                } else {
+                    roleFilterConditions.push(sql`1 = 0`);
+                }
+            } else {
+                if (user.sub) {
+                    roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
+                } else {
+                    roleFilterConditions.push(sql`1 = 0`);
+                }
+            }
+        } else {
+            roleFilterConditions.push(sql`1 = 0`);
+        }
+
+        conditions.push(...roleFilterConditions);
+        
+        //building the tab conditions
+
+        if (activeTab === 'pending') {
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['lost']));
+            conditions.push(eq(tenderCostingSheets.status, 'Submitted'));
+            conditions.push(or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)));
+        } else if (activeTab === 'approved') {
+            // conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb']));
+            conditions.push(eq(tenderCostingSheets.status, 'Approved'));
+            conditions.push(or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)));
+        } else if (activeTab === 'tender-dnb') {
+            // conditions.push(inArray(tenderInfos.status, [8, 34]));
+            conditions.push(eq(bidSubmissions.status, "Tender Missed"));
+        } else {
+            throw new BadRequestException(`Invalid tab: ${activeTab}`);
+        }
+
+        //returning the conditions
+        return conditions;
+    }
+    
     async getDashboardData(
-        userTeam: number,
         tab?: 'pending' | 'approved' | 'tender-dnb',
-        filters?: CostingApprovalFilters
+        filters?: CostingApprovalFilters,
+        user?: ValidatedUser,
+        teamId?: number
     ): Promise<PaginatedResult<CostingApprovalDashboardRow>> {
         const page = filters?.page || 1;
         const limit = filters?.limit || 50;
@@ -120,30 +182,24 @@ export class CostingApprovalsService {
 
         const activeTab = tab || 'pending';
 
-        // Build base conditions
-        const baseConditions = [
-            TenderInfosService.getActiveCondition(),
-            TenderInfosService.getApprovedCondition(),
-            // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-            isNotNull(tenderCostingSheets.submittedFinalPrice),
-        ];
+        if(!['pending' , 'approved', 'tender-dnb'].includes(activeTab)){
+            throw new BadRequestException(`Invalid Tab: ${activeTab}`);
+        }
 
-        // TODO: Add role-based team filtering middleware/guard
-        // - Admin: see all tenders
-        // - Team Leader/Coordinator: filter by user.team
-        // - Others: filter by team_member = user.id
-
-        // Build tab-specific conditions
-        const conditions = [...baseConditions];
+        //building the final conditions
+        const conditions: any[] = this.buildDashboardConditions(user, teamId, activeTab);
 
         if (activeTab === 'pending') {
-            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
-            conditions.push(isNull(tenderCostingSheets.status));
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['lost']));
+            conditions.push(eq(tenderCostingSheets.status, 'Submitted'));
+            conditions.push(or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)));
         } else if (activeTab === 'approved') {
-            conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
+            // conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb']));
             conditions.push(eq(tenderCostingSheets.status, 'Approved'));
+            conditions.push(or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)));
         } else if (activeTab === 'tender-dnb') {
-            conditions.push(inArray(tenderInfos.status, [8, 34]));
+            // conditions.push(inArray(tenderInfos.status, [8, 34]));
+            conditions.push(eq(bidSubmissions.status, "Tender Missed"));
         } else {
             throw new BadRequestException(`Invalid tab: ${activeTab}`);
         }
@@ -195,68 +251,6 @@ export class CostingApprovalsService {
             .limit(limit)
             .offset(offset) as any;
 
-        // Enrich rows with latest status log data
-        if (rows.length > 0) {
-            const tenderIds = rows.map((r: any) => r.tenderId);
-
-            // Get latest status log for each tender
-            const allStatusLogs = await this.db
-                .select({
-                    tenderId: tenderStatusHistory.tenderId,
-                    newStatus: tenderStatusHistory.newStatus,
-                    comment: tenderStatusHistory.comment,
-                    createdAt: tenderStatusHistory.createdAt,
-                    id: tenderStatusHistory.id,
-                })
-                .from(tenderStatusHistory)
-                .where(inArray(tenderStatusHistory.tenderId, tenderIds))
-                .orderBy(desc(tenderStatusHistory.createdAt), desc(tenderStatusHistory.id));
-
-            // Group by tenderId and take the first (latest) entry for each
-            const latestStatusLogMap = new Map<number, typeof allStatusLogs[0]>();
-            for (const log of allStatusLogs) {
-                if (!latestStatusLogMap.has(log.tenderId)) {
-                    latestStatusLogMap.set(log.tenderId, log);
-                }
-            }
-
-            // Get status names for latest status logs
-            const latestStatusIds = [...new Set(Array.from(latestStatusLogMap.values()).map(log => log.newStatus))];
-            const latestStatuses = latestStatusIds.length > 0
-                ? await this.db
-                    .select({ id: statuses.id, name: statuses.name })
-                    .from(statuses)
-                    .where(inArray(statuses.id, latestStatusIds))
-                : [];
-
-            const statusNameMap = new Map(latestStatuses.map(s => [s.id, s.name]));
-
-            const data = rows.map((row: any) => {
-                const latestLog = latestStatusLogMap.get(row.tenderId);
-                return {
-                    tenderId: row.tenderId,
-                    tenderNo: row.tenderNo,
-                    tenderName: row.tenderName,
-                    teamMember: row.teamMember,
-                    teamMemberName: row.teamMemberName,
-                    itemName: row.itemName,
-                    status: row.status,
-                    statusName: row.statusName,
-                    latestStatus: latestLog?.newStatus || null,
-                    latestStatusName: latestLog ? (statusNameMap.get(latestLog.newStatus) || null) : null,
-                    statusRemark: latestLog?.comment || null,
-                    dueDate: row.dueDate,
-                    emdAmount: row.emdAmount,
-                    gstValues: row.gstValues ? Number(row.gstValues) : 0,
-                    costingStatus: row.costingStatus,
-                    googleSheetUrl: row.googleSheetUrl,
-                    costingSheetId: row.costingSheetId,
-                };
-            });
-
-            return wrapPaginatedResponse(data, Number(count), page, limit);
-        }
-
         const data = rows.map((row: any) => ({
             tenderId: row.tenderId,
             tenderNo: row.tenderNo,
@@ -280,53 +274,24 @@ export class CostingApprovalsService {
         return wrapPaginatedResponse(data, Number(count), page, limit);
     }
 
-    async getDashboardCounts(): Promise<CostingApprovalDashboardCounts> {
-        const baseConditions = [
-            TenderInfosService.getActiveCondition(),
-            TenderInfosService.getApprovedCondition(),
-            isNotNull(tenderCostingSheets.submittedFinalPrice),
-        ];
+    async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<CostingApprovalDashboardCounts> {
 
-        // Count pending: costing_status IS NULL (or tenderCostingSheets.status IS NULL)
-        const pendingConditions = [
-            ...baseConditions,
-            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-            isNull(tenderCostingSheets.status),
-        ];
-
-        // Count approved: costing_status = 'Approved'
-        const approvedConditions = [
-            ...baseConditions,
-            TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-            eq(tenderCostingSheets.status, 'Approved'),
-        ];
-
-        // Count tender-dnb: status in [8, 9, 10, 11, 12, 13, 14, 15, 38, 39]
-        const tenderDnbBaseConditions = [
-            TenderInfosService.getActiveCondition(),
-            TenderInfosService.getApprovedCondition(),
-            isNotNull(tenderCostingSheets.submittedFinalPrice),
-        ];
-        const tenderDnbConditions = [
-            ...tenderDnbBaseConditions,
-            inArray(tenderInfos.status, [8, 34]),
-        ];
 
         const counts = await Promise.all([
             this.costingApprovalBaseQuery({
                 count: sql<number>`count(distinct ${tenderInfos.id})`,
             })
-                .where(and(...pendingConditions))
+                .where(and(...this.buildDashboardConditions(user, teamId, 'pending')))
                 .then(([result]: any) => Number(result?.count || 0)),
             this.costingApprovalBaseQuery({
                 count: sql<number>`count(distinct ${tenderInfos.id})`,
             })
-                .where(and(...approvedConditions))
+                .where(and(...this.buildDashboardConditions(user, teamId, 'approved')))
                 .then(([result]: any) => Number(result?.count || 0)),
             this.costingApprovalBaseQuery({
                 count: sql<number>`count(distinct ${tenderInfos.id})`,
             })
-                .where(and(...tenderDnbConditions))
+                .where(and(...this.buildDashboardConditions(user, teamId, 'tender-dnb')))
                 .then(([result]: any) => Number(result?.count || 0)),
         ]);
 
@@ -337,6 +302,8 @@ export class CostingApprovalsService {
             total: counts.reduce((sum, count) => sum + count, 0),
         };
     }
+
+
 
     async findById(id: number, userTeam: number) {
         // Join with tenderInfos to verify team access
@@ -424,6 +391,22 @@ export class CostingApprovalsService {
 
         // Send email notification
         await this.sendCostingSheetApprovedEmail(costingSheet.tenderId, result, userId);
+
+        // TIMER TRANSITION: Stop costing_sheet_approval timer
+        try {
+            this.logger.log(`Stopping timer for tender ${costingSheet.tenderId} after costing approval`);
+            await this.timersService.stopTimer({
+                entityType: 'TENDER',
+                entityId: costingSheet.tenderId,
+                stage: 'costing_sheet_approval',
+                userId: userId,
+                reason: 'Costing approved'
+            });
+            this.logger.log(`Successfully stopped costing_sheet_approval timer for tender ${costingSheet.tenderId}`);
+        } catch (error) {
+            this.logger.error(`Failed to stop timer for tender ${costingSheet.tenderId} after costing approval:`, error);
+            // Don't fail the entire operation if timer transition fails
+        }
 
         return result;
     }
@@ -592,7 +575,7 @@ export class CostingApprovalsService {
             'costing-sheet.approved',
             tenderId,
             approvedBy,
-            `Costing Sheet Approved: ${tender.tenderNo}`,
+            `Costing approved - ${tender.tenderName}`,
             'costing-sheet-approved',
             emailData,
             {
@@ -654,11 +637,14 @@ export class CostingApprovalsService {
             'costing-sheet.rejected',
             tenderId,
             rejectedBy,
-            `Costing Sheet Rejected: ${tender.tenderNo}`,
+            `Costing Rejected/Redo costing - ${tender.tenderName}`,
             'costing-sheet-rejected',
             emailData,
             {
                 to: [{ type: 'user', userId: tender.teamMember }],
+                cc: [
+                    { type: 'role', role: 'Admin', teamId: tender.team },
+                ],
             }
         );
     }

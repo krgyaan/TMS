@@ -18,7 +18,7 @@ export default function TenderApprovalCreatePage() {
     return (
         <TenderApprovalForm
             tenderId={id}
-            relationships={{ ...tender, infoSheet, approval } as unknown as TenderWithRelations}
+            relationships={{ ...tender, infoSheet, approval} as unknown as TenderWithRelations}
             isLoading={isPageLoading}
         />
     );

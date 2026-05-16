@@ -4,100 +4,112 @@ import { useEffect, useState } from "react";
 
 interface TenderTimerDisplayProps {
     remainingSeconds: number;
-    status: 'NOT_STARTED' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'OVERDUE';
+    status: 'NOT_STARTED' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'OVERDUE' | 'TIMER_NOT_FOUND' | 'STOPPED';
+    deadline?: Date | null;
 }
 
 export const TenderTimerDisplay = ({
     remainingSeconds,
-    status
+    status,
+    deadline
 }: TenderTimerDisplayProps) => {
-    const isRunning = status === 'RUNNING';
-    const [timeLeft, setTimeLeft] = useState(remainingSeconds);
+    const isActiveTimer = status === 'RUNNING' || status === 'OVERDUE';
+    const [displaySeconds, setDisplaySeconds] = useState(0);
+    const [isOverdue, setIsOverdue] = useState(false);
 
     // Format time as HH:MM:SS
     const formatTime = (seconds: number) => {
-        const isNegative = seconds < 0;
-        const absSeconds = Math.abs(seconds);
-
+        const absSeconds = Math.abs(Math.floor(seconds));
         const hours = Math.floor(absSeconds / 3600);
         const minutes = Math.floor((absSeconds % 3600) / 60);
         const secs = absSeconds % 60;
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    };
+
+    // Calculate time based on deadline
+    const calculateTime = () => {
+        if (!deadline) {
+            return {
+                seconds: Math.abs(remainingSeconds),
+                overdue: remainingSeconds < 0
+            };
+        }
+
+        const now = Date.now();
+        const deadlineTime = new Date(deadline).getTime();
+        const diff = deadlineTime - now;
+        const seconds = Math.floor(diff / 1000);
 
         return {
-            display: `${isNegative ? '-' : ''}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`,
-            shortDisplay: `${isNegative ? '-' : ''}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`,
-            isNegative
+            seconds: Math.abs(seconds),
+            overdue: diff < 0
         };
     };
 
-    const formattedTime = formatTime(remainingSeconds);
-
+    // Initial calculation and interval setup
     useEffect(() => {
-        setTimeLeft(remainingSeconds);
+        if (!isActiveTimer) {
+            // For non-active timers, just use remainingSeconds
+            setDisplaySeconds(Math.abs(remainingSeconds));
+            setIsOverdue(remainingSeconds < 0);
+            return;
+        }
 
-        if (!isRunning) return;
+        // Calculate immediately
+        const { seconds, overdue } = calculateTime();
+        setDisplaySeconds(seconds);
+        setIsOverdue(overdue);
 
-        const startTime = Date.now();
-        const initialTime = remainingSeconds;
+        // Update every second
+        const intervalId = setInterval(() => {
+            const { seconds, overdue } = calculateTime();
+            setDisplaySeconds(seconds);
+            setIsOverdue(overdue);
+        }, 1000);
 
-        const update = () => {
-            const elapsed = Math.floor((Date.now() - startTime) / 1000);
-            setTimeLeft(initialTime - elapsed);
-        };
+        return () => clearInterval(intervalId);
+    }, [deadline, remainingSeconds, isActiveTimer, status]);
 
-        // Use requestAnimationFrame for smoother updates
-        let animationFrameId: number;
-        const animate = () => {
-            update();
-            animationFrameId = requestAnimationFrame(animate);
-        };
-
-        animationFrameId = requestAnimationFrame(animate);
-
-        return () => {
-            cancelAnimationFrame(animationFrameId);
-        };
-    }, [remainingSeconds, isRunning]);
-
-    // Get display component based on status
     const getDisplay = () => {
+        const isPositive = !isOverdue;
+        const colorClass = isPositive ? "text-emerald-400" : "text-destructive";
+        const badgeVariant = isPositive ? "success" : "destructive";
+
+        if (status === 'TIMER_NOT_FOUND') {
+            return <span className="text-muted-foreground italic text-[10px]">Timer N/A</span>;
+        }
+
+        if (isActiveTimer) {
+            return (
+                <Badge 
+                    variant="outline" 
+                    className={`${colorClass} font-mono border-current bg-transparent`}
+                >
+                    {formatTime(displaySeconds)}
+                </Badge>
+            );
+        }
+
         switch (status) {
-            case 'RUNNING':
-                return (
-                    <Badge variant="outline" className={timeLeft < 0 ? "text-danger" : "text-emerald-400"}>
-                        {formatTime(timeLeft).display}
-                    </Badge>
-                );
             case 'COMPLETED':
+            case 'STOPPED':
                 return (
-                    <Badge variant={formattedTime.isNegative ? "destructive" : "success"}>
-                        <CheckCircle />
-                        {formattedTime.shortDisplay}
-                    </Badge>
-                );
-            case 'OVERDUE':
-                return (
-                    <Badge variant="destructive">
-                        <AlertTriangle />
-                        {formattedTime.shortDisplay}
+                    <Badge variant={badgeVariant as any} className="font-mono">
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        {formatTime(displaySeconds)}
                     </Badge>
                 );
             case 'PAUSED':
                 return (
-                    <Badge variant="secondary">
-                        <Clock />
-                        {formattedTime.shortDisplay}
+                    <Badge variant="secondary" className="font-mono">
+                        <Clock className="w-3 h-3 mr-1" />
+                        {formatTime(displaySeconds)}
                     </Badge>
                 );
             default:
-                return <span className="text-muted-foreground">Not started</span>;
+                return <span className="text-muted-foreground text-xs">Not started</span>;
         }
     };
 
-    return (
-        <>
-            <span className="hidden">{remainingSeconds}</span>
-            {getDisplay()}
-        </>
-    );
+    return getDisplay();
 };

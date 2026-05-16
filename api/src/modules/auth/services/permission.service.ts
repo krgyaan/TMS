@@ -6,6 +6,7 @@ import { permissions } from '@db/schemas/auth/permissions.schema';
 import { rolePermissions } from '@db/schemas/auth/role-permissions.schema';
 import { userPermissions } from '@db/schemas/auth/user-permissions.schema';
 import { DataScope, RoleName } from '@/common/constants/roles.constant';
+import { userRoles, users } from '@/db/schemas';
 
 export type PermissionCheck = {
     module: string;
@@ -153,6 +154,54 @@ export class PermissionService implements OnModuleInit {
 
         // Apply user overrides
         const userOverrides = this.cache.userOverrides.get(userId);
+        if (userOverrides) {
+            userOverrides.forEach((granted, perm) => {
+                if (granted) {
+                    perms.add(perm);
+                } else {
+                    perms.delete(perm);
+                }
+            });
+        }
+
+        return Array.from(perms);
+    }
+    
+    
+    async getUserPermissionsWithId(id: number): Promise<string[]> {
+        await this.ensureCacheValid();
+        
+        const user = await this.db
+            .select()
+            .from(users)
+            .where(eq(users.id, id))
+            .limit(1)
+            .then((rows) => rows[0]);
+
+
+        if(!user){
+            throw new Error("User not found");
+        }
+
+        const perms = new Set<string>();
+
+        const roleId = await this.db
+            .select()
+            .from(userRoles)
+            .where(eq(userRoles.userId, id))
+            .limit(1)
+            .then((rows) => rows[0]?.roleId ?? null);
+
+        // Add role permissions
+        if (roleId) {
+            const rolePerms = this.cache.rolePermissions.get(roleId);
+            if (rolePerms) {
+                rolePerms.forEach((p) => perms.add(p));
+            }
+        }
+
+        // Apply user overrides
+        const userOverrides = this.cache.userOverrides.get(id);
         if (userOverrides) {
             userOverrides.forEach((granted, perm) => {
                 if (granted) {

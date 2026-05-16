@@ -7,6 +7,7 @@ export type ResultDashboardFilters = {
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
     search?: string;
+    teamId?: number;
 };
 
 export interface UploadResultFormPageProps {
@@ -37,8 +38,10 @@ export type TenderResult = {
     tenderName: string;
     teamExecutiveName: string | null;
     tenderValue: string | null;
+    bidSubmissionDate: Date | string | null;
     itemName: string | null;
     status: string;
+    resultStatus: string;
     reverseAuctionId: number | null;
     raApplicable: boolean;
     technicallyQualified: string | null;
@@ -49,9 +52,14 @@ export type TenderResult = {
     l1Price: string | null;
     l2Price: string | null;
     ourPrice: string | null;
+    finalPrice: string | null;
+    tenderStatus: string | null;
+    woBasicDetailId: number | null;
+    emdDetails: EmdDetails | null;
     qualifiedPartiesScreenshot: string | null;
     finalResultScreenshot: string | null;
     resultUploadedAt: Date | null;
+    resultReason: string | null;
     createdAt: Date;
     updatedAt: Date;
 };
@@ -73,6 +81,8 @@ export interface ResultDashboardRow {
     raApplicable: boolean;
     reverseAuctionId: number | null;
     emdDetails: EmdDetails | null;
+    technicallyQualified: string | null;
+    woBasicDetailId: number | null;
 }
 
 export interface ResultDashboardCounts {
@@ -81,6 +91,12 @@ export interface ResultDashboardCounts {
     lost: number;
     disqualified: number;
     total: number;
+    totalAmounts: {
+        pending: number;
+        won: number;
+        lost: number;
+        disqualified: number;
+    };
 }
 
 export interface ResultDashboardResponse {

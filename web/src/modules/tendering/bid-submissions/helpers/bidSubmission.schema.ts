@@ -25,3 +25,12 @@ export const MarkAsMissedFormSchema = z.object({
 });
 
 export type MarkAsMissedFormValues = z.infer<typeof MarkAsMissedFormSchema>;
+
+export const GlobalBidMissedFormSchema = z.object({
+    tenderId: z.number(),
+    rejectionStatus: z.number().min(1, 'Status is required'),
+    preventionMeasures: z.string().optional(),
+    tmsImprovements: z.string().optional(),
+});
+
+export type GlobalBidMissedFormValues = z.infer<typeof GlobalBidMissedFormSchema>;

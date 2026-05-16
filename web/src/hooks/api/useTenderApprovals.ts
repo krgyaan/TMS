@@ -3,6 +3,7 @@ import { tenderApprovalsService } from '@/services/api/tender-approvals.service'
 import { handleQueryError } from '@/lib/react-query';
 import { toast } from 'sonner';
 import type { PaginatedResult, SaveTenderApprovalDto, TenderApprovalRow, TenderApprovalDashboardCounts, TenderApprovalFilters } from '@/types/api.types';
+import { useTeamFilter } from '@/hooks/useTeamFilter';
 
 export const tenderApprovalsKey = {
     all: ['tender-approvals'] as const,
@@ -12,13 +13,18 @@ export const tenderApprovalsKey = {
     detail: (id: number) => [...tenderApprovalsKey.details(), id] as const,
     byTender: (tenderId: number) => [...tenderApprovalsKey.all, 'by-tender', tenderId] as const,
     dashboardCounts: () => [...tenderApprovalsKey.all, 'dashboard-counts'] as const,
+    rejectedStatuses: [ 'rejected-statuses'] as const,
 }
 
 export const useTenderApprovals = (
-    tabKey?: 'pending' | 'accepted' | 'rejected' | 'tender-dnb',
+    tabKey?: 'pending' | 'accepted' | 'rejected' | 'rejected_later' | 'tender-dnb',
     pagination: { page: number; limit: number; search?: string } = { page: 1, limit: 50 },
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
+    const { teamId, userId, dataScope } = useTeamFilter();
+    // Pass effective teamId for both 'all' (admin) and 'team' scopes; for 'self' it will be null
+    const teamIdParam = teamId !== null ? teamId : undefined;
+
     const params: TenderApprovalFilters = {
         ...(tabKey && { tabKey }),
         page: pagination.page,
@@ -32,11 +38,14 @@ export const useTenderApprovals = (
         tabKey,
         ...pagination,
         ...sort,
+        dataScope,
+        teamId: teamId ?? null,
+        userId: userId ?? null,
     };
 
     return useQuery<PaginatedResult<TenderApprovalRow>>({
         queryKey: tenderApprovalsKey.list(queryKeyFilters),
-        queryFn: () => tenderApprovalsService.getAll(params),
+        queryFn: () => tenderApprovalsService.getAll(params, teamIdParam),
         placeholderData: (previousData) => {
             if (previousData && typeof previousData === 'object' && 'data' in previousData && 'meta' in previousData) {
                 return previousData;
@@ -89,9 +98,20 @@ export const useUpdateTenderApproval = () => {
 };
 
 export const useTenderApprovalsDashboardCounts = () => {
+    const { teamId, userId, dataScope } = useTeamFilter();
+    const teamIdParam = teamId !== null ? teamId : undefined;
+    const queryKey = [...tenderApprovalsKey.dashboardCounts(), dataScope, teamId ?? null, userId ?? null];
+
     return useQuery<TenderApprovalDashboardCounts>({
-        queryKey: tenderApprovalsKey.dashboardCounts(),
-        queryFn: () => tenderApprovalsService.getDashboardCounts(),
-        staleTime: 30000, // Cache for 30 seconds
+        queryKey,
+        queryFn: () => tenderApprovalsService.getDashboardCounts(teamIdParam),
+        staleTime: 0,
+    });  
+};
+
+export const useTenderRejectionStatuses = () => {
+    return useQuery({
+        queryKey : tenderApprovalsKey.rejectedStatuses,
+        queryFn: () => tenderApprovalsService.getTenderRejectedStatuses(),
     });
 };

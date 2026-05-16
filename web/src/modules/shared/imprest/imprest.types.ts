@@ -42,16 +42,32 @@ export interface ImprestRow {
 export type ImprestVoucherRow = {
     id: number;
     voucherCode: string;
+
     beneficiaryName: string;
+    beneficiaryId: string;
+
     amount: number;
+
     validFrom: string;
     validTo: string;
-    approvalStatus: number;
-    accountsSignedBy: string | null;
+
+    year: number;
+    week: number;
+
     adminApproval: boolean;
     accountantApproval: boolean;
-    adminSignedBy: string | null;
+
+    proofs: InvoiceProof[]; // 👈 added
+
     createdAt: string;
+};
+
+export type InvoiceProof = {
+    id: number;
+    file: string;
+    ext: string;
+    type: "image" | "pdf" | "doc" | string;
+    url: string;
 };
 
 export type ImprestVoucherView = {
@@ -59,6 +75,9 @@ export type ImprestVoucherView = {
         id: number;
         voucherCode: string;
         beneficiaryName: string;
+        beneficiaryId: number;
+        employeeName: string;
+        teamName: string;
         amount: number;
         validFrom: string;
         validTo: string;
@@ -69,6 +88,7 @@ export type ImprestVoucherView = {
         adminSignedAt: string | null;
         accountsRemark: string | null;
         adminRemark: string | null;
+        proofs: InvoiceProof[];
     };
     items: {
         id: number;
@@ -78,4 +98,60 @@ export type ImprestVoucherView = {
         amount: number;
         invoiceProof: string;
     }[];
+};
+
+export interface EmployeeImprestDashboardSummaryDto {
+    amountSpent: number;
+    amountApproved: number;
+    amountReceived: number;
+    amountLeft: number;
+
+    voucherInfo: {
+        totalVouchers: number;
+        accountsApproved: number;
+        adminApproved: number;
+    };
+}
+
+export interface EmployeeImprestDashboard {
+    summary: {
+        amountSpent: number;
+        amountApproved: number;
+        amountReceived: number;
+        amountLeft: number;
+
+        voucherInfo: {
+            totalVouchers: number;
+            accountsApproved: number;
+            adminApproved: number;
+        };
+    };
+
+    imprests: ImprestRow[];
+    transactions: {
+        id: number;
+        userId: number;
+        txnDate: string;
+        teamMemberName: string | null;
+        projectName: string | null;
+        amount: number;
+        createdAt: string;
+        updatedAt: string;
+    }[];
+}
+
+export interface ImprestPaymentHistoryRow {
+    id: number;
+    userId: number;
+
+    teamMemberName: string;
+    date: string; // ISO date
+    amount: number;
+    projectName: string | null;
+}
+
+export type ProofItem = {
+    type: "image" | "pdf";
+    url: string;
+    name: string;
 };

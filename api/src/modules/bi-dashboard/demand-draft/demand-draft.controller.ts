@@ -43,6 +43,11 @@ export class DemandDraftController {
         return this.demandDraftService.getDashboardCounts();
     }
 
+    @Get('requests/:id')
+    async getById(@Param('id', ParseIntPipe) id: number) {
+        return this.demandDraftService.getById(id);
+    }
+
     @Put('instruments/:id/action')
     @UseInterceptors(FilesInterceptor('files', 20, biDashboardMulterConfig))
     async updateAction(

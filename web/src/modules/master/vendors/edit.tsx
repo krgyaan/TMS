@@ -1,48 +1,33 @@
-import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useNavigate, useParams } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
-import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Edit, Trash2, Plus } from 'lucide-react';
-import {
-    useVendorOrganizationWithRelations,
-    useUpdateVendorOrganizationWithRelations,
-} from '@/hooks/api/useVendorOrganizations';
-import {
-    useCreateVendorGst,
-    useUpdateVendorGst,
-    useDeleteVendorGst,
-} from '@/hooks/api/useVendorGsts';
-import {
-    useCreateVendorAccount,
-    useUpdateVendorAccount,
-    useDeleteVendorAccount,
-} from '@/hooks/api/useVendorAccounts';
-import {
-    useCreateVendorFile,
-    useUpdateVendorFile,
-    useDeleteVendorFile,
-} from '@/hooks/api/useVendorFiles';
-import { useCreateVendor, useUpdateVendor } from '@/hooks/api/useVendors';
-import { paths } from '@/app/routes/paths';
-import { GstSection } from './components/GstSection';
-import { AccountSection } from './components/AccountSection';
-import { PersonSection } from './components/PersonSection';
-import { FileSection } from './components/FileSection';
+import { useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useNavigate, useParams } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Form } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle, Edit, Trash2, Plus } from "lucide-react";
+import { useVendorOrganizationWithRelations, useUpdateVendorOrganizationWithRelations } from "@/hooks/api/useVendorOrganizations";
+import { useCreateVendorGst, useUpdateVendorGst, useDeleteVendorGst } from "@/hooks/api/useVendorGsts";
+import { useCreateVendorAccount, useUpdateVendorAccount, useDeleteVendorAccount } from "@/hooks/api/useVendorAccounts";
+import { useCreateVendorFile, useUpdateVendorFile, useDeleteVendorFile } from "@/hooks/api/useVendorFiles";
+import { useCreateVendor, useUpdateVendor } from "@/hooks/api/useVendors";
+import { paths } from "@/app/routes/paths";
+import { GstSection } from "./components/GstSection";
+import { AccountSection } from "./components/AccountSection";
+import { PersonSection } from "./components/PersonSection";
+import { FileSection } from "./components/FileSection";
 
 const VendorFormSchema = z.object({
     organization: z.object({
-        name: z.string().min(1, 'Organization name is required').max(255),
+        name: z.string().min(1, "Organization name is required").max(255),
         address: z.string().max(500).optional(),
         status: z.boolean().default(true),
     }),
@@ -50,10 +35,10 @@ const VendorFormSchema = z.object({
         .array(
             z.object({
                 id: z.number().optional(),
-                gstState: z.string().min(1, 'GST state is required'),
-                gstNum: z.string().min(1, 'GST number is required'),
+                gstState: z.string().min(1, "GST state is required"),
+                gstNum: z.string().min(1, "GST number is required"),
                 status: z.boolean().default(true),
-            }),
+            })
         )
         .optional()
         .default([]),
@@ -61,11 +46,11 @@ const VendorFormSchema = z.object({
         .array(
             z.object({
                 id: z.number().optional(),
-                accountName: z.string().min(1, 'Account name is required'),
-                accountNum: z.string().min(1, 'Account number is required'),
-                accountIfsc: z.string().min(1, 'IFSC code is required'),
+                bankAccountName: z.string().min(1, "Account name is required"),
+                accountNum: z.string().min(1, "Account number is required"),
+                ifscCode: z.string().min(1, "IFSC code is required"),
                 status: z.boolean().default(true),
-            }),
+            })
         )
         .optional()
         .default([]),
@@ -73,11 +58,12 @@ const VendorFormSchema = z.object({
         .array(
             z.object({
                 id: z.number().optional(),
-                name: z.string().min(1, 'Person name is required'),
-                email: z.string().email('Invalid email').optional().or(z.literal('')),
+                name: z.string().min(1, "Person name is required"),
+                email: z.string().email("Invalid email").min(1, "Email is required"),
+                mobile: z.string().min(1, "Mobile number is required"),
                 address: z.string().optional(),
                 status: z.boolean().default(true),
-            }),
+            })
         )
         .optional()
         .default([]),
@@ -92,9 +78,7 @@ const EditVendorPage = () => {
 
     const { data: organization, isLoading, error } = useVendorOrganizationWithRelations(orgId);
     const updateVendor = useUpdateVendorOrganizationWithRelations();
-    const createGst = useCreateVendorGst();
-    const updateGst = useUpdateVendorGst();
-    const deleteGst = useDeleteVendorGst();
+
     const createAccount = useCreateVendorAccount();
     const updateAccount = useUpdateVendorAccount();
     const deleteAccount = useDeleteVendorAccount();
@@ -108,8 +92,8 @@ const EditVendorPage = () => {
         resolver: zodResolver(VendorFormSchema),
         defaultValues: {
             organization: {
-                name: '',
-                address: '',
+                name: "",
+                address: "",
                 status: true,
             },
             gsts: [],
@@ -122,8 +106,8 @@ const EditVendorPage = () => {
         if (organization) {
             form.reset({
                 organization: {
-                    name: organization.name || '',
-                    address: organization.address || '',
+                    name: organization.name || "",
+                    address: organization.address || "",
                     status: organization.status ?? true,
                 },
                 gsts: (organization as any).gsts || [],
@@ -146,9 +130,7 @@ const EditVendorPage = () => {
         return (
             <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                    Error loading vendor organization: {error?.message || 'Not found'}
-                </AlertDescription>
+                <AlertDescription>Error loading vendor organization: {error?.message || "Not found"}</AlertDescription>
             </Alert>
         );
     }
@@ -176,9 +158,7 @@ const EditVendorPage = () => {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Edit Vendor Organization</h1>
-                    <p className="text-muted-foreground mt-2">
-                        Update vendor organization details and manage related entities
-                    </p>
+                    <p className="text-muted-foreground mt-2">Update vendor organization details and manage related entities</p>
                 </div>
                 <Button variant="outline" onClick={() => navigate(paths.master.vendors)}>
                     Cancel
@@ -213,11 +193,7 @@ const EditVendorPage = () => {
                                     <FormItem>
                                         <FormLabel>Address</FormLabel>
                                         <FormControl>
-                                            <Textarea
-                                                placeholder="Enter organization address"
-                                                rows={3}
-                                                {...field}
-                                            />
+                                            <Textarea placeholder="Enter organization address" rows={3} {...field} />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
@@ -229,10 +205,7 @@ const EditVendorPage = () => {
                                 render={({ field }) => (
                                     <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                                         <FormControl>
-                                            <Checkbox
-                                                checked={field.value}
-                                                onCheckedChange={field.onChange}
-                                            />
+                                            <Checkbox checked={field.value} onCheckedChange={field.onChange} />
                                         </FormControl>
                                         <div className="space-y-1 leading-none">
                                             <FormLabel>Active</FormLabel>
@@ -258,46 +231,40 @@ const EditVendorPage = () => {
                                 </TabsList>
 
                                 <TabsContent value="gsts" className="mt-4">
-                                    <GstList orgId={orgId!} gsts={orgWithRelations.gsts || []} />
+                                    <GstSection orgId={orgId!} />
                                 </TabsContent>
 
                                 <TabsContent value="accounts" className="mt-4">
-                                    <AccountList
-                                        orgId={orgId!}
-                                        accounts={orgWithRelations.accounts || []}
-                                    />
+                                    <AccountSection orgId={orgId!} />
                                 </TabsContent>
 
                                 <TabsContent value="persons" className="mt-4">
-                                    <PersonList
-                                        orgId={orgId!}
-                                        persons={orgWithRelations.persons || []}
-                                    />
+                                    <PersonSection orgId={orgId!} />
                                 </TabsContent>
 
                                 <TabsContent value="files" className="mt-4">
-                                    <FileList
-                                        files={orgWithRelations.files || []}
-                                        persons={orgWithRelations.persons || []}
-                                    />
+                                    <FileSection orgId={orgId!} />
                                 </TabsContent>
                             </Tabs>
                         </CardContent>
                     </Card>
 
                     {/* Submit Buttons */}
-                    <div className="flex items-center justify-end gap-4 pt-4 border-t">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => navigate(paths.master.vendors)}
-                            disabled={updateVendor.isPending}
-                        >
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={updateVendor.isPending}>
-                            {updateVendor.isPending ? 'Updating...' : 'Update Organization'}
-                        </Button>
+                    <div className="flex flex-col items-end gap-4 pt-4 border-t">
+                        {Object.keys(form.formState.errors).length > 0 && (
+                            <div className="text-sm text-destructive flex items-center gap-2">
+                                <AlertCircle className="h-4 w-4" />
+                                Please fix the validation errors (check organization details and ensure all added persons have a valid email and mobile number).
+                            </div>
+                        )}
+                        <div className="flex items-center gap-4">
+                            <Button type="button" variant="outline" onClick={() => navigate(paths.master.vendors)} disabled={updateVendor.isPending}>
+                                Cancel
+                            </Button>
+                            <Button type="submit" disabled={updateVendor.isPending}>
+                                {updateVendor.isPending ? "Updating..." : "Update Organization"}
+                            </Button>
+                        </div>
                     </div>
                 </form>
             </Form>
@@ -325,29 +292,21 @@ const GstList = ({ orgId, gsts }: { orgId: number; gsts: any[] }) => {
                 </Button>
             </div>
             {gsts.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                    No GST numbers added yet
-                </div>
+                <div className="text-center py-8 text-muted-foreground">No GST numbers added yet</div>
             ) : (
                 <div className="space-y-2">
-                    {gsts.map((gst) => (
+                    {gsts.map(gst => (
                         <Card key={gst.id} className="p-4">
                             <div className="flex items-center justify-between">
                                 <div>
                                     <div className="font-medium">{gst.gstNum}</div>
-                                    <div className="text-sm text-muted-foreground">
-                                        State: {gst.gstState}
-                                    </div>
+                                    <div className="text-sm text-muted-foreground">State: {gst.gstState}</div>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Button variant="ghost" size="icon">
                                         <Edit className="h-4 w-4" />
                                     </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => gst.id && deleteGst.mutate(gst.id)}
-                                    >
+                                    <Button variant="ghost" size="icon" onClick={() => gst.id && deleteGst.mutate(gst.id)}>
                                         <Trash2 className="h-4 w-4 text-destructive" />
                                     </Button>
                                 </div>
@@ -373,31 +332,23 @@ const AccountList = ({ orgId, accounts }: { orgId: number; accounts: any[] }) =>
                 </Button>
             </div>
             {accounts.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                    No bank accounts added yet
-                </div>
+                <div className="text-center py-8 text-muted-foreground">No bank accounts added yet</div>
             ) : (
                 <div className="space-y-2">
-                    {accounts.map((account) => (
+                    {accounts.map(account => (
                         <Card key={account.id} className="p-4">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <div className="font-medium">{account.accountName}</div>
+                                    <div className="font-medium">{account.bankAccountName}</div>
                                     <div className="text-sm text-muted-foreground">
-                                        {account.accountNum} | {account.accountIfsc}
+                                        {account.accountNum} | {account.ifscCode}
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Button variant="ghost" size="icon">
                                         <Edit className="h-4 w-4" />
                                     </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() =>
-                                            account.id && deleteAccount.mutate(account.id)
-                                        }
-                                    >
+                                    <Button variant="ghost" size="icon" onClick={() => account.id && deleteAccount.mutate(account.id)}>
                                         <Trash2 className="h-4 w-4 text-destructive" />
                                     </Button>
                                 </div>
@@ -412,7 +363,7 @@ const AccountList = ({ orgId, accounts }: { orgId: number; accounts: any[] }) =>
 
 const PersonList = ({ orgId, persons }: { orgId: number; persons: any[] }) => {
     const createPerson = useCreateVendor();
-    const deletePerson = useDeleteVendorGst(); // Note: Need delete vendor hook
+    const deletePerson = useDeleteVendor();
 
     return (
         <div className="space-y-4">
@@ -423,20 +374,20 @@ const PersonList = ({ orgId, persons }: { orgId: number; persons: any[] }) => {
                 </Button>
             </div>
             {persons.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                    No persons added yet
-                </div>
+                <div className="text-center py-8 text-muted-foreground">No persons added yet</div>
             ) : (
                 <div className="space-y-2">
-                    {persons.map((person) => (
+                    {persons.map(person => (
                         <Card key={person.id} className="p-4">
                             <div className="flex items-center justify-between">
                                 <div>
                                     <div className="font-medium">{person.name}</div>
                                     {person.email && (
-                                        <div className="text-sm text-muted-foreground">
-                                            {person.email}
-                                        </div>
+                                        <>
+                                            <div className="text-sm text-muted-foreground">{person.email}</div>
+                                            <div className="text-sm text-muted-foreground">{person.mobile}</div>
+                                            <div className="text-sm text-muted-foreground whitespace-normal [overflow-wrap:anywhere]">{person.address ? person.address : ""}</div>
+                                        </>
                                     )}
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -459,8 +410,8 @@ const PersonList = ({ orgId, persons }: { orgId: number; persons: any[] }) => {
 const FileList = ({ files, persons }: { files: any[]; persons: any[] }) => {
     const deleteFile = useDeleteVendorFile();
     const getPersonName = (vendorId: number) => {
-        const person = persons.find((p) => p.id === vendorId);
-        return person?.name || 'Unknown';
+        const person = persons.find(p => p.id === vendorId);
+        return person?.name || "Unknown";
     };
 
     return (
@@ -475,24 +426,18 @@ const FileList = ({ files, persons }: { files: any[]; persons: any[] }) => {
                 <div className="text-center py-8 text-muted-foreground">No files added yet</div>
             ) : (
                 <div className="space-y-2">
-                    {files.map((file) => (
+                    {files.map(file => (
                         <Card key={file.id} className="p-4">
                             <div className="flex items-center justify-between">
                                 <div>
                                     <div className="font-medium">{file.name}</div>
-                                    <div className="text-sm text-muted-foreground">
-                                        Person: {getPersonName(file.vendorId)}
-                                    </div>
+                                    <div className="text-sm text-muted-foreground">Person: {getPersonName(file.vendorId)}</div>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Button variant="ghost" size="icon">
                                         <Edit className="h-4 w-4" />
                                     </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => file.id && deleteFile.mutate(file.id)}
-                                    >
+                                    <Button variant="ghost" size="icon" onClick={() => file.id && deleteFile.mutate(file.id)}>
                                         <Trash2 className="h-4 w-4 text-destructive" />
                                     </Button>
                                 </div>

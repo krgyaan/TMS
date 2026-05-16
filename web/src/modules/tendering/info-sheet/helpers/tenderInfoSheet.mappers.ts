@@ -13,6 +13,37 @@ const toNumber = (val: string | number | null | undefined, defaultValue = 0): nu
     return isNaN(num) ? defaultValue : num;
 };
 
+// Helper to extract document names from objects or return strings as-is
+const extractDocumentNames = (val: (string | { id?: number; documentName: string } | { id?: string | number; value?: string | number;[key: string]: any })[] | null | undefined): string[] => {
+    if (!val || !Array.isArray(val)) return [];
+    return val
+        .map(item => {
+            if (typeof item === 'string') return item;
+            if (typeof item === 'object' && item !== null) {
+                // Prioritize ID as the value to match dropdown option values
+                if ('id' in item && item.id != null) {
+                    return String(item.id);
+                }
+                // Fallback to names if ID is missing (for legacy or unusual data)
+                if ('projectName' in item && item.projectName != null) {
+                    return String(item.projectName);
+                }
+                if ('documentName' in item && item.documentName != null) {
+                    return String(item.documentName);
+                }
+                if ('value' in item && item.value != null) return String(item.value);
+                // Fallback: try to find first string/number property
+                for (const [, value] of Object.entries(item)) {
+                    if (typeof value === 'string' || typeof value === 'number') {
+                        return String(value);
+                    }
+                }
+            }
+            return item != null ? String(item) : null;
+        })
+        .filter((item): item is string => item !== null && item !== undefined && item !== 'undefined' && String(item).trim().length > 0);
+};
+
 const toStringArray = (val: (string | { id?: string | number; value?: string | number;[key: string]: any })[] | null | undefined): string[] => {
     if (!val || !Array.isArray(val)) return [];
     return val
@@ -82,6 +113,7 @@ export const buildDefaultValues = (tender?: TenderInfoWithNames | null): TenderI
     maxLdPercentage: 0,
 
     physicalDocsRequired: undefined,
+    physicalDocType: undefined,
     physicalDocsDeadline: '',
 
     techEligibilityAgeYears: 0,
@@ -105,9 +137,29 @@ export const buildDefaultValues = (tender?: TenderInfoWithNames | null): TenderI
     netWorthValue: 0,
 
     courierAddress: '',
-    clients: [{ clientName: '', clientDesignation: '', clientMobile: '', clientEmail: '' }],
+    courierName: '',
+    courierPhone: '',
+    courierAddressLine1: '',
+    courierAddressLine2: '',
+    courierCity: '',
+    courierState: '',
+    courierPincode: '',
+
+    clientDetailsPresent: 'YES',
+    customerInContact: 'YES',
+    courierDetailsPresent: 'YES',
+    // Default to one empty client box
+    clients: [
+        {
+            clientName: '',
+            clientDesignation: '',
+            clientMobile: '',
+            clientEmail: '',
+        },
+    ],
 
     teRemark: '',
+    teRejectionProof: [],
 });
 
 // Map API response to form values
@@ -120,26 +172,27 @@ export const mapResponseToForm = (
     }
 
     return {
-        teRecommendation: data.teRecommendation ?? 'YES',
-        teRejectionReason: data.teRejectionReason ?? null,
+        teRecommendation: (data.teRecommendation?.trim().toUpperCase() as 'YES' | 'NO') ?? 'YES',
+        teRejectionReason: data.teRejectionReason ? toNumber(data.teRejectionReason) : null,
         teRejectionRemarks: data.teRejectionRemarks ?? '',
 
-        processingFeeRequired: data.processingFeeRequired ?? undefined,
+        processingFeeRequired: (data.processingFeeRequired?.trim().toUpperCase() as 'YES' | 'NO') ?? undefined,
         processingFeeModes: data.processingFeeMode ?? [],
         processingFeeAmount: toNumber(data.processingFeeAmount),
 
-        tenderFeeRequired: data.tenderFeeRequired ?? undefined,
+        tenderFeeRequired: (data.tenderFeeRequired?.trim().toUpperCase() as 'YES' | 'NO') ?? undefined,
         tenderFeeModes: data.tenderFeeMode ?? [],
         tenderFeeAmount: toNumber(data.tenderFeeAmount),
 
-        emdRequired: data.emdRequired ?? undefined,
+        emdRequired: (data.emdRequired?.trim().toUpperCase() as 'YES' | 'NO' | 'EXEMPT') ?? undefined,
         emdModes: data.emdMode ?? [],
         emdAmount: toNumber(data.emdAmount),
+        tenderValue: toNumber(data.tenderValue),
 
-        bidValidityDays: toNumber(data.bidValidityDays),
-        commercialEvaluation: data.commercialEvaluation as TenderInfoSheetFormValues['commercialEvaluation'],
-        mafRequired: data.mafRequired as TenderInfoSheetFormValues['mafRequired'],
-        reverseAuctionApplicable: data.reverseAuctionApplicable ?? undefined,
+        bidValidityDays: data.bidValidityDays != null ? toNumber(data.bidValidityDays) : undefined,
+        commercialEvaluation: (data.commercialEvaluation?.trim() ?? undefined) as TenderInfoSheetFormValues['commercialEvaluation'],
+        mafRequired: (data.mafRequired?.trim() ?? undefined) as TenderInfoSheetFormValues['mafRequired'],
+        reverseAuctionApplicable: (data.reverseAuctionApplicable?.trim().toUpperCase() as 'YES' | 'NO') ?? undefined,
 
         paymentTermsSupply: toNumber(data.paymentTermsSupply),
         paymentTermsInstallation: toNumber(data.paymentTermsInstallation),
@@ -183,6 +236,7 @@ export const mapResponseToForm = (
         maxLdPercentage: toNumber(data.maxLdPercentage),
 
         physicalDocsRequired: data.physicalDocsRequired ?? undefined,
+        physicalDocType: (data.physicalDocType?.trim() ?? undefined) as TenderInfoSheetFormValues['physicalDocType'],
         physicalDocsDeadline: data.physicalDocsDeadline
             ? (typeof data.physicalDocsDeadline === 'string'
                 ? data.physicalDocsDeadline
@@ -190,6 +244,7 @@ export const mapResponseToForm = (
             : '',
 
         techEligibilityAgeYears: toNumber(data.techEligibilityAge),
+        oemExperience: data.oemExperience as 'YES' | 'NO' | null,
 
         workValueType: data.workValueType ?? undefined,
         orderValue1: toNumber(data.orderValue1),
@@ -197,20 +252,32 @@ export const mapResponseToForm = (
         orderValue3: toNumber(data.orderValue3),
         customEligibilityCriteria: data.customEligibilityCriteria ?? '',
 
-        technicalWorkOrders: toStringArray(data.technicalWorkOrders),
-        commercialDocuments: toStringArray(data.commercialDocuments),
+        technicalWorkOrders: extractDocumentNames(data.technicalWorkOrders),
+        commercialDocuments: extractDocumentNames(data.commercialDocuments),
 
-        avgAnnualTurnoverCriteria: data.avgAnnualTurnoverType as TenderInfoSheetFormValues['avgAnnualTurnoverCriteria'],
+        avgAnnualTurnoverCriteria: (data.avgAnnualTurnoverType?.trim() ?? undefined) as TenderInfoSheetFormValues['avgAnnualTurnoverCriteria'],
         avgAnnualTurnoverValue: toNumber(data.avgAnnualTurnoverValue),
-        workingCapitalCriteria: data.workingCapitalType as TenderInfoSheetFormValues['workingCapitalCriteria'],
+        workingCapitalCriteria: (data.workingCapitalType?.trim() ?? undefined) as TenderInfoSheetFormValues['workingCapitalCriteria'],
         workingCapitalValue: toNumber(data.workingCapitalValue),
-        solvencyCertificateCriteria: data.solvencyCertificateType as TenderInfoSheetFormValues['solvencyCertificateCriteria'],
+        solvencyCertificateCriteria: (data.solvencyCertificateType?.trim() ?? undefined) as TenderInfoSheetFormValues['solvencyCertificateCriteria'],
         solvencyCertificateValue: toNumber(data.solvencyCertificateValue),
-        netWorthCriteria: data.netWorthType as TenderInfoSheetFormValues['netWorthCriteria'],
+        netWorthCriteria: (data.netWorthType?.trim() ?? undefined) as TenderInfoSheetFormValues['netWorthCriteria'],
         netWorthValue: toNumber(data.netWorthValue),
 
         courierAddress: data.courierAddress ?? '',
+        courierName: data.courierName ?? '',
+        courierPhone: data.courierPhone ?? '',
+        courierAddressLine1: data.courierAddressLine1 ?? '',
+        courierAddressLine2: data.courierAddressLine2 ?? '',
+        courierCity: data.courierCity ?? '',
+        courierState: data.courierState ?? '',
+        courierPincode: data.courierPincode ?? '',
 
+        clientDetailsPresent: (data.clientDetailsPresent?.trim().toUpperCase() as 'YES' | 'NO') ?? undefined,
+        customerInContact: (data.customerInContact?.trim().toUpperCase() as 'YES' | 'NO') ?? undefined,
+        courierDetailsPresent: (data.courierDetailsPresent?.trim().toUpperCase() as 'YES' | 'NO') ?? undefined,
+
+        // Map existing clients, otherwise use one default empty client
         clients: data.clients && data.clients.length > 0
             ? data.clients.map(client => ({
                 clientName: client.clientName ?? '',
@@ -218,9 +285,17 @@ export const mapResponseToForm = (
                 clientMobile: client.clientMobile ?? '',
                 clientEmail: client.clientEmail ?? '',
             }))
-            : [{ clientName: '', clientDesignation: '', clientMobile: '', clientEmail: '' }],
+            : [
+                {
+                    clientName: '',
+                    clientDesignation: '',
+                    clientMobile: '',
+                    clientEmail: '',
+                },
+            ],
 
         teRemark: data.teFinalRemark ?? '',
+        teRejectionProof: toStringArray(data.teRejectionProof)
     };
 };
 
@@ -270,6 +345,9 @@ const cleanPayload = (payload: SaveTenderInfoSheetDto): SaveTenderInfoSheetDto =
         'physicalDocsRequired',
         'reverseAuctionApplicable',
         'oemExperience',
+        'clientDetailsPresent',
+        'customerInContact',
+        'courierDetailsPresent',
     ];
 
     // Validate and clean YES/NO fields
@@ -287,45 +365,148 @@ const cleanPayload = (payload: SaveTenderInfoSheetDto): SaveTenderInfoSheetDto =
 
 // Map form values to API payload
 export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderInfoSheetDto => {
+    // ─── When NO: only send rejection-related fields ───────────────────────────
+    if (values.teRecommendation === 'NO') {
+        return cleanPayload({
+            // Rejection fields
+            teRecommendation: 'NO',
+            teRejectionReason: values.teRejectionReason ?? null,
+            teRejectionRemarks: values.teRejectionRemarks || null,
+            teRejectionProof:
+                values.teRejectionProof?.length
+                    ? toStringArray(values.teRejectionProof)
+                    : null,
+
+            // Everything else → null / empty
+            tenderValue: null,
+            oemExperience: null,
+            processingFeeRequired: null,
+            processingFeeModes: null,
+            processingFeeAmount: null,
+            tenderFeeRequired: null,
+            tenderFeeModes: null,
+            tenderFeeAmount: null,
+            emdRequired: null,
+            emdModes: null,
+            emdAmount: null,
+            bidValidityDays: null,
+            commercialEvaluation: null,
+            mafRequired: null,
+            reverseAuctionApplicable: null,
+            paymentTermsSupply: null,
+            paymentTermsInstallation: null,
+            deliveryTimeSupply: null,
+            deliveryTimeInstallationInclusive: false,
+            deliveryTimeInstallationDays: null,
+            pbgRequired: null,
+            pbgMode: null,
+            pbgPercentage: null,
+            pbgDurationMonths: null,
+            sdRequired: null,
+            sdMode: null,
+            sdPercentage: null,
+            sdDurationMonths: null,
+            ldRequired: null,
+            ldPercentagePerWeek: null,
+            maxLdPercentage: null,
+            physicalDocsRequired: null,
+            physicalDocType: null,
+            physicalDocsDeadline: null,
+            techEligibilityAge: null,
+            workValueType: null,
+            orderValue1: null,
+            orderValue2: null,
+            orderValue3: null,
+            customEligibilityCriteria: null,
+            technicalWorkOrders: null,
+            commercialDocuments: null,
+            avgAnnualTurnoverType: null,
+            avgAnnualTurnoverValue: null,
+            workingCapitalType: null,
+            workingCapitalValue: null,
+            solvencyCertificateType: null,
+            solvencyCertificateValue: null,
+            netWorthType: null,
+            netWorthValue: null,
+            courierAddress: null,
+            courierName: null,
+            courierPhone: null,
+            courierAddressLine1: null,
+            courierAddressLine2: null,
+            courierCity: null,
+            courierState: null,
+            courierPincode: null,
+            clientDetailsPresent: null,
+            customerInContact: null,
+            courierDetailsPresent: null,
+            clients: [],
+            teFinalRemark: null,
+        });
+    }
+
+    // ─── When YES: existing full mapping logic (unchanged) ─────────────────────
     const payload: SaveTenderInfoSheetDto = {
         tenderValue: values.tenderValue ?? null,
         oemExperience: safeYesNoValue(values.oemExperience),
 
-        teRecommendation: values.teRecommendation,
-        teRejectionReason: values.teRecommendation === 'NO' ? (values.teRejectionReason ?? null) : null,
-        teRejectionRemarks: values.teRecommendation === 'NO' ? (values.teRejectionRemarks || null) : null,
+        teRecommendation: 'YES',
+        teRejectionReason: null,       // always null when YES
+        teRejectionRemarks: null,      // always null when YES
+        teRejectionProof: null,        // always null when YES
 
         processingFeeRequired: safeYesNoValue(values.processingFeeRequired),
         processingFeeModes: (() => {
-            if (values.processingFeeRequired !== 'YES' || !values.processingFeeModes?.length) return null;
-            const filtered = values.processingFeeModes.filter(mode => mode && mode !== 'undefined' && String(mode).trim().length > 0);
+            if (
+                values.processingFeeRequired !== 'YES' ||
+                !values.processingFeeModes?.length
+            )
+                return null;
+            const filtered = values.processingFeeModes.filter(
+                (mode) =>
+                    mode && mode !== 'undefined' && String(mode).trim().length > 0
+            );
             return filtered.length > 0 ? filtered : null;
         })(),
-        processingFeeAmount: values.processingFeeRequired === 'YES'
-            ? (values.processingFeeAmount ?? null)
-            : null,
+        processingFeeAmount:
+            values.processingFeeRequired === 'YES'
+                ? (values.processingFeeAmount ?? null)
+                : null,
 
         tenderFeeRequired: safeYesNoValue(values.tenderFeeRequired),
         tenderFeeModes: (() => {
-            if (values.tenderFeeRequired !== 'YES' || !values.tenderFeeModes?.length) return null;
-            const filtered = values.tenderFeeModes.filter(mode => mode && mode !== 'undefined' && String(mode).trim().length > 0);
+            if (
+                values.tenderFeeRequired !== 'YES' ||
+                !values.tenderFeeModes?.length
+            )
+                return null;
+            const filtered = values.tenderFeeModes.filter(
+                (mode) =>
+                    mode && mode !== 'undefined' && String(mode).trim().length > 0
+            );
             return filtered.length > 0 ? filtered : null;
         })(),
-        tenderFeeAmount: values.tenderFeeRequired === 'YES'
-            ? (values.tenderFeeAmount ?? null)
-            : null,
+        tenderFeeAmount:
+            values.tenderFeeRequired === 'YES'
+                ? (values.tenderFeeAmount ?? null)
+                : null,
 
-        emdRequired: values.emdRequired === 'YES' || values.emdRequired === 'NO' || values.emdRequired === 'EXEMPT'
-            ? values.emdRequired
-            : null,
+        emdRequired:
+            values.emdRequired === 'YES' ||
+            values.emdRequired === 'NO' ||
+            values.emdRequired === 'EXEMPT'
+                ? values.emdRequired
+                : null,
         emdModes: (() => {
-            if (values.emdRequired !== 'YES' || !values.emdModes?.length) return null;
-            const filtered = values.emdModes.filter(mode => mode && mode !== 'undefined' && String(mode).trim().length > 0);
+            if (values.emdRequired !== 'YES' || !values.emdModes?.length)
+                return null;
+            const filtered = values.emdModes.filter(
+                (mode) =>
+                    mode && mode !== 'undefined' && String(mode).trim().length > 0
+            );
             return filtered.length > 0 ? filtered : null;
         })(),
-        emdAmount: values.emdRequired === 'YES'
-            ? (values.emdAmount ?? null)
-            : null,
+        emdAmount:
+            values.emdRequired === 'YES' ? (values.emdAmount ?? null) : null,
 
         bidValidityDays: safeNumber(values.bidValidityDays),
         commercialEvaluation: values.commercialEvaluation ?? null,
@@ -336,67 +517,116 @@ export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderI
         paymentTermsInstallation: safeNumber(values.paymentTermsInstallation),
 
         deliveryTimeSupply: safeNumber(values.deliveryTimeSupply),
-        deliveryTimeInstallationInclusive: values.deliveryTimeInstallationInclusive ?? false,
+        deliveryTimeInstallationInclusive:
+            values.deliveryTimeInstallationInclusive ?? false,
         deliveryTimeInstallationDays: !values.deliveryTimeInstallationInclusive
             ? safeNumber(values.deliveryTimeInstallation)
             : null,
 
         pbgRequired: safeYesNoValue(values.pbgRequired),
-        pbgMode: values.pbgRequired === 'YES' && values.pbgForm?.length
-            ? toStringArray(values.pbgForm)
-            : null,
-        pbgPercentage: values.pbgRequired === 'YES' ? safeNumber(values.pbgPercentage) : null,
-        pbgDurationMonths: values.pbgRequired === 'YES' ? safeNumber(values.pbgDurationMonths) : null,
+        pbgMode:
+            values.pbgRequired === 'YES' && values.pbgForm?.length
+                ? toStringArray(values.pbgForm)
+                : null,
+        pbgPercentage:
+            values.pbgRequired === 'YES'
+                ? safeNumber(values.pbgPercentage)
+                : null,
+        pbgDurationMonths:
+            values.pbgRequired === 'YES'
+                ? safeNumber(values.pbgDurationMonths)
+                : null,
 
         sdRequired: safeYesNoValue(values.sdRequired),
-        sdMode: values.sdRequired === 'YES' && values.sdForm?.length
-            ? toStringArray(values.sdForm)
-            : null,
-        sdPercentage: values.sdRequired === 'YES' ? safeNumber(values.securityDepositPercentage) : null,
-        sdDurationMonths: values.sdRequired === 'YES' ? safeNumber(values.sdDurationMonths) : null,
+        sdMode:
+            values.sdRequired === 'YES' && values.sdForm?.length
+                ? toStringArray(values.sdForm)
+                : null,
+        sdPercentage:
+            values.sdRequired === 'YES'
+                ? safeNumber(values.securityDepositPercentage)
+                : null,
+        sdDurationMonths:
+            values.sdRequired === 'YES'
+                ? safeNumber(values.sdDurationMonths)
+                : null,
 
         ldRequired: safeYesNoValue(values.ldRequired),
         ldPercentagePerWeek: safeNumber(values.ldPercentagePerWeek),
         maxLdPercentage: safeNumber(values.maxLdPercentage),
 
         physicalDocsRequired: safeYesNoValue(values.physicalDocsRequired),
-        physicalDocsDeadline: values.physicalDocsRequired === 'YES'
-            ? (values.physicalDocsDeadline || null)
-            : null,
+        physicalDocType:
+            values.physicalDocsRequired === 'YES'
+                ? (values.physicalDocType || null)
+                : null,
+        physicalDocsDeadline:
+            values.physicalDocsRequired === 'YES'
+                ? (values.physicalDocsDeadline || null)
+                : null,
 
         techEligibilityAge: safeNumber(values.techEligibilityAgeYears),
 
         workValueType: values.workValueType ?? null,
-        orderValue1: values.workValueType === 'WORKS_VALUES' ? safeNumber(values.orderValue1) : null,
-        orderValue2: values.workValueType === 'WORKS_VALUES' ? safeNumber(values.orderValue2) : null,
-        orderValue3: values.workValueType === 'WORKS_VALUES' ? safeNumber(values.orderValue3) : null,
-        customEligibilityCriteria: values.workValueType === 'CUSTOM'
-            ? (values.customEligibilityCriteria || null)
-            : null,
+        orderValue1:
+            values.workValueType === 'WORKS_VALUES'
+                ? safeNumber(values.orderValue1)
+                : null,
+        orderValue2:
+            values.workValueType === 'WORKS_VALUES'
+                ? safeNumber(values.orderValue2)
+                : null,
+        orderValue3:
+            values.workValueType === 'WORKS_VALUES'
+                ? safeNumber(values.orderValue3)
+                : null,
+        customEligibilityCriteria:
+            values.workValueType === 'CUSTOM'
+                ? (values.customEligibilityCriteria || null)
+                : null,
 
-        technicalWorkOrders: values.technicalWorkOrders?.length ? toStringArray(values.technicalWorkOrders) : null,
-        commercialDocuments: values.commercialDocuments?.length ? toStringArray(values.commercialDocuments) : null,
+        technicalWorkOrders: values.technicalWorkOrders?.length
+            ? toStringArray(values.technicalWorkOrders)
+            : null,
+        commercialDocuments: values.commercialDocuments?.length
+            ? toStringArray(values.commercialDocuments)
+            : null,
 
         avgAnnualTurnoverType: values.avgAnnualTurnoverCriteria ?? null,
-        avgAnnualTurnoverValue: values.avgAnnualTurnoverCriteria === 'AMOUNT'
-            ? safeNumber(values.avgAnnualTurnoverValue)
-            : null,
+        avgAnnualTurnoverValue:
+            values.avgAnnualTurnoverCriteria === 'AMOUNT'
+                ? safeNumber(values.avgAnnualTurnoverValue)
+                : null,
         workingCapitalType: values.workingCapitalCriteria ?? null,
-        workingCapitalValue: values.workingCapitalCriteria === 'AMOUNT'
-            ? safeNumber(values.workingCapitalValue)
-            : null,
+        workingCapitalValue:
+            values.workingCapitalCriteria === 'AMOUNT'
+                ? safeNumber(values.workingCapitalValue)
+                : null,
         solvencyCertificateType: values.solvencyCertificateCriteria ?? null,
-        solvencyCertificateValue: values.solvencyCertificateCriteria === 'AMOUNT'
-            ? safeNumber(values.solvencyCertificateValue)
-            : null,
+        solvencyCertificateValue:
+            values.solvencyCertificateCriteria === 'AMOUNT'
+                ? safeNumber(values.solvencyCertificateValue)
+                : null,
         netWorthType: values.netWorthCriteria ?? null,
-        netWorthValue: values.netWorthCriteria === 'AMOUNT'
-            ? safeNumber(values.netWorthValue)
-            : null,
+        netWorthValue:
+            values.netWorthCriteria === 'AMOUNT'
+                ? safeNumber(values.netWorthValue)
+                : null,
 
         courierAddress: values.courierAddress || null,
+        courierName: values.courierName || null,
+        courierPhone: values.courierPhone || null,
+        courierAddressLine1: values.courierAddressLine1 || null,
+        courierAddressLine2: values.courierAddressLine2 || null,
+        courierCity: values.courierCity || null,
+        courierState: values.courierState || null,
+        courierPincode: values.courierPincode || null,
 
-        clients: values.clients.map(client => ({
+        clientDetailsPresent: safeYesNoValue(values.clientDetailsPresent),
+        customerInContact: safeYesNoValue(values.customerInContact),
+        courierDetailsPresent: safeYesNoValue(values.courierDetailsPresent),
+
+        clients: values.clients.map((client) => ({
             clientName: client.clientName,
             clientDesignation: client.clientDesignation || null,
             clientMobile: client.clientMobile || null,
@@ -406,6 +636,5 @@ export const mapFormToPayload = (values: TenderInfoSheetFormValues): SaveTenderI
         teFinalRemark: values.teRemark || null,
     };
 
-    // Clean and return payload
     return cleanPayload(payload);
 };

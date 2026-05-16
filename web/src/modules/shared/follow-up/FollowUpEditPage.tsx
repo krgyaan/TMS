@@ -34,10 +34,10 @@ import { FileUploadField } from "@/components/form/FileUploadField";
 export const FREQUENCY_LABELS: Record<number, string> = {
     1: "Daily",
     2: "Alternate Days",
-    3: "Weekly",
-    4: "Bi-Weekly",
-    5: "Monthly",
-    6: "Stopped",
+    3: "2 times a day",
+    4: "Weekly (every Mon)",
+    5: "Twice a Week (every Mon & Thu)",
+    6: "Stop",
 };
 
 export const STOP_REASON_LABELS: Record<number, string> = {
@@ -72,6 +72,7 @@ const FollowUpEditPage: React.FC = () => {
     const [existingAttachments, setExistingAttachments] = useState<string[]>([]);
     const [removedAttachments, setRemovedAttachments] = useState<string[]>([]);
     const [newFiles, setNewFiles] = useState<File[]>([]);
+    const [proofImage, setProofImage] = useState<File | null>(null);
 
     /* ✅ HYDRATE FORM FROM API */
     useEffect(() => {
@@ -109,12 +110,19 @@ const FollowUpEditPage: React.FC = () => {
 
     const removeNewPersonRow = (idx: number) => setPersons(p => p.filter((_, i) => i !== idx));
 
-    const removeExistingPerson = (personId: number) => {
-        setExistingPersons(prev => prev.filter(p => p.id !== personId));
+    const removeExistingPerson = (idx: number) => {
+        setExistingPersons(prev => prev.filter((_, i) => i !== idx));
     };
 
     const handleFiles = (items: any[]) => {
-        setNewFiles(items.map(i => i.file).filter(Boolean));
+        items.forEach(item => {
+            console.log({
+                name: item.file?.name,
+                type: item.file?.type,
+            });
+        });
+
+        setNewFiles(items.map(item => item.file).filter(Boolean));
     };
 
     /* ✅ SUBMIT HANDLER */
@@ -143,6 +151,11 @@ const FollowUpEditPage: React.FC = () => {
 
         // 4️⃣ New files
         newFiles.forEach(file => formData.append("attachments", file));
+
+        // 5️⃣ Proof image (only when stop reason is Objective Achieved)
+        if (proofImage) {
+            formData.append("proofImage", proofImage);
+        }
 
         updateMutation.mutateAsync(
             { id: followupId, data: formData },
@@ -277,8 +290,8 @@ const FollowUpEditPage: React.FC = () => {
                                 <div className="space-y-3">
                                     <h4 className="font-medium">Existing Contacts</h4>
                                     <div className="space-y-2">
-                                        {existingPersons.map(p => (
-                                            <div key={p.id} className="flex items-center justify-between p-3 border rounded-md">
+                                        {existingPersons.map((p, idx) => (
+                                            <div key={idx} className="flex items-center justify-between p-3 border rounded-md">
                                                 <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
                                                     <div>
                                                         <div className="font-medium">{p.name}</div>
@@ -293,7 +306,7 @@ const FollowUpEditPage: React.FC = () => {
                                                         <div className="text-xs text-muted-foreground">Email</div>
                                                     </div>
                                                 </div>
-                                                <Button size="sm" variant="ghost" onClick={() => removeExistingPerson(p.id)} className="text-destructive">
+                                                <Button size="sm" variant="ghost" onClick={() => removeExistingPerson(idx)} className="text-destructive">
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             </div>
@@ -394,6 +407,14 @@ const FollowUpEditPage: React.FC = () => {
                                                         placeholder={stopReason === 2 ? "Provide proof of objective achievement..." : "Enter remarks..."}
                                                         className="min-h-[80px]"
                                                     />
+                                                    {/* ✅ NEW: Proof image upload for Objective Achieved */}
+                                                    {stopReason === 2 && (
+                                                        <div className="space-y-1 mt-2">
+                                                            <Label>Proof Image</Label>
+                                                            <Input type="file" accept="image/*" onChange={e => setProofImage(e.target.files?.[0] ?? null)} />
+                                                            {proofImage && <p className="text-xs text-muted-foreground">{proofImage.name}</p>}
+                                                        </div>
+                                                    )}
                                                 </>
                                             )}
                                         </div>
@@ -424,12 +445,46 @@ const FollowUpEditPage: React.FC = () => {
                                 allowMultiple
                                 instantUpload={false}
                                 acceptedFileTypes={[
+                                    /* ===== Images ===== */
                                     "image/*",
+
+                                    /* ===== PDFs ===== */
                                     "application/pdf",
+
+                                    /* ===== Word ===== */
                                     "application/msword",
                                     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+
+                                    /* ===== PowerPoint ===== */
                                     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+
+                                    /* ===== Excel (ALL formats) ===== */
+                                    "application/vnd.ms-excel",
+                                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                    "application/vnd.ms-excel.sheet.macroEnabled.12",
+                                    "application/vnd.ms-excel.template.macroEnabled.12",
+                                    "application/vnd.ms-excel.addin.macroEnabled.12",
+                                    "application/vnd.ms-excel.sheet.binary.macroEnabled.12",
+
+                                    /* ===== Text / Data Excel formats ===== */
+                                    "text/csv",
+                                    "text/tab-separated-values",
                                     "text/plain",
+
+                                    /* ===== Browser fallbacks ===== */
+                                    "application/octet-stream",
+
+                                    /* ===== Extension-based safety net ===== */
+                                    ".xls",
+                                    ".xlsx",
+                                    ".xlsm",
+                                    ".xlsb",
+                                    ".xltx",
+                                    ".xltm",
+                                    ".xlam",
+                                    ".csv",
+                                    ".tsv",
+                                    ".txt",
                                 ]}
                             />
                         </div>

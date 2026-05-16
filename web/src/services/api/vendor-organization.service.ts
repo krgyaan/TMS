@@ -14,8 +14,10 @@ class VendorOrganizationsService extends BaseApiService {
     }
 
     async getAll(): Promise<VendorOrganization[]> {
-        const res = await this.get<{ data: VendorOrganization[] }>("");
-        return res.data;
+        console.log("Fetching all vendor organizations");
+        const res = await this.get<VendorOrganization[]>("");
+        console.log(res);
+        return res;
     }
 
     async getAllWithRelations(): Promise<VendorOrganizationWithRelations[]> {

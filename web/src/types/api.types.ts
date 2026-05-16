@@ -48,7 +48,7 @@ export interface ApiError {
     error?: string;
 }
 
-export interface Company { }
+export interface Company {}
 
 export interface NamedEntity {
     id: number | null;
@@ -65,7 +65,7 @@ export interface CreateUserDto {
     roleId: number;
 }
 
-export interface UpdateUserDto extends Partial<CreateUserDto> { }
+export interface UpdateUserDto extends Partial<CreateUserDto> {}
 
 export interface Location {
     id: number;
@@ -184,7 +184,7 @@ export interface VendorFile {
 
 export interface VendorGst {
     id: number;
-    org: number;
+    orgId: number;
     gstState: string;
     gstNum: string;
     status: boolean;
@@ -194,10 +194,10 @@ export interface VendorGst {
 
 export interface VendorAcc {
     id: number;
-    org: number;
-    accountName: string;
+    orgId: number;
+    bankAccountName: string;
     accountNum: string;
-    accountIfsc: string;
+    ifscCode: string;
     status: boolean;
     createdAt: string;
     updatedAt: string;
@@ -239,7 +239,7 @@ export interface VendorOrganizationWithRelations extends VendorOrganization {
 
 // DTOs for creating/updating vendor organizations with relations
 export interface CreateVendorGstDto {
-    org: number;
+    orgId: number;
     gstState: string;
     gstNum: string;
     status?: boolean;
@@ -252,17 +252,17 @@ export interface UpdateVendorGstDto {
 }
 
 export interface CreateVendorAccountDto {
-    org: number;
-    accountName: string;
+    orgId: number;
+    bankAccountName: string;
     accountNum: string;
-    accountIfsc: string;
+    ifscCode: string;
     status?: boolean;
 }
 
 export interface UpdateVendorAccountDto {
-    accountName?: string;
+    bankAccountName?: string;
     accountNum?: string;
-    accountIfsc?: string;
+    ifscCode?: string;
     status?: boolean;
 }
 
@@ -270,13 +270,12 @@ export interface CreateVendorFileDto {
     vendorId: number;
     name: string;
     filePath: string;
-    status?: boolean;
 }
 
 export interface UpdateVendorFileDto {
+    vendorId?: number;
     name?: string;
     filePath?: string;
-    status?: boolean;
 }
 
 export interface CreateVendorOrganizationWithRelationsDto {
@@ -285,11 +284,12 @@ export interface CreateVendorOrganizationWithRelationsDto {
         address?: string;
         status?: boolean;
     };
-    gsts?: Omit<CreateVendorGstDto, "org">[];
-    accounts?: Omit<CreateVendorAccountDto, "org">[];
+    gsts?: Omit<CreateVendorGstDto, "orgId">[];
+    accounts?: Omit<CreateVendorAccountDto, "orgId">[];
     persons?: Array<{
         name: string;
-        email?: string;
+        email: string;
+        mobile: string;
         address?: string;
         status?: boolean;
         files?: Omit<CreateVendorFileDto, "vendorId">[];
@@ -303,19 +303,20 @@ export interface UpdateVendorOrganizationWithRelationsDto {
         status?: boolean;
     };
     gsts?: {
-        create?: Omit<CreateVendorGstDto, "org">[];
+        create?: Omit<CreateVendorGstDto, "orgId">[];
         update?: Array<{ id: number; data: UpdateVendorGstDto }>;
         delete?: number[];
     };
     accounts?: {
-        create?: Omit<CreateVendorAccountDto, "org">[];
+        create?: Omit<CreateVendorAccountDto, "orgId">[];
         update?: Array<{ id: number; data: UpdateVendorAccountDto }>;
         delete?: number[];
     };
     persons?: {
         create?: Array<{
             name: string;
-            email?: string;
+            email: string;
+            mobile: string;
             address?: string;
             status?: boolean;
             files?: Omit<CreateVendorFileDto, "vendorId">[];
@@ -373,7 +374,7 @@ export interface CreateFollowupCategoryDto {
     status?: boolean;
 }
 
-export interface UpdateFollowupCategoryDto extends Partial<CreateFollowupCategoryDto> { }
+export interface UpdateFollowupCategoryDto extends Partial<CreateFollowupCategoryDto> {}
 
 export interface Designation {
     id: number;
@@ -388,7 +389,7 @@ export interface CreateDesignationDto {
     status?: boolean;
 }
 
-export interface UpdateDesignationDto extends Partial<CreateDesignationDto> { }
+export interface UpdateDesignationDto extends Partial<CreateDesignationDto> {}
 
 export interface DocumentSubmitted {
     id: number;
@@ -403,26 +404,26 @@ export interface CreateDocumentSubmittedDto {
     status?: boolean;
 }
 
-export interface UpdateDocumentSubmittedDto extends Partial<CreateDocumentSubmittedDto> { }
+export interface UpdateDocumentSubmittedDto extends Partial<CreateDocumentSubmittedDto> {}
 
 export interface CreateVendorDto {
-    organizationId?: number;
+    orgId?: number;
     name: string;
     email?: string;
     address?: string;
     status?: boolean;
 }
 
-export interface UpdateVendorDto extends Partial<CreateVendorDto> { }
+export interface UpdateVendorDto extends Partial<CreateVendorDto> {}
 
 export interface CreateVendorOrganizationDto {
-    organizationId?: number;
+    orgId?: number;
     name: string;
     address?: string;
     status?: boolean;
 }
 
-export interface UpdateVendorOrganizationDto extends Partial<CreateVendorOrganizationDto> { }
+export interface UpdateVendorOrganizationDto extends Partial<CreateVendorOrganizationDto> {}
 
 export interface CreateOrganizationDto {
     name: string;
@@ -431,7 +432,7 @@ export interface CreateOrganizationDto {
     status?: boolean;
 }
 
-export interface UpdateOrganizationDto extends Partial<CreateOrganizationDto> { }
+export interface UpdateOrganizationDto extends Partial<CreateOrganizationDto> {}
 
 export interface CreateWebsiteDto {
     name: string;
@@ -439,7 +440,7 @@ export interface CreateWebsiteDto {
     status?: boolean;
 }
 
-export interface UpdateWebsiteDto extends Partial<CreateWebsiteDto> { }
+export interface UpdateWebsiteDto extends Partial<CreateWebsiteDto> {}
 
 export interface CreateImprestCategoryDto {
     name: string;
@@ -447,7 +448,7 @@ export interface CreateImprestCategoryDto {
     status?: boolean;
 }
 
-export interface UpdateImprestCategoryDto extends Partial<CreateImprestCategoryDto> { }
+export interface UpdateImprestCategoryDto extends Partial<CreateImprestCategoryDto> {}
 
 // ========== INDUSTRIES ==========
 export interface Industry {
@@ -465,7 +466,7 @@ export interface CreateIndustryDto {
     status?: boolean;
 }
 
-export interface UpdateIndustryDto extends Partial<CreateIndustryDto> { }
+export interface UpdateIndustryDto extends Partial<CreateIndustryDto> {}
 
 // ========== TEAMS ==========
 
@@ -475,7 +476,7 @@ export interface CreateTeamDto {
     status?: boolean;
 }
 
-export interface UpdateTeamDto extends Partial<CreateTeamDto> { }
+export interface UpdateTeamDto extends Partial<CreateTeamDto> {}
 
 // ========== ROLES ==========
 export interface Role {
@@ -493,7 +494,7 @@ export interface CreateRoleDto {
     status?: boolean;
 }
 
-export interface UpdateRoleDto extends Partial<CreateRoleDto> { }
+export interface UpdateRoleDto extends Partial<CreateRoleDto> {}
 
 // ========== PERMISSIONS ==========
 export interface Permission {
@@ -543,7 +544,7 @@ export interface CreateStateDto {
     status?: boolean;
 }
 
-export interface UpdateStateDto extends Partial<CreateStateDto> { }
+export interface UpdateStateDto extends Partial<CreateStateDto> {}
 
 // ========== TQ TYPES ==========
 export interface TqType {
@@ -559,7 +560,7 @@ export interface CreateTqTypeDto {
     status?: boolean;
 }
 
-export interface UpdateTqTypeDto extends Partial<CreateTqTypeDto> { }
+export interface UpdateTqTypeDto extends Partial<CreateTqTypeDto> {}
 
 // ========== EMD RESPONSIBILITY ==========
 export interface EmdResponsibility {
@@ -576,7 +577,7 @@ export interface CreateEmdResponsibilityDto {
     status?: boolean;
 }
 
-export interface UpdateEmdResponsibilityDto extends Partial<CreateEmdResponsibilityDto> { }
+export interface UpdateEmdResponsibilityDto extends Partial<CreateEmdResponsibilityDto> {}
 
 // ========== FINANCIAL YEAR ==========
 export interface FinancialYear {
@@ -592,7 +593,23 @@ export interface CreateFinancialYearDto {
     status?: boolean;
 }
 
-export interface UpdateFinancialYearDto extends Partial<CreateFinancialYearDto> { }
+export interface UpdateFinancialYearDto extends Partial<CreateFinancialYearDto> {}
+
+// ========== FINANCE DOC TYPE ==========
+export interface FinanceDocType {
+    id: number;
+    name: string;
+    status: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateFinanceDocTypeDto {
+    name: string;
+    status?: boolean;
+}
+
+export interface UpdateFinanceDocTypeDto extends Partial<CreateFinanceDocTypeDto> {}
 
 // ========== LEAD TYPES ==========
 export interface LeadType {
@@ -610,7 +627,7 @@ export interface CreateLeadTypeDto {
     status?: boolean;
 }
 
-export interface UpdateLeadTypeDto extends Partial<CreateLeadTypeDto> { }
+export interface UpdateLeadTypeDto extends Partial<CreateLeadTypeDto> {}
 
 // ========== LOAN PARTY ==========
 export interface LoanParty {
@@ -628,7 +645,7 @@ export interface CreateLoanPartyDto {
     status?: boolean;
 }
 
-export interface UpdateLoanPartyDto extends Partial<CreateLeadTypeDto> { }
+export interface UpdateLoanPartyDto extends Partial<CreateLeadTypeDto> {}
 // Tender Info Sheet Types - Re-exported from consolidated types file
 
 // Re-export tendering types from their respective modules
@@ -643,7 +660,7 @@ export type {
     TenderTimer,
     TimerStatus,
     TenderWithTimer,
-} from '@/modules/tendering/tenders/helpers/tenderInfo.types';
+} from "@/modules/tendering/tenders/helpers/tenderInfo.types";
 
 export type {
     IncompleteField,
@@ -653,7 +670,7 @@ export type {
     TenderApprovalFilters,
     TenderApprovalTabData,
     TenderApprovalDashboardCounts,
-} from '@/modules/tendering/tender-approval/helpers/tenderApproval.types';
+} from "@/modules/tendering/tender-approval/helpers/tenderApproval.types";
 
 // Re-export EMD/Tender Fee types
 export type {
@@ -676,7 +693,7 @@ export type {
     CreatePaymentRequestDto,
     UpdatePaymentRequestDto,
     UpdateStatusDto,
-} from '@/modules/tendering/emds-tenderfees/helpers/emdTenderFee.types';
+} from "@/modules/tendering/emds-tenderfees/helpers/emdTenderFee.types";
 
 // Re-export Document Checklist types
 export type {
@@ -686,7 +703,7 @@ export type {
     UpdateDocumentChecklistDto,
     TenderDocumentChecklistDashboardRow,
     DocumentChecklistsDashboardCounts,
-} from '@/modules/tendering/checklists/helpers/documentChecklist.types';
+} from "@/modules/tendering/checklists/helpers/documentChecklist.types";
 
 // Re-export Bid Submission types
 export type {
@@ -697,9 +714,10 @@ export type {
     BidSubmissionListParams,
     SubmitBidDto,
     MarkAsMissedDto,
+    MarkAsMissedGlobalDto,
     UpdateBidSubmissionDto,
     BidSubmissionDashboardCounts,
-} from '@/modules/tendering/bid-submissions/helpers/bidSubmission.types';
+} from "@/modules/tendering/bid-submissions/helpers/bidSubmission.types";
 
 // Re-export Physical Docs types
 export type {
@@ -711,12 +729,10 @@ export type {
     PhysicalDocsPerson,
     PhysicalDocWithPersons,
     PhysicalDocsDashboardCounts,
-} from '@/modules/tendering/physical-docs/helpers/physicalDocs.types';
+} from "@/modules/tendering/physical-docs/helpers/physicalDocs.types";
 
 // Re-export RFQ types
-export type {
-    RfqDashboardCounts,
-} from '@/modules/tendering/rfqs/helpers/rfq.types';
+export type { RfqDashboardCounts } from "@/modules/tendering/rfqs/helpers/rfq.types";
 
 export interface PaginatedResponse<T> {
     data: T[];

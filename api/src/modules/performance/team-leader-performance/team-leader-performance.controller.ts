@@ -10,8 +10,8 @@ export class TeamLeaderPerformanceController {
     constructor(private readonly teamLeaderPerformanceService: TeamLeaderPerformanceService) {}
 
     @Get()
-    healthCheck(): string {
-        return "Team Leader Performance API is running.";
+    healthCheck(): { message: string } {
+        return { message: "Team Leader Performance API is running." };
     }
 
     @Public()

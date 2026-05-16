@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { and, eq, isNotNull, isNull, or, asc, desc, sql, inArray } from 'drizzle-orm';
+import { and, eq, isNotNull, isNull, or, asc, desc, sql, inArray, ilike, ne, notInArray } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -8,6 +8,7 @@ import { users } from '@db/schemas/auth/users.schema';
 import { items } from '@db/schemas/master/items.schema';
 import { tenderCostingSheets } from '@db/schemas/tendering/tender-costing-sheets.schema';
 import { bidSubmissions } from '@db/schemas/tendering/bid-submissions.schema';
+import { teams } from '@db/schemas/master/teams.schema';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
@@ -16,6 +17,9 @@ import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
+import { TimersService } from '@/modules/timers/timers.service';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { paymentInstruments, paymentRequestRelations, paymentRequests, tenderIncompleteFields } from '@/db/schemas';
 
 export type BidSubmissionDashboardRow = {
     tenderId: number;
@@ -49,6 +53,9 @@ export type BidSubmissionDashboardCounts = {
     total: number;
 };
 
+export const RFQActionStatuses = [10, 35, 14];
+export const EMDActionStatuses = [10, 33 ,35, 14];
+
 @Injectable()
 export class BidSubmissionsService {
     private readonly logger = new Logger(BidSubmissionsService.name);
@@ -59,15 +66,110 @@ export class BidSubmissionsService {
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
+        private readonly timersService: TimersService,
     ) { }
 
 
     /**
+     * Build role-based filter conditions for tender queries
+     */
+    private buildRoleFilterConditions(user?: ValidatedUser, teamId?: number): any[] {
+        const roleFilterConditions: any[] = [];
+
+        if (user && user.roleId) {
+            if (user.roleId === 1 || user.roleId === 2) {
+                // Super User or Admin: Show all, respect teamId filter if provided
+                if (teamId !== undefined && teamId !== null) {
+                    roleFilterConditions.push(eq(tenderInfos.team, teamId));
+                }
+            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+                // Team Leader, Coordinator, Engineer: Filter by primary_team_id
+                if (user.teamId) {
+                    roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
+                } else {
+                    roleFilterConditions.push(sql`1 = 0`); // Empty results
+                }
+            } else {
+                // All other roles: Show only own tenders
+                if (user.sub) {
+                    roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
+                } else {
+                    roleFilterConditions.push(sql`1 = 0`); // Empty results
+                }
+            }
+        } else {
+            // No user provided - return empty for security
+            roleFilterConditions.push(sql`1 = 0`);
+        }
+
+        return roleFilterConditions;
+    }
+
+    /**
      * Get dashboard data by tab - Direct queries without config
      */
+    private buildDashboardConditions(user?: ValidatedUser, teamId?: number, activeTab?: string, filters?: BidSubmissionFilters){
+        //building the base conditions
+        const conditions: any[] = [
+            TenderInfosService.getActiveCondition(),
+            TenderInfosService.getApprovedCondition(),
+            // eq(tenderCostingSheets.status, 'Approved'),
+        ]
+
+        //building the role conditions
+        const roleFilterConditions = this.buildRoleFilterConditions(user, teamId);
+        conditions.push(...roleFilterConditions);
+        
+        //building the tab conditions
+        
+        if (activeTab === 'pending') {
+            conditions.push(eq(tenderCostingSheets.status, 'Approved'));
+            conditions.push(isNull(bidSubmissions.id));
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['lost']));
+            conditions.push(or(ne(bidSubmissions.status, 'Tender Missed'), isNull(bidSubmissions.status)));
+        } else if (activeTab === 'submitted') {
+            conditions.push(isNotNull(bidSubmissions.id), eq(bidSubmissions.status, 'Bid Submitted'));
+            conditions.push(TenderInfosService.getExcludeStatusCondition(['lost']));
+            conditions.push(or(ne(bidSubmissions.status, 'Tender Missed'), isNull(bidSubmissions.status)));
+        } else if (activeTab === 'disqualified') {
+            conditions.push(eq(bidSubmissions.status, "Tender Missed"));
+            conditions.push(inArray(bidSubmissions.reasonStatus,[33])); //33 -> EMD Not paid
+        } else if (activeTab === 'tender-dnb') {
+            conditions.push(eq(bidSubmissions.status, "Tender Missed"));
+            conditions.push(
+                or(
+                    notInArray(bidSubmissions.reasonStatus,[33]),
+                    isNull(bidSubmissions.reasonStatus)
+                )
+            )
+        } else {
+            throw new BadRequestException(`Invalid tab: ${activeTab}`);
+        }
+
+
+        if (filters?.search) {
+            const searchStr = `%${filters.search}%`;
+            const searchConditions: any[] = [
+                sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
+                sql`${tenderInfos.gstValues}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.dueDate}::text ILIKE ${searchStr}`,
+                sql`${users.name} ILIKE ${searchStr}`,
+                sql`${statuses.name} ILIKE ${searchStr}`,
+            ];
+            conditions.push(sql`(${sql.join(searchConditions, sql` OR `)})`);
+        }
+
+        //returning the tab conditions
+        return conditions;
+
+    }
+
     async getDashboardData(
+        user?: ValidatedUser,
+        teamId?: number,
         tab?: 'pending' | 'submitted' | 'disqualified' | 'tender-dnb',
-        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; search?: string }
+        filters?: BidSubmissionFilters
     ): Promise<PaginatedResult<BidSubmissionDashboardRow>> {
         const page = filters?.page || 1;
         const limit = filters?.limit || 50;
@@ -75,50 +177,12 @@ export class BidSubmissionsService {
 
         const activeTab = tab ?? 'pending';
 
-        // Build base conditions
-        // Laravel entry condition: costing_status IS NOT NULL
-        // NestJS entry condition: status = 7 AND costingSheet.status = 'Approved'
-        const baseConditions = [
-            TenderInfosService.getActiveCondition(),
-            TenderInfosService.getApprovedCondition(),
-            // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-            eq(tenderCostingSheets.status, 'Approved'),
-        ];
-
-        // TODO: Add role-based team filtering middleware/guard
-        // - Admin: see all tenders
-        // - Team Leader/Coordinator: filter by user.team
-        // - Others: filter by team_member = user.id
-
-        // Build tab-specific conditions
-        const conditions = [...baseConditions];
-
-        if (activeTab === 'pending') {
-            conditions.push(isNull(bidSubmissions.id));
-        } else if (activeTab === 'submitted') {
-            conditions.push(isNotNull(bidSubmissions.id), eq(bidSubmissions.status, 'Bid Submitted'));
-        } else if (activeTab === 'disqualified') {
-            conditions.push(isNotNull(bidSubmissions.id), eq(bidSubmissions.status, 'Tender Missed'));
-        } else if (activeTab === 'tender-dnb') {
-            conditions.push(inArray(tenderInfos.status, [8, 34]));
-        } else {
-            throw new BadRequestException(`Invalid tab: ${activeTab}`);
+        if(!['pending', 'submitted', 'disqualified' ,'tender-dnb'].includes(activeTab)){
+            throw new BadRequestException(`Invalid Status: ${tab}`);
         }
 
-        // Add search conditions
-        if (filters?.search) {
-            const searchStr = `%${filters.search}%`;
-            conditions.push(
-                sql`(
-                    ${tenderInfos.tenderName} ILIKE ${searchStr} OR
-                    ${tenderInfos.tenderNo} ILIKE ${searchStr} OR
-                    ${tenderInfos.dueDate}::text ILIKE ${searchStr} OR
-                    ${users.name} ILIKE ${searchStr} OR
-                    ${statuses.name} ILIKE ${searchStr}
-                )`
-            );
-        }
-
+        const conditions : any[] = this.buildDashboardConditions(user, teamId, tab, filters);
+        
         const whereClause = and(...conditions);
 
         // Build orderBy clause
@@ -165,10 +229,10 @@ export class BidSubmissionsService {
         const [countResult] = await this.db
             .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
             .from(tenderInfos)
-            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-            .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(items, eq(items.id, tenderInfos.item))
-            .innerJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+            .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
             .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
             .where(whereClause);
         const total = Number(countResult?.count || 0);
@@ -192,15 +256,15 @@ export class BidSubmissionsService {
                 bidSubmissionStatus: bidSubmissions.status,
             })
             .from(tenderInfos)
-            .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-            .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(items, eq(items.id, tenderInfos.item))
-            .innerJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+            .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
             .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
             .where(whereClause)
+            .orderBy(orderByClause)
             .limit(limit)
-            .offset(offset)
-            .orderBy(orderByClause);
+            .offset(offset);
 
         // Map rows
         const mappedRows = rows.map((row) => {
@@ -231,80 +295,48 @@ export class BidSubmissionsService {
         return wrapPaginatedResponse(mappedRows, total, page, limit);
     }
 
-    async getDashboardCounts(): Promise<{ pending: number; submitted: number; disqualified: number; 'tender-dnb': number; total: number }> {
-        const baseConditions = [
-            TenderInfosService.getActiveCondition(),
-            TenderInfosService.getApprovedCondition(),
-            // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-            eq(tenderCostingSheets.status, 'Approved'),
-        ];
-
-        const pendingConditions = [
-            ...baseConditions,
-            isNull(bidSubmissions.id),
-        ];
-
-        const submittedConditions = [
-            ...baseConditions,
-            isNotNull(bidSubmissions.id), eq(bidSubmissions.status, 'Bid Submitted'),
-        ];
-
-        const disqualifiedConditions = [
-            ...baseConditions,
-            isNotNull(bidSubmissions.id),
-            eq(bidSubmissions.status, 'Tender Missed'),
-        ];
-
-        const tenderDnbBaseConditions = [
-            TenderInfosService.getActiveCondition(),
-            TenderInfosService.getApprovedCondition(),
-            eq(tenderCostingSheets.status, 'Approved'),
-        ];
-        const tenderDnbConditions = [
-            ...tenderDnbBaseConditions,
-            inArray(tenderInfos.status, [8, 34]),
-        ];
+    async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<{ pending: number; submitted: number; disqualified: number; 'tender-dnb': number; total: number }> {
 
         const counts = await Promise.all([
             this.db
                 .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
                 .from(tenderInfos)
-                .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-                .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
+                .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
                 .leftJoin(items, eq(items.id, tenderInfos.item))
-                .innerJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+                .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
                 .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
-                .where(and(...pendingConditions))
+                .where(and(...this.buildDashboardConditions(user, teamId, 'pending')))
                 .then(([result]) => Number(result?.count || 0)),
             this.db
                 .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
                 .from(tenderInfos)
-                .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-                .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
+                .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
                 .leftJoin(items, eq(items.id, tenderInfos.item))
-                .innerJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+                .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
                 .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
-                .where(and(...submittedConditions))
+                .where(and(...this.buildDashboardConditions(user, teamId, 'submitted')))
                 .then(([result]) => Number(result?.count || 0)),
             this.db
                 .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
                 .from(tenderInfos)
-                .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-                .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
+                .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
                 .leftJoin(items, eq(items.id, tenderInfos.item))
-                .innerJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+                .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
                 .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
-                .where(and(...disqualifiedConditions))
+                .where(and(...this.buildDashboardConditions(user, teamId, 'disqualified')))
                 .then(([result]) => Number(result?.count || 0)),
             this.db
                 .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
                 .from(tenderInfos)
-                .innerJoin(users, eq(users.id, tenderInfos.teamMember))
-                .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
+                .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
                 .leftJoin(items, eq(items.id, tenderInfos.item))
-                .innerJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+                .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
                 .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
-                .where(and(...tenderDnbConditions))
+                .where(and(...this.buildDashboardConditions(user, teamId, 'tender-dnb')))
                 .then(([result]) => Number(result?.count || 0)),
         ]);
 
@@ -428,6 +460,22 @@ export class BidSubmissionsService {
         // Send email notification
         await this.sendBidSubmittedEmail(data.tenderId, result, data.submittedBy);
 
+        // TIMER TRANSITION: Stop bid_submission timer
+        try {
+            this.logger.log(`Stopping timer for tender ${data.tenderId} after bid submitted`);
+            await this.timersService.stopTimer({
+                entityType: 'TENDER',
+                entityId: data.tenderId,
+                stage: 'bid_submission',
+                userId: data.submittedBy,
+                reason: 'Bid submitted'
+            });
+            this.logger.log(`Successfully stopped bid_submission timer for tender ${data.tenderId}`);
+        } catch (error) {
+            this.logger.error(`Failed to stop timer for tender ${data.tenderId} after bid submitted:`, error);
+            // Don't fail the entire operation if timer transition fails
+        }
+
         return result;
     }
 
@@ -440,10 +488,15 @@ export class BidSubmissionsService {
     }) {
         // Get current tender status before update
         const currentTender = await this.tenderInfosService.findById(data.tenderId);
+
+        if(!currentTender){
+            throw new Error("Tender not found!")
+        }
+
         const prevStatus = currentTender?.status ?? null;
 
         // AUTO STATUS CHANGE: Update tender status to 8 (Missed) and track it
-        const newStatus = 8; // Status ID for "Missed"
+        const newStatus = 8; // Status ID for "Bid Missed" -> new updated status specifically for Bid Missed
 
         // Check if bid submission already exists
         const existing = await this.findByTenderId(data.tenderId);
@@ -508,7 +561,241 @@ export class BidSubmissionsService {
         // Send email notification
         await this.sendBidMissedEmail(data.tenderId, result, data.submittedBy);
 
+
+        //stopping all the timers running for this tender
+        //for the time being stopping all the running timers
+        this.timersService.stopAllTimers({
+            entityId    : currentTender.id,
+            entityType  : 'TENDER',
+            userId      : data.submittedBy
+        });
+
         return result;
+    }
+
+    async markAsMissedGlobal(data : {tenderId: number, rejectionStatus : number, preventionMeasures? : string, tmsImprovements?: string, submittedBy: number}){
+        try{
+
+            //checking the tender entry
+            const [tender] = await this.db.select().from(tenderInfos).where(eq(tenderInfos.id, data.tenderId));
+
+            if(!tender){
+                throw new Error("tender not found.");
+            }
+
+            let prevStatus: any = null;
+            
+            if(tender?.status){
+                const [statusRow] = await this.db.select().from(statuses).where(eq(statuses.id, tender.status));
+                prevStatus = statusRow;
+            }
+
+            const [status] = await this.db.select({name: statuses.name, id: statuses.id}).from(statuses).where(eq(statuses.id, data.rejectionStatus));
+            const newStatus = status.id;
+
+
+            // checking for various actions to be performed
+            if (EMDActionStatuses.includes(data.rejectionStatus)) {
+                // applicable stage, we will perform EMD actions
+                await this.rejectEMD(tender.id, data.submittedBy, data.rejectionStatus);
+            }
+            
+
+            //checking bid submissionis
+            const existing = await this.findByTenderId(data.tenderId);
+
+            //marking the db value as missed
+            const result = await this.db.transaction(async (tx) => {
+                // Update tender status
+                await tx
+                    .update(tenderInfos)
+                    .set({ status: newStatus, updatedAt: new Date() })
+                    .where(eq(tenderInfos.id, data.tenderId));
+
+                // track status change
+                await this.tenderStatusHistoryService.trackStatusChange(
+                    data.tenderId,
+                    newStatus,
+                    data.submittedBy,
+                    prevStatus?.id,
+                    'Tender missed',
+                    tx
+                );
+
+                // Fetch the full status history for this tender
+                const statusHistory = await this.tenderStatusHistoryService.findByTenderId(data.tenderId, tx);
+
+                let bidSubmission;
+                if (existing) {
+                    // Update existing
+                    const [updated] = await tx
+                        .update(bidSubmissions)
+                        .set({
+                            status: 'Tender Missed',
+                            reasonForMissing: status.name,
+                            reasonStatus: status.id,
+                            preventionMeasures: data.preventionMeasures,
+                            tmsImprovements: data.tmsImprovements,
+                            submittedBy: data.submittedBy,
+                            statusHistoryMetatag: statusHistory,
+                            updatedAt: new Date(),
+                        })
+                        .where(eq(bidSubmissions.id, existing.id))
+                        .returning();
+
+                    bidSubmission = updated;
+                } else {
+                    // Create new
+                    const [created] = await tx
+                        .insert(bidSubmissions)
+                        .values({
+                            tenderId: data.tenderId,
+                            status: 'Tender Missed',
+                            reasonForMissing: status.name,
+                            reasonStatus: status.id,
+                            preventionMeasures: data.preventionMeasures,
+                            tmsImprovements: data.tmsImprovements,
+                            submittedBy: data.submittedBy,
+                            statusHistoryMetatag: statusHistory,
+                        })
+                        .returning();
+
+                    bidSubmission = created;
+                }
+
+                return bidSubmission;
+            });
+
+            if(data.rejectionStatus == 8){
+                //send bid missed email
+                await this.sendBidMissedEmail(data.tenderId, result, data.submittedBy);
+
+            } else {
+                // Send DNB email
+                await this.sendDNBEmail(data.tenderId, {reasonForMissing : result.reasonForMissing, fromStatus: prevStatus?.name || 'Unknown'}, data.submittedBy);
+            }
+
+            //stopping all the timers running for this tender
+            //for the time being stopping all the running timers
+            this.timersService.stopAllTimers({
+                entityId    : tender.id,
+                entityType  : 'TENDER',
+                userId      : data.submittedBy
+            });
+
+        } catch (err){
+            //logging the error 
+            this.logger.error("Failed to update the status" , data, err);
+        }     
+    }
+
+    // Implementing actions for different statuses
+    // Two actions required for now
+    // RejectRFQ -> action for statuses ->10, 35, 14
+    // RejectEMD -> action for statuses ->10, 33, 35, 14 
+
+    async rejectRFQ(tenderId : number){
+        //not needed for now since we use tenderstatus already
+        
+    }
+
+    async rejectEMD(tenderId: number , userId: number, statusId: number){
+        //reject the emd once these statuses are implemented
+        //need the rejection reason for rejecting the payment request
+
+        const pendingEmds = await this.db.
+                select({
+                    paymentRequests: paymentRequests,
+                    paymentInstruments: paymentInstruments,
+                    users: users,
+                })
+                .from(paymentRequests)
+                .where
+                (and(
+                    eq(paymentRequests.tenderId, tenderId),
+                    ilike(paymentInstruments.status, '%pending'),
+                ))
+                .leftJoin(paymentInstruments, eq(paymentInstruments.requestId, paymentRequests.id))
+                .leftJoin(users, eq(users.id, userId));
+
+
+        //no such pending entry found 
+
+        if(!pendingEmds){
+            return ;
+        }
+
+        const [status] = await this.db
+            .select()
+            .from(statuses)
+            .where(eq(statuses.id, statusId));
+
+        for (const emd of pendingEmds) {
+            // Updating each instrument and request in the table
+            if (emd.paymentInstruments?.id) {
+                // Stripping 'PENDING' from the end and replacing with 'REJECTED'
+                const newStatus = emd.paymentInstruments.status.replace(/PENDING$/i, 'REJECTED');
+
+                await this.db.update(paymentInstruments)
+                    .set({ 
+                        status: newStatus,
+                        action : 1
+                     })
+                    .where(eq(paymentInstruments.id, emd.paymentInstruments.id));
+            }
+
+            // 'remarks' exists in paymentRequests, not paymentInstruments
+            await this.db.update(paymentRequests)
+                .set({
+                    remarks: `Bid Missed - ${status?.name || 'Unknown'} - ${emd?.users?.name || 'Unknown'}`,
+                })
+                .where(eq(paymentRequests.id, emd.paymentRequests.id));
+        }
+
+    }
+
+    async getValidMissedStatuses(stage: string) {
+        let validStatusIds: number[] = [];
+
+        // Define valid status IDs for each stage
+        switch (stage) {
+            case 'tender-info':
+                validStatusIds = [9, 10, 11, 12, 13, 14, 15, 31, 32];
+                break;
+            case 'tender-info-approval':
+                validStatusIds = [9, 10, 11, 12, 13, 14, 15, 31, 32]; 
+                break;
+            case 'phy-doc':
+                validStatusIds = []; 
+                break;
+            case 'rfq':
+                validStatusIds = [14 ,35]; 
+                break;
+            case 'emd':
+                validStatusIds = [33];
+            case 'checklist':
+                validStatusIds = [];
+                break;
+            case 'costing-sheet':
+                validStatusIds = [10, 14 ,34, 35, 44, 36]; 
+                break;
+            case 'costing-approval':
+                validStatusIds = [10, 34, 44]; 
+                break;
+            case 'bid-submission':
+                validStatusIds = [8 , 10, 16 , 33 , 34, 35 ,36, 44];
+                break;
+        }
+
+        if (validStatusIds.length > 0) {
+            return this.db
+                .select({ id: statuses.id, name: statuses.name })
+                .from(statuses)
+                .where(inArray(statuses.id, validStatusIds));
+        }
+
+        // Fallback: return any status containing "Missed" or "Reject"
+        return "Missed";
     }
 
     async update(
@@ -568,7 +855,7 @@ export class BidSubmissionsService {
         subject: string,
         template: string,
         data: Record<string, any>,
-        recipients: { to?: RecipientSource[]; cc?: RecipientSource[] }
+        recipients: { to?: RecipientSource[]; cc?: RecipientSource[]; attachments?: { files: string[]; baseDir?: string } }
     ) {
         try {
             await this.emailService.sendTenderEmail({
@@ -580,6 +867,7 @@ export class BidSubmissionsService {
                 subject,
                 template,
                 data,
+                attachments: recipients.attachments,
             });
         } catch (error) {
             this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
@@ -592,7 +880,7 @@ export class BidSubmissionsService {
      */
     private async sendBidSubmittedEmail(
         tenderId: number,
-        bidSubmission: { submissionDatetime: Date | null },
+        bidSubmission: { submissionDatetime: Date | null; documents?: { submittedDocs?: string[]; submissionProof?: string | null; finalPriceSs?: string | null } | null },
         submittedBy: number
     ) {
         const tender = await this.tenderInfosService.findById(tenderId);
@@ -651,17 +939,59 @@ export class BidSubmissionsService {
             teName,
         };
 
+        // Get accounts team ID for CC
+        const accountsTeamId = await this.getAccountsTeamId();
+
+        const ccRecipients: RecipientSource[] = [
+            { type: 'role', role: 'Admin', teamId: tender.team },
+            { type: 'role', role: 'Coordinator', teamId: tender.team },
+        ];
+
+        // Add accounts team admin if accounts team exists
+        if (accountsTeamId) {
+            ccRecipients.push({ type: 'role', role: 'Admin', teamId: accountsTeamId });
+        }
+
+        // Collect attachments
+        const attachmentFiles: string[] = [];
+        if (bidSubmission.documents) {
+            if (bidSubmission.documents.submittedDocs && bidSubmission.documents.submittedDocs.length > 0) {
+                attachmentFiles.push(...bidSubmission.documents.submittedDocs);
+            }
+            if (bidSubmission.documents.submissionProof) {
+                attachmentFiles.push(bidSubmission.documents.submissionProof);
+            }
+            if (bidSubmission.documents.finalPriceSs) {
+                attachmentFiles.push(bidSubmission.documents.finalPriceSs);
+            }
+        }
+
         await this.sendEmail(
             'bid.submitted',
             tenderId,
             submittedBy,
-            `Bid Submitted: ${tender.tenderNo}`,
+            `Bid Submitted - ${tender.tenderName}`,
             'bid-submitted',
             emailData,
             {
                 to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
+                cc: ccRecipients,
+                attachments: attachmentFiles.length > 0 ? { files: attachmentFiles } : undefined,
             }
         );
+    }
+
+    /**
+     * Get Accounts team ID
+     */
+    private async getAccountsTeamId(): Promise<number | null> {
+        const [accountsTeam] = await this.db
+            .select({ id: teams.id })
+            .from(teams)
+            .where(sql`LOWER(${teams.name}) LIKE '%account%'`)
+            .limit(1);
+
+        return accountsTeam?.id || null;
     }
 
     /**
@@ -712,15 +1042,103 @@ export class BidSubmissionsService {
             te_name: teName,
         };
 
+        // Get accounts team ID for CC
+        const accountsTeamId = await this.getAccountsTeamId();
+
+        const ccRecipients: RecipientSource[] = [
+            { type: 'role', role: 'Admin', teamId: tender.team },
+            { type: 'role', role: 'Coordinator', teamId: tender.team },
+        ];
+
+        // Add accounts team admin if accounts team exists
+        if (accountsTeamId) {
+            ccRecipients.push({ type: 'role', role: 'Admin', teamId: accountsTeamId });
+        }
+
         await this.sendEmail(
             'bid.missed',
             tenderId,
             submittedBy,
-            `Bid Missed: ${tender.tenderNo}`,
+            `Bid Submission deadline Missed - ${tender.tenderName}`,
             'bid-missed',
             emailData,
             {
                 to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
+                cc: ccRecipients,
+            }
+        );
+    }
+
+    /**
+     * Send dnb  email
+     */
+    private async sendDNBEmail(
+        tenderId: number,
+        bidSubmission: { reasonForMissing: string, fromStatus : string },
+        submittedBy: number
+    ) {
+        const tender = await this.tenderInfosService.findById(tenderId);
+        if (!tender || !tender.teamMember) return;
+
+        // Get Team Leader name
+        const teamLeaderEmails = await this.recipientResolver.getEmailsByRole('Team Leader', tender.team);
+        let tlName = 'Team Leader';
+        if (teamLeaderEmails.length > 0) {
+            const [tlUser] = await this.db
+                .select({ name: users.name })
+                .from(users)
+                .where(eq(users.email, teamLeaderEmails[0]))
+                .limit(1);
+            if (tlUser?.name) {
+                tlName = tlUser.name;
+            }
+        }
+
+        // Get TE name
+        const teUser = await this.recipientResolver.getUserById(tender.teamMember);
+        const teName = teUser?.name || 'Tender Executive';
+
+        // Format due date and time
+        const dueDateTime = tender.dueDate ? new Date(tender.dueDate).toLocaleString('en-IN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        }) : 'Not specified';
+
+        const emailData = {
+            tl_name: tlName,
+            tender_name: tender.tenderName,
+            due_date_time: dueDateTime,
+            reason: bidSubmission.reasonForMissing || 'Not specified',
+            from_status_name : bidSubmission.fromStatus,
+            te_name: teName,
+        };
+
+        // Get accounts team ID for CC
+        const accountsTeamId = await this.getAccountsTeamId();
+
+        const ccRecipients: RecipientSource[] = [
+            { type: 'role', role: 'Admin', teamId: tender.team },
+            { type: 'role', role: 'Coordinator', teamId: tender.team },
+        ];
+
+        // Add accounts team admin if accounts team exists
+        if (accountsTeamId) {
+            ccRecipients.push({ type: 'role', role: 'Admin', teamId: accountsTeamId });
+        }
+
+        await this.sendEmail(
+            'tender.dnb',
+            tenderId,
+            submittedBy,
+            `Tender moved to DNB - ${tender.tenderName}`,
+            'bid-dnb',
+            emailData,
+            {
+                to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
+                cc: ccRecipients,
             }
         );
     }

@@ -1,13 +1,4 @@
-import {
-    pgTable,
-    serial,
-    varchar,
-    text,
-    bigint,
-    decimal,
-    timestamp,
-    integer,
-} from "drizzle-orm/pg-core";
+import { pgTable, serial, varchar, text, bigint, decimal, timestamp, integer } from "drizzle-orm/pg-core";
 
 export const tenderInfos = pgTable("tender_infos", {
     id: serial("id").primaryKey(),
@@ -30,6 +21,8 @@ export const tenderInfos = pgTable("tender_infos", {
     documents: text("documents"),
     // Tender approval fields
     tlRemarks: varchar("tl_remarks", { length: 200 }),
+    tlApprovalRemarks: varchar("tl_approval_remarks", { length: 200 }),
+    tlApprovalTimestamp: timestamp("tl_approval_timestamp", {withTimezone : true}),
     rfqTo: varchar("rfq_to", { length: 15 }),
     tlStatus: integer("tl_status").default(0).notNull(),
     processingFeeMode: varchar("processing_fee_mode", { length: 100 }),
@@ -39,7 +32,10 @@ export const tenderInfos = pgTable("tender_infos", {
     approveFinanceDocSelection: varchar("approve_finance_doc_selection", { length: 50 }),
     tenderApprovalStatus: varchar("tender_approval_status", { length: 50 }),
     tlRejectionRemarks: text("tl_rejection_remarks"),
-    oemNotAllowed: varchar("oem_not_allowed", { length: 50 }),
+    tlIncompleteRemarks: text("tl_incomplete_remarks"),
+    oemNotAllowed: text("oem_not_allowed").array(),
+    rfqRequired: varchar("rfq_required", { length: 10 }),
+    quotationFiles: text("quotation_files"),
 
     createdAt: timestamp("created_at", { withTimezone: true })
         .defaultNow()

@@ -7,6 +7,7 @@ import type {
     SubmitBidDto,
     MarkAsMissedDto,
     UpdateBidSubmissionDto,
+    MarkAsMissedGlobalDto,
 } from '@/modules/tendering/bid-submissions/helpers/bidSubmission.types';
 import type { PaginatedResult } from '@/types/api.types';
 
@@ -35,6 +36,12 @@ class BidSubmissionsService extends BaseApiService {
             if (params.sortOrder) {
                 search.set('sortOrder', params.sortOrder);
             }
+            if (params.search) {
+                search.set('search', params.search);
+            }
+            if (params.teamId !== undefined && params.teamId !== null) {
+                search.set('teamId', params.teamId.toString());
+            }
         }
 
         const queryString = search.toString();
@@ -57,12 +64,25 @@ class BidSubmissionsService extends BaseApiService {
         return this.post<BidSubmission>('/missed', data);
     }
 
+    async markAsMissedGlobal(data: MarkAsMissedGlobalDto): Promise<BidSubmission> {
+        return this.post<BidSubmission>('/missed-global', data);
+    }
+
+    async getValidMissedStatuses(stage: string): Promise<any> {
+        return this.get<any>(`/missed-global-statuses/${stage}`);
+    }
+
     async update(id: number, data: UpdateBidSubmissionDto): Promise<BidSubmission> {
         return this.patch<BidSubmission>(`/${id}`, data);
     }
 
-    async getDashboardCounts(): Promise<BidSubmissionDashboardCounts> {
-        return this.get<BidSubmissionDashboardCounts>('/dashboard/counts');
+    async getDashboardCounts(teamId?: number): Promise<BidSubmissionDashboardCounts> {
+        const params = new URLSearchParams();
+        if (teamId !== undefined && teamId !== null) {
+            params.append('teamId', teamId.toString());
+        }
+        const query = params.toString();
+        return this.get<BidSubmissionDashboardCounts>(query ? `/dashboard/counts?${query}` : '/dashboard/counts');
     }
 }
 

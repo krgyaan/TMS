@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { eq, like, and } from 'drizzle-orm';
+import { eq, ilike, like, and } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { roles, type Role, type NewRole } from '@db/schemas/auth/roles.schema';
@@ -57,7 +57,7 @@ export class RolesService {
         return this.db
             .select()
             .from(roles)
-            .where(like(roles.name, searchPattern));
+            .where(ilike(roles.name, searchPattern));
     }
 
     async getRolePermissions(roleId: number): Promise<Permission[]> {

@@ -3,6 +3,7 @@ import type { PhysicalDocsDashboardRow, PaginatedResult, CreatePhysicalDocsDto, 
 import { handleQueryError } from '@/lib/react-query'
 import { toast } from 'sonner'
 import { physicalDocsService } from '@/services/api/physical-docs.service'
+import { useTeamFilter } from '@/hooks/useTeamFilter'
 
 export const physicalDocsKey = {
     all: ['physical-docs'] as const,
@@ -20,14 +21,28 @@ export const usePhysicalDocs = (
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' },
     search?: string
 ) => {
+    const { teamId, userId, dataScope } = useTeamFilter();
+    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+
+    const queryKeyFilters = {
+        tab,
+        ...pagination,
+        ...sort,
+        search,
+        dataScope,
+        teamId: teamId ?? null,
+        userId: userId ?? null,
+    };
+
     return useQuery<PaginatedResult<PhysicalDocsDashboardRow>>({
-        queryKey: physicalDocsKey.list({ tab, ...pagination, ...sort, search }),
+        queryKey: physicalDocsKey.list(queryKeyFilters),
         queryFn: () => physicalDocsService.getDashboard(tab, {
             page: pagination.page,
             limit: pagination.limit,
             sortBy: sort?.sortBy,
             sortOrder: sort?.sortOrder,
             search,
+            teamId: teamIdParam,
         }),
         placeholderData: (previousData) => {
             if (previousData && typeof previousData === 'object' && 'data' in previousData && 'meta' in previousData) {
@@ -49,17 +64,7 @@ export const usePhysicalDoc = (id: number | null) => {
 export const usePhysicalDocByTenderId = (tenderId: number | null) => {
     return useQuery({
         queryKey: physicalDocsKey.byTender(tenderId ?? 0),
-        queryFn: async () => {
-            try {
-                return await physicalDocsService.getByTenderId(tenderId ?? 0);
-            } catch (error: any) {
-                // Handle 404 gracefully - return null if resource doesn't exist
-                if (error?.response?.status === 404) {
-                    return null;
-                }
-                throw error;
-            }
-        },
+        queryFn: () => physicalDocsService.getByTenderId(tenderId ?? 0),
         enabled: !!tenderId,
     });
 };
@@ -98,9 +103,13 @@ export const useUpdatePhysicalDoc = () => {
 };
 
 export const usePhysicalDocsDashboardCounts = () => {
+    const { teamId, userId, dataScope } = useTeamFilter();
+    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const queryKey = [...physicalDocsKey.dashboardCounts(), dataScope, teamId ?? null, userId ?? null];
+
     return useQuery<PhysicalDocsDashboardCounts>({
-        queryKey: physicalDocsKey.dashboardCounts(),
-        queryFn: () => physicalDocsService.getDashboardCounts(),
-        staleTime: 30000, // Cache for 30 seconds
+        queryKey,
+        queryFn: () => physicalDocsService.getDashboardCounts(teamIdParam),
+        staleTime: 0,
     });
 };

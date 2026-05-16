@@ -1,32 +1,32 @@
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch, type Resolver } from 'react-hook-form';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import { Save, ArrowLeft, IndianRupee } from 'lucide-react';
 import { useUploadRaResult } from '@/hooks/api/useReverseAuctions';
-import { FileUploadField } from '@/components/form/FileUploadField';
 import { useNavigate } from 'react-router-dom';
+import { paths } from '@/app/routes/paths';
+import { SelectField } from '@/components/form/SelectField';
+import { TenderFileUploader } from '@/components/tender-file-upload';
+import DateTimeInput from '@/components/form/DateTimeInput';
+import { Textarea } from '@/components/ui/textarea';
 
 const UploadRaResultSchema = z.object({
     raResult: z.enum(['Won', 'Lost', 'H1 Elimination']),
     veL1AtStart: z.enum(['Yes', 'No']),
     raStartPrice: z.string().optional(),
     raClosePrice: z.string().optional(),
+    raClosePriceL2: z.string().optional(),
+    raOurPrice: z.string().optional(),
     raCloseTime: z.string().optional(),
-    screenshotQualifiedParties: z.string().optional(),
-    screenshotDecrements: z.string().optional(),
-    finalResultScreenshot: z.string().optional(),
+    resultReason: z.string().optional(),
+    screenshotQualifiedParties: z.array(z.string()).default([]),
+    screenshotDecrements: z.array(z.string()).default([]),
+    finalResultScreenshot: z.array(z.string()).default([]),
 });
 
 type FormValues = z.infer<typeof UploadRaResultSchema>;
@@ -47,42 +47,55 @@ export default function RAResultFormPage({
 }: RAResultFormPageProps) {
     const navigate = useNavigate();
     const uploadResultMutation = useUploadRaResult();
-
     const form = useForm<FormValues>({
-        resolver: zodResolver(UploadRaResultSchema),
+        resolver: zodResolver(UploadRaResultSchema) as Resolver<FormValues>,
         defaultValues: {
             raResult: 'Won',
             veL1AtStart: 'Yes',
             raStartPrice: '',
             raClosePrice: '',
+            raClosePriceL2: '',
+            raOurPrice: '',
             raCloseTime: '',
-            screenshotQualifiedParties: '',
-            screenshotDecrements: '',
-            finalResultScreenshot: '',
+            resultReason: '',
+            screenshotQualifiedParties: [],
+            screenshotDecrements: [],
+            finalResultScreenshot: [],
         },
     });
 
+    const screenshotQualifiedParties = useWatch({ control: form.control, name: 'screenshotQualifiedParties' });
+    const screenshotDecrements = useWatch({ control: form.control, name: 'screenshotDecrements' });
+    const finalResultScreenshot = useWatch({ control: form.control, name: 'finalResultScreenshot' });
     const isSubmitting = form.formState.isSubmitting;
+
+    // Helper function to normalize empty strings to undefined for optional fields
+    const normalizeOptionalString = (value: string | undefined): string | undefined => {
+        return value && value.trim() ? value.trim() : undefined;
+    };
 
     const onSubmit = async (data: FormValues) => {
         try {
             await uploadResultMutation.mutateAsync({
-                id: raId,
+                raId: raId,
                 data: {
                     raResult: data.raResult,
                     veL1AtStart: data.veL1AtStart,
-                    raStartPrice: data.raStartPrice,
-                    raClosePrice: data.raClosePrice,
-                    raCloseTime: data.raCloseTime,
-                    screenshotQualifiedParties: data.screenshotQualifiedParties,
-                    screenshotDecrements: data.screenshotDecrements,
-                    finalResultScreenshot: data.finalResultScreenshot,
+                    raStartPrice: normalizeOptionalString(data.raStartPrice),
+                    raClosePrice: normalizeOptionalString(data.raClosePrice),
+                    raClosePriceL2: normalizeOptionalString(data.raClosePriceL2),
+                    raOurPrice: normalizeOptionalString(data.raOurPrice),
+                    raCloseTime: normalizeOptionalString(data.raCloseTime),
+                    resultReason: normalizeOptionalString(data.resultReason),
+                    screenshotQualifiedParties: data.screenshotQualifiedParties[0] || undefined,
+                    screenshotDecrements: data.screenshotDecrements[0] || undefined,
+                    finalResultScreenshot: data.finalResultScreenshot[0] || undefined,
                 },
             });
             if (onSuccess) {
                 onSuccess();
             } else {
-                navigate(`/tendering/ras/${raId}`);
+                navigate(paths.tendering.ras);
             }
         } catch (error) {
             console.error('Error uploading RA result:', error);
@@ -97,7 +110,7 @@ export default function RAResultFormPage({
                     {tenderDetails.tenderNo} - {tenderDetails.tenderName}
                 </CardDescription>
                 <CardAction>
-                    <Button variant="outline" onClick={() => navigate(`/tendering/ras/${raId}`)}>
+                    <Button variant="outline" onClick={() => navigate(paths.tendering.ras)}>
                         <ArrowLeft className="mr-2 h-4 w-4" />
                         Back
                     </Button>
@@ -107,53 +120,33 @@ export default function RAResultFormPage({
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
                         {/* RA Result */}
-                        <div className="grid gap-4 md:grid-cols-2">
-                            <FieldWrapper
+                        <div className="grid gap-4 md:grid-cols-3">
+                            <SelectField
                                 control={form.control}
                                 name="raResult"
                                 label="RA Result"
-                            >
-                                {(field) => (
-                                    <Select
-                                        value={field.value}
-                                        onValueChange={field.onChange}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select result" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="Won">Won</SelectItem>
-                                            <SelectItem value="Lost">Lost</SelectItem>
-                                            <SelectItem value="H1 Elimination">H1 Elimination</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                )}
-                            </FieldWrapper>
+                                options={[
+                                    { value: 'Won', label: 'Won' },
+                                    { value: 'Lost', label: 'Lost' },
+                                    { value: 'H1 Elimination', label: 'H1 Elimination' },
+                                ]}
+                                placeholder="Select result"
+                            />
 
-                            <FieldWrapper
+                            <SelectField
                                 control={form.control}
                                 name="veL1AtStart"
                                 label="VE L1 at start of RA"
-                            >
-                                {(field) => (
-                                    <Select
-                                        value={field.value}
-                                        onValueChange={field.onChange}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="Yes">Yes</SelectItem>
-                                            <SelectItem value="No">No</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                )}
-                            </FieldWrapper>
+                                options={[
+                                    { value: 'Yes', label: 'Yes' },
+                                    { value: 'No', label: 'No' },
+                                ]}
+                                placeholder="Select"
+                            />
                         </div>
 
                         {/* Pricing */}
-                        <div className="grid gap-4 md:grid-cols-2">
+                        <div className="grid gap-4 md:grid-cols-3">
                             <FieldWrapper
                                 control={form.control}
                                 name="raStartPrice"
@@ -190,44 +183,97 @@ export default function RAResultFormPage({
                                     </div>
                                 )}
                             </FieldWrapper>
+                            <FieldWrapper
+                                control={form.control}
+                                name="raClosePriceL2"
+                                label="L2 Price at RA Close"
+                            >
+                                {(field) => (
+                                    <div className="relative">
+                                        <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            {...field}
+                                            type="number"
+                                            step="0.01"
+                                            className="pl-10"
+                                            placeholder="Enter L2 close price at RA Close"
+                                        />
+                                    </div>
+                                )}
+                            </FieldWrapper>
+                            <FieldWrapper
+                                control={form.control}
+                                name="raCloseTime"
+                                label="RA Close Time"
+                            >
+                                {(field) => (
+                                    <DateTimeInput {...field} placeholder="Select close time" />
+                                )}
+                            </FieldWrapper>
+                            <FieldWrapper
+                                control={form.control}
+                                name="raOurPrice"
+                                label="Our Price at the End of RA"
+                            >
+                                {(field) => (
+                                    <div className="relative">
+                                        <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            {...field}
+                                            type="number"
+                                            step="0.01"
+                                            className="pl-10"
+                                            placeholder="Enter Our Price at the End of RA"
+                                        />
+                                    </div>
+                                )}
+                            </FieldWrapper>
                         </div>
 
-                        <FieldWrapper
-                            control={form.control}
-                            name="raCloseTime"
-                            label="RA Close Time"
-                        >
-                            {(field) => (
-                                <Input
-                                    {...field}
-                                    type="datetime-local"
-                                />
-                            )}
-                        </FieldWrapper>
+                        <div>
+                            {/* Reason for Win/Loss */}
+                            <FieldWrapper
+                                control={form.control}
+                                name="resultReason"
+                                label="Reason for Win/Loss"
+                                className="md:col-span-3"
+                            >
+                                {(field) => (
+                                    <Textarea
+                                        {...field}
+                                        placeholder="Enter the reason for winning or losing this tender"
+                                        rows={3}
+                                    />
+                                )}
+                            </FieldWrapper>
+                        </div>
 
                         {/* Screenshots */}
                         <div className="space-y-4">
                             <h4 className="font-semibold text-sm text-primary border-b pb-2">
                                 Upload Screenshots
                             </h4>
-                            <div className="grid gap-4 md:grid-cols-2">
-                                <FileUploadField
-                                    control={form.control}
-                                    name="screenshotQualifiedParties"
+                            <div className="grid gap-4 md:grid-cols-3">
+                                <TenderFileUploader
+                                    context="screenshot_qualified_parties"
+                                    value={screenshotQualifiedParties}
+                                    onChange={(paths) => form.setValue('screenshotQualifiedParties', paths)}
                                     label="Screenshot of Qualified Parties"
-                                    acceptedFileTypes={['image/*', 'application/pdf']}
+                                    disabled={isSubmitting}
                                 />
-                                <FileUploadField
-                                    control={form.control}
-                                    name="screenshotDecrements"
+                                <TenderFileUploader
+                                    context="screenshot_decrements"
+                                    value={screenshotDecrements}
+                                    onChange={(paths) => form.setValue('screenshotDecrements', paths)}
                                     label="Screenshot of Decrements"
-                                    acceptedFileTypes={['image/*', 'application/pdf']}
+                                    disabled={isSubmitting}
                                 />
-                                <FileUploadField
-                                    control={form.control}
-                                    name="finalResultScreenshot"
+                                <TenderFileUploader
+                                    context="final_result_screenshot"
+                                    value={finalResultScreenshot}
+                                    onChange={(paths) => form.setValue('finalResultScreenshot', paths)}
                                     label="Final Result Screenshot"
-                                    acceptedFileTypes={['image/*', 'application/pdf']}
+                                    disabled={isSubmitting}
                                 />
                             </div>
                         </div>
@@ -236,7 +282,7 @@ export default function RAResultFormPage({
                             <Button
                                 type="button"
                                 variant="outline"
-                                onClick={() => navigate(`/tendering/ras/${raId}`)}
+                                onClick={() => navigate(paths.tendering.ras)}
                                 disabled={isSubmitting}
                             >
                                 Cancel

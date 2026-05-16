@@ -5,30 +5,40 @@ import type { ColDef } from 'ag-grid-community';
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle, XCircle, Eye, Edit, FileX2, ExternalLink } from 'lucide-react';
+import { AlertCircle, CheckCircle, XCircle, Eye, Edit, FileX2, ExternalLink, Search, RefreshCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { formatDateTime } from '@/hooks/useFormatedDate';
-import { formatINR } from '@/hooks/useINRFormatter';
+import { Input } from '@/components/ui/input';
 import { useCostingApprovals, useCostingApprovalsDashboardCounts } from '@/hooks/api/useCostingApprovals';
-import type { CostingApprovalDashboardRow, CostingApprovalDashboardRowWithTimer } from '@/modules/tendering/costing-approvals/helpers/costing-approval.types';
-import { tenderNameCol } from '@/components/data-grid/columns';
+import type { CostingApprovalDashboardRow, CostingApprovalDashboardRowWithTimer, CostingApprovalTab } from '@/modules/tendering/costing-approvals/helpers/costingApproval.types';
+import { currencyCol, dateCol, tenderNameCol } from '@/components/data-grid/columns';
 import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
-
-type TabKey = 'pending' | 'approved' | 'tender-dnb';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { QuickFilter } from '@/components/ui/quick-filter';
+import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
+import { useTenderingPermissions } from '../hooks/useTenderingPermissions';
 
 const CostingApprovalListPage = () => {
-    const [activeTab, setActiveTab] = useState<TabKey>('pending');
+    const [searchParams] = useSearchParams();
+    const initialTab = (searchParams.get('tab') as CostingApprovalTab) || 'pending';
+    const [activeTab, setActiveTab] = useState<CostingApprovalTab>(initialTab);
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
+    const [search, setSearch] = useState<string>('');
+    const debouncedSearch = useDebouncedSearch(search, 300);
+    const { hasTenderingPermission } = useTenderingPermissions();
     const navigate = useNavigate();
+    const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({
+        open: false,
+        tenderId: null
+    });
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab]);
+    }, [activeTab, debouncedSearch]);
 
     const handleSortChanged = useCallback((event: any) => {
         const sortModel = event.api.getColumnState()
@@ -41,9 +51,13 @@ const CostingApprovalListPage = () => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, []);
 
+    const handlePageSizeChange = useCallback((newPageSize: number) => {
+        setPagination({ pageIndex: 0, pageSize: newPageSize });
+    }, []);
+
     const { data: apiResponse, isLoading: loading, error } = useCostingApprovals(
-        activeTab as TabKey,
-        { page: pagination.pageIndex + 1, limit: pagination.pageSize },
+        activeTab,
+        { page: pagination.pageIndex + 1, limit: pagination.pageSize, search: debouncedSearch || undefined },
         { sortBy: sortModel[0]?.colId, sortOrder: sortModel[0]?.sort }
     );
 
@@ -80,26 +94,32 @@ const CostingApprovalListPage = () => {
         {
             label: 'View Details',
             onClick: (row: CostingApprovalDashboardRow) => {
-                navigate(paths.tendering.costingApprovalView(row.costingSheetId!));
+                navigate(paths.tendering.costingApprovalView(row.tenderId!));
             },
             icon: <Eye className="h-4 w-4" />,
         },
-    ], [navigate]);
+        {
+            label : 'Mark As DNB',
+            onClick : (row) => navigate(paths.tendering.bidMissedGlobal(row.tenderId, "costing-approval")),
+            icon : <XCircle className='h-4 w-4' />,
+            visible : () => hasTenderingPermission && activeTab != 'tender-dnb',
+        }
+    ], [navigate, hasTenderingPermission, activeTab]);
 
     const tabsConfig = useMemo(() => {
         return [
             {
-                key: 'pending' as TabKey,
+                key: 'pending' as CostingApprovalTab,
                 name: 'Pending Approval',
                 count: counts?.pending ?? 0,
             },
             {
-                key: 'approved' as TabKey,
+                key: 'approved' as CostingApprovalTab,
                 name: 'Approved',
                 count: counts?.approved ?? 0,
             },
             {
-                key: 'tender-dnb' as TabKey,
+                key: 'tender-dnb' as CostingApprovalTab,
                 name: 'Tender DNB',
                 count: counts?.['tender-dnb'] ?? 0,
             },
@@ -107,11 +127,13 @@ const CostingApprovalListPage = () => {
     }, [counts]);
 
     const colDefs = useMemo<ColDef<CostingApprovalDashboardRowWithTimer>[]>(() => [
-        tenderNameCol<CostingApprovalDashboardRowWithTimer>('tenderNo', {
+        tenderNameCol<CostingApprovalDashboardRowWithTimer>('tenderName', {
+            field: 'tenderName',
+            colId: 'tenderName',
             headerName: 'Tender',
             filter: true,
             flex: 2,
-            minWidth: 250,
+            minWidth: 200,
         }),
         {
             field: 'teamMemberName',
@@ -123,44 +145,24 @@ const CostingApprovalListPage = () => {
             sortable: true,
             filter: true,
         },
-        {
+        dateCol<CostingApprovalDashboardRowWithTimer>('dueDate', { includeTime: true }, {
+            headerName: 'Due Date',
             field: 'dueDate',
             colId: 'dueDate',
-            headerName: 'Due Date',
             flex: 1.5,
             minWidth: 150,
-            valueGetter: (params: any) => params.data?.dueDate ? formatDateTime(params.data.dueDate) : '—',
             sortable: true,
             filter: true,
-        },
-        {
-            field: 'emdAmount',
-            colId: 'emdAmount',
-            headerName: 'EMD',
+        }),
+        currencyCol<CostingApprovalDashboardRowWithTimer>('emdAmount', {
+            field: "emdAmount",
+            colId: "emdAmount",
+            headerName: "EMD",
+            filter: true,
+            sortable: true,
             flex: 1,
-            minWidth: 130,
-            valueGetter: (params: any) => {
-                const value = params.data?.emdAmount;
-                if (!value) return '—';
-                return formatINR(parseFloat(value));
-            },
-            sortable: true,
-            filter: true,
-        },
-        {
-            field: 'gstValues',
-            colId: 'gstValues',
-            headerName: 'Tender Value',
-            flex: 1,
-            minWidth: 130,
-            valueGetter: (params: any) => {
-                const value = params.data?.gstValues;
-                if (value === null || value === undefined) return '—';
-                return formatINR(value);
-            },
-            sortable: true,
-            filter: true,
-        },
+            minWidth: 100,
+        }),
         {
             field: 'statusName',
             headerName: 'Tender Status',
@@ -170,34 +172,16 @@ const CostingApprovalListPage = () => {
             sortable: true,
             filter: true,
         },
-        {
-            field: 'submittedFinalPrice',
-            colId: 'submittedFinalPrice',
-            headerName: 'TE Final Price',
+        currencyCol<CostingApprovalDashboardRowWithTimer>('submittedFinalPrice', {
+            field: "submittedFinalPrice",
+            colId: "submittedFinalPrice",
+            headerName: "TE Final Price",
             flex: 1,
             minWidth: 130,
-            valueGetter: (params: any) => {
-                const value = params.data?.submittedFinalPrice;
-                if (!value) return '—';
-                return formatINR(parseFloat(value));
-            },
             sortable: true,
             filter: true,
-        },
-        {
-            field: 'submittedBudgetPrice',
-            colId: 'submittedBudgetPrice',
-            headerName: 'TE Budget',
-            flex: 1,
-            minWidth: 130,
-            valueGetter: (params: any) => {
-                const value = params.data?.submittedBudgetPrice;
-                if (!value) return '—';
-                return formatINR(parseFloat(value));
-            },
-            sortable: true,
-            filter: true,
-        },
+
+        }),
         {
             field: 'costingStatus',
             colId: 'costingStatus',
@@ -323,8 +307,8 @@ const CostingApprovalListPage = () => {
                 </div>
             </CardHeader>
             <CardContent className="px-0">
-                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as TabKey)}>
-                    <TabsList className="m-auto">
+                <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as CostingApprovalTab)}>
+                    <TabsList className="m-auto mb-4">
                         {tabsConfig.map((tab) => (
                             <TabsTrigger
                                 key={tab.key}
@@ -341,6 +325,31 @@ const CostingApprovalListPage = () => {
                         ))}
                     </TabsList>
 
+                    {/* Search Row: Quick Filters, Search Bar, Sort Filter */}
+                    <div className="flex items-center gap-4 px-6 pb-4">
+                        {/* Quick Filters (Left) */}
+                        <QuickFilter options={[
+                            { label: 'This Week', value: 'this-week' },
+                            { label: 'This Month', value: 'this-month' },
+                            { label: 'This Year', value: 'this-year' },
+                        ]} value={search} onChange={(value) => setSearch(value)} />
+
+                        {/* Search Bar (Center) - Flex grow */}
+                        <div className="flex-1 flex justify-end">
+                            <div className="relative">
+                                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    type="text"
+                                    placeholder="Search..."
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    className="pl-8 w-64"
+                                />
+                            </div>
+                        </div>
+
+                    </div>
+
                     {tabsConfig.map((tab) => (
                         <TabsContent
                             key={tab.key}
@@ -354,9 +363,9 @@ const CostingApprovalListPage = () => {
                                             <FileX2 className="h-12 w-12 mb-4" />
                                             <p className="text-lg font-medium">No {tab.name.toLowerCase()} costing sheets</p>
                                             <p className="text-sm mt-2">
-                                                {tab.key === 'submitted' && 'Submitted costing sheets will appear here for approval'}
+                                                {tab.key === 'pending' && 'Pending costing sheets will appear here for approval'}
                                                 {tab.key === 'approved' && 'Approved costing sheets will be shown here'}
-                                                {tab.key === 'rejected' && 'Rejected costing sheets will appear here'}
+                                                {tab.key === 'tender-dnb' && 'Tender DNB costing sheets will appear here'}
                                             </p>
                                         </div>
                                     ) : (
@@ -368,6 +377,9 @@ const CostingApprovalListPage = () => {
                                             rowCount={totalRows}
                                             paginationState={pagination}
                                             onPaginationChange={setPagination}
+                                            onPageSizeChange={handlePageSizeChange}
+                                            showTotalCount={true}
+                                            showLengthChange={true}
                                             gridOptions={{
                                                 defaultColDef: {
                                                     editable: false,
@@ -386,6 +398,15 @@ const CostingApprovalListPage = () => {
                     ))}
                 </Tabs>
             </CardContent>
+            <ChangeStatusModal
+                open={changeStatusModal.open}
+                onOpenChange={(open) => setChangeStatusModal({ ...changeStatusModal, open })}
+                tenderId={changeStatusModal.tenderId}
+                currentStatus={changeStatusModal.currentStatus}
+                onSuccess={() => {
+                    setChangeStatusModal({ open: false, tenderId: null });
+                }}
+            />
         </Card>
     );
 };
