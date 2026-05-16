@@ -18,6 +18,7 @@ export interface RfqDashboardRow {
     teamMemberName: string;
     status?: number;
     statusName?: string;
+    rfqStatus?: string;
     dueDate: Date;
     rfqId: number | null;
     rfqCount?: number;
@@ -50,6 +51,8 @@ export interface Rfq {
     tenderName: string;
     itemName: string;
     rfqTo: string;
+    requestedVendor: string | null;
+    requestedOrganization: string | null;
     teamMemberName: string;
     statusName: string;
     dueDate: Date;

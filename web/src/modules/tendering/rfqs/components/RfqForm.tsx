@@ -200,10 +200,13 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
     }, [form]);
 
     const handleSubmit: SubmitHandler<FormValues> = async (values) => {
-        // 1. Flatten Vendor IDs to CSV
+        // 1. Collect Vendor and Organization IDs
         const allSelectedPersonIds = values.vendorRows?.flatMap(row => row.personIds) || [];
-        // Remove duplicates just in case
+        const allSelectedOrgIds = values.vendorRows?.map(row => row.orgId).filter(id => !!id) || [];
+
+        // Remove duplicates and join to CSV
         const uniquePersonIds = Array.from(new Set(allSelectedPersonIds)).join(',');
+        const uniqueOrgIds = Array.from(new Set(allSelectedOrgIds)).join(',');
 
         // 2. Convert file paths to documents array format expected by API
         const documents = [
@@ -218,6 +221,7 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
             tenderId: tenderData.tenderId,
             dueDate: values.dueDate.toISOString(),
             docList: values.docList,
+            requestedOrganization: uniqueOrgIds,
             requestedVendor: uniquePersonIds,
             items: values.items.map(i => ({
                 ...i,
