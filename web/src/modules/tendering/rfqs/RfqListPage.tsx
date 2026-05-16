@@ -80,12 +80,14 @@ const Rfqs = () => {
                 if (row.rfqId) navigate(paths.tendering.rfqsResponseNew(row.rfqId));
             },
             icon: <ClipboardList className="h-4 w-4" />,
-            visible: (row: RfqDashboardRowWithTimer) => (activeTab === 'sent' || activeTab === 'responses') && row.rfqId != null,
+            //we will only show the rfq record receipt for the sent tab
+            visible: (row: RfqDashboardRowWithTimer) => (activeTab === 'sent') && row.rfqId != null,
         },
         {
             label: 'Send',
             onClick: (row: RfqDashboardRowWithTimer) => navigate(paths.tendering.rfqsCreate(row.tenderId)),
             icon: <CheckCircle className="h-4 w-4" />,
+            visible : () => ['sent','pending'].includes(activeTab),
         },
         {
             label: 'View',
@@ -182,7 +184,7 @@ const Rfqs = () => {
                     </Badge>
                 );
             },
-            visible: activeTab === 'sent' || activeTab === 'responses',
+            hide: activeTab !== 'sent',
             sortable: true,
             filter: true,
         },
@@ -199,7 +201,7 @@ const Rfqs = () => {
                     </Badge>
                 );
             },
-            visible: activeTab === 'responses',
+            hide: activeTab !== 'sent',
             sortable: true,
             filter: true,
         },
@@ -210,7 +212,11 @@ const Rfqs = () => {
             colId: 'vendorOrganizationNames',
             cellRenderer: (params: any) => {
                 const names = params.data?.vendorOrganizationNames;
-                if (!names) return <p>—</p>;
+
+                if (activeTab === 'responses') {
+                    return <span className="font-medium">{names}</span>;
+                }
+
                 return (
                     <Tooltip>
                         <TooltipTrigger asChild>
@@ -230,6 +236,25 @@ const Rfqs = () => {
             },
             sortable: true,
             filter: true,
+        },
+        {
+            field: 'rfqStatus',
+            headerName: 'RFQ Status',
+            width: 200,
+            colId: 'rfqStatus',
+            valueGetter: (params: any) => params.data?.statusName ? params.data.statusName : '—',
+            cellRenderer: (params: any) => {
+                const status = params.value;
+                if (!status) return '—';
+                return (
+                    <Badge variant="default">
+                        {status}
+                    </Badge>
+                );
+            },
+            sortable: true,
+            filter: true,
+            hide: activeTab !== 'rfq-rejected' && activeTab !== 'tender-dnb',
         },
         {
             field: 'statusName',
@@ -280,7 +305,7 @@ const Rfqs = () => {
             pinned: 'right',
             width: 57,
         },
-    ], [rfqsActions]);
+    ], [rfqsActions, activeTab]);
 
     if (loading) {
         return (
