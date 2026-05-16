@@ -43,6 +43,9 @@ export interface BankTransferActionFormData {
     tenderId: number | null;
     amount: number | null;
     accountName: string | null;
+    accountNumber: string | null;
+    ifsc: string | null;
+    purpose: string | null;
     utrNo: string | null;
     transactionDate: Date | null;
     paymentMethod: string | null;

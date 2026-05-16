@@ -85,10 +85,24 @@ export function BankTransferView({ data, followupData }: BankTransferViewProps) 
                                 <Badge variant="outline">{data.btStatus || '—'}</Badge>
                             </TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">
-                                Tender No
+                                Purpose
                             </TableCell>
                             <TableCell className="text-sm">
-                                {data.tenderNo || '—'}
+                                {data.purpose || '—'}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Account Number
+                            </TableCell>
+                            <TableCell className="text-sm font-mono">
+                                {data.accountNumber || '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                IFSC
+                            </TableCell>
+                            <TableCell className="text-sm font-mono">
+                                {data.ifsc || '—'}
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
