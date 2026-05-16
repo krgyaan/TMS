@@ -67,6 +67,9 @@ class RfqsService extends BaseApiService {
         return this.get<any>(query ? `/dashboard/counts?${query}` : '/dashboard/counts');
     }
 
+    async getResponseStatus(): Promise<any>{
+        return this.get<any>('/response-statuses');
+    }
 
 }
 
