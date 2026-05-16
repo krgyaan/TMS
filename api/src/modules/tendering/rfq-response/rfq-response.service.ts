@@ -32,7 +32,9 @@ export class RfqResponseService {
 
         const responseData: NewRfqResponse = {
             rfqId,
+            organizationId: data.organizationId,
             vendorId: data.vendorId,
+            oemStatus: data.oemStatus,
             receiptDatetime: new Date(data.receiptDatetime),
             gstPercentage: data.gstPercentage != null ? String(data.gstPercentage) : null,
             gstType: data.gstType ?? null,
