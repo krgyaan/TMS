@@ -381,7 +381,7 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
                 className="h-10 rounded-xl border-border/50 bg-muted/20 focus:bg-background text-sm"
               />
             </div> */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label className="text-xs font-semibold text-muted-foreground">Issue Date</Label>
                 <Input
@@ -400,7 +400,7 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
                   className="h-10 rounded-xl border-border/50 bg-muted/20 focus:bg-background text-sm"
                 />
               </div>
-            </div>
+            </div> */}
           </div>
 
           {/* Actions */}
