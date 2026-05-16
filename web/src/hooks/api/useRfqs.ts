@@ -112,7 +112,6 @@ export const useDeleteRfq = () => {
 };
 
 
-
 export const useRfqVendors = (rfqToIds: string | undefined) => {
     return useQuery({
         queryKey: ["rfq-vendors", rfqToIds],
@@ -135,6 +134,13 @@ export const useRfqVendors = (rfqToIds: string | undefined) => {
         enabled: !!rfqToIds && rfqToIds !== "0" && rfqToIds.trim() !== "",
     });
 };
+
+export const useResponseStatus = () => {
+    return useQuery({
+        queryKey : ['response-statuses'],
+        queryFn: () => rfqsService.getResponseStatus(),
+    })
+}
 
 export const useRfqsDashboardCounts = () => {
     const { teamId, userId, dataScope } = useTeamFilter();

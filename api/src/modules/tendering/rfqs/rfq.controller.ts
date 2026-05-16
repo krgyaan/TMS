@@ -70,6 +70,11 @@ export class RfqsController {
         return rfqs;
     }
 
+    @Get("response-statuses")
+    async getResponseStatuses(){
+        return this.rfqsService.findResponseStatuses();
+    } 
+
     @Get(":id")
     async getById(@Param("id", ParseIntPipe) id: number) {
         const rfq = await this.rfqsService.findById(id);

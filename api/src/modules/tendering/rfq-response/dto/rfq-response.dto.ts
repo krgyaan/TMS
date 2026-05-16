@@ -29,7 +29,9 @@ export type RfqResponseItemDto = z.infer<typeof RfqResponseItemSchema>;
  */
 export const CreateRfqResponseSchema = z.object({
     rfqId: bigintField().positive('RFQ ID must be positive'),
+    organizationId: bigintField().positive('Organization ID must be positive'),
     vendorId: bigintField().positive('Vendor ID must be positive'),
+    oemStatus: optionalNumber(z.coerce.number().int().positive()),
     receiptDatetime: requiredDateField,
     gstPercentage: optionalNumber(z.coerce.number().min(0).max(100)),
     gstType: optionalTextField(50),

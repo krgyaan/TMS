@@ -26,11 +26,21 @@ const GST_TYPE_FREIGHT_OPTIONS = [
     { value: 'exclusive', label: 'Exclusive' },
 ];
 
+interface StatusItem {
+    id: number;
+    name: string;
+}
+
+interface StatusResponse {
+    status: StatusItem[];
+    count: number;
+}
+
 interface RfqResponseFormProps {
     rfqId: number;
     rfqData: Rfq;
-    vendorName: string;
-    vendorId: number;
+    orgs: any;
+    responseStatus : StatusResponse
 }
 
 function buildInitialItems(rfqData: Rfq, masterItemOptions: Array<{ id: string; name: string }>) {
@@ -49,10 +59,12 @@ function buildInitialItems(rfqData: Rfq, masterItemOptions: Array<{ id: string; 
     });
 }
 
-export function RfqResponseForm({ rfqId, rfqData, vendorName, vendorId }: RfqResponseFormProps) {
+export function RfqResponseForm({ rfqId, rfqData, orgs, responseStatus }: RfqResponseFormProps) {
     const navigate = useNavigate();
     const createResponse = useCreateRfqResponse();
     const isSubmitting = createResponse.isPending;
+
+    console.log(rfqData);
 
     const masterItemOptions = useItemOptions();
     const itemOptionsFromUseItems = useMemo(
@@ -68,6 +80,9 @@ export function RfqResponseForm({ rfqId, rfqData, vendorName, vendorId }: RfqRes
     const form = useForm<RfqResponseFormValues>({
         resolver: zodResolver(RfqResponseFormSchema) as Resolver<RfqResponseFormValues>,
         defaultValues: {
+            orgId: '',
+            vendorId: '',
+            responseStatus: '',
             receiptDatetime: undefined,
             items: initialItems,
             gstPercentage: 0,
@@ -94,6 +109,30 @@ export function RfqResponseForm({ rfqId, rfqData, vendorName, vendorId }: RfqRes
     const technicalPaths = form.watch('technicalPaths');
     const mafPaths = form.watch('mafPaths');
     const miiPaths = form.watch('miiPaths');
+
+    const selectedOrgId = form.watch('orgId');
+
+    const orgOptions = useMemo(() => {
+        return (orgs || []).map((o: any) => ({
+            value: String(o.organizationId),
+            label: o.organizationName
+        }));
+    }, [orgs]);
+
+    const vendorOptions = useMemo(() => {
+        const org = (orgs || []).find((o: any) => String(o.organizationId) === selectedOrgId);
+        return (org?.vendors || []).map((v: any) => ({
+            value: String(v.id),
+            label: v.name
+        }));
+    }, [orgs, selectedOrgId]);
+
+    const responseStatusOptions = useMemo(() => {
+        return (responseStatus?.status || []).map((s) => ({
+            value: String(s.id),
+            label: s.name,
+        }));
+    }, [responseStatus]);
 
     const { fields: itemFields, remove: removeItem } = useFieldArray({
         control: form.control,
@@ -125,7 +164,9 @@ export function RfqResponseForm({ rfqId, rfqData, vendorName, vendorId }: RfqRes
         await createResponse.mutateAsync({
             rfqId,
             data: {
-                vendorId,
+                organizationId: parseInt(values.orgId, 10),
+                vendorId: parseInt(values.vendorId, 10),
+                oemStatus: parseInt(values.responseStatus, 10),
                 receiptDatetime: values.receiptDatetime.toISOString(),
                 gstPercentage: values.gstPercentage,
                 gstType: values.gstType,
@@ -153,11 +194,7 @@ export function RfqResponseForm({ rfqId, rfqData, vendorName, vendorId }: RfqRes
                                 </div>
                                 <div>
                                     <span className="text-muted-foreground block text-xs uppercase font-bold">Tender</span>
-                                    <span className="font-medium">{rfqData.tenderNo} – {rfqData.tenderName}</span>
-                                </div>
-                                <div>
-                                    <span className="text-muted-foreground block text-xs uppercase font-bold">Vendor</span>
-                                    <span className="font-medium">{vendorName}</span>
+                                    <span className="font-medium">{rfqData?.tender.tenderNo} – {rfqData?.tender.tenderName}</span>
                                 </div>
                             </div>
                         </CardDescription>
@@ -173,13 +210,34 @@ export function RfqResponseForm({ rfqId, rfqData, vendorName, vendorId }: RfqRes
             <CardContent>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
-                        <div className="space-y-4">
-                            <div className="w-full md:w-1/3">
-                                <FieldWrapper
-                                    control={form.control}
-                                    name="receiptDatetime"
-                                    label="Quotation Receipt Date and Time*"
-                                >
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <SelectField
+                                control={form.control}
+                                name="responseStatus"
+                                label="Response Status*"
+                                placeholder="Select Response Status"
+                                options={responseStatusOptions} 
+                            />
+                            <SelectField
+                                control={form.control}
+                                name="orgId"
+                                label="Organization*"
+                                placeholder="Select Organization"
+                                options={orgOptions}
+                            />
+                            <SelectField
+                                control={form.control}
+                                name="vendorId"
+                                label="Vendor*"
+                                placeholder={selectedOrgId ? "Select Vendor" : "Select Organization first"}
+                                options={vendorOptions}
+                                disabled={!selectedOrgId}
+                            />
+                            <FieldWrapper
+                                control={form.control}
+                                name="receiptDatetime"
+                                label="Quotation Receipt Date and Time*"
+                            >
                                     {(field) => (
                                         <DateTimeInput
                                             value={
@@ -194,7 +252,6 @@ export function RfqResponseForm({ rfqId, rfqData, vendorName, vendorId }: RfqRes
                                         />
                                     )}
                                 </FieldWrapper>
-                            </div>
                         </div>
 
                         <div className="space-y-4">

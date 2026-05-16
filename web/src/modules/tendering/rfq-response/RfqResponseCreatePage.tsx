@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { paths } from '@/app/routes/paths';
-import { useRfq, useRfqVendors } from '@/hooks/api/useRfqs';
+import { useRfq, useRfqVendors, useResponseStatus } from '@/hooks/api/useRfqs';
 import { RfqResponseForm } from './components/RfqResponseForm';
 import { useMemo } from 'react';
 
@@ -15,21 +15,10 @@ export default function RfqResponseCreatePage() {
 
     const rfqId = rfqIdParam ? parseInt(rfqIdParam, 10) : null;
     const { data: rfq, isLoading, error } = useRfq(rfqId);
-    const { data: vendorOrgs = [] } = useRfqVendors(rfq?.requestedVendor ?? undefined);
+    const { data: responseStatus } = useResponseStatus();
+    //giving all the vendor orgs
+    const orgs = rfq?.vendorOrganizations ?? undefined;
 
-    const { vendorName, vendorId } = useMemo(() => {
-        const firstOrg = vendorOrgs[0];
-        if (!firstOrg) return { vendorName: '—', vendorId: 0 };
-        const persons = firstOrg.persons ?? [];
-        if (persons.length > 0) {
-            const firstPerson = persons[0];
-            return {
-                vendorName: persons.length > 1 ? `${firstOrg.name} – ${firstPerson.name}` : firstOrg.name,
-                vendorId: firstPerson.id,
-            };
-        }
-        return { vendorName: firstOrg.name, vendorId: firstOrg.id };
-    }, [vendorOrgs]);
 
     if (!rfqIdParam || Number.isNaN(rfqId!)) {
         return (
@@ -93,8 +82,8 @@ export default function RfqResponseCreatePage() {
             <RfqResponseForm
                 rfqId={rfqId!}
                 rfqData={rfqData}
-                vendorName={vendorName}
-                vendorId={vendorId}
+                orgs={orgs}
+                responseStatus = {responseStatus}
             />
         </div>
     );
