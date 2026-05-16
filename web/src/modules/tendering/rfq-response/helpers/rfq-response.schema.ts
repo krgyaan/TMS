@@ -13,6 +13,9 @@ export const RfqResponseFormItemSchema = z.object({
 });
 
 export const RfqResponseFormSchema = z.object({
+    orgId: z.string().min(1, 'Organization is required'),
+    vendorId: z.string().min(1, 'Vendor is required'),
+    responseStatus: z.string().min(1, 'Response status is required'),
     receiptDatetime: z.date({ message: 'Quotation receipt date and time is required' }),
     items: z.array(RfqResponseFormItemSchema).min(1, 'At least one item is required'),
     gstPercentage: z.coerce.number().min(0).max(100),

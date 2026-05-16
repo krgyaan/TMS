@@ -211,23 +211,26 @@ const Rfqs = () => {
             width: 150,
             colId: 'vendorOrganizationNames',
             cellRenderer: (params: any) => {
-                const names = params.data?.vendorOrganizationNames;
+                const orgs = params.data?.vendorOrganizations || [];
+                const names = orgs.map((org: any) => org.name);
+
+                if (names.length === 0) return '—';
 
                 if (activeTab === 'responses') {
-                    return <span className="font-medium">{names}</span>;
+                    return <span className="font-medium text-sm">{names[0] || '—'}</span>;
                 }
 
                 return (
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <Badge variant="secondary">
-                                {names.split(',').length} vendors
+                            <Badge variant="secondary" className="cursor-default">
+                                {names.length} {names.length === 1 ? 'vendor' : 'vendors'}
                             </Badge>
                         </TooltipTrigger>
                         <TooltipContent>
-                            <ul className="list-disc list-inside font-medium">
-                                {names.split(',').map((name: string) => (
-                                    <li key={name}>{name}</li>
+                            <ul className="list-disc list-inside font-medium text-xs py-1">
+                                {names.map((name: string, idx: number) => (
+                                    <li key={`${name}-${idx}`}>{name}</li>
                                 ))}
                             </ul>
                         </TooltipContent>
@@ -236,6 +239,7 @@ const Rfqs = () => {
             },
             sortable: true,
             filter: true,
+            hide: activeTab !== 'sent' && activeTab !== 'responses',
         },
         {
             field: 'rfqStatus',
