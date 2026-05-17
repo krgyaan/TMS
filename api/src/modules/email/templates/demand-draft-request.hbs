@@ -1,5 +1,5 @@
 <div>
-    <p>Dear Kailash (Accounts team),</p>
+    <p>Dear Accounts team,</p>
 
     <p>The following cheque has been handed over to you.</p>
     <ul>
@@ -7,10 +7,9 @@
         <li>Due date: {{data.dueDate}}</li>
         <li>Amount: {{data.amountFormatted}}</li>
     </ul>
-    <p>Soft copy of Cheque (both sides)*: Attached</p>
-    <p>Receiving of the cheque handed over*: Attached</p>
+    <p>Soft copy of Cheque (both sides): <a href="{{data.softCopyCheque}}">Click here to view</a></p>
+    <p>Receiving of the cheque handed over: <a href="{{data.receivingCheque}}">Click here to view</a></p>
 
-    <p>Please print the prefilled Bank Format (attached below) to make the following Demand Draft.</p>
     <p>The DD is required in {{data.timeLimit}} hours.</p>
 
     <p>Please submit the request to the Bank using the details below:</p>
@@ -20,20 +19,18 @@
         <li>Amount: Rs. {{data.amountFormatted}}</li>
     </ul>
 
-    <p>Please courier the DD to the address below keeping sufficient margin for the courier delivery time to ensure the DD reaches before the due date and time and share the SOFT
-        COPY of the DD and the Docket slip with us on time using the link below or your dashboard:</p>
-    <p><a href="{{data.link}}">Accounts Form (DD)</a></p>
+    <p>Please courier the DD to the address below keeping sufficient margin for the courier delivery time to ensure the DD reaches before the due date and time </p>
+    <p>and share the SOFT COPY of the DD and the Docket slip with us on time using the <a href="{{data.link}}">Accounts Form (DD)</a>.</p>
     <p>Courier Address:</p>
     <pre>{{data.courierAddress}}</pre>
 
-    <p>Please attach the covering letter with the DD and courier it. (Attached below) (Pending)</p>
+    <p>Please attach the covering letter with the DD and courier it.</p>
 
     <p>"Ensuring timely operations is the only source of growth"</p>
 
     <p>
         Regards,<br />
-        Shivani,
-        <br />
-        Approved by Management<br />
+        Sunil,<br />
+        Approved by Management
     </p>
 </div>

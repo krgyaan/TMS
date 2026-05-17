@@ -616,6 +616,7 @@ export class PaymentRequestsQueryService {
                 projectName: paymentRequests.projectName,
                 dueDate: paymentRequests.dueDate,
                 requestedBy: paymentRequests.requestedBy,
+                requestedByName: users.name,
                 purpose: paymentRequests.purpose,
                 amountRequired: paymentRequests.amountRequired,
                 status: paymentRequests.status,
@@ -624,6 +625,7 @@ export class PaymentRequestsQueryService {
                 updatedAt: paymentRequests.updatedAt,
             })
             .from(paymentRequests)
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
             .where(eq(paymentRequests.tenderId, tenderId));
 
         if (requests.length === 0) return null;
@@ -667,6 +669,7 @@ export class PaymentRequestsQueryService {
                 projectName: paymentRequests.projectName,
                 dueDate: paymentRequests.dueDate,
                 requestedBy: paymentRequests.requestedBy,
+                requestedByName: users.name,
                 purpose: paymentRequests.purpose,
                 amountRequired: paymentRequests.amountRequired,
                 status: paymentRequests.status,
@@ -675,6 +678,7 @@ export class PaymentRequestsQueryService {
                 updatedAt: paymentRequests.updatedAt,
             })
             .from(paymentRequests)
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
             .where(eq(paymentRequests.tenderId, tenderId));
 
         if (requests.length === 0) return null;
@@ -1119,6 +1123,7 @@ export class PaymentRequestsQueryService {
             projectName: request.projectName,
             dueDate: request.dueDate ? request.dueDate.toISOString() : null,
             requestedBy: request.requestedBy,
+            requestedByName: request.requestedByName?.toString() || null,
             purpose: request.purpose,
             amountRequired: request.amountRequired?.toString() || '0',
             status: request.status,
