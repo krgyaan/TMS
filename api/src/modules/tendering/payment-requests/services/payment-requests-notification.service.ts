@@ -22,27 +22,13 @@ export class PaymentRequestsNotificationService {
         private readonly configService: ConfigService,
     ) {}
 
-    /**
-     * Send DD mail after cheque action
-     * Triggered when a cheque is approved/issued to send DD request email
-     */
     async sendDdMailAfterChequeAction(
+        chequeInstrument: any,
+        chequeDetails: any,
         ddInstrumentId: number,
-        requestId: number,
         tenderId: number,
         userId: number
     ) {
-        const [ddInstrument] = await this.db
-            .select()
-            .from(paymentInstruments)
-            .where(eq(paymentInstruments.id, ddInstrumentId))
-            .limit(1);
-
-        if (!ddInstrument) {
-            this.logger.warn(`DD instrument ${ddInstrumentId} not found`);
-            return { success: false, message: 'DD instrument not found' };
-        }
-
         const [tender] = await this.db
             .select()
             .from(tenderInfos)
@@ -61,9 +47,9 @@ export class PaymentRequestsNotificationService {
                 {
                     tenderNo: tender.tenderNo,
                     tenderName: tender.tenderName,
-                    amount: ddInstrument.amount,
-                    favouring: ddInstrument.favouring,
-                    payableAt: ddInstrument.payableAt,
+                    amount: chequeInstrument.amount,
+                    favouring: chequeInstrument.favouring,
+                    payableAt: chequeInstrument.payableAt,
                 },
                 ddInstrumentId,
                 'DD'
@@ -73,22 +59,54 @@ export class PaymentRequestsNotificationService {
             this.logger.error(`Failed to generate PDF for DD ${ddInstrumentId}`, error);
         }
 
-        // Send email to accounts team using sendTenderEmail
+        const apiUrl = this.configService.get<string>('app.apiUrl') || '';
+        const baseUrl = apiUrl.replace('/api/v1', '');
+
+        const formatCurrency = (amount: number) => {
+            return `₹${amount.toLocaleString('en-IN')}`;
+        };
+
+        const formatDateDDMMYYYY = (dateStr: string | null | undefined): string => {
+            if (!dateStr) return '';
+            try {
+                const d = new Date(dateStr);
+                const day = String(d.getDate()).padStart(2, '0');
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const year = d.getFullYear();
+                return `${day}-${month}-${year}`;
+            } catch {
+                return dateStr;
+            }
+        };
+
+        const softCopyChequeUrl = chequeDetails.chequeImagePath
+            ? `${baseUrl}/uploads/tendering/${chequeDetails.chequeImagePath}`
+            : '';
+
+        const receivingChequeUrl = chequeDetails.handover
+            ? `${baseUrl}/uploads/tendering/${chequeDetails.handover}`
+            : '';
+
         const teamId = tender.team;
         try {
             await this.emailService.sendTenderEmail({
-                tenderId: tenderId,
+                tenderId,
                 eventType: 'DD_REQUEST',
                 fromUserId: userId,
                 to: [{ type: 'role', role: 'accounts', teamId }],
                 subject: `DD Request - ${tender.tenderNo} - ${tender.tenderName}`,
-                template: 'dd-request',
+                template: 'demand-draft-request',
                 data: {
-                    tenderNo: tender.tenderNo,
-                    tenderName: tender.tenderName,
-                    amount: ddInstrument.amount,
-                    favouring: ddInstrument.favouring,
-                    payableAt: ddInstrument.payableAt,
+                    chequeNo: chequeDetails.chequeNo || 'N/A',
+                    dueDate: formatDateDDMMYYYY(chequeDetails.dueDate),
+                    amountFormatted: formatCurrency(Number(chequeInstrument.amount) || 0),
+                    softCopyCheque: softCopyChequeUrl,
+                    receivingCheque: receivingChequeUrl,
+                    timeLimit: chequeInstrument.courierDeadline || 24,
+                    beneficiaryName: chequeInstrument.favouring || 'Not specified',
+                    payableAt: chequeInstrument.payableAt || 'Not specified',
+                    link: `#/bi-dashboard/demand-drafts/${ddInstrumentId}`,
+                    courierAddress: chequeInstrument.courierAddress || 'Not specified',
                 },
             });
             this.logger.log(`DD email sent successfully for tender ${tenderId}`);
@@ -98,6 +116,190 @@ export class PaymentRequestsNotificationService {
         }
 
         return { success: true, message: 'DD mail triggered successfully' };
+    }
+
+    async sendFdrMailAfterChequeAction(
+        chequeInstrument: any,
+        chequeDetails: any,
+        fdrInstrumentId: number,
+        tenderId: number,
+        userId: number
+    ) {
+        const [tender] = await this.db
+            .select()
+            .from(tenderInfos)
+            .where(eq(tenderInfos.id, tenderId))
+            .limit(1);
+
+        if (!tender) {
+            this.logger.warn(`Tender ${tenderId} not found`);
+            return { success: false, message: 'Tender not found' };
+        }
+
+        // Generate PDF for FDR
+        try {
+            const pdfPaths = await this.pdfGenerator.generatePdfs(
+                'fdr-request',
+                {
+                    tenderNo: tender.tenderNo,
+                    tenderName: tender.tenderName,
+                    amount: chequeInstrument.amount,
+                    favouring: chequeInstrument.favouring,
+                    payableAt: chequeInstrument.payableAt,
+                },
+                fdrInstrumentId,
+                'FDR'
+            );
+            this.logger.log(`Generated PDFs for FDR: ${pdfPaths.join(', ')}`);
+        } catch (error) {
+            this.logger.error(`Failed to generate PDF for FDR ${fdrInstrumentId}`, error);
+        }
+
+        const apiUrl = this.configService.get<string>('app.apiUrl') || '';
+        const baseUrl = apiUrl.replace('/api/v1', '');
+
+        const formatCurrency = (amount: number) => {
+            return `₹${amount.toLocaleString('en-IN')}`;
+        };
+
+        const formatDateDDMMYYYY = (dateStr: string | null | undefined): string => {
+            if (!dateStr) return '';
+            try {
+                const d = new Date(dateStr);
+                const day = String(d.getDate()).padStart(2, '0');
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const year = d.getFullYear();
+                return `${day}-${month}-${year}`;
+            } catch {
+                return dateStr;
+            }
+        };
+
+        const softCopyChequeUrl = chequeDetails.chequeImagePath
+            ? `${baseUrl}/uploads/tendering/${chequeDetails.chequeImagePath}`
+            : '';
+
+        const receivingChequeUrl = chequeDetails.handover
+            ? `${baseUrl}/uploads/tendering/${chequeDetails.handover}`
+            : '';
+
+        const teamId = tender.team;
+        try {
+            await this.emailService.sendTenderEmail({
+                tenderId,
+                eventType: 'FDR_REQUEST',
+                fromUserId: userId,
+                to: [{ type: 'role', role: 'accounts', teamId }],
+                subject: `FDR Request - ${tender.tenderNo} - ${tender.tenderName}`,
+                template: 'fixed-deposit-receipt-request',
+                data: {
+                    chequeNo: chequeDetails.chequeNo || 'N/A',
+                    dueDate: formatDateDDMMYYYY(chequeDetails.dueDate),
+                    amountFormatted: formatCurrency(Number(chequeInstrument.amount) || 0),
+                    softCopyCheque: softCopyChequeUrl,
+                    receivingCheque: receivingChequeUrl,
+                    timeLimit: chequeInstrument.courierDeadline || 24,
+                    beneficiaryName: chequeInstrument.favouring || 'Not specified',
+                    payableAt: chequeInstrument.payableAt || 'Not specified',
+                    link: `#/bi-dashboard/fdrs/${fdrInstrumentId}`,
+                    courierAddress: chequeInstrument.courierAddress || 'Not specified',
+                },
+            });
+            this.logger.log(`FDR email sent successfully for tender ${tenderId}`);
+        } catch (error) {
+            this.logger.error(`Failed to send FDR email for tender ${tenderId}`, error);
+            return { success: false, message: 'Email failed' };
+        }
+
+        return { success: true, message: 'FDR mail triggered successfully' };
+    }
+
+    async sendChequeCreatedMail(
+        instrumentId: number,
+        status: 'Accepted' | 'Rejected',
+        rejectionReason?: string,
+        userId?: number,
+    ) {
+        const [instrument] = await this.db
+            .select({
+                requestId: paymentInstruments.requestId,
+                tenderId: paymentRequests.tenderId,
+                requestedBy: paymentRequests.requestedBy,
+                generatedPdf: paymentInstruments.generatedPdf,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .where(eq(paymentInstruments.id, instrumentId))
+            .limit(1);
+
+        if (!instrument) {
+            this.logger.warn(`Instrument ${instrumentId} not found for cheque created email`);
+            return;
+        }
+
+        if (!instrument.requestedBy) {
+            this.logger.warn(`RequestedBy not found for instrument ${instrumentId}`);
+            return;
+        }
+
+        const [requestedUser] = await this.db
+            .select({ name: users.name, email: users.email })
+            .from(users)
+            .where(eq(users.id, instrument.requestedBy))
+            .limit(1);
+
+        if (!requestedUser?.email) {
+            this.logger.warn(`Requested user not found for instrument ${instrumentId}`);
+            return;
+        }
+
+        const [chequeDetails] = await this.db
+            .select()
+            .from(instrumentChequeDetails)
+            .where(eq(instrumentChequeDetails.instrumentId, instrumentId))
+            .limit(1);
+
+        const apiUrl = this.configService.get<string>('app.apiUrl') || '';
+        const baseUrl = apiUrl.replace('/api/v1', '');
+
+        const chequePdfUrl = chequeDetails?.chequeImagePath
+            ? `${baseUrl}/uploads/tendering/${chequeDetails.chequeImagePath}`
+            : '';
+
+        const receivingPdfUrl = instrument.generatedPdf
+            ? `${baseUrl}/uploads/tendering/${instrument.generatedPdf}`
+            : '';
+
+        const deliveryMethod = chequeDetails?.deliveryMethod || '';
+
+        try {
+            const result = await this.emailService.sendPaymentEmail({
+                requestId: instrument.requestId,
+                tenderId: instrument.tenderId || undefined,
+                eventType: 'CHEQUE_CREATED',
+                fromUserId: userId || 13,
+                subject: `Cheque Request ${status === 'Accepted' ? 'Accepted' : 'Rejected'}`,
+                template: 'cheque-created',
+                data: {
+                    requestedBy: requestedUser.name,
+                    status: status === 'Accepted' ? 'Accepted' : 'Rejected',
+                    chequePdfUrl,
+                    remarks: status === 'Accepted' ? 'Your cheque has been created.' : '',
+                    reason: rejectionReason || '',
+                    chequeDeliveryMethod: deliveryMethod,
+                    receivingPdfUrl,
+                },
+                to: [{ type: 'emails', emails: [requestedUser.email] }],
+            });
+
+            if (result.success) {
+                this.logger.log(`Cheque created email sent for instrument ${instrumentId} (logId: ${result.emailLogId})`);
+            } else {
+                this.logger.warn(`Cheque created email failed for instrument ${instrumentId}: ${result.error}`);
+            }
+        } catch (error) {
+            this.logger.error(`Failed to send cheque created email for instrument ${instrumentId}:`, error);
+        }
     }
 
     /**

@@ -528,10 +528,9 @@ export class ChequeService {
                 .where(eq(instrumentChequeDetails.instrumentId, instrumentId));
         }
 
-        // Check for linked DD and send DD mail after cheque action 'accounts-form-1'
+        // Send emails after cheque action 'accounts-form-1' accepted
         if (body.action === 'accounts-form-1' && body.cheque_req === 'Accepted') {
             try {
-                // Get cheque details to check for linked DD
                 const [chequeDetails] = await this.db
                     .select()
                     .from(instrumentChequeDetails)
@@ -539,7 +538,6 @@ export class ChequeService {
                     .limit(1);
 
                 if (chequeDetails?.linkedDdId) {
-                    // Find the DD instrument that corresponds to this linkedDdId
                     const [ddDetail] = await this.db
                         .select()
                         .from(instrumentDdDetails)
@@ -547,7 +545,6 @@ export class ChequeService {
                         .limit(1);
 
                     if (ddDetail) {
-                        // Get the DD instrument and request
                         const [ddInstrument] = await this.db
                             .select()
                             .from(paymentInstruments)
@@ -555,7 +552,6 @@ export class ChequeService {
                             .limit(1);
 
                         if (ddInstrument) {
-                            // Get request ID and tender ID from request
                             const requestId = ddInstrument.requestId;
                             const [request] = await this.db
                                 .select()
@@ -564,10 +560,10 @@ export class ChequeService {
                                 .limit(1);
                             const tenderId = request?.tenderId || 0;
 
-                            // Send DD mail
                             await this.notificationService.sendDdMailAfterChequeAction(
+                                instrument,
+                                chequeDetails,
                                 ddInstrument.id,
-                                requestId,
                                 tenderId,
                                 user.id
                             );
@@ -575,10 +571,52 @@ export class ChequeService {
                             this.logger.log(`DD mail triggered after cheque action for cheque ${instrumentId}, DD instrument ${ddInstrument.id}`);
                         }
                     }
+                } else if (chequeDetails?.linkedFdrId) {
+                    const [fdrDetail] = await this.db
+                        .select()
+                        .from(instrumentFdrDetails)
+                        .where(eq(instrumentFdrDetails.id, chequeDetails.linkedFdrId))
+                        .limit(1);
+
+                    if (fdrDetail) {
+                        const [fdrInstrument] = await this.db
+                            .select()
+                            .from(paymentInstruments)
+                            .where(eq(paymentInstruments.id, fdrDetail.instrumentId))
+                            .limit(1);
+
+                        if (fdrInstrument) {
+                            const requestId = fdrInstrument.requestId;
+                            const [request] = await this.db
+                                .select()
+                                .from(paymentRequests)
+                                .where(eq(paymentRequests.id, requestId))
+                                .limit(1);
+                            const tenderId = request?.tenderId || 0;
+
+                            await this.notificationService.sendFdrMailAfterChequeAction(
+                                instrument,
+                                chequeDetails,
+                                fdrInstrument.id,
+                                tenderId,
+                                user.id
+                            );
+
+                            this.logger.log(`FDR mail triggered after cheque action for cheque ${instrumentId}, FDR instrument ${fdrInstrument.id}`);
+                        }
+                    }
+                } else {
+                    await this.notificationService.sendChequeCreatedMail(
+                        instrumentId,
+                        'Accepted',
+                        undefined,
+                        user.id,
+                    );
+
+                    this.logger.log(`Cheque created mail triggered after cheque action for cheque ${instrumentId}`);
                 }
             } catch (error) {
-                this.logger.error(`Failed to send DD mail after cheque action for cheque ${instrumentId}:`, error);
-                // Don't fail the operation if email fails
+                this.logger.error(`Failed to send mail after cheque action for cheque ${instrumentId}:`, error);
             }
         }
 
