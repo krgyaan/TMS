@@ -178,7 +178,8 @@ export class DemandDraftService {
             .leftJoin(instrumentDdDetails, eq(instrumentDdDetails.instrumentId, paymentInstruments.id));
         if (searchTerm) {
             countQueryBuilder = countQueryBuilder
-                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
                 .leftJoin(users, eq(users.id, paymentRequests.requestedBy));
         }
         const [countResult] = await countQueryBuilder.where(whereClause);
@@ -563,12 +564,14 @@ export class DemandDraftService {
                 ddPurpose: instrumentDdDetails.ddPurpose,
                 ddRemarks: instrumentDdDetails.ddRemarks,
                 tenderStatusName: statuses.name,
+                requestedByName: users.name,
             })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
             .leftJoin(instrumentDdDetails, eq(instrumentDdDetails.instrumentId, paymentInstruments.id))
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
             .where(and(
                 eq(paymentInstruments.id, id),
                 eq(paymentInstruments.instrumentType, 'DD'),
@@ -594,6 +597,7 @@ export class DemandDraftService {
                     .where(eq(couriers.id, courierId))
                     .limit(1);
                 if (courier) {
+                    const courierStatusLabels = ['Pending', 'In Transit', 'Dispatched', 'Not Delivered', 'Delivered', 'Rejected'];
                     courierDetails = {
                         id: courier.id,
                         toOrg: courier.toOrg,
@@ -604,7 +608,13 @@ export class DemandDraftService {
                         trackingNumber: courier.trackingNumber,
                         courierProvider: courier.courierProvider,
                         docketNo: courier.docketNo,
+                        docketSlip: courier.docketSlip,
+                        courierDocs: courier.courierDocs,
+                        deliveryPod: courier.deliveryPod,
+                        deliveryDate: courier.deliveryDate,
+                        pickupDate: courier.pickupDate,
                         status: courier.status,
+                        courierStatusName: courier.status != null ? (courierStatusLabels[courier.status] || 'Unknown') : 'Unknown',
                     };
                 }
             }
@@ -625,6 +635,7 @@ export class DemandDraftService {
             ddNo: result.ddNo,
             ddDate: result.ddDate ? new Date(result.ddDate) : null,
             tenderStatusName: result.tenderStatusName,
+            requestedByName: result.requestedByName || null,
             reqNo: result.reqNo,
             ddNeeds: result.ddNeeds,
             ddPurpose: result.ddPurpose,
@@ -633,6 +644,12 @@ export class DemandDraftService {
             courierAddress: result.courierAddress,
             courierAddressJson: result.courierAddressJson as Record<string, any> | null,
             courierDeadline: result.courierDeadline ? Number(result.courierDeadline) : null,
+            deliverBy: result.courierDeadline != null
+                ? (result.courierDeadline === -1 ? 'Tender Due Date'
+                    : result.courierDeadline === 24 ? '24 Hours'
+                    : result.courierDeadline === 48 ? '48 Hours'
+                    : `${result.courierDeadline} Hours`)
+                : null,
             utr: result.utr,
             docketNo: result.docketNo,
             generatedPdf: result.generatedPdf,
