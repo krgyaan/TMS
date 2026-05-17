@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger, NotFoundException, BadRequestException } fr
 import { eq, and, inArray, isNull, sql, asc, desc, like } from "drizzle-orm";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
-import { paymentRequests, paymentInstruments, instrumentFdrDetails, instrumentChequeDetails } from "@db/schemas/tendering/payment-requests.schema";
+import { paymentRequests, paymentInstruments, instrumentFdrDetails, instrumentChequeDetails, instrumentBgDetails } from "@db/schemas/tendering/payment-requests.schema";
 import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
 import { users } from "@db/schemas/auth/users.schema";
 import { statuses } from "@db/schemas/master/statuses.schema";
@@ -682,7 +682,52 @@ export class FdrService {
             }
         }
 
-        return { ...result, linkedCheque };
+        let linkedBg: any = null;
+        if (result.fdrSource && typeof result.fdrSource === 'string' && result.fdrSource.startsWith('BG_')) {
+            const bgInstrumentId = parseInt(result.fdrSource.replace('BG_', ''), 10);
+            if (!isNaN(bgInstrumentId)) {
+                const [bg] = await this.db
+                    .select({
+                        bgNo: instrumentBgDetails.bgNo,
+                        bgDate: instrumentBgDetails.bgDate,
+                        validityDate: instrumentBgDetails.validityDate,
+                        claimExpiryDate: instrumentBgDetails.claimExpiryDate,
+                        bankName: instrumentBgDetails.bankName,
+                        beneficiaryName: instrumentBgDetails.beneficiaryName,
+                        beneficiaryAddress: instrumentBgDetails.beneficiaryAddress,
+                        cashMarginPercent: instrumentBgDetails.cashMarginPercent,
+                        fdrMarginPercent: instrumentBgDetails.fdrMarginPercent,
+                        stampCharges: instrumentBgDetails.stampCharges,
+                        sfmsCharges: instrumentBgDetails.sfmsCharges,
+                        bgPurpose: instrumentBgDetails.bgPurpose,
+                        bgNeeds: instrumentBgDetails.bgNeeds,
+                        courierNo: instrumentBgDetails.courierNo,
+                        bgBankAcc: instrumentBgDetails.bgBankAcc,
+                        bgBankIfsc: instrumentBgDetails.bgBankIfsc,
+                        status: paymentInstruments.status,
+                        amount: paymentInstruments.amount,
+                    })
+                    .from(instrumentBgDetails)
+                    .innerJoin(paymentInstruments, eq(paymentInstruments.id, instrumentBgDetails.instrumentId))
+                    .where(eq(instrumentBgDetails.instrumentId, bgInstrumentId))
+                    .limit(1);
+                if (bg) {
+                    linkedBg = {
+                        ...bg,
+                        bgDate: bg.bgDate ? new Date(bg.bgDate) : null,
+                        validityDate: bg.validityDate ? new Date(bg.validityDate) : null,
+                        claimExpiryDate: bg.claimExpiryDate ? new Date(bg.claimExpiryDate) : null,
+                        cashMarginPercent: bg.cashMarginPercent ? Number(bg.cashMarginPercent) : null,
+                        fdrMarginPercent: bg.fdrMarginPercent ? Number(bg.fdrMarginPercent) : null,
+                        stampCharges: bg.stampCharges ? Number(bg.stampCharges) : null,
+                        sfmsCharges: bg.sfmsCharges ? Number(bg.sfmsCharges) : null,
+                        amount: bg.amount ? Number(bg.amount) : null,
+                    };
+                }
+            }
+        }
+
+        return { ...result, linkedCheque, linkedBg };
     }
 
     async getActionFormData(id: number) {
@@ -747,6 +792,7 @@ export class FdrService {
                     .where(eq(couriers.id, courierId))
                     .limit(1);
                 if (courier) {
+                    const courierStatusLabels = ['Pending', 'In Transit', 'Dispatched', 'Not Delivered', 'Delivered', 'Rejected'];
                     courierDetails = {
                         id: courier.id,
                         toOrg: courier.toOrg,
@@ -757,7 +803,13 @@ export class FdrService {
                         trackingNumber: courier.trackingNumber,
                         courierProvider: courier.courierProvider,
                         docketNo: courier.docketNo,
+                        docketSlip: courier.docketSlip,
+                        courierDocs: courier.courierDocs,
+                        deliveryPod: courier.deliveryPod,
+                        deliveryDate: courier.deliveryDate,
+                        pickupDate: courier.pickupDate,
                         status: courier.status,
+                        courierStatusName: courier.status != null ? (courierStatusLabels[courier.status] || 'Unknown') : 'Unknown',
                     };
                 }
             }
@@ -788,6 +840,12 @@ export class FdrService {
             courierAddress: result.courierAddress,
             courierAddressJson: result.courierAddressJson as Record<string, any> | null,
             courierDeadline: result.courierDeadline ? Number(result.courierDeadline) : null,
+            deliverBy: result.courierDeadline != null
+                ? (result.courierDeadline === -1 ? 'Tender Due Date'
+                    : result.courierDeadline === 24 ? '24 Hours'
+                    : result.courierDeadline === 48 ? '48 Hours'
+                    : `${result.courierDeadline} Hours`)
+                : null,
             utr: result.utr,
             docketNo: result.docketNo,
             generatedPdf: result.generatedPdf,

@@ -51,15 +51,47 @@ export interface DDActionFormData {
     ddPurpose: string | null;
     ddRemarks: string | null;
     courierAddress: string | null;
+    courierAddressJson: Record<string, any> | null;
     courierDeadline: number | null;
+    deliverBy: string | null;
+    tenderStatusName: string | null;
     utr: string | null;
     docketNo: string | null;
     generatedPdf: string | null;
     cancelPdf: string | null;
     docketSlip: string | null;
+    courierDetails: {
+        id: number;
+        toOrg: string | null;
+        toName: string | null;
+        toAddr: string | null;
+        toPin: string | null;
+        toMobile: string | null;
+        trackingNumber: string | null;
+        courierProvider: string | null;
+        docketNo: string | null;
+        status: string | null;
+    } | null;
     hasAccountsFormData: boolean;
     hasReturnedData: boolean;
     hasSettledData: boolean;
+}
+
+export interface LinkedChequeData {
+    chequeNo: string | null;
+    chequeDate: string | Date | null;
+    bankName: string | null;
+    amount: number | null;
+    status: string | null;
+    favouring: string | null;
+    requestId: number | null;
+}
+
+export interface DemandDraftViewProps {
+    data: DDActionFormData;
+    followupData?: DDFollowupData | null;
+    isLoading?: boolean;
+    className?: string;
 }
 
 export interface DDFollowupData {

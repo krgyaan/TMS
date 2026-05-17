@@ -1,42 +1,116 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { Wallet, Receipt } from 'lucide-react';
+import { Wallet, Receipt, Shield, Users, FileText, Eye } from 'lucide-react';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDate } from '@/hooks/useFormatedDate';
+import type { FDRFollowupData } from '../helpers/fdr.types';
+
+function SectionHeader({ title, icon: Icon }: { title: string; icon?: React.ComponentType<{ className?: string }> }) {
+    return (
+        <TableRow className="bg-muted/50">
+            <TableCell colSpan={4} className="font-semibold text-sm py-2">
+                <div className="flex items-center gap-2">
+                    {Icon && <Icon className="h-4 w-4" />}
+                    {title}
+                </div>
+            </TableCell>
+        </TableRow>
+    );
+}
+
+function FieldRow({ label, value, fullWidth = false }: { label: string; value: React.ReactNode; fullWidth?: boolean }) {
+    return (
+        <TableRow className="hover:bg-muted/30 transition-colors">
+            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                {label}
+            </TableCell>
+            <TableCell className={`text-sm ${fullWidth ? 'col-span-3' : 'w-3/4'} whitespace-normal [overflow-wrap:anywhere]`} colSpan={fullWidth ? undefined : 3}>
+                {value || '—'}
+            </TableCell>
+        </TableRow>
+    );
+}
+
+function EmptyState({ message }: { message: string }) {
+    return (
+        <TableRow className="hover:bg-muted/30 transition-colors">
+            <TableCell colSpan={4} className="text-sm text-muted-foreground italic py-2">
+                {message}
+            </TableCell>
+        </TableRow>
+    );
+}
+
+function CourierAddressBlock({ addressJson, address }: { addressJson: Record<string, any> | null | undefined; address: string | null | undefined }) {
+    if (addressJson) {
+        return (
+            <div className="space-y-0.5">
+                <div><span className="font-medium">Name:</span> {addressJson.name || '—'}</div>
+                {addressJson.phone && <div><span className="font-medium">Phone:</span> {addressJson.phone}</div>}
+                <div><span className="font-medium">Address:</span> {[addressJson.line1, addressJson.line2].filter(Boolean).join(', ') || '—'}</div>
+                <div>
+                    {[addressJson.city, addressJson.state].filter(Boolean).join(', ')}
+                    {addressJson.pincode ? ` - ${addressJson.pincode}` : ''}
+                </div>
+            </div>
+        );
+    }
+    return <>{address || '—'}</>;
+}
+
+function CourierDetailsBlock({ details }: { details: any }) {
+    if (!details) return <span className="text-muted-foreground italic">Not available</span>;
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
+    return (
+        <div className="space-y-0.5">
+            <div><span className="font-medium">Organisation:</span> {details.toOrg || '—'}</div>
+            <div><span className="font-medium">Contact:</span> {details.toName || '—'} {details.toMobile ? `(${details.toMobile})` : ''}</div>
+            <div><span className="font-medium">Address:</span> {details.toAddr || '—'} {details.toPin ? `- ${details.toPin}` : ''}</div>
+            <div><span className="font-medium">Provider:</span> {details.courierProvider || '—'}</div>
+            <div><span className="font-medium">Status:</span> {details.courierStatusName || details.status || '—'}</div>
+            {details.trackingNumber && <div><span className="font-medium">Tracking:</span> {details.trackingNumber}</div>}
+            {details.docketNo && <div><span className="font-medium">Docket No:</span> {details.docketNo}</div>}
+            {details.docketSlip && (
+                <div>
+                    <span className="font-medium">Docket Slip:</span>{' '}
+                    <a href={`${apiUrl}/tender-files/serve/${details.docketSlip}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
+                        <Eye className="h-3 w-3" /> View
+                    </a>
+                </div>
+            )}
+            {details.deliveryPod && (
+                <div>
+                    <span className="font-medium">Proof of Delivery:</span>{' '}
+                    <a href={`${apiUrl}/tender-files/serve/${details.deliveryPod}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
+                        <Eye className="h-3 w-3" /> View
+                    </a>
+                </div>
+            )}
+            {details.deliveryDate && <div><span className="font-medium">Delivery Date:</span> {formatDate(details.deliveryDate)}</div>}
+        </div>
+    );
+}
 
 interface FdrViewProps {
     data: any;
+    followupData?: FDRFollowupData | null;
     isLoading?: boolean;
     className?: string;
 }
 
 export function FdrView({
     data,
-    isLoading = false,
+    followupData,
     className = '',
 }: FdrViewProps) {
-    if (isLoading) {
-        return (
-            <Card className={className}>
-                <CardHeader>
-                    <Skeleton className="h-8 w-48" />
-                </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
-                        {Array.from({ length: 8 }).map((_, i) => (
-                            <Skeleton key={i} className="h-12 w-full" />
-                        ))}
-                    </div>
-                </CardContent>
-            </Card>
-        );
-    }
-
     if (!data) {
         return null;
     }
+
+    const status = data.fdrStatus || data.status || null;
+    const hasAccountsFormData = data.hasAccountsFormData === true;
+    const isAccountsFormRejected = data.fdrStatus === 'Rejected' || data.status === 'Rejected';
 
     return (
         <Card className={className}>
@@ -49,167 +123,53 @@ export function FdrView({
             <CardContent>
                 <Table>
                     <TableBody>
-                        {/* Basic Information */}
-                        <TableRow className="bg-muted/50">
-                            <TableCell colSpan={4} className="font-semibold text-sm">
-                                Basic Information
-                            </TableCell>
-                        </TableRow>
+                        {/* Request Form Information */}
+                        <SectionHeader title="Request Form" />
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
-                                FDR No
-                            </TableCell>
-                            <TableCell className="text-sm font-semibold w-1/4">
-                                {data.fdrNo || '—'}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
-                                FDR Date
-                            </TableCell>
-                            <TableCell className="text-sm w-1/4">
-                                {data.fdrDate ? formatDate(data.fdrDate) : '—'}
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
                                 Amount
                             </TableCell>
-                            <TableCell className="text-sm font-semibold">
+                            <TableCell className="text-sm font-semibold w-1/4">
                                 {data.amount ? formatINR(Number(data.amount)) : '—'}
                             </TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Status
                             </TableCell>
                             <TableCell className="text-sm">
-                                <Badge variant="outline">{data.status || '—'}</Badge>
+                                <Badge variant="outline">{status || '—'}</Badge>
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Purpose
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.fdrPurpose || data.purpose || data.requestPurpose || '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground whitespace-normal [overflow-wrap:anywhere]">
-                                    Favouring
-                                </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                FDR Purpose
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.fdrPurpose || data.purpose || '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Favouring
+                            </TableCell>
                             <TableCell className="text-sm">
                                 {data.favouring || '—'}
                             </TableCell>
                         </TableRow>
-
-                        {/* Request Information */}
-                        <TableRow className="bg-muted/50">
-                            <TableCell colSpan={4} className="font-semibold text-sm">
-                                Request Information
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                FDR Needs
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.fdrNeeds || '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Payable At
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.payableAt || '—'}
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">
-                                Request ID
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.requestId ?? '—'}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Request Type
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.requestType || '—'}
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Requested By
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.requestedByName || '—'}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Docket No
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.docketNo || '—'}
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Issue Date
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.issueDate ? formatDate(data.issueDate) : '—'}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Expiry Date
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.expiryDate ? formatDate(data.expiryDate) : '—'}
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Request Status
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.requestStatus || '—'}
-                            </TableCell>
-                            <TableCell colSpan={2} />
-                        </TableRow>
-                        {data.requestRemarks && (
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Request Remarks
-                                </TableCell>
-                                <TableCell className="text-sm break-words" colSpan={3}>
-                                    {data.requestRemarks}
-                                </TableCell>
-                            </TableRow>
-                        )}
-
-                        {/* Tender/Project Information */}
-                        <TableRow className="bg-muted/50">
-                            <TableCell colSpan={4} className="font-semibold text-sm">
-                                Tender/Project Information
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Tender No
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.tenderNo || data.projectNo || '—'}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Tender Name
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.tenderName || data.projectName || '—'}
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Bid Validity
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.tenderDueDate ? formatDate(data.tenderDueDate) : data.requestDueDate ? formatDate(data.requestDueDate) : '—'}
-                            </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Tender Status
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.tenderStatusName || '—'}
-                            </TableCell>
-                        </TableRow>
-
-                        {/* FDR Details */}
-                        <TableRow className="bg-muted/50">
-                            <TableCell colSpan={4} className="font-semibold text-sm">
-                                FDR Details
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Source
+                                FDR Source
                             </TableCell>
                             <TableCell className="text-sm">
                                 {data.fdrSource || '—'}
@@ -229,38 +189,55 @@ export function FdrView({
                                 {data.marginPercent ? `${Number(data.marginPercent)}%` : '—'}
                             </TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">
-                                FDR Purpose
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.fdrPurpose || '—'}
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Expiry Date
+                                FDR Expiry Date
                             </TableCell>
                             <TableCell className="text-sm">
                                 {data.fdrExpiryDate ? formatDate(data.fdrExpiryDate) : data.expiryDate ? formatDate(data.expiryDate) : '—'}
                             </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                FDR Needs
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.fdrNeeds || '—'}
-                            </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">
-                                Payable At
+                                Issue Date
                             </TableCell>
                             <TableCell className="text-sm">
-                                {data.payableAt || '—'}
+                                {data.issueDate ? formatDate(data.issueDate) : '—'}
                             </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Docket No
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.docketNo || '—'}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Requested By
                             </TableCell>
                             <TableCell className="text-sm">
                                 {data.requestedByName || '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Tender Status
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.tenderStatusName || '—'}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Delivery Method
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.deliverBy || '—'}
+                            </TableCell>
+                            <TableCell colSpan={2} />
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Tender Name
+                            </TableCell>
+                            <TableCell className="text-sm col-span-3">
+                                {data.tenderName || data.projectName || '—'}
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -268,17 +245,7 @@ export function FdrView({
                                 Courier Address
                             </TableCell>
                             <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]" colSpan={3}>
-                                {data.courierAddressJson ? (
-                                    <div className="space-y-0.5">
-                                        <div><span className="font-medium">Name:</span> {data.courierAddressJson.name || '—'}</div>
-                                        {data.courierAddressJson.phone && <div><span className="font-medium">Phone:</span> {data.courierAddressJson.phone}</div>}
-                                        <div><span className="font-medium">Address:</span> {[data.courierAddressJson.line1, data.courierAddressJson.line2].filter(Boolean).join(', ') || '—'}</div>
-                                        <div>
-                                            {[data.courierAddressJson.city, data.courierAddressJson.state].filter(Boolean).join(', ')}
-                                            {data.courierAddressJson.pincode ? ` - ${data.courierAddressJson.pincode}` : ''}
-                                        </div>
-                                    </div>
-                                ) : (data.courierAddress || '—')}
+                                <CourierAddressBlock addressJson={data.courierAddressJson} address={data.courierAddress} />
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -286,40 +253,77 @@ export function FdrView({
                                 Courier Details
                             </TableCell>
                             <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]" colSpan={3}>
-                                {data.courierDetails ? (
-                                    <div className="space-y-0.5">
-                                        <div><span className="font-medium">Organisation:</span> {data.courierDetails.toOrg || '—'}</div>
-                                        <div><span className="font-medium">Contact:</span> {data.courierDetails.toName || '—'} {data.courierDetails.toMobile ? `(${data.courierDetails.toMobile})` : ''}</div>
-                                        <div><span className="font-medium">Address:</span> {data.courierDetails.toAddr || '—'} {data.courierDetails.toPin ? `- ${data.courierDetails.toPin}` : ''}</div>
-                                        {data.courierDetails.trackingNumber && <div><span className="font-medium">Tracking:</span> {data.courierDetails.trackingNumber}</div>}
-                                        {data.courierDetails.courierProvider && <div><span className="font-medium">Provider:</span> {data.courierDetails.courierProvider}</div>}
-                                        {data.courierDetails.docketNo && <div><span className="font-medium">Docket No:</span> {data.courierDetails.docketNo}</div>}
-                                    </div>
-                                ) : (data.reqNo || '—')}
+                                <CourierDetailsBlock details={data.courierDetails} />
                             </TableCell>
                         </TableRow>
-
-                        {/* Remarks */}
-                        {data.fdrRemark && (
-                            <>
-                                <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={4} className="font-semibold text-sm">
-                                        Additional Information
-                                    </TableCell>
-                                </TableRow>
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        Remarks
-                                    </TableCell>
-                                    <TableCell className="text-sm break-words" colSpan={3}>
-                                        {data.fdrRemark || '—'}
-                                    </TableCell>
-                                </TableRow>
-                            </>
+                        {data.requestRemarks && (
+                            <FieldRow label="Request Remarks" value={data.requestRemarks} fullWidth />
                         )}
+
+                        {/* Accounts Form */}
+                        {hasAccountsFormData || data.fdrNo ? (
+                            <>
+                                <SectionHeader title="Accounts Form" icon={FileText} />
+                                {isAccountsFormRejected ? (
+                                    <>
+                                        <FieldRow
+                                            label="Status"
+                                            value={<Badge variant="destructive">Rejected</Badge>}
+                                        />
+                                        <FieldRow label="Rejection Reason" value={data.rejectionReason || data.fdrRemark} fullWidth />
+                                    </>
+                                ) : (
+                                    <>
+                                        <FieldRow
+                                            label="Status"
+                                            value={<Badge variant="default">Accepted</Badge>}
+                                        />
+                                        <TableRow className="hover:bg-muted/30 transition-colors">
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                FDR No
+                                            </TableCell>
+                                            <TableCell className="text-sm font-semibold">
+                                                {data.fdrNo || '—'}
+                                            </TableCell>
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                FDR Date
+                                            </TableCell>
+                                            <TableCell className="text-sm">
+                                                {data.fdrDate ? formatDate(data.fdrDate) : '—'}
+                                            </TableCell>
+                                        </TableRow>
+                                        <FieldRow label="Courier Req No" value={data.reqNo} />
+                                        <FieldRow label="UTR" value={data.utr} />
+                                        <FieldRow label="Remarks" value={data.fdrRemark} fullWidth />
+                                    </>
+                                )}
+                            </>
+                        ) : null}
+
+                        {/* Initiate Followup */}
+                        {followupData ? (
+                            <>
+                                <SectionHeader title="Initiate Followup" icon={Users} />
+                                <FieldRow label="Organisation Name" value={followupData.organisationName || '—'} />
+                                {followupData.contacts && followupData.contacts.length > 0 ? (
+                                    followupData.contacts.map((contact: any, index: number) => (
+                                        <FieldRow
+                                            key={index}
+                                            label={`Contact ${index + 1}`}
+                                            value={`${contact.name}${contact.phone ? ` - ${contact.phone}` : ''}${contact.email ? ` (${contact.email})` : ''}`}
+                                        />
+                                    ))
+                                ) : (
+                                    <EmptyState message="No contacts added" />
+                                )}
+                                <FieldRow label="Follow-up Start Date" value={followupData.followupStartDate ? formatDate(followupData.followupStartDate) : '—'} />
+                                <FieldRow label="Frequency" value={followupData.frequency} />
+                            </>
+                        ) : null}
                     </TableBody>
                 </Table>
 
+                {/* Linked Cheque */}
                 {data.linkedCheque && (
                     <div className="mt-6 border-t pt-4">
                         <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
@@ -345,6 +349,62 @@ export function FdrView({
                                     <TableCell><Badge variant="outline">{data.linkedCheque.status || '—'}</Badge></TableCell>
                                     <TableCell className="text-sm font-medium text-muted-foreground">Favouring</TableCell>
                                     <TableCell className="text-sm">{data.linkedCheque.favouring || '—'}</TableCell>
+                                </TableRow>
+                            </TableBody>
+                        </Table>
+                    </div>
+                )}
+
+                {/* Linked BG */}
+                {data.linkedBg && (
+                    <div className="mt-6 border-t pt-4">
+                        <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                            <Shield className="h-4 w-4" />
+                            Linked Bank Guarantee
+                        </h4>
+                        <Table>
+                            <TableBody>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">BG No</TableCell>
+                                    <TableCell className="text-sm font-semibold">{data.linkedBg.bgNo || '—'}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">BG Date</TableCell>
+                                    <TableCell className="text-sm">{data.linkedBg.bgDate ? formatDate(data.linkedBg.bgDate) : '—'}</TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Bank Name</TableCell>
+                                    <TableCell className="text-sm">{data.linkedBg.bankName || '—'}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Beneficiary</TableCell>
+                                    <TableCell className="text-sm">{data.linkedBg.beneficiaryName || '—'}</TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Amount</TableCell>
+                                    <TableCell className="text-sm font-semibold">{data.linkedBg.amount ? formatINR(Number(data.linkedBg.amount)) : '—'}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Status</TableCell>
+                                    <TableCell><Badge variant="outline">{data.linkedBg.status || '—'}</Badge></TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Validity Date</TableCell>
+                                    <TableCell className="text-sm">{data.linkedBg.validityDate ? formatDate(data.linkedBg.validityDate) : '—'}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Claim Expiry</TableCell>
+                                    <TableCell className="text-sm">{data.linkedBg.claimExpiryDate ? formatDate(data.linkedBg.claimExpiryDate) : '—'}</TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Cash Margin %</TableCell>
+                                    <TableCell className="text-sm">{data.linkedBg.cashMarginPercent != null ? `${data.linkedBg.cashMarginPercent}%` : '—'}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">FDR Margin %</TableCell>
+                                    <TableCell className="text-sm">{data.linkedBg.fdrMarginPercent != null ? `${data.linkedBg.fdrMarginPercent}%` : '—'}</TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Stamp Charges</TableCell>
+                                    <TableCell className="text-sm">{data.linkedBg.stampCharges != null ? formatINR(Number(data.linkedBg.stampCharges)) : '—'}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">SFMS Charges</TableCell>
+                                    <TableCell className="text-sm">{data.linkedBg.sfmsCharges != null ? formatINR(Number(data.linkedBg.sfmsCharges)) : '—'}</TableCell>
+                                </TableRow>
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Bank Account</TableCell>
+                                    <TableCell className="text-sm font-mono">{data.linkedBg.bgBankAcc || '—'}</TableCell>
+                                    <TableCell className="text-sm font-medium text-muted-foreground">Bank IFSC</TableCell>
+                                    <TableCell className="text-sm font-mono">{data.linkedBg.bgBankIfsc || '—'}</TableCell>
                                 </TableRow>
                             </TableBody>
                         </Table>
