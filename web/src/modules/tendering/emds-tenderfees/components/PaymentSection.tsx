@@ -113,7 +113,7 @@ export function PaymentSection({
         }
     }, [selectedMode, courierData, setValue, purpose, isEditMode, watch]);
 
-    if (filteredModes.length === 0) {
+    if (!selectedMode && type == 'TMS') {
         return (
             <div className="border rounded-lg p-6 bg-muted/20">
                 <div className="flex items-center justify-between mb-4">
@@ -121,7 +121,7 @@ export function PaymentSection({
                         {purpose === 'EMD' ? 'EMD' : purpose === 'TENDER_FEES' ? 'Tender Fee' : 'Processing Fee'} {amount > 0 ? `of ${formatINR(amount)}` : ''}
                     </h3>
                 </div>
-                <p className="text-muted-foreground text-sm">No payment modes available. Please request the Team Lead to configure at least one payment mode.</p>
+                <p className="text-muted-foreground text-sm">No payment modes available. Please request the Team Leader to configure at least one payment mode.</p>
             </div>
         );
     }
