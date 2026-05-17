@@ -10,7 +10,7 @@ import { PayOnPortalForm } from './PayOnPortalForm';
 import { DemandDraftForm } from './DemandDraftForm';
 import { BankGuaranteeForm } from './BankGuaranteeForm';
 import { FdrForm } from './FdrForm';
-import { ChequeForm } from './ChequeForm';
+// import { ChequeForm } from './ChequeForm';
 
 export type RequestType = 'TMS' | 'OTHER_THAN_TMS' | 'OTHER_THAN_TENDER' | 'OLD_ENTRY';
 
@@ -43,7 +43,7 @@ export function PaymentSection({
     allowedModes,
     amount,
     type = 'TMS',
-    courierAddress,
+    // courierAddress,
     courierData,
     defaultPurpose = purpose,
     isEditMode = false,
@@ -52,10 +52,14 @@ export function PaymentSection({
     const selectedMode = watch(`${purpose}.mode`);
 
     const filteredModes = useMemo(() => {
+        let modes = allowedModes;
         if (type === 'OLD_ENTRY') {
-            return allowedModes.filter(mode => OLD_ENTRY_MODES.includes(mode));
+            modes = modes.filter(mode => OLD_ENTRY_MODES.includes(mode));
         }
-        return allowedModes;
+        if (type === 'TMS') {
+            modes = modes.filter(mode => mode !== 'CHEQUE');
+        }
+        return modes;
     }, [type, allowedModes]);
 
     useEffect(() => {
@@ -76,9 +80,10 @@ export function PaymentSection({
             setAmountAndPurpose(`${purpose}.details.btAmount`, `${purpose}.details.btPurpose`);
         } else if (selectedMode === 'PORTAL') {
             setAmountAndPurpose(`${purpose}.details.portalAmount`, `${purpose}.details.portalPurpose`);
-        } else if (selectedMode === 'CHEQUE') {
-            setAmountAndPurpose(`${purpose}.details.chequeAmount`, `${purpose}.details.chequePurpose`);
-        }
+        } 
+        // else if (selectedMode === 'CHEQUE') {
+        //     setAmountAndPurpose(`${purpose}.details.chequeAmount`, `${purpose}.details.chequePurpose`);
+        // }
     }, [selectedMode, setValue, defaultPurpose, purpose, amount, isEditMode]);
 
     useEffect(() => {
@@ -116,7 +121,7 @@ export function PaymentSection({
                         {purpose === 'EMD' ? 'EMD' : purpose === 'TENDER_FEES' ? 'Tender Fee' : 'Processing Fee'} {amount > 0 ? `of ${formatINR(amount)}` : ''}
                     </h3>
                 </div>
-                <p className="text-muted-foreground text-sm">No payment modes configured for this tender.</p>
+                <p className="text-muted-foreground text-sm">No payment modes available. Please request the Team Lead to configure at least one payment mode.</p>
             </div>
         );
     }
@@ -161,7 +166,7 @@ export function PaymentSection({
                     {selectedMode === 'DD' && <DemandDraftForm amount={isEditMode ? undefined : amount} prefix={prefix} readOnly={!isEditMode && amount > 0} />}
                     {selectedMode === 'BG' && <BankGuaranteeForm amount={isEditMode ? undefined : amount} prefix={prefix} readOnly={!isEditMode && amount > 0} />}
                     {selectedMode === 'FDR' && <FdrForm amount={isEditMode ? undefined : amount} prefix={prefix} readOnly={!isEditMode && amount > 0} />}
-                    {selectedMode === 'CHEQUE' && <ChequeForm prefix={prefix} readOnly={!isEditMode && amount > 0} />}
+                    {/* {selectedMode === 'CHEQUE' && <ChequeForm prefix={prefix} readOnly={!isEditMode && amount > 0} />} */}
                 </div>
             )}
         </div>

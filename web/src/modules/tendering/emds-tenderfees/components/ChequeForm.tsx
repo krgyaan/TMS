@@ -29,8 +29,8 @@ export function ChequeForm({ prefix = 'emd.details', readOnly = false }: Payment
                 placeholder="Select Purpose"
                 disabled={readOnly}
             />
-            <FieldWrapper control={control} name={`${prefix}.chequeAmount`} label="Cheque Amount">
-                {(field) => <NumberInput {...field} placeholder="Leave blank for blank cheque" disabled={readOnly} />}
+            <FieldWrapper control={control} name={`${prefix}.chequeAmount`} label="Cheque Amount" description="Leave blank for blank cheque">
+                {(field) => <NumberInput {...field} disabled={readOnly} />}
             </FieldWrapper>
             <FieldWrapper control={control} name={`${prefix}.chequeFavouring`} label="Cheque in Favour of">
                 {(field) => <Input {...field} value={field.value || ''} placeholder="e.g., Individual or Company Name" />}
