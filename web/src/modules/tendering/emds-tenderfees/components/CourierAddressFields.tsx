@@ -5,7 +5,7 @@ import type { Control } from 'react-hook-form';
 interface CourierAddressFieldsProps {
     prefix: string;
     control: Control<any>;
-    fieldPrefix: 'dd' | 'fdr';
+    fieldPrefix: 'dd' | 'fdr' | 'cheque';
 }
 
 export function CourierAddressFields({ prefix, control, fieldPrefix }: CourierAddressFieldsProps) {

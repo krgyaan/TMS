@@ -69,6 +69,11 @@ export const CHEQUE_DELIVERY_OPTIONS = [
     { value: '24', label: '24 Hours' },
 ];
 
+export const CHEQUE_DELIVERY_METHODS = [
+    { value: 'COURIER', label: 'Courier' },
+    { value: 'HANDOVER', label: 'Handover' },
+];
+
 export const CHEQUE_PURPOSE = [
     { value: 'PAYABLE', label: 'Payable' },
     { value: 'SECURITY', label: 'Security' },
