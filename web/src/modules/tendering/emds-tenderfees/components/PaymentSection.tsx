@@ -84,7 +84,7 @@ export function PaymentSection({
     useEffect(() => {
         if (isEditMode || !courierData) return;
         const detailsPath = `${purpose}.details`;
-        const fp = selectedMode === 'DD' ? 'dd' : selectedMode === 'FDR' ? 'fdr' : null;
+        const fp = selectedMode === 'DD' ? 'dd' : selectedMode === 'FDR' ? 'fdr' : selectedMode === 'CHEQUE' ? 'cheque' : null;
         if (!fp) return;
 
         const fields: Array<{ key: string; field: string }> = [

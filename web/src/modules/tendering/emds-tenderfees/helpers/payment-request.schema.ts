@@ -100,6 +100,15 @@ export const PaymentDetailsSchema = z.object({
     chequeNeededIn: deliveryEnumField(),
     chequePurpose: z.string().optional(),
     chequeAccount: z.string().optional(),
+    chequeDeliveryMethod: z.string().optional(),
+    chequeHandoverTo: z.string().optional(),
+    chequeCourierName: z.string().optional(),
+    chequeCourierPhone: z.string().optional(),
+    chequeCourierAddressLine1: z.string().optional(),
+    chequeCourierAddressLine2: z.string().optional(),
+    chequeCourierCity: z.string().optional(),
+    chequeCourierState: z.string().optional(),
+    chequeCourierPincode: z.string().optional(),
 });
 
 export const BankTransferSchema = z.object({
@@ -448,21 +457,28 @@ export const ChequeSchema = z.object({
     chequeDate: z.string().optional(),
     chequeNeededIn: z.string().optional(),
     chequeAccount: z.string().optional(),
+    chequeDeliveryMethod: z.string().optional(),
+    chequeHandoverTo: z.string().optional(),
+    chequeCourierName: z.string().optional(),
+    chequeCourierPhone: z.string().optional(),
+    chequeCourierAddressLine1: z.string().optional(),
+    chequeCourierAddressLine2: z.string().optional(),
+    chequeCourierCity: z.string().optional(),
+    chequeCourierState: z.string().optional(),
+    chequeCourierPincode: z.string().optional(),
 }).superRefine((data, ctx) => {
-    if (!data.chequeFavouring || (typeof data.chequeFavouring === 'string' && data.chequeFavouring.trim() === '')) {
+    const hasFavouring = data.chequeFavouring && typeof data.chequeFavouring === 'string' && data.chequeFavouring.trim() !== '';
+    const hasAmount = data.chequeAmount !== undefined && data.chequeAmount !== null;
+    const hasDate = data.chequeDate && typeof data.chequeDate === 'string' && data.chequeDate.trim() !== '';
+
+    if (!hasFavouring && !hasAmount && !hasDate) {
         ctx.addIssue({
             code: 'custom',
-            message: 'Cheque in Favour of is required',
+            message: 'At least one of Cheque in Favour of / Cheque Amount / Cheque Date is required',
             path: ['chequeFavouring'],
         });
     }
-    if (!data.chequeDate || (typeof data.chequeDate === 'string' && data.chequeDate.trim() === '')) {
-        ctx.addIssue({
-            code: 'custom',
-            message: 'Cheque Date is required',
-            path: ['chequeDate'],
-        });
-    }
+
     if (!data.chequeNeededIn) {
         ctx.addIssue({
             code: 'custom',
@@ -490,6 +506,18 @@ export const ChequeSchema = z.object({
             message: 'Cheque Amount must be greater than 0',
             path: ['chequeAmount'],
         });
+    }
+
+    if (data.chequeDeliveryMethod === 'COURIER') {
+        validateCourierFields(data, ctx, 'cheque');
+    } else if (data.chequeDeliveryMethod === 'HANDOVER') {
+        if (!data.chequeHandoverTo || (typeof data.chequeHandoverTo === 'string' && data.chequeHandoverTo.trim() === '')) {
+            ctx.addIssue({
+                code: 'custom',
+                message: 'Cheque Handover to is required',
+                path: ['chequeHandoverTo'],
+            });
+        }
     }
 });
 
