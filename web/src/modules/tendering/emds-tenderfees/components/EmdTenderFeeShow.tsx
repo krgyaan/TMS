@@ -10,7 +10,8 @@ interface PaymentRequest {
     amountRequired: string | number;
     dueDate: string | Date | null;
     createdAt: string | Date | null;
-    requestedBy?: string | null;
+    requestedBy?: string | number | null;
+    requestedByName?: string | null;
     instruments?: Array<{
         id: number;
         instrumentType: string;
@@ -43,9 +44,9 @@ interface EmdTenderFeeShowProps {
 export const EmdTenderFeeShow = ({ paymentRequests, text }: EmdTenderFeeShowProps) => {
     if (!paymentRequests) return null;
 
-    const emdRequest = paymentRequests.find(r => r.purpose === "EMD");
-    const tenderFeeRequest = paymentRequests.find(r => r.purpose === "Tender Fee");
-    const processingFeeRequest = paymentRequests.find(r => r.purpose === "Processing Fee");
+    const emdRequests = paymentRequests.filter(r => r.purpose === "EMD");
+    const tenderFeeRequests = paymentRequests.filter(r => r.purpose === "Tender Fee");
+    const processingFeeRequests = paymentRequests.filter(r => r.purpose === "Processing Fee");
 
     return (
         <div className="space-y-4">
@@ -56,13 +57,13 @@ export const EmdTenderFeeShow = ({ paymentRequests, text }: EmdTenderFeeShowProp
                 </Alert>
             )}
 
-            {emdRequest?.instruments?.map(inst => (
+            {emdRequests.flatMap(r => r.instruments ?? []).map(inst => (
                 <InstrumentBiView key={inst.id} instrumentId={inst.id} instrumentType={inst.instrumentType} />
             ))}
-            {tenderFeeRequest?.instruments?.map(inst => (
+            {tenderFeeRequests.flatMap(r => r.instruments ?? []).map(inst => (
                 <InstrumentBiView key={inst.id} instrumentId={inst.id} instrumentType={inst.instrumentType} />
             ))}
-            {processingFeeRequest?.instruments?.map(inst => (
+            {processingFeeRequests.flatMap(r => r.instruments ?? []).map(inst => (
                 <InstrumentBiView key={inst.id} instrumentId={inst.id} instrumentType={inst.instrumentType} />
             ))}
         </div>

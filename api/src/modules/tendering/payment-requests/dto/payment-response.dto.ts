@@ -112,6 +112,7 @@ export const PaymentRequestResponse = z.object({
   projectName: nullishString,
   dueDate: nullishDate,
   requestedBy: z.number().nullable(),
+  requestedByName: nullishString,
   purpose: z.string(),
   amountRequired: z.string(),
   status: z.string(),
