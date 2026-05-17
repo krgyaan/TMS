@@ -324,6 +324,9 @@ export const instrumentChequeDetails = pgTable('instrument_cheque_details', {
     // Amount (for action 3)
     amount: decimal('amount', { precision: 15, scale: 2 }), // emd_cheques.amount
 
+    // Delivery method (Courier/Handover)
+    deliveryMethod: varchar('delivery_method', { length: 50 }),
+
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 });

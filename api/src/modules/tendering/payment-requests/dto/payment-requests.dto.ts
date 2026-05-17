@@ -95,6 +95,15 @@ const chequeDetails = z.object({
     chequeNeededIn: optionalString,
     chequePurpose: optionalString,
     chequeAccount: optionalString,
+    chequeDeliveryMethod: optionalString,
+    chequeHandoverTo: optionalString,
+    chequeCourierName: optionalString,
+    chequeCourierPhone: optionalString,
+    chequeCourierAddressLine1: optionalString,
+    chequeCourierAddressLine2: optionalString,
+    chequeCourierCity: optionalString,
+    chequeCourierState: optionalString,
+    chequeCourierPincode: optionalString,
 });
 
 const bankTransferDetails = z.object({

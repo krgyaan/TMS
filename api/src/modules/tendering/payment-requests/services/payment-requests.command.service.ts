@@ -436,8 +436,8 @@ export class PaymentRequestsCommandService {
 
         const shorthand = mode === 'BANK_TRANSFER' ? 'bt' : mode === 'PORTAL' ? 'portal' : mode.toLowerCase();
 
-        // Build structured courier address JSONB for DD/FDR
-        const courierAddressJson = (mode === 'DD' || mode === 'FDR') ? {
+        // Build structured courier address JSONB for DD/FDR/Cheque
+        const courierAddressJson = (mode === 'DD' || mode === 'FDR' || mode === 'CHEQUE') ? {
             name: details[`${shorthand}CourierName`] || null,
             phone: details[`${shorthand}CourierPhone`] || null,
             line1: details[`${shorthand}CourierAddressLine1`] || null,
@@ -529,6 +529,8 @@ export class PaymentRequestsCommandService {
                     bankName: details.chequeAccount || null,
                     chequeReason: details.chequePurpose || null,
                     chequeNeeds: details.chequeNeededIn || null,
+                    handover: details.chequeHandoverTo || null,
+                    deliveryMethod: details.chequeDeliveryMethod || null,
                 }).execute();
                 break;
 
