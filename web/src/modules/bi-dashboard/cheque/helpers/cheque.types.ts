@@ -86,7 +86,7 @@ export interface ChequeFormHistory {
 }
 
 export const ALL_CHEQUE_ACTION_OPTIONS = [
-    { value: 'accounts-form-1', label: 'Accounts Form' },
+    { value: 'accounts-form', label: 'Accounts Form' },
     { value: 'initiate-followup', label: 'Initiate Followup' },
     { value: 'stop-cheque', label: 'Stop Cheque from the Bank' },
     { value: 'paid-via-bank-transfer', label: 'Paid via Bank Transfer' },

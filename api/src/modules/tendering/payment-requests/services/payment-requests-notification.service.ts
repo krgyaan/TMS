@@ -40,25 +40,25 @@ export class PaymentRequestsNotificationService {
             return { success: false, message: 'Tender not found' };
         }
 
-        // Generate PDF for DD
-        try {
-            const pdfPaths = await this.pdfGenerator.generatePdfs(
-                'dd-request',
-                {
-                    tenderNo: tender.tenderNo,
-                    tenderName: tender.tenderName,
-                    amount: chequeInstrument.amount,
-                    favouring: chequeInstrument.favouring,
-                    payableAt: chequeInstrument.payableAt,
-                },
-                ddInstrumentId,
-                'DD'
-            );
-            this.logger.log(`Generated PDFs for DD: ${pdfPaths.join(', ')}`);
-        } catch (error) {
-            this.logger.error(`Failed to generate PDF for DD ${ddInstrumentId}`, error);
-        }
-
+        // Generate PDF for DD (commented out for cheque-triggered flow)
+        // try {
+        //     const pdfPaths = await this.pdfGenerator.generatePdfs(
+        //         'dd-request',
+        //         {
+        //             tenderNo: tender.tenderNo,
+        //             tenderName: tender.tenderName,
+        //             amount: chequeInstrument.amount,
+        //             favouring: chequeInstrument.favouring,
+        //             payableAt: chequeInstrument.payableAt,
+        //         },
+        //         ddInstrumentId,
+        //         'DD'
+        //     );
+        //     this.logger.log(`Generated PDFs for DD: ${pdfPaths.join(', ')}`);
+        // } catch (error) {
+        //     this.logger.error(`Failed to generate PDF for DD ${ddInstrumentId}`, error);
+        // }
+        
         const apiUrl = this.configService.get<string>('app.apiUrl') || '';
         const baseUrl = apiUrl.replace('/api/v1', '');
 
@@ -136,24 +136,24 @@ export class PaymentRequestsNotificationService {
             return { success: false, message: 'Tender not found' };
         }
 
-        // Generate PDF for FDR
-        try {
-            const pdfPaths = await this.pdfGenerator.generatePdfs(
-                'fdr-request',
-                {
-                    tenderNo: tender.tenderNo,
-                    tenderName: tender.tenderName,
-                    amount: chequeInstrument.amount,
-                    favouring: chequeInstrument.favouring,
-                    payableAt: chequeInstrument.payableAt,
-                },
-                fdrInstrumentId,
-                'FDR'
-            );
-            this.logger.log(`Generated PDFs for FDR: ${pdfPaths.join(', ')}`);
-        } catch (error) {
-            this.logger.error(`Failed to generate PDF for FDR ${fdrInstrumentId}`, error);
-        }
+        // Generate PDF for FDR (commented out for cheque-triggered flow)
+        // try {
+        //     const pdfPaths = await this.pdfGenerator.generatePdfs(
+        //         'fdr-request',
+        //         {
+        //             tenderNo: tender.tenderNo,
+        //             tenderName: tender.tenderName,
+        //             amount: chequeInstrument.amount,
+        //             favouring: chequeInstrument.favouring,
+        //             payableAt: chequeInstrument.payableAt,
+        //         },
+        //         fdrInstrumentId,
+        //         'FDR'
+        //     );
+        //     this.logger.log(`Generated PDFs for FDR: ${pdfPaths.join(', ')}`);
+        // } catch (error) {
+        //     this.logger.error(`Failed to generate PDF for FDR ${fdrInstrumentId}`, error);
+        // }
 
         const apiUrl = this.configService.get<string>('app.apiUrl') || '';
         const baseUrl = apiUrl.replace('/api/v1', '');

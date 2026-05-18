@@ -48,7 +48,7 @@ export const ChequeActionFormSchema = BaseActionFormSchema.extend({
     cancelled_image_path: z.any().optional(),
 }).refine(
     (data) => {
-        if (data.action === 'accounts-form-1') {
+        if (data.action === 'accounts-form') {
             return !!data.cheque_req;
         }
         return true;
@@ -59,7 +59,7 @@ export const ChequeActionFormSchema = BaseActionFormSchema.extend({
     }
 ).refine(
     (data) => {
-        if (data.action === 'accounts-form-1' && data.cheque_req === 'Rejected') {
+        if (data.action === 'accounts-form' && data.cheque_req === 'Rejected') {
             return !!data.reason_req;
         }
         return true;
@@ -140,7 +140,7 @@ export const ChequeActionFormSchema = BaseActionFormSchema.extend({
     }
 ).refine(
     (data) => {
-        if (data.action === 'accounts-form-1' && data.cheque_req === 'Accepted') {
+        if (data.action === 'accounts-form' && data.cheque_req === 'Accepted') {
             return !!data.cheque_no && !!data.receiving_cheque_handed_over &&
                 data.cheque_images && data.cheque_images.length > 0;
         }

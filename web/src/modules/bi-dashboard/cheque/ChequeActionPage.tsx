@@ -155,7 +155,7 @@ export default function ChequeActionPage() {
                             handover: actionFormData.handover ?? undefined,
                             chequeImages: actionFormData.chequeImagePath ? actionFormData.chequeImagePath.split(',') : undefined,
                             positivePayConfirmation: actionFormData.confirmation ?? undefined,
-                            remarks: actionFormData.reference ?? undefined,
+                            remarks: actionFormData.chequeRemarks ?? undefined,
                         } : undefined,
                         initiateFollowup: followupData ? {
                             organisationName: followupData.organisationName ?? undefined,

@@ -52,7 +52,7 @@ export function ChequeActionForm({ instrumentId, action: propAction, tenderId, f
     };
 
     const availableActions = propAction === 0
-        ? ALL_CHEQUE_ACTION_OPTIONS.filter(opt => opt.value === 'accounts-form-1')
+        ? ALL_CHEQUE_ACTION_OPTIONS.filter(opt => opt.value === 'accounts-form')
         : ALL_CHEQUE_ACTION_OPTIONS;
 
     const defaultValues: ChequeActionFormValues = {
@@ -251,7 +251,7 @@ export function ChequeActionForm({ instrumentId, action: propAction, tenderId, f
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                         {availableActions.map((option) => {
                             const hasHistory =
-                                (option.value === 'accounts-form-1' && hasAccountsFormData) ||
+                                (option.value === 'accounts-form' && hasAccountsFormData) ||
                                 (option.value === 'initiate-followup' && hasFollowupData) ||
                                 (option.value === 'stop-cheque' && hasStopChequeData) ||
                                 (option.value === 'paid-via-bank-transfer' && hasPaidViaBankTransferData) ||
@@ -280,7 +280,7 @@ export function ChequeActionForm({ instrumentId, action: propAction, tenderId, f
                 </div>
 
                 {/* Accounts Form */}
-                <ConditionalSection show={selectedAction === 'accounts-form-1'}>
+                <ConditionalSection show={selectedAction === 'accounts-form'}>
                     <div className="space-y-4 border rounded-lg p-4 bg-background">
                         <div className="flex items-center gap-2 pb-3 border-b">
                             <FileText className="h-5 w-5 text-primary" />

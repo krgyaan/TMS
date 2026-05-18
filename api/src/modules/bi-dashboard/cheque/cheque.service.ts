@@ -17,6 +17,8 @@ import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import type { ChequeDashboardRow, ChequeDashboardCounts } from '@/modules/bi-dashboard/cheque/helpers/cheque.types';
 import { CHEQUE_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
 import { PaymentRequestsNotificationService } from '@/modules/tendering/payment-requests/services/payment-requests-notification.service';
+import { FollowUpService } from '@/modules/follow-up/follow-up.service';
+import type { CreateFollowUpDto } from '@/modules/follow-up/zod';
 import { followUps } from '@/db/schemas/shared/follow-ups.schema';
 
 @Injectable()
@@ -26,6 +28,7 @@ export class ChequeService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         @Inject(forwardRef(() => PaymentRequestsNotificationService)) private readonly notificationService: PaymentRequestsNotificationService,
+        private readonly followUpService: FollowUpService,
     ) { }
 
     private statusMap() {
@@ -288,7 +291,6 @@ export class ChequeService {
     private mapActionToNumber(action: string): number {
         const actionMap: Record<string, number> = {
             'accounts-form': 1,
-            'accounts-form-1': 1,
             'initiate-followup': 2,
             'stop-cheque': 3,
             'paid-via-bank-transfer': 4,
@@ -374,7 +376,7 @@ export class ChequeService {
             updatedAt: new Date(),
         };
 
-        if (body.action === 'accounts-form-1') {
+        if (body.action === 'accounts-form' || body.action === 'accounts-form-1') {
             if (body.cheque_req === 'Accepted') {
                 updateData.status = CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED;
             } else if (body.cheque_req === 'Rejected') {
@@ -425,7 +427,7 @@ export class ChequeService {
             if (body.cheque_type) chequeDetailsUpdate.reqType = body.cheque_type;
             if (body.cheque_reason) chequeDetailsUpdate.chequeReason = body.cheque_reason;
             if (body.due_date) chequeDetailsUpdate.dueDate = body.due_date;
-        } else if (body.action === 'accounts-form-1') {
+        } else if (body.action === 'accounts-form' || body.action === 'accounts-form-1') {
             if (body.cheque_no) chequeDetailsUpdate.chequeNo = body.cheque_no;
             if (body.due_date) chequeDetailsUpdate.dueDate = body.due_date;
 
@@ -449,7 +451,7 @@ export class ChequeService {
 
             // Handle remarks
             if (body.remarks) {
-                chequeDetailsUpdate.reference = body.remarks;
+                chequeDetailsUpdate.remarks = body.remarks;
             }
 
             // Handle cheque_given_from_account
@@ -542,8 +544,8 @@ export class ChequeService {
                 .where(eq(instrumentChequeDetails.instrumentId, instrumentId));
         }
 
-        // Send emails after cheque action 'accounts-form-1' accepted
-        if (body.action === 'accounts-form-1' && body.cheque_req === 'Accepted') {
+        // Send emails after cheque action accounts-form accepted
+        if ((body.action === 'accounts-form' || body.action === 'accounts-form-1') && body.cheque_req === 'Accepted') {
             try {
                 const [chequeDetails] = await this.db
                     .select()
@@ -634,7 +636,41 @@ export class ChequeService {
             }
         }
 
-        // Follow-up creation will be handled by a different service class
+        if (body.action === 'initiate-followup' && body.emailBody) {
+            try {
+                let contacts: any[] = [];
+                if (body.contacts) {
+                    try {
+                        contacts = typeof body.contacts === 'string' ? JSON.parse(body.contacts) : body.contacts;
+                    } catch (e) {
+                        this.logger.warn('Failed to parse contacts for followup', e);
+                    }
+                }
+                const followupDto: CreateFollowUpDto = {
+                    area: 'Accounts',
+                    partyName: body.organisation_name || 'Unknown',
+                    details: body.emailBody,
+                    contacts: contacts.map((c: any) => ({
+                        name: c.name,
+                        email: c.email || null,
+                        phone: c.phone || null,
+                        org: body.organisation_name || null,
+                    })),
+                    frequency: body.frequency || null,
+                    startFrom: body.followup_start_date || undefined,
+                    emdId: instrumentId,
+                    followupFor: 'Cheque Followup',
+                    assignedToId: null,
+                    createdById: null,
+                    amount: 0,
+                    attachments: [],
+                    followUpHistory: []
+                };
+                await this.followUpService.create(followupDto, user.id || user.sub);
+            } catch (error) {
+                this.logger.warn(`Failed to create followup for Cheque instrument ${instrumentId}: ${error.message}`);
+            }
+        }
 
         return {
             success: true,
@@ -856,6 +892,7 @@ export class ChequeService {
                 chequeGivenFromAccount: instrumentChequeDetails.chequeGivenFromAccount,
                 proofImage: instrumentChequeDetails.proofImage,
                 cancelledImagePath: instrumentChequeDetails.cancelledImagePath,
+                chequeRemarks: instrumentChequeDetails.remarks,
             })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
@@ -908,6 +945,7 @@ export class ChequeService {
             chequeGivenFromAccount: result.chequeGivenFromAccount,
             proofImage: result.proofImage,
             cancelledImagePath: result.cancelledImagePath,
+            chequeRemarks: result.chequeRemarks,
             courierAddress: result.courierAddress,
             courierDeadline: result.courierDeadline ? Number(result.courierDeadline) : null,
             utr: result.utr,
