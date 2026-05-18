@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { eq, sql, desc } from "drizzle-orm";
+import { eq, sql, desc} from "drizzle-orm";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
 import {
@@ -17,6 +17,7 @@ import { vendors } from "@db/schemas/vendors/vendors.schema";
 import { RfqsService } from "@/modules/tendering/rfqs/rfq.service";
 import type { CreateRfqResponseBodyDto } from "./dto/rfq-response.dto";
 
+
 @Injectable()
 export class RfqResponseService {
     constructor(
@@ -26,15 +27,12 @@ export class RfqResponseService {
 
     async create(rfqId: number, data: CreateRfqResponseBodyDto) {
         const rfq = await this.rfqsService.findById(rfqId);
-        if (!rfq) {
-            throw new NotFoundException(`RFQ with ID ${rfqId} not found`);
-        }
 
         const responseData: NewRfqResponse = {
             rfqId,
             organizationId: data.organizationId,
             vendorId: data.vendorId,
-            oemStatus: data.oemStatus,
+            responseStatus: data.responseStatus,
             receiptDatetime: new Date(data.receiptDatetime),
             gstPercentage: data.gstPercentage != null ? String(data.gstPercentage) : null,
             gstType: data.gstType ?? null,
@@ -100,6 +98,18 @@ export class RfqResponseService {
         if (!rfq) {
             throw new NotFoundException(`RFQ with ID ${rfqId} not found`);
         }
+
+        const tenderId = rfq.tenderId;
+        const allTenderResponses = await this.getAllRfqResponses(tenderId);
+
+        // Find organizations that have already responded
+        const respondedOrgIds = new Set(allTenderResponses.map(r => r.organizationId));
+
+        // Pending organizations are those requested in the current RFQ but haven't responded yet
+        const pendingTenderResponses = (rfq.vendorOrganizations || []).filter(
+            org => !respondedOrgIds.has(org.organizationId)
+        );
+
         const rows = await this.db
             .select({
                 id: rfqResponses.id,
@@ -120,7 +130,39 @@ export class RfqResponseService {
             .leftJoin(tenderInfos, eq(rfqs.tenderId, tenderInfos.id))
             .where(eq(rfqResponses.rfqId, rfqId))
             .orderBy(desc(rfqResponses.createdAt));
-        return rows;
+            
+        return {
+            currentRfqResponses: rows,
+            allTenderResponses,
+            pendingTenderResponses,
+        };
+    }
+
+    async getAllRfqResponses(tenderId : number){
+        const rfqsData = await this.db
+            .select({
+                id: rfqResponses.id,
+                rfqId: rfqResponses.rfqId,
+                vendorId: rfqResponses.vendorId,
+                organizationName: vendorOrganizations.name,
+                organizationId: vendorOrganizations.id,
+                vendorName: vendors.name,
+                receiptDatetime: rfqResponses.receiptDatetime,
+                tenderName: tenderInfos.tenderName,
+                tenderNo: tenderInfos.tenderNo,
+                dueDate: tenderInfos.dueDate,
+                itemSummary: sql<string>`(SELECT string_agg(ri.requirement, ', ') FROM rfq_items ri WHERE ri.rfq_id = rfqs.id)`.as("item_summary"),
+                responseStatus: rfqResponses.responseStatus,
+            })
+            .from(rfqResponses)
+            .leftJoin(vendors, eq(rfqResponses.vendorId, vendors.id))
+            .leftJoin(vendorOrganizations, eq(vendors.orgId, vendorOrganizations.id))
+            .leftJoin(rfqs, eq(rfqResponses.rfqId, rfqs.id))
+            .leftJoin(tenderInfos, eq(rfqs.tenderId, tenderInfos.id))
+            .where(eq(rfqs.tenderId, tenderId))
+            .orderBy(desc(rfqResponses.createdAt));
+
+        return rfqsData;
     }
 
     async findById(responseId: number) {
