@@ -1,9 +1,9 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle2, Clock } from 'lucide-react';
+import { AlertCircle, ArrowLeft, CheckCircle2, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { paths } from '@/app/routes/paths';
 import { useRfq, useResponseStatus } from '@/hooks/api/useRfqs';
@@ -86,11 +86,18 @@ export default function RfqResponseCreatePage() {
     return (
         <div className="space-y-6">
             <Card>
-                <CardHeader className="pb-3">
-                    <h3 className="text-lg font-semibold tracking-tight">Response Status</h3>
-                    <p className="text-sm text-muted-foreground">
-                        Overview of vendor responses for this tender.
-                    </p>
+                <CardHeader className="pb-3 border-b bg-muted/10">
+                    <div className="space-y-1">
+                        <CardTitle className="text-lg font-semibold tracking-tight">Response Status</CardTitle>
+                        <CardDescription className="text-sm text-muted-foreground">
+                            Overview of vendor responses for this tender.
+                        </CardDescription>
+                    </div>
+                    <CardAction>
+                        <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
+                            <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                        </Button>
+                    </CardAction>
                 </CardHeader>
                 <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

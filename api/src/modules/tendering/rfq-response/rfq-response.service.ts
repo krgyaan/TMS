@@ -38,7 +38,7 @@ export class RfqResponseService {
             gstType: data.gstType ?? null,
             deliveryTime: data.deliveryTime ?? null,
             freightType: data.freightType ?? null,
-            notes: data.notes ?? null,
+            remarks: data.generalRemarks ?? null,
         };
 
         const [newResponse] = await this.db.insert(rfqResponses).values(responseData).returning();

@@ -15,6 +15,8 @@ import { TenderFileUploader } from '@/components/tender-file-upload';
 import { SelectField } from '@/components/form/SelectField';
 import { NumberInput } from '@/components/form/NumberInput';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+
 
 import { useCreateRfqResponse } from '@/hooks/api/useRfqResponses';
 import { useItemOptions } from '@/hooks/useSelectOptions';
@@ -92,6 +94,7 @@ export function RfqResponseForm({ rfqId, rfqData, orgs, responseStatus }: RfqRes
             technicalPaths: [],
             mafPaths: [],
             miiPaths: [],
+            generalRemarks: '',
         },
     });
 
@@ -142,6 +145,8 @@ export function RfqResponseForm({ rfqId, rfqData, orgs, responseStatus }: RfqRes
     });
 
     const handleSubmit: SubmitHandler<RfqResponseFormValues> = async (values) => {
+        const isQuotation = values.responseStatus === '1';
+
         const items = values.items.map((row) => {
             const qty = Number(row.qty) || 0;
             const unitPrice = Number(row.unitPrice) || 0;
@@ -156,24 +161,29 @@ export function RfqResponseForm({ rfqId, rfqData, orgs, responseStatus }: RfqRes
             };
         });
 
-        const documents: Array<{ docType: string; path: string }> = [
-            ...quotationPaths.map((path) => ({ docType: 'QUOTATION', path })),
-            ...technicalPaths.map((path) => ({ docType: 'TECHNICAL', path })),
-            ...mafPaths.map((path) => ({ docType: 'MAF_FORMAT', path })),
-            ...miiPaths.map((path) => ({ docType: 'MII_FORMAT', path })),
-        ].filter((d) => d.path);
+        const documents: Array<{ docType: string; path: string }> = isQuotation
+            ? [
+                  ...quotationPaths.map((path) => ({ docType: 'QUOTATION', path })),
+                  ...technicalPaths.map((path) => ({ docType: 'TECHNICAL', path })),
+                  ...mafPaths.map((path) => ({ docType: 'MAF_FORMAT', path })),
+                  ...miiPaths.map((path) => ({ docType: 'MII_FORMAT', path })),
+            ].filter((d) => d.path) : [];
 
+        const receiptDate = values.receiptDatetime ? new Date(values.receiptDatetime) : new Date();
+            
+        
         await createResponse.mutateAsync({
             rfqId,
             data: {
                 organizationId: parseInt(values.orgId, 10),
                 vendorId: parseInt(values.vendorId, 10),
                 responseStatus: parseInt(values.responseStatus, 10),
-                receiptDatetime: values.receiptDatetime.toISOString(),
-                gstPercentage: values.gstPercentage,
-                gstType: values.gstType,
-                deliveryTime: values.deliveryTime,
-                freightType: values.freightType,
+                receiptDatetime: receiptDate.toISOString(),
+                gstPercentage: isQuotation ? values.gstPercentage : undefined,
+                gstType: isQuotation ? values.gstType : undefined,
+                deliveryTime: isQuotation ? values.deliveryTime : undefined,
+                freightType: isQuotation ? values.freightType : undefined,
+                generalRemarks: !isQuotation ? (values.generalRemarks || undefined) : undefined,
                 items,
                 documents: documents.length ? documents : undefined,
             },
@@ -201,11 +211,6 @@ export function RfqResponseForm({ rfqId, rfqData, orgs, responseStatus }: RfqRes
                             </div>
                         </CardDescription>
                     </div>
-                    <CardAction>
-                        <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
-                            <ArrowLeft className="mr-2 h-4 w-4" /> Back
-                        </Button>
-                    </CardAction>
                 </div>
             </CardHeader>
 
@@ -213,13 +218,6 @@ export function RfqResponseForm({ rfqId, rfqData, orgs, responseStatus }: RfqRes
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <SelectField
-                                control={form.control}
-                                name="responseStatus"
-                                label="Response Status*"
-                                placeholder="Select Response Status"
-                                options={responseStatusOptions} 
-                            />
                             <SelectField
                                 control={form.control}
                                 name="orgId"
@@ -234,6 +232,13 @@ export function RfqResponseForm({ rfqId, rfqData, orgs, responseStatus }: RfqRes
                                 placeholder={selectedOrgId ? "Select Vendor" : "Select Organization first"}
                                 options={vendorOptions}
                                 disabled={!selectedOrgId}
+                            />
+                            <SelectField
+                                control={form.control}
+                                name="responseStatus"
+                                label="Response Status*"
+                                placeholder="Select Response Status"
+                                options={responseStatusOptions} 
                             />
                         </div>
 
@@ -433,6 +438,31 @@ export function RfqResponseForm({ rfqId, rfqData, orgs, responseStatus }: RfqRes
                                     </div>
                                 </div>
                             </>
+                        )}
+
+
+                        {selectedResponseStatus && !isQuotationReceived && (
+                            <div>
+                                <h3>Remarks</h3>
+                                <Separator />
+                                <div>
+                                    <FieldWrapper
+                                        control = {form.control}
+                                        name = "generalRemarks"
+                                        label = {null}
+                                    >
+                                        {
+                                            (f) => (
+                                                <Textarea
+                                                    {...f}
+                                                    placeholder="Please enter the remarks or the reason for no quotations"
+                                                    disabled = {isSubmitting}
+                                                />
+                                            )
+                                        }
+                                    </FieldWrapper>
+                                </div>
+                            </div>
                         )}
 
                         <div className="flex justify-end gap-3 pt-6 border-t">

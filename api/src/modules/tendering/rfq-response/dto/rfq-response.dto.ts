@@ -37,7 +37,7 @@ export const CreateRfqResponseSchema = z.object({
     gstType: optionalTextField(50),
     deliveryTime: optionalNumber(z.coerce.number().int().nonnegative()),
     freightType: optionalTextField(50),
-    notes: optionalString,
+    generalRemarks: optionalString,
     items: z.array(RfqResponseItemSchema).min(1, 'At least one item is required'),
     documents: z.array(RfqDocumentSchema).optional(),
 });
@@ -59,7 +59,7 @@ export const UpdateRfqResponseSchema = z.object({
     gstType: optionalTextField(50),
     deliveryTime: optionalNumber(z.coerce.number().int().nonnegative()),
     freightType: optionalTextField(50),
-    notes: optionalString,
+    generalRemarks: optionalString,
 });
 
 export type UpdateRfqResponseDto = z.infer<typeof UpdateRfqResponseSchema>;
