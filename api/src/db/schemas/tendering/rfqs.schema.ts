@@ -46,6 +46,7 @@ export const rfqResponses = pgTable("rfq_responses", {
     deliveryTime: integer("delivery_time"),
     freightType: varchar("freight_type", { length: 50 }),
     notes: text("notes"),
+    remarks: text("remarks"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
