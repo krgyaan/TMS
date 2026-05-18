@@ -37,7 +37,7 @@ export const rfqDocuments = pgTable("rfq_documents", {
 export const rfqResponses = pgTable("rfq_responses", {
     id: bigserial("id", { mode: "number" }).primaryKey(),
     rfqId: bigint("rfq_id", { mode: "number" }).notNull(),
-    oemStatus: bigint("oem_status", {mode: "number"}),
+    responseStatus: bigint("response_status", {mode: "number"}),
     organizationId: bigint("organization_id", { mode: "number" }),
     vendorId: bigint("vendor_id", { mode: "number" }).notNull(),
     receiptDatetime: timestamp("receipt_datetime", { withTimezone: true }).notNull(),
