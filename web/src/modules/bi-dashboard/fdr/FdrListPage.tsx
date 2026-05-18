@@ -74,14 +74,11 @@ const TABS_CONFIG: Array<{ key: FdrDashboardTab; name: string; icon: React.React
 const getStatusVariant = (status: string | null): string => {
     if (!status) return 'secondary';
     const statusLower = status.toLowerCase();
-    if (statusLower.includes('linked') || statusLower.includes('active')) {
+    if (statusLower.includes('created')) {
         return 'default';
     }
     if (statusLower.includes('cancelled') || statusLower.includes('rejected')) {
         return 'destructive';
-    }
-    if (statusLower.includes('returned')) {
-        return 'secondary';
     }
     return 'secondary';
 };
@@ -213,15 +210,16 @@ const FdrListPage = () => {
             {
                 field: 'expiry',
                 headerName: 'Expiry',
-                width: 120,
+                width: 90,
+                maxWidth: 90,
                 colId: 'expiry',
                 sortable: true,
-                valueFormatter: (params) => params.value ? formatDate(params.value) : '—',
-                comparator: (dateA, dateB) => {
-                    if (!dateA && !dateB) return 0;
-                    if (!dateA) return 1;
-                    if (!dateB) return -1;
-                    return new Date(dateA).getTime() - new Date(dateB).getTime();
+                cellRenderer: (params: any) => {
+                    const status = params.value;
+                    if (!status) return '—';
+                    if (status === 'No date') return <Badge variant="secondary">No date</Badge>;
+                    if (status === 'Expired') return <Badge variant="destructive">Expired</Badge>;
+                    return <Badge variant="default">{status}</Badge>;
                 },
             },
             {

@@ -25,18 +25,25 @@ export class FdrService {
         private readonly followUpService: FollowUpService
     ) { }
 
-    private statusMap() {
-        return {
+    private deriveFdrStatus(status: string | null): string {
+        const map: Record<string, string> = {
             [FDR_STATUSES.PENDING]: "Pending",
-            [FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED]: "Accepted",
-            [FDR_STATUSES.ACCOUNTS_FORM_REJECTED]: "Rejected",
+            [FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED]: "FDR Created",
+            [FDR_STATUSES.ACCOUNTS_FORM_REJECTED]: "FDR Rejected",
             [FDR_STATUSES.FOLLOWUP_INITIATED]: "Followup Initiated",
-            [FDR_STATUSES.RETURN_VIA_COURIER]: "Courier Return",
-            [FDR_STATUSES.RETURN_VIA_BANK_TRANSFER]: "Bank Return",
-            [FDR_STATUSES.SETTLED_WITH_PROJECT]: "Project Settlement",
-            [FDR_STATUSES.CANCELLATION_REQUESTED]: "Cancellation Request",
-            [FDR_STATUSES.CANCELLED]: "Cancelled",
+            [FDR_STATUSES.RETURN_VIA_COURIER]: "Returned via courier",
+            [FDR_STATUSES.RETURN_VIA_BANK_TRANSFER]: "Returned via Bank Transfer",
+            [FDR_STATUSES.SETTLED_WITH_PROJECT]: "Settled with Project Account",
+            [FDR_STATUSES.CANCELLATION_REQUESTED]: "FDR Cancellation request sent to branch",
+            [FDR_STATUSES.CANCELLED]: "FDR Cancelled at Branch",
         };
+        return map[status as string] || status || "Pending";
+    }
+
+    private deriveFdrExpiryStatus(fdrExpiryDate: Date | null): string {
+        if (!fdrExpiryDate) return 'No date';
+        const expiryDate = new Date(fdrExpiryDate.getTime() + 3 * 30 * 24 * 60 * 60 * 1000);
+        return expiryDate < new Date() ? 'Expired' : 'Valid';
     }
 
     private buildFdrDashboardConditions(tab?: string): { conditions: any[]; needsFdrDetails: boolean } {
@@ -215,8 +222,8 @@ export class FdrService {
             tenderNo: row.tenderNo || row.projectNo,
             tenderStatus: row.tenderStatus || row.tenderStatus,
             member: row.teamMember?.toString() ?? null,
-            expiry: row.expiry ? new Date(row.expiry) : null,
-            fdrStatus: this.statusMap()[row.fdrStatus],
+            expiry: this.deriveFdrExpiryStatus(row.expiry ? new Date(row.expiry) : null),
+            fdrStatus: this.deriveFdrStatus(row.fdrStatus),
         }));
 
         return wrapPaginatedResponse(data, total, page, limit);
@@ -818,7 +825,7 @@ export class FdrService {
         return {
             id: result.id,
             action: result.action,
-            fdrStatus: this.statusMap()[result.status] || result.status,
+            fdrStatus: this.deriveFdrStatus(result.status),
             tenderNo: result.tenderNo,
             tenderName: result.tenderName,
             tenderId: result.tenderId,

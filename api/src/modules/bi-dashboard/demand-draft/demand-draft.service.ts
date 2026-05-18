@@ -29,18 +29,25 @@ export class DemandDraftService {
         private readonly followUpService: FollowUpService,
     ) { }
 
-    private statusMap() {
-        return {
+    private deriveDdStatus(status: string | null): string {
+        const map: Record<string, string> = {
             [DD_STATUSES.PENDING]: 'Pending',
-            [DD_STATUSES.ACCOUNTS_FORM_ACCEPTED]: 'Accepted',
-            [DD_STATUSES.ACCOUNTS_FORM_REJECTED]: 'Rejected',
+            [DD_STATUSES.ACCOUNTS_FORM_ACCEPTED]: 'DD Created',
+            [DD_STATUSES.ACCOUNTS_FORM_REJECTED]: 'DD Rejected',
             [DD_STATUSES.FOLLOWUP_INITIATED]: 'Followup Initiated',
-            [DD_STATUSES.RETURN_VIA_COURIER]: 'Returned',
-            [DD_STATUSES.CANCELLATION_REQUESTED]: 'Cancellation Requested',
-            [DD_STATUSES.CANCELLED]: 'Cancelled at Branch',
-            [DD_STATUSES.RETURN_VIA_BANK_TRANSFER]: 'Returned',
-            [DD_STATUSES.SETTLED_WITH_PROJECT]: 'Settled with Project',
+            [DD_STATUSES.RETURN_VIA_COURIER]: 'Returned via courier',
+            [DD_STATUSES.RETURN_VIA_BANK_TRANSFER]: 'Returned via Bank Transfer',
+            [DD_STATUSES.SETTLED_WITH_PROJECT]: 'Settled with Project Account',
+            [DD_STATUSES.CANCELLATION_REQUESTED]: 'DD Cancellation request sent to branch',
+            [DD_STATUSES.CANCELLED]: 'DD Cancelled at Branch',
         };
+        return map[status as string] || status || 'Pending';
+    }
+
+    private deriveDdExpiryStatus(ddCreationDate: Date | null): string {
+        if (!ddCreationDate) return 'No date';
+        const expiryDate = new Date(ddCreationDate.getTime() + 3 * 30 * 24 * 60 * 60 * 1000);
+        return expiryDate < new Date() ? 'Expired' : 'Valid';
     }
 
     private buildDdDashboardConditions(tab?: string) {
@@ -186,10 +193,6 @@ export class DemandDraftService {
 
         const total = Number(countResult?.count || 0);
 
-        function isExpired(dueDate: Date): boolean {
-            return dueDate && new Date(dueDate.getTime() + 3 * 30 * 24 * 60 * 60 * 1000) < new Date(Date.now());
-        }
-
         const data: DemandDraftDashboardRow[] = rows.map((row) => ({
             id: row.id,
             requestId: row.requestId,
@@ -203,8 +206,8 @@ export class DemandDraftService {
             bidValidity: row.bidValidity ? new Date(row.bidValidity) : null,
             tenderStatus: row.tenderStatus,
             teamMember: row.teamMember?.toString() ?? null,
-            expiry: row.ddCreationDate ? (isExpired(new Date(row.ddCreationDate)) ? 'Expired' : 'Valid') : null,
-            ddStatus: this.statusMap()[row.ddStatus],
+            expiry: this.deriveDdExpiryStatus(row.ddCreationDate ? new Date(row.ddCreationDate) : null),
+            ddStatus: this.deriveDdStatus(row.ddStatus),
         }));
 
         return wrapPaginatedResponse(data, total, page, limit);
@@ -623,7 +626,7 @@ export class DemandDraftService {
         return {
             id: result.id,
             action: result.action,
-            ddStatus: this.statusMap()[result.status] || result.status,
+            ddStatus: this.deriveDdStatus(result.status),
             tenderNo: result.tenderNo,
             tenderName: result.tenderName,
             tenderId: result.tenderId,

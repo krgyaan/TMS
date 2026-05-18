@@ -9,7 +9,7 @@ export interface FdrDashboardRow {
     tenderNo: string | null;
     tenderStatus: string | null;
     member: string | null;
-    expiry: Date | null;
+    expiry: string | null;
     fdrStatus: string | null;
 }
 

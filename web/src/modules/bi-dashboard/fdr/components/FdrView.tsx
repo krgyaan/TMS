@@ -108,9 +108,31 @@ export function FdrView({
         return null;
     }
 
-    const status = data.fdrStatus || data.status || null;
+    const deriveFdrStatus = (s: string | null): string => {
+        const map: Record<string, string> = {
+            PENDING: 'Pending',
+            ACCOUNTS_FORM_ACCEPTED: 'FDR Created',
+            ACCOUNTS_FORM_REJECTED: 'FDR Rejected',
+            FOLLOWUP_INITIATED: 'Followup Initiated',
+            RETURN_VIA_COURIER: 'Returned via courier',
+            RETURN_VIA_BANK_TRANSFER: 'Returned via Bank Transfer',
+            SETTLED_WITH_PROJECT: 'Settled with Project Account',
+            CANCELLATION_REQUESTED: 'FDR Cancellation request sent to branch',
+            CANCELLED: 'FDR Cancelled at Branch',
+        };
+        return map[s as string] || s || 'Pending';
+    };
+
+    const deriveFdrExpiryStatus = (fdrExpiryDate: string | null): string => {
+        if (!fdrExpiryDate) return 'No date';
+        const expiryDate = new Date(new Date(fdrExpiryDate).getTime() + 3 * 30 * 24 * 60 * 60 * 1000);
+        return expiryDate < new Date() ? 'Expired' : 'Valid';
+    };
+
+    const status = deriveFdrStatus(data.fdrStatus || data.status);
     const hasAccountsFormData = data.hasAccountsFormData === true;
-    const isAccountsFormRejected = data.fdrStatus === 'Rejected' || data.status === 'Rejected';
+    const isAccountsFormRejected = (data.fdrStatus === 'ACCOUNTS_FORM_REJECTED' || data.status === 'ACCOUNTS_FORM_REJECTED');
+    const expiryStatus = data.fdrExpiryDate ? deriveFdrExpiryStatus(data.fdrExpiryDate) : data.expiryDate ? deriveFdrExpiryStatus(data.expiryDate) : null;
 
     return (
         <Card className={className}>
@@ -136,7 +158,7 @@ export function FdrView({
                                 Status
                             </TableCell>
                             <TableCell className="text-sm">
-                                <Badge variant="outline">{status || '—'}</Badge>
+                                <Badge variant="outline">{status}</Badge>
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -189,10 +211,16 @@ export function FdrView({
                                 {data.marginPercent ? `${Number(data.marginPercent)}%` : '—'}
                             </TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">
-                                FDR Expiry Date
+                                Expiry Status
                             </TableCell>
                             <TableCell className="text-sm">
-                                {data.fdrExpiryDate ? formatDate(data.fdrExpiryDate) : data.expiryDate ? formatDate(data.expiryDate) : '—'}
+                                {expiryStatus === 'No date' ? (
+                                    <Badge variant="secondary">No date</Badge>
+                                ) : expiryStatus === 'Expired' ? (
+                                    <Badge variant="destructive">Expired</Badge>
+                                ) : expiryStatus ? (
+                                    <Badge variant="default">{expiryStatus}</Badge>
+                                ) : '—'}
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
@@ -268,7 +296,7 @@ export function FdrView({
                                     <>
                                         <FieldRow
                                             label="Status"
-                                            value={<Badge variant="destructive">Rejected</Badge>}
+                                            value={<Badge variant="destructive">FDR Rejected</Badge>}
                                         />
                                         <FieldRow label="Rejection Reason" value={data.rejectionReason || data.fdrRemark} fullWidth />
                                     </>
@@ -276,7 +304,7 @@ export function FdrView({
                                     <>
                                         <FieldRow
                                             label="Status"
-                                            value={<Badge variant="default">Accepted</Badge>}
+                                            value={<Badge variant="default">FDR Created</Badge>}
                                         />
                                         <TableRow className="hover:bg-muted/30 transition-colors">
                                             <TableCell className="text-sm font-medium text-muted-foreground">

@@ -56,14 +56,11 @@ const TABS_CONFIG: Array<{ key: DemandDraftDashboardTab; name: string; icon: Rea
 const getStatusVariant = (status: string | null): string => {
     if (!status) return 'secondary';
     const statusLower = status.toLowerCase();
-    if (statusLower.includes('created') || statusLower.includes('active')) {
+    if (statusLower.includes('created')) {
         return 'default';
     }
     if (statusLower.includes('cancelled') || statusLower.includes('rejected')) {
         return 'destructive';
-    }
-    if (statusLower.includes('returned')) {
-        return 'secondary';
     }
     return 'secondary';
 };
@@ -233,7 +230,9 @@ const DemandDraftListPage = () => {
                 cellRenderer: (params: any) => {
                     const status = params.value;
                     if (!status) return '—';
-                    return <Badge variant={status === 'Expired' ? 'destructive' : 'default'}>{status}</Badge>;
+                    if (status === 'No date') return <Badge variant="secondary">No date</Badge>;
+                    if (status === 'Expired') return <Badge variant="destructive">Expired</Badge>;
+                    return <Badge variant="default">{status}</Badge>;
                 },
             },
             {

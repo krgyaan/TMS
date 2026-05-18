@@ -109,9 +109,31 @@ export function DemandDraftView({
         return null;
     }
 
-    const status = data.ddStatus || data.status || null;
+    const deriveDdStatus = (s: string | null): string => {
+        const map: Record<string, string> = {
+            PENDING: 'Pending',
+            ACCOUNTS_FORM_ACCEPTED: 'DD Created',
+            ACCOUNTS_FORM_REJECTED: 'DD Rejected',
+            FOLLOWUP_INITIATED: 'Followup Initiated',
+            RETURN_VIA_COURIER: 'Returned via courier',
+            RETURN_VIA_BANK_TRANSFER: 'Returned via Bank Transfer',
+            SETTLED_WITH_PROJECT: 'Settled with Project Account',
+            CANCELLATION_REQUESTED: 'DD Cancellation request sent to branch',
+            CANCELLED: 'DD Cancelled at Branch',
+        };
+        return map[s as string] || s || 'Pending';
+    };
+
+    const deriveDdExpiryStatus = (ddDate: string | null): string => {
+        if (!ddDate) return 'No date';
+        const expiryDate = new Date(new Date(ddDate).getTime() + 3 * 30 * 24 * 60 * 60 * 1000);
+        return expiryDate < new Date() ? 'Expired' : 'Valid';
+    };
+
+    const status = deriveDdStatus(data.ddStatus || data.status);
     const hasAccountsFormData = data.hasAccountsFormData === true;
-    const isAccountsFormRejected = data.ddStatus === 'Rejected' || data.status === 'Rejected';
+    const isAccountsFormRejected = (data.ddStatus === 'ACCOUNTS_FORM_REJECTED' || data.status === 'ACCOUNTS_FORM_REJECTED');
+    const expiryStatus = data.ddDate ? deriveDdExpiryStatus(data.ddDate) : null;
 
     return (
         <Card className={className}>
@@ -137,10 +159,22 @@ export function DemandDraftView({
                                 Status
                             </TableCell>
                             <TableCell className="text-sm">
-                                <Badge variant="outline">{status || '—'}</Badge>
+                                <Badge variant="outline">{status}</Badge>
                             </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Expiry Status
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {expiryStatus === 'No date' ? (
+                                    <Badge variant="secondary">No date</Badge>
+                                ) : expiryStatus === 'Expired' ? (
+                                    <Badge variant="destructive">Expired</Badge>
+                                ) : expiryStatus ? (
+                                    <Badge variant="default">{expiryStatus}</Badge>
+                                ) : '—'}
+                            </TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 DD Purpose
                             </TableCell>
@@ -202,7 +236,7 @@ export function DemandDraftView({
                                     <>
                                         <FieldRow
                                             label="Status"
-                                            value={<Badge variant="destructive">Rejected</Badge>}
+                                            value={<Badge variant="destructive">DD Rejected</Badge>}
                                         />
                                         <FieldRow label="Rejection Reason" value={data.rejectionReason || data.ddRemarks} fullWidth />
                                     </>
@@ -210,7 +244,7 @@ export function DemandDraftView({
                                     <>
                                         <FieldRow
                                             label="Status"
-                                            value={<Badge variant="default">Accepted</Badge>}
+                                            value={<Badge variant="default">DD Created</Badge>}
                                         />
                                         <TableRow className="hover:bg-muted/30 transition-colors">
                                             <TableCell className="text-sm font-medium text-muted-foreground">
