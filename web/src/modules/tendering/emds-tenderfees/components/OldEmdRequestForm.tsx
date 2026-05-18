@@ -46,8 +46,8 @@ export function OldEmdRequestForm({ tenderId, requestIds, initialData, mode = 'c
     const updateRequest = useUpdatePaymentRequest();
     const isEditMode = mode === 'edit';
     const { data: currentUser } = useCurrentUser();
-    const teamOptions = useTeamOptions();
-    const defaultTeamId = currentUser?.team?.id;
+    const teamOptions = useTeamOptions([1,2]);
+    const defaultTeamId = currentUser?.profile?.primaryTeamId;
 
     const form = useForm<FormValues>({
         resolver: zodResolver(OldEntryPaymentRequestSchema) as Resolver<FormValues>,
@@ -55,8 +55,8 @@ export function OldEmdRequestForm({ tenderId, requestIds, initialData, mode = 'c
             tenderName: '',
             tenderNo: '',
             tenderDueDate: '',
-            team: defaultTeamId || undefined,
-            EMD: { mode: defaultMode || undefined, details: {} },
+            team: defaultTeamId ?? undefined,
+            EMD: { mode: (defaultMode as any) || undefined, details: {} },
             TENDER_FEES: { mode: undefined, details: {} },
             PROCESSING_FEES: { mode: undefined, details: {} },
         },
@@ -175,7 +175,14 @@ export function OldEmdRequestForm({ tenderId, requestIds, initialData, mode = 'c
                         {/* Tender Details */}
                         {
                             (type === 'OLD_ENTRY') && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start mb-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-start mb-4">
+                                    <SelectField
+                                        control={form.control}
+                                        name="team"
+                                        label="Team"
+                                        options={teamOptions}
+                                        placeholder="Select Team"
+                                    />
                                     <FieldWrapper control={form.control} name="tenderName" label="Tender/Project Name">
                                         {(field) => <Input {...field} />}
                                     </FieldWrapper>
@@ -188,14 +195,6 @@ export function OldEmdRequestForm({ tenderId, requestIds, initialData, mode = 'c
                                 </div>
                             )
                         }
-
-                        <SelectField
-                            control={form.control}
-                            name="team"
-                            label="Team"
-                            options={teamOptions}
-                            placeholder="Select Team"
-                        />
 
                         <PaymentSection
                             purpose="EMD"
