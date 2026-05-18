@@ -40,7 +40,7 @@ type RfqRow = {
     teamMemberName: string;
     status: number;
     statusName: string;
-    rfqStatus: string | null;
+    responseStatus: string | null;
     latestStatus: number | null;
     latestStatusName: string | null;
     statusRemark: string | null;
@@ -83,6 +83,14 @@ type RfqDetails = {
     }>;
 
 };
+
+export const responseStatuses = [
+    { id: 1, name: "Quotation Received" },
+    { id: 2, name: "Product not available" },
+    { id: 3, name: "OEM docs not provided" },
+    { id: 4, name: "Not allowed by OEM" },
+    { id: 5, name: "Not Quoted by OEM" }
+] as const;
 
 @Injectable()
 export class RfqsService {
@@ -279,6 +287,7 @@ export class RfqsService {
                     statusName: statuses.name,
                     item: tenderInfos.item,
                     itemName: items.name,
+                    responseStatus: rfqResponses.responseStatus,
                     rfqTo: tenderInfos.rfqTo,
                     dueDate: tenderInfos.dueDate,
                     rfqId: rfqs.id,
@@ -302,6 +311,9 @@ export class RfqsService {
 
             const data: RfqRow[] = rows.map(row => {
                 const vendorName = row.vendorName || null;
+                const responseStatusLabel = row.responseStatus
+                    ? responseStatuses.find(s => s.id === Number(row.responseStatus))?.name || "Awaiting Response"
+                    : "Awaiting Response";
 
                 return {
                     tenderId: row.tenderId,
@@ -311,7 +323,7 @@ export class RfqsService {
                     teamMemberName: row.teamMemberName || "",
                     status: row.status || 0,
                     statusName: row.statusName || "",
-                    rfqStatus: row.statusName || "",
+                    responseStatus: responseStatusLabel,
                     latestStatus: null,
                     latestStatusName: null,
                     statusRemark: null,
@@ -403,7 +415,7 @@ export class RfqsService {
                     teamMemberName: row.teamMemberName || "",
                     status: row.status || 0,
                     statusName: row.statusName || "",
-                    rfqStatus: row.statusName || "",
+                    responseStatus: row.statusName || "",
                     latestStatus: null,
                     latestStatusName: null,
                     statusRemark: null,
@@ -560,15 +572,9 @@ export class RfqsService {
 
     async findResponseStatuses() {
         return {
-            status: [
-                { id: 1, name: "Quotation Received" },
-                { id: 2, name: "Product not available" },
-                { id: 3, name: "OEM docs not provided" },
-                { id: 4, name: "Not allowed by OEM" },
-                { id: 5, name: "Not Quoted by OEM" },
-            ],
-            count : 5
-            };
+            status: responseStatuses,
+            count: responseStatuses.length
+        };
     }
 
     private async getVendorOrganizations(requestedOrganization: string | null): Promise<any[]> {

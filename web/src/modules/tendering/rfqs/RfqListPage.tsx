@@ -246,7 +246,7 @@ const Rfqs = () => {
             headerName: 'RFQ Status',
             width: 200,
             colId: 'rfqStatus',
-            valueGetter: (params: any) => params.data?.statusName ? params.data.statusName : '—',
+            valueGetter: (params: any) => params.data?.responseStatus ? params.data.responseStatus : '—',
             cellRenderer: (params: any) => {
                 const status = params.value;
                 if (!status) return '—';
