@@ -257,15 +257,12 @@ export class DemandDraftService {
     private mapActionToNumber(action: string): number {
         const actionMap: Record<string, number> = {
             'accounts-form': 1,
-            'accounts-form-1': 1,
             'initiate-followup': 2,
             'returned-courier': 3,
             'returned-bank-transfer': 4,
             'settled': 5,
-            'settled-with-project': 5,
             'request-cancellation': 6,
-            'dd-cancellation-confirmation': 7,
-            'cancelled-at-branch': 7,
+            'cancellation-confirmation': 7,
         };
         return actionMap[action] || 1;
     }
@@ -304,7 +301,7 @@ export class DemandDraftService {
             updatedAt: new Date(),
         };
 
-        if (body.action === 'accounts-form' || body.action === 'accounts-form-1') {
+        if (body.action === 'accounts-form') {
             const [linkedCheque] = await this.db
                 .select({
                     status: paymentInstruments.status,
@@ -329,7 +326,7 @@ export class DemandDraftService {
             }
         }
 
-        if (body.action === 'accounts-form-1' || body.action === 'accounts-form') {
+        if (body.action === 'accounts-form') {
             if (body.dd_req === 'Accepted') {
                 updateData.status = DD_STATUSES.ACCOUNTS_FORM_ACCEPTED;
             } else if (body.dd_req === 'Rejected') {
@@ -345,11 +342,11 @@ export class DemandDraftService {
             updateData.status = DD_STATUSES.RETURN_VIA_BANK_TRANSFER;
             if (body.transfer_date) updateData.transferDate = body.transfer_date;
             if (body.utr) updateData.utr = body.utr;
-        } else if (body.action === 'settled' || body.action === 'settled-with-project') {
+        } else if (body.action === 'settled') {
             updateData.status = DD_STATUSES.SETTLED_WITH_PROJECT;
         } else if (body.action === 'request-cancellation') {
             updateData.status = DD_STATUSES.CANCELLATION_REQUESTED;
-        } else if (body.action === 'dd-cancellation-confirmation') {
+        } else if (body.action === 'cancellation-confirmation') {
             updateData.status = DD_STATUSES.CANCELLED;
             if (body.dd_cancellation_date) updateData.creditDate = body.dd_cancellation_date;
             if (body.dd_cancellation_amount) updateData.creditAmount = body.dd_cancellation_amount;
@@ -362,21 +359,13 @@ export class DemandDraftService {
             .where(eq(paymentInstruments.id, instrumentId));
 
         const ddDetailsUpdate: any = {};
-        if (body.action === 'accounts-form-1' || body.action === 'accounts-form') {
+        if (body.action === 'accounts-form') {
             // Store dd_no, dd_date, req_no when Accepted (form requires these)
             if (body.dd_req === 'Accepted') {
                 if (body.dd_no) ddDetailsUpdate.ddNo = body.dd_no;
                 if (body.dd_date) ddDetailsUpdate.ddDate = body.dd_date;
                 if (body.req_no) ddDetailsUpdate.reqNo = body.req_no;
             }
-        } else if (body.action === 'accounts-form-2') {
-            if (body.dd_no) ddDetailsUpdate.ddNo = body.dd_no;
-            if (body.dd_date) ddDetailsUpdate.ddDate = body.dd_date;
-            if (body.req_no) ddDetailsUpdate.reqNo = body.req_no;
-            if (body.remarks) ddDetailsUpdate.ddRemarks = body.remarks;
-        } else if (body.action === 'dd-cancellation-confirmation') {
-            // Store cancellation details - these might go to paymentInstruments instead
-            // Based on schema, these fields might need to be stored differently
         }
 
         if (Object.keys(ddDetailsUpdate).length > 0) {

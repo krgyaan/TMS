@@ -390,17 +390,13 @@ export class ChequeService {
             updatedAt: new Date(),
         };
 
-        if (body.action === 'accounts-form' || body.action === 'accounts-form-1') {
+        if (body.action === 'accounts-form') {
             if (body.cheque_req === 'Accepted') {
                 updateData.status = CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED;
             } else if (body.cheque_req === 'Rejected') {
                 updateData.status = CHEQUE_STATUSES.ACCOUNTS_FORM_REJECTED;
                 updateData.rejectionReason = body.reason_req || null;
             }
-        } else if (body.action === 'accounts-form-2') {
-            updateData.status = CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED;
-        } else if (body.action === 'accounts-form-3') {
-            updateData.status = CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED;
         } else if (body.action === 'initiate-followup') {
             updateData.status = CHEQUE_STATUSES.FOLLOWUP_INITIATED;
         } else if (body.action === 'stop-cheque') {
@@ -413,19 +409,6 @@ export class ChequeService {
             updateData.status = CHEQUE_STATUSES.DEPOSITED_IN_BANK;
         } else if (body.action === 'cancelled-torn') {
             updateData.status = CHEQUE_STATUSES.CANCELLED_TORN;
-        } else if (body.action === 'returned-courier') {
-            updateData.status = CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED; // Use appropriate status
-            const docketSlipFile = getFileForField('docket_slip', files, body, fileIndexTracker);
-            const docketSlipPath = getFilePathFromBody('docket_slip', body);
-            if (docketSlipFile) {
-                updateData.docketSlip = `bi-dashboard/${docketSlipFile.filename}`;
-            } else if (docketSlipPath) {
-                updateData.docketSlip = docketSlipPath;
-            } else if (filePaths.length > 0) {
-                updateData.docketSlip = filePaths[0];
-            }
-        } else if (body.action === 'request-cancellation') {
-            updateData.status = CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED; // Use appropriate status
         }
 
         await this.db
@@ -434,14 +417,7 @@ export class ChequeService {
             .where(eq(paymentInstruments.id, instrumentId));
 
         const chequeDetailsUpdate: any = {};
-        if (body.action === 'accounts-form-2') {
-            if (body.cheque_no) chequeDetailsUpdate.chequeNo = body.cheque_no;
-            if (body.cheque_date) chequeDetailsUpdate.chequeDate = body.cheque_date;
-            if (body.cheque_amount) chequeDetailsUpdate.amount = body.cheque_amount;
-            if (body.cheque_type) chequeDetailsUpdate.reqType = body.cheque_type;
-            if (body.cheque_reason) chequeDetailsUpdate.chequeReason = body.cheque_reason;
-            if (body.due_date) chequeDetailsUpdate.dueDate = body.due_date;
-        } else if (body.action === 'accounts-form' || body.action === 'accounts-form-1') {
+        if (body.action === 'accounts-form') {
             if (body.cheque_no) chequeDetailsUpdate.chequeNo = body.cheque_no;
             if (body.due_date) chequeDetailsUpdate.dueDate = body.due_date;
 

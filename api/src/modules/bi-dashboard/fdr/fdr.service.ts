@@ -278,10 +278,8 @@ export class FdrService {
             "returned-courier": 3,
             "returned-bank-transfer": 4,
             settled: 5,
-            "settled-with-project": 5,
             "request-cancellation": 6,
-            "fdr-cancellation-confirmation": 7,
-            "cancelled-at-branch": 7,
+            "cancellation-confirmation": 7,
         };
         return actionMap[action] || 1;
     }
@@ -314,7 +312,7 @@ export class FdrService {
             updatedAt: new Date(),
         };
 
-        if (body.action === "accounts-form" || body.action === "accounts-form-1") {
+        if (body.action === "accounts-form") {
             const [linkedCheque] = await this.db
                 .select({
                     status: paymentInstruments.status,
@@ -339,7 +337,7 @@ export class FdrService {
             }
         }
 
-        if (body.action === "accounts-form" || body.action === "accounts-form-1") {
+        if (body.action === "accounts-form") {
             if (body.fdr_req === "Accepted") {
                 updateData.status = FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED;
             } else if (body.fdr_req === "Rejected") {
@@ -367,10 +365,6 @@ export class FdrService {
                     this.logger.warn("Failed to parse prefilled_signed_fdr", e);
                 }
             }
-        } else if (body.action === "accounts-form-2") {
-            updateData.status = FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED;
-        } else if (body.action === "accounts-form-3") {
-            updateData.status = FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED;
         } else if (body.action === "initiate-followup") {
             updateData.status = FDR_STATUSES.FOLLOWUP_INITIATED;
         } else if (body.action === "returned-courier") {
@@ -382,7 +376,7 @@ export class FdrService {
             updateData.status = FDR_STATUSES.RETURN_VIA_BANK_TRANSFER;
             if (body.transfer_date) updateData.transferDate = body.transfer_date;
             if (body.utr) updateData.utr = body.utr;
-        } else if (body.action === "settled" || body.action === "settled-with-project") {
+        } else if (body.action === "settled") {
             updateData.status = FDR_STATUSES.SETTLED_WITH_PROJECT;
         } else if (body.action === "request-cancellation") {
             updateData.status = FDR_STATUSES.CANCELLATION_REQUESTED;
@@ -399,7 +393,7 @@ export class FdrService {
                     cancellation_remarks: body.cancellation_remarks,
                 };
             }
-        } else if (body.action === "fdr-cancellation-confirmation" || body.action === "cancelled-at-branch") {
+        } else if (body.action === "cancellation-confirmation") {
             updateData.status = FDR_STATUSES.CANCELLED;
             // Store cancellation details in legacyData
             if (body.fdr_cancellation_date || body.fdr_cancellation_amount || body.fdr_cancellation_reference_no) {
@@ -415,7 +409,7 @@ export class FdrService {
         await this.db.update(paymentInstruments).set(updateData).where(eq(paymentInstruments.id, instrumentId));
 
         const fdrDetailsUpdate: any = {};
-        if (body.action === "accounts-form" || body.action === "accounts-form-1") {
+        if (body.action === "accounts-form") {
             if (body.fdr_no) fdrDetailsUpdate.fdrNo = body.fdr_no;
             if (body.fdr_date) fdrDetailsUpdate.fdrDate = body.fdr_date;
             if (body.fdr_validity) fdrDetailsUpdate.fdrExpiryDate = body.fdr_validity;
@@ -432,55 +426,6 @@ export class FdrService {
                     stamp_charges: body.stamp_charges || null,
                     other_charges: body.other_charges || null,
                 };
-            }
-        } else if (body.action === "accounts-form-2") {
-            if (body.fdr_no) fdrDetailsUpdate.fdrNo = body.fdr_no;
-            if (body.fdr_date) fdrDetailsUpdate.fdrDate = body.fdr_date;
-            if (body.fdr_validity) fdrDetailsUpdate.fdrExpiryDate = body.fdr_validity;
-            if (body.req_no) fdrDetailsUpdate.reqNo = body.req_no;
-            if (body.remarks) fdrDetailsUpdate.fdrRemark = body.remarks;
-        } else if (body.action === "accounts-form-3") {
-            if (body.fdr_percentage) fdrDetailsUpdate.marginPercent = body.fdr_percentage;
-            if (body.fdr_amount) fdrDetailsUpdate.fdrAmt = body.fdr_amount;
-            if (body.fdr_roi) fdrDetailsUpdate.roi = body.fdr_roi;
-            if (body.sfms_confirmation && typeof body.sfms_confirmation === "string") {
-                updateData.legacyData = {
-                    ...(instrument.legacyData || {}),
-                    sfms_confirmation: body.sfms_confirmation,
-                };
-            }
-            // Store charges in legacyData
-            if (body.fdr_charges || body.sfms_charges || body.stamp_charges || body.other_charges) {
-                updateData.legacyData = {
-                    ...(instrument.legacyData || {}),
-                    ...(updateData.legacyData || {}),
-                    fdr_charges: body.fdr_charges || null,
-                    sfms_charges: body.sfms_charges || null,
-                    stamp_charges: body.stamp_charges || null,
-                    other_charges: body.other_charges || null,
-                };
-            }
-        } else if (body.action === "request-extension") {
-            if (body.request_letter_email && typeof body.request_letter_email === "string") {
-                updateData.legacyData = {
-                    ...(instrument.legacyData || {}),
-                    request_letter_email: body.request_letter_email,
-                };
-            }
-            // Store modification fields if provided
-            if (body.modification_fields) {
-                try {
-                    const modFields = typeof body.modification_fields === "string" ? JSON.parse(body.modification_fields) : body.modification_fields;
-                    if (Array.isArray(modFields) && modFields.length > 0) {
-                        updateData.legacyData = {
-                            ...(instrument.legacyData || {}),
-                            ...(updateData.legacyData || {}),
-                            modification_fields: JSON.stringify(modFields),
-                        };
-                    }
-                } catch (e) {
-                    this.logger.warn("Failed to parse modification_fields", e);
-                }
             }
         }
 
