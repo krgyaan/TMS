@@ -1,4 +1,4 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
@@ -8,9 +8,10 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, FileX2, Search, Eye, Clock, CheckCircle, XCircle, Shield, Link, Calendar, Edit } from 'lucide-react';
+import { AlertCircle, FileX2, Search, Eye, Clock, CheckCircle, XCircle, Shield, Link, Calendar, Edit, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { useChequeDashboard, useChequeDashboardCounts } from '@/hooks/api/useCheques';
 import type { ChequeDashboardRow, ChequeDashboardTab } from './helpers/cheque.types';
 import { formatINR } from '@/hooks/useINRFormatter';
@@ -340,6 +341,12 @@ const ChequeListPage = () => {
                                 Track and manage cheques for tenders.
                             </CardDescription>
                         </div>
+                        <CardAction>
+                            <Button variant="outline" onClick={() => navigate(paths.tendering.oldEmdsForCHEQUE())}>
+                                <Plus className="w-4 h-4" />
+                                Add Old Entry
+                            </Button>
+                        </CardAction>
                     </div>
                 </CardHeader>
                 <CardContent className="px-0">

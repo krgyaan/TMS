@@ -10,7 +10,7 @@ import { PayOnPortalForm } from './PayOnPortalForm';
 import { DemandDraftForm } from './DemandDraftForm';
 import { BankGuaranteeForm } from './BankGuaranteeForm';
 import { FdrForm } from './FdrForm';
-// import { ChequeForm } from './ChequeForm';
+import { ChequeForm } from './ChequeForm';
 
 export type RequestType = 'TMS' | 'OTHER_THAN_TMS' | 'OTHER_THAN_TENDER' | 'OLD_ENTRY';
 
@@ -34,9 +34,10 @@ interface PaymentSectionProps {
     courierData?: CourierAddressData;
     defaultPurpose?: string;
     isEditMode?: boolean;
+    defaultMode?: string;
 }
 
-const OLD_ENTRY_MODES = ['DD', 'FDR', 'BG'];
+const OLD_ENTRY_MODES = ['DD', 'FDR', 'BG', 'CHEQUE'];
 
 export function PaymentSection({
     purpose,
@@ -47,6 +48,7 @@ export function PaymentSection({
     courierData,
     defaultPurpose = purpose,
     isEditMode = false,
+    defaultMode,
 }: PaymentSectionProps) {
     const { control, watch, setValue } = useFormContext();
     const selectedMode = watch(`${purpose}.mode`);
@@ -61,6 +63,12 @@ export function PaymentSection({
         }
         return modes;
     }, [type, allowedModes]);
+
+    useEffect(() => {
+        if (defaultMode && !selectedMode) {
+            setValue(`${purpose}.mode`, defaultMode, { shouldValidate: false });
+        }
+    }, [defaultMode, selectedMode, setValue, purpose]);
 
     useEffect(() => {
         if (!selectedMode || isEditMode) return;
@@ -142,6 +150,7 @@ export function PaymentSection({
                         value={selectedMode || ''}
                         onValueChange={(v) => setValue(`${purpose}.mode`, v)}
                         className="flex flex-wrap gap-6"
+                        disabled={!!defaultMode}
                     >
                         {filteredModes.map((mode) => (
                             <div key={mode} className="flex items-center space-x-2">
@@ -166,7 +175,7 @@ export function PaymentSection({
                     {selectedMode === 'DD' && <DemandDraftForm amount={isEditMode ? undefined : amount} prefix={prefix} readOnly={!isEditMode && amount > 0} />}
                     {selectedMode === 'BG' && <BankGuaranteeForm amount={isEditMode ? undefined : amount} prefix={prefix} readOnly={!isEditMode && amount > 0} />}
                     {selectedMode === 'FDR' && <FdrForm amount={isEditMode ? undefined : amount} prefix={prefix} readOnly={!isEditMode && amount > 0} />}
-                    {/* {selectedMode === 'CHEQUE' && <ChequeForm prefix={prefix} readOnly={!isEditMode && amount > 0} />} */}
+                    {selectedMode === 'CHEQUE' && <ChequeForm prefix={prefix} readOnly={!isEditMode && amount > 0} />}
                 </div>
             )}
         </div>

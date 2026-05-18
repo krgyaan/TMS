@@ -1,4 +1,5 @@
 import { pgTable, varchar, text, decimal, timestamp, date, pgEnum, serial, index, integer, jsonb, boolean } from 'drizzle-orm/pg-core';
+import { teams } from '@/db/schemas/master/teams.schema';
 
 // Enums
 export const paymentPurposeEnum = pgEnum('payment_purpose', [
@@ -38,6 +39,7 @@ export const paymentRequests = pgTable('payment_requests', {
     // Direct mappings from MySQL emds table
     tenderId: integer('tender_id').notNull().default(0), // emds.tender_id
     type: paymentRequestTypeEnum('type').default('TMS'), // emds.type
+    team: integer('team').references(() => teams.id),
     tenderNo: varchar('tender_no', { length: 500 }).default('NA'), // emds.tender_no (equal to tender.tenderNo)
     projectName: varchar('project_name', { length: 500 }), // emds.project_name (equal to tender.tenderName)
     dueDate: timestamp('due_date'), // emds.due_date (equal to tender.dueDate)

@@ -228,6 +228,7 @@ export const CreatePaymentRequestSchema = z.object({
     tenderNo: z.string().optional(),
     tenderName: z.string().optional(),
     dueDate: z.string().optional(),
+    team: z.coerce.number().int().positive().optional(),
 
     EMD: emdSection,
     TENDER_FEES: tenderFeeSection,

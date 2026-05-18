@@ -90,7 +90,8 @@ export class PaymentRequestsCommandService {
                         payload.tenderNo,
                         payload.tenderName,
                         payload.dueDate,
-                        emdRemarks
+                        emdRemarks,
+                        payload.team
                     );
                     createdRequests.push(request);
 
@@ -140,7 +141,8 @@ export class PaymentRequestsCommandService {
                         payload.tenderNo,
                         payload.tenderName,
                         payload.dueDate,
-                        tfRemarks
+                        tfRemarks,
+                        payload.team
                     );
                     createdRequests.push(request);
 
@@ -177,7 +179,8 @@ export class PaymentRequestsCommandService {
                         payload.tenderNo,
                         payload.tenderName,
                         payload.dueDate,
-                        pfRemarks
+                        pfRemarks,
+                        payload.team
                     );
                     createdRequests.push(request);
 
@@ -384,7 +387,8 @@ export class PaymentRequestsCommandService {
         tenderNo?: string,
         tenderName?: string,
         dueDate?: string,
-        remarks?: string
+        remarks?: string,
+        team?: number
     ) {
         this.logger.log(`Creating payment request: ${purpose} - Amount: ${amount}`);
         const effectiveDueDate = tender?.dueDate 
@@ -405,7 +409,8 @@ export class PaymentRequestsCommandService {
                 purpose: purpose,
                 amountRequired: amount.toString(),
                 status: 'Pending',
-                remarks: remarks || 'Payment Request', 
+                remarks: remarks || 'Payment Request',
+                team: team || null,
             })
             .returning()
             .onConflictDoNothing()

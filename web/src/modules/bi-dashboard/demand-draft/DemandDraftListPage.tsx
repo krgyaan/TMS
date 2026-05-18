@@ -1,4 +1,4 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
@@ -8,9 +8,10 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, FileX2, Search, Eye, Clock, CheckCircle, XCircle, RotateCcw, Edit } from 'lucide-react';
+import { AlertCircle, FileX2, Search, Eye, Clock, CheckCircle, XCircle, RotateCcw, Edit, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { useDemandDraftDashboard, useDemandDraftDashboardCounts } from '@/hooks/api/useDemandDrafts';
 import type { DemandDraftDashboardRow, DemandDraftDashboardTab } from './helpers/demandDraft.types';
 import { tenderNameCol } from '@/components/data-grid/columns';
@@ -324,6 +325,12 @@ const DemandDraftListPage = () => {
                                 Track and manage demand drafts for tenders.
                             </CardDescription>
                         </div>
+                        <CardAction>
+                            <Button variant="outline" onClick={() => navigate(paths.tendering.oldEmdsForDD())}>
+                                <Plus className="w-4 h-4" />
+                                Add Old Entry
+                            </Button>
+                        </CardAction>
                     </div>
                 </CardHeader>
                 <CardContent className="px-0">

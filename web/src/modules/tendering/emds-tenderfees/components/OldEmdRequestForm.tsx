@@ -6,10 +6,13 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { ArrowLeft, Save, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useCreatePaymentRequest, useUpdatePaymentRequest } from '@/hooks/api/usePaymentRequests';
+import { useCurrentUser } from '@/hooks/api/useAuth';
+import { useTeamOptions } from '@/hooks/useSelectOptions';
 import { PaymentSection } from './PaymentSection';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { DateInput } from '@/components/form/DateInput';
+import { SelectField } from '@/components/form/SelectField';
 import FieldWrapper from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
 import { parseAllowedModes } from '../constants';
@@ -26,6 +29,7 @@ interface OldEmdRequestFormProps {
     };
     initialData?: FormValues;
     mode?: 'create' | 'edit';
+    defaultMode?: string;
 }
 
 function transformModeForBackend(mode: string): string {
@@ -36,11 +40,14 @@ function transformModeForBackend(mode: string): string {
     return mapping[mode] || mode;
 }
 
-export function OldEmdRequestForm({ tenderId, requestIds, initialData, mode = 'create' }: OldEmdRequestFormProps) {
+export function OldEmdRequestForm({ tenderId, requestIds, initialData, mode = 'create', defaultMode }: OldEmdRequestFormProps) {
     const navigate = useNavigate();
     const createRequest = useCreatePaymentRequest();
     const updateRequest = useUpdatePaymentRequest();
     const isEditMode = mode === 'edit';
+    const { data: currentUser } = useCurrentUser();
+    const teamOptions = useTeamOptions();
+    const defaultTeamId = currentUser?.team?.id;
 
     const form = useForm<FormValues>({
         resolver: zodResolver(OldEntryPaymentRequestSchema) as Resolver<FormValues>,
@@ -48,7 +55,8 @@ export function OldEmdRequestForm({ tenderId, requestIds, initialData, mode = 'c
             tenderName: '',
             tenderNo: '',
             tenderDueDate: '',
-            EMD: { mode: undefined, details: {} },
+            team: defaultTeamId || undefined,
+            EMD: { mode: defaultMode || undefined, details: {} },
             TENDER_FEES: { mode: undefined, details: {} },
             PROCESSING_FEES: { mode: undefined, details: {} },
         },
@@ -98,6 +106,7 @@ export function OldEmdRequestForm({ tenderId, requestIds, initialData, mode = 'c
                 tenderNo: values.tenderNo || '',
                 tenderName: values.tenderName || '',
                 dueDate: values.tenderDueDate || '',
+                team: values.team,
             };
 
             if (values.EMD?.mode) {
@@ -126,7 +135,7 @@ export function OldEmdRequestForm({ tenderId, requestIds, initialData, mode = 'c
         }
     };
 
-    const allowedEmdModes = parseAllowedModes(['DD', 'FDR', 'BG'].join(','));
+    const allowedEmdModes = parseAllowedModes(['DD', 'FDR', 'BG', 'CHEQUE'].join(','));
     const type = 'OLD_ENTRY';
 
     const isPending = isEditMode ? updateRequest.isPending : createRequest.isPending;
@@ -180,6 +189,14 @@ export function OldEmdRequestForm({ tenderId, requestIds, initialData, mode = 'c
                             )
                         }
 
+                        <SelectField
+                            control={form.control}
+                            name="team"
+                            label="Team"
+                            options={teamOptions}
+                            placeholder="Select Team"
+                        />
+
                         <PaymentSection
                             purpose="EMD"
                             allowedModes={allowedEmdModes}
@@ -187,6 +204,7 @@ export function OldEmdRequestForm({ tenderId, requestIds, initialData, mode = 'c
                             type={type}
                             courierAddress={''}
                             defaultPurpose="EMD"
+                            defaultMode={defaultMode}
                         />
                         <div className="flex items-center justify-end gap-4 pt-6 border-t">
                             <Button

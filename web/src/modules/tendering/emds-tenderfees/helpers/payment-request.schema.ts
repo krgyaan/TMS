@@ -609,6 +609,7 @@ export const OldEntryPaymentRequestSchema = z.object({
     tenderName: z.string().optional(),
     tenderNo: z.string().optional(),
     tenderDueDate: z.string().optional(),
+    team: z.coerce.number().int().positive({ message: "Team is required" }),
     // EMD
     EMD: z.object({
         mode: z.enum(['DD', 'FDR', 'BG', 'CHEQUE', 'BANK_TRANSFER', 'PORTAL', 'SURETY_BOND', 'NA']).optional(),

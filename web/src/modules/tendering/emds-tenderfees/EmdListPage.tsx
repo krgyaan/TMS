@@ -650,10 +650,6 @@ const EmdsAndTenderFeesPage = () => {
                         </CardDescription>
                     </div>
                     <CardAction className="flex items-center gap-2">
-                        <Button variant="outline" onClick={() => navigate(paths.tendering.oldEmdsTenderFeesCreate())}>
-                            <Plus className="w-4 h-4" />
-                            Add Old Entries
-                        </Button>
                         <Button variant="outline" onClick={() => navigate(paths.tendering.biOtherThanEmdsCreate())}>
                             <Plus className="w-4 h-4" />
                             BI Other Than EMDs
