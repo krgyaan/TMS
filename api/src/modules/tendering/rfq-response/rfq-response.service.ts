@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { eq, sql, desc} from "drizzle-orm";
+import { eq, sql, desc, inArray } from "drizzle-orm";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
 import {
@@ -122,6 +122,12 @@ export class RfqResponseService {
                 tenderNo: tenderInfos.tenderNo,
                 dueDate: tenderInfos.dueDate,
                 itemSummary: sql<string>`(SELECT string_agg(ri.requirement, ', ') FROM rfq_items ri WHERE ri.rfq_id = rfqs.id)`.as("item_summary"),
+                responseStatus: rfqResponses.responseStatus,
+                remarks: rfqResponses.remarks,
+                gstPercentage: rfqResponses.gstPercentage,
+                gstType: rfqResponses.gstType,
+                deliveryTime: rfqResponses.deliveryTime,
+                freightType: rfqResponses.freightType,
             })
             .from(rfqResponses)
             .leftJoin(vendors, eq(rfqResponses.vendorId, vendors.id))
@@ -130,14 +136,36 @@ export class RfqResponseService {
             .leftJoin(tenderInfos, eq(rfqs.tenderId, tenderInfos.id))
             .where(eq(rfqResponses.rfqId, rfqId))
             .orderBy(desc(rfqResponses.createdAt));
+
+        const responseIds = rows.map(r => r.id);
+        let allItems: any[] = [];
+        let allDocs: any[] = [];
+
+        if (responseIds.length > 0) {
+            allItems = await this.db
+                .select()
+                .from(rfqResponseItems)
+                .where(inArray(rfqResponseItems.rfqResponseId, responseIds));
+
+            allDocs = await this.db
+                .select()
+                .from(rfqResponseDocuments)
+                .where(inArray(rfqResponseDocuments.rfqResponseId, responseIds));
+        }
+
+        const rowsWithChildren = rows.map(row => ({
+            ...row,
+            items: allItems.filter(i => i.rfqResponseId === row.id),
+            documents: allDocs.filter(d => d.rfqResponseId === row.id),
+        }));
             
         return {
-            currentRfqResponses: rows,
+            currentRfqResponses: rowsWithChildren,
             allTenderResponses,
             pendingTenderResponses,
         };
     }
-
+ 
     async getAllRfqResponses(tenderId : number){
         const rfqsData = await this.db
             .select({
@@ -153,6 +181,7 @@ export class RfqResponseService {
                 dueDate: tenderInfos.dueDate,
                 itemSummary: sql<string>`(SELECT string_agg(ri.requirement, ', ') FROM rfq_items ri WHERE ri.rfq_id = rfqs.id)`.as("item_summary"),
                 responseStatus: rfqResponses.responseStatus,
+                remarks: rfqResponses.remarks,
             })
             .from(rfqResponses)
             .leftJoin(vendors, eq(rfqResponses.vendorId, vendors.id))
@@ -161,7 +190,7 @@ export class RfqResponseService {
             .leftJoin(tenderInfos, eq(rfqs.tenderId, tenderInfos.id))
             .where(eq(rfqs.tenderId, tenderId))
             .orderBy(desc(rfqResponses.createdAt));
-
+ 
         return rfqsData;
     }
 
