@@ -77,7 +77,6 @@ export class ChequeService {
                 eq(paymentInstruments.status, CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED),
                 or(
                     ilike(instrumentChequeDetails.chequeReason, '%Payable%'),
-                    ilike(instrumentChequeDetails.chequeReason, '%DD%'),
                     ilike(instrumentChequeDetails.chequeReason, '%other_payment%')
                 ),
                 this.getNotExpiredCondition(),
@@ -110,7 +109,7 @@ export class ChequeService {
             );
         } else if (tab === 'cancelled') {
             conditions.push(
-                inArray(paymentInstruments.action, [6, 7]),
+                eq(paymentInstruments.action, 6),
                 this.getNotExpiredCondition(),
             );
         } else if (tab === 'expired') {
