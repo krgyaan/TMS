@@ -21,7 +21,7 @@ import { StatusCache } from "@/utils/status-cache";
 import { wrapPaginatedResponse } from "@/utils/responseWrapper";
 import { TimersService } from "@/modules/timers/timers.service";
 import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
-import { bidSubmissions, organizations } from "@/db/schemas";
+import { bidSubmissions } from "@/db/schemas";
 
 export type RfqFilters = {
     rfqStatus?: "pending" | "sent";
@@ -60,8 +60,11 @@ type RfqDetails = {
     docList: string | null;
     requestedOrganization: string | null;
     requestedVendor: string | null;
-    requestedOrganizationNames: string[] | null;
-    requestedVendorNames: string[] | null;
+    vendorOrganizations: Array<{
+        organizationId: number;
+        organizationName: string;
+        vendors: Array<{ id: number; name: string; email: string }>;
+    }>;
     createdAt: Date;
     updatedAt: Date;
     items: Array<{
@@ -78,15 +81,7 @@ type RfqDetails = {
         path: string;
         metadata: any;
     }>;
-    requestedGroups: Array<{
-        organizationId: number;
-        organizationName: string;
-        vendors: Array<{
-            id: number;
-            name: string;
-            email: string;
-        }>;
-    }>;
+
 };
 
 @Injectable()
@@ -576,94 +571,47 @@ export class RfqsService {
             };
     }
 
-    // Private helper method
-    private async getVendorAndOrgNames(
-        requestedVendor: string | null,
-        requestedOrganization: string | null
-    ): Promise<{
-        vendorNames: string[];
-        organizationNames: string[];
-        requestedGroups: Array<{
-            organizationId: number;
-            organizationName: string;
-            vendors: Array<{ id: number; name: string; email: string }>;
-        }>;
-    }> {
-        const vendorNames: string[] = [];
-        const organizationNames: string[] = [];
-        const requestedGroups: any[] = [];
+    private async getVendorOrganizations(requestedOrganization: string | null): Promise<any[]> {
+        if (!requestedOrganization) return [];
 
-        const vendorIds = (requestedVendor ?? "")
-            .split(",")
+        const orgIds = requestedOrganization
+            .split(',')
             .map(id => parseInt(id.trim(), 10))
             .filter(id => !isNaN(id));
 
-        if (vendorIds.length > 0) {
-            // Fetch vendors with their organization details
-            const vendorRows = await this.db
-                .select({
-                    id: vendors.id,
-                    name: vendors.name,
-                    email: vendors.email,
-                    orgId: vendors.orgId,
-                    organizationName: vendorOrganizations.name,
-                })
-                .from(vendors)
-                .leftJoin(vendorOrganizations, eq(vendors.orgId, vendorOrganizations.id))
-                .where(inArray(vendors.id, vendorIds));
+        if (orgIds.length === 0) return [];
 
-            // Group vendors by organization
-            const orgMap = new Map<number, { id: number; name: string; vendors: any[] }>();
+        const rawOrgData = await this.db.select({
+                organization: vendorOrganizations,
+                vendor: vendors
+            })
+            .from(vendorOrganizations)
+            .leftJoin(vendors, eq(vendors.orgId, vendorOrganizations.id))
+            .where(inArray(vendorOrganizations.id, orgIds));
 
-            vendorRows.forEach(v => {
-                vendorNames.push(v.name);
-
-                const orgId = v.orgId || 0; // Use 0 for "No Organization"
-                const orgName = v.organizationName || "Other";
-
-                if (!orgMap.has(orgId)) {
-                    orgMap.set(orgId, {
-                        id: orgId,
-                        name: orgName,
-                        vendors: [],
-                    });
-                }
-
-                orgMap.get(orgId)!.vendors.push({
-                    id: v.id,
-                    name: v.name,
-                    email: v.email,
-                });
-            });
-
-            orgMap.forEach(group => {
-                requestedGroups.push({
-                    organizationId: group.id,
-                    organizationName: group.name,
-                    vendors: group.vendors,
-                });
-            });
-        }
-
-        // Fetch organization names for the legacy field if needed (from requestedOrganization)
-        if (requestedOrganization) {
-            const orgIds = requestedOrganization
-                .split(",")
-                .map(id => parseInt(id.trim(), 10))
-                .filter(id => !isNaN(id));
-
-            if (orgIds.length > 0) {
-                const orgRows = await this.db.select({ name: vendorOrganizations.name }).from(vendorOrganizations).where(inArray(vendorOrganizations.id, orgIds));
-
-                orgRows.forEach(org => {
-                    if (!organizationNames.includes(org.name)) {
-                        organizationNames.push(org.name);
-                    }
+        const groupsMap = new Map<number, any>();
+        rawOrgData.forEach((row: any) => {
+            const org = row.organization;
+            const vendor = row.vendor;
+            
+            if (!groupsMap.has(org.id)) {
+                groupsMap.set(org.id, {
+                    organizationId: org.id,
+                    organizationName: org.name,
+                    vendors: []
                 });
             }
-        }
+            
+            if (vendor) {
+                groupsMap.get(org.id).vendors.push({
+                    id: vendor.id,
+                    name: vendor.name,
+                    email: vendor.email
+                });
+            }
+        });
 
-        return { vendorNames, organizationNames, requestedGroups };
+        return Array.from(groupsMap.values());
     }
 
     // Updated findById
@@ -676,11 +624,11 @@ export class RfqsService {
 
         const rfqRow = rfqData[0];
 
-        const [rfqItemsData, rfqDocumentsData, tender, { vendorNames, organizationNames, requestedGroups }] = await Promise.all([
+        const [rfqItemsData, rfqDocumentsData, tender, vendorOrganizations] = await Promise.all([
             this.db.select().from(rfqItems).where(eq(rfqItems.rfqId, id)),
             this.db.select().from(rfqDocuments).where(eq(rfqDocuments.rfqId, id)),
             this.db.select().from(tenderInfos).where(eq(tenderInfos.id, rfqRow.tenderId)),
-            this.getVendorAndOrgNames(rfqRow.requestedVendor, rfqRow.requestedOrganization),
+            this.getVendorOrganizations(rfqRow.requestedOrganization)
         ]);
 
         return {
@@ -688,11 +636,10 @@ export class RfqsService {
             items: rfqItemsData,
             tender: tender[0],
             documents: rfqDocumentsData,
-            requestedVendorNames: vendorNames,
-            requestedOrganizationNames: organizationNames,
-            requestedGroups,
+            vendorOrganizations,
         } as RfqDetails;
     }
+
 
     // Updated findByTenderId
     async findByTenderId(tenderId: number): Promise<RfqDetails | null> {
@@ -704,19 +651,17 @@ export class RfqsService {
 
         const rfqRow = rfqData[0];
 
-        const [rfqItemsData, rfqDocumentsData, { vendorNames, organizationNames, requestedGroups }] = await Promise.all([
+        const [rfqItemsData, rfqDocumentsData, vendorOrganizations] = await Promise.all([
             this.db.select().from(rfqItems).where(eq(rfqItems.rfqId, rfqRow.id)),
             this.db.select().from(rfqDocuments).where(eq(rfqDocuments.rfqId, rfqRow.id)),
-            this.getVendorAndOrgNames(rfqRow.requestedVendor, rfqRow.requestedOrganization),
+            this.getVendorOrganizations(rfqRow.requestedOrganization),
         ]);
 
         return {
             ...rfqRow,
             items: rfqItemsData,
             documents: rfqDocumentsData,
-            requestedVendorNames: vendorNames,
-            requestedOrganizationNames: organizationNames,
-            requestedGroups,
+            vendorOrganizations,
         } as RfqDetails;
     }
 
@@ -730,19 +675,17 @@ export class RfqsService {
 
         const result: RfqDetails[] = await Promise.all(
             rfqRows.map(async rfqRow => {
-                const [rfqItemsData, rfqDocumentsData, { vendorNames, organizationNames, requestedGroups }] = await Promise.all([
+                const [rfqItemsData, rfqDocumentsData, vendorOrganizations] = await Promise.all([
                     this.db.select().from(rfqItems).where(eq(rfqItems.rfqId, rfqRow.id)),
                     this.db.select().from(rfqDocuments).where(eq(rfqDocuments.rfqId, rfqRow.id)),
-                    this.getVendorAndOrgNames(rfqRow.requestedVendor, rfqRow.requestedOrganization),
+                    this.getVendorOrganizations(rfqRow.requestedOrganization),
                 ]);
 
                 return {
                     ...rfqRow,
                     items: rfqItemsData,
                     documents: rfqDocumentsData,
-                    requestedVendorNames: vendorNames,
-                    requestedOrganizationNames: organizationNames,
-                    requestedGroups,
+                    vendorOrganizations,
                 } as RfqDetails;
             })
         );
@@ -818,11 +761,14 @@ export class RfqsService {
 
             await this.tenderStatusHistoryService.trackStatusChange(data.tenderId, newStatus, changedBy, prevStatus, "RFQ sent");
         });
+        
+        const vendorOrganizations = await this.getVendorOrganizations(newRfq.requestedOrganization);
 
         const rfqDetails = {
             ...newRfq,
             items: createdItems,
             documents: createdDocuments,
+            vendorOrganizations,
         } as RfqDetails;
 
         // Return immediately after transaction commits to avoid blocking the HTTP response
