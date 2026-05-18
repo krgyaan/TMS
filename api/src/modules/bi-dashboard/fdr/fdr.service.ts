@@ -10,7 +10,7 @@ import { teams } from "@db/schemas/master/teams.schema";
 import { wrapPaginatedResponse } from "@/utils/responseWrapper";
 import type { PaginatedResult } from "@/modules/tendering/types/shared.types";
 import type { FdrDashboardRow, FdrDashboardCounts } from "@/modules/bi-dashboard/fdr/helpers/fdr.types";
-import { FDR_STATUSES } from "@/modules/tendering/payment-requests/constants/payment-request-statuses";
+import { FDR_STATUSES, CHEQUE_STATUSES } from "@/modules/tendering/payment-requests/constants/payment-request-statuses";
 import { FollowUpService } from "@/modules/follow-up/follow-up.service";
 import type { CreateFollowUpDto } from "@/modules/follow-up/zod/create-follow-up.dto";
 import { followUps } from "@/db/schemas/shared/follow-ups.schema";
@@ -274,7 +274,6 @@ export class FdrService {
     private mapActionToNumber(action: string): number {
         const actionMap: Record<string, number> = {
             "accounts-form": 1,
-            "accounts-form-1": 1,
             "initiate-followup": 2,
             "returned-courier": 3,
             "returned-bank-transfer": 4,
@@ -314,6 +313,31 @@ export class FdrService {
             action: actionNumber,
             updatedAt: new Date(),
         };
+
+        if (body.action === "accounts-form" || body.action === "accounts-form-1") {
+            const [linkedCheque] = await this.db
+                .select({
+                    status: paymentInstruments.status,
+                    rejectionReason: paymentInstruments.rejectionReason,
+                })
+                .from(instrumentChequeDetails)
+                .innerJoin(paymentInstruments, eq(paymentInstruments.id, instrumentChequeDetails.instrumentId))
+                .where(eq(instrumentChequeDetails.linkedFdrId, instrumentId))
+                .limit(1);
+
+            if (linkedCheque) {
+                if (linkedCheque.status === CHEQUE_STATUSES.ACCOUNTS_FORM_REJECTED) {
+                    body.fdr_req = 'Rejected';
+                    if (!body.reason_req) {
+                        body.reason_req = linkedCheque.rejectionReason || 'Linked Cheque was rejected';
+                    }
+                } else if (linkedCheque.status !== CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED) {
+                    throw new BadRequestException(
+                        'Cannot process: linked Cheque is not yet accepted. Please accept the Cheque first.'
+                    );
+                }
+            }
+        }
 
         if (body.action === "accounts-form" || body.action === "accounts-form-1") {
             if (body.fdr_req === "Accepted") {

@@ -286,7 +286,7 @@ export class BankTransferService {
             updatedAt: new Date(),
         };
 
-        if (body.action === 'accounts-form' || body.action === 'accounts-form-1') {
+        if (body.action === 'accounts-form') {
             if (body.bt_req === 'Accepted') {
                 updateData.status = BT_STATUSES.ACCOUNTS_FORM_ACCEPTED;
             } else if (body.bt_req === 'Rejected') {
@@ -316,7 +316,7 @@ export class BankTransferService {
                 .where(eq(paymentInstruments.id, instrumentId));
             // Handle transfer details update or creation
             const transferDetailsUpdate: any = {};
-            if (body.action === 'accounts-form' || body.action === 'accounts-form-1') {
+            if (body.action === 'accounts-form') {
                 if (body.utr_no) transferDetailsUpdate.utrNum = body.utr_no;
                 // Support both payment_datetime (from form) and payment_date (legacy)
                 const paymentDateStr = body.payment_datetime || body.payment_date;
