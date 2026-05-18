@@ -72,7 +72,9 @@ export interface RfqResponseDetail {
 
 /** Request body for POST /rfqs/:rfqId/responses */
 export interface CreateRfqResponseBodyDto {
+    organizationId: number,
     vendorId: number;
+    responseStatus : number,
     receiptDatetime: string;
     gstPercentage?: number;
     gstType?: string;
