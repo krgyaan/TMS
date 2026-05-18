@@ -23,10 +23,6 @@ export const DemandDraftActionFormSchema = BaseActionFormSchema.extend({
     followup_start_date: z.string().optional(),
     frequency: z.number().int().min(1).max(6).optional(),
     emailBody: z.string().optional(),
-    stop_reason: z.number().int().min(1).max(4).optional().nullable(),
-    proof_text: z.string().optional().nullable(),
-    stop_remarks: z.string().optional().nullable(),
-
     docket_no: z.string().optional(),
     docket_slip: z.string().optional(),
 

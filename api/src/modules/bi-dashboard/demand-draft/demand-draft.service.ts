@@ -337,7 +337,7 @@ export class DemandDraftService {
             updateData.status = DD_STATUSES.FOLLOWUP_INITIATED;
         } else if (body.action === 'returned-courier') {
             updateData.status = DD_STATUSES.RETURN_VIA_COURIER;
-            updateData.docketSlip = body.docket_slip || null;
+            if (body.docket_no) updateData.docketNo = body.docket_no;
         } else if (body.action === 'returned-bank-transfer') {
             updateData.status = DD_STATUSES.RETURN_VIA_BANK_TRANSFER;
             if (body.transfer_date) updateData.transferDate = body.transfer_date;
@@ -348,8 +348,8 @@ export class DemandDraftService {
             updateData.status = DD_STATUSES.CANCELLATION_REQUESTED;
         } else if (body.action === 'cancellation-confirmation') {
             updateData.status = DD_STATUSES.CANCELLED;
-            if (body.dd_cancellation_date) updateData.creditDate = body.dd_cancellation_date;
-            if (body.dd_cancellation_amount) updateData.creditAmount = body.dd_cancellation_amount;
+            if (body.dd_cancellation_date) updateData.cancelledDate = body.dd_cancellation_date;
+            if (body.dd_cancellation_amount) updateData.amountCredited = body.dd_cancellation_amount;
             if (body.dd_cancellation_reference_no) updateData.referenceNo = body.dd_cancellation_reference_no;
         }
 

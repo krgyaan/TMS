@@ -471,28 +471,6 @@ export class ChequeService {
                     chequeDetailsUpdate.chequeImagePath = chequeImagesPath;
                 }
             }
-        } else if (body.action === 'accounts-form-3') {
-            // Legacy action - handle cheque_images if sent
-            const chequeImagesPath = getFilePathFromBody('cheque_images', body);
-            if (filePaths.length > 0 && body.cheque_images) {
-                const chequeImageIndexes = filePaths
-                    .map((path, idx) => body.cheque_images && path.includes('cheque_images') ? idx : -1)
-                    .filter(idx => idx >= 0);
-                if (chequeImageIndexes.length > 0) {
-                    chequeDetailsUpdate.chequeImagePath = chequeImageIndexes.map(idx => filePaths[idx]).join(',');
-                }
-            } else if (chequeImagesPath) {
-                try {
-                    const parsed = JSON.parse(chequeImagesPath);
-                    if (Array.isArray(parsed)) {
-                        chequeDetailsUpdate.chequeImagePath = parsed.join(',');
-                    } else {
-                        chequeDetailsUpdate.chequeImagePath = chequeImagesPath;
-                    }
-                } catch {
-                    chequeDetailsUpdate.chequeImagePath = chequeImagesPath;
-                }
-            }
         } else if (body.action === 'stop-cheque') {
             if (body.stop_reason_text) chequeDetailsUpdate.stopReasonText = body.stop_reason_text;
 
@@ -535,7 +513,7 @@ export class ChequeService {
         }
 
         // Send emails after cheque action accounts-form accepted
-        if ((body.action === 'accounts-form' || body.action === 'accounts-form-1') && body.cheque_req === 'Accepted') {
+        if (body.action === 'accounts-form' && body.cheque_req === 'Accepted') {
             try {
                 const [chequeDetails] = await this.db
                     .select()

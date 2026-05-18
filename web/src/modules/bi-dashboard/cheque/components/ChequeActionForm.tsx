@@ -14,7 +14,6 @@ import { Label } from '@/components/ui/label';
 import { ContactPersonFields } from '@/components/form/ContactPersonFields';
 import { FollowUpFrequencySelect } from '@/components/form/FollowUpFrequencySelect';
 import { FollowupEmailEditor } from '@/components/form/FollowupEmailEditor';
-import { StopReasonFields } from '@/components/form/StopReasonFields';
 import { ConditionalSection } from '@/components/form/ConditionalSection';
 import { NumberInput } from '@/components/form/NumberInput';
 import DateInput from '@/components/form/DateInput';
@@ -213,9 +212,6 @@ export function ChequeActionForm({ instrumentId, action: propAction, tenderId, f
             if (values.contacts) formData.append('contacts', JSON.stringify(values.contacts));
             if (values.followup_start_date) formData.append('followup_start_date', values.followup_start_date);
             if (values.frequency) formData.append('frequency', String(values.frequency));
-            if (values.stop_reason) formData.append('stop_reason', String(values.stop_reason));
-            if (values.proof_text) formData.append('proof_text', values.proof_text);
-            if (values.stop_remarks) formData.append('stop_remarks', values.stop_remarks);
             if (values.stop_reason_text) formData.append('stop_reason_text', values.stop_reason_text);
             if (values.proof_image) formData.append('proof_image', values.proof_image);
             if (values.transfer_date) {
@@ -405,16 +401,6 @@ export function ChequeActionForm({ instrumentId, action: propAction, tenderId, f
                                 {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                             </FieldWrapper>
                             <FollowUpFrequencySelect control={form.control} name="frequency" />
-                        </div>
-
-                        <div>
-                            <StopReasonFields
-                                control={form.control}
-                                frequencyFieldName="frequency"
-                                stopReasonFieldName="stop_reason"
-                                proofTextFieldName="proof_text"
-                                stopRemarksFieldName="stop_remarks"
-                            />
                         </div>
 
                         <div className="pt-4 border-t">

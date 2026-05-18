@@ -369,6 +369,7 @@ export class FdrService {
             updateData.status = FDR_STATUSES.FOLLOWUP_INITIATED;
         } else if (body.action === "returned-courier") {
             updateData.status = FDR_STATUSES.RETURN_VIA_COURIER;
+            if (body.docket_no) updateData.docketNo = body.docket_no;
             if (body.docket_slip && typeof body.docket_slip === "string") {
                 updateData.docketSlip = body.docket_slip;
             }
@@ -484,11 +485,6 @@ export class FdrService {
                             area = `${team.name} Team`;
                         }
 
-                        let proofImagePath: string | null = null;
-                        if (body.proof_image && typeof body.proof_image === "string") {
-                            proofImagePath = body.proof_image;
-                        }
-
                         // Map contacts to ContactPersonDto format and filter out invalid ones
                         const mappedContacts = contacts
                             .filter(contact => contact.name && contact.name.trim().length > 0)
@@ -515,10 +511,6 @@ export class FdrService {
                             contacts: mappedContacts,
                             frequency: body.frequency ? Number(body.frequency) : 1,
                             startFrom: body.followup_start_date || undefined,
-                            stopReason: body.stop_reason ? Number(body.stop_reason) : null,
-                            proofText: body.proof_text || null,
-                            proofImagePath: proofImagePath,
-                            stopRemarks: body.stop_remarks || null,
                             attachments: [],
                             createdById: user.id,
                             followUpHistory: [],

@@ -27,9 +27,6 @@ export const ChequeActionFormSchema = BaseActionFormSchema.extend({
     contacts: z.array(ContactPersonSchema).optional(),
     followup_start_date: z.string().optional(),
     frequency: z.number().int().min(1).max(6).optional(),
-    stop_reason: z.number().int().min(1).max(4).optional().nullable(),
-    proof_text: z.string().optional().nullable(),
-    stop_remarks: z.string().optional().nullable(),
     emailBody: z.string().optional(),
 
     // Stop the cheque from the bank

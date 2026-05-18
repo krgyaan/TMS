@@ -207,9 +207,6 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
             if (values.contacts) payload.contacts = values.contacts;
             if (values.followup_start_date) payload.followup_start_date = values.followup_start_date;
             if (values.frequency) payload.frequency = Number(values.frequency);
-            if (values.stop_reason) payload.stop_reason = values.stop_reason;
-            if (values.proof_text) payload.proof_text = values.proof_text;
-            if (values.stop_remarks) payload.stop_remarks = values.stop_remarks;
             if (values.docket_no) payload.docket_no = values.docket_no;
             if (values.docket_slip) payload.docket_slip = values.docket_slip;
             if (values.transfer_date) payload.transfer_date = values.transfer_date;
