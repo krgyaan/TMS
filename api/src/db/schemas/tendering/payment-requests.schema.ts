@@ -322,6 +322,8 @@ export const instrumentChequeDetails = pgTable('instrument_cheque_details', {
     confirmation: varchar('confirmation', { length: 200 }), // emd_cheques.confirmation
     reference: varchar('reference', { length: 200 }), // emd_cheques.reference
     stopReasonText: text('stop_reason_text'), // emd_cheques.stop_reason_text
+    chequeGivenFromAccount: varchar('cheque_given_from_account', { length: 500 }), // Cheque action form field
+    proofImage: varchar('proof_image', { length: 500 }), // Stop cheque proof image
 
     // Amount (for action 3)
     amount: decimal('amount', { precision: 15, scale: 2 }), // emd_cheques.amount

@@ -452,6 +452,11 @@ export class ChequeService {
                 chequeDetailsUpdate.reference = body.remarks;
             }
 
+            // Handle cheque_given_from_account
+            if (body.cheque_given_from_account) {
+                chequeDetailsUpdate.chequeGivenFromAccount = body.cheque_given_from_account;
+            }
+
             // Handle cheque_images - check both files array and body for paths
             const chequeImagesPath = getFilePathFromBody('cheque_images', body);
             if (filePaths.length > 0 && body.cheque_images) {
@@ -498,6 +503,15 @@ export class ChequeService {
             }
         } else if (body.action === 'stop-cheque') {
             if (body.stop_reason_text) chequeDetailsUpdate.stopReasonText = body.stop_reason_text;
+
+            // Handle proof_image
+            const proofImageFile = getFileForField('proof_image', files, body, fileIndexTracker);
+            const proofImagePath = getFilePathFromBody('proof_image', body);
+            if (proofImageFile) {
+                chequeDetailsUpdate.proofImage = `bi-dashboard/${proofImageFile.filename}`;
+            } else if (proofImagePath) {
+                chequeDetailsUpdate.proofImage = proofImagePath;
+            }
         } else if (body.action === 'paid-via-bank-transfer') {
             if (body.transfer_date) chequeDetailsUpdate.transferDate = body.transfer_date;
             if (body.utr) chequeDetailsUpdate.reference = body.utr;
@@ -838,6 +852,10 @@ export class ChequeService {
                 btTransferDate: instrumentChequeDetails.btTransferDate,
                 linkedDdId: instrumentChequeDetails.linkedDdId,
                 linkedFdrId: instrumentChequeDetails.linkedFdrId,
+                stopReasonText: instrumentChequeDetails.stopReasonText,
+                chequeGivenFromAccount: instrumentChequeDetails.chequeGivenFromAccount,
+                proofImage: instrumentChequeDetails.proofImage,
+                cancelledImagePath: instrumentChequeDetails.cancelledImagePath,
             })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
@@ -886,6 +904,10 @@ export class ChequeService {
             btTransferDate: result.btTransferDate ? new Date(result.btTransferDate) : null,
             linkedDdId: result.linkedDdId,
             linkedFdrId: result.linkedFdrId,
+            stopReasonText: result.stopReasonText,
+            chequeGivenFromAccount: result.chequeGivenFromAccount,
+            proofImage: result.proofImage,
+            cancelledImagePath: result.cancelledImagePath,
             courierAddress: result.courierAddress,
             courierDeadline: result.courierDeadline ? Number(result.courierDeadline) : null,
             utr: result.utr,

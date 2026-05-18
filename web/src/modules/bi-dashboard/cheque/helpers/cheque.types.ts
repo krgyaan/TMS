@@ -36,3 +36,75 @@ export interface ChequeDashboardCounts {
     expired: number;
     total: number;
 }
+
+export interface AccountsFormHistory {
+    chequeReq?: 'Accepted' | 'Rejected';
+    reasonReq?: string;
+    chequeNo?: string;
+    dueDate?: string;
+    handover?: string;
+    chequeImages?: string[];
+    positivePayConfirmation?: string;
+    remarks?: string;
+    chequeGivenFromAccount?: string;
+}
+
+export interface FollowupHistory {
+    organisationName?: string;
+    contacts?: Array<{ name: string; phone?: string; email?: string }>;
+    followupStartDate?: string;
+    frequency?: number;
+}
+
+export interface StopChequeHistory {
+    stopReasonText?: string;
+    proofImage?: string;
+}
+
+export interface PaidViaBankTransferHistory {
+    transferDate?: string;
+    amount?: number;
+    utr?: string;
+}
+
+export interface DepositedInBankHistory {
+    transferDate?: string;
+    reference?: string;
+}
+
+export interface CancelledTornHistory {
+    cancelledImagePath?: string;
+}
+
+export interface ChequeFormHistory {
+    accountsForm?: AccountsFormHistory;
+    initiateFollowup?: FollowupHistory;
+    stopCheque?: StopChequeHistory;
+    paidViaBankTransfer?: PaidViaBankTransferHistory;
+    depositedInBank?: DepositedInBankHistory;
+    cancelledTorn?: CancelledTornHistory;
+}
+
+export const ALL_CHEQUE_ACTION_OPTIONS = [
+    { value: 'accounts-form-1', label: 'Accounts Form' },
+    { value: 'initiate-followup', label: 'Initiate Followup' },
+    { value: 'stop-cheque', label: 'Stop Cheque from the Bank' },
+    { value: 'paid-via-bank-transfer', label: 'Paid via Bank Transfer' },
+    { value: 'deposited-in-bank', label: 'Deposited in Bank' },
+    { value: 'cancelled-torn', label: 'Cancelled/Torn' },
+];
+
+export interface ChequeActionFormProps {
+    instrumentId: number;
+    action?: number | null;
+    tenderId?: number | null;
+    instrumentData?: {
+        tenderNo?: string;
+        tenderName?: string;
+        amount?: number;
+        chequeNo?: string;
+        chequeDate?: string | Date;
+        tenderStatusName?: string;
+    };
+    formHistory?: ChequeFormHistory;
+}

@@ -3,8 +3,7 @@ import { useForm, FormProvider, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Save, AlertCircle } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ArrowLeft, Save } from 'lucide-react';
 import { useCreatePaymentRequest, useUpdatePaymentRequest } from '@/hooks/api/usePaymentRequests';
 import { useCurrentUser } from '@/hooks/api/useAuth';
 import { useTeamOptions } from '@/hooks/useSelectOptions';
@@ -158,12 +157,6 @@ export function OldEmdRequestForm({ tenderId, requestIds, initialData, mode = 'c
             </CardHeader>
 
             <CardContent>
-                {(tenderId === 0 || !tenderId) && (
-                    <Alert variant="warning" className="mb-6">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>Be Sure! The Request you are raising is not associated with any tender on TMS</AlertDescription>
-                    </Alert>
-                )}
                 <FormProvider {...form}>
                     <form
                         onSubmit={form.handleSubmit(handleSubmit, (errors) => {
