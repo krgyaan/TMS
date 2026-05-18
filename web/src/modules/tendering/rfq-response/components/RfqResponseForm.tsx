@@ -64,7 +64,6 @@ export function RfqResponseForm({ rfqId, rfqData, orgs, responseStatus }: RfqRes
     const createResponse = useCreateRfqResponse();
     const isSubmitting = createResponse.isPending;
 
-    console.log(rfqData);
 
     const masterItemOptions = useItemOptions();
     const itemOptionsFromUseItems = useMemo(
@@ -109,6 +108,9 @@ export function RfqResponseForm({ rfqId, rfqData, orgs, responseStatus }: RfqRes
     const technicalPaths = form.watch('technicalPaths');
     const mafPaths = form.watch('mafPaths');
     const miiPaths = form.watch('miiPaths');
+
+    const selectedResponseStatus = form.watch('responseStatus');
+    const isQuotationReceived = selectedResponseStatus === '1';
 
     const selectedOrgId = form.watch('orgId');
 
@@ -166,7 +168,7 @@ export function RfqResponseForm({ rfqId, rfqData, orgs, responseStatus }: RfqRes
             data: {
                 organizationId: parseInt(values.orgId, 10),
                 vendorId: parseInt(values.vendorId, 10),
-                oemStatus: parseInt(values.responseStatus, 10),
+                responseStatus: parseInt(values.responseStatus, 10),
                 receiptDatetime: values.receiptDatetime.toISOString(),
                 gstPercentage: values.gstPercentage,
                 gstType: values.gstType,
@@ -233,198 +235,205 @@ export function RfqResponseForm({ rfqId, rfqData, orgs, responseStatus }: RfqRes
                                 options={vendorOptions}
                                 disabled={!selectedOrgId}
                             />
-                            <FieldWrapper
-                                control={form.control}
-                                name="receiptDatetime"
-                                label="Quotation Receipt Date and Time*"
-                            >
-                                    {(field) => (
-                                        <DateTimeInput
-                                            value={
-                                                field.value
-                                                    ? field.value instanceof Date
-                                                        ? field.value.toISOString().slice(0, 16)
-                                                        : String(field.value)
-                                                    : ''
-                                            }
-                                            onChange={(value) => field.onChange(value ? new Date(value) : undefined)}
-                                            placeholder="yyyy-mm-ddT--:--"
-                                        />
-                                    )}
-                                </FieldWrapper>
                         </div>
 
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <h3 className="text-lg font-semibold">Item Details</h3>
-                            </div>
-                            <Separator />
+                        {isQuotationReceived && (
+                            <>
+                                <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
+                                    <FieldWrapper
+                                        control={form.control}
+                                        name="receiptDatetime"
+                                        label="Quotation Receipt Date and Time*"
+                                    >
+                                            {(field) => (
+                                                <DateTimeInput
+                                                    value={
+                                                        field.value
+                                                            ? field.value instanceof Date
+                                                                ? field.value.toISOString().slice(0, 16)
+                                                                : String(field.value)
+                                                            : ''
+                                                    }
+                                                    onChange={(value) => field.onChange(value ? new Date(value) : undefined)}
+                                                    placeholder="yyyy-mm-ddT--:--"
+                                                />
+                                            )}
+                                        </FieldWrapper>
+                                </div>
 
-                            <div className="overflow-x-auto">
-                                <table className="w-full border-collapse text-sm">
-                                    <thead>
-                                        <tr className="border-b bg-muted/50">
-                                            <th className="text-left p-2 w-12">Sr. No.</th>
-                                            <th className="text-left p-2">Item</th>
-                                            <th className="text-left p-2">Description</th>
-                                            <th className="text-left p-2 w-24">Quantity</th>
-                                            <th className="text-left p-2 w-20">Unit</th>
-                                            <th className="text-left p-2 w-28">Unit Price</th>
-                                            <th className="text-left p-2 w-28">Amount</th>
-                                            <th className="w-12" />
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {itemFields.map((field, index) => {
-                                            const qty = form.watch(`items.${index}.qty`);
-                                            const unitPrice = form.watch(`items.${index}.unitPrice`);
-                                            const amount =
-                                                (typeof qty === 'number' ? qty : Number(qty) || 0) *
-                                                (typeof unitPrice === 'number' ? unitPrice : Number(unitPrice) || 0);
-                                            return (
-                                                <tr key={field.id} className="border-b">
-                                                    <td className="p-2">{index + 1}</td>
-                                                    <td className="p-2">
-                                                        <SelectField
-                                                            control={form.control}
-                                                            name={`items.${index}.masterItemId`}
-                                                            label={index === 0 ? undefined : ''}
-                                                            placeholder="Select item"
-                                                            options={itemOptionsFromUseItems}
-                                                        />
-                                                    </td>
-                                                    <td className="p-2">
-                                                        <FieldWrapper
-                                                            control={form.control}
-                                                            name={`items.${index}.requirement`}
-                                                            label={index === 0 ? undefined : ''}
-                                                        >
-                                                            {(f) => <Input {...f} placeholder="Description" className="min-w-[120px]" />}
-                                                        </FieldWrapper>
-                                                    </td>
-                                                    <td className="p-2">
-                                                        <FieldWrapper
-                                                            control={form.control}
-                                                            name={`items.${index}.qty`}
-                                                            label={index === 0 ? undefined : ''}
-                                                        >
-                                                            {(f) => <NumberInput {...f} placeholder="0" />}
-                                                        </FieldWrapper>
-                                                    </td>
-                                                    <td className="p-2">
-                                                        <FieldWrapper
-                                                            control={form.control}
-                                                            name={`items.${index}.unit`}
-                                                            label={index === 0 ? undefined : ''}
-                                                        >
-                                                            {(f) => <Input {...f} placeholder="Nos" />}
-                                                        </FieldWrapper>
-                                                    </td>
-                                                    <td className="p-2">
-                                                        <FieldWrapper
-                                                            control={form.control}
-                                                            name={`items.${index}.unitPrice`}
-                                                            label={index === 0 ? undefined : ''}
-                                                        >
-                                                            {(f) => <NumberInput {...f} placeholder="0" />}
-                                                        </FieldWrapper>
-                                                    </td>
-                                                    <td className="p-2">
-                                                        <Input
-                                                            readOnly
-                                                            value={amount.toFixed(2)}
-                                                            className="bg-muted w-full"
-                                                        />
-                                                    </td>
-                                                    <td className="p-2">
-                                                        <Button
-                                                            type="button"
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="text-destructive hover:bg-destructive/10"
-                                                            onClick={() => removeItem(index)}
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </Button>
-                                                    </td>
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <h3 className="text-lg font-semibold">Item Details</h3>
+                                    </div>
+                                    <Separator />
+
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full border-collapse text-sm">
+                                            <thead>
+                                                <tr className="border-b bg-muted/50">
+                                                    <th className="text-left p-2 w-12">Sr. No.</th>
+                                                    <th className="text-left p-2">Item</th>
+                                                    <th className="text-left p-2">Description</th>
+                                                    <th className="text-left p-2 w-24">Quantity</th>
+                                                    <th className="text-left p-2 w-20">Unit</th>
+                                                    <th className="text-left p-2 w-28">Unit Price</th>
+                                                    <th className="text-left p-2 w-28">Amount</th>
+                                                    <th className="w-12" />
                                                 </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+                                            </thead>
+                                            <tbody>
+                                                {itemFields.map((field, index) => {
+                                                    const qty = form.watch(`items.${index}.qty`);
+                                                    const unitPrice = form.watch(`items.${index}.unitPrice`);
+                                                    const amount =
+                                                        (typeof qty === 'number' ? qty : Number(qty) || 0) *
+                                                        (typeof unitPrice === 'number' ? unitPrice : Number(unitPrice) || 0);
+                                                    return (
+                                                        <tr key={field.id} className="border-b">
+                                                            <td className="p-2">{index + 1}</td>
+                                                            <td className="p-2">
+                                                                <SelectField
+                                                                    control={form.control}
+                                                                    name={`items.${index}.masterItemId`}
+                                                                    label={index === 0 ? undefined : ''}
+                                                                    placeholder="Select item"
+                                                                    options={itemOptionsFromUseItems}
+                                                                />
+                                                            </td>
+                                                            <td className="p-2">
+                                                                <FieldWrapper
+                                                                    control={form.control}
+                                                                    name={`items.${index}.requirement`}
+                                                                    label={index === 0 ? undefined : ''}
+                                                                >
+                                                                    {(f) => <Input {...f} placeholder="Description" className="min-w-[120px]" />}
+                                                                </FieldWrapper>
+                                                            </td>
+                                                            <td className="p-2">
+                                                                <FieldWrapper
+                                                                    control={form.control}
+                                                                    name={`items.${index}.qty`}
+                                                                    label={index === 0 ? undefined : ''}
+                                                                >
+                                                                    {(f) => <NumberInput {...f} placeholder="0" />}
+                                                                </FieldWrapper>
+                                                            </td>
+                                                            <td className="p-2">
+                                                                <FieldWrapper
+                                                                    control={form.control}
+                                                                    name={`items.${index}.unit`}
+                                                                    label={index === 0 ? undefined : ''}
+                                                                >
+                                                                    {(f) => <Input {...f} placeholder="Nos" />}
+                                                                </FieldWrapper>
+                                                            </td>
+                                                            <td className="p-2">
+                                                                <FieldWrapper
+                                                                    control={form.control}
+                                                                    name={`items.${index}.unitPrice`}
+                                                                    label={index === 0 ? undefined : ''}
+                                                                >
+                                                                    {(f) => <NumberInput {...f} placeholder="0" />}
+                                                                </FieldWrapper>
+                                                            </td>
+                                                            <td className="p-2">
+                                                                <Input
+                                                                    readOnly
+                                                                    value={amount.toFixed(2)}
+                                                                    className="bg-muted w-full"
+                                                                />
+                                                            </td>
+                                                            <td className="p-2">
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="text-destructive hover:bg-destructive/10"
+                                                                    onClick={() => removeItem(index)}
+                                                                >
+                                                                    <Trash2 className="h-4 w-4" />
+                                                                </Button>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
 
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                <FieldWrapper
-                                    control={form.control}
-                                    name="gstPercentage"
-                                    label="GST Percentage*"
-                                >
-                                    {(f) => <NumberInput {...f} placeholder="0" />}
-                                </FieldWrapper>
-                                <SelectField
-                                    control={form.control}
-                                    name="gstType"
-                                    label="GST Type*"
-                                    placeholder="Select GST Type"
-                                    options={GST_TYPE_FREIGHT_OPTIONS}
-                                />
-                                <FieldWrapper
-                                    control={form.control}
-                                    name="deliveryTime"
-                                    label="Delivery Time (in days)*"
-                                >
-                                    {(f) => <NumberInput {...f} placeholder="0" />}
-                                </FieldWrapper>
-                                <SelectField
-                                    control={form.control}
-                                    name="freightType"
-                                    label="Freight*"
-                                    placeholder="Select Freight Type"
-                                    options={GST_TYPE_FREIGHT_OPTIONS}
-                                />
-                            </div>
-                        </div>
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                        <FieldWrapper
+                                            control={form.control}
+                                            name="gstPercentage"
+                                            label="GST Percentage*"
+                                        >
+                                            {(f) => <NumberInput {...f} placeholder="0" />}
+                                        </FieldWrapper>
+                                        <SelectField
+                                            control={form.control}
+                                            name="gstType"
+                                            label="GST Type*"
+                                            placeholder="Select GST Type"
+                                            options={GST_TYPE_FREIGHT_OPTIONS}
+                                        />
+                                        <FieldWrapper
+                                            control={form.control}
+                                            name="deliveryTime"
+                                            label="Delivery Time (in days)*"
+                                        >
+                                            {(f) => <NumberInput {...f} placeholder="0" />}
+                                        </FieldWrapper>
+                                        <SelectField
+                                            control={form.control}
+                                            name="freightType"
+                                            label="Freight*"
+                                            placeholder="Select Freight Type"
+                                            options={GST_TYPE_FREIGHT_OPTIONS}
+                                        />
+                                    </div>
+                                </div>
 
-                        <div className="space-y-4">
-                            <Alert>
-                                <AlertDescription className="text-sm">
-                                    Maximum 3 files per field. Total combined size should not exceed 25MB.
-                                </AlertDescription>
-                            </Alert>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                <TenderFileUploader
-                                    context="rfq-response-quotation"
-                                    value={quotationPaths}
-                                    onChange={(paths) => form.setValue('quotationPaths', paths)}
-                                    label="Quotation Document"
-                                    disabled={isSubmitting}
-                                />
-                                <TenderFileUploader
-                                    context="rfq-response-technical"
-                                    value={technicalPaths}
-                                    onChange={(paths) => form.setValue('technicalPaths', paths)}
-                                    label="Technical Documents"
-                                    disabled={isSubmitting}
-                                />
-                                <TenderFileUploader
-                                    context="rfq-response-maf"
-                                    value={mafPaths}
-                                    onChange={(paths) => form.setValue('mafPaths', paths)}
-                                    label="MAF Document"
-                                    disabled={isSubmitting}
-                                />
-                                <TenderFileUploader
-                                    context="rfq-response-mii"
-                                    value={miiPaths}
-                                    onChange={(paths) => form.setValue('miiPaths', paths)}
-                                    label="MII Document"
-                                    disabled={isSubmitting}
-                                />
-                            </div>
-                        </div>
+                                <div className="space-y-4">
+                                    <Alert>
+                                        <AlertDescription className="text-sm">
+                                            Maximum 3 files per field. Total combined size should not exceed 25MB.
+                                        </AlertDescription>
+                                    </Alert>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                        <TenderFileUploader
+                                            context="rfq-response-quotation"
+                                            value={quotationPaths}
+                                            onChange={(paths) => form.setValue('quotationPaths', paths)}
+                                            label="Quotation Document"
+                                            disabled={isSubmitting}
+                                        />
+                                        <TenderFileUploader
+                                            context="rfq-response-technical"
+                                            value={technicalPaths}
+                                            onChange={(paths) => form.setValue('technicalPaths', paths)}
+                                            label="Technical Documents"
+                                            disabled={isSubmitting}
+                                        />
+                                        <TenderFileUploader
+                                            context="rfq-response-maf"
+                                            value={mafPaths}
+                                            onChange={(paths) => form.setValue('mafPaths', paths)}
+                                            label="MAF Document"
+                                            disabled={isSubmitting}
+                                        />
+                                        <TenderFileUploader
+                                            context="rfq-response-mii"
+                                            value={miiPaths}
+                                            onChange={(paths) => form.setValue('miiPaths', paths)}
+                                            label="MII Document"
+                                            disabled={isSubmitting}
+                                        />
+                                    </div>
+                                </div>
+                            </>
+                        )}
 
                         <div className="flex justify-end gap-3 pt-6 border-t">
                             <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={isSubmitting}>
