@@ -57,13 +57,33 @@ export function ChequeView({
         return null;
     }
 
-    const isExpired = (dueDate: Date | null): boolean => {
-        if (!dueDate) return false;
-        const expiryDate = new Date(dueDate.getTime() + 3 * 30 * 24 * 60 * 60 * 1000);
-        return expiryDate < new Date();
+    const getExpiryStatus = (dueDate: string | null, chequeReason: string | null): string | null => {
+        if (chequeReason === 'DD') return 'DD Created';
+        if (chequeReason === 'FDR') return 'FDR Created';
+        if (!dueDate) return 'No date';
+        const expiryDate = new Date(new Date(dueDate).getTime() + 3 * 30 * 24 * 60 * 60 * 1000);
+        return expiryDate < new Date() ? 'Expired' : 'Valid';
     };
 
-    const expiryStatus = data.chequeDate ? (isExpired(new Date(data.chequeDate)) ? 'Expired' : 'Valid') : null;
+    const expiryStatus = getExpiryStatus(data.dueDate || data.chequeDate, data.chequeReason);
+
+    const getChequeStatus = (status: string | null, chequeReason: string | null): string => {
+        if (status === 'ACCOUNTS_FORM_ACCEPTED') {
+            if (chequeReason === 'DD') return 'DD Created';
+            if (chequeReason === 'FDR') return 'FDR Created';
+            return 'Cheque Created';
+        }
+        const map: Record<string, string> = {
+            PENDING: 'Pending',
+            ACCOUNTS_FORM_REJECTED: 'Cheque Rejected',
+            FOLLOWUP_INITIATED: 'Followup Initiated',
+            STOP_REQUESTED: 'Cheque Stopped via Bank',
+            DEPOSITED_IN_BANK: 'Deposited in Bank',
+            PAID_VIA_BANK_TRANSFER: 'Paid via Bank Transfer',
+            CANCELLED_TORN: 'Returned/Cancelled/Torn by Party',
+        };
+        return map[status as string] || status || 'Pending';
+    };
 
     return (
         <Card className={className}>
@@ -129,7 +149,7 @@ export function ChequeView({
                                     Status
                                 </TableCell>
                                 <TableCell className="text-sm">
-                                    <Badge variant="outline">{data.chequeStatus == 'Accepted' ? 'Paid' : data.chequeStatus || '—'}</Badge>
+                                    <Badge variant="outline">{getChequeStatus(data.status || data.chequeStatus, data.chequeReason)}</Badge>
                                 </TableCell>
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     Purpose
@@ -178,10 +198,12 @@ export function ChequeView({
                                     Expiry Status
                                 </TableCell>
                                 <TableCell className="text-sm">
-                                    {expiryStatus ? (
-                                        <Badge variant={expiryStatus === 'Expired' ? 'destructive' : 'default'}>
-                                            {expiryStatus}
-                                        </Badge>
+                                    {expiryStatus === 'No date' ? (
+                                        <Badge variant="secondary">No date</Badge>
+                                    ) : expiryStatus === 'Expired' ? (
+                                        <Badge variant="destructive">Expired</Badge>
+                                    ) : expiryStatus ? (
+                                        <Badge variant="default">{expiryStatus}</Badge>
                                     ) : '—'}
                                 </TableCell>
                                 <TableCell colSpan={2} />

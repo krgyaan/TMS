@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger, NotFoundException, BadRequestException, forwardRef } from '@nestjs/common';
 import { eq, and, inArray, isNull, isNotNull, sql, asc, desc, ne, notInArray, or, ilike } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import {
@@ -24,6 +25,7 @@ import { followUps } from '@/db/schemas/shared/follow-ups.schema';
 @Injectable()
 export class ChequeService {
     private readonly logger = new Logger(ChequeService.name);
+    private readonly requestedByUser = alias(users, 'requested_by_user');
 
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
@@ -31,17 +33,31 @@ export class ChequeService {
         private readonly followUpService: FollowUpService,
     ) { }
 
-    private statusMap() {
-        return {
+    private deriveChequeStatus(status: string | null, chequeReason: string | null): string {
+        if (status === CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED) {
+            if (chequeReason === 'DD') return 'DD Created';
+            if (chequeReason === 'FDR') return 'FDR Created';
+            return 'Cheque Created';
+        }
+        const map: Record<string, string> = {
             [CHEQUE_STATUSES.PENDING]: 'Pending',
-            [CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED]: 'Accepted',
-            [CHEQUE_STATUSES.ACCOUNTS_FORM_REJECTED]: 'Rejected',
+            [CHEQUE_STATUSES.ACCOUNTS_FORM_REJECTED]: 'Cheque Rejected',
             [CHEQUE_STATUSES.FOLLOWUP_INITIATED]: 'Followup Initiated',
-            [CHEQUE_STATUSES.STOP_REQUESTED]: 'Stop Requested',
-            [CHEQUE_STATUSES.DEPOSITED_IN_BANK]: 'Deposited',
-            [CHEQUE_STATUSES.PAID_VIA_BANK_TRANSFER]: 'Paid via BT',
-            [CHEQUE_STATUSES.CANCELLED_TORN]: 'Cancelled/Torn',
+            [CHEQUE_STATUSES.STOP_REQUESTED]: 'Cheque Stopped via Bank',
+            [CHEQUE_STATUSES.DEPOSITED_IN_BANK]: 'Deposited in Bank',
+            [CHEQUE_STATUSES.PAID_VIA_BANK_TRANSFER]: 'Paid via Bank Transfer',
+            [CHEQUE_STATUSES.CANCELLED_TORN]: 'Returned/Cancelled/Torn by Party',
         };
+        return map[status as string] || status || 'Pending';
+    }
+
+    private deriveExpiryStatus(dueDate: Date | null, chequeReason: string | null, status: string | null): string | null {
+        const isAccepted = status === CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED;
+        if (isAccepted && chequeReason === 'DD') return 'DD Created';
+        if (isAccepted && chequeReason === 'FDR') return 'FDR Created';
+        if (!dueDate) return 'No date';
+        const expiryDate = new Date(dueDate.getTime() + 3 * 30 * 24 * 60 * 60 * 1000);
+        return expiryDate < new Date() ? 'Expired' : 'Valid';
     }
 
     private getNotExpiredCondition() {
@@ -192,12 +208,14 @@ export class ChequeService {
                 cheque: instrumentChequeDetails.chequeDate,
                 dueDate: instrumentChequeDetails.dueDate,
                 chequeStatus: paymentInstruments.status,
+                requestedBy: this.requestedByUser.name,
             })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(this.requestedByUser, eq(this.requestedByUser.id, paymentRequests.requestedBy))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .where(whereClause)
             .orderBy(orderClause)
@@ -216,14 +234,11 @@ export class ChequeService {
 
         const total = Number(countResult?.count || 0);
 
-        function isExpired(dueDate: Date): boolean {
-            return dueDate && new Date(dueDate.getTime() + 3 * 30 * 24 * 60 * 60 * 1000) < new Date(Date.now());
-        }
-
         const data: ChequeDashboardRow[] = rows.map((row) => ({
             id: row.id,
             requestId: row.requestId,
             purpose: row.purpose,
+            requestedBy: row.requestedBy,
             chequeNo: row.chequeNo,
             payeeName: row.payeeName,
             bidValidity: row.bidValidity ? new Date(row.bidValidity) : null,
@@ -231,8 +246,8 @@ export class ChequeService {
             type: row.type,
             cheque: row.cheque,
             dueDate: row.dueDate ? new Date(row.dueDate) : null,
-            expiry: row.dueDate ? (isExpired(new Date(row.dueDate)) ? 'Expired' : 'Valid') : null,
-            chequeStatus: this.statusMap()[row.chequeStatus],
+            expiry: this.deriveExpiryStatus(row.dueDate ? new Date(row.dueDate) : null, row.type, row.chequeStatus),
+            chequeStatus: this.deriveChequeStatus(row.chequeStatus, row.type),
         }));
 
         return wrapPaginatedResponse(data, total, page, limit);
@@ -915,7 +930,7 @@ export class ChequeService {
         return {
             id: result.id,
             action: result.action,
-            chequeStatus: this.statusMap()[result.status] || result.status,
+            chequeStatus: this.deriveChequeStatus(result.status, result.chequeReason),
             tenderNo: result.tenderNo,
             tenderName: result.tenderName,
             tenderId: result.tenderId,

@@ -73,7 +73,7 @@ const TABS_CONFIG: Array<{ key: ChequeDashboardTab; name: string; icon: React.Re
 const getStatusVariant = (status: string | null): string => {
     if (!status) return 'secondary';
     const statusLower = status.toLowerCase();
-    if (statusLower.includes('accepted')) {
+    if (statusLower.includes('created')) {
         return 'default';
     }
     if (statusLower.includes('cancelled') || statusLower.includes('rejected')) {
@@ -176,6 +176,16 @@ const ChequeListPage = () => {
                 filter: true,
             },
             {
+                field: 'requestedBy',
+                headerName: 'Requested By',
+                width: 140,
+                maxWidth: 140,
+                colId: 'requestedBy',
+                valueGetter: (params) => params.data?.requestedBy || '—',
+                sortable: true,
+                filter: true,
+            },
+            {
                 field: 'bidValidity',
                 headerName: 'Bid Validity',
                 width: 120,
@@ -230,24 +240,35 @@ const ChequeListPage = () => {
                 },
             },
             {
+                field: 'requestedBy',
+                headerName: 'Member',
+                width: 180,
+                maxWidth: 180,
+                colId: 'requestedBy',
+                sortable: true,
+                filter: true,
+            },
+            {
                 field: 'expiry',
                 headerName: 'Expiry',
-                width: 90,
-                maxWidth: 90,
+                width: 120,
+                maxWidth: 140,
                 colId: 'expiry',
                 sortable: true,
                 filter: true,
                 cellRenderer: (params: any) => {
                     const status = params.value;
                     if (!status) return '—';
-                    return <Badge variant={status === 'Expired' ? 'destructive' : 'default'}>{status}</Badge>;
+                    if (status === 'No date') return <Badge variant="secondary">No date</Badge>;
+                    if (status === 'Expired') return <Badge variant="destructive">Expired</Badge>;
+                    return <Badge variant="default">{status}</Badge>;
                 },
             },
             {
                 field: 'chequeStatus',
                 headerName: 'Cheque Status',
-                width: 140,
-                maxWidth: 140,
+                width: 160,
+                maxWidth: 160,
                 colId: 'chequeStatus',
                 sortable: true,
                 filter: true,

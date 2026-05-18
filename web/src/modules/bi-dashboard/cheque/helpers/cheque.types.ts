@@ -13,6 +13,7 @@ export interface ChequeDashboardRow {
     id: number;
     requestId: number;
     purpose: string | null;
+    requestedBy: string | null;
     date: Date | null;
     chequeNo: string | null;
     payeeName: string | null;
@@ -21,7 +22,7 @@ export interface ChequeDashboardRow {
     type: string | null;
     cheque: string | null;
     dueDate: Date | null;
-    expiry: Date | null;
+    expiry: string | null;
     chequeStatus: string | null;
 }
 
