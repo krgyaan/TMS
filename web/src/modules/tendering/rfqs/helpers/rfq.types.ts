@@ -64,6 +64,11 @@ export interface Rfq {
         organizationName: string;
         vendors: Array<{ id: number; name: string; email: string }>;
     }>;
+    vendorOrganizations?: Array<{
+        organizationId: number;
+        organizationName: string;
+        vendors: Array<{ id: number; name: string; email: string }>;
+    }>;
     tender: any;
     items: RfqItem[];
     documents: RfqDocument[];
