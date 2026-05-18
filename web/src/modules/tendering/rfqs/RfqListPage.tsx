@@ -201,7 +201,7 @@ const Rfqs = () => {
                     </Badge>
                 );
             },
-            hide: activeTab !== 'sent',
+            hide: activeTab == 'pending' || activeTab ==  'responses',
             sortable: true,
             filter: true,
         },
@@ -239,7 +239,7 @@ const Rfqs = () => {
             },
             sortable: true,
             filter: true,
-            hide: activeTab !== 'sent' && activeTab !== 'responses',
+            hide: activeTab == 'pending',
         },
         {
             field: 'rfqStatus',
@@ -258,7 +258,7 @@ const Rfqs = () => {
             },
             sortable: true,
             filter: true,
-            hide: activeTab !== 'rfq-rejected' && activeTab !== 'tender-dnb',
+            hide: activeTab !== 'responses',
         },
         {
             field: 'statusName',
