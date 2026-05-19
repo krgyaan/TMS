@@ -308,6 +308,8 @@ export class DemandDraftService {
         if (body.action === 'accounts-form') {
             const [linkedCheque] = await this.db
                 .select({
+                    id: instrumentChequeDetails.id,
+                    instrumentId: instrumentChequeDetails.instrumentId,
                     status: paymentInstruments.status,
                     rejectionReason: paymentInstruments.rejectionReason,
                 })
@@ -315,14 +317,14 @@ export class DemandDraftService {
                 .innerJoin(paymentInstruments, eq(paymentInstruments.id, instrumentChequeDetails.instrumentId))
                 .where(eq(instrumentChequeDetails.linkedDdId, instrumentId))
                 .limit(1);
-
+            console.log({linkedCheque});
             if (linkedCheque) {
                 if (linkedCheque.status === CHEQUE_STATUSES.ACCOUNTS_FORM_REJECTED) {
                     body.dd_req = 'Rejected';
                     if (!body.reason_req) {
                         body.reason_req = linkedCheque.rejectionReason || 'Linked Cheque was rejected';
                     }
-                } else if (linkedCheque.status !== CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED) {
+                } else if (linkedCheque.status == CHEQUE_STATUSES.PENDING) {
                     throw new BadRequestException(
                         'Cannot process: linked Cheque is not yet accepted. Please accept the Cheque first.'
                     );
@@ -694,6 +696,7 @@ export class DemandDraftService {
                     amount: paymentInstruments.amount,
                     status: paymentInstruments.status,
                     requestId: paymentInstruments.id,
+                    ddDetailsId: instrumentChequeDetails.linkedDdId,
                 })
                 .from(instrumentChequeDetails)
                 .innerJoin(paymentInstruments, eq(paymentInstruments.id, instrumentChequeDetails.instrumentId))
