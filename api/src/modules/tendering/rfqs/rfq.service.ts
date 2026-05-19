@@ -545,6 +545,13 @@ export class RfqsService {
         } else if (tab === "responses") {
             conditions.push(isNotNull(rfqs.id));
             conditions.push(sql`EXISTS (SELECT 1 FROM ${rfqResponses} WHERE ${rfqResponses.rfqId} = ${rfqs.id})`);
+            //building the condition to ensure only quotation received RFQs are visible
+            conditions.push(
+                or(
+                    eq(rfqResponses.responseStatus, 1),
+                    isNull(rfqResponses.responseStatus)
+                )
+            );
             conditions.push(or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)));
         } else if (tab === "rfq-rejected") {
             // conditions.push(
@@ -918,17 +925,17 @@ export class RfqsService {
         try {
             this.logger.log(`Sending ${eventType} email for tender ${tenderId} to ${recipients.to?.length || 0} recipients`);
 
-            // await this.emailService.sendTenderEmail({
-            //     tenderId,
-            //     eventType,
-            //     fromUserId,
-            //     to: recipients.to || [],
-            //     cc: recipients.cc,
-            //     subject,
-            //     template,
-            //     data,
-            //     attachments: recipients.attachments,
-            // });
+            await this.emailService.sendTenderEmail({
+                tenderId,
+                eventType,
+                fromUserId,
+                to: recipients.to || [],
+                cc: recipients.cc,
+                subject,
+                template,
+                data,
+                attachments: recipients.attachments,
+            });
         } catch (error) {
             this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
             // Don't throw - email failure shouldn't break main operation
@@ -1079,15 +1086,15 @@ export class RfqsService {
                 `sendRfqSentEmail: tenderId=${tenderId}, rfqId=${rfqDetails.id}, orgId=${orgId} has ${attachmentFiles.length} attachment file(s): ${JSON.stringify(attachmentFiles)}`
             );
 
-            // await this.sendEmail("rfq.sent", tenderId, sentBy, `RFQ - ${tender.tenderName} - ${tender.tenderNo}`, "rfq-sent", emailData, {
-            //     to: [{ type: "emails", emails: vendorEmails }],
-            //     cc: [
-            //         { type: "role", role: "Admin", teamId: tender.team },
-            //         { type: "role", role: "Team Leader", teamId: tender.team },
-            //         { type: "role", role: "Coordinator", teamId: tender.team },
-            //     ],
-            //     attachments: attachmentFiles.length > 0 ? { files: attachmentFiles } : undefined,
-            // });
+            await this.sendEmail("rfq.sent", tenderId, sentBy, `RFQ - ${tender.tenderName} - ${tender.tenderNo}`, "rfq-sent", emailData, {
+                to: [{ type: "emails", emails: vendorEmails }],
+                cc: [
+                    { type: "role", role: "Admin", teamId: tender.team },
+                    { type: "role", role: "Team Leader", teamId: tender.team },
+                    { type: "role", role: "Coordinator", teamId: tender.team },
+                ],
+                attachments: attachmentFiles.length > 0 ? { files: attachmentFiles } : undefined,
+            });
         }
     }
 }
