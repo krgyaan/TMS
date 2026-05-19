@@ -79,7 +79,7 @@ export function Combobox({
     const filtered = React.useMemo(() => {
         const q = query.trim().toLowerCase();
         if (!q) return options;
-        return options.filter(o => o.name.toLowerCase().includes(q));
+        return options.filter(o => (o.name ?? "").toLowerCase().includes(q));
     }, [options, query]);
 
     React.useEffect(() => {
