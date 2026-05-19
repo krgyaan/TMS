@@ -738,7 +738,12 @@ function RfqResponsesViewer({ rfqId }: { rfqId: number }) {
             </h4>
             
             {/* Awaiting Responses (Pending) on Top */}
-            {pending.length > 0 ? (
+            {(received.length + pending.length) === 0 ? (
+                <div className="bg-amber-500/5 border border-amber-500/10 rounded-md p-3 flex items-center gap-2 text-amber-700 dark:text-amber-400 text-xs font-semibold">
+                    <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+                    No vendors requested for this RFQ.
+                </div>
+            ) : pending.length > 0 ? (
                 <div className="bg-muted/10 border border-muted rounded-md p-3 space-y-2">
                     <span className="text-[10px] font-bold text-muted-foreground flex items-center gap-1.5 uppercase tracking-wider">
                         <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
