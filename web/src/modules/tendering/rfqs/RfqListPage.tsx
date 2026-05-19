@@ -239,7 +239,7 @@ const Rfqs = () => {
             },
             sortable: true,
             filter: true,
-            hide: activeTab == 'pending' || activeTab == "rfq-rejected",
+            hide: activeTab == "rfq-rejected",
         },
         // {
         //     field: 'rfqStatus',
