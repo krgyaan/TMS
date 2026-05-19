@@ -391,7 +391,18 @@ export class RfqsService {
                 let fetchedVendorOrganizations: VendorOrganization[] = [];
 
                 if (activeTab === "pending") {
-                    fetchedVendorOrganizations = [];
+                    const orgIdsStr = row.rfqTo || "";
+                    const vendorOrganizationIds = orgIdsStr
+                        .split(",")
+                        .map(id => parseInt(id.trim(), 10))
+                        .filter(id => Number.isInteger(id) && id > 0);
+
+                    if (vendorOrganizationIds.length > 0) {
+                        fetchedVendorOrganizations = await this.db
+                            .select()
+                            .from(vendorOrganizations)
+                            .where(inArray(vendorOrganizations.id, vendorOrganizationIds));
+                    }
                 } else {
                     const orgIdsStr = row.vendorOrganizationIds || "";
                     const vendorOrganizationIds = orgIdsStr
