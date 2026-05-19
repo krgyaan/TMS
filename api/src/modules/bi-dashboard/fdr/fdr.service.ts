@@ -340,6 +340,16 @@ export class FdrService {
         if (body.action === "accounts-form") {
             if (body.fdr_req === "Accepted") {
                 updateData.status = FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED;
+                if (body.req_no) updateData.reqNo = body.req_no;
+                if (body.courier_address_json) {
+                    try {
+                        updateData.courierAddressJson = typeof body.courier_address_json === 'string'
+                            ? JSON.parse(body.courier_address_json)
+                            : body.courier_address_json;
+                    } catch {
+                        this.logger.warn('Failed to parse courier_address_json');
+                    }
+                }
             } else if (body.fdr_req === "Rejected") {
                 updateData.status = FDR_STATUSES.ACCOUNTS_FORM_REJECTED;
                 updateData.rejectionReason = body.reason_req || null;
@@ -750,6 +760,45 @@ export class FdrService {
         const hasReturnedData = result.action != null && result.action >= 3;
         const hasSettledData = result.action === 4 || result.action === 7;
 
+        let linkedChequeData: any = null;
+        {
+            const [cheque] = await this.db
+                .select({
+                    chequeNo: instrumentChequeDetails.chequeNo,
+                    amount: paymentInstruments.amount,
+                    status: paymentInstruments.status,
+                    requestId: paymentInstruments.id,
+                })
+                .from(instrumentChequeDetails)
+                .innerJoin(paymentInstruments, eq(paymentInstruments.id, instrumentChequeDetails.instrumentId))
+                .where(eq(instrumentChequeDetails.linkedFdrId, id))
+                .limit(1);
+            if (cheque) {
+                linkedChequeData = cheque;
+            }
+        }
+
+        let linkedBgData: any = null;
+        if (result.fdrNo) {
+            const fdrNo = result.fdrNo;
+            if (fdrNo) {
+                const [bg] = await this.db
+                    .select({
+                        bgNo: instrumentBgDetails.bgNo,
+                        bankName: instrumentBgDetails.bankName,
+                        status: paymentInstruments.status,
+                        instrumentId: paymentInstruments.id,
+                    })
+                    .from(instrumentBgDetails)
+                    .innerJoin(paymentInstruments, eq(paymentInstruments.id, instrumentBgDetails.instrumentId))
+                    .where(eq(instrumentBgDetails.fdrNo, fdrNo))
+                    .limit(1);
+                if (bg) {
+                    linkedBgData = bg;
+                }
+            }
+        }
+
         let courierDetails: any = null;
         if (result.reqNo) {
             const courierId = Number(result.reqNo);
@@ -822,6 +871,8 @@ export class FdrService {
             hasAccountsFormData,
             hasReturnedData,
             hasSettledData,
+            linkedCheque: linkedChequeData,
+            linkedBg: linkedBgData,
         };
     }
 

@@ -80,37 +80,22 @@ export interface FDRActionFormData {
     hasAccountsFormData: boolean;
     hasReturnedData: boolean;
     hasSettledData: boolean;
+    linkedCheque?: LinkedChequeData | null;
+    linkedBg?: LinkedBgData | null;
 }
 
 export interface LinkedChequeData {
     chequeNo: string | null;
-    chequeDate: string | Date | null;
-    bankName: string | null;
     amount: number | null;
     status: string | null;
-    favouring: string | null;
     requestId: number | null;
 }
 
 export interface LinkedBgData {
+    instrumentId: number;
     bgNo: string | null;
-    bgDate: string | Date | null;
-    validityDate: string | Date | null;
-    claimExpiryDate: string | Date | null;
     bankName: string | null;
-    beneficiaryName: string | null;
-    beneficiaryAddress: string | null;
-    cashMarginPercent: number | null;
-    fdrMarginPercent: number | null;
-    stampCharges: number | null;
-    sfmsCharges: number | null;
-    bgPurpose: string | null;
-    bgNeeds: string | null;
-    courierNo: string | null;
-    bgBankAcc: string | null;
-    bgBankIfsc: string | null;
     status: string | null;
-    amount: number | null;
 }
 
 export interface FdrViewProps {
@@ -144,6 +129,17 @@ export interface AccountsFormHistory {
     fdrDate?: string;
     reqNo?: string;
     remarks?: string;
+    courierOrg?: string;
+    courierName?: string;
+    courierPhone?: string;
+    courierAddrLine1?: string;
+    courierAddrLine2?: string;
+    courierCity?: string;
+    courierState?: string;
+    courierPincode?: string;
+    empFrom?: number;
+    delDate?: string;
+    urgency?: number;
 }
 
 export interface FollowupHistory {
@@ -209,7 +205,10 @@ export interface FDRActionFormProps {
         fdrNo?: string;
         fdrDate?: string | Date;
         fdrExpiryDate?: string | Date;
+        fdrSource?: string;
         tenderStatusName?: string;
     };
     formHistory?: FDRFormHistory;
+    linkedCheque?: LinkedChequeData | null;
+    linkedBg?: LinkedBgData | null;
 }

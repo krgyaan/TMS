@@ -75,15 +75,13 @@ export interface DDActionFormData {
     hasAccountsFormData: boolean;
     hasReturnedData: boolean;
     hasSettledData: boolean;
+    linkedCheque?: LinkedChequeData | null;
 }
 
 export interface LinkedChequeData {
     chequeNo: string | null;
-    chequeDate: string | Date | null;
-    bankName: string | null;
     amount: number | null;
     status: string | null;
-    favouring: string | null;
     requestId: number | null;
 }
 
@@ -118,6 +116,17 @@ export interface AccountsFormHistory {
     ddDate?: string;
     reqNo?: string;
     remarks?: string;
+    courierOrg?: string;
+    courierName?: string;
+    courierPhone?: string;
+    courierAddrLine1?: string;
+    courierAddrLine2?: string;
+    courierCity?: string;
+    courierState?: string;
+    courierPincode?: string;
+    empFrom?: string;
+    delDate?: string;
+    urgency?: string;
 }
 
 export interface FollowupHistory {
@@ -185,4 +194,5 @@ export interface DDActionFormProps {
         tenderStatusName?: string;
     };
     formHistory?: DDFormHistory;
+    linkedCheque?: LinkedChequeData | null;
 }

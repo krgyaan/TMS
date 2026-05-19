@@ -15,8 +15,20 @@ export const DemandDraftActionFormSchema = BaseActionFormSchema.extend({
     reason_req: z.string().optional(),
     dd_no: z.string().optional(),
     dd_date: z.string().optional(),
-    req_no: z.coerce.number().optional(),
     remarks_dd: z.string().optional(),
+
+    // Courier dispatch fields (creates courier record, stores its ID in req_no)
+    courierOrg: z.string().optional(),
+    courierName: z.string().optional(),
+    courierPhone: z.string().optional(),
+    courierAddrLine1: z.string().optional(),
+    courierAddrLine2: z.string().optional(),
+    courierCity: z.string().optional(),
+    courierState: z.string().optional(),
+    courierPincode: z.string().optional(),
+    empFrom: z.coerce.number().optional(),
+    delDate: z.string().optional(),
+    urgency: z.coerce.number().optional(),
 
     organisation_name: z.string().optional(),
     contacts: z.array(ContactPersonSchema).optional(),
@@ -51,11 +63,14 @@ export const DemandDraftActionFormSchema = BaseActionFormSchema.extend({
 ).refine(
     (data) => {
         if (data.action === 'accounts-form' && data.dd_req === 'Accepted') {
-            return !!data.dd_date && !!data.dd_no && !!data.req_no;
+            return !!data.dd_date && !!data.dd_no &&
+                !!data.courierOrg && !!data.courierName && !!data.courierPhone &&
+                !!data.courierAddrLine1 && !!data.courierPincode &&
+                !!data.empFrom && !!data.delDate && !!data.urgency;
         }
         return true;
     },
-    { message: 'DD date, DD number, and courier request number are required when accepted', path: ['dd_date'] }
+    { message: 'DD date, DD number, and courier dispatch details are required when accepted', path: ['dd_date'] }
 ).refine(
     (data) => {
         if (data.action === 'initiate-followup') {

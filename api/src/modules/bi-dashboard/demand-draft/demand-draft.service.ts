@@ -329,6 +329,15 @@ export class DemandDraftService {
         if (body.action === 'accounts-form') {
             if (body.dd_req === 'Accepted') {
                 updateData.status = DD_STATUSES.ACCOUNTS_FORM_ACCEPTED;
+                if (body.courier_address_json) {
+                    try {
+                        updateData.courierAddressJson = typeof body.courier_address_json === 'string'
+                            ? JSON.parse(body.courier_address_json)
+                            : body.courier_address_json;
+                    } catch {
+                        this.logger.warn('Failed to parse courier_address_json');
+                    }
+                }
             } else if (body.dd_req === 'Rejected') {
                 updateData.status = DD_STATUSES.ACCOUNTS_FORM_REJECTED;
                 updateData.rejectionReason = body.reason_req || null;
@@ -574,6 +583,7 @@ export class DemandDraftService {
                 tenderNo: paymentRequests.tenderNo,
                 tenderName: paymentRequests.projectName,
                 tenderId: paymentRequests.tenderId,
+                ddDetailsId: instrumentDdDetails.id,
                 ddNo: instrumentDdDetails.ddNo,
                 ddDate: instrumentDdDetails.ddDate,
                 reqNo: instrumentDdDetails.reqNo,
@@ -603,6 +613,24 @@ export class DemandDraftService {
         const hasAccountsFormData = result.action != null && result.action >= 1;
         const hasReturnedData = result.action != null && result.action >= 3;
         const hasSettledData = result.action === 5 || result.action === 7;
+
+        let linkedChequeData: any = null;
+        if (result.ddDetailsId) {
+            const [cheque] = await this.db
+                .select({
+                    chequeNo: instrumentChequeDetails.chequeNo,
+                    amount: paymentInstruments.amount,
+                    status: paymentInstruments.status,
+                    requestId: paymentInstruments.id,
+                })
+                .from(instrumentChequeDetails)
+                .innerJoin(paymentInstruments, eq(paymentInstruments.id, instrumentChequeDetails.instrumentId))
+                .where(eq(instrumentChequeDetails.linkedDdId, result.ddDetailsId))
+                .limit(1);
+            if (cheque) {
+                linkedChequeData = cheque;
+            }
+        }
 
         let courierDetails: any = null;
         if (result.reqNo) {
@@ -675,6 +703,7 @@ export class DemandDraftService {
             hasAccountsFormData,
             hasReturnedData,
             hasSettledData,
+            linkedCheque: linkedChequeData,
         };
     }
 

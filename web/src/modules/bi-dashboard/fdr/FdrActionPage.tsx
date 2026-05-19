@@ -65,6 +65,7 @@ export default function FdrActionPage() {
                 fdrNo: actionFormData.fdrNo ?? undefined,
                 fdrDate: actionFormData.fdrDate ?? undefined,
                 fdrExpiryDate: actionFormData.fdrExpiryDate ?? undefined,
+                fdrSource: actionFormData.fdrSource ?? undefined,
             };
         }
         const stored = getStoredData();
@@ -140,6 +141,8 @@ export default function FdrActionPage() {
                     action={currentAction}
                     tenderId={actionFormData?.tenderId ?? null}
                     instrumentData={instrumentData}
+                    linkedCheque={actionFormData?.linkedCheque ?? null}
+                    linkedBg={actionFormData?.linkedBg ?? null}
                     formHistory={{
                         accountsForm: actionFormData ? {
                             fdrReq: actionFormData.fdrStatus === 'Rejected' ? 'Rejected' :
@@ -150,6 +153,14 @@ export default function FdrActionPage() {
                             fdrDate: actionFormData.fdrDate ? new Date(actionFormData.fdrDate).toISOString() : undefined,
                             reqNo: actionFormData.reqNo ?? undefined,
                             remarks: actionFormData.fdrRemark ?? undefined,
+                            courierOrg: actionFormData.courierDetails?.toOrg ?? undefined,
+                            courierName: actionFormData.courierAddressJson?.name ?? undefined,
+                            courierPhone: actionFormData.courierAddressJson?.phone ?? undefined,
+                            courierAddrLine1: actionFormData.courierAddressJson?.line1 ?? undefined,
+                            courierAddrLine2: actionFormData.courierAddressJson?.line2 ?? undefined,
+                            courierCity: actionFormData.courierAddressJson?.city ?? undefined,
+                            courierState: actionFormData.courierAddressJson?.state ?? undefined,
+                            courierPincode: actionFormData.courierAddressJson?.pincode ?? undefined,
                         } : undefined,
                         initiateFollowup: followupData ? {
                             organisationName: followupData.organisationName ?? undefined,

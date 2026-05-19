@@ -145,6 +145,7 @@ export default function DemandDraftActionPage() {
                     action={currentAction}
                     instrumentData={instrumentData}
                     tenderId={actionFormData?.tenderId ?? null}
+                    linkedCheque={actionFormData?.linkedCheque ?? null}
                     formHistory={{
                         accountsForm: actionFormData ? {
                             ddReq: actionFormData.ddStatus === 'Rejected' ? 'Rejected' :
@@ -155,6 +156,14 @@ export default function DemandDraftActionPage() {
                             ddDate: actionFormData.ddDate ? new Date(actionFormData.ddDate).toISOString() : undefined,
                             reqNo: actionFormData.reqNo ?? undefined,
                             remarks: actionFormData.ddRemarks ?? undefined,
+                            courierOrg: actionFormData.courierDetails?.toOrg ?? undefined,
+                            courierName: actionFormData.courierAddressJson?.name ?? undefined,
+                            courierPhone: actionFormData.courierAddressJson?.phone ?? undefined,
+                            courierAddrLine1: actionFormData.courierAddressJson?.line1 ?? undefined,
+                            courierAddrLine2: actionFormData.courierAddressJson?.line2 ?? undefined,
+                            courierCity: actionFormData.courierAddressJson?.city ?? undefined,
+                            courierState: actionFormData.courierAddressJson?.state ?? undefined,
+                            courierPincode: actionFormData.courierAddressJson?.pincode ?? undefined,
                         } : undefined,
                         initiateFollowup: followupData ? {
                             organisationName: followupData.organisationName ?? undefined,

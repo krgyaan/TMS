@@ -15,8 +15,19 @@ export const FdrActionFormSchema = BaseActionFormSchema.extend({
     reason_req: z.string().optional(),
     fdr_no: z.string().optional(),
     fdr_date: z.string().optional(),
-    req_no: z.string().optional(),
     remarks_fdr: z.string().optional(),
+
+    courierOrg: z.string().optional(),
+    courierName: z.string().optional(),
+    courierPhone: z.string().optional(),
+    courierAddrLine1: z.string().optional(),
+    courierAddrLine2: z.string().optional(),
+    courierCity: z.string().optional(),
+    courierState: z.string().optional(),
+    courierPincode: z.string().optional(),
+    empFrom: z.coerce.number().optional(),
+    delDate: z.string().optional(),
+    urgency: z.coerce.number().optional(),
 
     organisation_name: z.string().optional(),
     contacts: z.array(ContactPersonSchema).optional(),
@@ -54,11 +65,11 @@ export const FdrActionFormSchema = BaseActionFormSchema.extend({
 ).refine(
     (data) => {
         if (data.action === 'accounts-form' && data.fdr_req === 'Accepted') {
-            return !!data.fdr_date && !!data.fdr_no && !!data.req_no;
+            return !!data.fdr_date && !!data.fdr_no && !!data.courierOrg;
         }
         return true;
     },
-    { message: 'FDR date, FDR number, and courier request number are required when accepted', path: ['fdr_date'] }
+    { message: 'FDR date, FDR number, and courier organization are required when accepted', path: ['fdr_date'] }
 ).refine(
     (data) => {
         if (data.action === 'initiate-followup') {

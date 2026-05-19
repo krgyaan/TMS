@@ -1,10 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { demandDraftsService } from '@/services/api/demand-drafts.service';
-import type {
-    DemandDraftDashboardRow,
-    DemandDraftDashboardCounts,
-    DemandDraftDashboardFilters,
-} from '@/modules/bi-dashboard/demand-draft/helpers/demandDraft.types';
+import type { DemandDraftDashboardRow, DemandDraftDashboardCounts, DashboardFilters } from '@/modules/bi-dashboard/demand-draft/helpers/demandDraft.types';
 import type { PaginatedResult } from '@/types/api.types';
 
 export const demandDraftsKey = {
@@ -19,9 +15,9 @@ export const demandDraftsKey = {
 };
 
 export const useDemandDraftDashboard = (
-    filters?: DemandDraftDashboardFilters
+    filters?: DashboardFilters
 ) => {
-    const params: DemandDraftDashboardFilters = {
+    const params: DashboardFilters = {
         ...filters,
     };
 
