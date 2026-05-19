@@ -81,9 +81,9 @@ const FollowUpCreatePage = () => {
                 comment: values.comment,
                 followupFor: values.followupFor,
                 contacts: values.contacts.map(c => ({
-                    name: c.name,
-                    email: c.email || null,
-                    phone: c.phone || null,
+                    name:  c.name?.trim(),
+                    email: c.email?.trim() || null,
+                    phone: c.phone?.trim() || null,
                 })),
             };
 
