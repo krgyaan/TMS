@@ -136,11 +136,11 @@ export default function RfqResponseCreatePage() {
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-muted/5 p-4 rounded-lg border text-sm">
                                     <div>
                                         <span className="text-muted-foreground block text-[10px] uppercase font-bold tracking-wider">Tender Number</span>
-                                        <span className="font-semibold text-foreground">{rfqData.tenderNo || '—'}</span>
+                                        <span className="font-semibold text-foreground">{rfqData?.tender?.tenderNo || '—'}</span>
                                     </div>
                                     <div>
                                         <span className="text-muted-foreground block text-[10px] uppercase font-bold tracking-wider">Tender Name</span>
-                                        <span className="font-semibold text-foreground">{rfqData.tenderName || '—'}</span>
+                                        <span className="font-semibold text-foreground">{rfqData?.tender?.tenderName || '—'}</span>
                                     </div>
                                     <div>
                                         <span className="text-muted-foreground block text-[10px] uppercase font-bold tracking-wider">RFQ ID</span>
@@ -323,7 +323,7 @@ export default function RfqResponseCreatePage() {
                                                                             return (
                                                                                 <a 
                                                                                     key={doc.id || dIdx} 
-                                                                                    href={doc.path} 
+                                                                                    href={"/uploads/tendering/" + doc.path} 
                                                                                     target="_blank" 
                                                                                     rel="noopener noreferrer"
                                                                                     className="p-2.5 border border-muted rounded flex items-center justify-between hover:bg-muted transition-all text-primary font-medium truncate bg-background text-[10px]"

@@ -386,7 +386,7 @@ export function RfqForm({ tenderData, initialData }: RfqFormProps) {
                                                                     return (
                                                                         <a 
                                                                             key={doc.id || idx} 
-                                                                            href={doc.path} 
+                                                                            href={"/uploads/tendering/" + doc.path} 
                                                                             target="_blank" 
                                                                             rel="noopener noreferrer"
                                                                             className="p-2 border border-muted rounded flex items-center gap-2 hover:bg-muted transition-all text-primary font-medium truncate bg-background shadow-none text-[11px]"
@@ -861,7 +861,7 @@ function RfqResponsesViewer({ rfqId }: { rfqId: number }) {
                                                             return (
                                                                 <a 
                                                                     key={doc.id || dIdx} 
-                                                                    href={doc.path} 
+                                                                    href={doc.path.startsWith('http') ? doc.path : doc.path.startsWith('/') ? `/uploads/tendering${doc.path}` : `/uploads/tendering/${doc.path}`} 
                                                                     target="_blank" 
                                                                     rel="noopener noreferrer"
                                                                     className="p-2.5 border border-muted rounded flex items-center justify-between hover:bg-muted transition-all text-primary font-medium truncate bg-background text-[10px]"
