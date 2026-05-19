@@ -547,24 +547,27 @@ export class RfqsService {
             conditions.push(sql`EXISTS (SELECT 1 FROM ${rfqResponses} WHERE ${rfqResponses.rfqId} = ${rfqs.id})`);
             conditions.push(or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)));
         } else if (tab === "rfq-rejected") {
-            conditions.push(
-                or(
-                    inArray(tenderInfos.status, [10, 14, 35]),
-                    inArray(bidSubmissions.reasonStatus, [10, 14, 35])
-                )
-            )
+            // conditions.push(
+            //     or(
+            //         inArray(tenderInfos.status, [10, 14, 35]),
+            //         inArray(bidSubmissions.reasonStatus, [10, 14, 35])
+            //     )
+            // )
+            conditions.push(isNull(rfqs.id));
+            conditions.push(eq(bidSubmissions.status, "Tender Missed"));
         } else if (tab === "tender-dnb") {
             // const dnbStatusIds = StatusCache.getIds("dnb");
             // const filteredDnbIds = dnbStatusIds.filter(id => [8, 34].includes(id));
             // if (filteredDnbIds.length > 0) {
             //     conditions.push(inArray(tenderInfos.status, filteredDnbIds));
             // }
-            conditions.push(eq(bidSubmissions.status, "Tender Missed"));
-            conditions.push(or(
-                notInArray(bidSubmissions.reasonStatus,[10, 14, 35]),
-                isNull(bidSubmissions.reasonStatus)
-            ));
+            // conditions.push(or(
+                //     notInArray(bidSubmissions.reasonStatus,[10, 14, 35]),
+                //     isNull(bidSubmissions.reasonStatus)
+                // ));
+                
             conditions.push(isNotNull(rfqs.id));
+            conditions.push(eq(bidSubmissions.status, "Tender Missed"));
         }
 
         return conditions;
