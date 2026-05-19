@@ -1,0 +1,25 @@
+<div>
+    <p>Dear {{data.requestedBy}},</p>
+
+    <p>The request for Fixed Deposit Receipt (FDR) creation has been {{data.status}}</p>
+    <ul>
+        <li>FDR Date: {{data.issueDate}}</li>
+        <li>FDR No: {{data.fdrNo}}</li>
+        <li>Beneficiary Name: {{data.beneficiaryName}}</li>
+        <li>Payable At: {{data.payableAt}}</li>
+        <li>Amount: {{data.amountFormatted}}</li>
+    </ul>
+    <p>Soft copy of the FDR: <a href="{{data.fdrImage}}">Download FDR</a></p>
+    <p>Courier Request No: <a href="{{data.courierLink}}">{{data.courierRequestNo}}</a></p>
+    {{#if data.remarks}}
+    <p>Remarks: {{data.remarks}}</p>
+    {{/if}}
+
+    {{#if data.status == 'APPROVED'}}
+        <p>Best of luck for the tender.</p>
+    {{/if}}
+    <p>
+        Regards,<br />
+        Account Team
+    </p>
+</div>
