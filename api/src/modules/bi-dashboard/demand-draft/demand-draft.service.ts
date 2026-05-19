@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { eq, and, inArray, isNull, sql, asc, desc, ne, or } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
@@ -19,6 +20,7 @@ import { FollowUpService } from '@/modules/follow-up/follow-up.service';
 import type { CreateFollowUpDto } from '@/modules/follow-up/zod';
 import { followUps } from '@/db/schemas/shared/follow-ups.schema';
 import { couriers } from '@/db/schemas/shared/couriers.schema';
+import { EmailService } from '@/modules/email/email.service';
 
 @Injectable()
 export class DemandDraftService {
@@ -27,6 +29,8 @@ export class DemandDraftService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly followUpService: FollowUpService,
+        private readonly emailService: EmailService,
+        private readonly configService: ConfigService,
     ) { }
 
     private deriveDdStatus(status: string | null): string {
@@ -399,6 +403,74 @@ export class DemandDraftService {
                     ...ddDetailsUpdate,
                     createdAt: new Date(),
                 });
+            }
+        }
+
+        // Send email notification for accounts-form (accept/reject)
+        if (body.action === 'accounts-form') {
+            const isAccepted = body.dd_req === 'Accepted';
+            try {
+                const [paymentReq] = await this.db
+                    .select({
+                        requestedBy: paymentRequests.requestedBy,
+                        tenderId: paymentRequests.tenderId,
+                        tenderNo: paymentRequests.tenderNo,
+                    })
+                    .from(paymentRequests)
+                    .where(eq(paymentRequests.id, instrument.requestId))
+                    .limit(1);
+
+                if (paymentReq?.requestedBy) {
+                    const [reqUser] = await this.db
+                        .select({ name: users.name, email: users.email })
+                        .from(users)
+                        .where(eq(users.id, paymentReq.requestedBy))
+                        .limit(1);
+
+                    if (reqUser?.email) {
+                        let imageUrl = '';
+                        if (isAccepted && body.req_no) {
+                            const [courier] = await this.db
+                                .select({ courierDocs: couriers.courierDocs })
+                                .from(couriers)
+                                .where(eq(couriers.id, Number(body.req_no)))
+                                .limit(1);
+                            const docs = (courier?.courierDocs ?? []) as string[];
+                            if (docs.length > 0) {
+                                const baseUrl = (this.configService.get<string>('app.apiUrl') || '').replace('/api/v1', '');
+                                imageUrl = `${baseUrl}/uploads/courier/${docs[0]}`;
+                            }
+                        }
+
+                        const formatCurrency = (amount: number) =>
+                            `₹${amount.toLocaleString('en-IN')}`;
+
+                        await this.emailService.sendPaymentEmail({
+                            requestId: instrument.requestId,
+                            tenderId: paymentReq.tenderId || undefined,
+                            eventType: isAccepted ? 'DD_CREATED' : 'DD_REJECTED',
+                            fromUserId: user.id,
+                            subject: `Demand Draft ${isAccepted ? 'Created' : 'Rejected'} - ${paymentReq.tenderNo || ''}`,
+                            template: 'dd-created',
+                            data: {
+                                requestedBy: reqUser.name,
+                                status: isAccepted ? 'Accepted' : 'Rejected',
+                                issueDate: isAccepted ? (body.dd_date || '') : '',
+                                chequeNo: isAccepted ? (body.dd_no || '') : '',
+                                beneficiaryName: instrument.favouring || '',
+                                payableAt: instrument.payableAt || '',
+                                amountFormatted: instrument.amount ? formatCurrency(Number(instrument.amount)) : '',
+                                ddImage: imageUrl,
+                                courierRequestNo: isAccepted ? (body.req_no || '') : '',
+                                courierLink: '',
+                                remarks: isAccepted ? (body.remarks || '') : (body.reason_req || ''),
+                            },
+                            to: [{ type: 'emails', emails: [reqUser.email] }],
+                        });
+                    }
+                }
+            } catch (error) {
+                this.logger.error(`Failed to send DD created email for instrument ${instrumentId}:`, error);
             }
         }
 
