@@ -201,7 +201,7 @@ const Rfqs = () => {
                     </Badge>
                 );
             },
-            hide: activeTab == 'pending' || activeTab ==  'responses',
+            hide: activeTab == 'pending' || activeTab ==  'responses' || activeTab == 'rfq-rejected',
             sortable: true,
             filter: true,
         },
@@ -239,27 +239,27 @@ const Rfqs = () => {
             },
             sortable: true,
             filter: true,
-            hide: activeTab == 'pending',
+            hide: activeTab == 'pending' || activeTab == "rfq-rejected",
         },
-        {
-            field: 'rfqStatus',
-            headerName: 'RFQ Status',
-            width: 200,
-            colId: 'rfqStatus',
-            valueGetter: (params: any) => params.data?.responseStatus ? params.data.responseStatus : '—',
-            cellRenderer: (params: any) => {
-                const status = params.value;
-                if (!status) return '—';
-                return (
-                    <Badge variant="default">
-                        {status}
-                    </Badge>
-                );
-            },
-            sortable: true,
-            filter: true,
-            hide: activeTab !== 'responses',
-        },
+        // {
+        //     field: 'rfqStatus',
+        //     headerName: 'RFQ Status',
+        //     width: 200,
+        //     colId: 'rfqStatus',
+        //     valueGetter: (params: any) => params.data?.responseStatus ? params.data.responseStatus : '—',
+        //     cellRenderer: (params: any) => {
+        //         const status = params.value;
+        //         if (!status) return '—';
+        //         return (
+        //             <Badge variant="default">
+        //                 {status}
+        //             </Badge>
+        //         );
+        //     },
+        //     sortable: true,
+        //     filter: true,
+        //     hide: activeTab !== 'responses',
+        // },
         {
             field: 'statusName',
             headerName: 'Tender Status',
