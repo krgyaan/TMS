@@ -587,15 +587,34 @@ export class RfqsService {
         };
     }
 
-    private async getVendorOrganizations(requestedOrganization: string | null): Promise<any[]> {
-        if (!requestedOrganization) return [];
-
+    private async getVendorOrganizations(
+        requestedOrganization: string | null,
+        requestedVendor: string | null = null
+    ): Promise<any[]> {
         const orgIds = requestedOrganization
-            .split(',')
-            .map(id => parseInt(id.trim(), 10))
-            .filter(id => !isNaN(id));
+            ? requestedOrganization
+                .split(',')
+                .map(id => parseInt(id.trim(), 10))
+                .filter(id => !isNaN(id))
+            : [];
 
-        if (orgIds.length === 0) return [];
+        const vendorIds = requestedVendor
+            ? requestedVendor
+                .split(',')
+                .map(id => parseInt(id.trim(), 10))
+                .filter(id => !isNaN(id))
+            : [];
+
+        if (orgIds.length === 0 && vendorIds.length === 0) return [];
+
+        const conditions: SQL[] = [];
+        
+        if (orgIds.length > 0) {
+            conditions.push(inArray(vendorOrganizations.id, orgIds));
+        }
+        if (vendorIds.length > 0) {
+            conditions.push(inArray(vendors.id, vendorIds));
+        }
 
         const rawOrgData = await this.db.select({
                 organization: vendorOrganizations,
@@ -603,12 +622,13 @@ export class RfqsService {
             })
             .from(vendorOrganizations)
             .leftJoin(vendors, eq(vendors.orgId, vendorOrganizations.id))
-            .where(inArray(vendorOrganizations.id, orgIds));
+            .where(or(...conditions));
 
         const groupsMap = new Map<number, any>();
         rawOrgData.forEach((row: any) => {
             const org = row.organization;
             const vendor = row.vendor;
+            if (!org) return;
             
             if (!groupsMap.has(org.id)) {
                 groupsMap.set(org.id, {
@@ -619,11 +639,14 @@ export class RfqsService {
             }
             
             if (vendor) {
-                groupsMap.get(org.id).vendors.push({
-                    id: vendor.id,
-                    name: vendor.name,
-                    email: vendor.email
-                });
+                const group = groupsMap.get(org.id);
+                if (!group.vendors.some((v: any) => v.id === vendor.id)) {
+                    group.vendors.push({
+                        id: vendor.id,
+                        name: vendor.name,
+                        email: vendor.email
+                    });
+                }
             }
         });
 
@@ -644,7 +667,7 @@ export class RfqsService {
             this.db.select().from(rfqItems).where(eq(rfqItems.rfqId, id)),
             this.db.select().from(rfqDocuments).where(eq(rfqDocuments.rfqId, id)),
             this.db.select().from(tenderInfos).where(eq(tenderInfos.id, rfqRow.tenderId)),
-            this.getVendorOrganizations(rfqRow.requestedOrganization)
+            this.getVendorOrganizations(rfqRow.requestedOrganization, rfqRow.requestedVendor)
         ]);
 
         return {
@@ -670,7 +693,7 @@ export class RfqsService {
         const [rfqItemsData, rfqDocumentsData, vendorOrganizations] = await Promise.all([
             this.db.select().from(rfqItems).where(eq(rfqItems.rfqId, rfqRow.id)),
             this.db.select().from(rfqDocuments).where(eq(rfqDocuments.rfqId, rfqRow.id)),
-            this.getVendorOrganizations(rfqRow.requestedOrganization),
+            this.getVendorOrganizations(rfqRow.requestedOrganization, rfqRow.requestedVendor),
         ]);
 
         return {
@@ -694,7 +717,7 @@ export class RfqsService {
                 const [rfqItemsData, rfqDocumentsData, vendorOrganizations] = await Promise.all([
                     this.db.select().from(rfqItems).where(eq(rfqItems.rfqId, rfqRow.id)),
                     this.db.select().from(rfqDocuments).where(eq(rfqDocuments.rfqId, rfqRow.id)),
-                    this.getVendorOrganizations(rfqRow.requestedOrganization),
+                    this.getVendorOrganizations(rfqRow.requestedOrganization, rfqRow.requestedVendor),
                 ]);
 
                 return {
@@ -778,7 +801,7 @@ export class RfqsService {
             await this.tenderStatusHistoryService.trackStatusChange(data.tenderId, newStatus, changedBy, prevStatus, "RFQ sent");
         });
         
-        const vendorOrganizations = await this.getVendorOrganizations(newRfq.requestedOrganization);
+        const vendorOrganizations = await this.getVendorOrganizations(newRfq.requestedOrganization, newRfq.requestedVendor);
 
         const rfqDetails = {
             ...newRfq,
