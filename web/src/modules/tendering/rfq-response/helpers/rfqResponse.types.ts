@@ -61,7 +61,7 @@ export interface RfqResponseDetail {
     gstType: string | null;
     deliveryTime: number | null;
     freightType: string | null;
-    notes: string | null;
+    generalRemarks: string | null;
     createdAt: string;
     updatedAt: string;
     items: RfqResponseItemRow[];
@@ -72,13 +72,15 @@ export interface RfqResponseDetail {
 
 /** Request body for POST /rfqs/:rfqId/responses */
 export interface CreateRfqResponseBodyDto {
+    organizationId: number,
     vendorId: number;
+    responseStatus : number,
     receiptDatetime: string;
     gstPercentage?: number;
     gstType?: string;
     deliveryTime?: number;
     freightType?: string;
-    notes?: string;
+    generalRemarks?: string;
     items: Array<{
         itemId: number;
         requirement: string;

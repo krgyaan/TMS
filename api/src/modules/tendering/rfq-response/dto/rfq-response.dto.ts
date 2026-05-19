@@ -29,13 +29,15 @@ export type RfqResponseItemDto = z.infer<typeof RfqResponseItemSchema>;
  */
 export const CreateRfqResponseSchema = z.object({
     rfqId: bigintField().positive('RFQ ID must be positive'),
+    organizationId: bigintField().positive('Organization ID must be positive'),
     vendorId: bigintField().positive('Vendor ID must be positive'),
+    responseStatus: optionalNumber(z.coerce.number().int().positive()),
     receiptDatetime: requiredDateField,
     gstPercentage: optionalNumber(z.coerce.number().min(0).max(100)),
     gstType: optionalTextField(50),
     deliveryTime: optionalNumber(z.coerce.number().int().nonnegative()),
     freightType: optionalTextField(50),
-    notes: optionalString,
+    generalRemarks: optionalString,
     items: z.array(RfqResponseItemSchema).min(1, 'At least one item is required'),
     documents: z.array(RfqDocumentSchema).optional(),
 });
@@ -57,7 +59,7 @@ export const UpdateRfqResponseSchema = z.object({
     gstType: optionalTextField(50),
     deliveryTime: optionalNumber(z.coerce.number().int().nonnegative()),
     freightType: optionalTextField(50),
-    notes: optionalString,
+    generalRemarks: optionalString,
 });
 
 export type UpdateRfqResponseDto = z.infer<typeof UpdateRfqResponseSchema>;

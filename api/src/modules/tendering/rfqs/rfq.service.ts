@@ -7,7 +7,7 @@ import { statuses } from "@db/schemas/master/statuses.schema";
 import { users } from "@db/schemas/auth/users.schema";
 import { NewRfq, rfqs, rfqItems, rfqDocuments, rfqResponses, NewRfqItem, NewRfqDocument } from "@db/schemas/tendering/rfqs.schema";
 import { items } from "@db/schemas/master/items.schema";
-import { vendorOrganizations } from "@db/schemas/vendors/vendor-organizations.schema";
+import { VendorOrganization, vendorOrganizations } from "@db/schemas/vendors/vendor-organizations.schema";
 import { vendors } from "@db/schemas/vendors/vendors.schema";
 import { CreateRfqDto, UpdateRfqDto } from "./dto/rfq.dto";
 import { TenderInfosService } from "@/modules/tendering/tenders/tenders.service";
@@ -40,6 +40,7 @@ type RfqRow = {
     teamMemberName: string;
     status: number;
     statusName: string;
+    responseStatus: string | null;
     latestStatus: number | null;
     latestStatusName: string | null;
     statusRemark: string | null;
@@ -47,7 +48,7 @@ type RfqRow = {
     rfqTo: string;
     dueDate: Date;
     rfqId: number | null;
-    vendorOrganizationNames: string | null;
+    vendorOrganizations: VendorOrganization[];
     rfqCount: number;
     responseCount: number;
 };
@@ -59,8 +60,11 @@ type RfqDetails = {
     docList: string | null;
     requestedOrganization: string | null;
     requestedVendor: string | null;
-    requestedOrganizationNames: string[] | null;
-    requestedVendorNames: string[] | null;
+    vendorOrganizations: Array<{
+        organizationId: number;
+        organizationName: string;
+        vendors: Array<{ id: number; name: string; email: string }>;
+    }>;
     createdAt: Date;
     updatedAt: Date;
     items: Array<{
@@ -77,16 +81,16 @@ type RfqDetails = {
         path: string;
         metadata: any;
     }>;
-    requestedGroups: Array<{
-        organizationId: number;
-        organizationName: string;
-        vendors: Array<{
-            id: number;
-            name: string;
-            email: string;
-        }>;
-    }>;
+
 };
+
+export const responseStatuses = [
+    { id: 1, name: "Quotation Received" },
+    { id: 2, name: "Product not available" },
+    { id: 3, name: "OEM docs not provided" },
+    { id: 4, name: "Not allowed by OEM" },
+    { id: 5, name: "Not Quoted by OEM" }
+] as const;
 
 @Injectable()
 export class RfqsService {
@@ -147,13 +151,8 @@ export class RfqsService {
                 return sql`${tenderInfos.dueDate} DESC NULLS LAST`;
 
             case "responses":
-                // Latest response received first
-                return sql`(
-                    SELECT MAX(${rfqResponses.receiptDatetime})
-                    FROM ${rfqResponses}
-                    JOIN ${rfqs} ON ${rfqResponses.rfqId} = ${rfqs.id}
-                    WHERE ${rfqs.tenderId} = ${tenderInfos.id}
-                ) DESC NULLS LAST`;
+                // For responses tab, we query rfqResponses directly so we can use receiptDatetime
+                return sql`${rfqResponses.receiptDatetime} DESC NULLS LAST`;
 
             case "rfq-rejected":
                 // Latest due date first
@@ -203,6 +202,16 @@ export class RfqsService {
                     AND ${vendorOrganizations.name} ILIKE ${searchStr}
                 )`,
             ];
+            if (activeTab === "responses") {
+                searchConditions.push(sql`EXISTS (
+                    SELECT 1 FROM ${vendors}
+                    LEFT JOIN ${vendorOrganizations} ON ${vendorOrganizations.id} = ${vendors.orgId}
+                    WHERE ${vendors.id} = ${rfqResponses.vendorId}
+                    AND (${vendors.name} ILIKE ${searchStr} OR ${vendorOrganizations.name} ILIKE ${searchStr})
+                )`);
+                
+            }
+
             conditions.push(sql`(${sql.join(searchConditions, sql` OR `)})`);
         }
 
@@ -229,12 +238,16 @@ export class RfqsService {
                     break;
                 case "responseDate":
                     // Sort by latest response date
-                    orderByClause = sql`(
-                        SELECT MAX(${rfqResponses.createdAt})
-                        FROM ${rfqResponses}
-                        JOIN ${rfqs} ON ${rfqResponses.rfqId} = ${rfqs.id}
-                        WHERE ${rfqs.tenderId} = ${tenderInfos.id}
-                    ) ${filters.sortOrder === "desc" ? sql`DESC NULLS LAST` : sql`ASC NULLS LAST`}`;
+                    if (activeTab === "responses") {
+                        orderByClause = sql`${rfqResponses.createdAt} ${filters.sortOrder === "desc" ? sql`DESC NULLS LAST` : sql`ASC NULLS LAST`}`;
+                    } else {
+                        orderByClause = sql`(
+                            SELECT MAX(${rfqResponses.createdAt})
+                            FROM ${rfqResponses}
+                            JOIN ${rfqs} ON ${rfqResponses.rfqId} = ${rfqs.id}
+                            WHERE ${rfqs.tenderId} = ${tenderInfos.id}
+                        ) ${filters.sortOrder === "desc" ? sql`DESC NULLS LAST` : sql`ASC NULLS LAST`}`;
+                    }
                     break;
                 case "statusName":
                     orderByClause = sortFn(statuses.name);
@@ -247,7 +260,88 @@ export class RfqsService {
             orderByClause = this.getDefaultSortByRfqTab(activeTab);
         }
 
-        // Get total count
+        if (activeTab === "responses") {
+            // Bifurcate by rfqResponses
+            const [countResult] = await this.db
+                .select({ count: sql<number>`count(distinct ${rfqResponses.id})` })
+                .from(rfqResponses)
+                .innerJoin(rfqs, eq(rfqs.id, rfqResponses.rfqId))
+                .innerJoin(tenderInfos, eq(tenderInfos.id, rfqs.tenderId))
+                .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+                .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+                .leftJoin(items, eq(items.id, tenderInfos.item))
+                .where(whereClause);
+            const total = Number(countResult?.count || 0);
+
+            const rows = await this.db
+                .select({
+                    responseId: rfqResponses.id,
+                    vendorId: rfqResponses.vendorId,
+                    tenderId: tenderInfos.id,
+                    tenderNo: tenderInfos.tenderNo,
+                    tenderName: tenderInfos.tenderName,
+                    teamMember: tenderInfos.teamMember,
+                    teamMemberName: users.name,
+                    status: tenderInfos.status,
+                    statusName: statuses.name,
+                    item: tenderInfos.item,
+                    itemName: items.name,
+                    responseStatus: rfqResponses.responseStatus,
+                    rfqTo: tenderInfos.rfqTo,
+                    dueDate: tenderInfos.dueDate,
+                    rfqId: rfqs.id,
+                    rfqRequired: tenderInfos.rfqRequired,
+                    vendorName: vendors.name,
+                    vendorOrganization: vendorOrganizations,
+                })
+                .from(rfqResponses)
+                .innerJoin(rfqs, eq(rfqs.id, rfqResponses.rfqId))
+                .innerJoin(tenderInfos, eq(tenderInfos.id, rfqs.tenderId))
+                .leftJoin(vendors, eq(vendors.id, rfqResponses.vendorId))
+                .leftJoin(vendorOrganizations, eq(vendorOrganizations.id, rfqResponses.organizationId))
+                .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+                .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
+                .leftJoin(items, eq(items.id, tenderInfos.item))
+                .where(whereClause)
+                .orderBy(orderByClause)
+                .limit(limit)
+                .offset(offset);
+
+            const data: RfqRow[] = rows.map(row => {
+                const vendorName = row.vendorName || null;
+                const responseStatusLabel = row.responseStatus
+                    ? responseStatuses.find(s => s.id === Number(row.responseStatus))?.name || "Awaiting Response"
+                    : "Awaiting Response";
+
+                return {
+                    tenderId: row.tenderId,
+                    tenderNo: row.tenderNo,
+                    tenderName: row.tenderName,
+                    teamMember: row.teamMember || 0,
+                    teamMemberName: row.teamMemberName || "",
+                    status: row.status || 0,
+                    statusName: row.statusName || "",
+                    responseStatus: responseStatusLabel,
+                    latestStatus: null,
+                    latestStatusName: null,
+                    statusRemark: null,
+                    itemName: row.itemName || "",
+                    rfqTo: row.rfqTo || "",
+                    dueDate: row.dueDate,
+                    rfqId: row.rfqId,
+                    vendorOrganizations: row.vendorOrganization ? [row.vendorOrganization] : [],
+                    vendorName,
+                    rfqCount: 1,
+                    responseCount: 1,
+                };
+            });
+
+            return wrapPaginatedResponse(data, total, page, limit);
+        }
+
+        // Get total count (for non-responses tabs)
         const [countResult] = await this.db
             .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
             .from(tenderInfos)
@@ -259,7 +353,7 @@ export class RfqsService {
             .where(whereClause);
         const total = Number(countResult?.count || 0);
 
-        // Get paginated data
+        // Get paginated data (for non-responses tabs)
         const rows = await this.db
             .select({
                 tenderId: tenderInfos.id,
@@ -269,13 +363,14 @@ export class RfqsService {
                 teamMemberName: users.name,
                 status: tenderInfos.status,
                 statusName: statuses.name,
+                rfqStatusName: statuses.name,
                 item: tenderInfos.item,
                 itemName: items.name,
                 rfqTo: tenderInfos.rfqTo,
                 dueDate: tenderInfos.dueDate,
                 rfqId: sql<number>`MAX(${rfqs.id})`,
                 rfqRequired: tenderInfos.rfqRequired,
-                vendorOrganizationIds: tenderInfos.rfqTo || null,
+                vendorOrganizationIds: sql<string>`(ARRAY_AGG(${rfqs.requestedOrganization} ORDER BY ${rfqs.id} DESC))[1]`,
                 rfqCount: sql<number>`(SELECT count(*)::int FROM ${rfqs} WHERE ${rfqs.tenderId} = ${tenderInfos.id})`,
                 responseCount: sql<number>`(SELECT count(*)::int FROM ${rfqResponses} JOIN ${rfqs} ON ${rfqResponses.rfqId} = ${rfqs.id} WHERE ${rfqs.tenderId} = ${tenderInfos.id})`,
             })
@@ -293,18 +388,23 @@ export class RfqsService {
 
         const data: RfqRow[] = await Promise.all(
             rows.map(async row => {
-                const vendorOrganizationIds = (row.vendorOrganizationIds ?? "")
-                    .split(",")
-                    .map(id => parseInt(id.trim(), 10))
-                    .filter(id => Number.isInteger(id) && id > 0);
+                let fetchedVendorOrganizations: VendorOrganization[] = [];
 
-                let vendorOrganizationNames: { name: string }[] = [];
+                if (activeTab === "pending") {
+                    fetchedVendorOrganizations = [];
+                } else {
+                    const orgIdsStr = row.vendorOrganizationIds || "";
+                    const vendorOrganizationIds = orgIdsStr
+                        .split(",")
+                        .map(id => parseInt(id.trim(), 10))
+                        .filter(id => Number.isInteger(id) && id > 0);
 
-                if (vendorOrganizationIds.length > 0) {
-                    vendorOrganizationNames = await this.db
-                        .select({ name: vendorOrganizations.name })
-                        .from(vendorOrganizations)
-                        .where(inArray(vendorOrganizations.id, vendorOrganizationIds));
+                    if (vendorOrganizationIds.length > 0) {
+                        fetchedVendorOrganizations = await this.db
+                            .select()
+                            .from(vendorOrganizations)
+                            .where(inArray(vendorOrganizations.id, vendorOrganizationIds));
+                    }
                 }
 
                 return {
@@ -315,6 +415,7 @@ export class RfqsService {
                     teamMemberName: row.teamMemberName || "",
                     status: row.status || 0,
                     statusName: row.statusName || "",
+                    responseStatus: row.statusName || "",
                     latestStatus: null,
                     latestStatusName: null,
                     statusRemark: null,
@@ -322,7 +423,7 @@ export class RfqsService {
                     rfqTo: row.rfqTo || "",
                     dueDate: row.dueDate,
                     rfqId: row.rfqId,
-                    vendorOrganizationNames: vendorOrganizationNames.map(org => org.name).join(", "),
+                    vendorOrganizations: fetchedVendorOrganizations,
                     rfqCount: Number(row.rfqCount ?? 0),
                     responseCount: Number(row.responseCount ?? 0),
                 };
@@ -330,6 +431,26 @@ export class RfqsService {
         );
 
         return wrapPaginatedResponse(data, total, page, limit);
+    }
+
+    //TO DO : use this later -> still deciding how i am going to use it
+    private async getVendorOrgName(vendorId: number) : Promise<VendorOrganization | undefined> {
+        //getting the orgId from our vendor ID
+        const [vendor] = await this.db
+            .select()
+            .from(vendors)
+            .where(eq(vendors.id, vendorId));
+
+        if (!vendor || vendor.orgId === null) {
+            return undefined;
+        }
+
+        const [org] = await this.db
+            .select()
+            .from(vendorOrganizations)
+            .where(eq(vendorOrganizations.id, vendor.orgId));
+        
+        return org;
     }
 
     /**
@@ -350,7 +471,7 @@ export class RfqsService {
                 .leftJoin(items, eq(items.id, tenderInfos.item))
                 .where(and(...this.buildDashboardConditions(user, teamId, "pending")))
                 .then(([result]) => Number(result?.count || 0)),
-            this.db
+            this.db // 
                 .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
                 .from(tenderInfos)
                 .leftJoin(rfqs, eq(rfqs.tenderId, tenderInfos.id))
@@ -360,7 +481,7 @@ export class RfqsService {
                 .leftJoin(items, eq(items.id, tenderInfos.item))
                 .where(and(...this.buildDashboardConditions(user, teamId, "sent")))
                 .then(([result]) => Number(result?.count || 0)),
-            this.db
+            this.db //rejected
                 .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
                 .from(tenderInfos)
                 .leftJoin(rfqs, eq(rfqs.tenderId, tenderInfos.id))
@@ -370,7 +491,7 @@ export class RfqsService {
                 .leftJoin(items, eq(items.id, tenderInfos.item))
                 .where(and(...this.buildDashboardConditions(user, teamId, "rfq-rejected")))
                 .then(([result]) => Number(result?.count || 0)),
-            this.db
+            this.db //dnb
                 .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
                 .from(tenderInfos)
                 .leftJoin(rfqs, eq(rfqs.tenderId, tenderInfos.id))
@@ -380,10 +501,11 @@ export class RfqsService {
                 .leftJoin(items, eq(items.id, tenderInfos.item))
                 .where(and(...this.buildDashboardConditions(user, teamId, "tender-dnb")))
                 .then(([result]) => Number(result?.count || 0)),
-            this.db
-                .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
-                .from(tenderInfos)
-                .leftJoin(rfqs, eq(rfqs.tenderId, tenderInfos.id))
+            this.db //responses
+                .select({ count: sql<number>`count(distinct ${rfqResponses.id})` })
+                .from(rfqResponses)
+                .innerJoin(rfqs, eq(rfqs.id, rfqResponses.rfqId))
+                .innerJoin(tenderInfos, eq(tenderInfos.id, rfqs.tenderId))
                 .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
                 .leftJoin(users, eq(users.id, tenderInfos.teamMember))
                 .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
@@ -423,120 +545,89 @@ export class RfqsService {
         } else if (tab === "responses") {
             conditions.push(isNotNull(rfqs.id));
             conditions.push(sql`EXISTS (SELECT 1 FROM ${rfqResponses} WHERE ${rfqResponses.rfqId} = ${rfqs.id})`);
-            conditions.push(or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)));
-        } else if (tab === "rfq-rejected") {
+            //building the condition to ensure only quotation received RFQs are visible
             conditions.push(
                 or(
-                    inArray(tenderInfos.status, [10, 14, 35]),
-                    inArray(bidSubmissions.reasonStatus, [10, 14, 35])
+                    eq(rfqResponses.responseStatus, 1),
+                    isNull(rfqResponses.responseStatus)
                 )
-            )
+            );
+            conditions.push(or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)));
+        } else if (tab === "rfq-rejected") {
+            // conditions.push(
+            //     or(
+            //         inArray(tenderInfos.status, [10, 14, 35]),
+            //         inArray(bidSubmissions.reasonStatus, [10, 14, 35])
+            //     )
+            // )
+            conditions.push(isNull(rfqs.id));
+            conditions.push(eq(bidSubmissions.status, "Tender Missed"));
         } else if (tab === "tender-dnb") {
             // const dnbStatusIds = StatusCache.getIds("dnb");
             // const filteredDnbIds = dnbStatusIds.filter(id => [8, 34].includes(id));
             // if (filteredDnbIds.length > 0) {
             //     conditions.push(inArray(tenderInfos.status, filteredDnbIds));
             // }
+            // conditions.push(or(
+                //     notInArray(bidSubmissions.reasonStatus,[10, 14, 35]),
+                //     isNull(bidSubmissions.reasonStatus)
+                // ));
+                
+            conditions.push(isNotNull(rfqs.id));
             conditions.push(eq(bidSubmissions.status, "Tender Missed"));
-            conditions.push(or(
-                notInArray(bidSubmissions.reasonStatus,[10, 14, 35]),
-                isNull(bidSubmissions.reasonStatus)
-            ));
-            // conditions.push(isNotNull(rfqs.id));
         }
 
         return conditions;
     }
 
+    async findResponseStatuses() {
+        return {
+            status: responseStatuses,
+            count: responseStatuses.length
+        };
+    }
 
-    // Private helper method
-    private async getVendorAndOrgNames(
-        requestedVendor: string | null,
-        requestedOrganization: string | null
-    ): Promise<{
-        vendorNames: string[];
-        organizationNames: string[];
-        requestedGroups: Array<{
-            organizationId: number;
-            organizationName: string;
-            vendors: Array<{ id: number; name: string; email: string }>;
-        }>;
-    }> {
-        const vendorNames: string[] = [];
-        const organizationNames: string[] = [];
-        const requestedGroups: any[] = [];
+    private async getVendorOrganizations(requestedOrganization: string | null): Promise<any[]> {
+        if (!requestedOrganization) return [];
 
-        const vendorIds = (requestedVendor ?? "")
-            .split(",")
+        const orgIds = requestedOrganization
+            .split(',')
             .map(id => parseInt(id.trim(), 10))
             .filter(id => !isNaN(id));
 
-        if (vendorIds.length > 0) {
-            // Fetch vendors with their organization details
-            const vendorRows = await this.db
-                .select({
-                    id: vendors.id,
-                    name: vendors.name,
-                    email: vendors.email,
-                    orgId: vendors.orgId,
-                    organizationName: vendorOrganizations.name,
-                })
-                .from(vendors)
-                .leftJoin(vendorOrganizations, eq(vendors.orgId, vendorOrganizations.id))
-                .where(inArray(vendors.id, vendorIds));
+        if (orgIds.length === 0) return [];
 
-            // Group vendors by organization
-            const orgMap = new Map<number, { id: number; name: string; vendors: any[] }>();
+        const rawOrgData = await this.db.select({
+                organization: vendorOrganizations,
+                vendor: vendors
+            })
+            .from(vendorOrganizations)
+            .leftJoin(vendors, eq(vendors.orgId, vendorOrganizations.id))
+            .where(inArray(vendorOrganizations.id, orgIds));
 
-            vendorRows.forEach(v => {
-                vendorNames.push(v.name);
-
-                const orgId = v.orgId || 0; // Use 0 for "No Organization"
-                const orgName = v.organizationName || "Other";
-
-                if (!orgMap.has(orgId)) {
-                    orgMap.set(orgId, {
-                        id: orgId,
-                        name: orgName,
-                        vendors: [],
-                    });
-                }
-
-                orgMap.get(orgId)!.vendors.push({
-                    id: v.id,
-                    name: v.name,
-                    email: v.email,
-                });
-            });
-
-            orgMap.forEach(group => {
-                requestedGroups.push({
-                    organizationId: group.id,
-                    organizationName: group.name,
-                    vendors: group.vendors,
-                });
-            });
-        }
-
-        // Fetch organization names for the legacy field if needed (from requestedOrganization)
-        if (requestedOrganization) {
-            const orgIds = requestedOrganization
-                .split(",")
-                .map(id => parseInt(id.trim(), 10))
-                .filter(id => !isNaN(id));
-
-            if (orgIds.length > 0) {
-                const orgRows = await this.db.select({ name: vendorOrganizations.name }).from(vendorOrganizations).where(inArray(vendorOrganizations.id, orgIds));
-
-                orgRows.forEach(org => {
-                    if (!organizationNames.includes(org.name)) {
-                        organizationNames.push(org.name);
-                    }
+        const groupsMap = new Map<number, any>();
+        rawOrgData.forEach((row: any) => {
+            const org = row.organization;
+            const vendor = row.vendor;
+            
+            if (!groupsMap.has(org.id)) {
+                groupsMap.set(org.id, {
+                    organizationId: org.id,
+                    organizationName: org.name,
+                    vendors: []
                 });
             }
-        }
+            
+            if (vendor) {
+                groupsMap.get(org.id).vendors.push({
+                    id: vendor.id,
+                    name: vendor.name,
+                    email: vendor.email
+                });
+            }
+        });
 
-        return { vendorNames, organizationNames, requestedGroups };
+        return Array.from(groupsMap.values());
     }
 
     // Updated findById
@@ -549,21 +640,22 @@ export class RfqsService {
 
         const rfqRow = rfqData[0];
 
-        const [rfqItemsData, rfqDocumentsData, { vendorNames, organizationNames, requestedGroups }] = await Promise.all([
+        const [rfqItemsData, rfqDocumentsData, tender, vendorOrganizations] = await Promise.all([
             this.db.select().from(rfqItems).where(eq(rfqItems.rfqId, id)),
             this.db.select().from(rfqDocuments).where(eq(rfqDocuments.rfqId, id)),
-            this.getVendorAndOrgNames(rfqRow.requestedVendor, rfqRow.requestedOrganization),
+            this.db.select().from(tenderInfos).where(eq(tenderInfos.id, rfqRow.tenderId)),
+            this.getVendorOrganizations(rfqRow.requestedOrganization)
         ]);
 
         return {
             ...rfqRow,
             items: rfqItemsData,
+            tender: tender[0],
             documents: rfqDocumentsData,
-            requestedVendorNames: vendorNames,
-            requestedOrganizationNames: organizationNames,
-            requestedGroups,
+            vendorOrganizations,
         } as RfqDetails;
     }
+
 
     // Updated findByTenderId
     async findByTenderId(tenderId: number): Promise<RfqDetails | null> {
@@ -575,19 +667,17 @@ export class RfqsService {
 
         const rfqRow = rfqData[0];
 
-        const [rfqItemsData, rfqDocumentsData, { vendorNames, organizationNames, requestedGroups }] = await Promise.all([
+        const [rfqItemsData, rfqDocumentsData, vendorOrganizations] = await Promise.all([
             this.db.select().from(rfqItems).where(eq(rfqItems.rfqId, rfqRow.id)),
             this.db.select().from(rfqDocuments).where(eq(rfqDocuments.rfqId, rfqRow.id)),
-            this.getVendorAndOrgNames(rfqRow.requestedVendor, rfqRow.requestedOrganization),
+            this.getVendorOrganizations(rfqRow.requestedOrganization),
         ]);
 
         return {
             ...rfqRow,
             items: rfqItemsData,
             documents: rfqDocumentsData,
-            requestedVendorNames: vendorNames,
-            requestedOrganizationNames: organizationNames,
-            requestedGroups,
+            vendorOrganizations,
         } as RfqDetails;
     }
 
@@ -601,19 +691,17 @@ export class RfqsService {
 
         const result: RfqDetails[] = await Promise.all(
             rfqRows.map(async rfqRow => {
-                const [rfqItemsData, rfqDocumentsData, { vendorNames, organizationNames, requestedGroups }] = await Promise.all([
+                const [rfqItemsData, rfqDocumentsData, vendorOrganizations] = await Promise.all([
                     this.db.select().from(rfqItems).where(eq(rfqItems.rfqId, rfqRow.id)),
                     this.db.select().from(rfqDocuments).where(eq(rfqDocuments.rfqId, rfqRow.id)),
-                    this.getVendorAndOrgNames(rfqRow.requestedVendor, rfqRow.requestedOrganization),
+                    this.getVendorOrganizations(rfqRow.requestedOrganization),
                 ]);
 
                 return {
                     ...rfqRow,
                     items: rfqItemsData,
                     documents: rfqDocumentsData,
-                    requestedVendorNames: vendorNames,
-                    requestedOrganizationNames: organizationNames,
-                    requestedGroups,
+                    vendorOrganizations,
                 } as RfqDetails;
             })
         );
@@ -652,6 +740,7 @@ export class RfqsService {
             tenderId: data.tenderId,
             dueDate: data.dueDate ? new Date(data.dueDate) : null,
             docList: data.docList || null,
+            requestedOrganization: data.requestedOrganization || null,
             requestedVendor: data.requestedVendor || null,
         };
 
@@ -688,11 +777,14 @@ export class RfqsService {
 
             await this.tenderStatusHistoryService.trackStatusChange(data.tenderId, newStatus, changedBy, prevStatus, "RFQ sent");
         });
+        
+        const vendorOrganizations = await this.getVendorOrganizations(newRfq.requestedOrganization);
 
         const rfqDetails = {
             ...newRfq,
             items: createdItems,
             documents: createdDocuments,
+            vendorOrganizations,
         } as RfqDetails;
 
         // Return immediately after transaction commits to avoid blocking the HTTP response
@@ -753,6 +845,9 @@ export class RfqsService {
         }
         if (data.docList !== undefined) {
             updateData.docList = data.docList;
+        }
+        if (data.requestedOrganization !== undefined) {
+            updateData.requestedOrganization = data.requestedOrganization;
         }
         if (data.requestedVendor !== undefined) {
             updateData.requestedVendor = data.requestedVendor;

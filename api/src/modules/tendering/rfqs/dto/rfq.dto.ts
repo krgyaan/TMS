@@ -40,6 +40,7 @@ export const CreateRfqSchema = z.object({
     tenderId: bigintField().positive('Tender ID must be positive'),
     dueDate: dateField,
     docList: optionalString,
+    requestedOrganization: optionalTextField(255),
     requestedVendor: optionalTextField(255),
     items: z.array(RfqItemSchema).min(1, 'At least one item is required'),
     documents: z.array(RfqDocumentSchema).optional(),
@@ -53,6 +54,7 @@ export type CreateRfqDto = z.infer<typeof CreateRfqSchema>;
 export const UpdateRfqSchema = z.object({
     dueDate: dateField,
     docList: optionalString,
+    requestedOrganization: optionalTextField(255),
     requestedVendor: optionalTextField(255),
     items: z.array(RfqItemSchema).optional(),
     documents: z.array(RfqDocumentSchema).optional(),

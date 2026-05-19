@@ -202,8 +202,12 @@ import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
 
 /** Local component for RFQ item with its responses (from RfqShowPage) */
 function RfqItemWithResponses({ rfq, index }: { rfq: Rfq; index: number }) {
-    const { data: rfqResponses = [], isLoading: rfqResponsesLoading } = useRfqResponses(rfq.id);
+    const { data: rfqResponsesData, isLoading: rfqResponsesLoading } = useRfqResponses(rfq.id);
     if (!rfq) return null;
+
+    const rfqResponses = Array.isArray(rfqResponsesData) 
+        ? rfqResponsesData 
+        : (rfqResponsesData?.currentRfqResponses || []);
 
     const groupedResponses = useMemo(() => {
         const groups: Record<string, typeof rfqResponses> = {};

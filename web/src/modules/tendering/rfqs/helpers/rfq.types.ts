@@ -18,6 +18,7 @@ export interface RfqDashboardRow {
     teamMemberName: string;
     status?: number;
     statusName?: string;
+    rfqStatus?: string;
     dueDate: Date;
     rfqId: number | null;
     rfqCount?: number;
@@ -50,6 +51,8 @@ export interface Rfq {
     tenderName: string;
     itemName: string;
     rfqTo: string;
+    requestedVendor: string | null;
+    requestedOrganization: string | null;
     teamMemberName: string;
     statusName: string;
     dueDate: Date;
@@ -61,6 +64,12 @@ export interface Rfq {
         organizationName: string;
         vendors: Array<{ id: number; name: string; email: string }>;
     }>;
+    vendorOrganizations?: Array<{
+        organizationId: number;
+        organizationName: string;
+        vendors: Array<{ id: number; name: string; email: string }>;
+    }>;
+    tender: any;
     items: RfqItem[];
     documents: RfqDocument[];
     docList: string | null;

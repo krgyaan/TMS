@@ -80,12 +80,14 @@ const Rfqs = () => {
                 if (row.rfqId) navigate(paths.tendering.rfqsResponseNew(row.rfqId));
             },
             icon: <ClipboardList className="h-4 w-4" />,
-            visible: (row: RfqDashboardRowWithTimer) => (activeTab === 'sent' || activeTab === 'responses') && row.rfqId != null,
+            //we will only show the rfq record receipt for the sent tab
+            visible: (row: RfqDashboardRowWithTimer) => (activeTab === 'sent') && row.rfqId != null,
         },
         {
             label: 'Send',
             onClick: (row: RfqDashboardRowWithTimer) => navigate(paths.tendering.rfqsCreate(row.tenderId)),
             icon: <CheckCircle className="h-4 w-4" />,
+            visible : () => ['sent','pending'].includes(activeTab),
         },
         {
             label: 'View',
@@ -129,7 +131,7 @@ const Rfqs = () => {
             },
             {
                 key: 'responses' as const,
-                name: 'Responses Recorded',
+                name: 'RFQ Quotations',
                 count: counts?.responses ?? 0,
             },
             {
@@ -182,7 +184,7 @@ const Rfqs = () => {
                     </Badge>
                 );
             },
-            visible: activeTab === 'sent' || activeTab === 'responses',
+            hide: activeTab !== 'sent',
             sortable: true,
             filter: true,
         },
@@ -199,7 +201,7 @@ const Rfqs = () => {
                     </Badge>
                 );
             },
-            visible: activeTab === 'responses',
+            hide: activeTab == 'pending' || activeTab ==  'responses' || activeTab == 'rfq-rejected',
             sortable: true,
             filter: true,
         },
@@ -209,19 +211,26 @@ const Rfqs = () => {
             width: 150,
             colId: 'vendorOrganizationNames',
             cellRenderer: (params: any) => {
-                const names = params.data?.vendorOrganizationNames;
-                if (!names) return <p>—</p>;
+                const orgs = params.data?.vendorOrganizations || [];
+                const names = orgs.map((org: any) => org.name);
+
+                if (names.length === 0) return '—';
+
+                if (activeTab === 'responses') {
+                    return <span className="font-medium text-sm">{names[0] || '—'}</span>;
+                }
+
                 return (
                     <Tooltip>
                         <TooltipTrigger asChild>
-                            <Badge variant="secondary">
-                                {names.split(',').length} vendors
+                            <Badge variant="secondary" className="cursor-default">
+                                {names.length} {names.length === 1 ? 'vendor' : 'vendors'}
                             </Badge>
                         </TooltipTrigger>
                         <TooltipContent>
-                            <ul className="list-disc list-inside font-medium">
-                                {names.split(',').map((name: string) => (
-                                    <li key={name}>{name}</li>
+                            <ul className="list-disc list-inside font-medium text-xs py-1">
+                                {names.map((name: string, idx: number) => (
+                                    <li key={`${name}-${idx}`}>{name}</li>
                                 ))}
                             </ul>
                         </TooltipContent>
@@ -230,7 +239,27 @@ const Rfqs = () => {
             },
             sortable: true,
             filter: true,
+            hide: activeTab == 'pending' || activeTab == "rfq-rejected",
         },
+        // {
+        //     field: 'rfqStatus',
+        //     headerName: 'RFQ Status',
+        //     width: 200,
+        //     colId: 'rfqStatus',
+        //     valueGetter: (params: any) => params.data?.responseStatus ? params.data.responseStatus : '—',
+        //     cellRenderer: (params: any) => {
+        //         const status = params.value;
+        //         if (!status) return '—';
+        //         return (
+        //             <Badge variant="default">
+        //                 {status}
+        //             </Badge>
+        //         );
+        //     },
+        //     sortable: true,
+        //     filter: true,
+        //     hide: activeTab !== 'responses',
+        // },
         {
             field: 'statusName',
             headerName: 'Tender Status',
@@ -280,7 +309,7 @@ const Rfqs = () => {
             pinned: 'right',
             width: 57,
         },
-    ], [rfqsActions]);
+    ], [rfqsActions, activeTab]);
 
     if (loading) {
         return (
@@ -331,12 +360,12 @@ const Rfqs = () => {
                             Review and approve RFQs.
                         </CardDescription>
                     </div>
-                    <CardAction>
+                    {/* <CardAction>
                         <Button variant="outline" onClick={() => navigate(paths.tendering.rfqsResponses)}>
                             <List className="h-4 w-4" />
                             View All Responses
                         </Button>
-                    </CardAction>
+                    </CardAction> */}
                 </div>
             </CardHeader>
             <CardContent className="px-0">

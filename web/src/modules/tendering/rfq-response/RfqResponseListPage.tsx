@@ -39,7 +39,8 @@ export default function RfqResponseListPage() {
     }, [activeTab, search]);
 
     // Data for "Responses" tab
-    const { data: responsesByRfq = [], isLoading: loadingByRfq, error: errorByRfq } = useRfqResponses(rfqIdNum);
+    const { data: responsesData, isLoading: loadingByRfq, error: errorByRfq } = useRfqResponses(rfqIdNum);
+    const responsesByRfq = Array.isArray(responsesData) ? responsesData : (responsesData?.currentRfqResponses || []);
 
     // Data for "RFQ Sent" or "Responses Recorded" tab (Dashboard view)
     const { data: rfqDashboard, isLoading: loadingDashboard } = useRfqsDashboard({
