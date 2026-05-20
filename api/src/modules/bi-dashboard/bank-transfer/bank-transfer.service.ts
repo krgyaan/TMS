@@ -52,7 +52,7 @@ export class BankTransferService {
         } else if (tab === 'accepted') {
             conditions.push(
                 inArray(paymentInstruments.action, [1, 2]),
-                eq(paymentInstruments.status, BT_STATUSES.ACCOUNTS_FORM_ACCEPTED)
+                inArray(paymentInstruments.status, [BT_STATUSES.ACCOUNTS_FORM_ACCEPTED, BT_STATUSES.FOLLOWUP_INITIATED])
             );
         } else if (tab === 'rejected') {
             conditions.push(

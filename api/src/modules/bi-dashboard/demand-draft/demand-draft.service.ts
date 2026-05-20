@@ -70,7 +70,7 @@ export class DemandDraftService {
         } else if (tab === 'created') {
             conditions.push(
                 inArray(paymentInstruments.action, [1, 2]),
-                eq(paymentInstruments.status, DD_STATUSES.ACCOUNTS_FORM_ACCEPTED)
+                inArray(paymentInstruments.status, [DD_STATUSES.ACCOUNTS_FORM_ACCEPTED, DD_STATUSES.FOLLOWUP_INITIATED])
             );
         } else if (tab === 'rejected') {
             conditions.push(

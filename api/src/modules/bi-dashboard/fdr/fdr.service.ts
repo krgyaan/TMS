@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger, NotFoundException, BadRequestException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { eq, and, inArray, isNull, sql, asc, desc, like } from "drizzle-orm";
+import { eq, and, inArray, isNull, sql, asc, desc } from "drizzle-orm";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
 import { paymentRequests, paymentInstruments, instrumentFdrDetails, instrumentChequeDetails, instrumentBgDetails } from "@db/schemas/tendering/payment-requests.schema";
@@ -66,10 +66,11 @@ export class FdrService {
             needsFdrDetails = true;
             conditions.push(
                 inArray(paymentInstruments.action, [1, 2]),
-                like(instrumentFdrDetails.fdrSource, "BG_%"),
                 sql`EXISTS (
                     SELECT 1 FROM instrument_bg_details bg
-                    WHERE bg.id = CAST(SUBSTRING(${instrumentFdrDetails.fdrSource} FROM 4) AS INTEGER)
+                    INNER JOIN payment_instruments pi_bg ON pi_bg.id = bg.instrument_id
+                    WHERE bg.fdr_no = ${instrumentFdrDetails.fdrNo}
+                    AND pi_bg.is_active = true
                     AND bg.bank_name = 'PNB_6011'
                 )`
             );
@@ -77,10 +78,11 @@ export class FdrService {
             needsFdrDetails = true;
             conditions.push(
                 inArray(paymentInstruments.action, [1, 2]),
-                like(instrumentFdrDetails.fdrSource, "BG_%"),
                 sql`EXISTS (
                     SELECT 1 FROM instrument_bg_details bg
-                    WHERE bg.id = CAST(SUBSTRING(${instrumentFdrDetails.fdrSource} FROM 4) AS INTEGER)
+                    INNER JOIN payment_instruments pi_bg ON pi_bg.id = bg.instrument_id
+                    WHERE bg.fdr_no = ${instrumentFdrDetails.fdrNo}
+                    AND pi_bg.is_active = true
                     AND bg.bank_name IN ('YESBANK_2011', 'YESBANK_0771', 'BGLIMIT_0771')
                 )`
             );

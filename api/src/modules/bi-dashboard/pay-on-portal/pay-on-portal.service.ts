@@ -51,7 +51,7 @@ export class PayOnPortalService {
         } else if (tab === 'accepted') {
             conditions.push(
                 inArray(paymentInstruments.action, [1, 2]),
-                eq(paymentInstruments.status, PORTAL_STATUSES.ACCOUNTS_FORM_ACCEPTED)
+                inArray(paymentInstruments.status, [PORTAL_STATUSES.ACCOUNTS_FORM_ACCEPTED, PORTAL_STATUSES.FOLLOWUP_INITIATED])
             );
         } else if (tab === 'rejected') {
             conditions.push(
