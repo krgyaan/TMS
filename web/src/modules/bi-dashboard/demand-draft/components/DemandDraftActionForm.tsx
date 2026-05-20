@@ -299,7 +299,7 @@ export function DemandDraftActionForm({ instrumentId, action: propAction, tender
                                     className="underline font-medium hover:text-amber-900 cursor-pointer"
                                     onClick={() => navigate(`/bi-dashboard/cheque/action/${linkedCheque.requestId}`)}
                                 >
-                                    {linkedCheque.requestId ? `Cheque #${linkedCheque.chequeNo}` : 'View Request'}
+                                    #{linkedCheque.chequeNo || 'View Request'}
                                 </button>
                                 , which is still <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300">{linkedCheque.status}</Badge>.
                                 Please process the cheque before filling this DD form.

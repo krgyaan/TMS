@@ -2,24 +2,26 @@
     <p>Dear Accounts Team,</p>
 
     <p>
-        Please make the following payment via NEFT/RTGS against <strong>{{data.paymentInstrumentType}}</strong> for:
+        Please make the following payment via NEFT/RTGS against <strong>{{data.purpose}}</strong>.
     </p>
-    {{#if data.tenderNo}} 
-        <p>Tender No: {{data.tenderNo}}</p>
-    {{/if}}
-    {{#if data.tenderName}} 
-        <p>Project Name: {{data.tenderName}}</p>
-    {{/if}}
-    {{#if data.dueDateTime}} 
-        <p>Due Date and Time: {{data.dueDateTime}}</p>
-    {{/if}}
+    <ul>
+        {{#if data.tenderNo}} 
+            <li>Tender No: {{data.tenderNo}}</li>
+        {{/if}}
+        {{#if data.tenderName}} 
+            <li>Project Name: {{data.tenderName}}</li>
+        {{/if}}
+        <li><b>Amount: {{data.amount}}</b></li>
+        {{#if data.dueDateTime}} 
+            <li><b>Due Date and Time: {{data.dueDateTime}}</b></li>
+        {{/if}}
+    </ul>
 
     <p>Please do the Maker using the details below:</p>
     <ul>
         <li>Account Name: {{data.btAccName}}</li>
         <li>Account Number: {{data.btAcc}}</li>
         <li>IFSC Code: {{data.btIfsc}}</li>
-        <li>Amount: Rs. {{data.amount}}</li>
     </ul>
     <p>
         Please do the payment before the due date and time and share the UTR with us on time using the

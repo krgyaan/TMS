@@ -608,7 +608,7 @@ export class DemandDraftService {
         }
 
         let linkedCheque: any = null;
-        if (result.ddDetailsId) {
+        if (result.instrumentId) {
             const [cheque] = await this.db
                 .select({
                     chequeNo: instrumentChequeDetails.chequeNo,
@@ -622,7 +622,7 @@ export class DemandDraftService {
                 .from(instrumentChequeDetails)
                 .innerJoin(paymentInstruments, eq(paymentInstruments.id, instrumentChequeDetails.instrumentId))
                 .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
-                .where(eq(instrumentChequeDetails.linkedDdId, result.ddDetailsId))
+                .where(eq(instrumentChequeDetails.linkedDdId, result.instrumentId))
                 .limit(1);
             if (cheque) {
                 linkedCheque = {
@@ -689,7 +689,7 @@ export class DemandDraftService {
         const hasSettledData = result.action === 5 || result.action === 7;
 
         let linkedChequeData: any = null;
-        if (result.ddDetailsId) {
+        if (result.id) {
             const [cheque] = await this.db
                 .select({
                     chequeNo: instrumentChequeDetails.chequeNo,
@@ -700,7 +700,7 @@ export class DemandDraftService {
                 })
                 .from(instrumentChequeDetails)
                 .innerJoin(paymentInstruments, eq(paymentInstruments.id, instrumentChequeDetails.instrumentId))
-                .where(eq(instrumentChequeDetails.linkedDdId, result.ddDetailsId))
+                .where(eq(instrumentChequeDetails.linkedDdId, result.id))
                 .limit(1);
             if (cheque) {
                 linkedChequeData = cheque;
