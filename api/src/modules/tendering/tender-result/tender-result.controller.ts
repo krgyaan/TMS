@@ -86,30 +86,14 @@ export class TenderResultController {
         return this.tenderResultService.createForTender(tenderId);
     }
 
-    @UseInterceptors(FilesInterceptor("files", 5 ,multerConfig))
     @Post('cancel-tender/:tenderId')
     cancelTender(
         @Param('tenderId', ParseIntPipe) tenderId: number,
         @CurrentUser() user: any,
-        @UploadedFiles() files : Express.Multer.File[],
-        @Req() req: any
+        @Body() dto: UploadTenderCancelledDto
     ){
-        if (!files || files.length === 0) {
-            throw new BadRequestException("No screenshot uploaded");
-        }
-
-        const parsed = UploadTenderCancelledSchema.safeParse(req.body);
-        if (!parsed.success) {
-            throw new BadRequestException(parsed.error.flatten());
-        }
-
-        const payload : UploadTenderCancelledDto = {
-            ...parsed.data,
-            proofScreenshot: files[0].filename,
-        }
-
         //calling the service function to cancel the tender
-        const result = this.tenderResultService.cancelTender(tenderId , user, payload);
+        const result = this.tenderResultService.cancelTender(tenderId , user, dto);
         return  result;
     }
 

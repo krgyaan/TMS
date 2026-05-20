@@ -124,4 +124,21 @@ export const useUploadResult = () => {
     });
 };
 
+export const uploadCancelledTenderResult= () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({tenderId, data} : {tenderId: number, data: any}) => tenderResultService.uploadCancelledTenderResult(tenderId, data),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: tenderResultKey.lists() });
+            queryClient.invalidateQueries({ queryKey: tenderResultKey.byTender(variables.tenderId) });
+            queryClient.invalidateQueries({ queryKey: tenderResultKey.counts() });
+            toast.success("Tender cancelled successfully");
+        },
+        onError: error => {
+            toast.error(handleQueryError(error));
+        },
+    })
+}
+
 export type { ResultDashboardRow, ResultDashboardCounts, ResultDashboardResponse };

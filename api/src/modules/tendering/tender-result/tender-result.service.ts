@@ -23,6 +23,7 @@ import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import { paymentInstruments, paymentRequests, tenderStatusHistory } from '@/db/schemas';
 import type { UploadResultDto, UploadTenderCancelledDto } from '@/modules/tendering/tender-result/dto/tender-result.dto';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { isThisSecond } from 'date-fns';
 
 const RESULT_STATUS = {
     RESULT_AWAITED: 'Result Awaited',
@@ -822,8 +823,8 @@ export class TenderResultService {
             .set({
                 status: RESULT_STATUS.CANCELLED,
                 result: 'Lost',
-                resultReason: dto.result,
-                finalResultScreenshot: dto.proofScreenshot,
+                resultReason: dto.resultReason,
+                finalResultScreenshot: dto.finalResultScreenshot,
                 resultUploadedAt: new Date(),
                 updatedAt: new Date(),
             })
@@ -836,6 +837,20 @@ export class TenderResultService {
             user.sub,
             prevStatus,
             "Tender Cancelled"
+        );
+
+        //tender cancelled email sent
+        await this.sendTenderCancelledEmail(
+            {
+                tenderId: tenderId,
+                tenderName: tender.tenderName,
+                tenderLink: `${process.env.FRONTEND_URL}/tendering/results/${tenderId}`,
+                tenderNo: tender.tenderNo,
+                finalScreenshot: dto.finalResultScreenshot,
+                team: tender.team
+            },
+            dto,
+            user.sub
         );
 
         // return the result
@@ -961,6 +976,40 @@ export class TenderResultService {
             uploadedBy,
             `Tender Result - ${emailData.result} - ${tender.tenderName}`,
             'tender-result',
+            emailData,
+            {
+                to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
+                cc: [{ type: 'role', role: 'Admin', teamId: tender.team }],
+                attachments,
+            }
+        );
+    }
+
+    async sendTenderCancelledEmail(
+        tender: {tenderId: number, tenderName : string, tenderLink: string, tenderNo: string, finalScreenshot: string, team : number},
+        dto: any, 
+        uploadedBy: number){
+        const emailData = {
+            tender_name : tender.tenderName,
+            tender_link : tender.tenderLink,
+            tender_no : tender.tenderNo,
+            final_screenshot : !!tender.finalScreenshot,
+            reason: dto.resultReason
+        };
+
+        const attachmentFiles = [tender.finalScreenshot].filter(Boolean) as string[];
+
+        const attachments = attachmentFiles.length > 0 ? {
+            files: attachmentFiles,
+            baseDir: 'result-screenshots',
+        } : undefined;
+
+        await this.sendEmail(
+            'tender-result-cancelled',
+            tender.tenderId,
+            uploadedBy,
+            `Tender Cancelled - ${tender.tenderName}`,
+            'tender-result-cancelled',
             emailData,
             {
                 to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],

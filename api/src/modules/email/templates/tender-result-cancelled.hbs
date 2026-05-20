@@ -1,0 +1,34 @@
+<div>
+    <p>Dear Sir,</p>
+    <p>
+        This is to inform you that the tender for {{data.tender_name}} has been <b>cancelled</b> after the bidding. 
+        {{!-- Tender Details :
+        Tender Name : {{data.tender_name}}
+        Tender Number : {{data.tender_no}} --}}
+        View Tender : {{data.tender_link}}
+    </p>
+    <p>Attached Below:</p>
+    <ul>
+        <li>
+            Screenshot of the Final result:
+            {{#if data.final_screenshot}}
+                Attached
+            {{else}}
+                Not Available
+            {{/if}}
+        </li>
+        <li>
+            {{#if data.reason}}
+            Reason For Tender Cancellation : {{data.reason}}
+            {{/if}}
+        </li>
+    </ul>
+    <p>
+        Best of luck for the next Tender.
+    </p>
+    <p>
+        Regards,<br />
+        Team Leader<br />
+        Volks Energie Pvt. Ltd.
+    </p>
+</div>
