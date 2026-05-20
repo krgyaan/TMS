@@ -5,9 +5,18 @@ export const contactPersonSchema = z.object({
     id: z.number().optional(),
     followUpId: z.number().optional(),
     name: z.string().optional(),
-    email: z.string().email().nullable().optional(),
-    phone: z.string().nullable().optional(),
-    org: z.string().nullable().optional(),
+    email: z.preprocess(
+        (val) => (typeof val === "string" && val.trim() === "" ? null : val),
+        z.string().trim().email().nullable().optional()
+    ),
+    phone: z.preprocess(
+        (val) => (typeof val === "string" && val.trim() === "" ? null : val),
+        z.string().trim().nullable().optional()
+    ),
+    org: z.preprocess(
+        (val) => (typeof val === "string" && val.trim() === "" ? null : val),
+        z.string().trim().nullable().optional()
+    ),
 });
 
 // Create follow-up schema
