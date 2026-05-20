@@ -49,6 +49,7 @@ export class PaymentRequestsNotificationService {
         chequeDetails: any,
         ddInstrumentId: number,
         tenderId: number,
+        requestId: number,
     ) {
         const [tender] = await this.db
             .select()
@@ -57,8 +58,7 @@ export class PaymentRequestsNotificationService {
             .limit(1);
 
         if (!tender) {
-            this.logger.warn(`Tender ${tenderId} not found`);
-            return { success: false, message: 'Tender not found' };
+            this.logger.warn(`Tender ${tenderId} not found for DD email, sending without label`);
         }
 
         const toEmails = this.getResponsibleUserByMode('DD');
@@ -91,10 +91,10 @@ export class PaymentRequestsNotificationService {
             ? `${baseUrl}/uploads/tendering/${chequeDetails.handover}`
             : '';
 
-        const teamId = tender.team;
         try {
-            await this.emailService.sendTenderEmail({
-                tenderId,
+            const result = await this.emailService.sendPaymentEmail({
+                requestId,
+                tenderId: tenderId > 0 ? tenderId : undefined,
                 eventType: 'DD_REQUEST',
                 fromUserId: 13,
                 subject: `Cheque created for DD`,
@@ -112,18 +112,18 @@ export class PaymentRequestsNotificationService {
                     courierAddress: chequeInstrument.courierAddress || 'Not specified',
                 },
                 to: [{ type: 'emails', emails: [toEmails] }],
-                // cc: [
-                //     { type: 'role', role: 'admin', teamId: tenderTeamId },
-                //     { type: 'emails', emails: ['accounts@volksenergie.in']}
-                // ]
             });
-            this.logger.log(`DD email sent successfully for tender ${tenderId}`);
+
+            if (result.success) {
+                this.logger.log(`DD email sent successfully for instrument ${requestId}`);
+            } else {
+                this.logger.warn(`DD email failed for instrument ${requestId}: ${result.error}`);
+            }
+            return result;
         } catch (error) {
-            this.logger.error(`Failed to send DD email for tender ${tenderId}`, error);
+            this.logger.error(`Failed to send DD email for instrument ${requestId}`, error);
             return { success: false, message: 'Email failed' };
         }
-
-        return { success: true, message: 'DD mail triggered successfully' };
     }
 
     async sendFdrMailAfterChequeAction(
@@ -131,6 +131,7 @@ export class PaymentRequestsNotificationService {
         chequeDetails: any,
         fdrInstrumentId: number,
         tenderId: number,
+        requestId: number,
     ) {
         const [tender] = await this.db
             .select()
@@ -139,8 +140,7 @@ export class PaymentRequestsNotificationService {
             .limit(1);
 
         if (!tender) {
-            this.logger.warn(`Tender ${tenderId} not found`);
-            return { success: false, message: 'Tender not found' };
+            this.logger.warn(`Tender ${tenderId} not found for FDR email, sending without label`);
         }
         
         const toEmails = this.getResponsibleUserByMode('FDR');
@@ -173,10 +173,10 @@ export class PaymentRequestsNotificationService {
             ? `${baseUrl}/uploads/tendering/${chequeDetails.handover}`
             : '';
 
-        const teamId = tender.team;
         try {
-            await this.emailService.sendTenderEmail({
-                tenderId,
+            const result = await this.emailService.sendPaymentEmail({
+                requestId,
+                tenderId: tenderId > 0 ? tenderId : undefined,
                 eventType: 'FDR_REQUEST',
                 fromUserId: 13,
                 subject: `Cheque created for FDR`,
@@ -194,18 +194,18 @@ export class PaymentRequestsNotificationService {
                     courierAddress: chequeInstrument.courierAddress || 'Not specified',
                 },
                 to: [{ type: 'emails', emails: [toEmails] }],
-                // cc: [
-                //     { type: 'role', role: 'admin', teamId: tenderTeamId },
-                //     { type: 'emails', emails: ['accounts@volksenergie.in']}
-                // ]
             });
-            this.logger.log(`FDR email sent successfully for tender ${tenderId}`);
+
+            if (result.success) {
+                this.logger.log(`FDR email sent successfully for instrument ${requestId}`);
+            } else {
+                this.logger.warn(`FDR email failed for instrument ${requestId}: ${result.error}`);
+            }
+            return result;
         } catch (error) {
-            this.logger.error(`Failed to send FDR email for tender ${tenderId}`, error);
+            this.logger.error(`Failed to send FDR email for instrument ${requestId}`, error);
             return { success: false, message: 'Email failed' };
         }
-
-        return { success: true, message: 'FDR mail triggered successfully' };
     }
 
     async sendChequeCreatedMail(

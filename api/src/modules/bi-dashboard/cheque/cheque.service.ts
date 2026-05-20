@@ -496,12 +496,13 @@ export class ChequeService {
                             chequeDetails,
                             ddInstrument.id,
                             tenderId,
+                            requestId,
                         );
 
                         if (result?.success) {
                             this.logger.log(`DD mail sent after cheque action for cheque ${instrumentId}, DD instrument ${ddInstrument.id}`);
                         } else {
-                            this.logger.warn(`DD mail not sent for cheque ${instrumentId} (DD instrument ${ddInstrument.id}): ${result?.message || 'unknown'}`);
+                            this.logger.warn(`DD mail not sent for cheque ${instrumentId} (DD instrument ${ddInstrument.id}): ${result?.success || 'unknown'}`);
                         }
                     }
                 } else if (chequeDetails?.linkedFdrId) {
@@ -532,12 +533,13 @@ export class ChequeService {
                                 chequeDetails,
                                 fdrInstrument.id,
                                 tenderId,
+                                requestId,
                             );
 
                             if (result?.success) {
                                 this.logger.log(`FDR mail sent after cheque action for cheque ${instrumentId}, FDR instrument ${fdrInstrument.id}`);
                             } else {
-                                this.logger.warn(`FDR mail not sent for cheque ${instrumentId} (FDR instrument ${fdrInstrument.id}): ${result?.message || 'unknown'}`);
+                                this.logger.warn(`FDR mail not sent for cheque ${instrumentId} (FDR instrument ${fdrInstrument.id}): ${result?.success || 'unknown'}`);
                             }
                         }
                     }
