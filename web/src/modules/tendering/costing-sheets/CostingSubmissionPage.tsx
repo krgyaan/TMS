@@ -43,7 +43,7 @@ export default function CostingSheetSubmitPage() {
     // Checkpoint Logic
     const rfqNA = approval?.rfqRequired === 'no' || tenderDetails.rfqTo === '0' || tenderDetails.rfqTo === '1';
     const emdNA = infoSheet?.emdRequired === 'NO' || infoSheet?.emdRequired === 'EXEMPT';
-    const physicalNA = infoSheet?.physicalDocsRequired === 'NO';
+    const physicalNA = infoSheet?.physicalDocsRequired === 'NO' || infoSheet?.physicalDocType === 'Only EMD' || infoSheet?.physicalDocType === 'ONLY_EMD';
 
     const checkpoints: Checkpoint[] = [
         {
