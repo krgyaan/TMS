@@ -138,12 +138,11 @@ export function CancelTenderModal({
                                     </p>
                                     <div className="border border-dashed border-destructive/20 rounded-xl p-3 bg-destructive/5 mt-2">
                                         <TenderFileUploader
-                                            context="result-screenshots"
+                                            context="cancel-tender"
                                             value={finalResultScreenshot ? [finalResultScreenshot] : []}
                                             onChange={(paths) => form.setValue('finalResultScreenshot', paths[0] || '')}
                                             label="Upload official proof file"
                                             disabled={isSubmitting}
-                                            maxFiles={1}
                                         />
                                         {form.formState.errors.finalResultScreenshot && (
                                             <p className="text-xs font-semibold text-destructive mt-1.5">
