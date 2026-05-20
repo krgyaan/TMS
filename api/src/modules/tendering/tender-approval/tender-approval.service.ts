@@ -655,7 +655,7 @@ export class TenderApprovalService {
             if (infoSheet.emdRequired === "YES" || infoSheet.emdRequired === "1") {
                 stagesToStart.push({ stage: "emd_requested" });
             }
-            if (infoSheet.physicalDocsRequired === "YES") {
+            if (infoSheet.physicalDocsRequired === "YES" && infoSheet.physicalDocType !== "ONLY_EMD") {
                 stagesToStart.push({ stage: "physical_docs" });
             }
             // Always start these timers
