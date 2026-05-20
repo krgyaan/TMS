@@ -317,12 +317,11 @@ export class ChequeService {
     async updateAction(
         instrumentId: number,
         body: any,
-        files: Express.Multer.File[],
         user: any,
     ) {
         this.logger.debug("Printing the id ", instrumentId);
-
         this.logger.debug("Printing the body of action update", body);
+
         const [instrument] = await this.db
             .select()
             .from(paymentInstruments)
@@ -338,50 +337,12 @@ export class ChequeService {
         }
 
         const actionNumber = this.mapActionToNumber(body.action);
-        let contacts: any[] = [];
-        if (body.contacts) {
-            try {
-                contacts = typeof body.contacts === 'string' ? JSON.parse(body.contacts) : body.contacts;
-            } catch (e) {
-                this.logger.warn('Failed to parse contacts', e);
-            }
-        }
 
-        // Track file index for processing files in order
-        const fileIndexTracker = { current: 0 };
-
-        const filePaths: string[] = [];
-        if (files && files.length > 0) {
-            for (const file of files) {
-                const relativePath = `bi-dashboard/${file.filename}`;
-                filePaths.push(relativePath);
-            }
-        }
-
-        /**
-         * Get single file for a field by checking if body field exists or if it's a file path string
-         */
-        const getFileForField = (
-            fieldname: string,
-            files: Express.Multer.File[],
-            body: any,
-            fileIndexTracker: { current: number }
-        ): Express.Multer.File | null => {
-            if (body[fieldname] !== undefined && files.length > fileIndexTracker.current) {
-                const file = files[fileIndexTracker.current];
-                fileIndexTracker.current++;
-                return file;
-            }
-            return null;
-        };
-
-        /**
-         * Get file path from body if it's a string (from TenderFileUploader)
-         */
+        // Get file path from body (set by TenderFileUploader prior to form submission)
         const getFilePathFromBody = (fieldname: string, body: any): string | null => {
-            if (body[fieldname] && typeof body[fieldname] === 'string') {
-                return body[fieldname];
-            }
+            const val = body[fieldname];
+            if (!val) return null;
+            if (typeof val === 'string') return val;
             return null;
         };
 
@@ -421,65 +382,47 @@ export class ChequeService {
             if (body.cheque_no) chequeDetailsUpdate.chequeNo = body.cheque_no;
             if (body.due_date) chequeDetailsUpdate.dueDate = body.due_date;
 
-            // Handle receiving_cheque_handed_over
-            const receivingChequeFile = getFileForField('receiving_cheque_handed_over', files, body, fileIndexTracker);
             const receivingChequePath = getFilePathFromBody('receiving_cheque_handed_over', body);
-            if (receivingChequeFile) {
-                chequeDetailsUpdate.handover = `bi-dashboard/${receivingChequeFile.filename}`;
-            } else if (receivingChequePath) {
+            if (receivingChequePath) {
                 chequeDetailsUpdate.handover = receivingChequePath;
             }
 
-            // Handle positive_pay_confirmation
-            const positivePayFile = getFileForField('positive_pay_confirmation', files, body, fileIndexTracker);
             const positivePayPath = getFilePathFromBody('positive_pay_confirmation', body);
-            if (positivePayFile) {
-                chequeDetailsUpdate.confirmation = `bi-dashboard/${positivePayFile.filename}`;
-            } else if (positivePayPath) {
+            if (positivePayPath) {
                 chequeDetailsUpdate.confirmation = positivePayPath;
             }
 
-            // Handle remarks
             if (body.remarks) {
                 chequeDetailsUpdate.remarks = body.remarks;
             }
 
-            // Handle cheque_given_from_account
             if (body.cheque_given_from_account) {
                 chequeDetailsUpdate.chequeGivenFromAccount = body.cheque_given_from_account;
             }
 
-            // Handle cheque_images - check both files array and body for paths
-            const chequeImagesPath = getFilePathFromBody('cheque_images', body);
-            if (filePaths.length > 0 && body.cheque_images) {
-                const chequeImageIndexes = filePaths
-                    .map((path, idx) => body.cheque_images && path.includes('cheque_images') ? idx : -1)
-                    .filter(idx => idx >= 0);
-                if (chequeImageIndexes.length > 0) {
-                    chequeDetailsUpdate.chequeImagePath = chequeImageIndexes.map(idx => filePaths[idx]).join(',');
-                }
-            } else if (chequeImagesPath) {
-                // If it's a string path (from TenderFileUploader), parse it if it's JSON array or use as single path
-                try {
-                    const parsed = JSON.parse(chequeImagesPath);
-                    if (Array.isArray(parsed)) {
-                        chequeDetailsUpdate.chequeImagePath = parsed.join(',');
-                    } else {
-                        chequeDetailsUpdate.chequeImagePath = chequeImagesPath;
+            // Handle cheque_images - can be array (JSON) or string (form-data fallback)
+            const chequeImages = body.cheque_images;
+            if (chequeImages) {
+                if (Array.isArray(chequeImages)) {
+                    chequeDetailsUpdate.chequeImagePath = chequeImages.join(',');
+                } else if (typeof chequeImages === 'string') {
+                    try {
+                        const parsed = JSON.parse(chequeImages);
+                        if (Array.isArray(parsed)) {
+                            chequeDetailsUpdate.chequeImagePath = parsed.join(',');
+                        } else {
+                            chequeDetailsUpdate.chequeImagePath = chequeImages;
+                        }
+                    } catch {
+                        chequeDetailsUpdate.chequeImagePath = chequeImages;
                     }
-                } catch {
-                    chequeDetailsUpdate.chequeImagePath = chequeImagesPath;
                 }
             }
         } else if (body.action === 'stop-cheque') {
             if (body.stop_reason_text) chequeDetailsUpdate.stopReasonText = body.stop_reason_text;
 
-            // Handle proof_image
-            const proofImageFile = getFileForField('proof_image', files, body, fileIndexTracker);
             const proofImagePath = getFilePathFromBody('proof_image', body);
-            if (proofImageFile) {
-                chequeDetailsUpdate.proofImage = `bi-dashboard/${proofImageFile.filename}`;
-            } else if (proofImagePath) {
+            if (proofImagePath) {
                 chequeDetailsUpdate.proofImage = proofImagePath;
             }
         } else if (body.action === 'paid-via-bank-transfer') {
@@ -490,30 +433,39 @@ export class ChequeService {
             if (body.bt_transfer_date) chequeDetailsUpdate.btTransferDate = body.bt_transfer_date;
             if (body.reference) chequeDetailsUpdate.reference = body.reference;
         } else if (body.action === 'cancelled-torn') {
-            const cancelledImageFile = getFileForField('cancelled_image_path', files, body, fileIndexTracker);
             const cancelledImagePath = getFilePathFromBody('cancelled_image_path', body);
-            if (cancelledImageFile) {
-                chequeDetailsUpdate.cancelledImagePath = `bi-dashboard/${cancelledImageFile.filename}`;
-            } else if (cancelledImagePath) {
+            if (cancelledImagePath) {
                 chequeDetailsUpdate.cancelledImagePath = cancelledImagePath;
-            } else if (filePaths.length > 0 && body.cancelled_image_path) {
-                const cancelledImageIndex = filePaths.findIndex((path: string) => path.includes('cancelled') || body.cancelled_image_path);
-                if (cancelledImageIndex >= 0) {
-                    chequeDetailsUpdate.cancelledImagePath = filePaths[cancelledImageIndex];
-                }
             }
         }
 
         if (Object.keys(chequeDetailsUpdate).length > 0) {
             chequeDetailsUpdate.updatedAt = new Date();
-            await this.db
-                .update(instrumentChequeDetails)
-                .set(chequeDetailsUpdate)
-                .where(eq(instrumentChequeDetails.instrumentId, instrumentId));
+
+            const [existing] = await this.db
+                .select({ id: instrumentChequeDetails.id })
+                .from(instrumentChequeDetails)
+                .where(eq(instrumentChequeDetails.instrumentId, instrumentId))
+                .limit(1);
+
+            if (existing) {
+                await this.db
+                    .update(instrumentChequeDetails)
+                    .set(chequeDetailsUpdate)
+                    .where(eq(instrumentChequeDetails.instrumentId, instrumentId));
+            } else {
+                await this.db
+                    .insert(instrumentChequeDetails)
+                    .values({
+                        instrumentId,
+                        ...chequeDetailsUpdate,
+                    });
+            }
         }
 
         // Send emails after cheque action accounts-form accepted
         if (body.action === 'accounts-form' && body.cheque_req === 'Accepted') {
+            this.logger.debug(`Email trigger condition met for cheque ${instrumentId}`);
             try {
                 const [chequeDetails] = await this.db
                     .select()
@@ -521,38 +473,35 @@ export class ChequeService {
                     .where(eq(instrumentChequeDetails.instrumentId, instrumentId))
                     .limit(1);
 
+                this.logger.debug(`Cheque details for ${instrumentId}: linkedDdId=${chequeDetails?.linkedDdId}, linkedFdrId=${chequeDetails?.linkedFdrId}`);
+
                 if (chequeDetails?.linkedDdId) {
-                    const [ddDetail] = await this.db
+                    const [ddInstrument] = await this.db
                         .select()
-                        .from(instrumentDdDetails)
-                        .where(eq(instrumentDdDetails.id, chequeDetails.linkedDdId))
+                        .from(paymentInstruments)
+                        .where(eq(paymentInstruments.id, chequeDetails.linkedDdId))
                         .limit(1);
-
-                    if (ddDetail) {
-                        const [ddInstrument] = await this.db
+                        
+                    if (ddInstrument) {
+                        const requestId = ddInstrument.requestId;
+                        const [request] = await this.db
                             .select()
-                            .from(paymentInstruments)
-                            .where(eq(paymentInstruments.id, ddDetail.instrumentId))
+                            .from(paymentRequests)
+                            .where(eq(paymentRequests.id, requestId))
                             .limit(1);
+                        const tenderId = request?.tenderId || 0;
 
-                        if (ddInstrument) {
-                            const requestId = ddInstrument.requestId;
-                            const [request] = await this.db
-                                .select()
-                                .from(paymentRequests)
-                                .where(eq(paymentRequests.id, requestId))
-                                .limit(1);
-                            const tenderId = request?.tenderId || 0;
+                        const result = await this.notificationService.sendDdMailAfterChequeAction(
+                            instrument,
+                            chequeDetails,
+                            ddInstrument.id,
+                            tenderId,
+                        );
 
-                            await this.notificationService.sendDdMailAfterChequeAction(
-                                instrument,
-                                chequeDetails,
-                                ddInstrument.id,
-                                tenderId,
-                                user.id
-                            );
-
-                            this.logger.log(`DD mail triggered after cheque action for cheque ${instrumentId}, DD instrument ${ddInstrument.id}`);
+                        if (result?.success) {
+                            this.logger.log(`DD mail sent after cheque action for cheque ${instrumentId}, DD instrument ${ddInstrument.id}`);
+                        } else {
+                            this.logger.warn(`DD mail not sent for cheque ${instrumentId} (DD instrument ${ddInstrument.id}): ${result?.message || 'unknown'}`);
                         }
                     }
                 } else if (chequeDetails?.linkedFdrId) {
@@ -578,15 +527,18 @@ export class ChequeService {
                                 .limit(1);
                             const tenderId = request?.tenderId || 0;
 
-                            await this.notificationService.sendFdrMailAfterChequeAction(
+                            const result = await this.notificationService.sendFdrMailAfterChequeAction(
                                 instrument,
                                 chequeDetails,
                                 fdrInstrument.id,
                                 tenderId,
-                                user.id
                             );
 
-                            this.logger.log(`FDR mail triggered after cheque action for cheque ${instrumentId}, FDR instrument ${fdrInstrument.id}`);
+                            if (result?.success) {
+                                this.logger.log(`FDR mail sent after cheque action for cheque ${instrumentId}, FDR instrument ${fdrInstrument.id}`);
+                            } else {
+                                this.logger.warn(`FDR mail not sent for cheque ${instrumentId} (FDR instrument ${fdrInstrument.id}): ${result?.message || 'unknown'}`);
+                            }
                         }
                     }
                 } else {
@@ -608,10 +560,14 @@ export class ChequeService {
             try {
                 let contacts: any[] = [];
                 if (body.contacts) {
-                    try {
-                        contacts = typeof body.contacts === 'string' ? JSON.parse(body.contacts) : body.contacts;
-                    } catch (e) {
-                        this.logger.warn('Failed to parse contacts for followup', e);
+                    if (Array.isArray(body.contacts)) {
+                        contacts = body.contacts;
+                    } else if (typeof body.contacts === 'string') {
+                        try {
+                            contacts = JSON.parse(body.contacts);
+                        } catch {
+                            this.logger.warn('Failed to parse contacts string', body.contacts);
+                        }
                     }
                 }
                 const followupDto: CreateFollowUpDto = {

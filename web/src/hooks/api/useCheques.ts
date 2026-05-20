@@ -102,8 +102,8 @@ export const useUpdateChequeAction = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, formData }: { id: number; formData: FormData }) =>
-            chequesService.updateAction(id, formData),
+        mutationFn: ({ id, data }: { id: number; data: Record<string, unknown> }) =>
+            chequesService.updateAction(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: chequesKey.all });
             queryClient.invalidateQueries({ queryKey: chequesKey.counts() });

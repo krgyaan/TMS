@@ -22,12 +22,33 @@ export class PaymentRequestsNotificationService {
         private readonly configService: ConfigService,
     ) {}
 
+    /**
+     * Get responsible user by mode
+     */
+    private getResponsibleUserByMode(mode: string) {
+        switch (mode) {
+            case 'BANK_TRANSFER':
+                return 'gyan@volksenergie.in';
+            case 'PORTAL':
+                return 'gyan@volksenergie.in';
+            case 'CHEQUE':
+                return 'gyan@volksenergie.in';
+            case 'DD':
+                return 'gyan@volksenergie.in';
+            case 'FDR':
+                return 'gyan@volksenergie.in';
+            case 'BG':
+                return 'gyan@volksenergie.in';
+            default:
+                return 'gyan@volksenergie.in';
+        }
+    }
+
     async sendDdMailAfterChequeAction(
         chequeInstrument: any,
         chequeDetails: any,
         ddInstrumentId: number,
         tenderId: number,
-        userId: number
     ) {
         const [tender] = await this.db
             .select()
@@ -40,24 +61,7 @@ export class PaymentRequestsNotificationService {
             return { success: false, message: 'Tender not found' };
         }
 
-        // Generate PDF for DD (commented out for cheque-triggered flow)
-        // try {
-        //     const pdfPaths = await this.pdfGenerator.generatePdfs(
-        //         'dd-request',
-        //         {
-        //             tenderNo: tender.tenderNo,
-        //             tenderName: tender.tenderName,
-        //             amount: chequeInstrument.amount,
-        //             favouring: chequeInstrument.favouring,
-        //             payableAt: chequeInstrument.payableAt,
-        //         },
-        //         ddInstrumentId,
-        //         'DD'
-        //     );
-        //     this.logger.log(`Generated PDFs for DD: ${pdfPaths.join(', ')}`);
-        // } catch (error) {
-        //     this.logger.error(`Failed to generate PDF for DD ${ddInstrumentId}`, error);
-        // }
+        const toEmails = this.getResponsibleUserByMode('DD');
         
         const apiUrl = this.configService.get<string>('app.apiUrl') || '';
         const baseUrl = apiUrl.replace('/api/v1', '');
@@ -92,9 +96,8 @@ export class PaymentRequestsNotificationService {
             await this.emailService.sendTenderEmail({
                 tenderId,
                 eventType: 'DD_REQUEST',
-                fromUserId: userId,
-                to: [{ type: 'role', role: 'accounts', teamId }],
-                subject: `DD Request - ${tender.tenderNo} - ${tender.tenderName}`,
+                fromUserId: 13,
+                subject: `Cheque created for DD`,
                 template: 'demand-draft-request',
                 data: {
                     chequeNo: chequeDetails.chequeNo || 'N/A',
@@ -108,6 +111,11 @@ export class PaymentRequestsNotificationService {
                     link: `#/bi-dashboard/demand-drafts/${ddInstrumentId}`,
                     courierAddress: chequeInstrument.courierAddress || 'Not specified',
                 },
+                to: [{ type: 'emails', emails: [toEmails] }],
+                // cc: [
+                //     { type: 'role', role: 'admin', teamId: tenderTeamId },
+                //     { type: 'emails', emails: ['accounts@volksenergie.in']}
+                // ]
             });
             this.logger.log(`DD email sent successfully for tender ${tenderId}`);
         } catch (error) {
@@ -123,7 +131,6 @@ export class PaymentRequestsNotificationService {
         chequeDetails: any,
         fdrInstrumentId: number,
         tenderId: number,
-        userId: number
     ) {
         const [tender] = await this.db
             .select()
@@ -135,25 +142,8 @@ export class PaymentRequestsNotificationService {
             this.logger.warn(`Tender ${tenderId} not found`);
             return { success: false, message: 'Tender not found' };
         }
-
-        // Generate PDF for FDR (commented out for cheque-triggered flow)
-        // try {
-        //     const pdfPaths = await this.pdfGenerator.generatePdfs(
-        //         'fdr-request',
-        //         {
-        //             tenderNo: tender.tenderNo,
-        //             tenderName: tender.tenderName,
-        //             amount: chequeInstrument.amount,
-        //             favouring: chequeInstrument.favouring,
-        //             payableAt: chequeInstrument.payableAt,
-        //         },
-        //         fdrInstrumentId,
-        //         'FDR'
-        //     );
-        //     this.logger.log(`Generated PDFs for FDR: ${pdfPaths.join(', ')}`);
-        // } catch (error) {
-        //     this.logger.error(`Failed to generate PDF for FDR ${fdrInstrumentId}`, error);
-        // }
+        
+        const toEmails = this.getResponsibleUserByMode('FDR');
 
         const apiUrl = this.configService.get<string>('app.apiUrl') || '';
         const baseUrl = apiUrl.replace('/api/v1', '');
@@ -188,9 +178,8 @@ export class PaymentRequestsNotificationService {
             await this.emailService.sendTenderEmail({
                 tenderId,
                 eventType: 'FDR_REQUEST',
-                fromUserId: userId,
-                to: [{ type: 'role', role: 'accounts', teamId }],
-                subject: `FDR Request - ${tender.tenderNo} - ${tender.tenderName}`,
+                fromUserId: 13,
+                subject: `Cheque created for FDR`,
                 template: 'fixed-deposit-receipt-request',
                 data: {
                     chequeNo: chequeDetails.chequeNo || 'N/A',
@@ -204,6 +193,11 @@ export class PaymentRequestsNotificationService {
                     link: `#/bi-dashboard/fdrs/${fdrInstrumentId}`,
                     courierAddress: chequeInstrument.courierAddress || 'Not specified',
                 },
+                to: [{ type: 'emails', emails: [toEmails] }],
+                // cc: [
+                //     { type: 'role', role: 'admin', teamId: tenderTeamId },
+                //     { type: 'emails', emails: ['accounts@volksenergie.in']}
+                // ]
             });
             this.logger.log(`FDR email sent successfully for tender ${tenderId}`);
         } catch (error) {
@@ -226,9 +220,10 @@ export class PaymentRequestsNotificationService {
                 tenderId: paymentRequests.tenderId,
                 requestedBy: paymentRequests.requestedBy,
                 generatedPdf: paymentInstruments.generatedPdf,
+                purpose: paymentInstruments.purpose,
             })
             .from(paymentInstruments)
-            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
             .where(eq(paymentInstruments.id, instrumentId))
             .limit(1);
 
@@ -237,20 +232,25 @@ export class PaymentRequestsNotificationService {
             return;
         }
 
+        let requestedUserName = 'Tender Executive';
+        let recipientEmail = '';
+
         if (!instrument.requestedBy) {
-            this.logger.warn(`RequestedBy not found for instrument ${instrumentId}`);
-            return;
-        }
+            this.logger.warn(`RequestedBy not found for instrument ${instrumentId}, using fallback recipient`);
+        } else {
+            const [requestedUser] = await this.db
+                .select({ name: users.name, email: users.email })
+                .from(users)
+                .where(eq(users.id, instrument.requestedBy))
+                .limit(1);
 
-        const [requestedUser] = await this.db
-            .select({ name: users.name, email: users.email })
-            .from(users)
-            .where(eq(users.id, instrument.requestedBy))
-            .limit(1);
-
-        if (!requestedUser?.email) {
-            this.logger.warn(`Requested user not found for instrument ${instrumentId}`);
-            return;
+            if (requestedUser) {
+                requestedUserName = requestedUser.name || requestedUserName;
+                recipientEmail = requestedUser.email || '';
+            }
+            if (!recipientEmail) {
+                this.logger.warn(`Requested user email not found for instrument ${instrumentId}, using fallback`);
+            }
         }
 
         const [chequeDetails] = await this.db
@@ -277,11 +277,11 @@ export class PaymentRequestsNotificationService {
                 requestId: instrument.requestId,
                 tenderId: instrument.tenderId || undefined,
                 eventType: 'CHEQUE_CREATED',
-                fromUserId: userId || 13,
-                subject: `Cheque Request ${status === 'Accepted' ? 'Accepted' : 'Rejected'}`,
+                fromUserId: 13,
+                subject: `Cheque created - ${instrument.purpose}`,
                 template: 'cheque-created',
                 data: {
-                    requestedBy: requestedUser.name,
+                    requestedBy: requestedUserName,
                     status: status === 'Accepted' ? 'Accepted' : 'Rejected',
                     chequePdfUrl,
                     remarks: status === 'Accepted' ? 'Your cheque has been created.' : '',
@@ -289,7 +289,7 @@ export class PaymentRequestsNotificationService {
                     chequeDeliveryMethod: deliveryMethod,
                     receivingPdfUrl,
                 },
-                to: [{ type: 'emails', emails: [requestedUser.email] }],
+                to: [{ type: 'emails' as const, emails: [recipientEmail || 'gyan@volksenergie.in'] }],
             });
 
             if (result.success) {
@@ -343,20 +343,6 @@ export class PaymentRequestsNotificationService {
         } catch (error) {
             this.logger.error(`Failed to generate PDF for instrument ${instrumentId}`, error);
             throw error;
-        }
-    }
-    
-    /**
-     * Get responsible user by mode
-     */
-    private getResponsibleUserByMode(mode: string) {
-        switch (mode) {
-            case 'BANK_TRANSFER':
-                return 'gyan@volksenergie.in';
-            case 'PORTAL':
-                return 'gyan@volksenergie.in';
-            default:
-                return 'gyan@volksenergie.in';
         }
     }
 
@@ -753,6 +739,7 @@ export class PaymentRequestsNotificationService {
         utrNo?: string,
         utrMessage?: string,
         rejectionReason?: string
+
     ): Promise<void> {
         const [instrument] = await this.db
             .select({ 
@@ -920,7 +907,7 @@ export class PaymentRequestsNotificationService {
                 tenderId: instrument.tenderId || undefined,
                 eventType: 'BT_RETURN',
                 fromUserId: 13,
-                subject: `Bank Transfer - Payment Returned`,
+                subject: `Payment Returned - ${instrument.projectName}`,
                 template: 'returned-action',
                 data: {
                     tenderExecutive: requestedUser.name,
@@ -1013,7 +1000,7 @@ export class PaymentRequestsNotificationService {
                 tenderId: instrument.tenderId || undefined,
                 eventType: 'POP_RETURN',
                 fromUserId: 13,
-                subject: `Pay on Portal - Payment Returned`,
+                subject: `Payment Returned - ${instrument.projectName}`,
                 template: 'returned-action',
                 data: {
                     tenderExecutive: requestedUser.name,

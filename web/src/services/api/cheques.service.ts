@@ -76,8 +76,8 @@ class ChequesService extends BaseApiService {
         return this.get<any>(`/instruments/${id}/followup`);
     }
 
-    async updateAction(id: number, formData: FormData): Promise<any> {
-        return this.put<any, FormData>(`/instruments/${id}/action`, formData);
+    async updateAction(id: number, data: Record<string, unknown>): Promise<any> {
+        return this.put<any>(`/instruments/${id}/action`, data);
     }
 }
 

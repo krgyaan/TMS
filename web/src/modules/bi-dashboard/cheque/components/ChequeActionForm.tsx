@@ -194,40 +194,37 @@ export function ChequeActionForm({ instrumentId, action: propAction, tenderId, f
 
     const handleSubmit = async (values: ChequeActionFormValues) => {
         try {
-            const formData = new FormData();
+            const data: Record<string, unknown> = {
+                action: values.action,
+            };
 
-            formData.append('action', values.action);
-            if (values.cheque_req) formData.append('cheque_req', values.cheque_req);
-            if (values.reason_req) formData.append('reason_req', values.reason_req);
-            if (values.cheque_no) formData.append('cheque_no', values.cheque_no);
-            if (values.due_date) formData.append('due_date', values.due_date);
-            if (values.receiving_cheque_handed_over) formData.append('receiving_cheque_handed_over', values.receiving_cheque_handed_over);
+            if (values.cheque_req) data.cheque_req = values.cheque_req;
+            if (values.reason_req) data.reason_req = values.reason_req;
+            if (values.cheque_no) data.cheque_no = values.cheque_no;
+            if (values.due_date) data.due_date = values.due_date;
+            if (values.receiving_cheque_handed_over) data.receiving_cheque_handed_over = values.receiving_cheque_handed_over;
             if (values.cheque_images && values.cheque_images.length > 0) {
-                formData.append('cheque_images', JSON.stringify(values.cheque_images));
+                data.cheque_images = values.cheque_images;
             }
-            if (values.positive_pay_confirmation) formData.append('positive_pay_confirmation', values.positive_pay_confirmation);
-            if (values.remarks) formData.append('remarks', values.remarks);
-            if (values.cheque_given_from_account) formData.append('cheque_given_from_account', values.cheque_given_from_account);
-            if (values.organisation_name) formData.append('organisation_name', values.organisation_name);
-            if (values.contacts) formData.append('contacts', JSON.stringify(values.contacts));
-            if (values.followup_start_date) formData.append('followup_start_date', values.followup_start_date);
-            if (values.frequency) formData.append('frequency', String(values.frequency));
-            if (values.stop_reason_text) formData.append('stop_reason_text', values.stop_reason_text);
-            if (values.proof_image) formData.append('proof_image', values.proof_image);
+            if (values.positive_pay_confirmation) data.positive_pay_confirmation = values.positive_pay_confirmation;
+            if (values.remarks) data.remarks = values.remarks;
+            if (values.cheque_given_from_account) data.cheque_given_from_account = values.cheque_given_from_account;
+            if (values.organisation_name) data.organisation_name = values.organisation_name;
+            if (values.contacts) data.contacts = values.contacts;
+            if (values.followup_start_date) data.followup_start_date = values.followup_start_date;
+            if (values.frequency) data.frequency = values.frequency;
+            if (values.stop_reason_text) data.stop_reason_text = values.stop_reason_text;
+            if (values.proof_image) data.proof_image = values.proof_image;
             if (values.transfer_date) {
-                if (values.action === 'deposited-in-bank') {
-                    formData.append('bt_transfer_date', values.transfer_date);
-                } else {
-                    formData.append('transfer_date', values.transfer_date);
-                }
+                data[values.action === 'deposited-in-bank' ? 'bt_transfer_date' : 'transfer_date'] = values.transfer_date;
             }
-            if (values.utr) formData.append('utr', values.utr);
-            if (values.amount) formData.append('amount', String(values.amount));
-            if (values.reference) formData.append('reference', values.reference);
-            if (values.cancelled_image_path) formData.append('cancelled_image_path', values.cancelled_image_path);
-            if (values.emailBody) formData.append('emailBody', values.emailBody);
+            if (values.utr) data.utr = values.utr;
+            if (values.amount) data.amount = values.amount;
+            if (values.reference) data.reference = values.reference;
+            if (values.cancelled_image_path) data.cancelled_image_path = values.cancelled_image_path;
+            if (values.emailBody) data.emailBody = values.emailBody;
 
-            await updateMutation.mutateAsync({ id: instrumentId, formData });
+            await updateMutation.mutateAsync({ id: instrumentId, data });
             toast.success('Action submitted successfully');
             navigate(-1);
             form.reset();
