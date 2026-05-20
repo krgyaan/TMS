@@ -367,7 +367,7 @@ export class EmailService {
     }
 
     /**
-     * Convenience method for tender emails
+     * Convenience method for tender emails -> Luifi waala email haiiiiii-> Gyan DONNN
      */
     async sendTenderEmail(options: SendTenderEmailOptions): Promise<{ success: boolean; emailLogId?: number; error?: string }> {
         // Get tender info for team

@@ -20,9 +20,10 @@ import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
-import { paymentInstruments, paymentRequests } from '@/db/schemas';
-import type { UploadResultDto } from '@/modules/tendering/tender-result/dto/tender-result.dto';
+import { paymentInstruments, paymentRequests, tenderStatusHistory } from '@/db/schemas';
+import type { UploadResultDto, UploadTenderCancelledDto } from '@/modules/tendering/tender-result/dto/tender-result.dto';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { isThisSecond } from 'date-fns';
 
 const RESULT_STATUS = {
     RESULT_AWAITED: 'Result Awaited',
@@ -790,6 +791,79 @@ export class TenderResultService {
         return result;
     }
 
+    async cancelTender(tenderId : number, user: any, dto: UploadTenderCancelledDto){
+        try{
+        //involves the logic for cancelling the tender
+        const [tender] = await this.db.select()
+            .from(tenderInfos)
+            .where(eq(tenderInfos.id, tenderId));
+
+        if(!tender){
+            throw new NotFoundException(`Tender not found with id : ${tenderId}`);
+        }
+
+        if(tender.status === 18){
+            return { message: "Status already updated" };
+        }
+
+        const prevStatus = tender.status;
+
+        //we will update the status
+        await this.db
+            .update(tenderInfos)
+            .set({status : 18})
+            .where(eq(tenderInfos.id, tenderId));
+
+        // Get or create tender result record
+        const { id: resultId } = await this.getOrCreateForTender(tenderId);
+
+        // Update the tender result record with cancellation details
+        await this.db
+            .update(tenderResults)
+            .set({
+                status: RESULT_STATUS.CANCELLED,
+                result: 'Lost',
+                resultReason: dto.resultReason,
+                finalResultScreenshot: dto.finalResultScreenshot,
+                resultUploadedAt: new Date(),
+                updatedAt: new Date(),
+            })
+            .where(eq(tenderResults.id, resultId));
+
+        //create tenderstatushistory log 
+        await this.tenderStatusHistoryService.trackStatusChange(
+            tenderId,
+            18,
+            user.sub,
+            prevStatus,
+            "Tender Cancelled"
+        );
+
+        //tender cancelled email sent
+        await this.sendTenderCancelledEmail(
+            {
+                tenderId: tenderId,
+                tenderName: tender.tenderName,
+                tenderLink: `${process.env.FRONTEND_URL}/tendering/results/${tenderId}`,
+                tenderNo: tender.tenderNo,
+                finalScreenshot: dto.finalResultScreenshot,
+                team: tender.team
+            },
+            dto,
+            user.sub
+        );
+
+        // return the result
+        return {
+            message: "Tender Cancelled Successfully"
+        }
+        
+        } catch (e){
+            //throw error if error occurs
+            throw new BadRequestException(`Semething went wrong : ${e}`);
+        }
+    }
+
     async getLinkedRaDetails(id: number) {
         const result = await this.findById(id);
 
@@ -902,6 +976,40 @@ export class TenderResultService {
             uploadedBy,
             `Tender Result - ${emailData.result} - ${tender.tenderName}`,
             'tender-result',
+            emailData,
+            {
+                to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
+                cc: [{ type: 'role', role: 'Admin', teamId: tender.team }],
+                attachments,
+            }
+        );
+    }
+
+    async sendTenderCancelledEmail(
+        tender: {tenderId: number, tenderName : string, tenderLink: string, tenderNo: string, finalScreenshot: string, team : number},
+        dto: any, 
+        uploadedBy: number){
+        const emailData = {
+            tender_name : tender.tenderName,
+            tender_link : tender.tenderLink,
+            tender_no : tender.tenderNo,
+            final_screenshot : !!tender.finalScreenshot,
+            reason: dto.resultReason
+        };
+
+        const attachmentFiles = [tender.finalScreenshot].filter(Boolean) as string[];
+
+        const attachments = attachmentFiles.length > 0 ? {
+            files: attachmentFiles,
+            baseDir: 'result-screenshots',
+        } : undefined;
+
+        await this.sendEmail(
+            'tender-result-cancelled',
+            tender.tenderId,
+            uploadedBy,
+            `Tender Cancelled - ${tender.tenderName}`,
+            'tender-result-cancelled',
             emailData,
             {
                 to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
