@@ -144,6 +144,7 @@ export class TqManagementController {
         @Body() dto: MarkAsNoTqDto,
         @CurrentUser() user: ValidatedUser
     ) {
+        // Building the no TQ again
         // Default to qualified=true, can be extended to accept qualification status from DTO
         return this.tqManagementService.markAsNoTq(dto.tenderId, user.sub, dto.qualified ?? true);
     }

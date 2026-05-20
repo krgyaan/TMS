@@ -8,7 +8,7 @@ import { users } from '@db/schemas/auth/users.schema';
 import { items } from '@db/schemas/master/items.schema';
 import { bidSubmissions } from '@db/schemas/tendering/bid-submissions.schema';
 import { tenderQueries } from '@db/schemas/tendering/tender-queries.schema';
-import { tenderQueryItems } from '@db/schemas/tendering';
+import { tenderQueryItems, tenderResults } from '@db/schemas/tendering';
 import { teams } from '@db/schemas/master/teams.schema';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
@@ -19,6 +19,7 @@ import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { TenderResultService } from '../tender-result/tender-result.service';
 
 export interface TqManagementDashboardCounts {
     awaited: number;
@@ -62,6 +63,7 @@ export class TqManagementService {
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
+        private readonly tenderResulService : TenderResultService,
     ) { }
 
     /**
@@ -605,6 +607,21 @@ export class TqManagementService {
                 .set({ status: newStatus, updatedAt: new Date() })
                 .where(eq(tenderInfos.id, tqRecord.tenderId));
 
+
+            //we also need to update the result status if the tender is qualified or disqualified
+            const {id : resultId} = await this.tenderResulService.getOrCreateForTender(tqRecord.tenderId);
+
+            //updating the actual entry to be disqualified -> The result entry
+            await this.db
+                .update(tenderResults)
+                .set({
+                    technicallyQualified: "No",
+                    status : "Disqualified",
+                    disqualificationReason: data.missedReason,
+                })
+                .where(eq(tenderResults.id, resultId));
+
+
             // Track status change
             await this.tenderStatusHistoryService.trackStatusChange(
                 tqRecord.tenderId,
@@ -653,6 +670,18 @@ export class TqManagementService {
                 .set({ status: newStatus, updatedAt: new Date() })
                 .where(eq(tenderInfos.id, tenderId));
 
+            //we also need to update the result status if the tender is qualified or disqualified
+            const {id : resultId} = await this.tenderResulService.getOrCreateForTender(tenderId);
+
+            //updating the actual entry to be disqualified -> The result entry
+            await this.db
+                .update(tenderResults)
+                .set({
+                    technicallyQualified: qualified ? "Yes" : "No",
+                    status : qualified ? "Under Evaluation" : "Disqualified"
+                })
+                .where(eq(tenderResults.id, resultId));
+
             // Track status change
             await this.tenderStatusHistoryService.trackStatusChange(
                 tenderId,
@@ -699,6 +728,19 @@ export class TqManagementService {
                 .update(tenderInfos)
                 .set({ status: newStatus, updatedAt: new Date() })
                 .where(eq(tenderInfos.id, tenderId));
+            
+            //we also need to update the result status if the tender is qualified or disqualified
+            const {id : resultId} = await this.tenderResulService.getOrCreateForTender(tqRecord.tenderId);
+
+            //updating the actual entry to be disqualified -> The result entry
+            await this.db
+                .update(tenderResults)
+                .set({
+                    technicallyQualified: "Yes",
+                    status : "Under Evaluation"
+                })
+                .where(eq(tenderResults.id, resultId));
+
 
             // Track status change
             await this.tenderStatusHistoryService.trackStatusChange(
