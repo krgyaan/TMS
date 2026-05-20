@@ -16,7 +16,7 @@ import { statuses } from '@db/schemas/master/statuses.schema';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import type { ChequeDashboardRow, ChequeDashboardCounts } from '@/modules/bi-dashboard/cheque/helpers/cheque.types';
-import { CHEQUE_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
+import { CHEQUE_STATUSES, DD_STATUSES, FDR_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
 import { PaymentRequestsNotificationService } from '@/modules/tendering/payment-requests/services/payment-requests-notification.service';
 import { FollowUpService } from '@/modules/follow-up/follow-up.service';
 import type { CreateFollowUpDto } from '@/modules/follow-up/zod';
@@ -463,8 +463,8 @@ export class ChequeService {
             }
         }
 
-        // Send emails after cheque action accounts-form accepted
-        if (body.action === 'accounts-form' && body.cheque_req === 'Accepted') {
+        // Send emails after cheque action accounts-form
+        if (body.action === 'accounts-form') {
             this.logger.debug(`Email trigger condition met for cheque ${instrumentId}`);
             try {
                 const [chequeDetails] = await this.db
@@ -475,52 +475,58 @@ export class ChequeService {
 
                 this.logger.debug(`Cheque details for ${instrumentId}: linkedDdId=${chequeDetails?.linkedDdId}, linkedFdrId=${chequeDetails?.linkedFdrId}`);
 
-                if (chequeDetails?.linkedDdId) {
-                    const [ddInstrument] = await this.db
-                        .select()
-                        .from(paymentInstruments)
-                        .where(eq(paymentInstruments.id, chequeDetails.linkedDdId))
-                        .limit(1);
-                        
-                    if (ddInstrument) {
-                        const requestId = ddInstrument.requestId;
-                        const [request] = await this.db
-                            .select()
-                            .from(paymentRequests)
-                            .where(eq(paymentRequests.id, requestId))
-                            .limit(1);
-                        const tenderId = request?.tenderId || 0;
+                if (body.cheque_req === 'Rejected') {
+                    await this.notificationService.sendChequeCreatedMail(
+                        instrumentId,
+                        'Rejected',
+                        body.reason_req || '',
+                        user.id,
+                    );
+                    this.logger.log(`Cheque rejection mail sent for cheque ${instrumentId}`);
 
-                        const result = await this.notificationService.sendDdMailAfterChequeAction(
-                            instrument,
-                            chequeDetails,
-                            ddInstrument.id,
-                            tenderId,
-                            requestId,
-                        );
+                    if (chequeDetails?.linkedDdId) {
+                        await this.db
+                            .update(paymentInstruments)
+                            .set({
+                                status: DD_STATUSES.ACCOUNTS_FORM_REJECTED,
+                                rejectionReason: body.reason_req || 'Linked Cheque was rejected',
+                                updatedAt: new Date(),
+                            })
+                            .where(eq(paymentInstruments.id, chequeDetails.linkedDdId));
+                        this.logger.log(`Auto-rejected DD instrument ${chequeDetails.linkedDdId} due to cheque ${instrumentId} rejection`);
 
-                        if (result?.success) {
-                            this.logger.log(`DD mail sent after cheque action for cheque ${instrumentId}, DD instrument ${ddInstrument.id}`);
-                        } else {
-                            this.logger.warn(`DD mail not sent for cheque ${instrumentId} (DD instrument ${ddInstrument.id}): ${result?.success || 'unknown'}`);
-                        }
+                        // Send DD rejection email
+                        const ddBody = { dd_req: 'Rejected', reason_req: body.reason_req || 'Linked Cheque was rejected' };
+                        await this.notificationService.sendDdCreatedMail(chequeDetails.linkedDdId, ddBody, user);
+                        this.logger.log(`DD rejection mail sent for instrument ${chequeDetails.linkedDdId}`);
                     }
-                } else if (chequeDetails?.linkedFdrId) {
-                    const [fdrDetail] = await this.db
-                        .select()
-                        .from(instrumentFdrDetails)
-                        .where(eq(instrumentFdrDetails.id, chequeDetails.linkedFdrId))
-                        .limit(1);
 
-                    if (fdrDetail) {
-                        const [fdrInstrument] = await this.db
+                    if (chequeDetails?.linkedFdrId) {
+                        await this.db
+                            .update(paymentInstruments)
+                            .set({
+                                status: FDR_STATUSES.ACCOUNTS_FORM_REJECTED,
+                                rejectionReason: body.reason_req || 'Linked Cheque was rejected',
+                                updatedAt: new Date(),
+                            })
+                            .where(eq(paymentInstruments.id, chequeDetails.linkedFdrId));
+                        this.logger.log(`Auto-rejected FDR instrument ${chequeDetails.linkedFdrId} due to cheque ${instrumentId} rejection`);
+
+                        // Send FDR rejection email
+                        const fdrBody = { fdr_req: 'Rejected', reason_req: body.reason_req || 'Linked Cheque was rejected' };
+                        await this.notificationService.sendFdrCreatedMail(chequeDetails.linkedFdrId, fdrBody, user);
+                        this.logger.log(`FDR rejection mail sent for instrument ${chequeDetails.linkedFdrId}`);
+                    }
+                } else if (body.cheque_req === 'Accepted') {
+                    if (chequeDetails?.linkedDdId) {
+                        const [ddInstrument] = await this.db
                             .select()
                             .from(paymentInstruments)
-                            .where(eq(paymentInstruments.id, fdrDetail.instrumentId))
+                            .where(eq(paymentInstruments.id, chequeDetails.linkedDdId))
                             .limit(1);
-
-                        if (fdrInstrument) {
-                            const requestId = fdrInstrument.requestId;
+                            
+                        if (ddInstrument) {
+                            const requestId = ddInstrument.requestId;
                             const [request] = await this.db
                                 .select()
                                 .from(paymentRequests)
@@ -528,30 +534,68 @@ export class ChequeService {
                                 .limit(1);
                             const tenderId = request?.tenderId || 0;
 
-                            const result = await this.notificationService.sendFdrMailAfterChequeAction(
+                            const result = await this.notificationService.sendDdMailAfterChequeAction(
                                 instrument,
                                 chequeDetails,
-                                fdrInstrument.id,
+                                ddInstrument.id,
                                 tenderId,
                                 requestId,
                             );
 
                             if (result?.success) {
-                                this.logger.log(`FDR mail sent after cheque action for cheque ${instrumentId}, FDR instrument ${fdrInstrument.id}`);
+                                this.logger.log(`DD mail sent after cheque action for cheque ${instrumentId}, DD instrument ${ddInstrument.id}`);
                             } else {
-                                this.logger.warn(`FDR mail not sent for cheque ${instrumentId} (FDR instrument ${fdrInstrument.id}): ${result?.success || 'unknown'}`);
+                                this.logger.warn(`DD mail not sent for cheque ${instrumentId} (DD instrument ${ddInstrument.id}): ${result?.success || 'unknown'}`);
                             }
                         }
-                    }
-                } else {
-                    await this.notificationService.sendChequeCreatedMail(
-                        instrumentId,
-                        'Accepted',
-                        undefined,
-                        user.id,
-                    );
+                    } else if (chequeDetails?.linkedFdrId) {
+                        const [fdrDetail] = await this.db
+                            .select()
+                            .from(instrumentFdrDetails)
+                            .where(eq(instrumentFdrDetails.id, chequeDetails.linkedFdrId))
+                            .limit(1);
 
-                    this.logger.log(`Cheque created mail triggered after cheque action for cheque ${instrumentId}`);
+                        if (fdrDetail) {
+                            const [fdrInstrument] = await this.db
+                                .select()
+                                .from(paymentInstruments)
+                                .where(eq(paymentInstruments.id, fdrDetail.instrumentId))
+                                .limit(1);
+
+                            if (fdrInstrument) {
+                                const requestId = fdrInstrument.requestId;
+                                const [request] = await this.db
+                                    .select()
+                                    .from(paymentRequests)
+                                    .where(eq(paymentRequests.id, requestId))
+                                    .limit(1);
+                                const tenderId = request?.tenderId || 0;
+
+                                const result = await this.notificationService.sendFdrMailAfterChequeAction(
+                                    instrument,
+                                    chequeDetails,
+                                    fdrInstrument.id,
+                                    tenderId,
+                                    requestId,
+                                );
+
+                                if (result?.success) {
+                                    this.logger.log(`FDR mail sent after cheque action for cheque ${instrumentId}, FDR instrument ${fdrInstrument.id}`);
+                                } else {
+                                    this.logger.warn(`FDR mail not sent for cheque ${instrumentId} (FDR instrument ${fdrInstrument.id}): ${result?.success || 'unknown'}`);
+                                }
+                            }
+                        }
+                    } else {
+                        await this.notificationService.sendChequeCreatedMail(
+                            instrumentId,
+                            'Accepted',
+                            undefined,
+                            user.id,
+                        );
+
+                        this.logger.log(`Cheque created mail triggered after cheque action for cheque ${instrumentId}`);
+                    }
                 }
             } catch (error) {
                 this.logger.error(`Failed to send mail after cheque action for cheque ${instrumentId}:`, error);

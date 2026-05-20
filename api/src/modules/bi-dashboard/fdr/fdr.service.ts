@@ -1,5 +1,4 @@
 import { Inject, Injectable, Logger, NotFoundException, BadRequestException } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { eq, and, inArray, isNull, sql, asc, desc } from "drizzle-orm";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
@@ -16,7 +15,7 @@ import { FollowUpService } from "@/modules/follow-up/follow-up.service";
 import type { CreateFollowUpDto } from "@/modules/follow-up/zod/create-follow-up.dto";
 import { followUps } from "@/db/schemas/shared/follow-ups.schema";
 import { couriers } from "@/db/schemas/shared/couriers.schema";
-import { EmailService } from "@/modules/email/email.service";
+import { PaymentRequestsNotificationService } from "@/modules/tendering/payment-requests/services/payment-requests-notification.service";
 
 @Injectable()
 export class FdrService {
@@ -25,8 +24,7 @@ export class FdrService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly followUpService: FollowUpService,
-        private readonly emailService: EmailService,
-        private readonly configService: ConfigService,
+        private readonly notificationService: PaymentRequestsNotificationService,
     ) { }
 
     private deriveFdrStatus(status: string | null): string {
@@ -466,67 +464,8 @@ export class FdrService {
 
         // Send email notification for accounts-form (accept/reject)
         if (body.action === "accounts-form") {
-            const isAccepted = body.fdr_req === "Accepted";
             try {
-                const [paymentReq] = await this.db
-                    .select({
-                        requestedBy: paymentRequests.requestedBy,
-                        tenderId: paymentRequests.tenderId,
-                        tenderNo: paymentRequests.tenderNo,
-                    })
-                    .from(paymentRequests)
-                    .where(eq(paymentRequests.id, instrument.requestId))
-                    .limit(1);
-
-                if (paymentReq?.requestedBy) {
-                    const [reqUser] = await this.db
-                        .select({ name: users.name, email: users.email })
-                        .from(users)
-                        .where(eq(users.id, paymentReq.requestedBy))
-                        .limit(1);
-
-                    if (reqUser?.email) {
-                        let imageUrl = "";
-                        if (isAccepted && body.req_no) {
-                            const [courierRec] = await this.db
-                                .select({ courierDocs: couriers.courierDocs })
-                                .from(couriers)
-                                .where(eq(couriers.id, Number(body.req_no)))
-                                .limit(1);
-                            const docs = (courierRec?.courierDocs ?? []) as string[];
-                            if (docs.length > 0) {
-                                const baseUrl = (this.configService.get<string>("app.apiUrl") || "").replace("/api/v1", "");
-                                imageUrl = `${baseUrl}/uploads/courier/${docs[0]}`;
-                            }
-                        }
-
-                        const formatCurrency = (amount: number) =>
-                            `₹${amount.toLocaleString("en-IN")}`;
-
-                        await this.emailService.sendPaymentEmail({
-                            requestId: instrument.requestId,
-                            tenderId: paymentReq.tenderId || undefined,
-                            eventType: isAccepted ? "FDR_CREATED" : "FDR_REJECTED",
-                            fromUserId: user.id,
-                            subject: `FDR ${isAccepted ? "Created" : "Rejected"} - ${paymentReq.tenderNo || ""}`,
-                            template: "fdr-create",
-                            data: {
-                                requestedBy: reqUser.name,
-                                status: isAccepted ? "Accepted" : "Rejected",
-                                issueDate: isAccepted ? (body.fdr_date || "") : "",
-                                fdrNo: isAccepted ? (body.fdr_no || "") : "",
-                                beneficiaryName: instrument.favouring || "",
-                                payableAt: instrument.payableAt || "",
-                                amountFormatted: instrument.amount ? formatCurrency(Number(instrument.amount)) : "",
-                                fdImage: imageUrl,
-                                courierRequestNo: isAccepted ? (body.req_no || "") : "",
-                                courierLink: "",
-                                remarks: isAccepted ? (body.remarks || "") : (body.reason_req || ""),
-                            },
-                            to: [{ type: "emails", emails: [reqUser.email] }],
-                        });
-                    }
-                }
+                await this.notificationService.sendFdrCreatedMail(instrumentId, body, user);
             } catch (error) {
                 this.logger.error(`Failed to send FDR created email for instrument ${instrumentId}:`, error);
             }

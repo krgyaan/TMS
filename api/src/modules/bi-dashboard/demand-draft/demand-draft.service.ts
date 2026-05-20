@@ -1,26 +1,20 @@
-import { Inject, Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { eq, and, inArray, isNull, sql, asc, desc, ne, or } from 'drizzle-orm';
-import { DRIZZLE } from '@db/database.module';
-import type { DbInstance } from '@db';
-import {
-    paymentRequests,
-    paymentInstruments,
-    instrumentDdDetails,
-    instrumentChequeDetails,
-} from '@db/schemas/tendering/payment-requests.schema';
-import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
-import { users } from '@db/schemas/auth/users.schema';
-import { statuses } from '@db/schemas/master/statuses.schema';
-import { wrapPaginatedResponse } from '@/utils/responseWrapper';
-import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
-import type { DemandDraftDashboardRow, DemandDraftDashboardCounts } from '@/modules/bi-dashboard/demand-draft/helpers/demandDraft.types';
-import { DD_STATUSES, CHEQUE_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
+import { couriers } from '@/db/schemas/shared/couriers.schema';
+import { followUps } from '@/db/schemas/shared/follow-ups.schema';
+import type { DemandDraftDashboardCounts, DemandDraftDashboardRow } from '@/modules/bi-dashboard/demand-draft/helpers/demandDraft.types';
 import { FollowUpService } from '@/modules/follow-up/follow-up.service';
 import type { CreateFollowUpDto } from '@/modules/follow-up/zod';
-import { followUps } from '@/db/schemas/shared/follow-ups.schema';
-import { couriers } from '@/db/schemas/shared/couriers.schema';
-import { EmailService } from '@/modules/email/email.service';
+import { CHEQUE_STATUSES, DD_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
+import { PaymentRequestsNotificationService } from '@/modules/tendering/payment-requests/services/payment-requests-notification.service';
+import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
+import { wrapPaginatedResponse } from '@/utils/responseWrapper';
+import type { DbInstance } from '@db';
+import { DRIZZLE } from '@db/database.module';
+import { users } from '@db/schemas/auth/users.schema';
+import { statuses } from '@db/schemas/master/statuses.schema';
+import { instrumentChequeDetails, instrumentDdDetails, paymentInstruments, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
+import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { and, asc, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 
 @Injectable()
 export class DemandDraftService {
@@ -29,8 +23,7 @@ export class DemandDraftService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly followUpService: FollowUpService,
-        private readonly emailService: EmailService,
-        private readonly configService: ConfigService,
+        private readonly notificationService: PaymentRequestsNotificationService,
     ) { }
 
     private deriveDdStatus(status: string | null): string {
@@ -410,67 +403,8 @@ export class DemandDraftService {
 
         // Send email notification for accounts-form (accept/reject)
         if (body.action === 'accounts-form') {
-            const isAccepted = body.dd_req === 'Accepted';
             try {
-                const [paymentReq] = await this.db
-                    .select({
-                        requestedBy: paymentRequests.requestedBy,
-                        tenderId: paymentRequests.tenderId,
-                        tenderNo: paymentRequests.tenderNo,
-                    })
-                    .from(paymentRequests)
-                    .where(eq(paymentRequests.id, instrument.requestId))
-                    .limit(1);
-
-                if (paymentReq?.requestedBy) {
-                    const [reqUser] = await this.db
-                        .select({ name: users.name, email: users.email })
-                        .from(users)
-                        .where(eq(users.id, paymentReq.requestedBy))
-                        .limit(1);
-
-                    if (reqUser?.email) {
-                        let imageUrl = '';
-                        if (isAccepted && body.req_no) {
-                            const [courier] = await this.db
-                                .select({ courierDocs: couriers.courierDocs })
-                                .from(couriers)
-                                .where(eq(couriers.id, Number(body.req_no)))
-                                .limit(1);
-                            const docs = (courier?.courierDocs ?? []) as string[];
-                            if (docs.length > 0) {
-                                const baseUrl = (this.configService.get<string>('app.apiUrl') || '').replace('/api/v1', '');
-                                imageUrl = `${baseUrl}/uploads/courier/${docs[0]}`;
-                            }
-                        }
-
-                        const formatCurrency = (amount: number) =>
-                            `₹${amount.toLocaleString('en-IN')}`;
-
-                        await this.emailService.sendPaymentEmail({
-                            requestId: instrument.requestId,
-                            tenderId: paymentReq.tenderId || undefined,
-                            eventType: isAccepted ? 'DD_CREATED' : 'DD_REJECTED',
-                            fromUserId: user.id,
-                            subject: `Demand Draft ${isAccepted ? 'Created' : 'Rejected'} - ${paymentReq.tenderNo || ''}`,
-                            template: 'dd-created',
-                            data: {
-                                requestedBy: reqUser.name,
-                                status: isAccepted ? 'Accepted' : 'Rejected',
-                                issueDate: isAccepted ? (body.dd_date || '') : '',
-                                chequeNo: isAccepted ? (body.dd_no || '') : '',
-                                beneficiaryName: instrument.favouring || '',
-                                payableAt: instrument.payableAt || '',
-                                amountFormatted: instrument.amount ? formatCurrency(Number(instrument.amount)) : '',
-                                ddImage: imageUrl,
-                                courierRequestNo: isAccepted ? (body.req_no || '') : '',
-                                courierLink: '',
-                                remarks: isAccepted ? (body.remarks || '') : (body.reason_req || ''),
-                            },
-                            to: [{ type: 'emails', emails: [reqUser.email] }],
-                        });
-                    }
-                }
+                await this.notificationService.sendDdCreatedMail(instrumentId, body, user);
             } catch (error) {
                 this.logger.error(`Failed to send DD created email for instrument ${instrumentId}:`, error);
             }
@@ -508,7 +442,7 @@ export class DemandDraftService {
                 };
                 await this.followUpService.create(followupDto, user.id || user.sub);
             } catch (error) {
-                this.logger.warn(`Failed to create followup for DD instrument ${instrumentId}: ${error.message}`);
+                this.logger.warn(`Failed to create followup for DD instrument ${instrumentId}: ${error}`);
             }
         }
 

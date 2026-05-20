@@ -1,14 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Inject } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { DRIZZLE } from '@db/database.module';
-import type { DbInstance } from '@db';
-import { and, eq } from 'drizzle-orm';
-import { paymentInstruments, instrumentTransferDetails, instrumentChequeDetails, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
+import { couriers, tenderInfos, userRoles, users } from '@/db/schemas';
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import { PdfGeneratorService } from '@/modules/pdf/pdf-generator.service';
-import { tenderInfos, userRoles, users } from '@/db/schemas';
+import type { DbInstance } from '@db';
+import { DRIZZLE } from '@db/database.module';
+import { instrumentChequeDetails, instrumentTransferDetails, paymentInstruments, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { and, eq } from 'drizzle-orm';
 
 @Injectable()
 export class PaymentRequestsNotificationService {
@@ -44,6 +43,23 @@ export class PaymentRequestsNotificationService {
         }
     }
 
+    private formatDateDDMMYYYY = (dateStr: string | null | undefined): string => {
+        if (!dateStr) return '';
+        try {
+            const d = new Date(dateStr);
+            const day = String(d.getDate()).padStart(2, '0');
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const year = d.getFullYear();
+            return `${day}-${month}-${year}`;
+        } catch {
+            return dateStr;
+        }
+    };
+
+    private formatCurrency = (amount: number) => {
+        return `₹${amount.toLocaleString('en-IN')}`;
+    };
+
     async sendDdMailAfterChequeAction(
         chequeInstrument: any,
         chequeDetails: any,
@@ -66,23 +82,6 @@ export class PaymentRequestsNotificationService {
         const apiUrl = this.configService.get<string>('app.apiUrl') || '';
         const baseUrl = apiUrl.replace('/api/v1', '');
 
-        const formatCurrency = (amount: number) => {
-            return `₹${amount.toLocaleString('en-IN')}`;
-        };
-
-        const formatDateDDMMYYYY = (dateStr: string | null | undefined): string => {
-            if (!dateStr) return '';
-            try {
-                const d = new Date(dateStr);
-                const day = String(d.getDate()).padStart(2, '0');
-                const month = String(d.getMonth() + 1).padStart(2, '0');
-                const year = d.getFullYear();
-                return `${day}-${month}-${year}`;
-            } catch {
-                return dateStr;
-            }
-        };
-
         const softCopyChequeUrl = chequeDetails.chequeImagePath
             ? `${baseUrl}/uploads/tendering/${chequeDetails.chequeImagePath}`
             : '';
@@ -101,8 +100,8 @@ export class PaymentRequestsNotificationService {
                 template: 'demand-draft-request',
                 data: {
                     chequeNo: chequeDetails.chequeNo || 'N/A',
-                    dueDate: formatDateDDMMYYYY(chequeDetails.dueDate),
-                    amountFormatted: formatCurrency(Number(chequeInstrument.amount) || 0),
+                    dueDate: this.formatDateDDMMYYYY(chequeDetails.dueDate),
+                    amountFormatted: this.formatCurrency(Number(chequeInstrument.amount) || 0),
                     softCopyCheque: softCopyChequeUrl,
                     receivingCheque: receivingChequeUrl,
                     timeLimit: chequeInstrument.courierDeadline || 24,
@@ -148,23 +147,6 @@ export class PaymentRequestsNotificationService {
         const apiUrl = this.configService.get<string>('app.apiUrl') || '';
         const baseUrl = apiUrl.replace('/api/v1', '');
 
-        const formatCurrency = (amount: number) => {
-            return `₹${amount.toLocaleString('en-IN')}`;
-        };
-
-        const formatDateDDMMYYYY = (dateStr: string | null | undefined): string => {
-            if (!dateStr) return '';
-            try {
-                const d = new Date(dateStr);
-                const day = String(d.getDate()).padStart(2, '0');
-                const month = String(d.getMonth() + 1).padStart(2, '0');
-                const year = d.getFullYear();
-                return `${day}-${month}-${year}`;
-            } catch {
-                return dateStr;
-            }
-        };
-
         const softCopyChequeUrl = chequeDetails.chequeImagePath
             ? `${baseUrl}/uploads/tendering/${chequeDetails.chequeImagePath}`
             : '';
@@ -183,8 +165,8 @@ export class PaymentRequestsNotificationService {
                 template: 'fixed-deposit-receipt-request',
                 data: {
                     chequeNo: chequeDetails.chequeNo || 'N/A',
-                    dueDate: formatDateDDMMYYYY(chequeDetails.dueDate),
-                    amountFormatted: formatCurrency(Number(chequeInstrument.amount) || 0),
+                    dueDate: this.formatDateDDMMYYYY(chequeDetails.dueDate),
+                    amountFormatted: this.formatCurrency(Number(chequeInstrument.amount) || 0),
                     softCopyCheque: softCopyChequeUrl,
                     receivingCheque: receivingChequeUrl,
                     timeLimit: chequeInstrument.courierDeadline || 24,
@@ -205,6 +187,196 @@ export class PaymentRequestsNotificationService {
         } catch (error) {
             this.logger.error(`Failed to send FDR email for instrument ${requestId}`, error);
             return { success: false, message: 'Email failed' };
+        }
+    }
+
+    async sendDdCreatedMail(instrumentId: number, body: any, user: any) {
+        const isAccepted = body.dd_req === 'Accepted';
+
+        const [instrument] = await this.db
+            .select({
+                requestId: paymentInstruments.requestId,
+                favouring: paymentInstruments.favouring,
+                payableAt: paymentInstruments.payableAt,
+                amount: paymentInstruments.amount,
+            })
+            .from(paymentInstruments)
+            .where(eq(paymentInstruments.id, instrumentId))
+            .limit(1);
+
+        if (!instrument) {
+            this.logger.warn(`Instrument ${instrumentId} not found for DD created email`);
+            return;
+        }
+
+        const [paymentReq] = await this.db
+            .select({
+                requestedBy: paymentRequests.requestedBy,
+                tenderId: paymentRequests.tenderId,
+                purpose: paymentRequests.purpose,
+            })
+            .from(paymentRequests)
+            .where(eq(paymentRequests.id, instrument.requestId))
+            .limit(1);
+
+        if (!paymentReq?.requestedBy) {
+            this.logger.warn(`RequestedBy not found for DD instrument ${instrumentId}`);
+            return;
+        }
+
+        const [reqUser] = await this.db
+            .select({ name: users.name, email: users.email })
+            .from(users)
+            .where(eq(users.id, paymentReq.requestedBy))
+            .limit(1);
+
+        if (!reqUser?.email) {
+            this.logger.warn(`Requester email not found for DD instrument ${instrumentId}`);
+            return;
+        }
+
+        let imageUrl = '';
+        let courierRequestLink = '';
+        if (isAccepted && body.req_no) {
+            const [courier] = await this.db
+                .select({ courierDocs: couriers.courierDocs })
+                .from(couriers)
+                .where(eq(couriers.id, Number(body.req_no)))
+                .limit(1);
+
+            const docs = (courier?.courierDocs ?? []) as string[];
+            if (docs.length > 0) {
+                const baseUrl = (this.configService.get<string>('app.apiUrl') || '').replace('/api/v1', '');
+                imageUrl = `${baseUrl}/uploads/courier/${docs[0]}`;
+            }
+            courierRequestLink = `#/shared/couriers/show/${body.req_no}`;
+        }
+
+        try {
+            const result = await this.emailService.sendPaymentEmail({
+                requestId: instrument.requestId,
+                tenderId: paymentReq.tenderId || undefined,
+                eventType: isAccepted ? 'DD_CREATED' : 'DD_REJECTED',
+                fromUserId: 13,
+                subject: `Request for DD ${isAccepted ? 'Accepted' : 'Rejected'} - ${paymentReq.purpose || ''}`,
+                template: 'dd-created',
+                data: {
+                    requestedBy: reqUser.name,
+                    status: isAccepted ? 'Accepted' : 'Rejected',
+                    issueDate: isAccepted ? (this.formatDateDDMMYYYY(body.dd_date) || '') : '',
+                    chequeNo: isAccepted ? (body.dd_no || '') : '',
+                    beneficiaryName: instrument.favouring || '',
+                    payableAt: instrument.payableAt || '',
+                    amountFormatted: instrument.amount ? this.formatCurrency(Number(instrument.amount)) : '',
+                    ddImage: imageUrl,
+                    courierRequestNo: isAccepted ? (body.req_no || '') : '',
+                    courierRequestLink,
+                    remarks: isAccepted ? (body.remarks || '') : (body.reason_req || ''),
+                },
+                to: [{ type: 'emails', emails: [reqUser.email] }],
+            });
+
+            if (result.success) {
+                this.logger.log(`DD created email sent for instrument ${instrumentId}`);
+            } else {
+                this.logger.warn(`DD created email failed for instrument ${instrumentId}: ${result.error}`);
+            }
+        } catch (error) {
+            this.logger.error(`Failed to send DD created email for instrument ${instrumentId}:`, error);
+        }
+    }
+
+    async sendFdrCreatedMail(instrumentId: number, body: any, user: any) {
+        const isAccepted = body.fdr_req === 'Accepted';
+
+        const [instrument] = await this.db
+            .select({
+                requestId: paymentInstruments.requestId,
+                favouring: paymentInstruments.favouring,
+                payableAt: paymentInstruments.payableAt,
+                amount: paymentInstruments.amount,
+            })
+            .from(paymentInstruments)
+            .where(eq(paymentInstruments.id, instrumentId))
+            .limit(1);
+
+        if (!instrument) {
+            this.logger.warn(`Instrument ${instrumentId} not found for FDR created email`);
+            return;
+        }
+
+        const [paymentReq] = await this.db
+            .select({
+                requestedBy: paymentRequests.requestedBy,
+                tenderId: paymentRequests.tenderId,
+                purpose: paymentRequests.purpose,
+            })
+            .from(paymentRequests)
+            .where(eq(paymentRequests.id, instrument.requestId))
+            .limit(1);
+
+        if (!paymentReq?.requestedBy) {
+            this.logger.warn(`RequestedBy not found for FDR instrument ${instrumentId}`);
+            return;
+        }
+
+        const [reqUser] = await this.db
+            .select({ name: users.name, email: users.email })
+            .from(users)
+            .where(eq(users.id, paymentReq.requestedBy))
+            .limit(1);
+
+        if (!reqUser?.email) {
+            this.logger.warn(`Requester email not found for FDR instrument ${instrumentId}`);
+            return;
+        }
+
+        let imageUrl = '';
+        if (isAccepted && body.req_no) {
+            const [courier] = await this.db
+                .select({ courierDocs: couriers.courierDocs })
+                .from(couriers)
+                .where(eq(couriers.id, Number(body.req_no)))
+                .limit(1);
+
+            const docs = (courier?.courierDocs ?? []) as string[];
+            if (docs.length > 0) {
+                const baseUrl = (this.configService.get<string>('app.apiUrl') || '').replace('/api/v1', '');
+                imageUrl = `${baseUrl}/uploads/courier/${docs[0]}`;
+            }
+        }
+
+        try {
+            const result = await this.emailService.sendPaymentEmail({
+                requestId: instrument.requestId,
+                tenderId: paymentReq.tenderId || undefined,
+                eventType: isAccepted ? 'FDR_CREATED' : 'FDR_REJECTED',
+                fromUserId: 13,
+                subject: `Request for FDR ${isAccepted ? 'Accepted' : 'Rejected'} - ${paymentReq.purpose || ''}`,
+                template: 'fdr-create',
+                data: {
+                    requestedBy: reqUser.name,
+                    status: isAccepted ? 'Accepted' : 'Rejected',
+                    issueDate: isAccepted ? (this.formatDateDDMMYYYY(body.fdr_date) || '') : '',
+                    fdrNo: isAccepted ? (body.fdr_no || '') : '',
+                    beneficiaryName: instrument.favouring || '',
+                    payableAt: instrument.payableAt || '',
+                    amountFormatted: instrument.amount ? this.formatCurrency(Number(instrument.amount)) : '',
+                    fdrImage: imageUrl,
+                    courierRequestNo: isAccepted ? (body.req_no || '') : '',
+                    courierLink: '',
+                    remarks: isAccepted ? (body.remarks || '') : (body.reason_req || ''),
+                },
+                to: [{ type: 'emails', emails: [reqUser.email] }],
+            });
+
+            if (result.success) {
+                this.logger.log(`FDR created email sent for instrument ${instrumentId}`);
+            } else {
+                this.logger.warn(`FDR created email failed for instrument ${instrumentId}: ${result.error}`);
+            }
+        } catch (error) {
+            this.logger.error(`Failed to send FDR created email for instrument ${instrumentId}:`, error);
         }
     }
 
@@ -398,55 +570,6 @@ export class PaymentRequestsNotificationService {
             )
             .limit(1);
 
-        // Format date with time
-        const formatDateTime = (dateStr: string | null | undefined): string => {
-            if (!dateStr) return '';
-            try {
-                return new Date(dateStr).toLocaleString('en-IN', {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                });
-            } catch {
-                return dateStr;
-            }
-        };
-
-        // Format date only
-        const formatDate = (dateStr: string | null | undefined): string => {
-            if (!dateStr) return '';
-            try {
-                return new Date(dateStr).toLocaleDateString('en-IN', {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric',
-                });
-            } catch {
-                return dateStr;
-            }
-        };
-
-        // Format currency
-        const formatCurrency = (amount: number) => {
-            return `₹${amount.toLocaleString('en-IN')}`;
-        };
-
-        // Format date as DD-MM-YYYY
-        const formatDateDDMMYYYY = (dateStr: string | null | undefined): string => {
-            if (!dateStr) return '';
-            try {
-                const d = new Date(dateStr);
-                const day = String(d.getDate()).padStart(2, '0');
-                const month = String(d.getMonth() + 1).padStart(2, '0');
-                const year = d.getFullYear();
-                return `${day}-${month}-${year}`;
-            } catch {
-                return dateStr;
-            }
-        };
-
         const mode = instrumentType.toUpperCase();
 
         const toEmails = this.getResponsibleUserByMode(mode);
@@ -471,11 +594,11 @@ export class PaymentRequestsNotificationService {
                         paymentInstrumentType: instrumentType,
                         tenderNo: tender?.tenderNo || 'NA',
                         tenderName: tender?.tenderName || 'Not specified',
-                        dueDateTime: formatDateTime(tender?.dueDate),
+                        dueDateTime: this.formatDateDDMMYYYY(tender?.dueDate),
                         btAccName: btDetails?.accountName || 'Not specified',
                         btAcc: btDetails?.accountNumber || 'Not specified',
                         btIfsc: btDetails?.ifsc || 'Not specified',
-                        amount: formatCurrency(Number(instrument.amount) || 0),
+                        amount: this.formatCurrency(Number(instrument.amount) || 0),
                         isOthersPurpose: !(tenderId > 0),
                         link: `#/tendering/emds/${instrument.requestId}`,
                         tlName: tlUser?.name || 'Team Leader',
@@ -517,11 +640,11 @@ export class PaymentRequestsNotificationService {
                         purpose: purpose,
                         netbanking: portalDetails?.isNetbanking || 'Not specified',
                         debit: portalDetails?.isDebit || 'Not specified',
-                        amount: formatCurrency(Number(instrument.amount) || 0),
+                        amount: this.formatCurrency(Number(instrument.amount) || 0),
                         isOthersPurpose: !(tenderId > 0),
                         tender_no: tender?.tenderNo || 'NA',
                         tender_name: tender?.tenderName || 'Not specified',
-                        dueDate: formatDateTime(tender?.dueDate),
+                        dueDate: this.formatDateDDMMYYYY(tender?.dueDate),
                         link: `#/tendering/emds/${instrument.requestId}`,
                         tlName: tlUser?.name || 'Team Leader',
                     },
@@ -548,14 +671,14 @@ export class PaymentRequestsNotificationService {
 
             let finalPurpose = purpose || 'Payment';
             let finalPartyName = instrument.favouring || 'Not specified';
-            let finalChequeDate = formatDateDDMMYYYY(instrument.issueDate) || formatDateDDMMYYYY(new Date().toISOString());
+            let finalChequeDate = this.formatDateDDMMYYYY(instrument.issueDate) || this.formatDateDDMMYYYY(new Date().toISOString());
             let receivingPdfUrl = '';
 
             if (chequeDetails?.linkedDdId || chequeDetails?.linkedFdrId) {
                 const linkedType = chequeDetails?.linkedDdId ? 'DD' : 'FDR';
                 finalPurpose = linkedType;
                 finalPartyName = `Yourself for ${linkedType}`;
-                finalChequeDate = formatDateDDMMYYYY(new Date().toISOString());
+                finalChequeDate = this.formatDateDDMMYYYY(new Date().toISOString());
 
                 try {
                     const pdfPaths = await this.pdfGenerator.generatePdfs(
@@ -596,7 +719,7 @@ export class PaymentRequestsNotificationService {
                         purpose: finalPurpose,
                         partyName: finalPartyName,
                         chequeDate: finalChequeDate,
-                        amount: formatCurrency(Number(instrument.amount) || 0),
+                        amount: this.formatCurrency(Number(instrument.amount) || 0),
                         chequeNeeds: instrument.courierDeadline || 24,
                         link: `#/tendering/emds/${instrument.requestId}`,
                         tlName: tlUser?.name || 'Team Leader',
@@ -678,22 +801,6 @@ export class PaymentRequestsNotificationService {
 
         const status = btReq === 'Accepted' ? 'accepted' : 'rejected';
 
-        // Format date with time
-        const formatDateTime = (dateStr: string | null | undefined): string => {
-            if (!dateStr) return '';
-            try {
-                return new Date(dateStr).toLocaleString('en-IN', {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                });
-            } catch {
-                return dateStr;
-            }
-        };
-
         try {
             const result = await this.emailService.sendPaymentEmail({
                 requestId: instrument.requestId,
@@ -708,7 +815,7 @@ export class PaymentRequestsNotificationService {
                     tenderNo,
                     tenderName,
                     status,
-                    paymentDateTime: formatDateTime(paymentDateTime) || '',
+                    paymentDateTime: this.formatDateDDMMYYYY(paymentDateTime) || '',
                     utr: utrNo || '',
                     utrMessage: utrMessage || '',
                     rejectionReason: rejectionReason || '',
@@ -797,22 +904,6 @@ export class PaymentRequestsNotificationService {
         const apiUrl = this.configService.get<string>('app.apiUrl') || '';
         const paymentProofUrl = paymentProofPath ? `${apiUrl}/tender-files/serve/${paymentProofPath}` : '';
 
-        // Format date with time
-        const formatDateTime = (dateStr: string | null | undefined): string => {
-            if (!dateStr) return '';
-            try {
-                return new Date(dateStr).toLocaleString('en-IN', {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                });
-            } catch {
-                return dateStr;
-            }
-        };
-
         try {
             const result = await this.emailService.sendPaymentEmail({
                 requestId: instrument.requestId,
@@ -824,7 +915,7 @@ export class PaymentRequestsNotificationService {
                 data: {
                     tenderExecutive: requestedUser.name,
                     status,
-                    paymentDateTime: formatDateTime(paymentDateTime) || '',
+                    paymentDateTime: this.formatDateDDMMYYYY(paymentDateTime) || '',
                     utr: utrNo || '',
                     utrMessage: utrMessage || '',
                     rejectionReason: rejectionReason || '',
@@ -885,21 +976,7 @@ export class PaymentRequestsNotificationService {
         if (!requestedUser?.email) {
             this.logger.warn(`RequestedBy user not found for instrument ${instrumentId}`);
             return;
-        }
-
-        // Format date only
-        const formatDate = (dateStr: string | null | undefined): string => {
-            if (!dateStr) return '';
-            try {
-                return new Date(dateStr).toLocaleDateString('en-IN', {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric',
-                });
-            } catch {
-                return dateStr;
-            }
-        };
+        }   
 
         try {
             const result = await this.emailService.sendPaymentEmail({
@@ -914,7 +991,7 @@ export class PaymentRequestsNotificationService {
                     paymentInstrumentType: 'Bank Transfer',
                     tenderName: instrument.projectName || 'NA',
                     tenderNo: instrument.tenderNo || 'NA',
-                    returnTransferDate: formatDate(returnTransferDate) || '',
+                    returnTransferDate: this.formatDateDDMMYYYY(returnTransferDate) || '',
                     returnUtr: returnUtr || '',
                     senderName: 'Accounts Team',
                 },
@@ -980,20 +1057,6 @@ export class PaymentRequestsNotificationService {
             .where(eq(instrumentTransferDetails.instrumentId, instrumentId))
             .limit(1);
 
-        // Format date only
-        const formatDate = (dateStr: string | null | undefined): string => {
-            if (!dateStr) return '';
-            try {
-                return new Date(dateStr).toLocaleDateString('en-IN', {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric',
-                });
-            } catch {
-                return dateStr;
-            }
-        };
-
         try {
             const result = await this.emailService.sendPaymentEmail({
                 requestId: instrument.requestId,
@@ -1008,7 +1071,7 @@ export class PaymentRequestsNotificationService {
                     portalName: transferDetails?.portalName || 'NA',
                     tenderName: instrument.projectName || 'NA',
                     tenderNo: instrument.tenderNo || 'NA',
-                    returnTransferDate: formatDate(returnTransferDate) || '',
+                    returnTransferDate: this.formatDateDDMMYYYY(returnTransferDate) || '',
                     returnUtr: returnUtr || '',
                     senderName: 'Accounts Team',
                 },
