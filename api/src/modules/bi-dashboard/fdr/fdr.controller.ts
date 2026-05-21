@@ -13,6 +13,7 @@ export class FdrController {
         @Query('sortBy') sortBy?: string,
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
         @Query('search') search?: string,
+        @Query('teamId') teamId?: string,
     ) {
         return this.fdrService.getDashboardData(tab, {
             page: page ? parseInt(page, 10) : undefined,
@@ -20,6 +21,7 @@ export class FdrController {
             sortBy,
             sortOrder,
             search,
+            teamId: teamId ? parseInt(teamId, 10) : undefined,
         });
     }
 

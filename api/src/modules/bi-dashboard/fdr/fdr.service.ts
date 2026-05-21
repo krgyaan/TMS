@@ -116,6 +116,7 @@ export class FdrService {
             sortBy?: string;
             sortOrder?: "asc" | "desc";
             search?: string;
+            teamId?: number;
         }
     ): Promise<PaginatedResult<FdrDashboardRow>> {
         const page = options?.page || 1;
@@ -126,6 +127,12 @@ export class FdrService {
         const conditions = [...baseConditions];
 
         const searchTerm = options?.search?.trim();
+
+        // Team filter
+        const teamId = options?.teamId;
+        if (teamId) {
+            conditions.push(sql`COALESCE(${tenderInfos.team}, ${users.team}) = ${teamId}`);
+        }
 
         // Search filter - search across all rendered columns
         // Note: We always join instrumentFdrDetails in the query, so we can search FDR columns
