@@ -74,10 +74,12 @@ const PayOnPortalListPage = () => {
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
     const debouncedSearch = useDebouncedSearch(search, 300);
+    const [teamFilter, setTeamFilter] = useState<string>('All');
+    const teamId = teamFilter === 'All' ? undefined : teamFilter === 'AC' ? 1 : 2;
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, debouncedSearch]);
+    }, [activeTab, debouncedSearch, teamFilter]);
 
     const handlePageSizeChange = useCallback((newPageSize: number) => {
         setPagination({ pageIndex: 0, pageSize: newPageSize });
@@ -101,6 +103,7 @@ const PayOnPortalListPage = () => {
         sortBy: sortModel[0]?.colId,
         sortOrder: sortModel[0]?.sort,
         search: debouncedSearch || undefined,
+        team: teamId,
     });
 
     const { data: counts } = usePayOnPortalDashboardCounts();
@@ -353,8 +356,8 @@ const PayOnPortalListPage = () => {
                                 { label: 'DC Team', value: 'DC' },
                                 { label: 'All Team', value: 'All' },
                             ]}
-                                value={search}
-                                onChange={(value) => setSearch(value)}
+                                value={teamFilter}
+                                onChange={(value) => setTeamFilter(value)}
                             />
 
                             {/* Search Bar (Center) - Flex grow */}

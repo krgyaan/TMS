@@ -31,6 +31,9 @@ class DemandDraftsService extends BaseApiService {
             if (params.search) {
                 search.set('search', params.search);
             }
+            if (params.team) {
+                search.set('teamId', String(params.team));
+            }
         }
 
         const queryString = search.toString();

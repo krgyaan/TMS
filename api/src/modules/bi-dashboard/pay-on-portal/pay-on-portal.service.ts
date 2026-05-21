@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger, NotFoundException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { eq, and, inArray, isNull, sql, asc, desc, or } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { paymentRequests, paymentInstruments, instrumentTransferDetails } from '@db/schemas/tendering/payment-requests.schema';
@@ -18,6 +19,7 @@ import { PaymentRequestsNotificationService } from '@/modules/tendering/payment-
 @Injectable()
 export class PayOnPortalService {
     private readonly logger = new Logger(PayOnPortalService.name);
+    private readonly requesterUser = alias(users, 'requester');
 
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
@@ -79,6 +81,7 @@ export class PayOnPortalService {
             sortBy?: string;
             sortOrder?: 'asc' | 'desc';
             search?: string;
+            teamId?: number;
         },
     ): Promise<PaginatedResult<PayOnPortalDashboardRow>> {
         const page = options?.page || 1;
@@ -88,6 +91,12 @@ export class PayOnPortalService {
         const conditions = this.buildPopDashboardConditions(tab);
 
         const searchTerm = options?.search?.trim();
+
+        // Team filter
+        const teamId = options?.teamId;
+        if (teamId) {
+            conditions.push(sql`COALESCE(${tenderInfos.team}, ${this.requesterUser.team}) = ${teamId}`);
+        }
 
         // Search filter - search across all rendered columns
         if (searchTerm) {
@@ -151,6 +160,7 @@ export class PayOnPortalService {
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id))
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(this.requesterUser, eq(this.requesterUser.id, paymentRequests.requestedBy))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .where(whereClause)
             .orderBy(orderClause)
@@ -164,9 +174,10 @@ export class PayOnPortalService {
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id));
-        if (searchTerm) {
+        if (searchTerm || teamId) {
             countQueryBuilder = countQueryBuilder
                 .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+                .leftJoin(this.requesterUser, eq(this.requesterUser.id, paymentRequests.requestedBy))
                 .leftJoin(statuses, eq(statuses.id, tenderInfos.status));
         }
         const [countResult] = await countQueryBuilder.where(whereClause);

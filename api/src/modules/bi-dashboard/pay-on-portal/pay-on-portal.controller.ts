@@ -13,6 +13,7 @@ export class PayOnPortalController {
         @Query('sortBy') sortBy?: string,
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
         @Query('search') search?: string,
+        @Query('teamId') teamId?: string,
     ) {
         return this.payOnPortalService.getDashboardData(tab, {
             page: page ? parseInt(page, 10) : undefined,
@@ -20,6 +21,7 @@ export class PayOnPortalController {
             sortBy,
             sortOrder,
             search,
+            teamId: teamId ? parseInt(teamId, 10) : undefined,
         });
     }
 
