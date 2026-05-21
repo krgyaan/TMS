@@ -80,6 +80,7 @@ export class BankTransferService {
             sortBy?: string;
             sortOrder?: 'asc' | 'desc';
             search?: string;
+            teamId?: number;
         },
     ): Promise<PaginatedResult<BankTransferDashboardRow>> {
         const page = options?.page || 1;
@@ -89,6 +90,12 @@ export class BankTransferService {
         const conditions = this.buildBtDashboardConditions(tab);
 
         const searchTerm = options?.search?.trim();
+
+        // Team filter
+        const teamId = options?.teamId;
+        if (teamId) {
+            conditions.push(sql`COALESCE(${tenderInfos.team}, ${users.team}) = ${teamId}`);
+        }
 
         // Search filter - search across all rendered columns
         if (searchTerm) {
@@ -166,7 +173,7 @@ export class BankTransferService {
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id));
-        if (searchTerm) {
+        if (searchTerm || teamId) {
             countQueryBuilder = countQueryBuilder
                 .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
                 .leftJoin(statuses, eq(statuses.id, tenderInfos.status));
