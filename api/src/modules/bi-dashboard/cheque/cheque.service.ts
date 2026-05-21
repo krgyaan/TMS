@@ -1,26 +1,26 @@
-import { Inject, Injectable, Logger, NotFoundException, BadRequestException, forwardRef } from '@nestjs/common';
-import { eq, and, inArray, isNull, isNotNull, sql, asc, desc, ne, notInArray, or, ilike } from 'drizzle-orm';
-import { alias } from 'drizzle-orm/pg-core';
-import { DRIZZLE } from '@db/database.module';
+import { followUps } from '@/db/schemas/shared/follow-ups.schema';
+import type { ChequeDashboardCounts, ChequeDashboardRow } from '@/modules/bi-dashboard/cheque/helpers/cheque.types';
+import { FollowUpService } from '@/modules/follow-up/follow-up.service';
+import type { CreateFollowUpDto } from '@/modules/follow-up/zod';
+import { CHEQUE_STATUSES, DD_STATUSES, FDR_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
+import { PaymentRequestsNotificationService } from '@/modules/tendering/payment-requests/services/payment-requests-notification.service';
+import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
+import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { DbInstance } from '@db';
+import { DRIZZLE } from '@db/database.module';
+import { users } from '@db/schemas/auth/users.schema';
+import { statuses } from '@db/schemas/master/statuses.schema';
 import {
-    paymentRequests,
-    paymentInstruments,
     instrumentChequeDetails,
     instrumentDdDetails,
     instrumentFdrDetails,
+    paymentInstruments,
+    paymentRequests,
 } from '@db/schemas/tendering/payment-requests.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
-import { users } from '@db/schemas/auth/users.schema';
-import { statuses } from '@db/schemas/master/statuses.schema';
-import { wrapPaginatedResponse } from '@/utils/responseWrapper';
-import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
-import type { ChequeDashboardRow, ChequeDashboardCounts } from '@/modules/bi-dashboard/cheque/helpers/cheque.types';
-import { CHEQUE_STATUSES, DD_STATUSES, FDR_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
-import { PaymentRequestsNotificationService } from '@/modules/tendering/payment-requests/services/payment-requests-notification.service';
-import { FollowUpService } from '@/modules/follow-up/follow-up.service';
-import type { CreateFollowUpDto } from '@/modules/follow-up/zod';
-import { followUps } from '@/db/schemas/shared/follow-ups.schema';
+import { BadRequestException, forwardRef, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 
 @Injectable()
 export class ChequeService {
@@ -170,7 +170,7 @@ export class ChequeService {
                 sql`${instrumentChequeDetails.dueDate}::text ILIKE ${searchStr}`,
                 sql`${paymentInstruments.status} ILIKE ${searchStr}`,
             ];
-            conditions.push(sql`(${sql.join(searchConditions, sql` OR `)})`);
+            conditions.push(sql`(${sql.join(searchConditions, ' OR ')})`);
         }
 
         const whereClause = and(...conditions);
@@ -638,7 +638,7 @@ export class ChequeService {
                 };
                 await this.followUpService.create(followupDto, user.id || user.sub);
             } catch (error) {
-                this.logger.warn(`Failed to create followup for Cheque instrument ${instrumentId}: ${error.message}`);
+                this.logger.warn(`Failed to create followup for Cheque instrument ${instrumentId}: ${error}`);
             }
         }
 

@@ -24,6 +24,10 @@ export class PaymentRequestsNotificationService {
     /**
      * Get responsible user by mode
      */
+    private getFrontendUrl(): string {
+        return this.configService.get<string>('app.publicAppUrl') || 'http://localhost:5173';
+    }
+
     private getResponsibleUserByMode(mode: string) {
         switch (mode) {
             case 'BANK_TRANSFER':
@@ -107,7 +111,7 @@ export class PaymentRequestsNotificationService {
                     timeLimit: chequeInstrument.courierDeadline || 24,
                     beneficiaryName: chequeInstrument.favouring || 'Not specified',
                     payableAt: chequeInstrument.payableAt || 'Not specified',
-                    link: `#/bi-dashboard/demand-drafts/${ddInstrumentId}`,
+                    link: `${this.getFrontendUrl()}/#/bi-dashboard/demand-drafts/${ddInstrumentId}`,
                     courierAddress: chequeInstrument.courierAddress || 'Not specified',
                 },
                 to: [{ type: 'emails', emails: [toEmails] }],
@@ -172,7 +176,7 @@ export class PaymentRequestsNotificationService {
                     timeLimit: chequeInstrument.courierDeadline || 24,
                     beneficiaryName: chequeInstrument.favouring || 'Not specified',
                     payableAt: chequeInstrument.payableAt || 'Not specified',
-                    link: `#/bi-dashboard/fdrs/${fdrInstrumentId}`,
+                    link: `${this.getFrontendUrl()}/#/bi-dashboard/fdrs/${fdrInstrumentId}`,
                     courierAddress: chequeInstrument.courierAddress || 'Not specified',
                 },
                 to: [{ type: 'emails', emails: [toEmails] }],
@@ -249,7 +253,7 @@ export class PaymentRequestsNotificationService {
                 const baseUrl = (this.configService.get<string>('app.apiUrl') || '').replace('/api/v1', '');
                 imageUrl = `${baseUrl}/uploads/courier/${docs[0]}`;
             }
-            courierRequestLink = `#/shared/couriers/show/${body.req_no}`;
+            courierRequestLink = `${this.getFrontendUrl()}/#/shared/couriers/show/${body.req_no}`;
         }
 
         try {
@@ -600,7 +604,7 @@ export class PaymentRequestsNotificationService {
                         btIfsc: btDetails?.ifsc || 'Not specified',
                         amount: this.formatCurrency(Number(instrument.amount) || 0),
                         isOthersPurpose: !(tenderId > 0),
-                        link: `#/tendering/emds/${instrument.requestId}`,
+                        link: `${this.getFrontendUrl()}/#/tendering/emds/${instrument.requestId}`,
                         tlName: tlUser?.name || 'Team Leader',
                     },
                     to: [{ type: 'emails', emails: [toEmails] }],
@@ -645,7 +649,7 @@ export class PaymentRequestsNotificationService {
                         tender_no: tender?.tenderNo || 'NA',
                         tender_name: tender?.tenderName || 'Not specified',
                         dueDate: this.formatDateDDMMYYYY(tender?.dueDate),
-                        link: `#/tendering/emds/${instrument.requestId}`,
+                        link: `${this.getFrontendUrl()}/#/tendering/emds/${instrument.requestId}`,
                         tlName: tlUser?.name || 'Team Leader',
                     },
                     to: [{ type: 'emails', emails: [toEmails] }],
@@ -721,7 +725,7 @@ export class PaymentRequestsNotificationService {
                         chequeDate: finalChequeDate,
                         amount: this.formatCurrency(Number(instrument.amount) || 0),
                         chequeNeeds: instrument.courierDeadline || 24,
-                        link: `#/tendering/emds/${instrument.requestId}`,
+                        link: `${this.getFrontendUrl()}/#/tendering/emds/${instrument.requestId}`,
                         tlName: tlUser?.name || 'Team Leader',
                         receivingPdfUrl,
                     },
