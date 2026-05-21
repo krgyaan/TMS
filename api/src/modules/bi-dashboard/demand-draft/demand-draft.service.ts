@@ -91,6 +91,7 @@ export class DemandDraftService {
             sortBy?: string;
             sortOrder?: 'asc' | 'desc';
             search?: string;
+            teamId?: number;
         },
     ): Promise<PaginatedResult<DemandDraftDashboardRow>> {
         const page = options?.page || 1;
@@ -100,6 +101,12 @@ export class DemandDraftService {
         const conditions = this.buildDdDashboardConditions(tab);
 
         const searchTerm = options?.search?.trim();
+
+        // Team filter
+        const teamId = options?.teamId;
+        if (teamId) {
+            conditions.push(sql`COALESCE(${tenderInfos.team}, ${users.team}) = ${teamId}`);
+        }
 
         // Search filter - search across all rendered columns
         if (searchTerm) {
@@ -180,10 +187,9 @@ export class DemandDraftService {
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(instrumentDdDetails, eq(instrumentDdDetails.instrumentId, paymentInstruments.id));
-        if (searchTerm) {
+        if (searchTerm || teamId) {
             countQueryBuilder = countQueryBuilder
-            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+                .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
                 .leftJoin(users, eq(users.id, paymentRequests.requestedBy));
         }
         const [countResult] = await countQueryBuilder.where(whereClause);
