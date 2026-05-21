@@ -10,7 +10,7 @@ export interface TenderRow {
     gstValues: string;
     organizationName: string | null;
     rfqTo: string | null;
-    oemNotAllowed: string | null;
+    oemNotAllowed: string[] | null;
     tlStatus: number;
     teamMember: number | null;
     teamMemberName: string | null;
