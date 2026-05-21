@@ -380,7 +380,7 @@ export class BankTransferService {
                         body.reason_req || undefined
                     );
                 } catch (error) {
-                    this.logger.warn(`Failed to send BT action email: ${error.message}`);
+                    this.logger.warn(`Failed to send BT action email: ${error}`);
                 }
             }
 
@@ -393,7 +393,7 @@ export class BankTransferService {
                         body.return_utr
                     );
                 } catch (error) {
-                    this.logger.warn(`Failed to send BT return email: ${error.message}`);
+                    this.logger.warn(`Failed to send BT return email: ${error}`);
                 }
             }
 
@@ -429,7 +429,7 @@ export class BankTransferService {
                     };
                     await this.followUpService.create(followupDto, user.id || user.sub);
                 } catch (error) {
-                    this.logger.warn(`Failed to create followup for BT instrument ${instrumentId}: ${error.message}`);
+                    this.logger.warn(`Failed to create followup for BT instrument ${instrumentId}: ${error}`);
                 }
             }
 

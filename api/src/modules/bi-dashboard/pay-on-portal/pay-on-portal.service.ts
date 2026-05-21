@@ -415,7 +415,7 @@ export class PayOnPortalService {
                     throw new Error('Update operation failed - no existing transfer details found');
                 }
             } catch (error) {
-                this.logger.error(`Failed to save transfer details: ${error.message}`);
+                this.logger.error(`Failed to save transfer details: ${error}`);
                 throw new InternalServerErrorException('Failed to save transfer details. Please try again.');
             }
         }
@@ -433,7 +433,7 @@ export class PayOnPortalService {
                     body.reason_req || undefined
                 );
             } catch (error) {
-                this.logger.warn(`Failed to send POP action email: ${error.message}`);
+                this.logger.warn(`Failed to send POP action email: ${error}`);
             }
         }
 
@@ -446,7 +446,7 @@ export class PayOnPortalService {
                     body.return_utr
                 );
             } catch (error) {
-                this.logger.warn(`Failed to send POP return email: ${error.message}`);
+                this.logger.warn(`Failed to send POP return email: ${error}`);
             }
         }
 
@@ -482,7 +482,7 @@ export class PayOnPortalService {
                 };
                 await this.followUpService.create(followupDto, user.id || user.sub);
             } catch (error) {
-                this.logger.warn(`Failed to create followup for POP instrument ${instrumentId}: ${error.message}`);
+                this.logger.warn(`Failed to create followup for POP instrument ${instrumentId}: ${error}`);
             }
         }
 
