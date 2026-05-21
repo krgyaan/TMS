@@ -72,7 +72,8 @@ export type TenderFileContext =
     | "kickoff-mom"
     | "contract-agreement"
     | "tender-rejection-proof"
-    | "cancel-tender";
+    | "cancel-tender"
+    | "payment-proof";
 
 export interface FileConfig {
     maxFiles: number;
@@ -841,6 +842,16 @@ export const FILE_CONFIGS: Record<TenderFileContext, FileConfig> = {
         pdfQuality: 80,
     },
     "cancel-tender": {
+        maxFiles: 1,
+        maxSizeBytes: MB(10),
+        allowedMimeTypes: [...DOCS],
+        allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".webp"],
+        compressImages: true,
+        imageQuality: 100,
+        compressPdf: false,
+        pdfQuality: 100,
+    },
+    "payment-proof": {
         maxFiles: 1,
         maxSizeBytes: MB(10),
         allowedMimeTypes: [...DOCS],

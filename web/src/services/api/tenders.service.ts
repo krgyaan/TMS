@@ -51,6 +51,10 @@ class TenderInfosService extends BaseApiService {
         return this.get<TenderInfoWithNames>(`/${id}`);
     }
 
+    async getPaymentDetails(id: number): Promise<any> {
+        return this.get<any>(`/${id}/payment-details`);
+    }
+
     async create(data: CreateTenderRequest): Promise<TenderInfo> {
         return this.post<TenderInfo>('', data);
     }

@@ -5,16 +5,17 @@ import { useEffect } from 'react';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Save, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useCreatePaymentRequest, useUpdatePaymentRequest } from '@/hooks/api/useEmds';
-import { EmdSection } from './EmdSection';
+import { useCreatePaymentRequest, useUpdatePaymentRequest } from '@/hooks/api/usePaymentRequests';
+import { PaymentSection } from './PaymentSection';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import DateInput from '@/components/form/DateInput';
 import FieldWrapper from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
-import { BiOtherThanEmdRequestSchema, type BiOtherThanEmdRequestFormValues } from '../helpers/emdTenderFee.schema';
+import { parseAllowedModes } from '../constants';
+import { BiOtherThanTenderRequestSchema, type BiOtherThanTenderRequestFormValues } from '../helpers/payment-request.schema';
 
-type FormValues = BiOtherThanEmdRequestFormValues;
+type FormValues = BiOtherThanTenderRequestFormValues;
 
 interface BiOtherThanEmdRequestFormProps {
     tenderId?: number;
@@ -34,8 +35,8 @@ export function BiOtherThanEmdRequestForm({ tenderId, requestIds, initialData, m
     const isEditMode = mode === 'edit';
 
     const form = useForm<FormValues>({
-        resolver: zodResolver(BiOtherThanEmdRequestSchema) as Resolver<FormValues>,
-        defaultValues: initialData || { tenderName: '', tenderNo: '', tenderDueDate: '', emd: { mode: undefined, details: {} } },
+        resolver: zodResolver(BiOtherThanTenderRequestSchema) as Resolver<FormValues>,
+        defaultValues: initialData || { tenderName: '', tenderNo: '', tenderDueDate: '', EMD: { mode: undefined, details: {} } },
     });
 
     useEffect(() => {
@@ -48,11 +49,11 @@ export function BiOtherThanEmdRequestForm({ tenderId, requestIds, initialData, m
         if (isEditMode) {
             const updatePromises: Promise<any>[] = [];
 
-            if (values.emd?.mode && requestIds?.emd) {
+            if (values.EMD?.mode && requestIds?.emd) {
                 const payload = {
-                    emd: {
-                        mode: values.emd.mode,
-                        details: values.emd.details || {},
+                    EMD: {
+                        mode: values.EMD.mode,
+                        details: values.EMD.details || {},
                     },
                 };
                 updatePromises.push(
@@ -84,14 +85,14 @@ export function BiOtherThanEmdRequestForm({ tenderId, requestIds, initialData, m
                 dueDate: values.tenderDueDate || '',
             };
 
-            if (values.emd?.mode) {
-                payload.emd = {
-                    mode: values.emd.mode,
-                    details: values.emd.details || {},
+            if (values.EMD?.mode) {
+                payload.EMD = {
+                    mode: values.EMD.mode,
+                    details: values.EMD.details || {},
                 };
             }
 
-            if (!payload.emd) {
+            if (!payload.EMD) {
                 toast.error('Please select at least one payment mode');
                 return;
             }
@@ -112,9 +113,9 @@ export function BiOtherThanEmdRequestForm({ tenderId, requestIds, initialData, m
 
 
 
-    const allowedEmdModes = ['DD', 'FDR', 'CHEQUE', 'BG'];
+    const allowedEmdModes = parseAllowedModes(['DD', 'FDR', 'BG', 'CHEQUE'].join(','));
     const hasEmd = true;
-    const type = 'BI_OTHER_THAN_EMD';
+    const type = 'OTHER_THAN_TENDER';
 
     const isPending = isEditMode ? updateRequest.isPending : createRequest.isPending;
 
@@ -143,10 +144,16 @@ export function BiOtherThanEmdRequestForm({ tenderId, requestIds, initialData, m
                     </Alert>
                 )}
                 <FormProvider {...form}>
-                    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
+                    <form
+                        onSubmit={form.handleSubmit(handleSubmit, (errors) => {
+                            console.error('Form validation errors:', errors);
+                            toast.error('Please fix the errors in the form before submitting');
+                        })}
+                        className="space-y-8"
+                    >
                         {/* Tender Details */}
                         {
-                            (type === 'BI_OTHER_THAN_EMD') && (
+                            (type === 'OTHER_THAN_TENDER') && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start mb-4">
                                     <FieldWrapper control={form.control} name="tenderName" label="Tender/Project Name">
                                         {(field) => <Input {...field} />}
@@ -162,12 +169,13 @@ export function BiOtherThanEmdRequestForm({ tenderId, requestIds, initialData, m
                         }
 
                         {hasEmd && (
-                            <EmdSection
+                            <PaymentSection
+                                purpose="EMD"
                                 allowedModes={allowedEmdModes}
                                 amount={0}
-                                defaultPurpose="EMD"
                                 type={type}
                                 courierAddress={''}
+                                defaultPurpose=""
                             />
                         )}
 

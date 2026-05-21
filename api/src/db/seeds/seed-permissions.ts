@@ -136,7 +136,7 @@ const ROLE_PERMISSION_MAP: Record<string, { module: string; action: string }[]> 
         ...cru('master.tq-types'),
         ...cru('master.loan-parties'),
         ...cru('master.financial-years'),
-        ...cru('master.emds-responsibilities'),
+        ...cru('master.emd-responsibilities'),
 
         // ==================== SHARED MODULE (Common Team) ====================
         ...cru('shared.imprests'),

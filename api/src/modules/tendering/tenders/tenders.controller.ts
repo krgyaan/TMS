@@ -89,6 +89,11 @@ export class TenderInfoController {
         return this.tenderInfosService.getMailingLogs(id);
     }
 
+    @Get(':id/payment-details')
+    async getPaymentDetails(@Param('id', ParseIntPipe) id: number) {
+        return this.tenderInfosService.findPaymentDetails(id);
+    }
+
     @Get(':id')
     async getById(@Param('id', ParseIntPipe) id: number) {
         const tender = await this.tenderInfosService.findById(id);

@@ -1,30 +1,35 @@
 <div>
-    <p>Dear Shivani/Accounts team,</p>
+    <p>Dear Accounts Team,</p>
 
     <p>
-        Please make the following payment via NEFT/RTGS against EMD for tender no.{{data.tenderNo}}, Project Name
-        {{data.tenderName}}, The due date and time of this tender is
-        {{data.dueDateTime}}
-        at
-        {{data.dueTime}}.
+        Please make the following payment via NEFT/RTGS against <strong>{{data.purpose}}</strong>.
     </p>
+    <ul>
+        {{#if data.tenderNo}} 
+            <li>Tender No: {{data.tenderNo}}</li>
+        {{/if}}
+        {{#if data.tenderName}} 
+            <li>Project Name: {{data.tenderName}}</li>
+        {{/if}}
+        <li><b>Amount: {{data.amount}}</b></li>
+        {{#if data.dueDateTime}} 
+            <li><b>Due Date and Time: {{data.dueDateTime}}</b></li>
+        {{/if}}
+    </ul>
 
     <p>Please do the Maker using the details below:</p>
     <ul>
         <li>Account Name: {{data.btAccName}}</li>
         <li>Account Number: {{data.btAcc}}</li>
         <li>IFSC Code: {{data.btIfsc}}</li>
-        <li>Amount: Rs. {{data.amount}}</li>
     </ul>
     <p>
-        Please do the payment before the due date and time and share the UTR with us on time using the link below:
-        <a href="{{data.link}}"> Account Form</a>
+        Please do the payment before the due date and time and share the UTR with us on time using the
+        <a href="{{data.link}}">link</a>.
     </p>
     <p>"Ensuring timely operations is the only source of growth"</p>
-
     <p>
-        {{{data.sign}}}<br />
-        Approved by
+        Approved by,<br>
         {{data.tlName}}
     </p>
 </div>

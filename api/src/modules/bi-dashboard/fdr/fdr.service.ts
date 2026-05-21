@@ -1,8 +1,8 @@
 import { Inject, Injectable, Logger, NotFoundException, BadRequestException } from "@nestjs/common";
-import { eq, and, inArray, isNull, sql, asc, desc, like } from "drizzle-orm";
+import { eq, and, inArray, isNull, sql, asc, desc } from "drizzle-orm";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
-import { paymentRequests, paymentInstruments, instrumentFdrDetails } from "@db/schemas/tendering/emds.schema";
+import { paymentRequests, paymentInstruments, instrumentFdrDetails, instrumentChequeDetails, instrumentBgDetails } from "@db/schemas/tendering/payment-requests.schema";
 import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
 import { users } from "@db/schemas/auth/users.schema";
 import { statuses } from "@db/schemas/master/statuses.schema";
@@ -10,9 +10,12 @@ import { teams } from "@db/schemas/master/teams.schema";
 import { wrapPaginatedResponse } from "@/utils/responseWrapper";
 import type { PaginatedResult } from "@/modules/tendering/types/shared.types";
 import type { FdrDashboardRow, FdrDashboardCounts } from "@/modules/bi-dashboard/fdr/helpers/fdr.types";
-import { FDR_STATUSES } from "@/modules/tendering/emds/constants/emd-statuses";
+import { FDR_STATUSES, CHEQUE_STATUSES } from "@/modules/tendering/payment-requests/constants/payment-request-statuses";
 import { FollowUpService } from "@/modules/follow-up/follow-up.service";
 import type { CreateFollowUpDto } from "@/modules/follow-up/zod/create-follow-up.dto";
+import { followUps } from "@/db/schemas/shared/follow-ups.schema";
+import { couriers } from "@/db/schemas/shared/couriers.schema";
+import { PaymentRequestsNotificationService } from "@/modules/tendering/payment-requests/services/payment-requests-notification.service";
 
 @Injectable()
 export class FdrService {
@@ -20,21 +23,29 @@ export class FdrService {
 
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
-        private readonly followUpService: FollowUpService
+        private readonly followUpService: FollowUpService,
+        private readonly notificationService: PaymentRequestsNotificationService,
     ) { }
 
-    private statusMap() {
-        return {
+    private deriveFdrStatus(status: string | null): string {
+        const map: Record<string, string> = {
             [FDR_STATUSES.PENDING]: "Pending",
-            [FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED]: "Accepted",
-            [FDR_STATUSES.ACCOUNTS_FORM_REJECTED]: "Rejected",
+            [FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED]: "FDR Created",
+            [FDR_STATUSES.ACCOUNTS_FORM_REJECTED]: "FDR Rejected",
             [FDR_STATUSES.FOLLOWUP_INITIATED]: "Followup Initiated",
-            [FDR_STATUSES.COURIER_RETURN_RECEIVED]: "Courier Return",
-            [FDR_STATUSES.BANK_RETURN_COMPLETED]: "Bank Return",
-            [FDR_STATUSES.PROJECT_SETTLEMENT_COMPLETED]: "Project Settlement",
-            [FDR_STATUSES.CANCELLATION_REQUESTED]: "Cancellation Request",
-            [FDR_STATUSES.CANCELLED_AT_BRANCH]: "Cancelled",
+            [FDR_STATUSES.RETURN_VIA_COURIER]: "Returned via courier",
+            [FDR_STATUSES.RETURN_VIA_BANK_TRANSFER]: "Returned via Bank Transfer",
+            [FDR_STATUSES.SETTLED_WITH_PROJECT]: "Settled with Project Account",
+            [FDR_STATUSES.CANCELLATION_REQUESTED]: "FDR Cancellation request sent to branch",
+            [FDR_STATUSES.CANCELLED]: "FDR Cancelled at Branch",
         };
+        return map[status as string] || status || "Pending";
+    }
+
+    private deriveFdrExpiryStatus(fdrExpiryDate: Date | null): string {
+        if (!fdrExpiryDate) return 'No date';
+        const expiryDate = new Date(fdrExpiryDate.getTime() + 3 * 30 * 24 * 60 * 60 * 1000);
+        return expiryDate < new Date() ? 'Expired' : 'Valid';
     }
 
     private buildFdrDashboardConditions(tab?: string): { conditions: any[]; needsFdrDetails: boolean } {
@@ -53,10 +64,11 @@ export class FdrService {
             needsFdrDetails = true;
             conditions.push(
                 inArray(paymentInstruments.action, [1, 2]),
-                like(instrumentFdrDetails.fdrSource, "BG_%"),
                 sql`EXISTS (
                     SELECT 1 FROM instrument_bg_details bg
-                    WHERE bg.id = CAST(SUBSTRING(${instrumentFdrDetails.fdrSource} FROM 4) AS INTEGER)
+                    INNER JOIN payment_instruments pi_bg ON pi_bg.id = bg.instrument_id
+                    WHERE bg.fdr_no = ${instrumentFdrDetails.fdrNo}
+                    AND pi_bg.is_active = true
                     AND bg.bank_name = 'PNB_6011'
                 )`
             );
@@ -64,10 +76,11 @@ export class FdrService {
             needsFdrDetails = true;
             conditions.push(
                 inArray(paymentInstruments.action, [1, 2]),
-                like(instrumentFdrDetails.fdrSource, "BG_%"),
                 sql`EXISTS (
                     SELECT 1 FROM instrument_bg_details bg
-                    WHERE bg.id = CAST(SUBSTRING(${instrumentFdrDetails.fdrSource} FROM 4) AS INTEGER)
+                    INNER JOIN payment_instruments pi_bg ON pi_bg.id = bg.instrument_id
+                    WHERE bg.fdr_no = ${instrumentFdrDetails.fdrNo}
+                    AND pi_bg.is_active = true
                     AND bg.bank_name IN ('YESBANK_2011', 'YESBANK_0771', 'BGLIMIT_0771')
                 )`
             );
@@ -103,6 +116,7 @@ export class FdrService {
             sortBy?: string;
             sortOrder?: "asc" | "desc";
             search?: string;
+            teamId?: number;
         }
     ): Promise<PaginatedResult<FdrDashboardRow>> {
         const page = options?.page || 1;
@@ -113,6 +127,12 @@ export class FdrService {
         const conditions = [...baseConditions];
 
         const searchTerm = options?.search?.trim();
+
+        // Team filter
+        const teamId = options?.teamId;
+        if (teamId) {
+            conditions.push(sql`COALESCE(${tenderInfos.team}, ${users.team}) = ${teamId}`);
+        }
 
         // Search filter - search across all rendered columns
         // Note: We always join instrumentFdrDetails in the query, so we can search FDR columns
@@ -213,8 +233,8 @@ export class FdrService {
             tenderNo: row.tenderNo || row.projectNo,
             tenderStatus: row.tenderStatus || row.tenderStatus,
             member: row.teamMember?.toString() ?? null,
-            expiry: row.expiry ? new Date(row.expiry) : null,
-            fdrStatus: this.statusMap()[row.fdrStatus],
+            expiry: this.deriveFdrExpiryStatus(row.expiry ? new Date(row.expiry) : null),
+            fdrStatus: this.deriveFdrStatus(row.fdrStatus),
         }));
 
         return wrapPaginatedResponse(data, total, page, limit);
@@ -265,44 +285,19 @@ export class FdrService {
     private mapActionToNumber(action: string): number {
         const actionMap: Record<string, number> = {
             "accounts-form": 1,
-            "accounts-form-1": 1,
             "initiate-followup": 2,
             "returned-courier": 3,
             "returned-bank-transfer": 4,
             settled: 5,
-            "settled-with-project": 5,
             "request-cancellation": 6,
-            "fdr-cancellation-confirmation": 7,
-            "cancelled-at-branch": 7,
+            "cancellation-confirmation": 7,
         };
         return actionMap[action] || 1;
     }
 
-    /**
-     * Get single file for a field by checking if body field exists or if it's a file path string
-     * Files are processed in order as they appear in the files array
-     */
-    private getFileForField(fieldname: string, files: Express.Multer.File[], body: any, fileIndexTracker: { current: number }): Express.Multer.File | null {
-        // Check if body has this field (indicating a file was uploaded)
-        if (body[fieldname] !== undefined && files.length > fileIndexTracker.current) {
-            const file = files[fileIndexTracker.current];
-            fileIndexTracker.current++;
-            return file;
-        }
-        return null;
-    }
 
-    /**
-     * Get file path from body if it's a string (from TenderFileUploader)
-     */
-    private getFilePathFromBody(fieldname: string, body: any): string | null {
-        if (body[fieldname] && typeof body[fieldname] === "string") {
-            return body[fieldname];
-        }
-        return null;
-    }
 
-    async updateAction(instrumentId: number, body: any, files: Express.Multer.File[], user: any) {
+    async updateAction(instrumentId: number, body: Record<string, any>, user: any) {
         const [instrument] = await this.db.select().from(paymentInstruments).where(eq(paymentInstruments.id, instrumentId)).limit(1);
 
         if (!instrument) {
@@ -323,41 +318,57 @@ export class FdrService {
             }
         }
 
-        // Track file index for processing files in order
-        const fileIndexTracker = { current: 0 };
-
-        const filePaths: string[] = [];
-        if (files && files.length > 0) {
-            for (const file of files) {
-                const relativePath = `bi-dashboard/${file.filename}`;
-                filePaths.push(relativePath);
-            }
-        }
-
         const updateData: any = {
             action: actionNumber,
             updatedAt: new Date(),
         };
 
-        if (body.action === "accounts-form" || body.action === "accounts-form-1") {
+        if (body.action === "accounts-form") {
+            const [linkedCheque] = await this.db
+                .select({
+                    status: paymentInstruments.status,
+                    rejectionReason: paymentInstruments.rejectionReason,
+                })
+                .from(instrumentChequeDetails)
+                .innerJoin(paymentInstruments, eq(paymentInstruments.id, instrumentChequeDetails.instrumentId))
+                .where(eq(instrumentChequeDetails.linkedFdrId, instrumentId))
+                .limit(1);
+
+            if (linkedCheque) {
+                if (linkedCheque.status === CHEQUE_STATUSES.ACCOUNTS_FORM_REJECTED) {
+                    body.fdr_req = 'Rejected';
+                    if (!body.reason_req) {
+                        body.reason_req = linkedCheque.rejectionReason || 'Linked Cheque was rejected';
+                    }
+                } else if (linkedCheque.status !== CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED) {
+                    throw new BadRequestException(
+                        'Cannot process: linked Cheque is not yet accepted. Please accept the Cheque first.'
+                    );
+                }
+            }
+        }
+
+        if (body.action === "accounts-form") {
             if (body.fdr_req === "Accepted") {
                 updateData.status = FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED;
+                if (body.req_no) updateData.reqNo = body.req_no;
+                if (body.courier_address_json) {
+                    try {
+                        updateData.courierAddressJson = typeof body.courier_address_json === 'string'
+                            ? JSON.parse(body.courier_address_json)
+                            : body.courier_address_json;
+                    } catch {
+                        this.logger.warn('Failed to parse courier_address_json');
+                    }
+                }
             } else if (body.fdr_req === "Rejected") {
                 updateData.status = FDR_STATUSES.ACCOUNTS_FORM_REJECTED;
                 updateData.rejectionReason = body.reason_req || null;
             }
-            // Store file paths from TenderFileUploader (strings) or files
-            const fdrFormatImranFile = this.getFileForField("fdr_format_imran", files, body, fileIndexTracker);
-            const fdrFormatImranPath = this.getFilePathFromBody("fdr_format_imran", body);
-            if (fdrFormatImranFile) {
+            if (body.fdr_format_imran && typeof body.fdr_format_imran === "string") {
                 updateData.legacyData = {
                     ...(instrument.legacyData || {}),
-                    fdr_format_imran: `bi-dashboard/${fdrFormatImranFile.filename}`,
-                };
-            } else if (fdrFormatImranPath) {
-                updateData.legacyData = {
-                    ...(instrument.legacyData || {}),
-                    fdr_format_imran: fdrFormatImranPath,
+                    fdr_format_imran: body.fdr_format_imran,
                 };
             }
             // Store prefilled_signed_fdr files (can be array of paths or files)
@@ -375,47 +386,27 @@ export class FdrService {
                     this.logger.warn("Failed to parse prefilled_signed_fdr", e);
                 }
             }
-        } else if (body.action === "accounts-form-2") {
-            updateData.status = FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED;
-        } else if (body.action === "accounts-form-3") {
-            updateData.status = FDR_STATUSES.ACCOUNTS_FORM_ACCEPTED;
         } else if (body.action === "initiate-followup") {
             updateData.status = FDR_STATUSES.FOLLOWUP_INITIATED;
         } else if (body.action === "returned-courier") {
-            updateData.status = FDR_STATUSES.COURIER_RETURN_RECEIVED;
-            // Handle docket_slip file or path
-            const docketSlipFile = this.getFileForField("docket_slip", files, body, fileIndexTracker);
-            const docketSlipPath = this.getFilePathFromBody("docket_slip", body);
-            if (docketSlipFile) {
-                updateData.docketSlip = `bi-dashboard/${docketSlipFile.filename}`;
-            } else if (docketSlipPath) {
-                updateData.docketSlip = docketSlipPath;
-            } else if (filePaths.length > 0) {
-                updateData.docketSlip = filePaths[0];
+            updateData.status = FDR_STATUSES.RETURN_VIA_COURIER;
+            if (body.docket_no) updateData.docketNo = body.docket_no;
+            if (body.docket_slip && typeof body.docket_slip === "string") {
+                updateData.docketSlip = body.docket_slip;
             }
         } else if (body.action === "returned-bank-transfer") {
-            updateData.status = FDR_STATUSES.BANK_RETURN_COMPLETED;
+            updateData.status = FDR_STATUSES.RETURN_VIA_BANK_TRANSFER;
             if (body.transfer_date) updateData.transferDate = body.transfer_date;
             if (body.utr) updateData.utr = body.utr;
-        } else if (body.action === "settled" || body.action === "settled-with-project") {
-            updateData.status = FDR_STATUSES.PROJECT_SETTLEMENT_COMPLETED;
+        } else if (body.action === "settled") {
+            updateData.status = FDR_STATUSES.SETTLED_WITH_PROJECT;
         } else if (body.action === "request-cancellation") {
             updateData.status = FDR_STATUSES.CANCELLATION_REQUESTED;
-            // Handle covering letter file or path
-            const coveringLetterFile = this.getFileForField("covering_letter", files, body, fileIndexTracker);
-            const coveringLetterPath = this.getFilePathFromBody("covering_letter", body);
-            if (coveringLetterFile) {
-                updateData.coveringLetter = `bi-dashboard/${coveringLetterFile.filename}`;
-            } else if (coveringLetterPath) {
-                updateData.coveringLetter = coveringLetterPath;
+            if (body.covering_letter && typeof body.covering_letter === "string") {
+                updateData.coveringLetter = body.covering_letter;
             }
-            // Handle req_receive file or path
-            const reqReceiveFile = this.getFileForField("req_receive", files, body, fileIndexTracker);
-            const reqReceivePath = this.getFilePathFromBody("req_receive", body);
-            if (reqReceiveFile) {
-                updateData.reqReceive = `bi-dashboard/${reqReceiveFile.filename}`;
-            } else if (reqReceivePath) {
-                updateData.reqReceive = reqReceivePath;
+            if (body.req_receive && typeof body.req_receive === "string") {
+                updateData.reqReceive = body.req_receive;
             }
             // Store cancellation remarks
             if (body.cancellation_remarks) {
@@ -424,8 +415,8 @@ export class FdrService {
                     cancellation_remarks: body.cancellation_remarks,
                 };
             }
-        } else if (body.action === "fdr-cancellation-confirmation" || body.action === "cancelled-at-branch") {
-            updateData.status = FDR_STATUSES.CANCELLED_AT_BRANCH;
+        } else if (body.action === "cancellation-confirmation") {
+            updateData.status = FDR_STATUSES.CANCELLED;
             // Store cancellation details in legacyData
             if (body.fdr_cancellation_date || body.fdr_cancellation_amount || body.fdr_cancellation_reference_no) {
                 updateData.legacyData = {
@@ -440,7 +431,7 @@ export class FdrService {
         await this.db.update(paymentInstruments).set(updateData).where(eq(paymentInstruments.id, instrumentId));
 
         const fdrDetailsUpdate: any = {};
-        if (body.action === "accounts-form" || body.action === "accounts-form-1") {
+        if (body.action === "accounts-form") {
             if (body.fdr_no) fdrDetailsUpdate.fdrNo = body.fdr_no;
             if (body.fdr_date) fdrDetailsUpdate.fdrDate = body.fdr_date;
             if (body.fdr_validity) fdrDetailsUpdate.fdrExpiryDate = body.fdr_validity;
@@ -457,71 +448,6 @@ export class FdrService {
                     stamp_charges: body.stamp_charges || null,
                     other_charges: body.other_charges || null,
                 };
-            }
-        } else if (body.action === "accounts-form-2") {
-            if (body.fdr_no) fdrDetailsUpdate.fdrNo = body.fdr_no;
-            if (body.fdr_date) fdrDetailsUpdate.fdrDate = body.fdr_date;
-            if (body.fdr_validity) fdrDetailsUpdate.fdrExpiryDate = body.fdr_validity;
-            if (body.req_no) fdrDetailsUpdate.reqNo = body.req_no;
-            if (body.remarks) fdrDetailsUpdate.fdrRemark = body.remarks;
-        } else if (body.action === "accounts-form-3") {
-            if (body.fdr_percentage) fdrDetailsUpdate.marginPercent = body.fdr_percentage;
-            if (body.fdr_amount) fdrDetailsUpdate.fdrAmt = body.fdr_amount;
-            if (body.fdr_roi) fdrDetailsUpdate.roi = body.fdr_roi;
-            // Handle sfms_confirmation file or path
-            const sfmsConfFile = this.getFileForField("sfms_confirmation", files, body, fileIndexTracker);
-            const sfmsConfPath = this.getFilePathFromBody("sfms_confirmation", body);
-            if (sfmsConfFile) {
-                updateData.legacyData = {
-                    ...(instrument.legacyData || {}),
-                    sfms_confirmation: `bi-dashboard/${sfmsConfFile.filename}`,
-                };
-            } else if (sfmsConfPath) {
-                updateData.legacyData = {
-                    ...(instrument.legacyData || {}),
-                    sfms_confirmation: sfmsConfPath,
-                };
-            }
-            // Store charges in legacyData
-            if (body.fdr_charges || body.sfms_charges || body.stamp_charges || body.other_charges) {
-                updateData.legacyData = {
-                    ...(instrument.legacyData || {}),
-                    ...(updateData.legacyData || {}),
-                    fdr_charges: body.fdr_charges || null,
-                    sfms_charges: body.sfms_charges || null,
-                    stamp_charges: body.stamp_charges || null,
-                    other_charges: body.other_charges || null,
-                };
-            }
-        } else if (body.action === "request-extension") {
-            // Store request letter/email file or path
-            const requestLetterFile = this.getFileForField("request_letter_email", files, body, fileIndexTracker);
-            const requestLetterPath = this.getFilePathFromBody("request_letter_email", body);
-            if (requestLetterFile) {
-                updateData.legacyData = {
-                    ...(instrument.legacyData || {}),
-                    request_letter_email: `bi-dashboard/${requestLetterFile.filename}`,
-                };
-            } else if (requestLetterPath) {
-                updateData.legacyData = {
-                    ...(instrument.legacyData || {}),
-                    request_letter_email: requestLetterPath,
-                };
-            }
-            // Store modification fields if provided
-            if (body.modification_fields) {
-                try {
-                    const modFields = typeof body.modification_fields === "string" ? JSON.parse(body.modification_fields) : body.modification_fields;
-                    if (Array.isArray(modFields) && modFields.length > 0) {
-                        updateData.legacyData = {
-                            ...(instrument.legacyData || {}),
-                            ...(updateData.legacyData || {}),
-                            modification_fields: JSON.stringify(modFields),
-                        };
-                    }
-                } catch (e) {
-                    this.logger.warn("Failed to parse modification_fields", e);
-                }
             }
         }
 
@@ -540,6 +466,15 @@ export class FdrService {
                     ...fdrDetailsUpdate,
                     createdAt: new Date(),
                 });
+            }
+        }
+
+        // Send email notification for accounts-form (accept/reject)
+        if (body.action === "accounts-form") {
+            try {
+                await this.notificationService.sendFdrCreatedMail(instrumentId, body, user);
+            } catch (error) {
+                this.logger.error(`Failed to send FDR created email for instrument ${instrumentId}:`, error);
             }
         }
 
@@ -580,16 +515,6 @@ export class FdrService {
                             area = `${team.name} Team`;
                         }
 
-                        // Identify proof image from files
-                        let proofImagePath: string | null = null;
-                        const proofImageFile = this.getFileForField("proof_image", files, body, fileIndexTracker);
-                        const proofImagePathFromBody = this.getFilePathFromBody("proof_image", body);
-                        if (proofImageFile) {
-                            proofImagePath = proofImageFile.filename;
-                        } else if (proofImagePathFromBody) {
-                            proofImagePath = proofImagePathFromBody;
-                        }
-
                         // Map contacts to ContactPersonDto format and filter out invalid ones
                         const mappedContacts = contacts
                             .filter(contact => contact.name && contact.name.trim().length > 0)
@@ -606,19 +531,16 @@ export class FdrService {
 
                         // Create followup DTO
                         const followUpDto: CreateFollowUpDto = {
-                            area,
+                            area: (body.area || 'Accounts'),
                             partyName: body.organisation_name || "",
                             amount: instrument.amount ? Number(instrument.amount) : 0,
-                            followupFor: "FDR",
+                            followupFor: "EMD Refund",
                             assignedToId: tenderInfo.teamMemberId || null,
                             emdId: paymentRequest.requestId,
+                            details: body.emailBody || null,
                             contacts: mappedContacts,
                             frequency: body.frequency ? Number(body.frequency) : 1,
                             startFrom: body.followup_start_date || undefined,
-                            stopReason: body.stop_reason ? Number(body.stop_reason) : null,
-                            proofText: body.proof_text || null,
-                            proofImagePath: proofImagePath,
-                            stopRemarks: body.stop_remarks || null,
                             attachments: [],
                             createdById: user.id,
                             followUpHistory: [],
@@ -659,6 +581,7 @@ export class FdrService {
                 utr: paymentInstruments.utr,
                 docketNo: paymentInstruments.docketNo,
                 courierAddress: paymentInstruments.courierAddress,
+                courierAddressJson: paymentInstruments.courierAddressJson,
                 courierDeadline: paymentInstruments.courierDeadline,
                 action: paymentInstruments.action,
                 status: paymentInstruments.status,
@@ -668,6 +591,7 @@ export class FdrService {
                 docketSlip: paymentInstruments.docketSlip,
                 coveringLetter: paymentInstruments.coveringLetter,
                 extraPdfPaths: paymentInstruments.extraPdfPaths,
+                reqNo: paymentInstruments.reqNo,
                 createdAt: paymentInstruments.createdAt,
                 updatedAt: paymentInstruments.updatedAt,
 
@@ -731,6 +655,291 @@ export class FdrService {
             throw new NotFoundException(`Payment Request with ID ${id} not found`);
         }
 
-        return result;
+        let linkedCheque: any = null;
+        if (result.instrumentId) {
+            const [cheque] = await this.db
+                .select({
+                    chequeNo: instrumentChequeDetails.chequeNo,
+                    chequeDate: instrumentChequeDetails.chequeDate,
+                    bankName: instrumentChequeDetails.bankName,
+                    amount: paymentInstruments.amount,
+                    status: paymentInstruments.status,
+                    favouring: paymentInstruments.favouring,
+                    requestId: paymentRequests.id,
+                })
+                .from(instrumentChequeDetails)
+                .innerJoin(paymentInstruments, eq(paymentInstruments.id, instrumentChequeDetails.instrumentId))
+                .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+                .where(eq(instrumentChequeDetails.linkedFdrId, result.instrumentId))
+                .limit(1);
+            if (cheque) {
+                linkedCheque = {
+                    ...cheque,
+                    chequeDate: cheque.chequeDate ? new Date(cheque.chequeDate) : null,
+                };
+            }
+        }
+
+        let linkedBg: any = null;
+        if (result.fdrNo) {
+            const [bg] = await this.db
+                .select({
+                    bgNo: instrumentBgDetails.bgNo,
+                    bgDate: instrumentBgDetails.bgDate,
+                    validityDate: instrumentBgDetails.validityDate,
+                    claimExpiryDate: instrumentBgDetails.claimExpiryDate,
+                    bankName: instrumentBgDetails.bankName,
+                    beneficiaryName: instrumentBgDetails.beneficiaryName,
+                    beneficiaryAddress: instrumentBgDetails.beneficiaryAddress,
+                    cashMarginPercent: instrumentBgDetails.cashMarginPercent,
+                    fdrMarginPercent: instrumentBgDetails.fdrMarginPercent,
+                    stampCharges: instrumentBgDetails.stampCharges,
+                    sfmsCharges: instrumentBgDetails.sfmsCharges,
+                    bgPurpose: instrumentBgDetails.bgPurpose,
+                    bgNeeds: instrumentBgDetails.bgNeeds,
+                    courierNo: instrumentBgDetails.courierNo,
+                    bgBankAcc: instrumentBgDetails.bgBankAcc,
+                    bgBankIfsc: instrumentBgDetails.bgBankIfsc,
+                    status: paymentInstruments.status,
+                    amount: paymentInstruments.amount,
+                    instrumentId: paymentInstruments.id,
+                })
+                .from(instrumentBgDetails)
+                .innerJoin(paymentInstruments, eq(paymentInstruments.id, instrumentBgDetails.instrumentId))
+                .where(eq(instrumentBgDetails.fdrNo, result.fdrNo))
+                .limit(1);
+            if (bg) {
+                linkedBg = {
+                    ...bg,
+                    bgDate: bg.bgDate ? new Date(bg.bgDate) : null,
+                    validityDate: bg.validityDate ? new Date(bg.validityDate) : null,
+                    claimExpiryDate: bg.claimExpiryDate ? new Date(bg.claimExpiryDate) : null,
+                    cashMarginPercent: bg.cashMarginPercent ? Number(bg.cashMarginPercent) : null,
+                    fdrMarginPercent: bg.fdrMarginPercent ? Number(bg.fdrMarginPercent) : null,
+                    stampCharges: bg.stampCharges ? Number(bg.stampCharges) : null,
+                    sfmsCharges: bg.sfmsCharges ? Number(bg.sfmsCharges) : null,
+                    amount: bg.amount ? Number(bg.amount) : null,
+                };
+            }
+        }
+
+        return { ...result, linkedCheque, linkedBg };
+    }
+
+    async getActionFormData(id: number) {
+        const [result] = await this.db
+            .select({
+                id: paymentInstruments.id,
+                action: paymentInstruments.action,
+                status: paymentInstruments.status,
+                amount: paymentInstruments.amount,
+                favouring: paymentInstruments.favouring,
+                payableAt: paymentInstruments.payableAt,
+                issueDate: paymentInstruments.issueDate,
+                expiryDate: paymentInstruments.expiryDate,
+                utr: paymentInstruments.utr,
+                docketNo: paymentInstruments.docketNo,
+                courierAddress: paymentInstruments.courierAddress,
+                courierAddressJson: paymentInstruments.courierAddressJson,
+                courierDeadline: paymentInstruments.courierDeadline,
+                generatedPdf: paymentInstruments.generatedPdf,
+                cancelPdf: paymentInstruments.cancelPdf,
+                docketSlip: paymentInstruments.docketSlip,
+                tenderNo: paymentRequests.tenderNo,
+                tenderName: paymentRequests.projectName,
+                tenderId: paymentRequests.tenderId,
+                fdrNo: instrumentFdrDetails.fdrNo,
+                fdrDate: instrumentFdrDetails.fdrDate,
+                fdrSource: instrumentFdrDetails.fdrSource,
+                fdrPurpose: instrumentFdrDetails.fdrPurpose,
+                fdrExpiryDate: instrumentFdrDetails.fdrExpiryDate,
+                fdrNeeds: instrumentFdrDetails.fdrNeeds,
+                fdrRemark: instrumentFdrDetails.fdrRemark,
+                reqNo: paymentInstruments.reqNo,
+                tenderStatusName: statuses.name,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(instrumentFdrDetails, eq(instrumentFdrDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .where(and(
+                eq(paymentInstruments.id, id),
+                eq(paymentInstruments.instrumentType, 'FDR'),
+                eq(paymentInstruments.isActive, true)
+            ))
+            .limit(1);
+
+        if (!result) {
+            throw new NotFoundException(`Payment Instrument with ID ${id} not found`);
+        }
+
+        const hasAccountsFormData = result.action != null && result.action >= 1;
+        const hasReturnedData = result.action != null && result.action >= 3;
+        const hasSettledData = result.action === 4 || result.action === 7;
+
+        let linkedChequeData: any = null;
+        {
+            const [cheque] = await this.db
+                .select({
+                    chequeNo: instrumentChequeDetails.chequeNo,
+                    amount: paymentInstruments.amount,
+                    status: paymentInstruments.status,
+                    requestId: paymentInstruments.id,
+                })
+                .from(instrumentChequeDetails)
+                .innerJoin(paymentInstruments, eq(paymentInstruments.id, instrumentChequeDetails.instrumentId))
+                .where(eq(instrumentChequeDetails.linkedFdrId, id))
+                .limit(1);
+            if (cheque) {
+                linkedChequeData = cheque;
+            }
+        }
+
+        let linkedBgData: any = null;
+        if (result.fdrNo) {
+            const fdrNo = result.fdrNo;
+            if (fdrNo) {
+                const [bg] = await this.db
+                    .select({
+                        bgNo: instrumentBgDetails.bgNo,
+                        bankName: instrumentBgDetails.bankName,
+                        status: paymentInstruments.status,
+                        instrumentId: paymentInstruments.id,
+                    })
+                    .from(instrumentBgDetails)
+                    .innerJoin(paymentInstruments, eq(paymentInstruments.id, instrumentBgDetails.instrumentId))
+                    .where(eq(instrumentBgDetails.fdrNo, fdrNo))
+                    .limit(1);
+                if (bg) {
+                    linkedBgData = bg;
+                }
+            }
+        }
+
+        let courierDetails: any = null;
+        if (result.reqNo) {
+            const courierId = Number(result.reqNo);
+            if (!isNaN(courierId)) {
+                const [courier] = await this.db
+                    .select()
+                    .from(couriers)
+                    .where(eq(couriers.id, courierId))
+                    .limit(1);
+                if (courier) {
+                    const courierStatusLabels = ['Pending', 'In Transit', 'Dispatched', 'Not Delivered', 'Delivered', 'Rejected'];
+                    courierDetails = {
+                        id: courier.id,
+                        toOrg: courier.toOrg,
+                        toName: courier.toName,
+                        toAddr: courier.toAddr,
+                        toPin: courier.toPin,
+                        toMobile: courier.toMobile,
+                        trackingNumber: courier.trackingNumber,
+                        courierProvider: courier.courierProvider,
+                        docketNo: courier.docketNo,
+                        docketSlip: courier.docketSlip,
+                        courierDocs: courier.courierDocs,
+                        deliveryPod: courier.deliveryPod,
+                        deliveryDate: courier.deliveryDate,
+                        pickupDate: courier.pickupDate,
+                        status: courier.status,
+                        courierStatusName: courier.status != null ? (courierStatusLabels[courier.status] || 'Unknown') : 'Unknown',
+                    };
+                }
+            }
+        }
+
+        return {
+            id: result.id,
+            action: result.action,
+            fdrStatus: this.deriveFdrStatus(result.status),
+            tenderNo: result.tenderNo,
+            tenderName: result.tenderName,
+            tenderId: result.tenderId,
+            amount: result.amount ? Number(result.amount) : null,
+            favouring: result.favouring,
+            payableAt: result.payableAt,
+            issueDate: result.issueDate ? new Date(result.issueDate) : null,
+            expiryDate: result.expiryDate ? new Date(result.expiryDate) : null,
+            fdrNo: result.fdrNo,
+            fdrDate: result.fdrDate ? new Date(result.fdrDate) : null,
+            tenderStatusName: result.tenderStatusName,
+            fdrSource: result.fdrSource,
+            fdrPurpose: result.fdrPurpose,
+            fdrExpiryDate: result.fdrExpiryDate ? new Date(result.fdrExpiryDate) : null,
+            fdrNeeds: result.fdrNeeds,
+            fdrRemark: result.fdrRemark,
+            reqNo: result.reqNo,
+            courierDetails,
+            courierAddress: result.courierAddress,
+            courierAddressJson: result.courierAddressJson as Record<string, any> | null,
+            courierDeadline: result.courierDeadline ? Number(result.courierDeadline) : null,
+            deliverBy: result.courierDeadline != null
+                ? (result.courierDeadline === -1 ? 'Tender Due Date'
+                    : result.courierDeadline === 24 ? '24 Hours'
+                    : result.courierDeadline === 48 ? '48 Hours'
+                    : `${result.courierDeadline} Hours`)
+                : null,
+            utr: result.utr,
+            docketNo: result.docketNo,
+            generatedPdf: result.generatedPdf,
+            cancelPdf: result.cancelPdf,
+            docketSlip: result.docketSlip,
+            hasAccountsFormData,
+            hasReturnedData,
+            hasSettledData,
+            linkedCheque: linkedChequeData,
+            linkedBg: linkedBgData,
+        };
+    }
+
+    async getFollowupData(instrumentId: number) {
+        const [result] = await this.db
+            .select({
+                id: followUps.id,
+                emdId: followUps.emdId,
+                partyName: followUps.partyName,
+                area: followUps.area,
+                amount: followUps.amount,
+                contacts: followUps.contacts,
+                frequency: followUps.frequency,
+                startFrom: followUps.startFrom,
+                nextFollowUpDate: followUps.nextFollowUpDate,
+                stopReason: followUps.stopReason,
+                proofText: followUps.proofText,
+                stopRemarks: followUps.stopRemarks,
+                proofImagePath: followUps.proofImagePath,
+                assignmentStatus: followUps.assignmentStatus,
+                createdAt: followUps.createdAt,
+            })
+            .from(followUps)
+            .where(and(
+                eq(followUps.emdId, instrumentId),
+                isNull(followUps.deletedAt)
+            ))
+            .orderBy(desc(followUps.createdAt))
+            .limit(1);
+
+        if (!result) {
+            return null;
+        }
+
+        return {
+            id: result.id,
+            organisationName: result.partyName,
+            area: result.area,
+            amount: result.amount ? Number(result.amount) : null,
+            contacts: result.contacts || [],
+            frequency: result.frequency,
+            followupStartDate: result.startFrom ? new Date(result.startFrom) : null,
+            nextFollowUpDate: result.nextFollowUpDate ? new Date(result.nextFollowUpDate) : null,
+            stopReason: result.stopReason,
+            proofText: result.proofText,
+            stopRemarks: result.stopRemarks,
+            proofImagePath: result.proofImagePath,
+            assignmentStatus: result.assignmentStatus,
+            createdAt: result.createdAt,
+        };
     }
 }

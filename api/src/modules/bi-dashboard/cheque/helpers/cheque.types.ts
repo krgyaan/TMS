@@ -2,6 +2,7 @@ export interface ChequeDashboardRow {
     id: number;
     requestId: number;
     purpose: string | null;
+    requestedBy: string | null;
     chequeNo: string | null;
     payeeName: string | null;
     bidValidity: Date | null;

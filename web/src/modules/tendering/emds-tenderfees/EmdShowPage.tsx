@@ -1,10 +1,11 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useState, useCallback } from "react";
 import { paths } from "@/app/routes/paths";
 import { TenderDetailsSection } from "@/modules/tendering/tenders/components/TenderView";
 import { PhysicalDocsSection } from "@/modules/tendering/physical-docs/components/PhysicalDocsView";
 import { RfqSection } from "@/modules/tendering/rfqs/components/RfqView";
 import { EmdTenderFeeSection } from "@/modules/tendering/emds-tenderfees/components/EmdTenderFeeShow";
+import { PaymentInstrumentView } from "@/modules/tendering/emds-tenderfees/components/PaymentInstrumentView";
 import { DocumentChecklistSection } from "@/modules/tendering/checklists/components/DocumentChecklistView";
 import { CostingSheetSection } from "@/modules/tendering/costing-sheets/components/CostingSheetView";
 import { BidSubmissionSection } from "@/modules/tendering/bid-submissions/components/BidSubmissionView";
@@ -18,10 +19,15 @@ import { useTenderStepStatuses } from "@/hooks/api/useTenderStepStatuses";
 
 export default function EmdShowPage() {
     const { id } = useParams<{ id: string }>();
+    const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const tenderId = id ? Number(id) : null;
+    const prParam = searchParams.get('pr');
+    const paymentRequestId = prParam ? Number(prParam) : null;
 
-    const { steps: tenderSteps } = useTenderStepStatuses(tenderId);
+    const isPaymentRequestView = tenderId === 0 && !!paymentRequestId;
+
+    const { steps: tenderSteps } = useTenderStepStatuses(isPaymentRequestView ? null : tenderId);
 
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["emd-fees"]));
 
@@ -38,6 +44,10 @@ export default function EmdShowPage() {
     const collapseAll = useCallback(() => setExpandedSections(new Set()), []);
 
     const renderSectionContent = (stepId: string) => {
+        if (isPaymentRequestView && stepId === "emd-fees") {
+            return <PaymentInstrumentView paymentRequestId={paymentRequestId} />;
+        }
+
         if (!tenderId) return null;
         switch (stepId) {
             case "tender-details":   return <TenderDetailsSection tenderId={tenderId} />;
@@ -54,12 +64,34 @@ export default function EmdShowPage() {
         }
     };
 
-    if (!tenderId) {
+    if (tenderId === null || tenderId === undefined) {
         return (
             <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>Invalid Tender ID.</AlertDescription>
             </Alert>
+        );
+    }
+
+    if (isPaymentRequestView) {
+        return (
+            <ShowPageLayout
+                steps={[{
+                    id: 'emd-fees', label: 'Payment Request',
+                    shortLabel: "",
+                    stepNumber: 0,
+                    status: "completed" as const,
+                    hasData: false,
+                    isLoading: false
+                }]}
+                expandedSections={expandedSections}
+                onToggleSection={toggleSection}
+                onExpandAll={() => setExpandedSections(new Set(['emd-fees']))}
+                onCollapseAll={() => setExpandedSections(new Set())}
+                onBack={() => navigate(paths.tendering.emdsTenderFees)}
+                backLabel="Back to EMD / Tender Fees"
+                renderSectionContent={renderSectionContent}
+            />
         );
     }
 

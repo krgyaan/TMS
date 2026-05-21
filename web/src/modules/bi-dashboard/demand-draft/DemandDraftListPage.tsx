@@ -1,4 +1,4 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
@@ -8,9 +8,11 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, FileX2, Search, Eye, Clock, CheckCircle, XCircle, RotateCcw, Edit } from 'lucide-react';
+import { AlertCircle, FileX2, Search, Eye, Clock, CheckCircle, XCircle, RotateCcw, Edit, Plus } from 'lucide-react';
+import { QuickFilter } from '@/components/ui/quick-filter';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { useDemandDraftDashboard, useDemandDraftDashboardCounts } from '@/hooks/api/useDemandDrafts';
 import type { DemandDraftDashboardRow, DemandDraftDashboardTab } from './helpers/demandDraft.types';
 import { tenderNameCol } from '@/components/data-grid/columns';
@@ -55,14 +57,11 @@ const TABS_CONFIG: Array<{ key: DemandDraftDashboardTab; name: string; icon: Rea
 const getStatusVariant = (status: string | null): string => {
     if (!status) return 'secondary';
     const statusLower = status.toLowerCase();
-    if (statusLower.includes('created') || statusLower.includes('active')) {
+    if (statusLower.includes('created')) {
         return 'default';
     }
     if (statusLower.includes('cancelled') || statusLower.includes('rejected')) {
         return 'destructive';
-    }
-    if (statusLower.includes('returned')) {
-        return 'secondary';
     }
     return 'secondary';
 };
@@ -74,25 +73,12 @@ const DemandDraftListPage = () => {
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
     const debouncedSearch = useDebouncedSearch(search, 300);
+    const [teamFilter, setTeamFilter] = useState<string>('All');
+    const teamId = teamFilter === 'All' ? undefined : teamFilter === 'AC' ? 1 : 2;
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, debouncedSearch]);
-
-    const handlePageSizeChange = useCallback((newPageSize: number) => {
-        setPagination({ pageIndex: 0, pageSize: newPageSize });
-    }, []);
-
-    const handleSortChanged = useCallback((event: any) => {
-        const sortModel = event.api.getColumnState()
-            .filter((col: any) => col.sort)
-            .map((col: any) => ({
-                colId: col.colId,
-                sort: col.sort as 'asc' | 'desc'
-            }));
-        setSortModel(sortModel);
-        setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, []);
+    }, [teamFilter]);
 
     const { data: apiResponse, isLoading, error } = useDemandDraftDashboard({
         tab: activeTab,
@@ -101,6 +87,7 @@ const DemandDraftListPage = () => {
         sortBy: sortModel[0]?.colId,
         sortOrder: sortModel[0]?.sort,
         search: debouncedSearch || undefined,
+        team: teamId,
     });
 
     const { data: counts } = useDemandDraftDashboardCounts();
@@ -232,7 +219,9 @@ const DemandDraftListPage = () => {
                 cellRenderer: (params: any) => {
                     const status = params.value;
                     if (!status) return '—';
-                    return <Badge variant={status === 'Expired' ? 'destructive' : 'default'}>{status}</Badge>;
+                    if (status === 'No date') return <Badge variant="secondary">No date</Badge>;
+                    if (status === 'Expired') return <Badge variant="destructive">Expired</Badge>;
+                    return <Badge variant="default">{status}</Badge>;
                 },
             },
             {
@@ -324,6 +313,12 @@ const DemandDraftListPage = () => {
                                 Track and manage demand drafts for tenders.
                             </CardDescription>
                         </div>
+                        <CardAction>
+                            <Button variant="outline" onClick={() => navigate(paths.tendering.oldEmdsForDD())}>
+                                <Plus className="w-4 h-4" />
+                                Add Old Entry
+                            </Button>
+                        </CardAction>
                     </div>
                 </CardHeader>
                 <CardContent className="px-0">
@@ -351,7 +346,15 @@ const DemandDraftListPage = () => {
 
                         {/* Search Row: Quick Filters, Search Bar */}
                         <div className="flex items-center gap-4 px-6 pb-4">
-                            {/* Quick Filters (Left) - Optional, can be added per page */}
+                            {/* Quick Filters (Left) */}
+                            <QuickFilter options={[
+                                { label: 'AC Team', value: 'AC' },
+                                { label: 'DC Team', value: 'DC' },
+                                { label: 'All Team', value: 'All' },
+                            ]}
+                                value={teamFilter}
+                                onChange={(value) => setTeamFilter(value)}
+                            />
 
                             {/* Search Bar (Center) - Flex grow */}
                             <div className="flex-1 flex justify-end">

@@ -44,6 +44,22 @@ export interface SendTenderEmailOptions {
     };
 }
 
+export interface SendPaymentEmailOptions {
+    requestId: number;          // Always present — used as referenceId when no tender
+    tenderId?: number;          // Optional, 0/null/undefined for non-tender requests
+    eventType: string;
+    fromUserId: number;
+    to: RecipientSource[];
+    cc?: RecipientSource[];
+    subject: string;
+    template: string;
+    data: Record<string, any>;
+    attachments?: {
+        files: string[];
+        baseDir?: string;
+    };
+}
+
 export interface ResolvedEmail {
     fromEmail: string;
     fromUserId: number;

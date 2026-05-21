@@ -232,6 +232,20 @@
       "when": 1766130446324,
       "tag": "0057_first_photon",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1766352000000,
+      "tag": "0058_increase_client_mobile_length",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1766352100000,
+      "tag": "0059_add_delivery_method_to_cheque",
+      "breakpoints": true
     }
   ]
 }

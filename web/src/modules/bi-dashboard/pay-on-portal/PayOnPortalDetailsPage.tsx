@@ -3,16 +3,18 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
-import { usePayOnPortalDetails } from '@/hooks/api/usePayOnPortals';
+import { usePayOnPortalActionFormData, usePayOnPortalFollowupData, type PayOnPortalActionFormData } from '@/hooks/api/usePayOnPortals';
 import { PayOnPortalView } from './components/PayOnPortalView';
 import { paths } from '@/app/routes/paths';
+import { TenderView } from '@/modules/tendering/tenders/components/TenderView';
 
 const PayOnPortalDetailsPage = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const requestId = id ? parseInt(id, 10) : 0;
+    const instrumentId = id ? parseInt(id, 10) : 0;
 
-    const { data, isLoading, error } = usePayOnPortalDetails(requestId);
+    const { data, isLoading, error } = usePayOnPortalActionFormData(instrumentId);
+    const { data: followupData } = usePayOnPortalFollowupData(instrumentId);
 
     if (isLoading) {
         return (
@@ -49,7 +51,12 @@ const PayOnPortalDetailsPage = () => {
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back
             </Button>
-            <PayOnPortalView data={data} isLoading={isLoading} />
+            <PayOnPortalView data={data as PayOnPortalActionFormData} followupData={followupData} />
+            {data?.tenderId && (
+                <>
+                    <TenderView tenderId={data?.tenderId as number} />
+                </>
+            )}
         </div>
     );
 };

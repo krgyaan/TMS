@@ -1,43 +1,63 @@
-import { Inject, Injectable, Logger, NotFoundException, BadRequestException, forwardRef } from '@nestjs/common';
-import { eq, and, inArray, isNull, isNotNull, sql, asc, desc, ne, notInArray, or, ilike } from 'drizzle-orm';
-import { DRIZZLE } from '@db/database.module';
+import { followUps } from '@/db/schemas/shared/follow-ups.schema';
+import type { ChequeDashboardCounts, ChequeDashboardRow } from '@/modules/bi-dashboard/cheque/helpers/cheque.types';
+import { FollowUpService } from '@/modules/follow-up/follow-up.service';
+import type { CreateFollowUpDto } from '@/modules/follow-up/zod';
+import { CHEQUE_STATUSES, DD_STATUSES, FDR_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
+import { PaymentRequestsNotificationService } from '@/modules/tendering/payment-requests/services/payment-requests-notification.service';
+import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
+import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { DbInstance } from '@db';
+import { DRIZZLE } from '@db/database.module';
+import { users } from '@db/schemas/auth/users.schema';
+import { statuses } from '@db/schemas/master/statuses.schema';
 import {
-    paymentRequests,
-    paymentInstruments,
     instrumentChequeDetails,
     instrumentDdDetails,
     instrumentFdrDetails,
-} from '@db/schemas/tendering/emds.schema';
+    paymentInstruments,
+    paymentRequests,
+} from '@db/schemas/tendering/payment-requests.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
-import { users } from '@db/schemas/auth/users.schema';
-import { statuses } from '@db/schemas/master/statuses.schema';
-import { wrapPaginatedResponse } from '@/utils/responseWrapper';
-import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
-import type { ChequeDashboardRow, ChequeDashboardCounts } from '@/modules/bi-dashboard/cheque/helpers/cheque.types';
-import { CHEQUE_STATUSES } from '@/modules/tendering/emds/constants/emd-statuses';
-import { EmdsService } from '@/modules/tendering/emds/emds.service';
+import { BadRequestException, forwardRef, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { and, asc, desc, eq, ilike, inArray, isNotNull, isNull, ne, or, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 
 @Injectable()
 export class ChequeService {
     private readonly logger = new Logger(ChequeService.name);
+    private readonly requestedByUser = alias(users, 'requested_by_user');
 
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
-        @Inject(forwardRef(() => EmdsService)) private readonly emdsService: EmdsService,
+        @Inject(forwardRef(() => PaymentRequestsNotificationService)) private readonly notificationService: PaymentRequestsNotificationService,
+        private readonly followUpService: FollowUpService,
     ) { }
 
-    private statusMap() {
-        return {
+    private deriveChequeStatus(status: string | null, chequeReason: string | null): string {
+        if (status === CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED) {
+            if (chequeReason === 'DD') return 'DD Created';
+            if (chequeReason === 'FDR') return 'FDR Created';
+            return 'Cheque Created';
+        }
+        const map: Record<string, string> = {
             [CHEQUE_STATUSES.PENDING]: 'Pending',
-            [CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED]: 'Accepted',
-            [CHEQUE_STATUSES.ACCOUNTS_FORM_REJECTED]: 'Rejected',
+            [CHEQUE_STATUSES.ACCOUNTS_FORM_REJECTED]: 'Cheque Rejected',
             [CHEQUE_STATUSES.FOLLOWUP_INITIATED]: 'Followup Initiated',
-            [CHEQUE_STATUSES.STOP_REQUESTED]: 'Stop Requested',
-            [CHEQUE_STATUSES.DEPOSITED_IN_BANK]: 'Deposited',
-            [CHEQUE_STATUSES.PAID_VIA_BANK_TRANSFER]: 'Paid via BT',
-            [CHEQUE_STATUSES.CANCELLED_TORN]: 'Cancelled/Torn',
+            [CHEQUE_STATUSES.STOP_REQUESTED]: 'Cheque Stopped via Bank',
+            [CHEQUE_STATUSES.DEPOSITED_IN_BANK]: 'Deposited in Bank',
+            [CHEQUE_STATUSES.PAID_VIA_BANK_TRANSFER]: 'Paid via Bank Transfer',
+            [CHEQUE_STATUSES.CANCELLED_TORN]: 'Returned/Cancelled/Torn by Party',
         };
+        return map[status as string] || status || 'Pending';
+    }
+
+    private deriveExpiryStatus(dueDate: Date | null, chequeReason: string | null, status: string | null): string | null {
+        const isAccepted = status === CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED;
+        if (isAccepted && chequeReason === 'DD') return 'DD Created';
+        if (isAccepted && chequeReason === 'FDR') return 'FDR Created';
+        if (!dueDate) return 'No date';
+        const expiryDate = new Date(dueDate.getTime() + 3 * 30 * 24 * 60 * 60 * 1000);
+        return expiryDate < new Date() ? 'Expired' : 'Valid';
     }
 
     private getNotExpiredCondition() {
@@ -73,7 +93,6 @@ export class ChequeService {
                 eq(paymentInstruments.status, CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED),
                 or(
                     ilike(instrumentChequeDetails.chequeReason, '%Payable%'),
-                    ilike(instrumentChequeDetails.chequeReason, '%DD%'),
                     ilike(instrumentChequeDetails.chequeReason, '%other_payment%')
                 ),
                 this.getNotExpiredCondition(),
@@ -106,7 +125,7 @@ export class ChequeService {
             );
         } else if (tab === 'cancelled') {
             conditions.push(
-                inArray(paymentInstruments.action, [6, 7]),
+                eq(paymentInstruments.action, 6),
                 this.getNotExpiredCondition(),
             );
         } else if (tab === 'expired') {
@@ -126,6 +145,7 @@ export class ChequeService {
             sortBy?: string;
             sortOrder?: 'asc' | 'desc';
             search?: string;
+            teamId?: number;
         },
     ): Promise<PaginatedResult<ChequeDashboardRow>> {
         const page = options?.page || 1;
@@ -135,6 +155,12 @@ export class ChequeService {
         const conditions = this.buildChequeDashboardConditions(tab);
 
         const searchTerm = options?.search?.trim();
+
+        // Team filter
+        const teamId = options?.teamId;
+        if (teamId) {
+            conditions.push(sql`COALESCE(${tenderInfos.team}, ${this.requestedByUser.team}) = ${teamId}`);
+        }
 
         // Search filter - search across all rendered columns
         if (searchTerm) {
@@ -151,7 +177,7 @@ export class ChequeService {
                 sql`${instrumentChequeDetails.dueDate}::text ILIKE ${searchStr}`,
                 sql`${paymentInstruments.status} ILIKE ${searchStr}`,
             ];
-            conditions.push(sql`(${sql.join(searchConditions, sql` OR `)})`);
+            conditions.push(sql`(${sql.join(searchConditions, ' OR ')})`);
         }
 
         const whereClause = and(...conditions);
@@ -189,12 +215,14 @@ export class ChequeService {
                 cheque: instrumentChequeDetails.chequeDate,
                 dueDate: instrumentChequeDetails.dueDate,
                 chequeStatus: paymentInstruments.status,
+                requestedBy: this.requestedByUser.name,
             })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(this.requestedByUser, eq(this.requestedByUser.id, paymentRequests.requestedBy))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .where(whereClause)
             .orderBy(orderClause)
@@ -203,24 +231,25 @@ export class ChequeService {
 
         // Count query for pagination
         // Using same joins to ensure Search works on Tender Name etc
-        const [countResult] = await this.db
+        let countQueryBuilder = this.db
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
-            .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
-            .where(whereClause);
+            .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id));
+        if (teamId) {
+            countQueryBuilder = countQueryBuilder
+                .leftJoin(this.requestedByUser, eq(this.requestedByUser.id, paymentRequests.requestedBy));
+        }
+        const [countResult] = await countQueryBuilder.where(whereClause);
 
         const total = Number(countResult?.count || 0);
-
-        function isExpired(dueDate: Date): boolean {
-            return dueDate && new Date(dueDate.getTime() + 3 * 30 * 24 * 60 * 60 * 1000) < new Date(Date.now());
-        }
 
         const data: ChequeDashboardRow[] = rows.map((row) => ({
             id: row.id,
             requestId: row.requestId,
             purpose: row.purpose,
+            requestedBy: row.requestedBy,
             chequeNo: row.chequeNo,
             payeeName: row.payeeName,
             bidValidity: row.bidValidity ? new Date(row.bidValidity) : null,
@@ -228,8 +257,8 @@ export class ChequeService {
             type: row.type,
             cheque: row.cheque,
             dueDate: row.dueDate ? new Date(row.dueDate) : null,
-            expiry: row.dueDate ? (isExpired(new Date(row.dueDate)) ? 'Expired' : 'Valid') : null,
-            chequeStatus: this.statusMap()[row.chequeStatus],
+            expiry: this.deriveExpiryStatus(row.dueDate ? new Date(row.dueDate) : null, row.type, row.chequeStatus),
+            chequeStatus: this.deriveChequeStatus(row.chequeStatus, row.type),
         }));
 
         return wrapPaginatedResponse(data, total, page, limit);
@@ -287,7 +316,6 @@ export class ChequeService {
     private mapActionToNumber(action: string): number {
         const actionMap: Record<string, number> = {
             'accounts-form': 1,
-            'accounts-form-1': 1,
             'initiate-followup': 2,
             'stop-cheque': 3,
             'paid-via-bank-transfer': 4,
@@ -300,12 +328,11 @@ export class ChequeService {
     async updateAction(
         instrumentId: number,
         body: any,
-        files: Express.Multer.File[],
         user: any,
     ) {
         this.logger.debug("Printing the id ", instrumentId);
-
         this.logger.debug("Printing the body of action update", body);
+
         const [instrument] = await this.db
             .select()
             .from(paymentInstruments)
@@ -321,50 +348,12 @@ export class ChequeService {
         }
 
         const actionNumber = this.mapActionToNumber(body.action);
-        let contacts: any[] = [];
-        if (body.contacts) {
-            try {
-                contacts = typeof body.contacts === 'string' ? JSON.parse(body.contacts) : body.contacts;
-            } catch (e) {
-                this.logger.warn('Failed to parse contacts', e);
-            }
-        }
 
-        // Track file index for processing files in order
-        const fileIndexTracker = { current: 0 };
-
-        const filePaths: string[] = [];
-        if (files && files.length > 0) {
-            for (const file of files) {
-                const relativePath = `bi-dashboard/${file.filename}`;
-                filePaths.push(relativePath);
-            }
-        }
-
-        /**
-         * Get single file for a field by checking if body field exists or if it's a file path string
-         */
-        const getFileForField = (
-            fieldname: string,
-            files: Express.Multer.File[],
-            body: any,
-            fileIndexTracker: { current: number }
-        ): Express.Multer.File | null => {
-            if (body[fieldname] !== undefined && files.length > fileIndexTracker.current) {
-                const file = files[fileIndexTracker.current];
-                fileIndexTracker.current++;
-                return file;
-            }
-            return null;
-        };
-
-        /**
-         * Get file path from body if it's a string (from TenderFileUploader)
-         */
+        // Get file path from body (set by TenderFileUploader prior to form submission)
         const getFilePathFromBody = (fieldname: string, body: any): string | null => {
-            if (body[fieldname] && typeof body[fieldname] === 'string') {
-                return body[fieldname];
-            }
+            const val = body[fieldname];
+            if (!val) return null;
+            if (typeof val === 'string') return val;
             return null;
         };
 
@@ -373,17 +362,13 @@ export class ChequeService {
             updatedAt: new Date(),
         };
 
-        if (body.action === 'accounts-form-1') {
+        if (body.action === 'accounts-form') {
             if (body.cheque_req === 'Accepted') {
                 updateData.status = CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED;
             } else if (body.cheque_req === 'Rejected') {
                 updateData.status = CHEQUE_STATUSES.ACCOUNTS_FORM_REJECTED;
                 updateData.rejectionReason = body.reason_req || null;
             }
-        } else if (body.action === 'accounts-form-2') {
-            updateData.status = CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED;
-        } else if (body.action === 'accounts-form-3') {
-            updateData.status = CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED;
         } else if (body.action === 'initiate-followup') {
             updateData.status = CHEQUE_STATUSES.FOLLOWUP_INITIATED;
         } else if (body.action === 'stop-cheque') {
@@ -396,19 +381,6 @@ export class ChequeService {
             updateData.status = CHEQUE_STATUSES.DEPOSITED_IN_BANK;
         } else if (body.action === 'cancelled-torn') {
             updateData.status = CHEQUE_STATUSES.CANCELLED_TORN;
-        } else if (body.action === 'returned-courier') {
-            updateData.status = CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED; // Use appropriate status
-            const docketSlipFile = getFileForField('docket_slip', files, body, fileIndexTracker);
-            const docketSlipPath = getFilePathFromBody('docket_slip', body);
-            if (docketSlipFile) {
-                updateData.docketSlip = `bi-dashboard/${docketSlipFile.filename}`;
-            } else if (docketSlipPath) {
-                updateData.docketSlip = docketSlipPath;
-            } else if (filePaths.length > 0) {
-                updateData.docketSlip = filePaths[0];
-            }
-        } else if (body.action === 'request-cancellation') {
-            updateData.status = CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED; // Use appropriate status
         }
 
         await this.db
@@ -417,86 +389,53 @@ export class ChequeService {
             .where(eq(paymentInstruments.id, instrumentId));
 
         const chequeDetailsUpdate: any = {};
-        if (body.action === 'accounts-form-2') {
-            if (body.cheque_no) chequeDetailsUpdate.chequeNo = body.cheque_no;
-            if (body.cheque_date) chequeDetailsUpdate.chequeDate = body.cheque_date;
-            if (body.cheque_amount) chequeDetailsUpdate.amount = body.cheque_amount;
-            if (body.cheque_type) chequeDetailsUpdate.reqType = body.cheque_type;
-            if (body.cheque_reason) chequeDetailsUpdate.chequeReason = body.cheque_reason;
-            if (body.due_date) chequeDetailsUpdate.dueDate = body.due_date;
-        } else if (body.action === 'accounts-form-1') {
+        if (body.action === 'accounts-form') {
             if (body.cheque_no) chequeDetailsUpdate.chequeNo = body.cheque_no;
             if (body.due_date) chequeDetailsUpdate.dueDate = body.due_date;
 
-            // Handle receiving_cheque_handed_over
-            const receivingChequeFile = getFileForField('receiving_cheque_handed_over', files, body, fileIndexTracker);
             const receivingChequePath = getFilePathFromBody('receiving_cheque_handed_over', body);
-            if (receivingChequeFile) {
-                chequeDetailsUpdate.handover = `bi-dashboard/${receivingChequeFile.filename}`;
-            } else if (receivingChequePath) {
+            if (receivingChequePath) {
                 chequeDetailsUpdate.handover = receivingChequePath;
             }
 
-            // Handle positive_pay_confirmation
-            const positivePayFile = getFileForField('positive_pay_confirmation', files, body, fileIndexTracker);
             const positivePayPath = getFilePathFromBody('positive_pay_confirmation', body);
-            if (positivePayFile) {
-                chequeDetailsUpdate.confirmation = `bi-dashboard/${positivePayFile.filename}`;
-            } else if (positivePayPath) {
+            if (positivePayPath) {
                 chequeDetailsUpdate.confirmation = positivePayPath;
             }
 
-            // Handle remarks
             if (body.remarks) {
-                chequeDetailsUpdate.reference = body.remarks;
+                chequeDetailsUpdate.remarks = body.remarks;
             }
 
-            // Handle cheque_images - check both files array and body for paths
-            const chequeImagesPath = getFilePathFromBody('cheque_images', body);
-            if (filePaths.length > 0 && body.cheque_images) {
-                const chequeImageIndexes = filePaths
-                    .map((path, idx) => body.cheque_images && path.includes('cheque_images') ? idx : -1)
-                    .filter(idx => idx >= 0);
-                if (chequeImageIndexes.length > 0) {
-                    chequeDetailsUpdate.chequeImagePath = chequeImageIndexes.map(idx => filePaths[idx]).join(',');
-                }
-            } else if (chequeImagesPath) {
-                // If it's a string path (from TenderFileUploader), parse it if it's JSON array or use as single path
-                try {
-                    const parsed = JSON.parse(chequeImagesPath);
-                    if (Array.isArray(parsed)) {
-                        chequeDetailsUpdate.chequeImagePath = parsed.join(',');
-                    } else {
-                        chequeDetailsUpdate.chequeImagePath = chequeImagesPath;
-                    }
-                } catch {
-                    chequeDetailsUpdate.chequeImagePath = chequeImagesPath;
-                }
+            if (body.cheque_given_from_account) {
+                chequeDetailsUpdate.chequeGivenFromAccount = body.cheque_given_from_account;
             }
-        } else if (body.action === 'accounts-form-3') {
-            // Legacy action - handle cheque_images if sent
-            const chequeImagesPath = getFilePathFromBody('cheque_images', body);
-            if (filePaths.length > 0 && body.cheque_images) {
-                const chequeImageIndexes = filePaths
-                    .map((path, idx) => body.cheque_images && path.includes('cheque_images') ? idx : -1)
-                    .filter(idx => idx >= 0);
-                if (chequeImageIndexes.length > 0) {
-                    chequeDetailsUpdate.chequeImagePath = chequeImageIndexes.map(idx => filePaths[idx]).join(',');
-                }
-            } else if (chequeImagesPath) {
-                try {
-                    const parsed = JSON.parse(chequeImagesPath);
-                    if (Array.isArray(parsed)) {
-                        chequeDetailsUpdate.chequeImagePath = parsed.join(',');
-                    } else {
-                        chequeDetailsUpdate.chequeImagePath = chequeImagesPath;
+
+            // Handle cheque_images - can be array (JSON) or string (form-data fallback)
+            const chequeImages = body.cheque_images;
+            if (chequeImages) {
+                if (Array.isArray(chequeImages)) {
+                    chequeDetailsUpdate.chequeImagePath = chequeImages.join(',');
+                } else if (typeof chequeImages === 'string') {
+                    try {
+                        const parsed = JSON.parse(chequeImages);
+                        if (Array.isArray(parsed)) {
+                            chequeDetailsUpdate.chequeImagePath = parsed.join(',');
+                        } else {
+                            chequeDetailsUpdate.chequeImagePath = chequeImages;
+                        }
+                    } catch {
+                        chequeDetailsUpdate.chequeImagePath = chequeImages;
                     }
-                } catch {
-                    chequeDetailsUpdate.chequeImagePath = chequeImagesPath;
                 }
             }
         } else if (body.action === 'stop-cheque') {
             if (body.stop_reason_text) chequeDetailsUpdate.stopReasonText = body.stop_reason_text;
+
+            const proofImagePath = getFilePathFromBody('proof_image', body);
+            if (proofImagePath) {
+                chequeDetailsUpdate.proofImage = proofImagePath;
+            }
         } else if (body.action === 'paid-via-bank-transfer') {
             if (body.transfer_date) chequeDetailsUpdate.transferDate = body.transfer_date;
             if (body.utr) chequeDetailsUpdate.reference = body.utr;
@@ -505,56 +444,99 @@ export class ChequeService {
             if (body.bt_transfer_date) chequeDetailsUpdate.btTransferDate = body.bt_transfer_date;
             if (body.reference) chequeDetailsUpdate.reference = body.reference;
         } else if (body.action === 'cancelled-torn') {
-            const cancelledImageFile = getFileForField('cancelled_image_path', files, body, fileIndexTracker);
             const cancelledImagePath = getFilePathFromBody('cancelled_image_path', body);
-            if (cancelledImageFile) {
-                chequeDetailsUpdate.cancelledImagePath = `bi-dashboard/${cancelledImageFile.filename}`;
-            } else if (cancelledImagePath) {
+            if (cancelledImagePath) {
                 chequeDetailsUpdate.cancelledImagePath = cancelledImagePath;
-            } else if (filePaths.length > 0 && body.cancelled_image_path) {
-                const cancelledImageIndex = filePaths.findIndex((path: string) => path.includes('cancelled') || body.cancelled_image_path);
-                if (cancelledImageIndex >= 0) {
-                    chequeDetailsUpdate.cancelledImagePath = filePaths[cancelledImageIndex];
-                }
             }
         }
 
         if (Object.keys(chequeDetailsUpdate).length > 0) {
             chequeDetailsUpdate.updatedAt = new Date();
-            await this.db
-                .update(instrumentChequeDetails)
-                .set(chequeDetailsUpdate)
-                .where(eq(instrumentChequeDetails.instrumentId, instrumentId));
+
+            const [existing] = await this.db
+                .select({ id: instrumentChequeDetails.id })
+                .from(instrumentChequeDetails)
+                .where(eq(instrumentChequeDetails.instrumentId, instrumentId))
+                .limit(1);
+
+            if (existing) {
+                await this.db
+                    .update(instrumentChequeDetails)
+                    .set(chequeDetailsUpdate)
+                    .where(eq(instrumentChequeDetails.instrumentId, instrumentId));
+            } else {
+                await this.db
+                    .insert(instrumentChequeDetails)
+                    .values({
+                        instrumentId,
+                        ...chequeDetailsUpdate,
+                    });
+            }
         }
 
-        // Check for linked DD and send DD mail after cheque action 'accounts-form-1'
-        if (body.action === 'accounts-form-1' && body.cheque_req === 'Accepted') {
+        // Send emails after cheque action accounts-form
+        if (body.action === 'accounts-form') {
+            this.logger.debug(`Email trigger condition met for cheque ${instrumentId}`);
             try {
-                // Get cheque details to check for linked DD
                 const [chequeDetails] = await this.db
                     .select()
                     .from(instrumentChequeDetails)
                     .where(eq(instrumentChequeDetails.instrumentId, instrumentId))
                     .limit(1);
 
-                if (chequeDetails?.linkedDdId) {
-                    // Find the DD instrument that corresponds to this linkedDdId
-                    const [ddDetail] = await this.db
-                        .select()
-                        .from(instrumentDdDetails)
-                        .where(eq(instrumentDdDetails.id, chequeDetails.linkedDdId))
-                        .limit(1);
+                this.logger.debug(`Cheque details for ${instrumentId}: linkedDdId=${chequeDetails?.linkedDdId}, linkedFdrId=${chequeDetails?.linkedFdrId}`);
 
-                    if (ddDetail) {
-                        // Get the DD instrument and request
+                if (body.cheque_req === 'Rejected') {
+                    await this.notificationService.sendChequeCreatedMail(
+                        instrumentId,
+                        'Rejected',
+                        body.reason_req || '',
+                        user.id,
+                    );
+                    this.logger.log(`Cheque rejection mail sent for cheque ${instrumentId}`);
+
+                    if (chequeDetails?.linkedDdId) {
+                        await this.db
+                            .update(paymentInstruments)
+                            .set({
+                                status: DD_STATUSES.ACCOUNTS_FORM_REJECTED,
+                                rejectionReason: body.reason_req || 'Linked Cheque was rejected',
+                                updatedAt: new Date(),
+                            })
+                            .where(eq(paymentInstruments.id, chequeDetails.linkedDdId));
+                        this.logger.log(`Auto-rejected DD instrument ${chequeDetails.linkedDdId} due to cheque ${instrumentId} rejection`);
+
+                        // Send DD rejection email
+                        const ddBody = { dd_req: 'Rejected', reason_req: body.reason_req || 'Linked Cheque was rejected' };
+                        await this.notificationService.sendDdCreatedMail(chequeDetails.linkedDdId, ddBody, user);
+                        this.logger.log(`DD rejection mail sent for instrument ${chequeDetails.linkedDdId}`);
+                    }
+
+                    if (chequeDetails?.linkedFdrId) {
+                        await this.db
+                            .update(paymentInstruments)
+                            .set({
+                                status: FDR_STATUSES.ACCOUNTS_FORM_REJECTED,
+                                rejectionReason: body.reason_req || 'Linked Cheque was rejected',
+                                updatedAt: new Date(),
+                            })
+                            .where(eq(paymentInstruments.id, chequeDetails.linkedFdrId));
+                        this.logger.log(`Auto-rejected FDR instrument ${chequeDetails.linkedFdrId} due to cheque ${instrumentId} rejection`);
+
+                        // Send FDR rejection email
+                        const fdrBody = { fdr_req: 'Rejected', reason_req: body.reason_req || 'Linked Cheque was rejected' };
+                        await this.notificationService.sendFdrCreatedMail(chequeDetails.linkedFdrId, fdrBody, user);
+                        this.logger.log(`FDR rejection mail sent for instrument ${chequeDetails.linkedFdrId}`);
+                    }
+                } else if (body.cheque_req === 'Accepted') {
+                    if (chequeDetails?.linkedDdId) {
                         const [ddInstrument] = await this.db
                             .select()
                             .from(paymentInstruments)
-                            .where(eq(paymentInstruments.id, ddDetail.instrumentId))
+                            .where(eq(paymentInstruments.id, chequeDetails.linkedDdId))
                             .limit(1);
-
+                            
                         if (ddInstrument) {
-                            // Get request ID and tender ID from request
                             const requestId = ddInstrument.requestId;
                             const [request] = await this.db
                                 .select()
@@ -563,25 +545,113 @@ export class ChequeService {
                                 .limit(1);
                             const tenderId = request?.tenderId || 0;
 
-                            // Send DD mail
-                            await this.emdsService.sendDdMailAfterChequeAction(
+                            const result = await this.notificationService.sendDdMailAfterChequeAction(
+                                instrument,
+                                chequeDetails,
                                 ddInstrument.id,
-                                requestId,
                                 tenderId,
-                                user.id
+                                requestId,
                             );
 
-                            this.logger.log(`DD mail triggered after cheque action for cheque ${instrumentId}, DD instrument ${ddInstrument.id}`);
+                            if (result?.success) {
+                                this.logger.log(`DD mail sent after cheque action for cheque ${instrumentId}, DD instrument ${ddInstrument.id}`);
+                            } else {
+                                this.logger.warn(`DD mail not sent for cheque ${instrumentId} (DD instrument ${ddInstrument.id}): ${result?.success || 'unknown'}`);
+                            }
                         }
+                    } else if (chequeDetails?.linkedFdrId) {
+                        const [fdrDetail] = await this.db
+                            .select()
+                            .from(instrumentFdrDetails)
+                            .where(eq(instrumentFdrDetails.id, chequeDetails.linkedFdrId))
+                            .limit(1);
+
+                        if (fdrDetail) {
+                            const [fdrInstrument] = await this.db
+                                .select()
+                                .from(paymentInstruments)
+                                .where(eq(paymentInstruments.id, fdrDetail.instrumentId))
+                                .limit(1);
+
+                            if (fdrInstrument) {
+                                const requestId = fdrInstrument.requestId;
+                                const [request] = await this.db
+                                    .select()
+                                    .from(paymentRequests)
+                                    .where(eq(paymentRequests.id, requestId))
+                                    .limit(1);
+                                const tenderId = request?.tenderId || 0;
+
+                                const result = await this.notificationService.sendFdrMailAfterChequeAction(
+                                    instrument,
+                                    chequeDetails,
+                                    fdrInstrument.id,
+                                    tenderId,
+                                    requestId,
+                                );
+
+                                if (result?.success) {
+                                    this.logger.log(`FDR mail sent after cheque action for cheque ${instrumentId}, FDR instrument ${fdrInstrument.id}`);
+                                } else {
+                                    this.logger.warn(`FDR mail not sent for cheque ${instrumentId} (FDR instrument ${fdrInstrument.id}): ${result?.success || 'unknown'}`);
+                                }
+                            }
+                        }
+                    } else {
+                        await this.notificationService.sendChequeCreatedMail(
+                            instrumentId,
+                            'Accepted',
+                            undefined,
+                            user.id,
+                        );
+
+                        this.logger.log(`Cheque created mail triggered after cheque action for cheque ${instrumentId}`);
                     }
                 }
             } catch (error) {
-                this.logger.error(`Failed to send DD mail after cheque action for cheque ${instrumentId}:`, error);
-                // Don't fail the operation if email fails
+                this.logger.error(`Failed to send mail after cheque action for cheque ${instrumentId}:`, error);
             }
         }
 
-        // Follow-up creation will be handled by a different service class
+        if (body.action === 'initiate-followup' && body.emailBody) {
+            try {
+                let contacts: any[] = [];
+                if (body.contacts) {
+                    if (Array.isArray(body.contacts)) {
+                        contacts = body.contacts;
+                    } else if (typeof body.contacts === 'string') {
+                        try {
+                            contacts = JSON.parse(body.contacts);
+                        } catch {
+                            this.logger.warn('Failed to parse contacts string', body.contacts);
+                        }
+                    }
+                }
+                const followupDto: CreateFollowUpDto = {
+                    area: 'Accounts',
+                    partyName: body.organisation_name || 'Unknown',
+                    details: body.emailBody,
+                    contacts: contacts.map((c: any) => ({
+                        name: c.name,
+                        email: c.email || null,
+                        phone: c.phone || null,
+                        org: body.organisation_name || null,
+                    })),
+                    frequency: body.frequency || null,
+                    startFrom: body.followup_start_date || undefined,
+                    emdId: instrumentId,
+                    followupFor: 'Cheque Followup',
+                    assignedToId: null,
+                    createdById: null,
+                    amount: 0,
+                    attachments: [],
+                    followUpHistory: []
+                };
+                await this.followUpService.create(followupDto, user.id || user.sub);
+            } catch (error) {
+                this.logger.warn(`Failed to create followup for Cheque instrument ${instrumentId}: ${error}`);
+            }
+        }
 
         return {
             success: true,
@@ -760,5 +830,162 @@ export class ChequeService {
             return { ...result, linkedDd, linkedFdr };
         }
         return { ...result, linkedDd, linkedFdr };
+    }
+
+    async getActionFormData(id: number) {
+        const [result] = await this.db
+            .select({
+                id: paymentInstruments.id,
+                action: paymentInstruments.action,
+                status: paymentInstruments.status,
+                amount: paymentInstruments.amount,
+                favouring: paymentInstruments.favouring,
+                payableAt: paymentInstruments.payableAt,
+                issueDate: paymentInstruments.issueDate,
+                expiryDate: paymentInstruments.expiryDate,
+                purpose: paymentInstruments.purpose,
+                utr: paymentInstruments.utr,
+                docketNo: paymentInstruments.docketNo,
+                courierAddress: paymentInstruments.courierAddress,
+                courierDeadline: paymentInstruments.courierDeadline,
+                generatedPdf: paymentInstruments.generatedPdf,
+                cancelPdf: paymentInstruments.cancelPdf,
+                docketSlip: paymentInstruments.docketSlip,
+                tenderNo: paymentRequests.tenderNo,
+                tenderName: paymentRequests.projectName,
+                tenderId: paymentRequests.tenderId,
+                requestPurpose: paymentRequests.purpose,
+                requestCreatedAt: paymentRequests.createdAt,
+                requestedByName: users.name,
+                chequeNo: instrumentChequeDetails.chequeNo,
+                chequeDate: instrumentChequeDetails.chequeDate,
+                bankName: instrumentChequeDetails.bankName,
+                chequeNeeds: instrumentChequeDetails.chequeNeeds,
+                chequeReason: instrumentChequeDetails.chequeReason,
+                chequeImagePath: instrumentChequeDetails.chequeImagePath,
+                handover: instrumentChequeDetails.handover,
+                confirmation: instrumentChequeDetails.confirmation,
+                reference: instrumentChequeDetails.reference,
+                btTransferDate: instrumentChequeDetails.btTransferDate,
+                linkedDdId: instrumentChequeDetails.linkedDdId,
+                linkedFdrId: instrumentChequeDetails.linkedFdrId,
+                stopReasonText: instrumentChequeDetails.stopReasonText,
+                chequeGivenFromAccount: instrumentChequeDetails.chequeGivenFromAccount,
+                proofImage: instrumentChequeDetails.proofImage,
+                cancelledImagePath: instrumentChequeDetails.cancelledImagePath,
+                chequeRemarks: instrumentChequeDetails.remarks,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+            .where(and(
+                eq(paymentInstruments.id, id),
+                eq(paymentInstruments.instrumentType, 'Cheque'),
+                eq(paymentInstruments.isActive, true)
+            ))
+            .limit(1);
+
+        if (!result) {
+            throw new NotFoundException(`Payment Instrument with ID ${id} not found`);
+        }
+
+        const hasAccountsFormData = result.action != null && result.action >= 1;
+        const hasReturnedData = result.action != null && [3, 4].includes(result.action);
+        const hasSettledData = result.action != null && [5, 6].includes(result.action);
+
+        return {
+            id: result.id,
+            action: result.action,
+            chequeStatus: this.deriveChequeStatus(result.status, result.chequeReason),
+            tenderNo: result.tenderNo,
+            tenderName: result.tenderName,
+            tenderId: result.tenderId,
+            amount: result.amount ? Number(result.amount) : null,
+            favouring: result.favouring,
+            payableAt: result.payableAt,
+            issueDate: result.issueDate ? new Date(result.issueDate) : null,
+            expiryDate: result.expiryDate ? new Date(result.expiryDate) : null,
+            purpose: result.purpose,
+            requestPurpose: result.requestPurpose,
+            requestedByName: result.requestedByName?.toString() || null,
+            requestCreatedAt: result.requestCreatedAt ? result.requestCreatedAt.toISOString() : null,
+            chequeNo: result.chequeNo,
+            chequeDate: result.chequeDate ? new Date(result.chequeDate) : null,
+            bankName: result.bankName,
+            chequeNeeds: result.chequeNeeds,
+            chequeReason: result.chequeReason,
+            chequeImagePath: result.chequeImagePath,
+            handover: result.handover,
+            confirmation: result.confirmation,
+            reference: result.reference,
+            btTransferDate: result.btTransferDate ? new Date(result.btTransferDate) : null,
+            linkedDdId: result.linkedDdId,
+            linkedFdrId: result.linkedFdrId,
+            stopReasonText: result.stopReasonText,
+            chequeGivenFromAccount: result.chequeGivenFromAccount,
+            proofImage: result.proofImage,
+            cancelledImagePath: result.cancelledImagePath,
+            chequeRemarks: result.chequeRemarks,
+            courierAddress: result.courierAddress,
+            courierDeadline: result.courierDeadline ? Number(result.courierDeadline) : null,
+            utr: result.utr,
+            docketNo: result.docketNo,
+            generatedPdf: result.generatedPdf,
+            cancelPdf: result.cancelPdf,
+            docketSlip: result.docketSlip,
+            hasAccountsFormData,
+            hasReturnedData,
+            hasSettledData,
+        };
+    }
+
+    async getFollowupData(instrumentId: number) {
+        const [result] = await this.db
+            .select({
+                id: followUps.id,
+                emdId: followUps.emdId,
+                partyName: followUps.partyName,
+                area: followUps.area,
+                amount: followUps.amount,
+                contacts: followUps.contacts,
+                frequency: followUps.frequency,
+                startFrom: followUps.startFrom,
+                nextFollowUpDate: followUps.nextFollowUpDate,
+                stopReason: followUps.stopReason,
+                proofText: followUps.proofText,
+                stopRemarks: followUps.stopRemarks,
+                proofImagePath: followUps.proofImagePath,
+                assignmentStatus: followUps.assignmentStatus,
+                createdAt: followUps.createdAt,
+            })
+            .from(followUps)
+            .where(and(
+                eq(followUps.emdId, instrumentId),
+                isNull(followUps.deletedAt)
+            ))
+            .orderBy(desc(followUps.createdAt))
+            .limit(1);
+
+        if (!result) {
+            return null;
+        }
+
+        return {
+            id: result.id,
+            organisationName: result.partyName,
+            area: result.area,
+            amount: result.amount ? Number(result.amount) : null,
+            contacts: result.contacts || [],
+            frequency: result.frequency,
+            followupStartDate: result.startFrom ? new Date(result.startFrom) : null,
+            nextFollowUpDate: result.nextFollowUpDate ? new Date(result.nextFollowUpDate) : null,
+            stopReason: result.stopReason,
+            proofText: result.proofText,
+            stopRemarks: result.stopRemarks,
+            proofImagePath: result.proofImagePath,
+            assignmentStatus: result.assignmentStatus,
+            createdAt: result.createdAt,
+        };
     }
 }

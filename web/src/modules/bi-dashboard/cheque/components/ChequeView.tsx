@@ -2,17 +2,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Receipt, ExternalLink, Loader2, AlertCircle, Eye } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Receipt, Eye } from 'lucide-react';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDate, formatDateTime } from '@/hooks/useFormatedDate';
-import { paths } from '@/app/routes/paths';
-import { useTender } from '@/hooks/api/useTenders';
-import { useInfoSheet } from '@/hooks/api/useInfoSheets';
-import { TenderView } from '@/modules/tendering/tenders/components/TenderView';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { InfoSheetView } from '@/modules/tendering/info-sheet/components/InfoSheetView';
 import { tenderFilesService } from '@/services/api/tender-files.service';
 
 interface ChequeViewProps {
@@ -29,10 +21,10 @@ const FileLink = ({ file }: { file?: string }) => {
             <a
                 href={tenderFilesService.getFileUrl(file)}
                 target="_blank"
-                className="flex items-center gap-1 text-blue-600 hover:underline"
+                className="flex items-center gap-1 text-primary hover:underline"
             >
                 <Eye className="h-4 w-4" />
-                {file?.split('_').slice(1).join('_')}
+                {'View'}
             </a>
         </div>
     );
@@ -43,6 +35,7 @@ export function ChequeView({
     isLoading = false,
     className = '',
 }: ChequeViewProps) {
+    console.log("Cheque: ", data);
     if (isLoading) {
         return (
             <Card className={className}>
@@ -64,22 +57,36 @@ export function ChequeView({
         return null;
     }
 
-    // If Tender Id exist
-    const tenderId = Number.isNaN(data.tenderId) ? null : data.tenderId;
-    const { data: tender, isLoading: isTenderLoading } = useTender(tenderId);
-    const { data: infoSheet, isLoading: infoSheetLoading, error: infoSheetError } = useInfoSheet(tenderId);
-
-    const isExpired = (dueDate: Date | null): boolean => {
-        if (!dueDate) return false;
-        const expiryDate = new Date(dueDate.getTime() + 3 * 30 * 24 * 60 * 60 * 1000);
-        return expiryDate < new Date();
+    const getExpiryStatus = (dueDate: string | null, chequeReason: string | null): string | null => {
+        if (chequeReason === 'DD') return 'DD Created';
+        if (chequeReason === 'FDR') return 'FDR Created';
+        if (!dueDate) return 'No date';
+        const expiryDate = new Date(new Date(dueDate).getTime() + 3 * 30 * 24 * 60 * 60 * 1000);
+        return expiryDate < new Date() ? 'Expired' : 'Valid';
     };
 
-    const expiryStatus = data.dueDate ? (isExpired(new Date(data.dueDate)) ? 'Expired' : 'Valid') : null;
+    const expiryStatus = getExpiryStatus(data.dueDate || data.chequeDate, data.chequeReason);
+
+    const getChequeStatus = (status: string | null, chequeReason: string | null): string => {
+        if (status === 'ACCOUNTS_FORM_ACCEPTED') {
+            if (chequeReason === 'DD') return 'DD Created';
+            if (chequeReason === 'FDR') return 'FDR Created';
+            return 'Cheque Created';
+        }
+        const map: Record<string, string> = {
+            PENDING: 'Pending',
+            ACCOUNTS_FORM_REJECTED: 'Cheque Rejected',
+            FOLLOWUP_INITIATED: 'Followup Initiated',
+            STOP_REQUESTED: 'Cheque Stopped via Bank',
+            DEPOSITED_IN_BANK: 'Deposited in Bank',
+            PAID_VIA_BANK_TRANSFER: 'Paid via Bank Transfer',
+            CANCELLED_TORN: 'Returned/Cancelled/Torn by Party',
+        };
+        return map[status as string] || status || 'Pending';
+    };
 
     return (
-        <>
-            <Card className={className}>
+        <Card className={className}>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <Receipt className="h-5 w-5" />
@@ -97,37 +104,37 @@ export function ChequeView({
                             </TableRow>
                             <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Request ID
+                                    Tender Number
                                 </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.requestId ?? '—'}
+                                <TableCell className="text-sm font-semibold">
+                                    {data.tenderNo}
                                 </TableCell>
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Tender Name
+                                </TableCell>
+                                <TableCell className="text-sm font-semibold">
+                                    {data.tenderName}
+                                </TableCell>
+                            </TableRow>
+                            <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     Requested By
                                 </TableCell>
                                 <TableCell className="text-sm">
                                     {data.requestedByName || '—'}
                                 </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Request Type
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.requestType ?? '—'}
-                                </TableCell>
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     Requeste Date
                                 </TableCell>
                                 <TableCell className="text-sm">
-                                    {formatDateTime(data.createdAt)}
+                                    {formatDateTime(data.requestCreatedAt)}
                                 </TableCell>
                             </TableRow>
                             <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Payee Name
+                                    Cheque in Favour of
                                 </TableCell>
-                                <TableCell className="text-sm">
+                                <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
                                     {data.payeeName || data.favouring || '—'}
                                 </TableCell>
                                 <TableCell className="text-sm font-medium text-muted-foreground">
@@ -142,13 +149,13 @@ export function ChequeView({
                                     Status
                                 </TableCell>
                                 <TableCell className="text-sm">
-                                    <Badge variant="outline">{data.status || '—'}</Badge>
+                                    <Badge variant="outline">{getChequeStatus(data.status || data.chequeStatus, data.chequeReason)}</Badge>
                                 </TableCell>
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     Purpose
                                 </TableCell>
                                 <TableCell className="text-sm">
-                                    {data.purpose || '—'}
+                                    {data.chequeReason || data.purpose || data.requestPurpose || '—'}
                                 </TableCell>
                             </TableRow>
 
@@ -180,41 +187,27 @@ export function ChequeView({
                                     {data.bankName || '—'}
                                 </TableCell>
                                 <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Cheque Needed In (Hours)
+                                    Cheque Needed In
                                 </TableCell>
                                 <TableCell className="text-sm">
-                                    {data.chequeNeeds || '—'}
+                                    {data.chequeNeeds || '—'} Hours
                                 </TableCell>
                             </TableRow>
                             <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Due Date
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.dueDate ? formatDate(data.dueDate) : '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
                                     Expiry Status
                                 </TableCell>
                                 <TableCell className="text-sm">
-                                    {expiryStatus ? (
-                                        <Badge variant={expiryStatus === 'Expired' ? 'destructive' : 'default'}>
-                                            {expiryStatus}
-                                        </Badge>
+                                    {expiryStatus === 'No date' ? (
+                                        <Badge variant="secondary">No date</Badge>
+                                    ) : expiryStatus === 'Expired' ? (
+                                        <Badge variant="destructive">Expired</Badge>
+                                    ) : expiryStatus ? (
+                                        <Badge variant="default">{expiryStatus}</Badge>
                                     ) : '—'}
                                 </TableCell>
+                                <TableCell colSpan={2} />
                             </TableRow>
-                            {data.btTransferDate && (
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground">
-                                        BT Transfer Date
-                                    </TableCell>
-                                    <TableCell className="text-sm">
-                                        {formatDate(data.btTransferDate)}
-                                    </TableCell>
-                                    <TableCell colSpan={2} />
-                                </TableRow>
-                            )}
 
                             {/* Handover/Confirmation Details */}
                             {(data.handover || data.confirmation || data.reference) && (
@@ -249,191 +242,9 @@ export function ChequeView({
                                 </>
                             )}
 
-                            {/* Linked References (fallback when linkedDd/linkedFdr not populated) */}
-                            {!data.linkedDd && !data.linkedFdr && (data.linkedDdId || data.linkedFdrId) && (
-                                <>
-                                    <TableRow className="bg-muted/50">
-                                        <TableCell colSpan={4} className="font-semibold text-sm">
-                                            Linked References
-                                        </TableCell>
-                                    </TableRow>
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Linked DD ID
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {data.linkedDdId || '—'}
-                                        </TableCell>
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Linked FDR ID
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {data.linkedFdrId || '—'}
-                                        </TableCell>
-                                    </TableRow>
-                                </>
-                            )}
-
-                            {/* Linked Demand Draft */}
-                            {data.linkedDd && (
-                                <>
-                                    <TableRow className="bg-muted/50">
-                                        <TableCell colSpan={4} className="font-semibold text-sm">
-                                            Linked Demand Draft
-                                        </TableCell>
-                                    </TableRow>
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            DD No
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {data.linkedDd.ddNo || '—'}
-                                        </TableCell>
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            DD Date
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {data.linkedDd.ddDate ? formatDate(data.linkedDd.ddDate) : '—'}
-                                        </TableCell>
-                                    </TableRow>
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Amount
-                                        </TableCell>
-                                        <TableCell className="text-sm font-semibold">
-                                            {data.linkedDd.amount ? formatINR(Number(data.linkedDd.amount)) : '—'}
-                                        </TableCell>
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Status
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            <Badge variant="outline">{data.linkedDd.status || '—'}</Badge>
-                                        </TableCell>
-                                    </TableRow>
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Favouring
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {data.linkedDd.favouring || '—'}
-                                        </TableCell>
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Payable At
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {data.linkedDd.payableAt || '—'}
-                                        </TableCell>
-                                    </TableRow>
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell colSpan={4} className="text-sm">
-                                            <Button variant="link" className="h-auto p-0 text-primary" asChild>
-                                                <Link to={paths.bi.demandDraftView(data.linkedDd.requestId)}>
-                                                    <ExternalLink className="h-4 w-4 mr-1 inline" />
-                                                    View DD
-                                                </Link>
-                                            </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                </>
-                            )}
-
-                            {/* Linked FDR */}
-                            {data.linkedFdr && (
-                                <>
-                                    <TableRow className="bg-muted/50">
-                                        <TableCell colSpan={4} className="font-semibold text-sm">
-                                            Linked FDR
-                                        </TableCell>
-                                    </TableRow>
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            FDR No
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {data.linkedFdr.fdrNo || '—'}
-                                        </TableCell>
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            FDR Date
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {data.linkedFdr.fdrDate ? formatDate(data.linkedFdr.fdrDate) : '—'}
-                                        </TableCell>
-                                    </TableRow>
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Amount
-                                        </TableCell>
-                                        <TableCell className="text-sm font-semibold">
-                                            {data.linkedFdr.amount ? formatINR(Number(data.linkedFdr.amount)) : '—'}
-                                        </TableCell>
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Status
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            <Badge variant="outline">{data.linkedFdr.status || '—'}</Badge>
-                                        </TableCell>
-                                    </TableRow>
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Favouring
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {data.linkedFdr.favouring || '—'}
-                                        </TableCell>
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Payable At
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {data.linkedFdr.payableAt || '—'}
-                                        </TableCell>
-                                    </TableRow>
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell colSpan={4} className="text-sm">
-                                            <Button variant="link" className="h-auto p-0 text-primary" asChild>
-                                                <Link to={paths.bi.fdrView(data.linkedFdr.requestId)}>
-                                                    <ExternalLink className="h-4 w-4 mr-1 inline" />
-                                                    View FDR
-                                                </Link>
-                                            </Button>
-                                        </TableCell>
-                                    </TableRow>
-                                </>
-                            )}
                         </TableBody>
                     </Table>
                 </CardContent>
             </Card>
-            <div className='space-y-5'>
-                {isTenderLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    </div>
-                ) : tender ? (
-                    <TenderView tender={tender} />
-                ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                        No tender details found
-                    </div>
-                )}
-                {infoSheetLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    </div>
-                ) : infoSheetError ? (
-                    <Alert variant="destructive" className="mb-4">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>
-                            Failed to load info sheet details
-                        </AlertDescription>
-                    </Alert>
-                ) : infoSheet ? (
-                    <InfoSheetView infoSheet={infoSheet} />
-                ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                        No info sheet details found
-                    </div>
-                )}
-            </div>
-        </>
-    );
-}
+        );
+    }

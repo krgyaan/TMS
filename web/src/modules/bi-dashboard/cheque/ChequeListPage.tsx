@@ -1,4 +1,4 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
@@ -8,9 +8,11 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, FileX2, Search, Eye, Clock, CheckCircle, XCircle, Shield, Link, Calendar, Edit } from 'lucide-react';
+import { AlertCircle, FileX2, Search, Eye, Clock, CheckCircle, XCircle, Shield, Link, Calendar, Edit, Plus } from 'lucide-react';
+import { QuickFilter } from '@/components/ui/quick-filter';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { useChequeDashboard, useChequeDashboardCounts } from '@/hooks/api/useCheques';
 import type { ChequeDashboardRow, ChequeDashboardTab } from './helpers/cheque.types';
 import { formatINR } from '@/hooks/useINRFormatter';
@@ -72,7 +74,7 @@ const TABS_CONFIG: Array<{ key: ChequeDashboardTab; name: string; icon: React.Re
 const getStatusVariant = (status: string | null): string => {
     if (!status) return 'secondary';
     const statusLower = status.toLowerCase();
-    if (statusLower.includes('accepted')) {
+    if (statusLower.includes('created')) {
         return 'default';
     }
     if (statusLower.includes('cancelled') || statusLower.includes('rejected')) {
@@ -88,10 +90,12 @@ const ChequeListPage = () => {
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
     const debouncedSearch = useDebouncedSearch(search, 300);
+    const [teamFilter, setTeamFilter] = useState<string>('All');
+    const teamId = teamFilter === 'All' ? undefined : teamFilter === 'AC' ? 1 : 2;
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, debouncedSearch]);
+    }, [activeTab, debouncedSearch, teamFilter]);
 
     const handlePageSizeChange = useCallback((newPageSize: number) => {
         setPagination({ pageIndex: 0, pageSize: newPageSize });
@@ -115,6 +119,7 @@ const ChequeListPage = () => {
         sortBy: sortModel[0]?.colId,
         sortOrder: sortModel[0]?.sort,
         search: debouncedSearch || undefined,
+        team: teamId,
     });
 
     const { data: counts } = useChequeDashboardCounts();
@@ -175,6 +180,16 @@ const ChequeListPage = () => {
                 filter: true,
             },
             {
+                field: 'requestedBy',
+                headerName: 'Requested By',
+                width: 140,
+                maxWidth: 140,
+                colId: 'requestedBy',
+                valueGetter: (params) => params.data?.requestedBy || '—',
+                sortable: true,
+                filter: true,
+            },
+            {
                 field: 'bidValidity',
                 headerName: 'Bid Validity',
                 width: 120,
@@ -204,19 +219,10 @@ const ChequeListPage = () => {
                 },
             },
             {
-                field: 'purpose',
-                headerName: 'Purpose',
-                width: 100,
-                colId: 'purpose',
-                valueGetter: (params) => params.data?.purpose || '—',
-                sortable: true,
-                filter: true,
-            },
-            {
                 field: 'type',
                 headerName: 'Type',
-                width: 80,
-                maxWidth: 80,
+                width: 120,
+                maxWidth: 120,
                 colId: 'type',
                 valueGetter: (params) => params.data?.type || '—',
                 sortable: true,
@@ -238,24 +244,35 @@ const ChequeListPage = () => {
                 },
             },
             {
+                field: 'requestedBy',
+                headerName: 'Member',
+                width: 180,
+                maxWidth: 180,
+                colId: 'requestedBy',
+                sortable: true,
+                filter: true,
+            },
+            {
                 field: 'expiry',
                 headerName: 'Expiry',
-                width: 90,
-                maxWidth: 90,
+                width: 120,
+                maxWidth: 140,
                 colId: 'expiry',
                 sortable: true,
                 filter: true,
                 cellRenderer: (params: any) => {
                     const status = params.value;
                     if (!status) return '—';
-                    return <Badge variant={status === 'Expired' ? 'destructive' : 'default'}>{status}</Badge>;
+                    if (status === 'No date') return <Badge variant="secondary">No date</Badge>;
+                    if (status === 'Expired') return <Badge variant="destructive">Expired</Badge>;
+                    return <Badge variant="default">{status}</Badge>;
                 },
             },
             {
                 field: 'chequeStatus',
                 headerName: 'Cheque Status',
-                width: 140,
-                maxWidth: 140,
+                width: 160,
+                maxWidth: 160,
                 colId: 'chequeStatus',
                 sortable: true,
                 filter: true,
@@ -340,6 +357,12 @@ const ChequeListPage = () => {
                                 Track and manage cheques for tenders.
                             </CardDescription>
                         </div>
+                        <CardAction>
+                            <Button variant="outline" onClick={() => navigate(paths.tendering.oldEmdsForCHEQUE())}>
+                                <Plus className="w-4 h-4" />
+                                Add Old Entry
+                            </Button>
+                        </CardAction>
                     </div>
                 </CardHeader>
                 <CardContent className="px-0">
@@ -367,7 +390,15 @@ const ChequeListPage = () => {
 
                         {/* Search Row: Quick Filters, Search Bar */}
                         <div className="flex items-center gap-4 px-6 pb-4">
-                            {/* Quick Filters (Left) - Optional, can be added per page */}
+                            {/* Quick Filters (Left) */}
+                            <QuickFilter options={[
+                                { label: 'AC Team', value: 'AC' },
+                                { label: 'DC Team', value: 'DC' },
+                                { label: 'All Team', value: 'All' },
+                            ]}
+                                value={teamFilter}
+                                onChange={(value) => setTeamFilter(value)}
+                            />
 
                             {/* Search Bar (Center) - Flex grow */}
                             <div className="flex-1 flex justify-end">

@@ -13,6 +13,11 @@ export class TenderInfoSheetsController {
         return this.infoSheetsService.findByTenderId(tenderId);
     }
 
+    @Get(':tenderId/contacts')
+    async getTenderContacts(@Param('tenderId', ParseIntPipe) tenderId: number) {
+        return this.infoSheetsService.getTenderContacts(tenderId);
+    }
+
     @Post(':tenderId')
     @HttpCode(HttpStatus.CREATED)
     async create(

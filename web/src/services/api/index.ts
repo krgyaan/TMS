@@ -24,7 +24,7 @@ export { leadTypesService } from './lead-type.service';
 export { loanPartiesService } from './loan-party.service';
 export { tenderInfosService } from './tenders.service';
 export { infoSheetsService } from './info-sheet.service';
-export { emdsService } from './emds.service';
+export { paymentRequestsService } from './payment-requests.service';
 export { rfqsService } from './rfqs.service';
 export { rfqResponseService } from './rfqResponse.service';
 export { emdResponsibilityService } from './emd-responsibility.service';

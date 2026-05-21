@@ -571,6 +571,51 @@ export class TenderInfosService {
         });
     }
 
+    async findPaymentDetails(id: number) {
+        const tender = await this.db
+            .select({
+                id: tenderInfos.id,
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                teamMemberName: users.name,
+                dueDate: tenderInfos.dueDate,
+                emd: tenderInfos.emd,
+                emdMode: tenderInfos.emdMode,
+                tenderFees: tenderInfos.tenderFees,
+                tenderFeeMode: tenderInfos.tenderFeeMode,
+                processingFeeMode: tenderInfos.processingFeeMode,
+            })
+            .from(tenderInfos)
+            .leftJoin(users, eq(tenderInfos.teamMember, users.id))
+            .where(eq(tenderInfos.id, id))
+            .limit(1);
+
+        if (tender.length === 0) {
+            return null;
+        }
+
+        const infoSheet = await this.db
+            .select({
+                processingFeeAmount: tenderInformation.processingFeeAmount,
+                courierName: tenderInformation.courierName,
+                courierPhone: tenderInformation.courierPhone,
+                courierAddress: tenderInformation.courierAddress,
+                courierAddressLine1: tenderInformation.courierAddressLine1,
+                courierAddressLine2: tenderInformation.courierAddressLine2,
+                courierCity: tenderInformation.courierCity,
+                courierState: tenderInformation.courierState,
+                courierPincode: tenderInformation.courierPincode,
+            })
+            .from(tenderInformation)
+            .where(eq(tenderInformation.tenderId, id))
+            .limit(1);
+
+        return {
+            ...tender[0],
+            ...(infoSheet.length > 0 ? infoSheet[0] : {}),
+        };
+    }
+
     async create(data: NewTenderInfo, createdBy: number): Promise<TenderInfo> {
         const rows = await this.db.insert(tenderInfos).values(data).returning();
         const newTender = rows[0];
@@ -723,7 +768,7 @@ export class TenderInfosService {
         });
 
         // Send email notification for status update
-        await this.sendTenderStatusUpdateEmail(tenderId, oldStatusName, newStatusName, comment, changedBy);
+        // await this.sendTenderStatusUpdateEmail(tenderId, oldStatusName, newStatusName, comment, changedBy);
 
         return updated;
     }

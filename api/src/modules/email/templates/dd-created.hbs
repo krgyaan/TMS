@@ -1,0 +1,27 @@
+<div>
+    <p>Dear {{data.requestedBy}},</p>
+
+    <p>The request for Demand Draft (DD) creation has been {{data.status}}</p>
+    <ul>
+        {{#if data.issueDate}}<li>DD Date: {{data.issueDate}}</li>{{/if}}
+        {{#if data.chequeNo}}<li>DD No: {{data.chequeNo}}</li>{{/if}}
+        <li>Beneficiary Name: {{data.beneficiaryName}}</li>
+        <li>Payable At: {{data.payableAt}}</li>
+        <li>Amount: {{data.amountFormatted}}</li>
+    </ul>
+    {{#if data.ddImage}}
+    <p>Soft copy of the DD: <a href="{{data.ddImage}}">Download DD</a></p>
+    {{/if}}
+    {{#if data.courierRequestNo}}
+    <p>Courier Request No: <a href="{{data.courierRequestLink}}" target="_blank">{{data.courierRequestNo}}</a></p>
+    {{/if}}
+    {{#if data.remarks}}
+    <p>Remarks: {{data.remarks}}</p>
+    {{/if}}
+
+    <p>Best of luck for the tender.</p>
+    <p>
+        Regards,<br />
+        Account Team
+    </p>
+</div>

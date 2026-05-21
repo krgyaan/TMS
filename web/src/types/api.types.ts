@@ -566,15 +566,16 @@ export interface UpdateTqTypeDto extends Partial<CreateTqTypeDto> {}
 export interface EmdResponsibility {
     id: number;
     name: string;
-    description?: string;
-    status: boolean;
+    instrumentType?: string;
+    assignedUserId?: number;
     createdAt: string;
     updatedAt: string;
 }
 
 export interface CreateEmdResponsibilityDto {
     name: string;
-    status?: boolean;
+    instrumentType?: string;
+    assignedUserId?: number;
 }
 
 export interface UpdateEmdResponsibilityDto extends Partial<CreateEmdResponsibilityDto> {}
@@ -693,7 +694,7 @@ export type {
     CreatePaymentRequestDto,
     UpdatePaymentRequestDto,
     UpdateStatusDto,
-} from "@/modules/tendering/emds-tenderfees/helpers/emdTenderFee.types";
+} from "@/modules/tendering/emds-tenderfees/helpers/payment-request.types";
 
 // Re-export Document Checklist types
 export type {

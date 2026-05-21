@@ -1,273 +1,218 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { AlertCircle, ArrowRightLeft, Loader2 } from 'lucide-react';
+import { ArrowRightLeft, Users, Banknote, CheckCircle2, FileText } from 'lucide-react';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDate, formatDateTime } from '@/hooks/useFormatedDate';
-import { useTender } from '@/hooks/api/useTenders';
-import { useInfoSheet } from '@/hooks/api/useInfoSheets';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { InfoSheetView } from '@/modules/tendering/info-sheet/components/InfoSheetView';
-import { TenderView } from '@/modules/tendering/tenders/components/TenderView';
+import type { BankTransferViewProps } from '../helpers/bankTransfer.types';
 
-interface BankTransferViewProps {
-    data: any;
-    isLoading?: boolean;
-    className?: string;
+function SectionHeader({ title, icon: Icon }: { title: string; icon?: React.ComponentType<{ className?: string }> }) {
+    return (
+        <TableRow className="bg-muted/50">
+            <TableCell colSpan={4} className="font-semibold text-sm py-2">
+                <div className="flex items-center gap-2">
+                    {Icon && <Icon className="h-4 w-4" />}
+                    {title}
+                </div>
+            </TableCell>
+        </TableRow>
+    );
 }
 
-export function BankTransferView({
-    data,
-    isLoading = false,
-    className = '',
-}: BankTransferViewProps) {
-    if (isLoading) {
-        return (
-            <Card className={className}>
-                <CardHeader>
-                    <Skeleton className="h-8 w-48" />
-                </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
-                        {Array.from({ length: 8 }).map((_, i) => (
-                            <Skeleton key={i} className="h-12 w-full" />
-                        ))}
-                    </div>
-                </CardContent>
-            </Card>
-        );
-    }
+function FieldRow({ label, value, fullWidth = false }: { label: string; value: React.ReactNode; fullWidth?: boolean }) {
+    return (
+        <TableRow className="hover:bg-muted/30 transition-colors">
+            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                {label}
+            </TableCell>
+            <TableCell className={`text-sm ${fullWidth ? 'col-span-3' : 'w-3/4'} whitespace-normal [overflow-wrap:anywhere]`} colSpan={fullWidth ? undefined : 3}>
+                {value || '—'}
+            </TableCell>
+        </TableRow>
+    );
+}
+
+function EmptyState({ message }: { message: string }) {
+    return (
+        <TableRow className="hover:bg-muted/30 transition-colors">
+            <TableCell colSpan={4} className="text-sm text-muted-foreground italic py-2">
+                {message}
+            </TableCell>
+        </TableRow>
+    );
+}
+
+export function BankTransferView({ data, followupData }: BankTransferViewProps) {
 
     if (!data) {
         return null;
     }
 
-    // If Tender Id exist
-    const tenderId = Number.isNaN(data.tenderId) ? null : data.tenderId;
-    const { data: tender, isLoading: isTenderLoading } = useTender(tenderId);
-    const { data: infoSheet, isLoading: infoSheetLoading, error: infoSheetError } = useInfoSheet(tenderId);
+    const isAccountsFormRejected = data.btStatus === 'Rejected';
 
     return (
-        <>
-            <Card className={className}>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <ArrowRightLeft className="h-5 w-5" />
-                        Bank Transfer Details
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableBody>
-                            {/* Basic Information */}
-                            <TableRow className="bg-muted/50">
-                                <TableCell colSpan={4} className="font-semibold text-sm">
-                                    Basic Information
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
-                                    Request Date
-                                </TableCell>
-                                <TableCell className="text-sm font-semibold w-1/4">
-                                    {formatDateTime(data.createdAt)}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Requested By
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.requestedByName || '—'}
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Amount
-                                </TableCell>
-                                <TableCell className="text-sm font-semibold">
-                                    {data.amount ? formatINR(Number(data.amount)) : '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Purpose
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.purpose || '—'}
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Status
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    <Badge variant="outline">{data.status || '—'}</Badge>
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Request ID
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.requestId ?? '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Request Type
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.requestType || '—'}
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Bid Validity
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.tenderDueDate ? formatDate(data.tenderDueDate) : data.requestDueDate ? formatDate(data.requestDueDate) : '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Tender Status
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.tenderStatusName || '—'}
-                                </TableCell>
-                            </TableRow>
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                    <ArrowRightLeft className="h-5 w-5" />
+                    Bank Transfer Details
+                </CardTitle>
+            </CardHeader>
+            <CardContent>
+                <Table>
+                    <TableBody>
+                        {/* Basic Information - Always shown */}
+                        <SectionHeader title="Basic Information" />
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
+                                Amount
+                            </TableCell>
+                            <TableCell className="text-sm font-semibold w-1/4">
+                                {data.amount ? formatINR(Number(data.amount)) : '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Account Name
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.accountName || '—'}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Status
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                <Badge variant="outline">{data.btStatus || '—'}</Badge>
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Purpose
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.purpose || '—'}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Account Number
+                            </TableCell>
+                            <TableCell className="text-sm font-mono">
+                                {data.accountNumber || '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                IFSC
+                            </TableCell>
+                            <TableCell className="text-sm font-mono">
+                                {data.ifsc || '—'}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Tender Name
+                            </TableCell>
+                            <TableCell className="text-sm col-span-3">
+                                {data.tenderName || '—'}
+                            </TableCell>
+                        </TableRow>
 
-                            {/* Transfer Details */}
-                            <TableRow className="bg-muted/50">
-                                <TableCell colSpan={4} className="font-semibold text-sm">
-                                    Transfer Details
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Account Name
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.accountName || '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Account Number
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.accountNumber || '—'}
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    IFSC
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.ifsc || '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Transaction Date
-                                </TableCell>
-                                <TableCell className="text-sm">
-                                    {data.transactionDate ? formatDateTime(data.transactionDate) : '—'}
-                                </TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="text-sm font-medium text-muted-foreground w-1/4">
-                                    UTR No
-                                </TableCell>
-                                <TableCell className="text-sm w-1/4">
-                                    {data.utrNo || data.utrNum || '—'}
-                                </TableCell>
-                                <TableCell className="text-sm font-medium text-muted-foreground">
-                                    UTR Message
-                                </TableCell>
-                                <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
-                                    {data.utrMsg || '—'}
-                                </TableCell>
-                            </TableRow>
+                        {/* Accounts Form Section */}
+                        {data.hasAccountsFormData ? (
+                            <>
+                                <SectionHeader title="Accounts Form" icon={FileText} />
+                                {isAccountsFormRejected ? (
+                                    <>
+                                        <TableRow className="hover:bg-muted/30 transition-colors">
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                Status
+                                            </TableCell>
+                                            <TableCell className="text-sm col-span-3">
+                                                <Badge variant="destructive">Rejected</Badge>
+                                            </TableCell>
+                                        </TableRow>
+                                        <FieldRow label="Rejection Reason" value={data.rejectionReason} fullWidth />
+                                    </>
+                                ) : (
+                                    <>
+                                        <TableRow className="hover:bg-muted/30 transition-colors">
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                Status
+                                            </TableCell>
+                                            <TableCell className="text-sm col-span-3">
+                                                <Badge variant="default">Accepted</Badge>
+                                            </TableCell>
+                                        </TableRow>
+                                        <FieldRow label="Payment Date/Time" value={data.paymentDateTime ? formatDateTime(data.paymentDateTime) : '—'} />
+                                        <FieldRow label="UTR No" value={data.utrNo} />
+                                        <FieldRow label="UTR Message" value={data.utrMsg} fullWidth />
+                                    </>
+                                )}
+                            </>
+                        ) : (
+                            <>
+                                <SectionHeader title="Accounts Form" icon={FileText} />
+                                <EmptyState message="No accounts form action taken" />
+                            </>
+                        )}
 
-                            {/* Return Details */}
-                            {(data.returnTransferDate || data.returnUtr) && (
-                                <>
-                                    <TableRow className="bg-muted/50">
-                                        <TableCell colSpan={4} className="font-semibold text-sm">
-                                            Return Details
-                                        </TableCell>
-                                    </TableRow>
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Return Transfer Date
-                                        </TableCell>
-                                        <TableCell className="text-sm">
-                                            {data.returnTransferDate ? formatDate(data.returnTransferDate) : '—'}
-                                        </TableCell>
-                                        <TableCell className="text-sm font-medium text-muted-foreground">
-                                            Return UTR
-                                        </TableCell>
-                                        <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
-                                            {data.returnUtr || '—'}
-                                        </TableCell>
-                                    </TableRow>
-                                </>
-                            )}
+                        {/* Initiate Followup Section */}
+                        {followupData ? (
+                            <>
+                                <SectionHeader title="Initiate Followup" icon={Users} />
+                                <FieldRow label="Organisation Name" value={followupData.organisationName || '—'} />
+                                {followupData.contacts && followupData.contacts.length > 0 ? (
+                                    followupData.contacts.map((contact, index) => (
+                                        <TableRow key={index} className="hover:bg-muted/30 transition-colors">
+                                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                                Contact {index + 1}
+                                            </TableCell>
+                                            <TableCell className="text-sm col-span-3">
+                                                {contact.name}
+                                                {contact.phone && ` - ${contact.phone}`}
+                                                {contact.email && ` (${contact.email})`}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                ) : (
+                                    <EmptyState message="No contacts added" />
+                                )}
+                                <FieldRow label="Follow-up Start Date" value={followupData.followupStartDate ? formatDate(followupData.followupStartDate) : '—'} />
+                                <FieldRow label="Frequency" value={followupData.frequency} />
+                            </>
+                        ) : (
+                            <>
+                                <SectionHeader title="Initiate Followup" icon={Users} />
+                                <EmptyState message="No followup initiated" />
+                            </>
+                        )}
 
-                            {/* Remarks */}
-                            {data.reason && (
-                                <>
-                                    <TableRow className="bg-muted/50">
-                                        <TableCell colSpan={4} className="font-semibold text-sm">
-                                            Additional Information
-                                        </TableCell>
-                                    </TableRow>
-                                    <TableRow className="hover:bg-muted/30 transition-colors">
-                                        <TableCell className="text-sm font-medium text-muted-foreground whitespace-normal [overflow-wrap:anywhere]">
-                                            Reason
-                                        </TableCell>
-                                        <TableCell className="text-sm break-words" colSpan={3}>
-                                            {data.reason || '—'}
-                                        </TableCell>
-                                    </TableRow>
-                                </>
-                            )}
-                            {data.remarks && (
-                                <TableRow className="hover:bg-muted/30 transition-colors">
-                                    <TableCell className="text-sm font-medium text-muted-foreground whitespace-normal [overflow-wrap:anywhere]">
-                                        Remarks
-                                    </TableCell>
-                                    <TableCell className="text-sm break-words" colSpan={3}>
-                                        {data.remarks || '—'}
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
-            <div className='space-y-5'>
-                {isTenderLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    </div>
-                ) : tender ? (
-                    <TenderView tender={tender} />
-                ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                        No tender details found
-                    </div>
-                )}
-                {infoSheetLoading ? (
-                    <div className="flex items-center justify-center py-8">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    </div>
-                ) : infoSheetError ? (
-                    <Alert variant="destructive" className="mb-4">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription>
-                            Failed to load info sheet details
-                        </AlertDescription>
-                    </Alert>
-                ) : infoSheet ? (
-                    <InfoSheetView infoSheet={infoSheet} />
-                ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                        No info sheet details found
-                    </div>
-                )}
-            </div>
-        </>
+                        {/* Returned Section */}
+                        {data.hasReturnedData ? (
+                            <>
+                                <SectionHeader title="Returned via Bank Transfer" icon={Banknote} />
+                                <FieldRow label="Transfer Date" value={data.returnTransferDate ? formatDate(data.returnTransferDate) : '—'} />
+                                <FieldRow label="Return UTR" value={data.returnUtr} fullWidth />
+                            </>
+                        ) : (
+                            <>
+                                <SectionHeader title="Returned via Bank Transfer" icon={Banknote} />
+                                <EmptyState message="No return recorded" />
+                            </>
+                        )}
+
+                        {/* Settled Section */}
+                        {data.hasSettledData ? (
+                            <>
+                                <SectionHeader title="Settled with Project Account" icon={CheckCircle2} />
+                                <FieldRow label="Remarks" value={data.settledRemarks || data.remarks || '—'} fullWidth />
+                            </>
+                        ) : (
+                            <>
+                                <SectionHeader title="Settled with Project Account" icon={CheckCircle2} />
+                                <EmptyState message="Not settled" />
+                            </>
+                        )}
+                    </TableBody>
+                </Table>
+            </CardContent>
+        </Card>
     );
 }

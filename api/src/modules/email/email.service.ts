@@ -1,9 +1,9 @@
-import { Inject, Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as Handlebars from 'handlebars';
 import * as fs from 'fs';
 import * as path from 'path';
-import { eq, and, lt, sql, isNotNull, or } from 'drizzle-orm';
+import { eq, and, lt, sql } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import { emailLogs, tenderInfos } from '@/db/schemas';
 import { GmailClient } from './gmail.client';
@@ -11,8 +11,8 @@ import { RecipientResolver } from './recipient.resolver';
 import {
     SendEmailOptions,
     SendTenderEmailOptions,
+    SendPaymentEmailOptions,
     ResolvedEmail,
-    EmailStatus,
 } from './dto/send-email.dto';
 import type { DbInstance } from '@/db';
 import { normalize } from 'path';
@@ -156,12 +156,14 @@ export class EmailService {
             // 1. Check sender OAuth
             const hasOAuth = await this.gmail.hasValidOAuth(options.fromUserId);
             if (!hasOAuth) {
+                this.logger.warn(`Email send aborted: sender ${options.fromUserId} has no valid OAuth for event ${options.eventType}`);
                 return { success: false, error: 'Sender needs to authenticate with Google.' };
             }
 
             // 2. Get sender info
             const sender = await this.recipientResolver.getUserById(options.fromUserId);
             if (!sender) {
+                this.logger.warn(`Email send aborted: sender ${options.fromUserId} not found for event ${options.eventType}`);
                 return { success: false, error: 'Sender not found.' };
             }
 
@@ -172,6 +174,7 @@ export class EmailService {
             ]);
 
             if (toEmails.length === 0) {
+                this.logger.warn(`Email send aborted: no valid recipients resolved for event ${options.eventType}`);
                 return { success: false, error: 'No valid recipients.' };
             }
 
@@ -404,6 +407,59 @@ export class EmailService {
                 tenderName,
             },
             labelPath,
+            attachments: options.attachments,
+        });
+    }
+
+    /**
+     * Convenience method for payment request emails
+     * Handles both tender-linked and non-tender payment requests.
+     * - If tenderId > 0: fetches tender info, generates label, uses tender as reference
+     * - If no tenderId: skips tender lookup, no labeling, uses payment_request as reference
+     */
+    async sendPaymentEmail(options: SendPaymentEmailOptions): Promise<{ success: boolean; emailLogId?: number; error?: string }> {
+        let labelPath = '';
+        let referenceType = 'payment_request';
+        let referenceId = options.requestId;
+        let extraData: Record<string, any> = {};
+
+        // If tender exists, fetch info and generate label
+        if (options.tenderId && options.tenderId > 0) {
+            const tender = await this.db
+                .select({ teamId: tenderInfos.team, tenderName: tenderInfos.tenderName })
+                .from(tenderInfos)
+                .where(eq(tenderInfos.id, options.tenderId))
+                .limit(1);
+
+            if (tender.length) {
+                const teamId = tender[0].teamId;
+                const teamName = this.recipientResolver.getTeamName(teamId);
+                const tenderName = tender[0].tenderName;
+
+                labelPath = this.generateTenderLabelPath(teamName, tenderName);
+                referenceType = 'tender';
+                referenceId = options.tenderId;
+                extraData = { teamName, tenderName };
+            } else {
+                // Tender ID was provided but tender not found in DB — proceed without labeling
+                this.logger.warn(`sendPaymentEmail: Tender ${options.tenderId} not found, proceeding without label`);
+            }
+        }
+
+        return this.send({
+            referenceType,
+            referenceId,
+            eventType: options.eventType,
+            fromUserId: options.fromUserId,
+            to: options.to,
+            cc: options.cc,
+            subject: options.subject,
+            template: options.template,
+            data: {
+                ...options.data,
+                ...extraData,
+            },
+            labelPath: labelPath || undefined,
             attachments: options.attachments,
         });
     }

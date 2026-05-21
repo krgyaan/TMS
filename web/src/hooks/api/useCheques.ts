@@ -14,6 +14,8 @@ export const chequesKey = {
     details: () => [...chequesKey.all, 'detail'] as const,
     detail: (id: number) => [...chequesKey.details(), id] as const,
     counts: () => [...chequesKey.all, 'counts'] as const,
+    actionForm: (id: number) => [...chequesKey.all, 'action-form', id] as const,
+    followup: (id: number) => [...chequesKey.all, 'followup', id] as const,
 };
 
 export const useChequeDashboard = (
@@ -29,7 +31,8 @@ export const useChequeDashboard = (
         limit: filters?.limit, 
         search: filters?.search,
         sortBy: filters?.sortBy,
-        sortOrder: filters?.sortOrder
+        sortOrder: filters?.sortOrder,
+        team: filters?.team,
     };
 
     const query = useQuery<PaginatedResult<ChequeDashboardRow>>({
@@ -74,12 +77,34 @@ export const useChequeDetails = (id: number) => {
     return query;
 };
 
+export const useChequeActionFormData = (id: number) => {
+    return useQuery({
+        queryKey: chequesKey.actionForm(id),
+        queryFn: async () => {
+            const result = await chequesService.getActionFormData(id);
+            return result;
+        },
+        enabled: !!id,
+    });
+};
+
+export const useChequeFollowupData = (id: number) => {
+    return useQuery({
+        queryKey: chequesKey.followup(id),
+        queryFn: async () => {
+            const result = await chequesService.getFollowupData(id);
+            return result;
+        },
+        enabled: !!id,
+    });
+};
+
 export const useUpdateChequeAction = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, formData }: { id: number; formData: FormData }) =>
-            chequesService.updateAction(id, formData),
+        mutationFn: ({ id, data }: { id: number; data: Record<string, unknown> }) =>
+            chequesService.updateAction(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: chequesKey.all });
             queryClient.invalidateQueries({ queryKey: chequesKey.counts() });

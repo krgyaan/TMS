@@ -46,3 +46,6 @@ export * from "./projects.schema";
 // Documents Submitted
 export * from "./documents-submitted.schema";
 export * from "./documents-submitted.relations";
+
+// EMD Responsibilities
+export * from "./emd-responsibilities";
