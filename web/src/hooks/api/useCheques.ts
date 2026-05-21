@@ -31,7 +31,8 @@ export const useChequeDashboard = (
         limit: filters?.limit, 
         search: filters?.search,
         sortBy: filters?.sortBy,
-        sortOrder: filters?.sortOrder
+        sortOrder: filters?.sortOrder,
+        team: filters?.team,
     };
 
     const query = useQuery<PaginatedResult<ChequeDashboardRow>>({

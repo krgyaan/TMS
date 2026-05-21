@@ -7,6 +7,7 @@ export type ChequeDashboardFilters = {
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
     search?: string;
+    team?: number;
 };
 
 export interface ChequeDashboardRow {

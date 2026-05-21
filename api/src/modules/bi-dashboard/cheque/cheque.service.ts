@@ -145,6 +145,7 @@ export class ChequeService {
             sortBy?: string;
             sortOrder?: 'asc' | 'desc';
             search?: string;
+            teamId?: number;
         },
     ): Promise<PaginatedResult<ChequeDashboardRow>> {
         const page = options?.page || 1;
@@ -154,6 +155,12 @@ export class ChequeService {
         const conditions = this.buildChequeDashboardConditions(tab);
 
         const searchTerm = options?.search?.trim();
+
+        // Team filter
+        const teamId = options?.teamId;
+        if (teamId) {
+            conditions.push(sql`COALESCE(${tenderInfos.team}, ${this.requestedByUser.team}) = ${teamId}`);
+        }
 
         // Search filter - search across all rendered columns
         if (searchTerm) {
@@ -224,13 +231,17 @@ export class ChequeService {
 
         // Count query for pagination
         // Using same joins to ensure Search works on Tender Name etc
-        const [countResult] = await this.db
+        let countQueryBuilder = this.db
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
             .from(paymentInstruments)
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
-            .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
-            .where(whereClause);
+            .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id));
+        if (teamId) {
+            countQueryBuilder = countQueryBuilder
+                .leftJoin(this.requestedByUser, eq(this.requestedByUser.id, paymentRequests.requestedBy));
+        }
+        const [countResult] = await countQueryBuilder.where(whereClause);
 
         const total = Number(countResult?.count || 0);
 
