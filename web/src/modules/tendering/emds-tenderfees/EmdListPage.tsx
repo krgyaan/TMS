@@ -4,7 +4,7 @@ import type { ColDef } from "ag-grid-community";
 import DataTable from "@/components/ui/data-table";
 import { formatDateTime } from "@/hooks/useFormatedDate";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
-import { EyeIcon, Pencil, Plus, RefreshCw, Search, Send, Download } from "lucide-react";
+import { EyeIcon, Pencil, Plus, RefreshCw, Search, Send, Download, XCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsTrigger, TabsList } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";

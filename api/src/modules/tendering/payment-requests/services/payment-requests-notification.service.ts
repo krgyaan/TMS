@@ -1,4 +1,4 @@
-import { couriers, tenderInfos, userRoles, users } from '@/db/schemas';
+import { couriers, tenderInfos, userRoles, users, emdResponsibility } from '@/db/schemas';
 import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import { PdfGeneratorService } from '@/modules/pdf/pdf-generator.service';
@@ -28,23 +28,41 @@ export class PaymentRequestsNotificationService {
         return this.configService.get<string>('app.publicAppUrl') || 'http://localhost:5173';
     }
 
-    private getResponsibleUserByMode(mode: string) {
-        switch (mode) {
-            case 'BANK_TRANSFER':
-                return 'gyan@volksenergie.in';
-            case 'PORTAL':
-                return 'gyan@volksenergie.in';
-            case 'CHEQUE':
-                return 'gyan@volksenergie.in';
-            case 'DD':
-                return 'gyan@volksenergie.in';
-            case 'FDR':
-                return 'gyan@volksenergie.in';
-            case 'BG':
-                return 'gyan@volksenergie.in';
-            default:
-                return 'gyan@volksenergie.in';
+    private readonly instrumentTypeMap: Record<string, string> = {
+        DD: 'DD',
+        FDR: 'FDR',
+        BG: 'BG',
+        CHEQUE: 'Cheque',
+        'BANK TRANSFER': 'Bank Transfer',
+        BANK_TRANSFER: 'Bank Transfer',
+        PORTAL: 'Portal Payment',
+        'PORTAL PAYMENT': 'Portal Payment',
+    };
+
+    private async getResponsibleUserEmailByMode(mode: string): Promise<string> {
+        const dbType = this.instrumentTypeMap[mode];
+        if (!dbType) {
+            this.logger.warn(`No instrument type mapping for mode: ${mode}`);
+            return 'gyan@volksenergie.in';
         }
+        const [result] = await this.db
+            .select({ email: users.email })
+            .from(emdResponsibility)
+            .leftJoin(users, eq(users.id, emdResponsibility.assignedUserId))
+            .where(eq(emdResponsibility.instrumentType, dbType))
+            .limit(1);
+        return result?.email || 'gyan@volksenergie.in';
+    }
+
+    private async getResponsibleUserIdByMode(mode: string): Promise<number | null> {
+        const dbType = this.instrumentTypeMap[mode];
+        if (!dbType) return null;
+        const [result] = await this.db
+            .select({ userId: emdResponsibility.assignedUserId })
+            .from(emdResponsibility)
+            .where(eq(emdResponsibility.instrumentType, dbType))
+            .limit(1);
+        return result?.userId ?? null;
     }
 
     private formatDateDDMMYYYY = (dateStr: string | null | undefined): string => {
@@ -81,7 +99,7 @@ export class PaymentRequestsNotificationService {
             this.logger.warn(`Tender ${tenderId} not found for DD email, sending without label`);
         }
 
-        const toEmails = this.getResponsibleUserByMode('DD');
+        const toEmails = await this.getResponsibleUserEmailByMode('DD');
         
         const apiUrl = this.configService.get<string>('app.apiUrl') || '';
         const baseUrl = apiUrl.replace('/api/v1', '');
@@ -95,11 +113,12 @@ export class PaymentRequestsNotificationService {
             : '';
 
         try {
+            // From: Cheque responsible user — To: DD responsible user
             const result = await this.emailService.sendPaymentEmail({
                 requestId,
                 tenderId: tenderId > 0 ? tenderId : undefined,
                 eventType: 'DD_REQUEST',
-                fromUserId: 13,
+                fromUserId: await this.getResponsibleUserIdByMode('CHEQUE') ?? 33,
                 subject: `Cheque created for DD`,
                 template: 'demand-draft-request',
                 data: {
@@ -111,7 +130,7 @@ export class PaymentRequestsNotificationService {
                     timeLimit: chequeInstrument.courierDeadline || 24,
                     beneficiaryName: chequeInstrument.favouring || 'Not specified',
                     payableAt: chequeInstrument.payableAt || 'Not specified',
-                    link: `${this.getFrontendUrl()}/#/bi-dashboard/demand-drafts/${ddInstrumentId}`,
+                    link: `${this.getFrontendUrl()}/bi-dashboard/demand-drafts/${ddInstrumentId}`,
                     courierAddress: chequeInstrument.courierAddress || 'Not specified',
                 },
                 to: [{ type: 'emails', emails: [toEmails] }],
@@ -146,7 +165,7 @@ export class PaymentRequestsNotificationService {
             this.logger.warn(`Tender ${tenderId} not found for FDR email, sending without label`);
         }
         
-        const toEmails = this.getResponsibleUserByMode('FDR');
+        const toEmails = await this.getResponsibleUserEmailByMode('FDR');
 
         const apiUrl = this.configService.get<string>('app.apiUrl') || '';
         const baseUrl = apiUrl.replace('/api/v1', '');
@@ -160,11 +179,12 @@ export class PaymentRequestsNotificationService {
             : '';
 
         try {
+            // From: Cheque responsible user — To: FDR responsible user
             const result = await this.emailService.sendPaymentEmail({
                 requestId,
                 tenderId: tenderId > 0 ? tenderId : undefined,
                 eventType: 'FDR_REQUEST',
-                fromUserId: 13,
+                fromUserId: await this.getResponsibleUserIdByMode('CHEQUE') ?? 33,
                 subject: `Cheque created for FDR`,
                 template: 'fixed-deposit-receipt-request',
                 data: {
@@ -176,7 +196,7 @@ export class PaymentRequestsNotificationService {
                     timeLimit: chequeInstrument.courierDeadline || 24,
                     beneficiaryName: chequeInstrument.favouring || 'Not specified',
                     payableAt: chequeInstrument.payableAt || 'Not specified',
-                    link: `${this.getFrontendUrl()}/#/bi-dashboard/fdrs/${fdrInstrumentId}`,
+                    link: `${this.getFrontendUrl()}/bi-dashboard/fdrs/${fdrInstrumentId}`,
                     courierAddress: chequeInstrument.courierAddress || 'Not specified',
                 },
                 to: [{ type: 'emails', emails: [toEmails] }],
@@ -253,15 +273,16 @@ export class PaymentRequestsNotificationService {
                 const baseUrl = (this.configService.get<string>('app.apiUrl') || '').replace('/api/v1', '');
                 imageUrl = `${baseUrl}/uploads/courier/${docs[0]}`;
             }
-            courierRequestLink = `${this.getFrontendUrl()}/#/shared/couriers/show/${body.req_no}`;
+            courierRequestLink = `${this.getFrontendUrl()}/shared/couriers/show/${body.req_no}`;
         }
 
         try {
+            // From: DD responsible user — To: Requestor
             const result = await this.emailService.sendPaymentEmail({
                 requestId: instrument.requestId,
                 tenderId: paymentReq.tenderId || undefined,
                 eventType: isAccepted ? 'DD_CREATED' : 'DD_REJECTED',
-                fromUserId: 13,
+                fromUserId: await this.getResponsibleUserIdByMode('DD') ?? 33,
                 subject: `Request for DD ${isAccepted ? 'Accepted' : 'Rejected'} - ${paymentReq.purpose || ''}`,
                 template: 'dd-created',
                 data: {
@@ -351,11 +372,12 @@ export class PaymentRequestsNotificationService {
         }
 
         try {
+            // From: FDR responsible user — To: Requestor
             const result = await this.emailService.sendPaymentEmail({
                 requestId: instrument.requestId,
                 tenderId: paymentReq.tenderId || undefined,
                 eventType: isAccepted ? 'FDR_CREATED' : 'FDR_REJECTED',
-                fromUserId: 13,
+                fromUserId: await this.getResponsibleUserIdByMode('FDR') ?? 33,
                 subject: `Request for FDR ${isAccepted ? 'Accepted' : 'Rejected'} - ${paymentReq.purpose || ''}`,
                 template: 'fdr-create',
                 data: {
@@ -449,11 +471,12 @@ export class PaymentRequestsNotificationService {
         const deliveryMethod = chequeDetails?.deliveryMethod || '';
 
         try {
+            // From: Cheque responsible user — To: Requestor
             const result = await this.emailService.sendPaymentEmail({
                 requestId: instrument.requestId,
                 tenderId: instrument.tenderId || undefined,
                 eventType: 'CHEQUE_CREATED',
-                fromUserId: 13,
+                fromUserId: await this.getResponsibleUserIdByMode('CHEQUE') ?? 33,
                 subject: `Cheque created - ${instrument.purpose}`,
                 template: 'cheque-created',
                 data: {
@@ -576,7 +599,7 @@ export class PaymentRequestsNotificationService {
 
         const mode = instrumentType.toUpperCase();
 
-        const toEmails = this.getResponsibleUserByMode(mode);
+        const toEmails = await this.getResponsibleUserEmailByMode(mode);
 
         if (mode === 'BANK TRANSFER') {
             const [btDetails] = await this.db
@@ -586,12 +609,12 @@ export class PaymentRequestsNotificationService {
                 .limit(1);            
 
             try {
+                // From: Requestor — To: BT responsible user
                 const result = await this.emailService.sendPaymentEmail({
                     requestId: instrument.requestId,
                     tenderId: tenderId || undefined,
                     eventType: 'BANK_TRANSFER_REQUEST',
-                    // fromUserId: requestedBy,
-                    fromUserId: 13,
+                    fromUserId: requestedBy,
                     subject: `Bank Transfer - ${purpose}`,
                     template: 'bank-transfer-request',
                     data: {
@@ -604,7 +627,7 @@ export class PaymentRequestsNotificationService {
                         btIfsc: btDetails?.ifsc || 'Not specified',
                         amount: this.formatCurrency(Number(instrument.amount) || 0),
                         isOthersPurpose: !(tenderId > 0),
-                        link: `${this.getFrontendUrl()}/#/tendering/emds/${instrument.requestId}`,
+                        link: `${this.getFrontendUrl()}/tendering/emds/${instrument.requestId}`,
                         tlName: tlUser?.name || 'Team Leader',
                     },
                     to: [{ type: 'emails', emails: [toEmails] }],
@@ -631,12 +654,12 @@ export class PaymentRequestsNotificationService {
             console.log("Portal: ", portalDetails);
                 
             try {
+                // From: Requestor — To: Portal-Payment responsible user
                 const result = await this.emailService.sendPaymentEmail({
                     requestId: instrument.requestId,
                     tenderId: tenderId || undefined,
                     eventType: 'PORTAL_PAYMENT_REQUEST',
-                    // fromUserId: requestedBy,
-                    fromUserId: 13,
+                    fromUserId: requestedBy,
                     subject: `Pay on Portal - ${purpose}`,
                     template: 'pay-on-portal-request',
                     data: {
@@ -649,7 +672,7 @@ export class PaymentRequestsNotificationService {
                         tender_no: tender?.tenderNo || 'NA',
                         tender_name: tender?.tenderName || 'Not specified',
                         dueDate: this.formatDateDDMMYYYY(tender?.dueDate),
-                        link: `${this.getFrontendUrl()}/#/tendering/emds/${instrument.requestId}`,
+                        link: `${this.getFrontendUrl()}/tendering/emds/${instrument.requestId}`,
                         tlName: tlUser?.name || 'Team Leader',
                     },
                     to: [{ type: 'emails', emails: [toEmails] }],
@@ -725,7 +748,7 @@ export class PaymentRequestsNotificationService {
                         chequeDate: finalChequeDate,
                         amount: this.formatCurrency(Number(instrument.amount) || 0),
                         chequeNeeds: instrument.courierDeadline || 24,
-                        link: `${this.getFrontendUrl()}/#/tendering/emds/${instrument.requestId}`,
+                        link: `${this.getFrontendUrl()}/tendering/emds/${instrument.requestId}`,
                         tlName: tlUser?.name || 'Team Leader',
                         receivingPdfUrl,
                     },
@@ -806,11 +829,12 @@ export class PaymentRequestsNotificationService {
         const status = btReq === 'Accepted' ? 'accepted' : 'rejected';
 
         try {
+            // From: BT responsible user — To: Requestor
             const result = await this.emailService.sendPaymentEmail({
                 requestId: instrument.requestId,
                 tenderId: instrument.tenderId || undefined,
                 eventType: 'BT_ACTION',
-                fromUserId: 13,
+                fromUserId: await this.getResponsibleUserIdByMode('BANK_TRANSFER') ?? 33,
                 subject: `Payment via Bank Transfer ${purpose}`,
                 template: 'bt-action',
                 data: {
@@ -825,7 +849,7 @@ export class PaymentRequestsNotificationService {
                     rejectionReason: rejectionReason || '',
                     senderName: 'Accounts Team',
                 },
-                to: [{ type: 'emails', emails: ['gyan@volksenergie.in'] }],
+                to: [{ type: 'emails', emails: [requestedUser.email] }],
                 // cc: [
                 //     { type: 'role', role: 'admin', teamId: tenderTeamId },
                 //     { type: 'emails', emails: ['accounts@volksenergie.in']}
@@ -909,11 +933,12 @@ export class PaymentRequestsNotificationService {
         const paymentProofUrl = paymentProofPath ? `${apiUrl}/tender-files/serve/${paymentProofPath}` : '';
 
         try {
+            // From: Portal-Payment responsible user — To: Requestor
             const result = await this.emailService.sendPaymentEmail({
                 requestId: instrument.requestId,
                 tenderId: instrument.tenderId || undefined,
                 eventType: 'POP_ACTION',
-                fromUserId: 13,
+                fromUserId: await this.getResponsibleUserIdByMode('PORTAL_PAYMENT') ?? 33,
                 subject: `Payment on Portal - ${purpose}`,
                 template: 'pop-action',
                 data: {
@@ -926,7 +951,7 @@ export class PaymentRequestsNotificationService {
                     senderName: 'Accounts Team',
                     paymentProofUrl,
                 },
-                to: [{ type: 'emails', emails: ['gyan@volksenergie.in'] }],
+                to: [{ type: 'emails', emails: [requestedUser.email] }],
                 // cc: [
                 //     { type: 'role', role: 'admin', teamId: tenderTeamId },
                 //     { type: 'emails', emails: ['accounts@volksenergie.in']}
@@ -983,11 +1008,12 @@ export class PaymentRequestsNotificationService {
         }   
 
         try {
+            // From: BT responsible user — To: Requestor
             const result = await this.emailService.sendPaymentEmail({
                 requestId: instrument.requestId,
                 tenderId: instrument.tenderId || undefined,
                 eventType: 'BT_RETURN',
-                fromUserId: 13,
+                fromUserId: await this.getResponsibleUserIdByMode('BANK_TRANSFER') ?? 33,
                 subject: `Payment Returned - ${instrument.projectName}`,
                 template: 'returned-action',
                 data: {
@@ -999,7 +1025,7 @@ export class PaymentRequestsNotificationService {
                     returnUtr: returnUtr || '',
                     senderName: 'Accounts Team',
                 },
-                to: [{ type: 'emails', emails: ['gyan@volksenergie.in'] }],
+                to: [{ type: 'emails', emails: [requestedUser.email] }],
                 // cc: [
                 //     { type: 'role', role: 'admin', teamId: tenderTeamId },
                 //     { type: 'emails', emails: ['accounts@volksenergie.in']}
@@ -1062,11 +1088,12 @@ export class PaymentRequestsNotificationService {
             .limit(1);
 
         try {
+            // From: Portal-Payment responsible user — To: Requestor
             const result = await this.emailService.sendPaymentEmail({
                 requestId: instrument.requestId,
                 tenderId: instrument.tenderId || undefined,
                 eventType: 'POP_RETURN',
-                fromUserId: 13,
+                fromUserId: await this.getResponsibleUserIdByMode('PORTAL_PAYMENT') ?? 33,
                 subject: `Payment Returned - ${instrument.projectName}`,
                 template: 'returned-action',
                 data: {
@@ -1079,7 +1106,7 @@ export class PaymentRequestsNotificationService {
                     returnUtr: returnUtr || '',
                     senderName: 'Accounts Team',
                 },
-                to: [{ type: 'emails', emails: ['gyan@volksenergie.in'] }],
+                to: [{ type: 'emails', emails: [requestedUser.email] }],
                 // cc: [
                 //     { type: 'role', role: 'admin', teamId: tenderTeamId },
                 //     { type: 'emails', emails: ['accounts@volksenergie.in']}
