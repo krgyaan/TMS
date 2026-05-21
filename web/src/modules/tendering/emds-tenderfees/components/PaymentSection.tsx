@@ -170,7 +170,7 @@ export function PaymentSection({
                         Fill in the details for <strong>{MODE_LABELS[selectedMode] || selectedMode}</strong>
                     </p>
 
-                    {selectedMode === 'PORTAL' && <PayOnPortalForm amount={isEditMode ? undefined : amount} prefix={prefix} readOnly={!isEditMode && amount > 0} />}
+                    {(selectedMode === 'PORTAL' || selectedMode === 'POP') && <PayOnPortalForm amount={isEditMode ? undefined : amount} prefix={prefix} readOnly={!isEditMode && amount > 0} />}
                     {(selectedMode === 'BANK_TRANSFER' || selectedMode === 'BT') && <BankTransferForm amount={isEditMode ? undefined : amount} prefix={prefix} readOnly={!isEditMode && amount > 0} />}
                     {selectedMode === 'DD' && <DemandDraftForm amount={isEditMode ? undefined : amount} prefix={prefix} readOnly={!isEditMode && amount > 0} />}
                     {selectedMode === 'BG' && <BankGuaranteeForm amount={isEditMode ? undefined : amount} prefix={prefix} readOnly={!isEditMode && amount > 0} />}
