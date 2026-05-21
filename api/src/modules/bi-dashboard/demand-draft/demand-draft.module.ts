@@ -1,4 +1,5 @@
 import { FollowUpModule } from '@/modules/follow-up/follow-up.module';
+import { EmailModule } from '@/modules/email/email.module';
 import { PaymentRequestsModule } from '@/modules/tendering/payment-requests/payment-requests.module';
 import { TenderFilesService } from '@/modules/tendering/tender-files/tender-files.service';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
@@ -9,7 +10,7 @@ import { DemandDraftController } from './demand-draft.controller';
 import { DemandDraftService } from './demand-draft.service';
 
 @Module({
-    imports: [DatabaseModule, FollowUpModule, PaymentRequestsModule],
+    imports: [DatabaseModule, FollowUpModule, EmailModule, PaymentRequestsModule],
     controllers: [DemandDraftController],
     providers: [DemandDraftService, TenderInfosService, TenderStatusHistoryService, TenderFilesService],
     exports: [DemandDraftService],

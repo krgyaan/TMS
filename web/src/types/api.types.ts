@@ -566,15 +566,16 @@ export interface UpdateTqTypeDto extends Partial<CreateTqTypeDto> {}
 export interface EmdResponsibility {
     id: number;
     name: string;
-    description?: string;
-    status: boolean;
+    instrumentType?: string;
+    assignedUserId?: number;
     createdAt: string;
     updatedAt: string;
 }
 
 export interface CreateEmdResponsibilityDto {
     name: string;
-    status?: boolean;
+    instrumentType?: string;
+    assignedUserId?: number;
 }
 
 export interface UpdateEmdResponsibilityDto extends Partial<CreateEmdResponsibilityDto> {}

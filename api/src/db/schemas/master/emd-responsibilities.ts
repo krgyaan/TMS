@@ -6,8 +6,8 @@ export const emdResponsibility = pgTable("emd-responsibilities", {
     name: varchar("name", { length: 255 }),
     instrumentType: varchar("instrument_type", { length: 30 }),
     assignedUserId: bigint('assigned_user_id', { mode: 'number' }).references(() => users.id),
-    createdAt: timestamp({ mode: "date" }).defaultNow(),
-    updatedAt: timestamp({ mode: "date" }).defaultNow()
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow()
 });
 
 export type EmdResponsibility = typeof emdResponsibility.$inferSelect;

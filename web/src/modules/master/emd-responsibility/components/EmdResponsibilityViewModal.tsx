@@ -5,7 +5,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog'
-import { Badge } from '@/components/ui/badge'
+import { useGetTeamMembers } from "@/hooks/api/useUsers";
 import type { EmdResponsibility } from '@/types/api.types'
 
 type EmdResponsibilityViewModalProps = {
@@ -19,6 +19,11 @@ export const EmdResponsibilityViewModal = ({
     onOpenChange,
     emdResponsibility
 }: EmdResponsibilityViewModalProps) => {
+    const { data: accountsUsers = [] } = useGetTeamMembers(5);
+    const assignedUser = emdResponsibility?.assignedUserId
+        ? accountsUsers.find(u => u.id === emdResponsibility.assignedUserId)
+        : undefined;
+
     if (!emdResponsibility) return null
 
     return (
@@ -34,12 +39,19 @@ export const EmdResponsibilityViewModal = ({
                         <p className="text-sm font-medium mt-1">{emdResponsibility.name}</p>
                     </div>
                     <div>
-                        <label className="text-sm font-medium text-muted-foreground">Status</label>
-                        <div className="mt-1">
-                            <Badge variant={emdResponsibility.status ? 'default' : 'secondary'}>
-                                {emdResponsibility.status ? 'Active' : 'Inactive'}
-                            </Badge>
-                        </div>
+                        <label className="text-sm font-medium text-muted-foreground">Instrument Type</label>
+                        <p className="text-sm font-medium mt-1">{emdResponsibility.instrumentType || <span className="text-muted-foreground">—</span>}</p>
+                    </div>
+                    <div>
+                        <label className="text-sm font-medium text-muted-foreground">Assigned User</label>
+                        {assignedUser ? (
+                            <div className="flex flex-col mt-1">
+                                <span className="text-sm font-medium">{assignedUser.name}</span>
+                                <span className="text-xs text-muted-foreground">{assignedUser.email}</span>
+                            </div>
+                        ) : (
+                            <p className="text-sm font-medium mt-1 text-muted-foreground">—</p>
+                        )}
                     </div>
                     <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                         <div>

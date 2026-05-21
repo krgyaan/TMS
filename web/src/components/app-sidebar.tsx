@@ -167,7 +167,7 @@ const navMain: NavGroup[] = [
             { title: "Imprest Categories", url: paths.master.imprestCategories, permission: "master.imprest-categories" },
             { title: "Followup Categories", url: paths.master.followupCategories, permission: "master.followup-categories" },
             // { title: "Financial Year", url: paths.master.financialYears, permission: "master.financial-years" },
-            { title: "EMDs Responsibilities", url: paths.master.emdsResponsibilities, permission: "master.emds-responsibilities" },
+            { title: "EMD Responsibilities", url: paths.master.emdsResponsibilities, permission: "master.emd-responsibilities" },
             { title: "Lead Types", url: paths.master.leadTypes, permission: "master.lead-types" },
             { title: "TQ Types", url: paths.master.tqTypes, permission: "master.tq-types" },
             { title: "Loan Parties", url: paths.master.loanParties, permission: "master.loan-parties" },
