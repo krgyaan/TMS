@@ -77,7 +77,8 @@ export class ReverseAuctionController {
     findByTenderId(@Param('tenderId', ParseIntPipe) tenderId: number) {
         return this.reverseAuctionService.findByTenderId(tenderId);
     }
-
+    
+    // dont really know where this is being used -> will have to check with GIANNNNUU
     @Post('create/:tenderId')
     createForTender(
         @Param('tenderId', ParseIntPipe) tenderId: number,

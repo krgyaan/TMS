@@ -709,11 +709,13 @@ export class ReverseAuctionService {
      */
     async scheduleRa(tenderId: number, dto: ScheduleRaDto, changedBy: number) {
         // Get current tender status before update
-        console.log('scheduleRa service', tenderId, dto, changedBy);
         const currentTender = await this.tenderInfosService.findById(tenderId);
-        console.log('currentTender', currentTender);
+
         const prevStatus = currentTender?.status ?? null;
-        console.log('prevStatus', prevStatus);
+
+        //defining raStatus to be used in result 
+        let raStatus : string;
+
 
         let updateData: any = {
             technicallyQualified: dto.technicallyQualified,
@@ -727,6 +729,7 @@ export class ReverseAuctionService {
             // Disqualified
             updateData.status = RA_STATUS.DISQUALIFIED;
             updateData.disqualificationReason = dto.disqualificationReason;
+            raStatus = "Disqualified, RA Not Scheduled";
         } else {
             // Qualified - schedule RA
             updateData.status = RA_STATUS.RA_SCHEDULED;
@@ -738,7 +741,8 @@ export class ReverseAuctionService {
 
             // AUTO STATUS CHANGE: Update tender status to 23 (RA scheduled)
             newStatus = 23; // Status ID for "RA scheduled"
-            statusComment = 'RA scheduled';
+            statusComment = 'RA Scheduled';
+            // raStatus = 'Qualified, RA Scheduled'; -> will think about this later ->  for now we will keep things simple and use 'pending'
         }
 
         const result = await this.db.transaction(async (tx) => {
@@ -757,7 +761,8 @@ export class ReverseAuctionService {
                 .returning();
 
             // Sync to tender_results
-            await this.syncToTenderResult(tenderId, inserted?.id ?? 0, inserted.status, tx);
+            // already getting synced
+            await this.syncToTenderResult(tenderId, inserted?.id ?? 0, inserted.status, tx, raStatus);
 
             // Update tender status if RA was scheduled
             if (newStatus !== null) {
@@ -794,9 +799,26 @@ export class ReverseAuctionService {
     async uploadResult(raId: number, dto: UploadRaResultDto, changedBy: number) {
         const existing = await this.findById(raId);
 
+        // Check if tender_results has tqStatus as "Pending" (or if it is null/not created yet)
+        const [tenderResult] = await this.db
+            .select({
+                tqStatus: tenderResults.tqStatus
+            })
+            .from(tenderResults)
+            .where(eq(tenderResults.tenderId, existing.tenderId))
+            .limit(1);
+
+        const currentTqStatus = tenderResult?.tqStatus ?? 'pending';
+        if (currentTqStatus.toLowerCase() === 'pending') {
+            throw new BadRequestException('TQ pending. Kindly complete TQ before uploading the Result.');
+        }
+
         // Get current tender status before update
         const currentTender = await this.tenderInfosService.findById(existing.tenderId);
         const prevStatus = currentTender?.status ?? null;
+
+        // getting the raStatus so we can use it
+        let raStatus;
 
         let status: string;
         let newTenderStatus: number | null = null;
@@ -807,17 +829,20 @@ export class ReverseAuctionService {
                 status = RA_STATUS.WON;
                 newTenderStatus = 25; // Status ID for "Won"
                 statusComment = 'RA Won';
+                raStatus = statusComment;
                 break;
             case 'Lost':
                 status = RA_STATUS.LOST;
                 newTenderStatus = 24; // Status ID for "Lost"
                 statusComment = 'RA Lost';
+                raStatus = statusComment;
                 break;
             case 'H1 Elimination':
                 status = RA_STATUS.LOST_H1;
                 // AUTO STATUS CHANGE: Update tender status to 41 (H1 Elimination)
                 newTenderStatus = 41; // Status ID for "H1 Elimination"
                 statusComment = 'H1 Elimination';
+                raStatus = statusComment;
                 break;
             default:
                 status = existing.status;
@@ -846,7 +871,7 @@ export class ReverseAuctionService {
                 .returning();
 
             // Sync to tender_results
-            await this.syncToTenderResult(existing.tenderId, raId, status, tx);
+            await this.syncToTenderResult(existing.tenderId, raId, status, tx, raStatus);
 
             // Update tender status if H1 Elimination
             if (newTenderStatus !== null) {
@@ -869,34 +894,34 @@ export class ReverseAuctionService {
             return updated;
         });
 
-        // Send email notification
-        if (dto.raResult === 'Won' || dto.raResult === 'Lost') {
-            const mappedDto: UploadResultDto = {
-                technicallyQualified: 'Yes',
-                disqualificationReason: null,
-                qualifiedPartiesCount: existing.qualifiedPartiesCount ?? null,
-                qualifiedPartiesNames: existing.qualifiedPartiesNames ?? [],
-                result: dto.raResult as 'Won' | 'Lost',
-                resultReason: dto.resultReason ?? null,
-                l1Price: dto.raClosePrice ?? null,
-                l2Price: dto.raClosePriceL2 ?? null,
-                ourPrice: dto.raOurPrice ?? null,
-                qualifiedPartiesScreenshot: dto.screenshotQualifiedParties ?? null,
-                finalResultScreenshot: dto.finalResultScreenshot ?? null,
-            };
+        // // Send email notification
+        // if (dto.raResult === 'Won' || dto.raResult === 'Lost') {
+        //     const mappedDto: UploadResultDto = {
+        //         technicallyQualified: 'Yes',
+        //         disqualificationReason: null,
+        //         qualifiedPartiesCount: existing.qualifiedPartiesCount ?? null,
+        //         qualifiedPartiesNames: existing.qualifiedPartiesNames ?? [],
+        //         result: dto.raResult as 'Won' | 'Lost',
+        //         resultReason: dto.resultReason ?? null,
+        //         l1Price: dto.raClosePrice ?? null,
+        //         l2Price: dto.raClosePriceL2 ?? null,
+        //         ourPrice: dto.raOurPrice ?? null,
+        //         qualifiedPartiesScreenshot: dto.screenshotQualifiedParties ?? null,
+        //         finalResultScreenshot: dto.finalResultScreenshot ?? null,
+        //     };
 
-            await this.tenderResultService.sendTenderResultEmail(
-                existing.tenderId,
-                {
-                    qualifiedPartiesScreenshot: dto.screenshotQualifiedParties ?? null,
-                    finalResultScreenshot: dto.finalResultScreenshot ?? null,
-                },
-                changedBy,
-                mappedDto
-            );
-        } else {
-            await this.sendRaResultEmail(existing.tenderId, result, changedBy, dto);
-        }
+        //     await this.tenderResultService.sendTenderResultEmail(
+        //         existing.tenderId,
+        //         {
+        //             qualifiedPartiesScreenshot: dto.screenshotQualifiedParties ?? null,
+        //             finalResultScreenshot: dto.finalResultScreenshot ?? null,
+        //         },
+        //         changedBy,
+        //         mappedDto
+        //     );
+        // } else {
+        //     await this.sendRaResultEmail(existing.tenderId, result, changedBy, dto);
+        // }
 
         return result;
     }
@@ -954,7 +979,7 @@ export class ReverseAuctionService {
         return updated.length;
     }
 
-    private async syncToTenderResult(tenderId: number, raId: number, status: string, dbClient: any = this.db) {
+    private async syncToTenderResult(tenderId: number, raId: number, status: string, dbClient: any = this.db, raStatus?: string) {
         // Fetch RA Record to sync fields
         const [raRecord] = await dbClient
             .select()
@@ -994,6 +1019,7 @@ export class ReverseAuctionService {
             updatePayload.qualifiedPartiesNames = raRecord.qualifiedPartiesNames;
             updatePayload.technicallyQualified = raRecord.technicallyQualified;
             updatePayload.disqualificationReason = raRecord.disqualificationReason;
+            updatePayload.raStatus= raStatus ? raStatus : 'pending';
         }
 
         // Check if tender_result exists
