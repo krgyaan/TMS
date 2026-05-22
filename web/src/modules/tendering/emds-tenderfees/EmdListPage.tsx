@@ -31,6 +31,7 @@ import { payOnPortalsService } from '@/services/api/pay-on-portals.service';
 import { chequesService } from '@/services/api/cheques.service';
 import { bankGuaranteesService } from '@/services/api/bank-guarantees.service';
 import { paymentRequestsService } from '@/services/api/payment-requests.service';
+import { useAuth } from "@/contexts/AuthContext";
 
 const TABS = [
     { value: 'pending', label: 'Request Pending' },
@@ -87,6 +88,7 @@ const EmdsAndTenderFeesPage = () => {
     });
     const { hasTenderingPermission } = useTenderingPermissions();
     const [exporting, setExporting] = useState(false);
+    const { isAdmin, isSuperUser } = useAuth();
 
     const EXPORT_TAB_OPTIONS = [
         { value: 'pending', label: 'Request Pending' },
@@ -662,28 +664,31 @@ const EmdsAndTenderFeesPage = () => {
 
                     {/* Search Row: Download + Search */}
                     <div className="flex items-center gap-4 px-6 pb-4">
-                        <div className="flex items-center gap-2">
-                            <Select value={exportTab} onValueChange={setExportTab}>
-                                <SelectTrigger className="w-48">
-                                    <SelectValue placeholder="Choose tab to export" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {EXPORT_TAB_OPTIONS.map(opt => (
-                                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={handleExport}
-                                disabled={!exportTab || exporting}
-                            >
-                                <Download className="mr-2 h-4 w-4" />
-                                {exporting ? 'Exporting...' : 'Download Excel'}
-                            </Button>
-                        </div>
-
+                        {
+                            (isAdmin || isSuperUser) && (
+                            <div className="flex items-center gap-2">
+                                <Select value={exportTab} onValueChange={setExportTab}>
+                                    <SelectTrigger className="w-48">
+                                        <SelectValue placeholder="Choose tab to export" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {EXPORT_TAB_OPTIONS.map(opt => (
+                                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleExport}
+                                    disabled={!exportTab || exporting}
+                                >
+                                    <Download className="mr-2 h-4 w-4" />
+                                    {exporting ? 'Exporting...' : 'Download Excel'}
+                                </Button>
+                            </div>
+                            )
+                        }
                         <div className="flex-1 flex justify-end">
                             <div className="relative">
                                 <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
