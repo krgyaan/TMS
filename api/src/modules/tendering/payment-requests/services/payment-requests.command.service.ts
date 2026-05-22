@@ -779,18 +779,6 @@ export class PaymentRequestsCommandService {
         };
     }
 
-    private getInitialStatus(mode: string): string {
-        const statusMap: Record<string, string> = {
-            'DD': 'DD_ACCOUNTS_FORM_PENDING',
-            'FDR': 'FDR_ACCOUNTS_FORM_PENDING',
-            'BG': 'BG_ACCOUNTS_FORM_PENDING',
-            'CHEQUE': 'CHEQUE_ACCOUNTS_FORM_PENDING',
-            'BANK_TRANSFER': 'Bank Transfer_ACCOUNTS_FORM_PENDING',
-            'PORTAL': 'Portal Payment_ACCOUNTS_FORM_PENDING',
-        };
-        return statusMap[mode] || 'ACCOUNTS_FORM_PENDING';
-    }
-
     private async createStatusHistoryEntry(
         tx: any,
         instrumentId: number,
@@ -798,7 +786,7 @@ export class PaymentRequestsCommandService {
         formData: any,
         userId?: number
     ) {
-        const toStatus = this.getInitialStatus(mode);
+        const toStatus = 'PENDING';
         
         let userName = '';
         let userRoleId = 0;

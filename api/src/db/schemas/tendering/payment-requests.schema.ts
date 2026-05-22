@@ -91,7 +91,7 @@ export const paymentInstruments = pgTable('payment_instruments', {
     courierDeadline: integer('courier_deadline'), // emd_fdrs.courier_deadline, emd_demand_drafts.courier_deadline, emd_bgs.bg_courier_deadline
 
     action: integer('action').default(0), // emd_fdrs.action, emd_demand_drafts.action, emd_bgs.action, emd_cheques.action
-    status: varchar('status', { length: 100 }).default('ACCOUNTS_FORM_PENDING').notNull(),
+    status: varchar('status', { length: 100 }).default('PENDING').notNull(),
     isActive: boolean('is_active').default(true),
 
     // File paths
