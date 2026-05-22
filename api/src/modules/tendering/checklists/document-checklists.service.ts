@@ -75,15 +75,17 @@ export class DocumentChecklistsService {
         // Apply role-based filtering
         const roleFilterConditions: any[] = [];
         if (user && user.roleId) {
-            // Role ID 1 = Super User, 2 = Admin: Show all tenders, respect teamId filter if provided
-            if (user.roleId === 1 || user.roleId === 2) {
+            if (user.dataScope === 'all') {
                 // Super User or Admin: Show all, respect teamId filter if provided
                 if (teamId !== undefined && teamId !== null) {
                     roleFilterConditions.push(eq(tenderInfos.team, teamId));
                 }
                 // If no teamId filter, show all (no additional condition added)
-            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
-                // Role ID 3 = Team Leader, 4 = Coordinator, 6 = Engineer: Filter by primary_team_id
+            } else if (user.canSwitchTeams && teamId !== undefined && teamId !== null) {
+                // Role can switch teams and selected a specific team
+                roleFilterConditions.push(eq(tenderInfos.team, teamId));
+            } else if (user.dataScope === 'team') {
+                // Team-scoped roles: Filter by primary team
                 if (user.teamId) {
                     roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
                 } else {
@@ -91,7 +93,7 @@ export class DocumentChecklistsService {
                     roleFilterConditions.push(sql`1 = 0`); // Always false condition
                 }
             } else {
-                // All other roles: Show only own tenders
+                // Self-scoped roles: Show only own records
                 if (user.sub) {
                     roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
                 } else {
@@ -238,11 +240,13 @@ export class DocumentChecklistsService {
         // Build role-based conditions
         const roleFilterConditions: any[] = [];
         if (user && user.roleId) {
-            if (user.roleId === 1 || user.roleId === 2) {
+            if (user.dataScope === 'all') {
                 if (teamId !== undefined && teamId !== null) {
                     roleFilterConditions.push(eq(tenderInfos.team, teamId));
                 }
-            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+            } else if (user.canSwitchTeams && teamId !== undefined && teamId !== null) {
+                roleFilterConditions.push(eq(tenderInfos.team, teamId));
+            } else if (user.dataScope === 'team') {
                 if (user.teamId) {
                     roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
                 } else {
