@@ -5,17 +5,66 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { paths } from '@/app/routes/paths';
-import { useTenderResultByTenderId } from '@/hooks/api/useTenderResults';
+import { useTenderResult, useTenderResultByTenderId } from '@/hooks/api/useTenderResults';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SubmissionChecklist, type Checkpoint } from '@/components/tendering/SubmissionChecklist';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 
 export default function TenderResultUploadPage() {
-    const { tenderId } = useParams<{ tenderId: string }>();
+    const { tenderId, id } = useParams<{ tenderId?: string; id?: string }>();
     const navigate = useNavigate();
-    const tenderIdNum = Number(tenderId);
+    const isEditMode = !!id;
 
-    const { data: tenderDetails, isLoading: tenderLoading } = useTender(tenderIdNum);
-    const { data: result, isLoading: resultLoading } = useTenderResultByTenderId(tenderIdNum);
+    const resultId = id ? Number(id) : null;
+    const tenderIdNum = tenderId ? Number(tenderId) : null;
+
+    // Fetch result by ID if in edit mode
+    const { data: editResult, isLoading: editResultLoading, error: editResultError } = useTenderResult(resultId);
+
+    // Fetch result by tender ID if in upload mode
+    const { data: uploadResult, isLoading: uploadResultLoading } = useTenderResultByTenderId(isEditMode ? null : tenderIdNum);
+
+    const result = isEditMode ? editResult : uploadResult;
+    const resultLoading = isEditMode ? editResultLoading : uploadResultLoading;
+
+    // The effective tender ID to fetch tender details
+    const effectiveTenderId = isEditMode ? result?.tenderId : tenderIdNum;
+
+    const { data: tenderDetails, isLoading: tenderLoading } = useTender(effectiveTenderId ?? null);
+
+    if (resultLoading || tenderLoading || (isEditMode && !result)) {
+        return (
+            <Card>
+                <CardHeader>
+                    <Skeleton className="h-8 w-48" />
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-4">
+                        {Array.from({ length: 8 }).map((_, i) => (
+                            <Skeleton key={i} className="h-12 w-full" />
+                        ))}
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (isEditMode && (editResultError || !result)) {
+        return (
+            <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                    Result not found or failed to load.
+                    <br />
+                    {editResultError?.message}
+                    <br />
+                    <Button variant="outline" size="sm" className="ml-4" onClick={() => navigate(paths.tendering.results)}>
+                        Back to List
+                    </Button>
+                </AlertDescription>
+            </Alert>
+        );
+    }
 
     if (!tenderDetails) {
         return (
@@ -29,10 +78,6 @@ export default function TenderResultUploadPage() {
                 </AlertDescription>
             </Alert>
         );
-    }
-
-    if (tenderLoading || resultLoading) {
-        return <Skeleton className="h-[800px]" />;
     }
 
     const raStatus = result ? result?.raStatus : 'pending';
@@ -57,21 +102,21 @@ export default function TenderResultUploadPage() {
             status: raStatus === 'pending' ? 'pending' : 'fulfilled',
             description: raStatus === 'pending' ? 'RA not completed' : (raStatus ?? undefined),
         },
-    ]
+    ];
 
     return (
         <>
-            <SubmissionChecklist checkpoints ={checkpoints} />
+            <SubmissionChecklist checkpoints={checkpoints} />
 
             <UploadResultFormPage
-                tenderId={tenderIdNum}
+                tenderId={effectiveTenderId!}
                 tenderDetails={{
                     tenderNo: tenderDetails.tenderNo,
                     tenderName: tenderDetails.tenderName,
                     partiesCount: result?.qualifiedPartiesCount || '',
                     partiesNames: result?.qualifiedPartiesNames || [],
                 }}
-                isEditMode={false}
+                isEditMode={isEditMode}
                 onSuccess={() => navigate(paths.tendering.results)}
             />
         </>

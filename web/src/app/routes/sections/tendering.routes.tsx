@@ -66,7 +66,6 @@ const Tendering_RA_Schedule = lazy(() => import('@/modules/tendering/ras/RaSched
 const Tendering_RA_UploadResult = lazy(() => import('@/modules/tendering/ras/RaUploadResultPage'));
 const Tendering_Results = lazy(() => import('@/modules/tendering/results/TenderResultListPage'));
 const Tendering_Result_Show = lazy(() => import('@/modules/tendering/results/TenderResultShowPage'));
-const Tendering_Result_Edit = lazy(() => import('@/modules/tendering/results/TenderResultEditPage'));
 const Tendering_Result_Upload = lazy(() => import('@/modules/tendering/results/TenderResultUploadPage'));
 const RequestExtensionListPage = lazy(() => import('@/modules/tendering/request-extension/RequestExtensionListPage'));
 const RequestExtensionCreatePage = lazy(() => import('@/modules/tendering/request-extension/RequestExtensionCreatePage'));
@@ -145,7 +144,7 @@ export default function TenderingRoutes() {
             <Route path="results" element={<RouteWrapper><Tendering_Results /></RouteWrapper>} />
             <Route path="results/upload/:tenderId" element={<RouteWrapper><Tendering_Result_Upload /></RouteWrapper>} />
             <Route path="results/:tenderId" element={<RouteWrapper><Tendering_Result_Show /></RouteWrapper>} />
-            <Route path="results/:id/edit" element={<RouteWrapper><Tendering_Result_Edit /></RouteWrapper>} />
+            <Route path="results/:id/edit" element={<RouteWrapper><Tendering_Result_Upload /></RouteWrapper>} />
             <Route path="request-extension" element={<RouteWrapper><RequestExtensionListPage /></RouteWrapper>} />
             <Route path="request-extension/:tenderId/create" element={<RouteWrapper><RequestExtensionCreatePage /></RouteWrapper>} />
             <Route path="request-extension/:tenderId/edit/:id" element={<RouteWrapper><RequestExtensionEditPage /></RouteWrapper>} />
