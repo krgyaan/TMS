@@ -26,7 +26,7 @@ export const useResultDashboard = (
     filters?: ResultDashboardFilters
 ) => {
     const { teamId, userId, dataScope } = useTeamFilter();
-    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const teamIdParam = teamId !== null ? teamId : undefined;
 
     const params: ResultDashboardFilters = {
         ...filters,
@@ -64,7 +64,7 @@ export const useResultDashboard = (
 
 export const useResultDashboardCounts = () => {
     const { teamId, userId, dataScope } = useTeamFilter();
-    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const teamIdParam = teamId !== null ? teamId : undefined;
     const queryKey = [...tenderResultKey.counts(), dataScope, teamId ?? null, userId ?? null];
 
     return useQuery<ResultDashboardCounts>({
