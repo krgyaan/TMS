@@ -55,7 +55,7 @@ export default function CostingSheetSubmitPage() {
         {
             id: 'emd',
             label: 'EMD Status',
-            status: emdNA ? 'na' : (Array.isArray(paymentRequests) && paymentRequests.some(r => r.tenderId === id) ? 'fulfilled' : 'pending'),
+            status: emdNA ? 'na' : (paymentRequests?.some(r => r.tenderId === id) ? 'fulfilled' : 'pending'),
             description: emdNA ? 'EMD not required' : 'Process EMD payment'
         },
         {

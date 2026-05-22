@@ -177,7 +177,7 @@ const renderValue = (value: any) => {
 };
 
 export const EmdTenderFeeShow = ({ paymentRequests, text }: EmdTenderFeeShowProps) => {
-    if (!paymentRequests || !Array.isArray(paymentRequests)) return null;
+    if (!paymentRequests) return null;
 
     const emdRequest = paymentRequests.find(r => r.purpose === "EMD");
     const tenderFeeRequest = paymentRequests.find(r => r.purpose === "Tender Fee");
@@ -485,7 +485,7 @@ export function EmdTenderFeeSection({ tenderId }: { tenderId: number | null }) {
     if (infoSheet?.tenderFeeRequired == 'NO' || infoSheet?.tenderFeeRequired == null) text += "Tender Fee, ";
     if (infoSheet?.processingFeeRequired == 'NO' || infoSheet?.processingFeeRequired == null) text += "Processing Fee";
 
-    if (!paymentRequests || !Array.isArray(paymentRequests) || paymentRequests.length === 0) {
+    if (!paymentRequests || paymentRequests.length === 0) {
         return (
             <Card>
                 <CardContent className="pt-0">
