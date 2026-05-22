@@ -34,6 +34,7 @@ export const MODE_LABELS: Record<string, string> = {
     'BG': 'Bank Guarantee',
     'BANK_TRANSFER': 'Bank Transfer',
     'PORTAL': 'Payment on Portal',
+    'POP': 'Payment on Portal',
     'BT': 'Bank Transfer',
 };
 
