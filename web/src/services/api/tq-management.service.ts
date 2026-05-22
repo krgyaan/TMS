@@ -72,12 +72,12 @@ class TqManagementService extends BaseApiService {
         return this.patch<TenderQuery>(`/${id}/missed`, data);
     }
 
-    async markAsNoTq(tenderId: number, qualified: boolean = true): Promise<TenderQuery> {
-        return this.post<TenderQuery>('/no-tq', { tenderId, qualified });
+    async markAsNoTq(tenderId: number, qualified: boolean = true, disqualificationReason?: string): Promise<TenderQuery> {
+        return this.post<TenderQuery>('/no-tq', { tenderId, qualified, disqualificationReason });
     }
 
-    async tqQualified(tqId: number, qualified: boolean = true): Promise<TenderQuery> {
-        return this.patch<TenderQuery>(`/${tqId}/qualified`, { qualified });
+    async tqQualified(tqId: number, qualified: boolean = true, disqualificationReason?: string): Promise<TenderQuery> {
+        return this.patch<TenderQuery>(`/${tqId}/qualified`, { qualified, disqualificationReason });
     }
 
     async getDashboardCounts(teamId?: number): Promise<TqManagementDashboardCounts> {

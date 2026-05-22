@@ -641,7 +641,7 @@ export class TqManagementService {
         return result[0];
     }
 
-    async markAsNoTq(tenderId: number, userId: number, qualified: boolean = true) {
+    async markAsNoTq(tenderId: number, userId: number, qualified: boolean = true, disqualificationReason?: string) {
         // Get current tender status before update
         const currentTender = await this.tenderInfosService.findById(tenderId);
         const prevStatus = currentTender?.status ?? null;
@@ -661,6 +661,7 @@ export class TqManagementService {
                     receivedBy: userId,
                     receivedAt: new Date(),
                     tqSubmissionDeadline: null,
+                    missedReason: qualified ? null : disqualificationReason,
                 })
                 .returning();
 
@@ -678,7 +679,8 @@ export class TqManagementService {
                 .update(tenderResults)
                 .set({
                     technicallyQualified: qualified ? "Yes" : "No",
-                    status : qualified ? "Under Evaluation" : "Disqualified"
+                    status : qualified ? "Under Evaluation" : "Disqualified",
+                    disqualificationReason: qualified ? null : (disqualificationReason || null)
                 })
                 .where(eq(tenderResults.id, resultId));
 
@@ -698,7 +700,7 @@ export class TqManagementService {
         return result;
     }
 
-    async tqQualified(id: number, userId: number, qualified: boolean = true) {
+    async tqQualified(id: number, userId: number, qualified: boolean = true, disqualificationReason?: string) {
         // Get TQ record to find tenderId
         const tqRecord = await this.findById(id);
         const tenderId = tqRecord.tenderId;
@@ -718,6 +720,7 @@ export class TqManagementService {
                 .update(tenderQueries)
                 .set({
                     status: tqStatus,
+                    missedReason: qualified ? null : disqualificationReason,
                     updatedAt: new Date(),
                 })
                 .where(eq(tenderQueries.id, id))
@@ -736,8 +739,9 @@ export class TqManagementService {
             await this.db
                 .update(tenderResults)
                 .set({
-                    technicallyQualified: "Yes",
-                    status : "Under Evaluation"
+                    technicallyQualified: qualified ? "Yes" : "No",
+                    status : qualified ? "Under Evaluation" : "Disqualified",
+                    disqualificationReason: qualified ? null : (disqualificationReason || null)
                 })
                 .where(eq(tenderResults.id, resultId));
 
