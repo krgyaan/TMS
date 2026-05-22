@@ -5,7 +5,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog'
-import { useGetTeamMembers } from "@/hooks/api/useUsers";
 import type { EmdResponsibility } from '@/types/api.types'
 
 type EmdResponsibilityViewModalProps = {
@@ -19,11 +18,6 @@ export const EmdResponsibilityViewModal = ({
     onOpenChange,
     emdResponsibility
 }: EmdResponsibilityViewModalProps) => {
-    const { data: accountsUsers = [] } = useGetTeamMembers(5);
-    const assignedUser = emdResponsibility?.assignedUserId
-        ? accountsUsers.find(u => u.id === emdResponsibility.assignedUserId)
-        : undefined;
-
     if (!emdResponsibility) return null
 
     return (
@@ -44,10 +38,10 @@ export const EmdResponsibilityViewModal = ({
                     </div>
                     <div>
                         <label className="text-sm font-medium text-muted-foreground">Assigned User</label>
-                        {assignedUser ? (
+                        {emdResponsibility.assignedUserName ? (
                             <div className="flex flex-col mt-1">
-                                <span className="text-sm font-medium">{assignedUser.name}</span>
-                                <span className="text-xs text-muted-foreground">{assignedUser.email}</span>
+                                <span className="text-sm font-medium">{emdResponsibility.assignedUserName}</span>
+                                {emdResponsibility.assignedUserEmail && <span className="text-xs text-muted-foreground">{emdResponsibility.assignedUserEmail}</span>}
                             </div>
                         ) : (
                             <p className="text-sm font-medium mt-1 text-muted-foreground">—</p>

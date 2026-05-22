@@ -568,6 +568,8 @@ export interface EmdResponsibility {
     name: string;
     instrumentType?: string;
     assignedUserId?: number;
+    assignedUserName?: string;
+    assignedUserEmail?: string;
     createdAt: string;
     updatedAt: string;
 }

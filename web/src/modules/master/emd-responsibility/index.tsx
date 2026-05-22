@@ -6,9 +6,7 @@ import { useState } from "react";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { useEmdResponsibilities } from "@/hooks/api/useEmdResponsibility";
-import { useGetTeamMembers } from "@/hooks/api/useUsers";
 import type { EmdResponsibility } from "@/types/api.types";
-import type { User } from "@/types/api.types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Plus } from "lucide-react";
@@ -22,8 +20,6 @@ const rowSelection: RowSelectionOptions = {
 
 const EmdResponsibilityPage = () => {
     const { data: emdResponsibilities, isLoading, error, refetch } = useEmdResponsibilities();
-    const { data: accountsUsers = [] } = useGetTeamMembers(5);
-    const userMap = new Map<number, User>(accountsUsers.map(u => [u.id, u]));
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [viewModalOpen, setViewModalOpen] = useState(false);
     const [selectedEmdResponsibility, setSelectedEmdResponsibility] = useState<EmdResponsibility | null>(null);
@@ -82,17 +78,18 @@ const EmdResponsibilityPage = () => {
             },
         },
         {
-            field: "assignedUserId",
+            field: "assignedUserName",
             headerName: "Assigned User",
             width: 220,
             filter: "agTextColumnFilter",
             cellRenderer: (params: any) => {
-                const user = params.value ? userMap.get(params.value) : undefined;
-                if (!user) return <span className="text-gray-400">—</span>;
+                const name = params.data?.assignedUserName;
+                const email = params.data?.assignedUserEmail;
+                if (!name) return <span className="text-gray-400">—</span>;
                 return (
                     <div className="flex flex-col py-1">
-                        <span className="text-sm font-medium">{user.name}</span>
-                        <span className="text-xs text-muted-foreground">{user.email}</span>
+                        <span className="text-sm font-medium">{name}</span>
+                        {email && <span className="text-xs text-muted-foreground">{email}</span>}
                     </div>
                 );
             },
@@ -196,7 +193,6 @@ const EmdResponsibilityPage = () => {
                         enableRowSelection={true}
                         selectionType="multiple"
                         onSelectionChanged={rows => console.log("Selected rows:", rows)}
-                        height="100%"
                     />
                 </CardContent>
             </Card>
