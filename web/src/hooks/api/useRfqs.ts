@@ -20,7 +20,7 @@ export const rfqsKey = {
 
 export const useRfqsDashboard = (filters?: RfqDashboardFilters) => {
     const { teamId, userId, dataScope } = useTeamFilter();
-    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const teamIdParam = teamId !== null ? teamId : undefined;
 
     const effectiveFilters: RfqDashboardFilters | undefined = filters
         ? { ...filters, ...(teamIdParam !== undefined ? { teamId: teamIdParam } : {}) }
@@ -144,7 +144,7 @@ export const useResponseStatus = () => {
 
 export const useRfqsDashboardCounts = () => {
     const { teamId, userId, dataScope } = useTeamFilter();
-    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const teamIdParam = teamId !== null ? teamId : undefined;
     const queryKey = [...rfqsKey.dashboardCounts(), dataScope, teamId ?? null, userId ?? null];
 
     return useQuery({
