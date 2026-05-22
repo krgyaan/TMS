@@ -82,6 +82,22 @@ const BankTransferListPage = () => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, [teamFilter]);
 
+
+    const handlePageSizeChange = useCallback((newPageSize: number) => {
+        setPagination({ pageIndex: 0, pageSize: newPageSize });
+    }, []);
+
+    const handleSortChanged = useCallback((event: any) => {
+        const sortModel = event.api.getColumnState()
+            .filter((col: any) => col.sort)
+            .map((col: any) => ({
+                colId: col.colId,
+                sort: col.sort as 'asc' | 'desc'
+            }));
+        setSortModel(sortModel);
+        setPagination(p => ({ ...p, pageIndex: 0 }));
+    }, []);
+
     const { data: apiResponse, isLoading, error } = useBankTransferDashboard({
         tab: activeTab,
         page: pagination.pageIndex + 1,

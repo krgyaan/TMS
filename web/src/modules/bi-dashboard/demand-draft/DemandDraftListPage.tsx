@@ -14,14 +14,14 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useDemandDraftDashboard, useDemandDraftDashboardCounts } from '@/hooks/api/useDemandDrafts';
-import type { DemandDraftDashboardRow, DemandDraftDashboardTab } from './helpers/demandDraft.types';
+import type { DemandDraftDashboardRow, DashboardTab } from './helpers/demandDraft.types';
 import { tenderNameCol } from '@/components/data-grid/columns';
 import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { paths } from '@/app/routes/paths';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 
-const TABS_CONFIG: Array<{ key: DemandDraftDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
+const TABS_CONFIG: Array<{ key: DashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
         key: 'pending',
         name: 'Pending',
@@ -67,7 +67,7 @@ const getStatusVariant = (status: string | null): string => {
 };
 
 const DemandDraftListPage = () => {
-    const [activeTab, setActiveTab] = useState<DemandDraftDashboardTab>('pending');
+    const [activeTab, setActiveTab] = useState<DashboardTab>('pending');
     const navigate = useNavigate();
     const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
@@ -79,6 +79,22 @@ const DemandDraftListPage = () => {
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, [teamFilter]);
+
+    
+    const handlePageSizeChange = useCallback((newPageSize: number) => {
+        setPagination({ pageIndex: 0, pageSize: newPageSize });
+    }, []);
+
+    const handleSortChanged = useCallback((event: any) => {
+        const sortModel = event.api.getColumnState()
+            .filter((col: any) => col.sort)
+            .map((col: any) => ({
+                colId: col.colId,
+                sort: col.sort as 'asc' | 'desc'
+            }));
+        setSortModel(sortModel);
+        setPagination(p => ({ ...p, pageIndex: 0 }));
+    }, []);
 
     const { data: apiResponse, isLoading, error } = useDemandDraftDashboard({
         tab: activeTab,
@@ -324,7 +340,7 @@ const DemandDraftListPage = () => {
                 <CardContent className="px-0">
                     <Tabs
                         value={activeTab}
-                        onValueChange={(value) => setActiveTab(value as DemandDraftDashboardTab)}
+                        onValueChange={(value) => setActiveTab(value as DashboardTab)}
                     >
                         <TabsList className="m-auto mb-4">
                             {tabsWithData.map((tab) => (
