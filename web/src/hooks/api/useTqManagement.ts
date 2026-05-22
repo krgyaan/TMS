@@ -20,7 +20,7 @@ export const useTqManagement = (
     filters?: TqManagementFilters,
 ) => {
     const { teamId, userId, dataScope } = useTeamFilter();
-    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const teamIdParam = teamId !== null ? teamId : undefined;
 
     const effectiveFilters: TqManagementFilters | undefined = filters
         ? { ...filters, ...(teamIdParam !== undefined ? { teamId: teamIdParam } : {}) }
@@ -174,7 +174,7 @@ export const useUpdateTqReceived = () => {
 
 export const useTqManagementDashboardCounts = () => {
     const { teamId, userId, dataScope } = useTeamFilter();
-    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const teamIdParam = teamId !== null ? teamId : undefined;
     const queryKey = [...tqManagementKey.dashboardCounts(), dataScope, teamId ?? null, userId ?? null];
 
     return useQuery<TqManagementDashboardCounts>({

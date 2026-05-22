@@ -88,7 +88,7 @@ export const useOeAssignments = (id: number) => {
 export const useWoBasicDetailsDashboardSummary = () => {
   const { teamId, dataScope } = useTeamFilter();
   // Only pass teamId for Super User/Admin (dataScope === 'all') when a team is selected
-  const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const teamIdParam = teamId !== null ? teamId : undefined;
 
   return useQuery({
     queryKey: woBasicDetailsKeys.dashboardSummary(teamIdParam ?? null),

@@ -51,7 +51,7 @@ export const usePaymentDashboard = (
     search?: string
 ) => {
     const { teamId, dataScope } = useTeamFilter();
-    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const teamIdParam = teamId !== null ? teamId : undefined;
 
     const queryKeyFilters = {
         tab,
@@ -83,7 +83,7 @@ export const usePaymentDashboard = (
 // Counts only hook (for initial tab badge rendering)
 export const usePaymentDashboardCounts = () => {
     const { teamId, userId, dataScope } = useTeamFilter();
-    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const teamIdParam = teamId !== null ? teamId : undefined;
     const queryKey = [...paymentRequestsKey.dashboardCounts(), dataScope, teamId ?? null, userId ?? null];
 
     return useQuery({
