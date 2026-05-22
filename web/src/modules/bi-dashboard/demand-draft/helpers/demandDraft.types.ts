@@ -13,16 +13,18 @@ export interface DashboardFilters {
 export interface DemandDraftDashboardRow {
     id: number;
     requestId: number;
-    tenderId: number;
-    tenderNo: string;
-    projectName: string | null;
-    purpose: string;
-    amount: string | null;
-    instrumentId: number;
-    ddStatus: string;
-    action: number;
-    requestedByName: string | null;
-    createdAt: string | null;
+    purpose: string | null;
+    ddCreationDate: string | null;
+    ddNo: string | null;
+    beneficiaryName: string | null;
+    ddAmount: number | null;
+    tenderName: string | null;
+    tenderNo: string | null;
+    bidValidity: string | null;
+    tenderStatus: string | null;
+    teamMember: string | null;
+    expiry: string | null;
+    ddStatus: string | null;
 }
 
 export interface DemandDraftDashboardCounts {

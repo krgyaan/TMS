@@ -13,16 +13,16 @@ export interface DashboardFilters {
 export interface FdrDashboardRow {
     id: number;
     requestId: number;
-    tenderId: number;
-    tenderNo: string;
-    projectName: string | null;
-    purpose: string;
-    amount: string | null;
-    instrumentId: number;
-    fdrStatus: string;
-    action: number;
-    requestedByName: string | null;
-    createdAt: string | null;
+    fdrCreationDate: string | null;
+    fdrNo: string | null;
+    beneficiaryName: string | null;
+    fdrAmount: number | null;
+    tenderName: string | null;
+    tenderNo: string | null;
+    tenderStatus: string | null;
+    member: string | null;
+    expiry: string | null;
+    fdrStatus: string | null;
 }
 
 export interface FdrDashboardCounts {
@@ -30,10 +30,10 @@ export interface FdrDashboardCounts {
     rejected: number;
     returned: number;
     cancelled: number;
-    pnbBgLinked: number;
-    yblBgLinked: number;
-    securityDeposit: number;
-    bondLinked: number;
+    'pnb-bg-linked': number;
+    'ybl-bg-linked': number;
+    'security-deposit': number;
+    'bond-linked': number;
 }
 
 export interface FDRActionFormData {
