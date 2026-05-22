@@ -43,7 +43,7 @@ export class PaymentRequestsNotificationService {
         const dbType = this.instrumentTypeMap[mode];
         if (!dbType) {
             this.logger.warn(`No instrument type mapping for mode: ${mode}`);
-            return 'gyan@volksenergie.in';
+            return 'kailash@volksenergie.in';
         }
         const [result] = await this.db
             .select({ email: users.email })
@@ -51,7 +51,7 @@ export class PaymentRequestsNotificationService {
             .leftJoin(users, eq(users.id, emdResponsibility.assignedUserId))
             .where(eq(emdResponsibility.instrumentType, dbType))
             .limit(1);
-        return result?.email || 'gyan@volksenergie.in';
+        return result?.email || 'kailash@volksenergie.in';
     }
 
     private async getResponsibleUserIdByMode(mode: string): Promise<number | null> {
