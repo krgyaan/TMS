@@ -14,6 +14,7 @@ import { SelectField } from '@/components/form/SelectField';
 import { TenderFileUploader } from '@/components/tender-file-upload';
 import DateTimeInput from '@/components/form/DateTimeInput';
 import { Textarea } from '@/components/ui/textarea';
+import { showErrorToast } from '@/utils/errorToast';
 
 const UploadRaResultSchema = z.object({
     raResult: z.enum(['Won', 'Lost', 'H1 Elimination']),
@@ -99,6 +100,7 @@ export default function RAResultFormPage({
             }
         } catch (error) {
             console.error('Error uploading RA result:', error);
+            showErrorToast(error);
         }
     };
 
