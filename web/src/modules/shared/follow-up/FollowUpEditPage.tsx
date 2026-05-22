@@ -156,12 +156,12 @@ const FollowUpEditPage: React.FC = () => {
 
         // 3️⃣ Frontend validation for contacts
         for (const [index, contact] of cleanedContacts.entries()) {
-            if (!contact.name) {
-                toast.error(`Contact #${index + 1} Name is required`);
+            if (!contact.email) {
+                toast.error(`Contact #${index + 1} Email is required`);
                 return;
             }
-            if (contact.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email)) {
-                toast.error(`Contact #${index + 1} ("${contact.name}") has an invalid email address`);
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email)) {
+                toast.error(`Contact #${index + 1} has an invalid email address`);
                 return;
             }
         }
