@@ -402,20 +402,23 @@ export class TenderInfosService {
             }
         }
 
-        // Apply role-based filtering
+        // Apply role and team-based filtering
+        // Uses canSwitchTeams and dataScope instead of hardcoded role IDs so
+        // any role configured with canSwitchTeams: true gets team-switching access.
         if (filters?.user) {
             const user = filters.user;
-            // Role ID 1 = Super User, 2 = Admin: Show all tenders, respect teamId filter if provided
-            if (user.roleId === 1 || user.roleId === 2) {
-                // Super User or Admin: Show all, respect teamId filter if provided from frontend
-                // The teamId filter is already applied below if provided
-            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
-                // Role ID 3 = Team Leader, 4 = Coordinator, 6 = Engineer: Filter by primary_team_id
+            if (user.canSwitchTeams && !filters?.unallocated && filters?.teamId !== undefined && filters?.teamId !== null) {
+                // User switched to a specific team via the sidebar team switcher
+                conditions.push(eq(tenderInfos.team, filters.teamId));
+            } else if (user.dataScope === 'all') {
+                // Super User or Admin without a specific team selected: show all
+            } else if (user.dataScope === 'team') {
+                // Team-scoped roles: filter by primary team
                 if (user.teamId) {
                     conditions.push(eq(tenderInfos.team, user.teamId));
                 }
             } else {
-                // All other roles: Show only own tenders
+                // Self-scoped roles: show only own records
                 conditions.push(eq(tenderInfos.teamMember, user.sub));
             }
         }
@@ -434,14 +437,6 @@ export class TenderInfosService {
                     ${statuses.name} ILIKE ${searchStr}
                 )`
             );
-        }
-
-        // Apply teamId filter only for Super User/Admin (they can switch teams)
-        // For other roles, team filtering is handled by role-based logic above
-        if (filters?.user && (filters.user.roleId === 1 || filters.user.roleId === 2)) {
-            if (!filters?.unallocated && filters?.teamId !== undefined && filters?.teamId !== null) {
-                conditions.push(eq(tenderInfos.team, filters.teamId));
-            }
         }
 
         // assignedTo filter (for explicit user filtering, typically not used with role-based filtering)
@@ -1207,17 +1202,21 @@ export class TenderInfosService {
         const baseCondition = TenderInfosService.getActiveCondition();
 
         // Apply role-based filtering
+        // Uses canSwitchTeams and dataScope instead of hardcoded role IDs so
+        // any role configured with canSwitchTeams: true gets team-switching access.
         const roleFilterConditions: any[] = [];
         if (user && user.roleId) {
-            // Role ID 1 = Super User, 2 = Admin: Show all tenders, respect teamId filter if provided
-            if (user.roleId === 1 || user.roleId === 2) {
+            if (user.dataScope === 'all') {
                 // Super User or Admin: Show all, respect teamId filter if provided
                 if (teamId !== undefined && teamId !== null) {
                     roleFilterConditions.push(eq(tenderInfos.team, teamId));
                 }
                 // If no teamId filter, show all (no additional condition added)
-            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
-                // Role ID 3 = Team Leader, 4 = Coordinator, 6 = Engineer: Filter by primary_team_id
+            } else if (user.canSwitchTeams && teamId !== undefined && teamId !== null) {
+                // Role can switch teams and selected a specific team
+                roleFilterConditions.push(eq(tenderInfos.team, teamId));
+            } else if (user.dataScope === 'team') {
+                // Team-scoped roles: Filter by primary team
                 if (user.teamId) {
                     roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
                 } else {
@@ -1225,7 +1224,7 @@ export class TenderInfosService {
                     roleFilterConditions.push(sql`1 = 0`); // Always false condition
                 }
             } else {
-                // All other roles: Show only own tenders
+                // Self-scoped roles: Show only own records
                 if (user.sub) {
                     roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
                 } else {
