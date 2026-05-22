@@ -618,6 +618,7 @@ export class TqManagementService {
                     technicallyQualified: "No",
                     status : "Disqualified",
                     disqualificationReason: data.missedReason,
+                    tqStatus : "Disqualified, TQ missed"
                 })
                 .where(eq(tenderResults.id, resultId));
 
@@ -645,6 +646,9 @@ export class TqManagementService {
         // Get current tender status before update
         const currentTender = await this.tenderInfosService.findById(tenderId);
         const prevStatus = currentTender?.status ?? null;
+
+        //finding the tq_status for Result Entry 
+        let tqStatus = qualified ? 'Qualified, No TQ Recieved' : 'Disqualified, No TQ Recieved';
 
         // AUTO STATUS CHANGE: Update tender status based on qualification
         // Status 37 (Qualified, No TQ received) or Status 38 (Disqualified, No TQ received)
@@ -680,7 +684,8 @@ export class TqManagementService {
                 .set({
                     technicallyQualified: qualified ? "Yes" : "No",
                     status : qualified ? "Under Evaluation" : "Disqualified",
-                    disqualificationReason: qualified ? null : (disqualificationReason || null)
+                    disqualificationReason: qualified ? null : (disqualificationReason || null),
+                    tqStatus : tqStatus
                 })
                 .where(eq(tenderResults.id, resultId));
 
@@ -690,7 +695,7 @@ export class TqManagementService {
                 newStatus,
                 userId,
                 prevStatus,
-                qualified ? 'Qualified, No TQ received' : 'Disqualified, No TQ received',
+                tqStatus,
                 tx
             );
 
@@ -712,10 +717,12 @@ export class TqManagementService {
         // AUTO STATUS CHANGE: Update tender status based on qualification
         // Status 40 (TQ replied, Qualified) or Status 39 (Disqualified, TQ missed)
         const newStatus = qualified ? 40 : 39;
+        
+        //finding the tq_status for Result Entry 
+        let tqStatus = qualified ? 'Qualified, TQ Replied' : 'Disqualified, TQ Missed';
 
         const result = await this.db.transaction(async (tx) => {
             // Update TQ record status based on qualification
-            const tqStatus = qualified ? 'TQ replied, Qualified' : 'Disqualified, TQ missed';
             const updated = await tx
                 .update(tenderQueries)
                 .set({
@@ -741,7 +748,8 @@ export class TqManagementService {
                 .set({
                     technicallyQualified: qualified ? "Yes" : "No",
                     status : qualified ? "Under Evaluation" : "Disqualified",
-                    disqualificationReason: qualified ? null : (disqualificationReason || null)
+                    disqualificationReason: qualified ? null : (disqualificationReason || null),
+                    tqStatus : tqStatus,
                 })
                 .where(eq(tenderResults.id, resultId));
 
@@ -752,7 +760,7 @@ export class TqManagementService {
                 newStatus,
                 userId,
                 prevStatus,
-                qualified ? 'TQ Qualified' : 'TQ Disqualified',
+                tqStatus,
                 tx
             );
 
