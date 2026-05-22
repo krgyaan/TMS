@@ -198,26 +198,40 @@ const portalDetails = z.object({
 // Payment Section Schemas
 // ============================================================================
 
-const emdSection = z.discriminatedUnion("mode", [
+const emdModeMapping: Record<string, string> = {
+    BT: 'BANK_TRANSFER',
+    POP: 'PORTAL',
+};
+
+const normalizeMode = (data: unknown) => {
+    if (data && typeof data === 'object' && 'mode' in (data as Record<string, unknown>)) {
+        const d = data as Record<string, unknown>;
+        const mapped = emdModeMapping[d.mode as string];
+        return mapped ? { ...d, mode: mapped } : data;
+    }
+    return data;
+};
+
+const emdSection = z.preprocess(normalizeMode, z.discriminatedUnion("mode", [
     z.object({ mode: z.literal("DD"), details: ddDetails }),
     z.object({ mode: z.literal("FDR"), details: fdrDetails }),
     z.object({ mode: z.literal("BG"), details: bgDetails }),
     z.object({ mode: z.literal("CHEQUE"), details: chequeDetails }),
     z.object({ mode: z.literal("BANK_TRANSFER"), details: bankTransferDetails }),
     z.object({ mode: z.literal("PORTAL"), details: portalDetails }),
-]).optional();
+])).optional();
 
-const tenderFeeSection = z.discriminatedUnion("mode", [
+const tenderFeeSection = z.preprocess(normalizeMode, z.discriminatedUnion("mode", [
     z.object({ mode: z.literal("PORTAL"), details: portalDetails }),
     z.object({ mode: z.literal("BANK_TRANSFER"), details: bankTransferDetails }),
     z.object({ mode: z.literal("DD"), details: ddDetails }),
-]).optional();
+])).optional();
 
-const processingFeeSection = z.discriminatedUnion("mode", [
+const processingFeeSection = z.preprocess(normalizeMode, z.discriminatedUnion("mode", [
     z.object({ mode: z.literal("PORTAL"), details: portalDetails }),
     z.object({ mode: z.literal("BANK_TRANSFER"), details: bankTransferDetails }),
     z.object({ mode: z.literal("DD"), details: ddDetails }),
-]).optional();
+])).optional();
 
 // ============================================================================
 // Create/Update Payment Request Schemas

@@ -34,6 +34,14 @@ export function BiOtherThanEmdRequestForm({ tenderId, requestIds, initialData, m
     const updateRequest = useUpdatePaymentRequest();
     const isEditMode = mode === 'edit';
 
+    function transformModeForBackend(mode: string): string {
+        const mapping: Record<string, string> = {
+            BT: 'BANK_TRANSFER',
+            POP: 'PORTAL',
+        };
+        return mapping[mode] || mode;
+    }
+
     const form = useForm<FormValues>({
         resolver: zodResolver(BiOtherThanTenderRequestSchema) as Resolver<FormValues>,
         defaultValues: initialData || { tenderName: '', tenderNo: '', tenderDueDate: '', EMD: { mode: undefined, details: {} } },
@@ -52,7 +60,7 @@ export function BiOtherThanEmdRequestForm({ tenderId, requestIds, initialData, m
             if (values.EMD?.mode && requestIds?.emd) {
                 const payload = {
                     EMD: {
-                        mode: values.EMD.mode,
+                        mode: transformModeForBackend(values.EMD.mode),
                         details: values.EMD.details || {},
                     },
                 };
@@ -87,7 +95,7 @@ export function BiOtherThanEmdRequestForm({ tenderId, requestIds, initialData, m
 
             if (values.EMD?.mode) {
                 payload.EMD = {
-                    mode: values.EMD.mode,
+                    mode: transformModeForBackend(values.EMD.mode),
                     details: values.EMD.details || {},
                 };
             }
