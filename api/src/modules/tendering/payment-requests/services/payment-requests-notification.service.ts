@@ -19,7 +19,24 @@ export class PaymentRequestsNotificationService {
         private readonly recipientResolver: RecipientResolver,
         private readonly pdfGenerator: PdfGeneratorService,
         private readonly configService: ConfigService,
-    ) {}
+    ) { }
+
+    private async getTenderTeamId(tenderId: number, requestedBy: number): Promise<number> {
+        if (tenderId > 0) {
+            const [tender] = await this.db
+                .select({ team: tenderInfos.team })
+                .from(tenderInfos)
+                .where(eq(tenderInfos.id, tenderId))
+                .limit(1);
+            return tender?.team || 1;
+        }
+        const [user] = await this.db
+            .select({ team: users.team })
+            .from(users)
+            .where(eq(users.id, requestedBy))
+            .limit(1);
+        return user?.team || 2;
+    }
 
     /**
      * Get responsible user by mode
@@ -112,6 +129,14 @@ export class PaymentRequestsNotificationService {
             ? `${baseUrl}/uploads/tendering/${chequeDetails.handover}`
             : '';
 
+        const [ddPaymentReq] = await this.db
+            .select({ requestedBy: paymentRequests.requestedBy })
+            .from(paymentRequests)
+            .where(eq(paymentRequests.id, requestId))
+            .limit(1);
+
+        const tenderTeamId = await this.getTenderTeamId(tenderId, ddPaymentReq?.requestedBy || 0);
+
         try {
             // From: Cheque responsible user — To: DD responsible user
             const result = await this.emailService.sendPaymentEmail({
@@ -134,6 +159,11 @@ export class PaymentRequestsNotificationService {
                     courierAddress: chequeInstrument.courierAddress || 'Not specified',
                 },
                 to: [{ type: 'emails', emails: [toEmails] }],
+                cc: [
+                    { type: 'role', role: 'Admin', teamId: tenderTeamId },
+                    { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+                    { type: 'emails', emails: ['accounts@volksenergie.in'] },
+                ],
             });
 
             if (result.success) {
@@ -178,6 +208,14 @@ export class PaymentRequestsNotificationService {
             ? `${baseUrl}/uploads/tendering/${chequeDetails.handover}`
             : '';
 
+        const [fdrPaymentReq] = await this.db
+            .select({ requestedBy: paymentRequests.requestedBy })
+            .from(paymentRequests)
+            .where(eq(paymentRequests.id, requestId))
+            .limit(1);
+
+        const tenderTeamId = await this.getTenderTeamId(tenderId, fdrPaymentReq?.requestedBy || 0);
+
         try {
             // From: Cheque responsible user — To: FDR responsible user
             const result = await this.emailService.sendPaymentEmail({
@@ -200,6 +238,11 @@ export class PaymentRequestsNotificationService {
                     courierAddress: chequeInstrument.courierAddress || 'Not specified',
                 },
                 to: [{ type: 'emails', emails: [toEmails] }],
+                cc: [
+                    { type: 'role', role: 'Admin', teamId: tenderTeamId },
+                    { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+                    { type: 'emails', emails: ['accounts@volksenergie.in'] },
+                ],
             });
 
             if (result.success) {
@@ -276,6 +319,8 @@ export class PaymentRequestsNotificationService {
             courierRequestLink = `${this.getFrontendUrl()}/shared/couriers/show/${body.req_no}`;
         }
 
+        const tenderTeamId = await this.getTenderTeamId(paymentReq.tenderId || 0, paymentReq.requestedBy || 0);
+
         try {
             // From: DD responsible user — To: Requestor
             const result = await this.emailService.sendPaymentEmail({
@@ -299,6 +344,11 @@ export class PaymentRequestsNotificationService {
                     remarks: isAccepted ? (body.remarks || '') : (body.reason_req || ''),
                 },
                 to: [{ type: 'emails', emails: [reqUser.email] }],
+                cc: [
+                    { type: 'role', role: 'Admin', teamId: tenderTeamId },
+                    { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+                    { type: 'emails', emails: ['accounts@volksenergie.in'] },
+                ],
             });
 
             if (result.success) {
@@ -371,6 +421,8 @@ export class PaymentRequestsNotificationService {
             }
         }
 
+        const tenderTeamId = await this.getTenderTeamId(paymentReq.tenderId || 0, paymentReq.requestedBy || 0);
+
         try {
             // From: FDR responsible user — To: Requestor
             const result = await this.emailService.sendPaymentEmail({
@@ -394,6 +446,11 @@ export class PaymentRequestsNotificationService {
                     remarks: isAccepted ? (body.remarks || '') : (body.reason_req || ''),
                 },
                 to: [{ type: 'emails', emails: [reqUser.email] }],
+                cc: [
+                    { type: 'role', role: 'Admin', teamId: tenderTeamId },
+                    { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+                    { type: 'emails', emails: ['accounts@volksenergie.in'] },
+                ],
             });
 
             if (result.success) {
@@ -469,6 +526,7 @@ export class PaymentRequestsNotificationService {
             : '';
 
         const deliveryMethod = chequeDetails?.deliveryMethod || '';
+        const tenderTeamId = await this.getTenderTeamId(instrument.tenderId || 0, instrument.requestedBy || 0);
 
         try {
             // From: Cheque responsible user — To: Requestor
@@ -489,6 +547,11 @@ export class PaymentRequestsNotificationService {
                     receivingPdfUrl,
                 },
                 to: [{ type: 'emails' as const, emails: [recipientEmail || 'gyan@volksenergie.in'] }],
+                cc: [
+                    { type: 'role', role: 'Admin', teamId: tenderTeamId },
+                    { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+                    { type: 'emails', emails: ['accounts@volksenergie.in'] },
+                ],
             });
 
             if (result.success) {
@@ -631,10 +694,11 @@ export class PaymentRequestsNotificationService {
                         tlName: tlUser?.name || 'Team Leader',
                     },
                     to: [{ type: 'emails', emails: [toEmails] }],
-                    // cc: [
-                    //     { type: 'role', role: 'admin', teamId: tenderTeamId },
-                    //     { type: 'emails', emails: ['accounts@volksenergie.in']}
-                    // ]
+                    cc: [
+                        { type: 'role', role: 'Admin', teamId: tenderTeamId },
+                        { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+                        { type: 'emails', emails: ['accounts@volksenergie.in']},
+                    ]
                 });
                 if (result.success) {
                     this.logger.log(`Bank transfer email sent for instrument ${instrumentId} (logId: ${result.emailLogId})`);
@@ -676,10 +740,11 @@ export class PaymentRequestsNotificationService {
                         tlName: tlUser?.name || 'Team Leader',
                     },
                     to: [{ type: 'emails', emails: [toEmails] }],
-                    // cc: [
-                    //     { type: 'role', role: 'admin', teamId: tenderTeamId },
-                    //     { type: 'emails', emails: ['accounts@volksenergie.in']}
-                    // ]
+                    cc: [
+                        { type: 'role', role: 'Admin', teamId: tenderTeamId },
+                        { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+                        { type: 'emails', emails: ['accounts@volksenergie.in']},
+                    ]
                 });
                 if (result.success) {
                     this.logger.log(`Portal payment email sent for instrument ${instrumentId} (logId: ${result.emailLogId})`);
@@ -753,10 +818,11 @@ export class PaymentRequestsNotificationService {
                         receivingPdfUrl,
                     },
                     to: [{ type: 'emails', emails: ['gyan@volksenergie.in'] }],
-                    // cc: [
-                    //     { type: 'role', role: 'admin', teamId: tenderTeamId },
-                    //     { type: 'emails', emails: ['accounts@volksenergie.in']}
-                    // ],
+                    cc: [
+                        { type: 'role', role: 'Admin', teamId: tenderTeamId },
+                        { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+                        { type: 'emails', emails: ['accounts@volksenergie.in']},
+                    ],
                 });
                 if (result.success) {
                     this.logger.log(`Cheque email sent for instrument ${instrumentId} (logId: ${result.emailLogId})`);
@@ -828,6 +894,8 @@ export class PaymentRequestsNotificationService {
 
         const status = btReq === 'Accepted' ? 'accepted' : 'rejected';
 
+        const tenderTeamId = await this.getTenderTeamId(instrument.tenderId || 0, instrument.requestedBy || 0);
+
         try {
             // From: BT responsible user — To: Requestor
             const result = await this.emailService.sendPaymentEmail({
@@ -850,10 +918,11 @@ export class PaymentRequestsNotificationService {
                     senderName: 'Accounts Team',
                 },
                 to: [{ type: 'emails', emails: [requestedUser.email] }],
-                // cc: [
-                //     { type: 'role', role: 'admin', teamId: tenderTeamId },
-                //     { type: 'emails', emails: ['accounts@volksenergie.in']}
-                // ],
+                cc: [
+                    { type: 'role', role: 'Admin', teamId: tenderTeamId },
+                    { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+                    { type: 'emails', emails: ['accounts@volksenergie.in']},
+                ],
             });
 
             if (result.success) {
@@ -932,6 +1001,8 @@ export class PaymentRequestsNotificationService {
         const apiUrl = this.configService.get<string>('app.apiUrl') || '';
         const paymentProofUrl = paymentProofPath ? `${apiUrl}/tender-files/serve/${paymentProofPath}` : '';
 
+        const tenderTeamId = await this.getTenderTeamId(instrument.tenderId || 0, instrument.requestedBy || 0);
+
         try {
             // From: Portal-Payment responsible user — To: Requestor
             const result = await this.emailService.sendPaymentEmail({
@@ -952,10 +1023,11 @@ export class PaymentRequestsNotificationService {
                     paymentProofUrl,
                 },
                 to: [{ type: 'emails', emails: [requestedUser.email] }],
-                // cc: [
-                //     { type: 'role', role: 'admin', teamId: tenderTeamId },
-                //     { type: 'emails', emails: ['accounts@volksenergie.in']}
-                // ],
+                cc: [
+                    { type: 'role', role: 'Admin', teamId: tenderTeamId },
+                    { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+                    { type: 'emails', emails: ['accounts@volksenergie.in']},
+                ],
             });
 
             if (result.success) {
@@ -1007,6 +1079,8 @@ export class PaymentRequestsNotificationService {
             return;
         }   
 
+        const tenderTeamId = await this.getTenderTeamId(instrument.tenderId || 0, instrument.requestedBy || 0);
+
         try {
             // From: BT responsible user — To: Requestor
             const result = await this.emailService.sendPaymentEmail({
@@ -1026,10 +1100,11 @@ export class PaymentRequestsNotificationService {
                     senderName: 'Accounts Team',
                 },
                 to: [{ type: 'emails', emails: [requestedUser.email] }],
-                // cc: [
-                //     { type: 'role', role: 'admin', teamId: tenderTeamId },
-                //     { type: 'emails', emails: ['accounts@volksenergie.in']}
-                // ],
+                cc: [
+                    { type: 'role', role: 'Admin', teamId: tenderTeamId },
+                    { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+                    { type: 'emails', emails: ['accounts@volksenergie.in']},
+                ],
             });
 
             if (result.success) {
@@ -1087,6 +1162,8 @@ export class PaymentRequestsNotificationService {
             .where(eq(instrumentTransferDetails.instrumentId, instrumentId))
             .limit(1);
 
+        const tenderTeamId = await this.getTenderTeamId(instrument.tenderId || 0, instrument.requestedBy || 0);
+
         try {
             // From: Portal-Payment responsible user — To: Requestor
             const result = await this.emailService.sendPaymentEmail({
@@ -1107,10 +1184,11 @@ export class PaymentRequestsNotificationService {
                     senderName: 'Accounts Team',
                 },
                 to: [{ type: 'emails', emails: [requestedUser.email] }],
-                // cc: [
-                //     { type: 'role', role: 'admin', teamId: tenderTeamId },
-                //     { type: 'emails', emails: ['accounts@volksenergie.in']}
-                // ],
+                cc: [
+                    { type: 'role', role: 'Admin', teamId: tenderTeamId },
+                    { type: 'role', role: 'Team Leader', teamId: tenderTeamId },
+                    { type: 'emails', emails: ['accounts@volksenergie.in']},
+                ],
             });
 
             if (result.success) {
