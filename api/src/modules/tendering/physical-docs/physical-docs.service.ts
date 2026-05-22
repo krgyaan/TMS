@@ -17,7 +17,6 @@ import { RecipientResolver } from "@/modules/email/recipient.resolver";
 import type { RecipientSource } from "@/modules/email/dto/send-email.dto";
 import { Logger } from "@nestjs/common";
 import { tenderClients } from "@db/schemas/tendering/tender-info-sheet.schema";
-import { StatusCache } from "@/utils/status-cache";
 import { wrapPaginatedResponse } from "@/utils/responseWrapper";
 import { TimersService } from "@/modules/timers/timers.service";
 import { couriers } from "@db/schemas/shared/couriers.schema";
@@ -239,7 +238,7 @@ export class PhysicalDocsService {
                 sql`${statuses.name} ILIKE ${searchStr}`,
                 sql`${tenderInformation.courierAddress} ILIKE ${searchStr}`,
                 sql`${tenderInformation.physicalDocsDeadline}::text ILIKE ${searchStr}`,
-                sql`${physicalDocs.courierNo} ILIKE ${searchStr}`,
+                sql`${physicalDocs.courierNo}::text ILIKE ${searchStr}`,
             ];
             conditions.push(sql`(${sql.join(searchConditions, sql` OR `)})`);
         }
@@ -356,16 +355,18 @@ export class PhysicalDocsService {
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
             // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-            eq(tenderInformation.physicalDocsRequired, "Yes"),
+            or(
+                inArray(tenderInformation.physicalDocsRequired, ["Yes", "YES"]),
+                inArray(tenderInformation.physicalDocType, ["EMD_AND_OTHER_DOCUMENTS", "ONLY_OTHER_DOCUMENT"])
+            ),
             ...roleFilterConditions,
         ];
 
-        const dnbCondition = [ne(bidSubmissions.status, "Tender Missed")];
+        // Count pending: physicalDocsId IS NULL, not bid missed
+        const pendingConditions = [...baseConditions, isNull(physicalDocs.id), or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status))];
+        
 
-        // Count pending: status = 3, physicalDocsId IS NULL
-        const pendingConditions = [...baseConditions, or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)) ];
-
-        // Count sent: status = 30, physicalDocsId IS NOT NULL
+        // Count sent: physicalDocsId IS NOT NULL, not bid missed
         const sentConditions = [...baseConditions, or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)), isNotNull(physicalDocs.id)];
 
         const counts = await Promise.all([
@@ -376,6 +377,7 @@ export class PhysicalDocsService {
                 .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
                 .leftJoin(items, eq(items.id, tenderInfos.item))
                 .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
+                .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
                 .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
                 .where(and(...pendingConditions))
                 .then(([result]) => Number(result?.count || 0)),
@@ -386,6 +388,7 @@ export class PhysicalDocsService {
                 .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
                 .leftJoin(items, eq(items.id, tenderInfos.item))
                 .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
+                .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
                 .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
                 .where(and(...sentConditions))
                 .then(([result]) => Number(result?.count || 0)),
@@ -396,8 +399,10 @@ export class PhysicalDocsService {
                 .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
                 .leftJoin(items, eq(items.id, tenderInfos.item))
                 .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
+                .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
                 .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
                 .where(and(
+                    ...baseConditions,
                     eq(bidSubmissions.status, 'Tender Missed'),
                     isNotNull(physicalDocs.id),
                 ))
