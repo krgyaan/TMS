@@ -20,7 +20,7 @@ export const useBidSubmissions = (
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
     const { teamId, userId, dataScope } = useTeamFilter();
-    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const teamIdParam = teamId !== null ? teamId : undefined;
 
     const params: BidSubmissionListParams = {
         tab,
@@ -147,7 +147,7 @@ export const useUpdateBidSubmission = () => {
 
 export const useBidSubmissionsDashboardCounts = () => {
     const { teamId, userId, dataScope } = useTeamFilter();
-    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const teamIdParam = teamId !== null ? teamId : undefined;
     const queryKey = [...bidSubmissionsKey.dashboardCounts(), dataScope, teamId ?? null, userId ?? null];
 
     return useQuery<BidSubmissionDashboardCounts>({
