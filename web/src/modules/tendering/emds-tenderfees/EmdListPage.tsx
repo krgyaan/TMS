@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ColDef } from "ag-grid-community";
 import DataTable from "@/components/ui/data-table";
 import { formatDateTime } from "@/hooks/useFormatedDate";
@@ -649,12 +649,6 @@ const EmdsAndTenderFeesPage = () => {
                             Track all payment requests for your assigned tenders
                         </CardDescription>
                     </div>
-                    <CardAction className="flex items-center gap-2">
-                        <Button variant="outline" onClick={() => navigate(paths.tendering.biOtherThanEmdsCreate())}>
-                            <Plus className="w-4 h-4" />
-                            BI Other Than EMDs
-                        </Button>
-                    </CardAction>
                 </div>
             </CardHeader>
 
