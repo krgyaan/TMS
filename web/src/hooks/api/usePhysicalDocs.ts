@@ -22,7 +22,7 @@ export const usePhysicalDocs = (
     search?: string
 ) => {
     const { teamId, userId, dataScope } = useTeamFilter();
-    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const teamIdParam = teamId !== null ? teamId : undefined;
 
     const queryKeyFilters = {
         tab,
@@ -104,7 +104,7 @@ export const useUpdatePhysicalDoc = () => {
 
 export const usePhysicalDocsDashboardCounts = () => {
     const { teamId, userId, dataScope } = useTeamFilter();
-    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const teamIdParam = teamId !== null ? teamId : undefined;
     const queryKey = [...physicalDocsKey.dashboardCounts(), dataScope, teamId ?? null, userId ?? null];
 
     return useQuery<PhysicalDocsDashboardCounts>({
