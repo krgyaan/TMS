@@ -50,6 +50,7 @@ export function PaymentSection({
     isEditMode = false,
     defaultMode,
 }: PaymentSectionProps) {
+    console.log("PaymentSection Props:", { purpose, allowedModes, amount, type, courierData, defaultPurpose, isEditMode, defaultMode });
     const { control, watch, setValue } = useFormContext();
     const selectedMode = watch(`${purpose}.mode`);
 
@@ -65,11 +66,12 @@ export function PaymentSection({
     }, [type, allowedModes]);
 
     useEffect(() => {
-        if (defaultMode && !selectedMode) {
+        if (defaultMode && filteredModes.length > 0) {
             setValue(`${purpose}.mode`, defaultMode, { shouldValidate: false });
         }
-    }, [defaultMode, selectedMode, setValue, purpose]);
-
+    }, [defaultMode, filteredModes, setValue, purpose]);
+    console.log("Allowed EMD Modes:", filteredModes);
+    
     useEffect(() => {
         if (!selectedMode || isEditMode) return;
 
@@ -84,9 +86,9 @@ export function PaymentSection({
             setAmountAndPurpose(`${purpose}.details.ddAmount`, `${purpose}.details.ddPurpose`);
         } else if (selectedMode === 'FDR') {
             setAmountAndPurpose(`${purpose}.details.fdrAmount`, `${purpose}.details.fdrPurpose`);
-        } else if (selectedMode === 'BANK_TRANSFER') {
+        } else if (selectedMode === 'BANK_TRANSFER' || selectedMode === 'BT') {
             setAmountAndPurpose(`${purpose}.details.btAmount`, `${purpose}.details.btPurpose`);
-        } else if (selectedMode === 'PORTAL') {
+        } else if (selectedMode === 'PORTAL' || selectedMode === 'POP') {
             setAmountAndPurpose(`${purpose}.details.portalAmount`, `${purpose}.details.portalPurpose`);
         } 
         // else if (selectedMode === 'CHEQUE') {
@@ -121,7 +123,7 @@ export function PaymentSection({
         }
     }, [selectedMode, courierData, setValue, purpose, isEditMode, watch]);
 
-    if (!selectedMode && type == 'TMS') {
+    if (filteredModes.length === 0 && type == 'TMS') {
         return (
             <div className="border rounded-lg p-6 bg-muted/20">
                 <div className="flex items-center justify-between mb-4">
