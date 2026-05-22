@@ -26,7 +26,7 @@ export const useReverseAuctionDashboard = (
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
     const { teamId, userId, dataScope } = useTeamFilter();
-    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const teamIdParam = teamId !== null ? teamId : undefined;
 
     const effectiveFilters: RaDashboardListParams = {
         ...filters,
@@ -61,7 +61,7 @@ export const useReverseAuctionDashboard = (
 // Fetch only counts (for badges)
 export const useReverseAuctionDashboardCounts = () => {
     const { teamId, userId, dataScope } = useTeamFilter();
-    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const teamIdParam = teamId !== null ? teamId : undefined;
     const queryKey = [...reverseAuctionsKey.counts(), dataScope, teamId ?? null, userId ?? null];
 
     return useQuery<RaDashboardCounts>({
