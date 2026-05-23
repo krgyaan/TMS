@@ -9,7 +9,6 @@ import type {
   Page7FormSchema,
 } from "./woDetail.schema";
 
-// Form value types
 export type Page1FormValues = z.infer<typeof Page1FormSchema>;
 export type Page2FormValues = z.infer<typeof Page2FormSchema>;
 export type Page3FormValues = z.infer<typeof Page3FormSchema>;
@@ -18,7 +17,6 @@ export type Page5FormValues = z.infer<typeof Page5FormSchema>;
 export type Page6FormValues = z.infer<typeof Page6FormSchema>;
 export type Page7FormValues = z.infer<typeof Page7FormSchema>;
 
-// All page data union type
 export type PageFormValues =
   | Page1FormValues
   | Page2FormValues
@@ -28,81 +26,74 @@ export type PageFormValues =
   | Page6FormValues
   | Page7FormValues;
 
-// Contact type
 export interface Contact {
   id?: number;
   organization?: string;
   departments?: "EIC" | "User" | "C&P" | "Finance";
-  name: string;
+  name?: string;
   designation?: string;
   phone?: string;
   email?: string;
 }
 
-// BOQ Item type
 export interface BOQItem {
   id?: number;
-  srNo: number;
-  itemDescription: string;
-  quantity: string;
-  rate: string;
+  srNo?: number;
+  itemDescription?: string;
+  quantity?: string;
+  rate?: string;
   amount?: string;
   sortOrder?: number;
 }
 
-// Address type
 export interface Address {
   id?: number;
-  srNos: number[] | "all";
-  customerName: string;
-  address: string;
+  srNos?: number[] | "all";
+  customerName?: string;
+  address?: string;
   gst?: string;
 }
 
-// Amendment type
 export interface Amendment {
   id?: number;
-  pageNo: string;
-  clauseNo: string;
-  currentStatement: string;
-  correctedStatement: string;
+  pageNo?: string;
+  clauseNo?: string;
+  currentStatement?: string;
+  correctedStatement?: string;
 }
 
-// Site Visit Person
 export interface SiteVisitPerson {
-  name: string;
+  name?: string;
   phone?: string;
   email?: string;
 }
 
-// Wizard state
 export interface WizardState {
   currentPage: number;
-  completedPages: number[];
-  skippedPages: number[];
   woDetailId: number | null;
   woBasicDetailId: number;
   status: WizardStatus;
-  lastSavedAt?: string;
 }
 
 export type WizardStatus = "draft" | "in_progress" | "completed" | "submitted_for_review";
 
-// Page component props
+export interface ServerFieldError {
+  field: string;
+  message: string;
+}
+
 export interface PageFormProps {
   woDetailId: number | null;
   woBasicDetailId: number;
-  onSubmit: (data: any) => Promise<void>;
+  onSaveDraft: (data: Record<string, unknown>) => Promise<ServerFieldError[] | void>;
+  onSaveDraftOnly: (data: Record<string, unknown>) => Promise<ServerFieldError[] | void>;
   onSkip: () => Promise<void>;
   onBack: () => void;
-  onSaveDraft: (data: any) => Promise<void>;
   isFirstPage: boolean;
   isLastPage: boolean;
-  isLoading: boolean;
   isSaving: boolean;
 }
 
-// Wizard progress from API
 export interface WizardProgress {
   currentPage: number;
   completedPages: number[];
@@ -111,7 +102,6 @@ export interface WizardProgress {
   lastSavedAt: string;
 }
 
-// Page data response types
 export interface Page1Data {
   contacts: Contact[];
   tenderDocumentsChecklist: Record<string, string>;
@@ -172,7 +162,6 @@ export interface Page7Data {
   courierRequestPrepared: string;
 }
 
-// Union type for all page data
 export type PageData =
   | Page1Data
   | Page2Data
@@ -182,7 +171,6 @@ export type PageData =
   | Page6Data
   | Page7Data;
 
-// Validation result
 export interface WizardValidationResult {
   isValid: boolean;
   missingRequiredPages: number[];
@@ -190,16 +178,13 @@ export interface WizardValidationResult {
   errors: Record<number, string[]>;
 }
 
-// Full WO Detail Data
 export interface WoDetailData {
   id: number;
   woBasicDetailId: number;
 
-  // Page 1
   tenderDocumentsChecklist: Record<string, string> | null;
   contacts?: Contact[];
 
-  // Page 2
   ldApplicable: string;
   maxLd: string | null;
   ldStartDate: string | null;
@@ -212,26 +197,22 @@ export interface WoDetailData {
   detailedPoApplicable: string;
   detailedPoFollowupId: number | null;
 
-  // Page 3
   swotStrengths: string | null;
   swotWeaknesses: string | null;
   swotOpportunities: string | null;
   swotThreats: string | null;
 
-  // Page 4
   billingBoq?: BOQItem[];
   buybackBoq?: BOQItem[];
   billingAddresses?: Address[];
   shippingAddresses?: Address[];
 
-  // Page 5
   siteVisitNeeded: string;
   siteVisitPerson: SiteVisitPerson | null;
   documentsFromTendering: string[] | null;
   documentsNeeded: string[] | null;
   documentsInHouse: string[] | null;
 
-  // Page 6
   costingSheetLink: string | null;
   hasDiscrepancies: string;
   discrepancyComments: string | null;
@@ -242,19 +223,16 @@ export interface WoDetailData {
   budgetAdmin: string | null;
   budgetBuybackSale: string | null;
 
-  // Page 7
   oeWoAmendmentNeeded: string | null;
   oeSignaturePrepared: string;
   courierRequestPrepared: string;
   amendments?: Amendment[];
 
-  // Wizard Progress
   currentPage: number;
   completedPages: number[];
   skippedPages: number[];
   status: WizardStatus;
 
-  // Timestamps
   createdAt: string;
   updatedAt: string;
 }

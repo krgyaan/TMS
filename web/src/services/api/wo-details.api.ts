@@ -137,6 +137,15 @@ class WoDetailsService extends BaseApiService {
     return this.post<WoDetail & { message: string }>(`/${woDetailId}/wizard/submit-for-review`);
   }
 
+  async submitAllPages(woDetailId: number): Promise<{
+    valid: boolean;
+    pageErrors: Record<number, string[]>;
+    message: string;
+    data?: WoDetail;
+  }> {
+    return this.post(`/${woDetailId}/wizard/submit-all`);
+  }
+
   // IMPORT & INTEGRATION METHODS
   async importTenderContacts(woBasicDetailId: number, woDetailId: number): Promise<ImportContactsResponse> {
     return this.post<ImportContactsResponse>(`/${woDetailId}/import-tender-contacts`, {

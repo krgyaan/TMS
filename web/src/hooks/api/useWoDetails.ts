@@ -36,8 +36,6 @@ export const woDetailsKeys = {
 };
 
 // WIZARD QUERY HOOKS (ESSENTIAL - USED BY FORMS)
-console.log('🔷 woDetailsService:', woDetailsService);
-console.log('🔷 Available methods:', Object.keys(woDetailsService));
 
 export const useWoDetailByBasicDetail = (woBasicDetailId: number) => {
   return useQuery({
@@ -214,6 +212,25 @@ export const useSkipPage = () => {
   });
 };
 
+// Submit all pages at once (for preview page)
+export const useSubmitAllPages = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (woDetailId: number) => woDetailsService.submitAllPages(woDetailId),
+    onSuccess: (result, woDetailId) => {
+      queryClient.invalidateQueries({ queryKey: woDetailsKeys.all });
+      queryClient.invalidateQueries({ queryKey: woDetailsKeys.detail(woDetailId) });
+      queryClient.invalidateQueries({ queryKey: woDetailsKeys.wizardProgress(woDetailId) });
+      toast.success(result.message);
+      return result;
+    },
+    onError: (error: any) => {
+      toast.error(handleQueryError(error));
+    },
+  });
+};
+
 // Submit wizard for review
 export const useSubmitForReview = () => {
   const queryClient = useQueryClient();
@@ -236,7 +253,8 @@ export const useSubmitForReview = () => {
 export const useAutoSave = (
   woDetailId: number | null,
   pageNum: number,
-  enabled: boolean = true
+  enabled: boolean = true,
+  delayMs: number = 4000
 ) => {
   const { mutate: saveDraft, isPending } = useSavePageDraft();
   const lastSavedRef = useRef<string | null>(null);
@@ -245,7 +263,7 @@ export const useAutoSave = (
     if (!woDetailId || woDetailId <= 0 || !enabled) return;
 
     const dataString = JSON.stringify(data);
-    if (dataString === lastSavedRef.current) return; // No changes
+    if (dataString === lastSavedRef.current) return;
 
     saveDraft(
       { woDetailId, pageNum, data },
@@ -255,7 +273,7 @@ export const useAutoSave = (
         },
       }
     );
-  }, 2000);
+  }, delayMs);
 
   const saveNow = useCallback(
     (data: any) => {

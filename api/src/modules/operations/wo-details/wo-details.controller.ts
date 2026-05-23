@@ -190,6 +190,15 @@ export class WoDetailsController {
   ) {
     return this.woDetailsService.submitForReview(id, user.sub);
   }
+
+  @Post(':id/wizard/submit-all')
+  @HttpCode(HttpStatus.OK)
+  async submitAllPages(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: ValidatedUser,
+  ) {
+    return this.woDetailsService.submitAllPages(id, user.sub);
+  }
   // IMPORT OPERATIONS
   @Post(':id/import-tender-contacts')
   @HttpCode(HttpStatus.OK)

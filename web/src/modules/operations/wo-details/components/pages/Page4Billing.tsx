@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useCallback } from "react";
 import { useForm, useFieldArray, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,11 +44,10 @@ const calculateAmount = (quantity: string, rate: string): number => {
 export function Page4Billing({
     woDetailId,
     initialData,
-    onSubmit,
+    onSaveDraft,
+    onSaveDraftOnly,
     onSkip,
     onBack,
-    onSaveDraft,
-    isLoading,
     isSaving,
 }: Page4BillingProps) {
     const form = useForm<Page4FormValues>({
@@ -116,13 +115,23 @@ export function Page4Billing({
         }
     }, [initialData, form]);
 
-    const handleFormSubmit = async (values: Page4FormValues) => {
-        await onSubmit(values);
-    };
+    const handleSaveAndContinue = useCallback(async () => {
+        const errors = await onSaveDraft(form.getValues());
+        if (errors?.length) {
+            for (const err of errors) {
+                form.setError(err.field as any, { message: err.message });
+            }
+        }
+    }, [onSaveDraft, form]);
 
-    const handleSaveDraft = async () => {
-        await onSaveDraft(form.getValues());
-    };
+    const handleSaveDraftOnly = useCallback(async () => {
+        const errors = await onSaveDraftOnly(form.getValues());
+        if (errors?.length) {
+            for (const err of errors) {
+                form.setError(err.field as any, { message: err.message });
+            }
+        }
+    }, [onSaveDraftOnly, form]);
 
     const renderBoqTable = (
         fields: typeof billingBoqFields,
@@ -393,7 +402,7 @@ export function Page4Billing({
 
     return (
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
+            <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
                 {renderBoqTable(
                     billingBoqFields,
                     "billingBoq",
@@ -439,13 +448,13 @@ export function Page4Billing({
                 <WizardNavigation
                     currentPage={4}
                     totalPages={WIZARD_CONFIG.TOTAL_PAGES}
-                    canSkip={false}
-                    isSubmitting={isLoading}
+                    canSkip={true}
+                    isSubmitting={isSaving}
                     isSaving={isSaving || isAutoSaving}
                     onBack={onBack}
-                    onSubmit={() => form.handleSubmit(handleFormSubmit)()}
+                    onSubmit={handleSaveAndContinue}
                     onSkip={onSkip}
-                    onSaveDraft={handleSaveDraft}
+                    onSaveDraft={handleSaveDraftOnly}
                 />
             </form>
         </Form>

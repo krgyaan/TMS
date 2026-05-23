@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -33,11 +33,10 @@ const defaultValues: Page2FormValues = {
 export function Page2Compliance({
     woDetailId,
     initialData,
-    onSubmit,
+    onSaveDraft,
+    onSaveDraftOnly,
     onSkip,
     onBack,
-    onSaveDraft,
-    isLoading,
     isSaving,
 }: Page2ComplianceProps) {
     const form = useForm<Page2FormValues>({
@@ -65,18 +64,27 @@ export function Page2Compliance({
         }
     }, [initialData, form]);
 
-    const handleFormSubmit = async (values: Page2FormValues) => {
-        await onSubmit(values);
-    };
+    const handleSaveAndContinue = useCallback(async () => {
+        const errors = await onSaveDraft(form.getValues());
+        if (errors?.length) {
+            for (const err of errors) {
+                form.setError(err.field as any, { message: err.message });
+            }
+        }
+    }, [onSaveDraft, form]);
 
-    const handleSaveDraft = async () => {
-        await onSaveDraft(form.getValues());
-    };
+    const handleSaveDraftOnly = useCallback(async () => {
+        const errors = await onSaveDraftOnly(form.getValues());
+        if (errors?.length) {
+            for (const err of errors) {
+                form.setError(err.field as any, { message: err.message });
+            }
+        }
+    }, [onSaveDraftOnly, form]);
 
     return (
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
-                {/* LD Section */}
+            <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
                 <Card>
                     <CardHeader className="border-b bg-muted/10">
                         <CardTitle className="flex items-center gap-2">
@@ -151,7 +159,6 @@ export function Page2Compliance({
                     </CardContent>
                 </Card>
 
-                {/* PBG Section */}
                 <Card>
                     <CardHeader className="border-b bg-muted/10">
                         <CardTitle className="flex items-center gap-2">
@@ -197,7 +204,6 @@ export function Page2Compliance({
                     </CardContent>
                 </Card>
 
-                {/* Contract Agreement Section */}
                 <Card>
                     <CardHeader className="border-b bg-muted/10">
                         <CardTitle className="flex items-center gap-2">
@@ -235,7 +241,6 @@ export function Page2Compliance({
                     </CardContent>
                 </Card>
 
-                {/* Detailed PO Section */}
                 <Card>
                     <CardHeader className="border-b bg-muted/10">
                         <CardTitle className="flex items-center gap-2">
@@ -280,13 +285,13 @@ export function Page2Compliance({
                 <WizardNavigation
                     currentPage={2}
                     totalPages={WIZARD_CONFIG.TOTAL_PAGES}
-                    canSkip={false}
-                    isSubmitting={isLoading}
+                    canSkip={true}
+                    isSubmitting={isSaving}
                     isSaving={isSaving || isAutoSaving}
                     onBack={onBack}
-                    onSubmit={() => form.handleSubmit(handleFormSubmit)()}
+                    onSubmit={handleSaveAndContinue}
                     onSkip={onSkip}
-                    onSaveDraft={handleSaveDraft}
+                    onSaveDraft={handleSaveDraftOnly}
                 />
             </form>
         </Form>

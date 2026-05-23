@@ -26,8 +26,6 @@ const TENDER_CHECKLIST_ITEMS = [
   'result',
 ] as const;
 
-const REQUIRED_PAGES = [1, 2, 4, 7] as const;
-const SKIPPABLE_PAGES = [3, 5, 6] as const;
 const TOTAL_PAGES = 7;
 
 // Type union for page data
@@ -668,12 +666,6 @@ export class WoDetailsService {
   async validateWizard(id: number): Promise<WizardValidationResult> {
     const detail = await this.findByIdWithRelations(id);
     const completedPages = detail.completedPages as number[];
-    const skippedPages = detail.skippedPages as number[];
-
-    const missingRequiredPages = REQUIRED_PAGES.filter(
-      (page) =>
-        !completedPages.includes(page) && !skippedPages.includes(page),
-    );
 
     const incompletePages: number[] = [];
     const errors: Record<number, string[]> = {};
@@ -822,12 +814,11 @@ export class WoDetailsService {
       }
     }
 
-    const isValid =
-      missingRequiredPages.length === 0 && incompletePages.length === 0;
+    const isValid = incompletePages.length === 0;
 
     return {
       isValid,
-      missingRequiredPages,
+      missingRequiredPages: [],
       incompletePages,
       errors,
     };
@@ -835,28 +826,17 @@ export class WoDetailsService {
 
   private getSubmissionBlockers(detail: any): string[] {
     const blockers: string[] = [];
-    const completedPages = (detail.completedPages as number[]) || [];
 
-    // Check required pages
-    for (const page of REQUIRED_PAGES) {
-      if (!completedPages.includes(page)) {
-        blockers.push(`Page ${page} must be completed`);
-      }
+    if (detail.oeWoAmendmentNeeded === true) {
+      blockers.push('WO Amendment is pending');
     }
 
-    // Page 7 specific checks
-    if (completedPages.includes(7)) {
-      if (detail.oeWoAmendmentNeeded === true) {
-        blockers.push('WO Amendment is pending');
+    if (detail.oeWoAmendmentNeeded === false) {
+      if (!detail.oeSignaturePrepared) {
+        blockers.push('OE Signature must be prepared');
       }
-
-      if (detail.oeWoAmendmentNeeded === false) {
-        if (!detail.oeSignaturePrepared) {
-          blockers.push('OE Signature must be prepared');
-        }
-        if (!detail.courierRequestPrepared) {
-          blockers.push('Courier request must be prepared');
-        }
+      if (!detail.courierRequestPrepared) {
+        blockers.push('Courier request must be prepared');
       }
     }
 
@@ -1006,13 +986,6 @@ export class WoDetailsService {
   ) {
     const detail = await this.findById(id);
 
-    // Check if page can be skipped
-    if (!(SKIPPABLE_PAGES as readonly number[]).includes(pageNum)) {
-      throw new BadRequestException(
-        `Page ${pageNum} cannot be skipped. Required pages: ${REQUIRED_PAGES.join(', ')}`,
-      );
-    }
-
     const now = new Date();
     const updateValues: Record<string, unknown> = {
       updatedAt: now,
@@ -1097,6 +1070,49 @@ export class WoDetailsService {
     return {
       ...this.mapRowToResponse(row!),
       message: 'WO Details submitted for TL review',
+    };
+  }
+
+  async submitAllPages(
+    id: number,
+    userId?: number,
+  ) {
+    const detail = await this.findByIdWithRelations(id);
+    const now = new Date();
+    const allPages = [1, 2, 3, 4, 5, 6, 7];
+
+    const [row] = await this.db
+      .update(woDetails)
+      .set({
+        status: 'submitted_for_review',
+        currentPage: 7,
+        completedPages: allPages,
+        skippedPages: [],
+        completedAt: now,
+        updatedAt: now,
+        updatedBy: userId ?? null,
+      })
+      .where(eq(woDetails.id, id))
+      .returning();
+
+    await this.db
+      .update(woBasicDetails)
+      .set({ currentStage: 'wo_acceptance', updatedAt: now })
+      .where(eq(woBasicDetails.id, detail.woBasicDetailId));
+
+    await this.db.insert(woAcceptance).values({
+      woDetailId: id,
+      status: 'pending_review',
+      createdAt: now,
+      updatedAt: now,
+      createdBy: userId ?? null,
+    });
+
+    return {
+      valid: true,
+      pageErrors: {},
+      message: 'WO Details submitted for TL review',
+      data: this.mapRowToResponse(row!),
     };
   }
   // GET PAGE DATA

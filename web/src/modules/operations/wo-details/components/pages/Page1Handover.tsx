@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,11 +45,10 @@ const defaultChecklist: Page1FormValues["tenderDocumentsChecklist"] = {
 export function Page1Handover({
     woDetailId,
     initialData,
-    onSubmit,
+    onSaveDraft,
+    onSaveDraftOnly,
     onSkip,
     onBack,
-    onSaveDraft,
-    isLoading,
     isSaving,
 }: Page1HandoverProps) {
     const form = useForm<Page1FormValues>({
@@ -71,7 +70,6 @@ export function Page1Handover({
 
     const { autoSave, isSaving: isAutoSaving } = useAutoSave(woDetailId, 1);
 
-    // Auto-save on form changes
     useEffect(() => {
         const subscription = form.watch((values) => {
             if (values) autoSave(values);
@@ -79,7 +77,6 @@ export function Page1Handover({
         return () => subscription.unsubscribe();
     }, [form, autoSave]);
 
-    // Reset form when initialData changes
     useEffect(() => {
         if (initialData) {
             form.reset({
@@ -89,18 +86,27 @@ export function Page1Handover({
         }
     }, [initialData, form]);
 
-    const handleFormSubmit = async (values: Page1FormValues) => {
-        await onSubmit(values);
-    };
+    const handleSaveAndContinue = useCallback(async () => {
+        const errors = await onSaveDraft(form.getValues());
+        if (errors?.length) {
+            for (const err of errors) {
+                form.setError(err.field as any, { message: err.message });
+            }
+        }
+    }, [onSaveDraft, form]);
 
-    const handleSaveDraft = async () => {
-        await onSaveDraft(form.getValues());
-    };
+    const handleSaveDraftOnly = useCallback(async () => {
+        const errors = await onSaveDraftOnly(form.getValues());
+        if (errors?.length) {
+            for (const err of errors) {
+                form.setError(err.field as any, { message: err.message });
+            }
+        }
+    }, [onSaveDraftOnly, form]);
 
     return (
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
-                {/* Client Details */}
+            <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
@@ -229,16 +235,9 @@ export function Page1Handover({
                             <Plus className="h-4 w-4 mr-2" />
                             Add Contact
                         </Button>
-
-                        {form.formState.errors.contacts?.root && (
-                            <p className="text-sm text-destructive mt-2">
-                                {form.formState.errors.contacts.root.message}
-                            </p>
-                        )}
                     </CardContent>
                 </Card>
 
-                {/* Tender Documents Checklist */}
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
@@ -268,13 +267,13 @@ export function Page1Handover({
                 <WizardNavigation
                     currentPage={1}
                     totalPages={WIZARD_CONFIG.TOTAL_PAGES}
-                    canSkip={false}
-                    isSubmitting={isLoading}
+                    canSkip={true}
+                    isSubmitting={isSaving}
                     isSaving={isSaving || isAutoSaving}
                     onBack={onBack}
-                    onSubmit={() => form.handleSubmit(handleFormSubmit)()}
+                    onSubmit={handleSaveAndContinue}
                     onSkip={onSkip}
-                    onSaveDraft={handleSaveDraft}
+                    onSaveDraft={handleSaveDraftOnly}
                 />
             </form>
         </Form>

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import { useForm, useFieldArray, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -30,11 +30,10 @@ const defaultValues: Page5FormValues = {
 export function Page5Execution({
     woDetailId,
     initialData,
-    onSubmit,
+    onSaveDraft,
+    onSaveDraftOnly,
     onSkip,
     onBack,
-    onSaveDraft,
-    isLoading,
     isSaving,
 }: Page5ExecutionProps) {
     const form = useForm<Page5FormValues>({
@@ -77,13 +76,23 @@ export function Page5Execution({
         }
     }, [initialData, form]);
 
-    const handleFormSubmit = async (values: Page5FormValues) => {
-        await onSubmit(values);
-    };
+    const handleSaveAndContinue = useCallback(async () => {
+        const errors = await onSaveDraft(form.getValues());
+        if (errors?.length) {
+            for (const err of errors) {
+                form.setError(err.field as any, { message: err.message });
+            }
+        }
+    }, [onSaveDraft, form]);
 
-    const handleSaveDraft = async () => {
-        await onSaveDraft(form.getValues());
-    };
+    const handleSaveDraftOnly = useCallback(async () => {
+        const errors = await onSaveDraftOnly(form.getValues());
+        if (errors?.length) {
+            for (const err of errors) {
+                form.setError(err.field as any, { message: err.message });
+            }
+        }
+    }, [onSaveDraftOnly, form]);
 
     const DocumentList = ({
         title,
@@ -150,8 +159,7 @@ export function Page5Execution({
 
     return (
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
-                {/* Site Visit Section */}
+            <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
                 <Card>
                     <CardHeader className="border-b bg-muted/10">
                         <CardTitle className="flex items-center gap-2">
@@ -225,7 +233,6 @@ export function Page5Execution({
                     </CardContent>
                 </Card>
 
-                {/* Documentation Section */}
                 <Card>
                     <CardHeader className="border-b bg-muted/10">
                         <CardTitle className="flex items-center gap-2">
@@ -271,12 +278,12 @@ export function Page5Execution({
                     currentPage={5}
                     totalPages={WIZARD_CONFIG.TOTAL_PAGES}
                     canSkip={true}
-                    isSubmitting={isLoading}
+                    isSubmitting={isSaving}
                     isSaving={isSaving || isAutoSaving}
                     onBack={onBack}
-                    onSubmit={() => form.handleSubmit(handleFormSubmit)()}
+                    onSubmit={handleSaveAndContinue}
                     onSkip={onSkip}
-                    onSaveDraft={handleSaveDraft}
+                    onSaveDraft={handleSaveDraftOnly}
                 />
             </form>
         </Form>
