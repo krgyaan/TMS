@@ -61,11 +61,11 @@ export const TENDER_CHECKLIST_ITEMS = [
 ] as const;
 
 export const YES_NO_OPTIONS = [
-  { value: 'YES', label: 'Yes' },
-  { value: 'NO', label: 'No' },
+  { value: 'true', label: 'Yes' },
+  { value: 'false', label: 'No' },
 ];
 
-export type YesNoValue = "YES" | "NO";
+export type YesNoValue = "true" | "false";
 
 export const WIZARD_CONFIG = {
   TOTAL_PAGES: 8,

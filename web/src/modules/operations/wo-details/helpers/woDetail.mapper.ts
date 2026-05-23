@@ -17,8 +17,8 @@ const stringToBool = (val: string | undefined | null): boolean | undefined => {
 };
 
 const boolToString = (val: boolean | undefined | null): string | undefined => {
-  if (val === true) return "YES";
-  if (val === false) return "NO";
+  if (val === true) return "true";
+  if (val === false) return "false";
   return undefined;
 };
 
