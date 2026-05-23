@@ -98,6 +98,13 @@ export interface WoBasicDetail {
   receiptPreGst: string | null;
   budgetPreGst: string | null;
   grossMargin: string | null;
+  finalPrice: string | null;
+  budgetSupply: string | null;
+  budgetService: string | null;
+  budgetFreight: string | null;
+  budgetAdmin: string | null;
+  budgetBuybackSale: string | null;
+  budgetGemCharges: string | null;
   woDraft: string | null;
   tmsDocuments: TmsDocuments | null;
   oeFirst: number | null;
@@ -139,6 +146,13 @@ export interface CreateWoBasicDetailDto {
   receiptPreGst?: string;
   budgetPreGst?: string;
   grossMargin?: string;
+  finalPrice?: string;
+  budgetSupply?: string;
+  budgetService?: string;
+  budgetFreight?: string;
+  budgetAdmin?: string;
+  budgetBuybackSale?: string;
+  budgetGemCharges?: string;
   woDraft?: string;
   tmsDocuments?: TmsDocuments;
 }

@@ -29,6 +29,15 @@ export const CreateWoBasicDetailSchema = z.object({
   receiptPreGst: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid decimal format").optional(),
   budgetPreGst: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid decimal format").optional(),
   grossMargin: z.string().regex(/^-?\d+(\.\d{1,2})?$/, "Invalid decimal format").optional(),
+  finalPrice: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid decimal format").optional(),
+
+  // Budget breakdown
+  budgetSupply: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid decimal format").optional(),
+  budgetService: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid decimal format").optional(),
+  budgetFreight: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid decimal format").optional(),
+  budgetAdmin: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid decimal format").optional(),
+  budgetBuybackSale: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid decimal format").optional(),
+  budgetGemCharges: z.string().regex(/^\d+(\.\d{1,2})?$/, "Invalid decimal format").optional(),
 
   // Document upload
   woDraft: z.string().max(255).optional(),
@@ -180,6 +189,13 @@ export const WoBasicDetailsResponseSchema = z.object({
   receiptPreGst: z.string().nullable(),
   budgetPreGst: z.string().nullable(),
   grossMargin: z.string().nullable(),
+  finalPrice: z.string().nullable(),
+  budgetSupply: z.string().nullable(),
+  budgetService: z.string().nullable(),
+  budgetFreight: z.string().nullable(),
+  budgetAdmin: z.string().nullable(),
+  budgetBuybackSale: z.string().nullable(),
+  budgetGemCharges: z.string().nullable(),
   woDraft: z.string().nullable(),
   teChecklistConfirmed: z.boolean().nullable(),
   tmsDocuments: z.any().nullable(),

@@ -25,6 +25,15 @@ export const woBasicDetails = pgTable("wo_basic_details", {
     receiptPreGst: numeric("receipt_pre_gst", { precision: 20, scale: 2 }),
     budgetPreGst: numeric("budget_pre_gst", { precision: 20, scale: 2 }),
     grossMargin: numeric("gross_margin", { precision: 5, scale: 2 }),
+    finalPrice: numeric("final_price", { precision: 20, scale: 2 }),
+
+    // Budget breakdown
+    budgetSupply: numeric("budget_supply", { precision: 20, scale: 2 }),
+    budgetService: numeric("budget_service", { precision: 20, scale: 2 }),
+    budgetFreight: numeric("budget_freight", { precision: 20, scale: 2 }),
+    budgetAdmin: numeric("budget_admin", { precision: 20, scale: 2 }),
+    budgetBuybackSale: numeric("budget_buyback_sale", { precision: 20, scale: 2 }),
+    budgetGemCharges: numeric("budget_gem_charges", { precision: 20, scale: 2 }),
 
     // Document upload
     woDraft: varchar("wo_draft", { length: 255 }),
