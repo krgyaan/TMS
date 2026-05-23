@@ -714,8 +714,6 @@ export class PaymentRequestsNotificationService {
                 .from(instrumentTransferDetails)
                 .where(eq(instrumentTransferDetails.instrumentId, instrumentId))
                 .limit(1);
-
-            console.log("Portal: ", portalDetails);
                 
             try {
                 // From: Requestor — To: Portal-Payment responsible user
@@ -817,7 +815,7 @@ export class PaymentRequestsNotificationService {
                         tlName: tlUser?.name || 'Team Leader',
                         receivingPdfUrl,
                     },
-                    to: [{ type: 'emails', emails: ['gyan@volksenergie.in'] }],
+                    to: [{ type: 'emails', emails: [toEmails] }],
                     cc: [
                         { type: 'role', role: 'Admin', teamId: tenderTeamId },
                         { type: 'role', role: 'Team Leader', teamId: tenderTeamId },

@@ -1182,12 +1182,12 @@ export class TenderApprovalService {
         }
 
         await this.sendEmail(eventType, tenderId, tlId, subject, template, emailData, {
-            to: [{ type: "emails", emails: ['gyan@volksenergie.in'] }],
-            // to: [{ type: "user", userId: tender.teamMember }],
-            // cc: [
-            //     { type: "role", role: "Admin", teamId: tender.team },
-            //     { type: "role", role: "Coordinator", teamId: tender.team },
-            // ],
+            // to: [{ type: "emails", emails: ['gyan@volksenergie.in'] }],
+            to: [{ type: "user", userId: tender.teamMember }],
+            cc: [
+                { type: "role", role: "Admin", teamId: tender.team },
+                { type: "role", role: "Coordinator", teamId: tender.team },
+            ],
         });
     }
 }
