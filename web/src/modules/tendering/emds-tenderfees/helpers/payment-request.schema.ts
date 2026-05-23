@@ -1,6 +1,13 @@
 import { z } from 'zod';
 import { DELIVERY_OPTIONS } from '../constants';
 
+const emdModeMapping: Record<string, string> = {
+    BT: 'BANK_TRANSFER',
+    POP: 'PORTAL',
+};
+const normalizeMode = (val: unknown) =>
+    typeof val === 'string' ? (emdModeMapping[val] ?? val) : val;
+
 const DELIVERY_OPTION_VALUES = DELIVERY_OPTIONS.map(option => option.value) as ['TENDER_DUE', '24', '48', '72', '96', '120'];
 
 const deliveryEnumField = () =>
@@ -585,19 +592,19 @@ export const PaymentRequestSchema = z.object({
     requestedBy: z.string().optional(),
     // EMD
     EMD: z.object({
-        mode: z.enum(['DD', 'FDR', 'BG', 'CHEQUE', 'BANK_TRANSFER', 'PORTAL', 'SURETY_BOND', 'NA']).optional(),
+        mode: z.preprocess(normalizeMode, z.enum(['DD', 'FDR', 'BG', 'CHEQUE', 'BANK_TRANSFER', 'PORTAL', 'SURETY_BOND', 'NA'])).optional(),
         details: PaymentDetailsSchema.optional(),
     }).superRefine(validatePaymentMode).optional(),
 
     // Tender Fee
     TENDER_FEES: z.object({
-        mode: z.enum(['PORTAL', 'BANK_TRANSFER', 'DD', 'NA']).optional(),
+        mode: z.preprocess(normalizeMode, z.enum(['PORTAL', 'BANK_TRANSFER', 'DD', 'NA'])).optional(),
         details: PaymentDetailsSchema.optional(),
     }).superRefine(validatePaymentMode).optional(),
 
     // Processing Fee
     PROCESSING_FEES: z.object({
-        mode: z.enum(['PORTAL', 'BANK_TRANSFER', 'DD', 'NA']).optional(),
+        mode: z.preprocess(normalizeMode, z.enum(['PORTAL', 'BANK_TRANSFER', 'DD', 'NA'])).optional(),
         details: PaymentDetailsSchema.optional(),
     }).superRefine(validatePaymentMode).optional(),
 });
@@ -612,19 +619,19 @@ export const OldEntryPaymentRequestSchema = z.object({
     team: z.coerce.number().int().positive({ message: "Team is required" }),
     // EMD
     EMD: z.object({
-        mode: z.enum(['DD', 'FDR', 'BG', 'CHEQUE', 'BANK_TRANSFER', 'PORTAL', 'SURETY_BOND', 'NA']).optional(),
+        mode: z.preprocess(normalizeMode, z.enum(['DD', 'FDR', 'BG', 'CHEQUE', 'BANK_TRANSFER', 'PORTAL', 'SURETY_BOND', 'NA'])).optional(),
         details: PaymentDetailsSchema.optional(),
     }).superRefine(validatePaymentMode).optional(),
 
     // Tender Fee
     TENDER_FEES: z.object({
-        mode: z.enum(['PORTAL', 'BANK_TRANSFER', 'DD', 'NA']).optional(),
+        mode: z.preprocess(normalizeMode, z.enum(['PORTAL', 'BANK_TRANSFER', 'DD', 'NA'])).optional(),
         details: PaymentDetailsSchema.optional(),
     }).superRefine(validatePaymentMode).optional(),
 
     // Processing Fee
     PROCESSING_FEES: z.object({
-        mode: z.enum(['PORTAL', 'BANK_TRANSFER', 'DD', 'NA']).optional(),
+        mode: z.preprocess(normalizeMode, z.enum(['PORTAL', 'BANK_TRANSFER', 'DD', 'NA'])).optional(),
         details: PaymentDetailsSchema.optional(),
     }).superRefine(validatePaymentMode).optional(),
 });
@@ -638,7 +645,7 @@ export const BiOtherThanTenderRequestSchema = z.object({
     tenderDueDate: z.string().optional(),
     // EMD only
     EMD: z.object({
-        mode: z.enum(['DD', 'FDR', 'BG', 'CHEQUE']).optional(),
+        mode: z.preprocess(normalizeMode, z.enum(['DD', 'FDR', 'BG', 'CHEQUE'])).optional(),
         details: PaymentDetailsSchema.optional(),
     }).superRefine(validatePaymentMode).optional(),
 });
