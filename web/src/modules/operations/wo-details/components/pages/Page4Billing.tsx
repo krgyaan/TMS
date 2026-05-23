@@ -1,21 +1,23 @@
-import { useEffect, useMemo, useCallback } from "react";
-import { useForm, useFieldArray, type Resolver } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Form, FormControl, FormField, FormItem, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, Package, MapPin, Truck } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { MapPin, Package, Plus, Receipt, Trash2, Truck } from "lucide-react";
+import { useCallback, useEffect, useMemo } from "react";
+import { useFieldArray, useForm, type Resolver } from "react-hook-form";
 
-import { Page4FormSchema } from "@/modules/operations/wo-details/helpers/woDetail.schema";
+import { FieldWrapper } from "@/components/form/FieldWrapper";
+import { useAutoSave } from "@/hooks/api/useWoDetails";
 import { WizardNavigation } from "@/modules/operations/wo-details/components/WizardNavigation";
 import { WIZARD_CONFIG } from "@/modules/operations/wo-details/helpers/constants";
-import { useAutoSave } from "@/hooks/api/useWoDetails";
+import { Page4FormSchema } from "@/modules/operations/wo-details/helpers/woDetail.schema";
 
-import type { Page4FormValues, PageFormProps, BOQItem, Address } from "@/modules/operations/wo-details/helpers/woDetail.types";
+import type { Address, BOQItem, Page4FormValues, PageFormProps } from "@/modules/operations/wo-details/helpers/woDetail.types";
 
 interface Page4BillingProps extends PageFormProps {
     initialData?: Partial<Page4FormValues>;
@@ -140,148 +142,142 @@ export function Page4Billing({
         onAdd: () => void,
         total: number,
         title: string,
-        icon: React.ReactNode,
-        colorClass: string,
         minRows: number = 0
     ) => (
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    {icon}
-                    {title}
-                </CardTitle>
-            </CardHeader>
-            <CardContent>
-                <div className="border rounded-lg overflow-x-auto">
-                    <table className="w-full text-sm">
-                        <thead className="bg-muted">
-                            <tr>
-                                <th className="p-3 text-left w-20">Sr. No.</th>
-                                <th className="p-3 text-left">Item Description</th>
-                                <th className="p-3 text-left w-32">Quantity</th>
-                                <th className="p-3 text-left w-32">Rate</th>
-                                <th className="p-3 text-left w-32">Amount</th>
-                                <th className="p-3 text-left w-16"></th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                            {fields.map((field, index) => {
-                                const quantity = form.watch(`${namePrefix}.${index}.quantity`);
-                                const rate = form.watch(`${namePrefix}.${index}.rate`);
-                                const amount = calculateAmount(quantity, rate);
+        <div>
+            <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                <Package className="h-4 w-4 text-muted-foreground" />
+                {title}
+            </h3>
+            <div className="border rounded-lg overflow-x-auto">
+                <table className="w-full text-sm">
+                    <thead className="bg-muted">
+                        <tr>
+                            <th className="p-3 text-left w-20">Sr. No.</th>
+                            <th className="p-3 text-left">Item Description</th>
+                            <th className="p-3 text-left w-32">Quantity</th>
+                            <th className="p-3 text-left w-32">Rate</th>
+                            <th className="p-3 text-left w-32">Amount</th>
+                            <th className="p-3 text-left w-16"></th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                        {fields.map((field, index) => {
+                            const quantity = form.watch(`${namePrefix}.${index}.quantity`);
+                            const rate = form.watch(`${namePrefix}.${index}.rate`);
+                            const amount = calculateAmount(quantity, rate);
 
-                                return (
-                                    <tr key={field.id}>
-                                        <td className="p-2">
-                                            <FormField
-                                                control={form.control}
-                                                name={`${namePrefix}.${index}.srNo`}
-                                                render={({ field }) => (
-                                                    <FormItem>
-                                                        <FormControl>
-                                                            <Input
-                                                                {...field}
-                                                                type="number"
-                                                                className="h-8 text-xs w-16"
-                                                                min={1}
-                                                                onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
-                                                            />
-                                                        </FormControl>
-                                                    </FormItem>
-                                                )}
-                                            />
-                                        </td>
-                                        <td className="p-2">
-                                            <FormField
-                                                control={form.control}
-                                                name={`${namePrefix}.${index}.itemDescription`}
-                                                render={({ field }) => (
-                                                    <FormItem>
-                                                        <FormControl>
-                                                            <Input {...field} placeholder="Item description" className="h-8 text-xs" />
-                                                        </FormControl>
-                                                        <FormMessage className="text-xs" />
-                                                    </FormItem>
-                                                )}
-                                            />
-                                        </td>
-                                        <td className="p-2">
-                                            <FormField
-                                                control={form.control}
-                                                name={`${namePrefix}.${index}.quantity`}
-                                                render={({ field }) => (
-                                                    <FormItem>
-                                                        <FormControl>
-                                                            <Input {...field} placeholder="0.00" className="h-8 text-xs" />
-                                                        </FormControl>
-                                                        <FormMessage className="text-xs" />
-                                                    </FormItem>
-                                                )}
-                                            />
-                                        </td>
-                                        <td className="p-2">
-                                            <FormField
-                                                control={form.control}
-                                                name={`${namePrefix}.${index}.rate`}
-                                                render={({ field }) => (
-                                                    <FormItem>
-                                                        <FormControl>
-                                                            <Input {...field} placeholder="0.00" className="h-8 text-xs" />
-                                                        </FormControl>
-                                                        <FormMessage className="text-xs" />
-                                                    </FormItem>
-                                                )}
-                                            />
-                                        </td>
-                                        <td className="p-2">
-                                            <span className="text-sm font-medium">₹{amount.toLocaleString()}</span>
-                                        </td>
-                                        <td className="p-2">
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                type="button"
-                                                onClick={() => onRemove(index)}
-                                                disabled={fields.length <= minRows}
-                                                className="text-destructive"
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                            {fields.length === 0 && (
-                                <tr>
-                                    <td colSpan={6} className="p-4 text-center text-muted-foreground">
-                                        No items. Add one using the button below.
+                            return (
+                                <tr key={field.id}>
+                                    <td className="p-2">
+                                        <FormField
+                                            control={form.control}
+                                            name={`${namePrefix}.${index}.srNo`}
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormControl>
+                                                        <Input
+                                                            {...field}
+                                                            type="number"
+                                                            className="h-8 text-xs w-16"
+                                                            min={1}
+                                                            onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                                                        />
+                                                    </FormControl>
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </td>
+                                    <td className="p-2">
+                                        <FormField
+                                            control={form.control}
+                                            name={`${namePrefix}.${index}.itemDescription`}
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormControl>
+                                                        <Input {...field} placeholder="Item description" className="h-8 text-xs" />
+                                                    </FormControl>
+                                                    <FormMessage className="text-xs" />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </td>
+                                    <td className="p-2">
+                                        <FormField
+                                            control={form.control}
+                                            name={`${namePrefix}.${index}.quantity`}
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormControl>
+                                                        <Input {...field} placeholder="0.00" className="h-8 text-xs" />
+                                                    </FormControl>
+                                                    <FormMessage className="text-xs" />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </td>
+                                    <td className="p-2">
+                                        <FormField
+                                            control={form.control}
+                                            name={`${namePrefix}.${index}.rate`}
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormControl>
+                                                        <Input {...field} placeholder="0.00" className="h-8 text-xs" />
+                                                    </FormControl>
+                                                    <FormMessage className="text-xs" />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </td>
+                                    <td className="p-2">
+                                        <span className="text-sm font-medium">₹{amount.toLocaleString()}</span>
+                                    </td>
+                                    <td className="p-2">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            type="button"
+                                            onClick={() => onRemove(index)}
+                                            disabled={fields.length <= minRows}
+                                            className="text-destructive"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
                                     </td>
                                 </tr>
-                            )}
-                        </tbody>
-                        {fields.length > 0 && (
-                            <tfoot className="bg-muted/50">
-                                <tr>
-                                    <td colSpan={4} className="p-3 text-right font-semibold">Total:</td>
-                                    <td className={`p-3 font-bold ${colorClass}`}>₹{total.toLocaleString()}</td>
-                                    <td></td>
-                                </tr>
-                            </tfoot>
+                            );
+                        })}
+                        {fields.length === 0 && (
+                            <tr>
+                                <td colSpan={6} className="p-4 text-center text-muted-foreground">
+                                    No items. Add one using the button below.
+                                </td>
+                            </tr>
                         )}
-                    </table>
-                </div>
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="mt-4"
-                    onClick={onAdd}
-                >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Row
-                </Button>
-            </CardContent>
-        </Card>
+                    </tbody>
+                    {fields.length > 0 && (
+                        <tfoot className="bg-muted/50">
+                            <tr>
+                                <td colSpan={4} className="p-3 text-right font-semibold">Total:</td>
+                                <td className="p-3 font-bold">₹{total.toLocaleString()}</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
+                    )}
+                </table>
+            </div>
+            <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={onAdd}
+            >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Row
+            </Button>
+        </div>
     );
 
     const renderAddressSection = (
@@ -292,18 +288,16 @@ export function Page4Billing({
         title: string,
         icon: React.ReactNode
     ) => (
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                    {icon}
-                    {title}
-                </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+        <div>
+            <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                {icon}
+                {title}
+            </h3>
+            <div className="space-y-4">
                 {fields.map((field, index) => (
                     <div key={field.id} className="p-4 border rounded-lg space-y-4">
                         <div className="flex justify-between items-center">
-                            <h4 className="font-medium">{title.replace("es", "")} {index + 1}</h4>
+                            <h4 className="font-medium text-sm">{title.replace("es", "")} {index + 1}</h4>
                             <Button
                                 variant="ghost"
                                 size="sm"
@@ -342,47 +336,17 @@ export function Page4Billing({
                                 )}
                             </div>
 
-                            <FormField
-                                control={form.control}
-                                name={`${namePrefix}.${index}.customerName`}
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Customer Name</FormLabel>
-                                        <FormControl>
-                                            <Input {...field} placeholder="Customer name" />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
+                            <FieldWrapper control={form.control} name={`${namePrefix}.${index}.customerName`} label="Customer Name">
+                                {(field) => <Input {...field} placeholder="Customer name" />}
+                            </FieldWrapper>
 
-                            <FormField
-                                control={form.control}
-                                name={`${namePrefix}.${index}.gst`}
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>GST Number</FormLabel>
-                                        <FormControl>
-                                            <Input {...field} placeholder="27AABCU9603R1ZX" />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
+                            <FieldWrapper control={form.control} name={`${namePrefix}.${index}.gst`} label="GST Number">
+                                {(field) => <Input {...field} placeholder="27AABCU9603R1ZX" />}
+                            </FieldWrapper>
 
-                            <FormField
-                                control={form.control}
-                                name={`${namePrefix}.${index}.address`}
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Address</FormLabel>
-                                        <FormControl>
-                                            <Textarea {...field} placeholder="Full address" rows={2} />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
+                            <FieldWrapper control={form.control} name={`${namePrefix}.${index}.address`} label="Address">
+                                {(field) => <Textarea {...field} placeholder="Full address" rows={2} />}
+                            </FieldWrapper>
                         </div>
                     </div>
                 ))}
@@ -396,54 +360,66 @@ export function Page4Billing({
                     <Plus className="h-4 w-4 mr-2" />
                     Add {title.replace("es", "")}
                 </Button>
-            </CardContent>
-        </Card>
+            </div>
+        </div>
     );
 
     return (
         <Form {...form}>
-            <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
-                {renderBoqTable(
-                    billingBoqFields,
-                    "billingBoq",
-                    removeBillingBoq,
-                    () => appendBillingBoq({ ...defaultBoqItem, srNo: billingBoqFields.length + 1 }),
-                    billingTotal,
-                    "Billing BOQ",
-                    <Package className="h-5 w-5 text-orange-500" />,
-                    "text-green-600",
-                    1
-                )}
+            <form onSubmit={(e) => e.preventDefault()} className="space-y-8">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                            <Receipt className="h-5 w-5 text-muted-foreground" />
+                            Billing
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-8">
+                        {renderBoqTable(
+                            billingBoqFields,
+                            "billingBoq",
+                            removeBillingBoq,
+                            () => appendBillingBoq({ ...defaultBoqItem, srNo: billingBoqFields.length + 1 }),
+                            billingTotal,
+                            "Billing BOQ",
+                            1
+                        )}
 
-                {renderBoqTable(
-                    buybackBoqFields,
-                    "buybackBoq",
-                    removeBuybackBoq,
-                    () => appendBuybackBoq({ ...defaultBoqItem, srNo: buybackBoqFields.length + 1 }),
-                    buybackTotal,
-                    "Buyback BOQ (Optional)",
-                    <Package className="h-5 w-5 text-blue-500" />,
-                    "text-blue-600",
-                    0
-                )}
+                        <Separator />
 
-                {renderAddressSection(
-                    billingAddressFields,
-                    "billingAddresses",
-                    removeBillingAddress,
-                    () => appendBillingAddress(defaultAddress),
-                    "Billing Addresses",
-                    <MapPin className="h-5 w-5 text-orange-500" />
-                )}
+                        {renderBoqTable(
+                            buybackBoqFields,
+                            "buybackBoq",
+                            removeBuybackBoq,
+                            () => appendBuybackBoq({ ...defaultBoqItem, srNo: buybackBoqFields.length + 1 }),
+                            buybackTotal,
+                            "Buyback BOQ (Optional)",
+                            0
+                        )}
 
-                {renderAddressSection(
-                    shippingAddressFields,
-                    "shippingAddresses",
-                    removeShippingAddress,
-                    () => appendShippingAddress(defaultAddress),
-                    "Shipping Addresses",
-                    <Truck className="h-5 w-5 text-orange-500" />
-                )}
+                        <Separator />
+
+                        {renderAddressSection(
+                            billingAddressFields,
+                            "billingAddresses",
+                            removeBillingAddress,
+                            () => appendBillingAddress(defaultAddress),
+                            "Billing Addresses",
+                            <MapPin className="h-4 w-4 text-muted-foreground" />
+                        )}
+
+                        <Separator />
+
+                        {renderAddressSection(
+                            shippingAddressFields,
+                            "shippingAddresses",
+                            removeShippingAddress,
+                            () => appendShippingAddress(defaultAddress),
+                            "Shipping Addresses",
+                            <Truck className="h-4 w-4 text-muted-foreground" />
+                        )}
+                    </CardContent>
+                </Card>
 
                 <WizardNavigation
                     currentPage={4}

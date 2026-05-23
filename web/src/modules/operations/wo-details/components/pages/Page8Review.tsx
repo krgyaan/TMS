@@ -1,10 +1,11 @@
-import { useWoDetailWithRelations } from "@/hooks/api/useWoDetails";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, AlertCircle, ArrowLeft, Send, FileCheck, Users, ShieldCheck, TrendingUp, Package, MapPinned, Calculator, FileEdit } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useWoDetailWithRelations } from "@/hooks/api/useWoDetails";
+import { AlertCircle, ArrowLeft, Calculator, FileCheck, FileEdit, Loader2, MapPinned, Package, Send, ShieldCheck, SkipForward, TrendingUp, Users } from "lucide-react";
 import { useState } from "react";
-import type { Contact, BOQItem, Address } from "../../helpers/woDetail.types";
+import type { Address, BOQItem, Contact } from "../../helpers/woDetail.types";
 
 interface Page8ReviewProps {
     woDetailId: number | null;
@@ -32,6 +33,62 @@ const PAGE_TITLES: Record<number, string> = {
     7: "WO Acceptance",
 };
 
+type DetailShape = Record<string, unknown>;
+
+function countFilled(detail: DetailShape, fields: string[]): number {
+    return fields.filter((f) => {
+        const val = detail[f];
+        if (val === null || val === undefined || val === "") return false;
+        if (Array.isArray(val)) return val.length > 0;
+        if (typeof val === "object") return Object.keys(val as object).length > 0;
+        return true;
+    }).length;
+}
+
+const PAGE_FIELDS: Record<number, { total: number; check: (d: DetailShape) => number }> = {
+    1: {
+        total: 2,
+        check: (d) => ((d.contacts as any[])?.length ? 1 : 0) + (d.tenderDocumentsChecklist ? 1 : 0),
+    },
+    2: {
+        total: 4,
+        check: (d) =>
+            countFilled(d, ["ldApplicable", "isPbgApplicable", "isContractAgreement", "detailedPoApplicable"]),
+    },
+    3: {
+        total: 4,
+        check: (d) =>
+            countFilled(d, ["swotStrengths", "swotWeaknesses", "swotOpportunities", "swotThreats"]),
+    },
+    4: {
+        total: 3,
+        check: (d) =>
+            ((d.billingBoq as any[])?.length ? 1 : 0) +
+            ((d.billingAddresses as any[])?.length ? 1 : 0) +
+            ((d.shippingAddresses as any[])?.length ? 1 : 0),
+    },
+    5: {
+        total: 4,
+        check: (d) =>
+            countFilled(d, ["siteVisitNeeded"]) +
+            ((d.documentsFromTendering as any[])?.length ? 1 : 0) +
+            ((d.documentsNeeded as any[])?.length ? 1 : 0) +
+            ((d.documentsInHouse as any[])?.length ? 1 : 0),
+    },
+    6: {
+        total: 3,
+        check: (d) =>
+            (d.costingSheetLink ? 1 : 0) +
+            (d.hasDiscrepancies !== undefined && d.hasDiscrepancies !== null ? 1 : 0) +
+            (d.budgetPreGst ? 1 : 0),
+    },
+    7: {
+        total: 3,
+        check: (d) =>
+            countFilled(d, ["oeWoAmendmentNeeded", "oeSignaturePrepared", "courierRequestPrepared"]),
+    },
+};
+
 function SummaryRow({ label, value }: { label: string; value: string | undefined | null }) {
     return (
         <div className="flex justify-between py-1.5 border-b border-dashed last:border-0">
@@ -41,17 +98,53 @@ function SummaryRow({ label, value }: { label: string; value: string | undefined
     );
 }
 
-function SectionCard({ pageNum, children }: { pageNum: number; children: React.ReactNode }) {
+function SectionCard({
+    pageNum,
+    isSkipped,
+    filled,
+    total,
+    children,
+}: {
+    pageNum: number;
+    isSkipped: boolean;
+    filled: number;
+    total: number;
+    children: React.ReactNode;
+}) {
+    const allFilled = filled >= total;
     return (
-        <Card>
-            <CardHeader className="border-b bg-muted/10 py-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                    <span className="text-orange-500">{PAGE_ICONS[pageNum]}</span>
-                    {PAGE_TITLES[pageNum]}
-                </CardTitle>
+        <Card className={isSkipped ? "opacity-60" : ""}>
+            <CardHeader className="py-3">
+                <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                        <span className="text-muted-foreground">{PAGE_ICONS[pageNum]}</span>
+                        {PAGE_TITLES[pageNum]}
+                    </CardTitle>
+                    {isSkipped ? (
+                        <Badge variant="outline" className="gap-1 text-yellow-700 border-yellow-300 bg-yellow-50">
+                            <SkipForward className="h-3 w-3" />
+                            Skipped
+                        </Badge>
+                    ) : (
+                        <Badge
+                            variant="outline"
+                            className={
+                                allFilled
+                                    ? "gap-1 text-green-700 border-green-300 bg-green-50"
+                                    : "gap-1 text-muted-foreground"
+                            }
+                        >
+                            {filled}/{total} fields
+                        </Badge>
+                    )}
+                </div>
             </CardHeader>
             <CardContent className="p-4">
-                {children}
+                {isSkipped ? (
+                    <p className="text-sm text-muted-foreground italic">This page was skipped.</p>
+                ) : (
+                    children
+                )}
             </CardContent>
         </Card>
     );
@@ -85,6 +178,14 @@ export function Page8Review({ woDetailId, onSubmit, onBack }: Page8ReviewProps) 
         );
     }
 
+    const skipped = detail.skippedPages || [];
+    const d = detail as unknown as Record<string, unknown>;
+    const pageStatus = (n: number) => ({
+        isSkipped: skipped.includes(n),
+        filled: PAGE_FIELDS[n].check(d),
+        total: PAGE_FIELDS[n].total,
+    });
+
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -109,7 +210,7 @@ export function Page8Review({ woDetailId, onSubmit, onBack }: Page8ReviewProps) 
             )}
 
             {/* Page 1: Contacts & Checklist */}
-            <SectionCard pageNum={1}>
+            <SectionCard pageNum={1} {...pageStatus(1)}>
                 {detail.contacts && detail.contacts.length > 0 ? (
                     <div className="space-y-2">
                         {detail.contacts.map((c: Contact, i: number) => (
@@ -134,7 +235,7 @@ export function Page8Review({ woDetailId, onSubmit, onBack }: Page8ReviewProps) 
             </SectionCard>
 
             {/* Page 2: Compliance */}
-            <SectionCard pageNum={2}>
+            <SectionCard pageNum={2} {...pageStatus(2)}>
                 <SummaryRow label="LD Applicable" value={detail.ldApplicable ? "Yes" : "No"} />
                 {detail.ldApplicable && (
                     <>
@@ -151,7 +252,7 @@ export function Page8Review({ woDetailId, onSubmit, onBack }: Page8ReviewProps) 
             </SectionCard>
 
             {/* Page 3: SWOT */}
-            <SectionCard pageNum={3}>
+            <SectionCard pageNum={3} {...pageStatus(3)}>
                 {detail.swotStrengths || detail.swotWeaknesses || detail.swotOpportunities || detail.swotThreats ? (
                     <div className="grid grid-cols-2 gap-4">
                         {detail.swotStrengths && (
@@ -185,7 +286,7 @@ export function Page8Review({ woDetailId, onSubmit, onBack }: Page8ReviewProps) 
             </SectionCard>
 
             {/* Page 4: Billing */}
-            <SectionCard pageNum={4}>
+            <SectionCard pageNum={4} {...pageStatus(4)}>
                 <p className="text-sm font-medium mb-2">Billing BOQ ({detail.billingBoq?.length || 0} items)</p>
                 {detail.billingBoq && detail.billingBoq.length > 0 ? (
                     <div className="border rounded text-sm mb-3">
@@ -220,7 +321,7 @@ export function Page8Review({ woDetailId, onSubmit, onBack }: Page8ReviewProps) 
             </SectionCard>
 
             {/* Page 5: Execution */}
-            <SectionCard pageNum={5}>
+            <SectionCard pageNum={5} {...pageStatus(5)}>
                 <SummaryRow label="Site Visit Required" value={detail.siteVisitNeeded ? "Yes" : "No"} />
                 {detail.siteVisitPerson?.name && (
                     <>
@@ -235,7 +336,7 @@ export function Page8Review({ woDetailId, onSubmit, onBack }: Page8ReviewProps) 
             </SectionCard>
 
             {/* Page 6: Profitability */}
-            <SectionCard pageNum={6}>
+            <SectionCard pageNum={6} {...pageStatus(6)}>
                 {detail.costingSheetLink && (
                     <SummaryRow label="Costing Sheet" value={detail.costingSheetLink} />
                 )}
@@ -252,7 +353,7 @@ export function Page8Review({ woDetailId, onSubmit, onBack }: Page8ReviewProps) 
             </SectionCard>
 
             {/* Page 7: Acceptance */}
-            <SectionCard pageNum={7}>
+            <SectionCard pageNum={7} {...pageStatus(7)}>
                 <SummaryRow label="Amendment Needed" value={detail.oeWoAmendmentNeeded === true ? "Yes" : detail.oeWoAmendmentNeeded === false ? "No" : "Not set"} />
                 {detail.oeWoAmendmentNeeded === false && (
                     <>

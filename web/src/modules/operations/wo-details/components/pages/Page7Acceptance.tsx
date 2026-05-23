@@ -1,20 +1,24 @@
-import { useEffect, useCallback } from "react";
-import { useForm, useFieldArray, type Resolver } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Trash2, FileEdit, CheckCircle2, Pen, Truck, AlertTriangle, ShieldCheck } from "lucide-react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { AlertTriangle, CheckCircle2, FileEdit, Info, Pen, Plus, Trash2, Truck } from "lucide-react";
+import { useCallback, useEffect } from "react";
+import { useFieldArray, useForm, type Resolver } from "react-hook-form";
 
-import { Page7FormSchema } from "@/modules/operations/wo-details/helpers/woDetail.schema";
-import { WizardNavigation } from "@/modules/operations/wo-details/components/WizardNavigation";
-import { YES_NO_OPTIONS, WIZARD_CONFIG } from "@/modules/operations/wo-details/helpers/constants";
+import { ConditionalSection } from "@/components/form/ConditionalSection";
+import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { useAutoSave } from "@/hooks/api/useWoDetails";
+import { WizardNavigation } from "@/modules/operations/wo-details/components/WizardNavigation";
+import { WIZARD_CONFIG, YES_NO_OPTIONS } from "@/modules/operations/wo-details/helpers/constants";
+import { Page7FormSchema } from "@/modules/operations/wo-details/helpers/woDetail.schema";
 
-import type { Page7FormValues, PageFormProps, Amendment } from "@/modules/operations/wo-details/helpers/woDetail.types";
+import type { Amendment, Page7FormValues, PageFormProps } from "@/modules/operations/wo-details/helpers/woDetail.types";
 
 interface Page7AcceptanceProps extends PageFormProps {
     initialData?: Partial<Page7FormValues>;
@@ -91,202 +95,155 @@ export function Page7Acceptance({
 
     return (
         <Form {...form}>
-            <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
+            <form onSubmit={(e) => e.preventDefault()} className="space-y-8">
                 <Card>
-                    <CardHeader className="border-b bg-muted/10">
-                        <CardTitle className="flex items-center gap-2">
-                            <FileEdit className="h-5 w-5 text-orange-500" />
-                            WO Amendment Decision
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                            <FileEdit className="h-5 w-5 text-muted-foreground" />
+                            WO Acceptance
                         </CardTitle>
-                        <CardDescription>Does this WO require any amendments before acceptance?</CardDescription>
                     </CardHeader>
-                    <CardContent className="p-6">
-                        <div className="max-w-xs">
-                            <SelectField
-                                control={form.control}
-                                name="oeWoAmendmentNeeded"
-                                label="Amendment Needed?"
-                                options={YES_NO_OPTIONS}
-                                placeholder="Select"
-                            />
+                    <CardContent className="space-y-8">
+                        <div>
+                            <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                                <FileEdit className="h-4 w-4 text-muted-foreground" />
+                                WO Amendment Decision
+                            </h3>
+                            <p className="text-xs text-muted-foreground mb-4">Does this WO require any amendments before acceptance?</p>
+                            <div className="max-w-xs">
+                                <SelectField
+                                    control={form.control}
+                                    name="oeWoAmendmentNeeded"
+                                    label="Amendment Needed?"
+                                    options={YES_NO_OPTIONS}
+                                    placeholder="Select"
+                                />
+                            </div>
                         </div>
-                    </CardContent>
-                </Card>
 
-                {watchAmendmentNeeded === "true" && (
-                    <Card>
-                        <CardHeader className="border-b bg-muted/10">
-                            <CardTitle className="flex items-center gap-2">
-                                <AlertTriangle className="h-5 w-5 text-orange-500" />
-                                Amendment Details
-                            </CardTitle>
-                            <CardDescription>Specify all required corrections for the Work Order.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="p-6 space-y-6">
-                            {amendmentFields.map((field, index) => (
-                                <div key={field.id} className="p-6 border rounded-2xl space-y-6 relative">
-                                    <div className="flex justify-between items-center">
-                                        <h4 className="font-bold text-sm uppercase tracking-wider text-orange-800">
-                                            Amendment #{index + 1}
-                                        </h4>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            type="button"
-                                            onClick={() => removeAmendment(index)}
-                                            className="text-destructive h-8 w-8 hover:bg-red-100"
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                    </div>
+                        <ConditionalSection show={watchAmendmentNeeded === "true"}>
+                            <Separator />
+                            <div>
+                                <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                                    <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                                    Amendment Details
+                                </h3>
+                                <p className="text-xs text-muted-foreground mb-4">Specify all required corrections for the Work Order.</p>
+                                <div className="space-y-6">
+                                    {amendmentFields.map((field, index) => (
+                                        <div key={field.id} className="p-4 border rounded-lg space-y-4 relative">
+                                            <div className="flex justify-between items-center">
+                                                <h4 className="font-semibold text-sm">Amendment #{index + 1}</h4>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    type="button"
+                                                    onClick={() => removeAmendment(index)}
+                                                    className="text-destructive h-8 w-8"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
 
-                                    <div className="grid gap-6 md:grid-cols-6 items-start">
-                                        <FormField
-                                            control={form.control}
-                                            name={`amendments.${index}.pageNo`}
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Page Number</FormLabel>
-                                                    <FormControl>
-                                                        <Input {...field} placeholder="e.g., 12" />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
+                                            <div className="grid gap-4 md:grid-cols-6 items-start">
+                                                <FieldWrapper control={form.control} name={`amendments.${index}.pageNo`} label="Page Number">
+                                                    {(field) => <Input {...field} placeholder="e.g., 12" />}
+                                                </FieldWrapper>
+                                                <FieldWrapper control={form.control} name={`amendments.${index}.clauseNo`} label="Clause Number">
+                                                    {(field) => <Input {...field} placeholder="e.g., 5.1.a" />}
+                                                </FieldWrapper>
 
-                                        <FormField
-                                            control={form.control}
-                                            name={`amendments.${index}.clauseNo`}
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Clause Number</FormLabel>
-                                                    <FormControl>
-                                                        <Input {...field} placeholder="e.g., 5.1.a" />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-
-                                        <div className="md:col-span-4 grid grid-cols-2 gap-6">
-                                            <FormField
-                                                control={form.control}
-                                                name={`amendments.${index}.currentStatement`}
-                                                render={({ field }) => (
-                                                    <FormItem>
-                                                        <FormLabel>Current Statement in WO</FormLabel>
-                                                        <FormControl>
+                                                <div className="md:col-span-4 grid grid-cols-2 gap-4">
+                                                    <FieldWrapper control={form.control} name={`amendments.${index}.currentStatement`} label="Current Statement in WO">
+                                                        {(field) => (
                                                             <Textarea
                                                                 {...field}
                                                                 placeholder="Copy the exact text from the PO/WO..."
                                                                 rows={2}
-                                                                className="bg-white"
                                                             />
-                                                        </FormControl>
-                                                        <FormMessage />
-                                                    </FormItem>
-                                                )}
-                                            />
-
-                                            <FormField
-                                                control={form.control}
-                                                name={`amendments.${index}.correctedStatement`}
-                                                render={({ field }) => (
-                                                    <FormItem>
-                                                        <FormLabel>Proposed Corrected Statement</FormLabel>
-                                                        <FormControl>
+                                                        )}
+                                                    </FieldWrapper>
+                                                    <FieldWrapper control={form.control} name={`amendments.${index}.correctedStatement`} label="Proposed Corrected Statement">
+                                                        {(field) => (
                                                             <Textarea
                                                                 {...field}
                                                                 placeholder="How it should read after amendment..."
                                                                 rows={2}
-                                                                className="bg-white border-green-200 focus:border-green-500"
                                                             />
-                                                        </FormControl>
-                                                        <FormMessage />
-                                                    </FormItem>
-                                                )}
-                                            />
+                                                        )}
+                                                    </FieldWrapper>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
-                                </div>
-                            ))}
+                                    ))}
 
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => appendAmendment(defaultAmendment)}
-                                className="w-full border-dashed border-2 py-6 hover:bg-orange-50 hover:border-orange-200"
-                            >
-                                <Plus className="h-4 w-4 mr-2" />
-                                Add Another Amendment
-                            </Button>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {watchAmendmentNeeded === "false" && (
-                    <Card>
-                        <CardHeader className="border-b bg-muted/10">
-                            <CardTitle className="flex items-center gap-2">
-                                <CheckCircle2 className="h-5 w-5 text-green-600" />
-                                Final Acceptance Checklist
-                            </CardTitle>
-                            <CardDescription>Complete these steps to finalize Work Order acceptance.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="p-6 space-y-6">
-                            <div className="grid gap-6 md:grid-cols-2">
-                                <div className="p-6 border rounded-2xl space-y-4 bg-muted/5">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-blue-100 rounded-lg">
-                                            <Pen className="h-5 w-5 text-blue-600" />
-                                        </div>
-                                        <h4 className="font-semibold text-sm">Digital Signature</h4>
-                                    </div>
-                                    <p className="text-xs text-muted-foreground leading-relaxed">
-                                        Apply digital signature of authorized signatory on all pages of the PO/WO PDF.
-                                    </p>
-                                    <SelectField
-                                        control={form.control}
-                                        name="oeSignaturePrepared"
-                                        label="Signature Applied?"
-                                        options={YES_NO_OPTIONS}
-                                        placeholder="Select"
-                                    />
-                                </div>
-
-                                <div className="p-6 border rounded-2xl space-y-4 bg-muted/5">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-purple-100 rounded-lg">
-                                            <Truck className="h-5 w-5 text-purple-600" />
-                                        </div>
-                                        <h4 className="font-semibold text-sm">Courier Preparation</h4>
-                                    </div>
-                                    <p className="text-xs text-muted-foreground leading-relaxed">
-                                        Initiate courier request for physical signed copies. Processed after TL approval.
-                                    </p>
-                                    <SelectField
-                                        control={form.control}
-                                        name="courierRequestPrepared"
-                                        label="Courier Initiated?"
-                                        options={YES_NO_OPTIONS}
-                                        placeholder="Select"
-                                    />
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => appendAmendment(defaultAmendment)}
+                                        className="w-full border-dashed border-2 py-4"
+                                    >
+                                        <Plus className="h-4 w-4 mr-2" />
+                                        Add Another Amendment
+                                    </Button>
                                 </div>
                             </div>
+                        </ConditionalSection>
 
-                            <div className="bg-blue-50 border border-blue-200 p-6 rounded-2xl flex gap-4 items-start">
-                                <ShieldCheck className="h-6 w-6 text-blue-600 shrink-0 mt-1" />
-                                <div className="space-y-1">
-                                    <p className="text-sm font-semibold text-blue-900">Signatory Authorization</p>
-                                    <p className="text-sm text-blue-800 leading-relaxed">
+                        <ConditionalSection show={watchAmendmentNeeded === "false"}>
+                            <Separator />
+                            <div>
+                                <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                                    <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+                                    Final Acceptance Checklist
+                                </h3>
+                                <p className="text-xs text-muted-foreground mb-4">Complete these steps to finalize Work Order acceptance.</p>
+                                <div className="grid gap-6 md:grid-cols-2 mb-4">
+                                    <div className="p-4 border rounded-lg space-y-3 bg-muted/5">
+                                        <div className="flex items-center gap-3">
+                                            <Pen className="h-4 w-4 text-muted-foreground" />
+                                            <h4 className="font-semibold text-sm">Digital Signature</h4>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground leading-relaxed">
+                                            Apply digital signature of authorized signatory on all pages of the PO/WO PDF.
+                                        </p>
+                                        <SelectField
+                                            control={form.control}
+                                            name="oeSignaturePrepared"
+                                            label="Signature Applied?"
+                                            options={YES_NO_OPTIONS}
+                                            placeholder="Select"
+                                        />
+                                    </div>
+
+                                    <div className="p-4 border rounded-lg space-y-3 bg-muted/5">
+                                        <div className="flex items-center gap-3">
+                                            <Truck className="h-4 w-4 text-muted-foreground" />
+                                            <h4 className="font-semibold text-sm">Courier Preparation</h4>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground leading-relaxed">
+                                            Initiate courier request for physical signed copies. Processed after TL approval.
+                                        </p>
+                                        <SelectField
+                                            control={form.control}
+                                            name="courierRequestPrepared"
+                                            label="Courier Initiated?"
+                                            options={YES_NO_OPTIONS}
+                                            placeholder="Select"
+                                        />
+                                    </div>
+                                </div>
+
+                                <Alert>
+                                    <Info className="h-4 w-4" />
+                                    <AlertDescription>
                                         Upon submission, an authority letter will be automatically generated authorizing the TL to sign on behalf of the company for this specific project.
-                                    </p>
-                                </div>
+                                    </AlertDescription>
+                                </Alert>
                             </div>
-                        </CardContent>
-                    </Card>
-                )}
+                        </ConditionalSection>
+                    </CardContent>
+                </Card>
 
                 <WizardNavigation
                     currentPage={7}

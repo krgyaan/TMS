@@ -61,9 +61,9 @@ export const TENDER_CHECKLIST_ITEMS = [
 ] as const;
 
 export const YES_NO_OPTIONS = [
-  { label: "Yes", value: "true" },
-  { label: "No", value: "false" },
-] as const;
+  { value: 'YES', label: 'Yes' },
+  { value: 'NO', label: 'No' },
+];
 
 export type YesNoValue = "true" | "false";
 

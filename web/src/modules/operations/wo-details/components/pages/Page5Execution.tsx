@@ -1,17 +1,20 @@
-import { useEffect, useCallback } from "react";
-import { useForm, useFieldArray, type Resolver } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Plus, Trash2, MapPinned, FileText, User } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { FileText, MapPinned, Plus, Trash2, User } from "lucide-react";
+import { useCallback, useEffect } from "react";
+import { useFieldArray, useForm, type Resolver } from "react-hook-form";
 
-import { Page5FormSchema } from "@/modules/operations/wo-details/helpers/woDetail.schema";
-import { WizardNavigation } from "@/modules/operations/wo-details/components/WizardNavigation";
-import { YES_NO_OPTIONS, WIZARD_CONFIG } from "@/modules/operations/wo-details/helpers/constants";
+import { ConditionalSection } from "@/components/form/ConditionalSection";
+import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { useAutoSave } from "@/hooks/api/useWoDetails";
+import { WizardNavigation } from "@/modules/operations/wo-details/components/WizardNavigation";
+import { WIZARD_CONFIG, YES_NO_OPTIONS } from "@/modules/operations/wo-details/helpers/constants";
+import { Page5FormSchema } from "@/modules/operations/wo-details/helpers/woDetail.schema";
 
 import type { Page5FormValues, PageFormProps } from "@/modules/operations/wo-details/helpers/woDetail.types";
 
@@ -101,7 +104,6 @@ export function Page5Execution({
         namePrefix,
         onAdd,
         onRemove,
-        color,
     }: {
         title: string;
         icon: React.ElementType;
@@ -109,16 +111,10 @@ export function Page5Execution({
         namePrefix: string;
         onAdd: () => void;
         onRemove: (index: number) => void;
-        color: string;
     }) => (
-        <Card>
-            <CardHeader className="border-b py-3">
-                <CardTitle className={`flex items-center gap-2 text-sm font-semibold text-${color}-600`}>
-                    <Icon className="h-4 w-4" />
-                    {title}
-                </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 space-y-3">
+        <div>
+            <h4 className="text-xs font-semibold text-muted-foreground mb-2">{title}</h4>
+            <div className="space-y-2">
                 {fields.map((field, index) => (
                     <div key={field.id || index} className="group flex items-center gap-2">
                         <FormField
@@ -153,123 +149,92 @@ export function Page5Execution({
                     <Plus className="h-3 w-3 mr-2" />
                     Add Document
                 </Button>
-            </CardContent>
-        </Card>
+            </div>
+        </div>
     );
 
     return (
         <Form {...form}>
-            <form onSubmit={(e) => e.preventDefault()} className="space-y-6">
+            <form onSubmit={(e) => e.preventDefault()} className="space-y-8">
                 <Card>
-                    <CardHeader className="border-b bg-muted/10">
-                        <CardTitle className="flex items-center gap-2">
-                            <MapPinned className="h-5 w-5 text-orange-500" />
-                            Site Visit Assessment
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                            <MapPinned className="h-5 w-5 text-muted-foreground" />
+                            Project Execution
                         </CardTitle>
-                        <CardDescription>Determine if a site visit is necessary for project execution.</CardDescription>
                     </CardHeader>
-                    <CardContent className="p-6 space-y-6">
-                        <div className="max-w-xs">
-                            <SelectField
-                                control={form.control}
-                                name="siteVisitNeeded"
-                                label="Site Visit Required?"
-                                options={YES_NO_OPTIONS}
-                                placeholder="Select"
-                            />
+                    <CardContent className="space-y-8">
+                        <div>
+                            <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                                <MapPinned className="h-4 w-4 text-muted-foreground" />
+                                Site Visit Assessment
+                            </h3>
+                            <p className="text-xs text-muted-foreground mb-4">Determine if a site visit is necessary for project execution.</p>
+                            <div className="max-w-xs mb-4">
+                                <SelectField
+                                    control={form.control}
+                                    name="siteVisitNeeded"
+                                    label="Site Visit Required?"
+                                    options={YES_NO_OPTIONS}
+                                    placeholder="Select"
+                                />
+                            </div>
+
+                            <ConditionalSection show={watchSiteVisitNeeded === "true"}>
+                                <div className="p-4 border border-dashed rounded-lg space-y-4">
+                                    <h4 className="text-sm font-semibold flex items-center gap-2">
+                                        <User className="h-4 w-4 text-muted-foreground" />
+                                        Proposed Contact Person
+                                    </h4>
+                                    <div className="grid gap-4 md:grid-cols-3">
+                                        <FieldWrapper control={form.control} name="siteVisitPerson.name" label="Full Name">
+                                            {(field) => <Input {...field} placeholder="John Doe" />}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name="siteVisitPerson.phone" label="Phone Number">
+                                            {(field) => <Input {...field} placeholder="+91 XXXXX XXXXX" />}
+                                        </FieldWrapper>
+                                        <FieldWrapper control={form.control} name="siteVisitPerson.email" label="Email Address">
+                                            {(field) => <Input {...field} type="email" placeholder="john@example.com" />}
+                                        </FieldWrapper>
+                                    </div>
+                                </div>
+                            </ConditionalSection>
                         </div>
 
-                        {watchSiteVisitNeeded === "true" && (
-                            <div className="bg-muted/5 p-6 rounded-xl border border-dashed space-y-4">
-                                <h4 className="font-semibold text-sm flex items-center gap-2">
-                                    <User className="h-4 w-4 text-primary" />
-                                    Proposed Contact Person
-                                </h4>
-                                <div className="grid gap-6 md:grid-cols-3">
-                                    <FormField
-                                        control={form.control}
-                                        name="siteVisitPerson.name"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Full Name</FormLabel>
-                                                <FormControl>
-                                                    <Input {...field} placeholder="John Doe" />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
+                        <Separator />
 
-                                    <FormField
-                                        control={form.control}
-                                        name="siteVisitPerson.phone"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Phone Number</FormLabel>
-                                                <FormControl>
-                                                    <Input {...field} placeholder="+91 XXXXX XXXXX" />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-
-                                    <FormField
-                                        control={form.control}
-                                        name="siteVisitPerson.email"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Email Address</FormLabel>
-                                                <FormControl>
-                                                    <Input {...field} type="email" placeholder="john@example.com" />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                </div>
+                        <div>
+                            <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                                <FileText className="h-4 w-4 text-muted-foreground" />
+                                Documentation & OEM Approvals
+                            </h3>
+                            <p className="text-xs text-muted-foreground mb-4">Identify documents that need to be collected or prepared.</p>
+                            <div className="grid gap-6 md:grid-cols-3">
+                                <DocumentList
+                                    title="Available from Tendering"
+                                    icon={FileText}
+                                    fields={docsFromTenderingFields}
+                                    namePrefix="documentsFromTendering"
+                                    onAdd={() => appendDocFromTendering("" as any)}
+                                    onRemove={removeDocFromTendering}
+                                />
+                                <DocumentList
+                                    title="Additional Documents Needed"
+                                    icon={FileText}
+                                    fields={docsNeededFields}
+                                    namePrefix="documentsNeeded"
+                                    onAdd={() => appendDocNeeded("" as any)}
+                                    onRemove={removeDocNeeded}
+                                />
+                                <DocumentList
+                                    title="To be Created In-House"
+                                    icon={FileText}
+                                    fields={docsInHouseFields}
+                                    namePrefix="documentsInHouse"
+                                    onAdd={() => appendDocInHouse("" as any)}
+                                    onRemove={removeDocInHouse}
+                                />
                             </div>
-                        )}
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader className="border-b bg-muted/10">
-                        <CardTitle className="flex items-center gap-2">
-                            <FileText className="h-5 w-5 text-orange-500" />
-                            Documentation & OEM Approvals
-                        </CardTitle>
-                        <CardDescription>Identify documents that need to be collected or prepared.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-6">
-                        <div className="grid gap-6 md:grid-cols-3">
-                            <DocumentList
-                                title="Available from Tendering"
-                                icon={FileText}
-                                fields={docsFromTenderingFields}
-                                namePrefix="documentsFromTendering"
-                                onAdd={() => appendDocFromTendering("" as any)}
-                                onRemove={removeDocFromTendering}
-                                color="green"
-                            />
-                            <DocumentList
-                                title="Additional Documents Needed"
-                                icon={FileText}
-                                fields={docsNeededFields}
-                                namePrefix="documentsNeeded"
-                                onAdd={() => appendDocNeeded("" as any)}
-                                onRemove={removeDocNeeded}
-                                color="yellow"
-                            />
-                            <DocumentList
-                                title="To be Created In-House"
-                                icon={FileText}
-                                fields={docsInHouseFields}
-                                namePrefix="documentsInHouse"
-                                onAdd={() => appendDocInHouse("" as any)}
-                                onRemove={removeDocInHouse}
-                                color="blue"
-                            />
                         </div>
                     </CardContent>
                 </Card>
