@@ -126,14 +126,6 @@ export const formToApi = {
       costingSheetLink: emptyStringToNull(form.costingSheetLink),
       hasDiscrepancies: stringToBool(form.hasDiscrepancies),
       discrepancyComments: emptyStringToNull(form.discrepancyComments),
-      budgetPreGst: emptyStringToNull(form.budgetPreGst),
-      budgetBreakdown: {
-        supply: emptyStringToNull(form.budgetSupply),
-        service: emptyStringToNull(form.budgetService),
-        freight: emptyStringToNull(form.budgetFreight),
-        admin: emptyStringToNull(form.budgetAdmin),
-        buybackSale: emptyStringToNull(form.budgetBuybackSale),
-      },
     };
   },
 
@@ -208,17 +200,10 @@ export const apiToForm = {
   },
 
   page6(api: ApiResponse): Partial<Page6FormValues> {
-    const breakdown = api.budgetBreakdown as Record<string, string | undefined> | undefined;
     return {
       costingSheetLink: (api.costingSheetLink as string) ?? "",
       hasDiscrepancies: boolToString(api.hasDiscrepancies as boolean | undefined | null),
       discrepancyComments: (api.discrepancyComments as string) ?? "",
-      budgetPreGst: (api.budgetPreGst as string) ?? "",
-      budgetSupply: breakdown?.supply ?? (api.budgetSupply as string) ?? "",
-      budgetService: breakdown?.service ?? (api.budgetService as string) ?? "",
-      budgetFreight: breakdown?.freight ?? (api.budgetFreight as string) ?? "",
-      budgetAdmin: breakdown?.admin ?? (api.budgetAdmin as string) ?? "",
-      budgetBuybackSale: breakdown?.buybackSale ?? (api.budgetBuybackSale as string) ?? "",
     };
   },
 

@@ -326,12 +326,6 @@ export interface WoDetail {
   hasDiscrepancies: boolean;
   discrepancyComments: string | null;
   discrepancyNotifiedAt: string | null;
-  budgetPreGst: string | null;
-  budgetSupply: string | null;
-  budgetService: string | null;
-  budgetFreight: string | null;
-  budgetAdmin: string | null;
-  budgetBuybackSale: string | null;
 
   // Page 7: WO Acceptance (OE Step)
   oeWoAmendmentNeeded: boolean | null;
@@ -422,12 +416,6 @@ export interface UpdateWoDetailDto {
   costingSheetLink?: string;
   hasDiscrepancies?: boolean;
   discrepancyComments?: string;
-  budgetPreGst?: string;
-  budgetSupply?: string;
-  budgetService?: string;
-  budgetFreight?: string;
-  budgetAdmin?: string;
-  budgetBuybackSale?: string;
 
   // Page 7
   oeWoAmendmentNeeded?: boolean;
@@ -1068,13 +1056,6 @@ export interface Page6Data {
   hasDiscrepancies: boolean;
   discrepancyComments: string | null;
   discrepancyNotifiedAt: string | null;
-  budgetPreGst: string | null;
-  budgetSupply: string | null;
-  budgetService: string | null;
-  budgetFreight: string | null;
-  budgetAdmin: string | null;
-  budgetBuybackSale: string | null;
-  totalBudget: string;
 }
 
 export interface Page7Data {

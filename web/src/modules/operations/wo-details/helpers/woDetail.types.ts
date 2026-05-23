@@ -147,12 +147,6 @@ export interface Page6Data {
   costingSheetLink: string;
   hasDiscrepancies: string;
   discrepancyComments: string;
-  budgetPreGst: string;
-  budgetSupply: string;
-  budgetService: string;
-  budgetFreight: string;
-  budgetAdmin: string;
-  budgetBuybackSale: string;
 }
 
 export interface Page7Data {
@@ -216,12 +210,6 @@ export interface WoDetailData {
   costingSheetLink: string | null;
   hasDiscrepancies: string;
   discrepancyComments: string | null;
-  budgetPreGst: string | null;
-  budgetSupply: string | null;
-  budgetService: string | null;
-  budgetFreight: string | null;
-  budgetAdmin: string | null;
-  budgetBuybackSale: string | null;
 
   oeWoAmendmentNeeded: string | null;
   oeSignaturePrepared: string;

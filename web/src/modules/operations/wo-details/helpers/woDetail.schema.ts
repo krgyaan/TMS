@@ -97,12 +97,6 @@ export const Page6FormSchema = z.object({
   costingSheetLink: z.string().optional().or(z.literal("")),
   hasDiscrepancies: z.string().optional(),
   discrepancyComments: z.string().optional(),
-  budgetPreGst: z.string().optional(),
-  budgetSupply: z.string().optional(),
-  budgetService: z.string().optional(),
-  budgetFreight: z.string().optional(),
-  budgetAdmin: z.string().optional(),
-  budgetBuybackSale: z.string().optional(),
 });
 
 export const AmendmentSchema = z.object({

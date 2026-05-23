@@ -76,11 +76,10 @@ const PAGE_FIELDS: Record<number, { total: number; check: (d: DetailShape) => nu
             ((d.documentsInHouse as any[])?.length ? 1 : 0),
     },
     6: {
-        total: 3,
+        total: 2,
         check: (d) =>
             (d.costingSheetLink ? 1 : 0) +
-            (d.hasDiscrepancies !== undefined && d.hasDiscrepancies !== null ? 1 : 0) +
-            (d.budgetPreGst ? 1 : 0),
+            (d.hasDiscrepancies !== undefined && d.hasDiscrepancies !== null ? 1 : 0),
     },
     7: {
         total: 3,
@@ -342,14 +341,6 @@ export function Page8Review({ woDetailId, onSubmit, onBack }: Page8ReviewProps) 
                 )}
                 <SummaryRow label="Discrepancies Found" value={detail.hasDiscrepancies ? "Yes" : "No"} />
                 {detail.hasDiscrepancies && <SummaryRow label="Comments" value={detail.discrepancyComments} />}
-                <SummaryRow label="Budget (Pre-GST)" value={detail.budgetPreGst ? `₹${detail.budgetPreGst}` : "—"} />
-                <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t">
-                    <SummaryRow label="Supply" value={detail.budgetSupply ? `₹${detail.budgetSupply}` : "—"} />
-                    <SummaryRow label="Service" value={detail.budgetService ? `₹${detail.budgetService}` : "—"} />
-                    <SummaryRow label="Freight" value={detail.budgetFreight ? `₹${detail.budgetFreight}` : "—"} />
-                    <SummaryRow label="Admin" value={detail.budgetAdmin ? `₹${detail.budgetAdmin}` : "—"} />
-                    <SummaryRow label="Buyback" value={detail.budgetBuybackSale ? `₹${detail.budgetBuybackSale}` : "—"} />
-                </div>
             </SectionCard>
 
             {/* Page 7: Acceptance */}

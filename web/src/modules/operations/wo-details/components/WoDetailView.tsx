@@ -496,40 +496,6 @@ export function WoDetailView({ data }: { data: WoDetailWithRelations }) {
                 </CardContent>
             </Card>
 
-            {/* DETAILED BUDGET */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                        <Calculator className="h-5 w-5 text-orange-500" />
-                        Detailed Budget (Pre-GST)
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-4">
-                    <Table>
-                        <TableBody>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="font-medium text-muted-foreground w-1/4">Supply Budget</TableCell>
-                                <TableCell className="font-semibold w-1/4">{formatINR(parseFloat(data.budgetSupply || '0'))}</TableCell>
-                                <TableCell className="font-medium text-muted-foreground w-1/4">Service Budget</TableCell>
-                                <TableCell className="font-semibold w-1/4">{formatINR(parseFloat(data.budgetService || '0'))}</TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="font-medium text-muted-foreground">Freight Budget</TableCell>
-                                <TableCell className="font-semibold">{formatINR(parseFloat(data.budgetFreight || '0'))}</TableCell>
-                                <TableCell className="font-medium text-muted-foreground">Admin Budget</TableCell>
-                                <TableCell className="font-semibold">{formatINR(parseFloat(data.budgetAdmin || '0'))}</TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="font-medium text-muted-foreground">Buyback Sale</TableCell>
-                                <TableCell className="font-semibold text-destructive">{formatINR(parseFloat(data.budgetBuybackSale || '0'))}</TableCell>
-                                <TableCell className="font-bold text-primary">Total Budget (Pre-GST)</TableCell>
-                                <TableCell className="text-xl font-bold">{formatINR(parseFloat(data.budgetPreGst || '0'))}</TableCell>
-                            </TableRow>
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
-
             {/* OE SUBMISSION INFO */}
             <Card>
                 <CardHeader>

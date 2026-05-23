@@ -137,12 +137,6 @@ export const UpdateWoDetailSchema = z.object({
     .or(z.literal('')),
   hasDiscrepancies: OptionalBooleanSchema,
   discrepancyComments: z.string().nullable().optional(),
-  budgetPreGst: DecimalSchema.nullable().optional(),
-  budgetSupply: DecimalSchema.nullable().optional(),
-  budgetService: DecimalSchema.nullable().optional(),
-  budgetFreight: DecimalSchema.nullable().optional(),
-  budgetAdmin: DecimalSchema.nullable().optional(),
-  budgetBuybackSale: DecimalSchema.nullable().optional(),
 
   // Page 7
   oeWoAmendmentNeeded: OptionalBooleanSchema,
@@ -416,12 +410,6 @@ export const SavePage6Schema = z.object({
     .or(z.literal('')),
   hasDiscrepancies: OptionalBooleanSchema,
   discrepancyComments: z.string().nullable().optional(),
-  budgetPreGst: DecimalSchema.nullable().optional(),
-  budgetSupply: DecimalSchema.nullable().optional(),
-  budgetService: DecimalSchema.nullable().optional(),
-  budgetFreight: DecimalSchema.nullable().optional(),
-  budgetAdmin: DecimalSchema.nullable().optional(),
-  budgetBuybackSale: DecimalSchema.nullable().optional(),
 });
 
 export const SubmitPage6Schema = z
@@ -435,12 +423,6 @@ export const SubmitPage6Schema = z
       .or(z.literal('')),
     hasDiscrepancies: BooleanSchema,
     discrepancyComments: z.string().nullable().optional(),
-    budgetPreGst: DecimalSchema,
-    budgetSupply: DecimalSchema.nullable().optional(),
-    budgetService: DecimalSchema.nullable().optional(),
-    budgetFreight: DecimalSchema.nullable().optional(),
-    budgetAdmin: DecimalSchema.nullable().optional(),
-    budgetBuybackSale: DecimalSchema.nullable().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.hasDiscrepancies && !data.discrepancyComments?.trim()) {

@@ -92,12 +92,6 @@ export class WoDetailsService {
       hasDiscrepancies: row.hasDiscrepancies ?? false,
       discrepancyComments: row.discrepancyComments,
       discrepancyNotifiedAt: row.discrepancyNotifiedAt?.toISOString() ?? null,
-      budgetPreGst: row.budgetPreGst,
-      budgetSupply: row.budgetSupply,
-      budgetService: row.budgetService,
-      budgetFreight: row.budgetFreight,
-      budgetAdmin: row.budgetAdmin,
-      budgetBuybackSale: row.budgetBuybackSale,
 
       // Page 7
       oeWoAmendmentNeeded: row.oeWoAmendmentNeeded,
@@ -549,18 +543,6 @@ export class WoDetailsService {
       updateValues.hasDiscrepancies = data.hasDiscrepancies;
     if (data.discrepancyComments !== undefined)
       updateValues.discrepancyComments = data.discrepancyComments;
-    if (data.budgetPreGst !== undefined)
-      updateValues.budgetPreGst = data.budgetPreGst;
-    if (data.budgetSupply !== undefined)
-      updateValues.budgetSupply = data.budgetSupply;
-    if (data.budgetService !== undefined)
-      updateValues.budgetService = data.budgetService;
-    if (data.budgetFreight !== undefined)
-      updateValues.budgetFreight = data.budgetFreight;
-    if (data.budgetAdmin !== undefined)
-      updateValues.budgetAdmin = data.budgetAdmin;
-    if (data.budgetBuybackSale !== undefined)
-      updateValues.budgetBuybackSale = data.budgetBuybackSale;
     if (data.oeWoAmendmentNeeded !== undefined)
       updateValues.oeWoAmendmentNeeded = data.oeWoAmendmentNeeded;
     if (data.oeSignaturePrepared !== undefined)
@@ -773,10 +755,6 @@ export class WoDetailsService {
     // Validate Page 6
     if (completedPages.includes(6)) {
       const page6Errors: string[] = [];
-
-      if (!detail.budgetPreGst) {
-        page6Errors.push('Budget Pre-GST is required');
-      }
 
       if (detail.hasDiscrepancies && !detail.discrepancyComments?.trim()) {
         page6Errors.push('Discrepancy comments are required');
@@ -1241,13 +1219,6 @@ export class WoDetailsService {
           hasDiscrepancies: detail.hasDiscrepancies,
           discrepancyComments: detail.discrepancyComments,
           discrepancyNotifiedAt: detail.discrepancyNotifiedAt,
-          budgetPreGst: detail.budgetPreGst,
-          budgetSupply: detail.budgetSupply,
-          budgetService: detail.budgetService,
-          budgetFreight: detail.budgetFreight,
-          budgetAdmin: detail.budgetAdmin,
-          budgetBuybackSale: detail.budgetBuybackSale,
-          totalBudget: this.calculateBudgetTotal(detail),
         };
 
       case 7:
@@ -1364,35 +1335,6 @@ export class WoDetailsService {
           updateValues.hasDiscrepancies = data.hasDiscrepancies;
         if (data.discrepancyComments !== undefined)
           updateValues.discrepancyComments = data.discrepancyComments;
-        if (data.budgetPreGst !== undefined)
-          updateValues.budgetPreGst = data.budgetPreGst;
-
-        // Handle budget breakdown (nested object from frontend)
-        if (data.budgetBreakdown !== undefined) {
-          const breakdown = data.budgetBreakdown;
-          if (breakdown.supply !== undefined)
-            updateValues.budgetSupply = breakdown.supply;
-          if (breakdown.service !== undefined)
-            updateValues.budgetService = breakdown.service;
-          if (breakdown.freight !== undefined)
-            updateValues.budgetFreight = breakdown.freight;
-          if (breakdown.admin !== undefined)
-            updateValues.budgetAdmin = breakdown.admin;
-          if (breakdown.buybackSale !== undefined)
-            updateValues.budgetBuybackSale = breakdown.buybackSale;
-        }
-
-        // Also handle flat fields (backwards compatibility)
-        if (data.budgetSupply !== undefined)
-          updateValues.budgetSupply = data.budgetSupply;
-        if (data.budgetService !== undefined)
-          updateValues.budgetService = data.budgetService;
-        if (data.budgetFreight !== undefined)
-          updateValues.budgetFreight = data.budgetFreight;
-        if (data.budgetAdmin !== undefined)
-          updateValues.budgetAdmin = data.budgetAdmin;
-        if (data.budgetBuybackSale !== undefined)
-          updateValues.budgetBuybackSale = data.budgetBuybackSale;
         break;
 
       case 7:
@@ -1618,16 +1560,6 @@ export class WoDetailsService {
     return total.toFixed(2);
   }
 
-  private calculateBudgetTotal(detail: any): string {
-    const supply = parseFloat(detail.budgetSupply || '0') || 0;
-    const service = parseFloat(detail.budgetService || '0') || 0;
-    const freight = parseFloat(detail.budgetFreight || '0') || 0;
-    const admin = parseFloat(detail.budgetAdmin || '0') || 0;
-    const buyback = parseFloat(detail.budgetBuybackSale || '0') || 0;
-
-    const total = supply + service + freight + admin - buyback;
-    return total.toFixed(2);
-  }
   // DASHBOARD
   async getDashboardSummary(user: ValidatedUser, teamId?: number) {
     const conditions: any[] = [
