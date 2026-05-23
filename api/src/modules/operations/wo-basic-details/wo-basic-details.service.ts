@@ -7,7 +7,7 @@ import { woBasicDetails, woContacts, woDetails } from '@db/schemas/operations';
 import { users } from '@db/schemas/auth/users.schema';
 import type { CreateWoBasicDetailDto, UpdateWoBasicDetailDto, AssignOeDto, BulkAssignOeDto, RemoveOeAssignmentDto, WoBasicDetailsQueryDto } from './dto/wo-basic-details.dto';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { projects, teams, tenderInfos } from '@/db/schemas';
+import { projects, teams, tenderInfos, organizations, items, locations, tenderClients, tenderCostingSheets } from '@/db/schemas';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 
 const oeFirstUser = alias(users, 'oeFirstUser');
@@ -771,6 +771,60 @@ export class WoBasicDetailsService {
             .where(eq(woBasicDetails.enquiryId, enquiryId));
 
         return rows.map((r) => this.mapRowToResponse(r));
+    }
+
+    async getPrefillData(tenderId: number) {
+        const [tender] = await this.db
+            .select({
+                team: tenderInfos.team,
+                organizationAcronym: organizations.acronym,
+                itemName: items.name,
+                locationName: locations.name,
+            })
+            .from(tenderInfos)
+            .leftJoin(organizations, eq(organizations.id, tenderInfos.organization))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(locations, eq(locations.id, tenderInfos.location))
+            .where(eq(tenderInfos.id, tenderId))
+            .limit(1);
+
+        const [costingSheet] = await this.db
+            .select({
+                budgetPrice: tenderCostingSheets.budgetPrice,
+                receiptPrice: tenderCostingSheets.receiptPrice,
+                grossMargin: tenderCostingSheets.grossMargin,
+                finalPrice: tenderCostingSheets.finalPrice,
+            })
+            .from(tenderCostingSheets)
+            .where(eq(tenderCostingSheets.tenderId, tenderId))
+            .limit(1);
+
+        const clients = await this.db
+            .select({
+                clientName: tenderClients.clientName,
+                clientDesignation: tenderClients.clientDesignation,
+                clientMobile: tenderClients.clientMobile,
+                clientEmail: tenderClients.clientEmail,
+            })
+            .from(tenderClients)
+            .where(eq(tenderClients.tenderId, tenderId));
+
+        return {
+            team: tender?.team ?? null,
+            organizationAcronym: tender?.organizationAcronym ?? null,
+            itemName: tender?.itemName ?? null,
+            locationName: tender?.locationName ?? null,
+            budgetPrice: costingSheet?.budgetPrice ?? null,
+            receiptPrice: costingSheet?.receiptPrice ?? null,
+            grossMargin: costingSheet?.grossMargin ?? null,
+            finalPrice: costingSheet?.finalPrice ?? null,
+            clients: clients.map(c => ({
+                clientName: c.clientName,
+                clientDesignation: c.clientDesignation,
+                clientMobile: c.clientMobile,
+                clientEmail: c.clientEmail,
+            })),
+        };
     }
 
     // DASHBOARD/REPORTING

@@ -18,13 +18,10 @@ import { Separator } from "@/components/ui/separator";
 import { ConditionalSection } from "@/components/form/ConditionalSection";
 import { SelectField } from "@/components/form/SelectField";
 import { YES_NO_OPTIONS } from "../../wo-details/helpers/constants";
-import { useInfoSheet } from "@/hooks/api/useInfoSheets";
 import { useWoContactsByBasicDetail, useCreateBulkWoContacts, useDeleteAllContactsByBasicDetail } from "@/hooks/api/useWoContacts";
 import type { WoBasicDetailFormValues, WoBasicDetail } from "../helpers/basiDetail.types";
 import { buildDefaultValues, mapResponseToForm, mapFormToCreatePayload, mapFormToUpdatePayload } from "../helpers/basiDetail.mapper";
-import { useCreateWoBasicDetail, useUpdateWoBasicDetail } from "@/hooks/api/useWoBasicDetails";
-import { useTender } from "@/hooks/api/useTenders";
-import { useCostingSheetByTender } from "@/hooks/api/useCostingSheets";
+import { useCreateWoBasicDetail, useUpdateWoBasicDetail, useWoBasicDetailPrefill } from "@/hooks/api/useWoBasicDetails";
 import { toast } from "sonner";
 
 interface BasicDetailFormProps {
@@ -68,26 +65,25 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
     const watchPricesChanged = form.watch("pricesChanged");
 
     const tenderId = watchTenderId ? Number(watchTenderId) : null;
-    const { data: tenderData } = useTender(tenderId);
-    const { data: costingData } = useCostingSheetByTender(tenderId || 0);
+    const { data: prefillData } = useWoBasicDetailPrefill(tenderId);
 
     // Auto-fill from Costing Sheet
     useEffect(() => {
-        if (mode === "create" && costingData) {
-            if (costingData.budgetPrice && !form.getValues("budgetPreGst")) {
-                form.setValue("budgetPreGst", Number(costingData.budgetPrice));
+        if (mode === "create" && prefillData) {
+            if (prefillData.budgetPrice && !form.getValues("budgetPreGst")) {
+                form.setValue("budgetPreGst", Number(prefillData.budgetPrice));
             }
-            if (costingData.receiptPrice && !form.getValues("receiptPreGst")) {
-                form.setValue("receiptPreGst", Number(costingData.receiptPrice));
+            if (prefillData.receiptPrice && !form.getValues("receiptPreGst")) {
+                form.setValue("receiptPreGst", Number(prefillData.receiptPrice));
             }
-            if (costingData.grossMargin && !form.getValues("grossMargin")) {
-                form.setValue("grossMargin", Number(costingData.grossMargin));
+            if (prefillData.grossMargin && !form.getValues("grossMargin")) {
+                form.setValue("grossMargin", Number(prefillData.grossMargin));
             }
-            if (costingData.finalPrice && !form.getValues("finalPrice")) {
-                form.setValue("finalPrice", Number(costingData.finalPrice));
+            if (prefillData.finalPrice && !form.getValues("finalPrice")) {
+                form.setValue("finalPrice", Number(prefillData.finalPrice));
             }
         }
-    }, [mode, costingData, form]);
+    }, [mode, prefillData, form]);
 
     // Background Project Code/Name Generation
     // Format: teamName/FY/orgAcronym/location/item/last4WoNumber
@@ -101,13 +97,12 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
     };
 
     const { projectCode: derivedCode, projectName: derivedName } = useMemo(() => {
-        if (!tenderData) return { projectCode: "", projectName: "" };
-        const t = tenderData as any;
+        if (!prefillData) return { projectCode: "", projectName: "" };
 
-        const teamName = teamArray.find((team) => team.id === t.team)?.name || "";
-        const orgName = t.organizationAcronym || "";
-        const itemName = t.itemName || "";
-        const locName = t.locationName || "";
+        const teamName = teamArray.find((team) => team.id === prefillData.team)?.name || "";
+        const orgName = prefillData.organizationAcronym || "";
+        const itemName = prefillData.itemName || "";
+        const locName = prefillData.locationName || "";
         const suffix = watchWoNumber ? String(watchWoNumber).slice(-4) : "";
         const yearSegment = watchWoDate ? getFinancialYear(watchWoDate instanceof Date ? watchWoDate : new Date(watchWoDate)) : "";
 
@@ -118,7 +113,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
             projectCode: `${teamName}/${yearSegment}/${orgName}/${locName}/${itemName}/${suffix}`,
             projectName: `${orgName} ${locName} ${itemName}`.trim(),
         };
-    }, [tenderData, watchWoNumber, watchWoDate]);
+    }, [prefillData, watchWoNumber, watchWoDate]);
 
     useEffect(() => {
         if (derivedCode) form.setValue("projectCode", derivedCode);
@@ -137,9 +132,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
         }
     }, [watchBudget, watchReceipt, form]);
 
-    // Fetch Tender Info for Clients
-    const { data: infoSheetData } = useInfoSheet(tenderId);
-    const tenderClients = infoSheetData?.clients || [];
+    const tenderClients = prefillData?.clients || [];
 
     // WO Contacts (if in edit mode)
     const { data: woContactsData } = useWoContactsByBasicDetail(existingData?.id || 0);

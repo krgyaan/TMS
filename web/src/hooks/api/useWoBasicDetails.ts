@@ -97,6 +97,14 @@ export const useWoBasicDetailsDashboardSummary = () => {
   });
 };
 
+export const useWoBasicDetailPrefill = (tenderId: number | null) => {
+  return useQuery({
+    queryKey: [...woBasicDetailsKeys.all, 'prefill', tenderId] as const,
+    queryFn: () => woBasicDetailsService.getPrefillData(tenderId!),
+    enabled: !!tenderId,
+  });
+};
+
 export const useCheckProjectCode = (projectCode: string) => {
   return useQuery({
     queryKey: woBasicDetailsKeys.projectCodeCheck(projectCode),

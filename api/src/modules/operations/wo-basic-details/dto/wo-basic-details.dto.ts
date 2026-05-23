@@ -169,6 +169,29 @@ export type WoBasicDetailsQueryDto = z.infer<typeof WoBasicDetailsQuerySchema> &
 };
 
 // ============================================
+// PREFILL DATA SCHEMA
+// ============================================
+
+export const WoBasicDetailPrefillSchema = z.object({
+  team: z.number().nullable(),
+  organizationAcronym: z.string().nullable(),
+  itemName: z.string().nullable(),
+  locationName: z.string().nullable(),
+  budgetPrice: z.string().nullable(),
+  receiptPrice: z.string().nullable(),
+  grossMargin: z.string().nullable(),
+  finalPrice: z.string().nullable(),
+  clients: z.array(z.object({
+    clientName: z.string().nullable(),
+    clientDesignation: z.string().nullable(),
+    clientMobile: z.string().nullable(),
+    clientEmail: z.string().nullable(),
+  })),
+});
+
+export type WoBasicDetailPrefillDto = z.infer<typeof WoBasicDetailPrefillSchema>;
+
+// ============================================
 // RESPONSE SCHEMAS
 // ============================================
 

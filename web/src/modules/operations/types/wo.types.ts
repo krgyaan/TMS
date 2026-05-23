@@ -198,6 +198,23 @@ export interface WoBasicDetailsFilters {
   status?: number[];
 }
 
+export interface WoBasicDetailPrefillData {
+  team: number | null;
+  organizationAcronym: string | null;
+  itemName: string | null;
+  locationName: string | null;
+  budgetPrice: string | null;
+  receiptPrice: string | null;
+  grossMargin: string | null;
+  finalPrice: string | null;
+  clients: Array<{
+    clientName: string | null;
+    clientDesignation: string | null;
+    clientMobile: string | null;
+    clientEmail: string | null;
+  }>;
+}
+
 export interface OeAssignment {
   oeUserId: number;
   assignedAt: string | null;
