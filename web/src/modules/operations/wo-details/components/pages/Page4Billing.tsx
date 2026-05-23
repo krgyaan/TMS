@@ -37,9 +37,9 @@ const defaultAddress: Address = {
     gst: "",
 };
 
-const calculateAmount = (quantity: string, rate: string): number => {
-    const q = parseFloat(quantity) || 0;
-    const r = parseFloat(rate) || 0;
+const calculateAmount = (quantity: string | undefined, rate: string | undefined): number => {
+    const q = parseFloat(quantity ?? "0") || 0;
+    const r = parseFloat(rate ?? "0") || 0;
     return Number((q * r).toFixed(2));
 };
 

@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { formToApi } from "../../helpers/woDetail.mapper";
 import { useAutoSave } from "@/hooks/api/useWoDetails";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { FileText, Info, Receipt, ShieldCheck } from "lucide-react";
@@ -48,7 +49,7 @@ export function Page2Compliance({
         defaultValues: { ...defaultValues, ...initialData },
     });
 
-    const { autoSave, isSaving: isAutoSaving } = useAutoSave(woDetailId, 2);
+    const { autoSave, isSaving: isAutoSaving } = useAutoSave(woDetailId, 2, true, 4000, formToApi.page2);
 
     const watchLdApplicable = form.watch("ldApplicable");
     const watchPbgApplicable = form.watch("isPbgApplicable");

@@ -88,10 +88,6 @@ export function Page3Swot({
                         </p>
                         <div className="grid gap-6 md:grid-cols-2">
                             <div className="space-y-2">
-                                <h3 className="text-sm font-semibold flex items-center gap-2">
-                                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                                    Strengths of VE
-                                </h3>
                                 <FieldWrapper control={form.control} name="swotStrengths" label="Strengths of VE">
                                     {(field) => (
                                         <Textarea
@@ -104,10 +100,6 @@ export function Page3Swot({
                             </div>
 
                             <div className="space-y-2">
-                                <h3 className="text-sm font-semibold flex items-center gap-2">
-                                    <TrendingDown className="h-4 w-4 text-muted-foreground" />
-                                    Weaknesses of VE
-                                </h3>
                                 <FieldWrapper control={form.control} name="swotWeaknesses" label="Weaknesses of VE">
                                     {(field) => (
                                         <Textarea
@@ -120,10 +112,6 @@ export function Page3Swot({
                             </div>
 
                             <div className="space-y-2">
-                                <h3 className="text-sm font-semibold flex items-center gap-2">
-                                    <Lightbulb className="h-4 w-4 text-muted-foreground" />
-                                    Opportunities for VE
-                                </h3>
                                 <FieldWrapper control={form.control} name="swotOpportunities" label="Opportunities for VE">
                                     {(field) => (
                                         <Textarea
@@ -136,10 +124,6 @@ export function Page3Swot({
                             </div>
 
                             <div className="space-y-2">
-                                <h3 className="text-sm font-semibold flex items-center gap-2">
-                                    <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-                                    Threats/Risks in the Project
-                                </h3>
                                 <FieldWrapper control={form.control} name="swotThreats" label="Threats/Risks in the Project">
                                     {(field) => (
                                         <Textarea

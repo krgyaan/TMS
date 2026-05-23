@@ -12,6 +12,7 @@ import { useForm } from "react-hook-form";
 import { ConditionalSection } from "@/components/form/ConditionalSection";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
+import { formToApi } from "@/modules/operations/wo-details/helpers/woDetail.mapper";
 import { useAutoSave } from "@/hooks/api/useWoDetails";
 import { WizardNavigation } from "@/modules/operations/wo-details/components/WizardNavigation";
 import { WIZARD_CONFIG, YES_NO_OPTIONS } from "@/modules/operations/wo-details/helpers/constants";
@@ -55,7 +56,7 @@ export function Page6Profitability({
         },
     });
 
-    const { autoSave, isSaving: isAutoSaving } = useAutoSave(woDetailId, 6);
+    const { autoSave, isSaving: isAutoSaving } = useAutoSave(woDetailId, 6, true, 4000, formToApi.page6);
 
     const watchHasDiscrepancies = form.watch("hasDiscrepancies");
     const watchBudgetSupply = form.watch("budgetSupply");

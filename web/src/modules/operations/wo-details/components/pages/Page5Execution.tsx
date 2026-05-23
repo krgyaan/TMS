@@ -11,6 +11,7 @@ import { useFieldArray, useForm, type Resolver } from "react-hook-form";
 import { ConditionalSection } from "@/components/form/ConditionalSection";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
+import { formToApi } from "@/modules/operations/wo-details/helpers/woDetail.mapper";
 import { useAutoSave } from "@/hooks/api/useWoDetails";
 import { WizardNavigation } from "@/modules/operations/wo-details/components/WizardNavigation";
 import { WIZARD_CONFIG, YES_NO_OPTIONS } from "@/modules/operations/wo-details/helpers/constants";
@@ -48,21 +49,21 @@ export function Page5Execution({
         fields: docsFromTenderingFields,
         append: appendDocFromTendering,
         remove: removeDocFromTendering,
-    } = useFieldArray({ control: form.control, name: "documentsFromTendering" as any });
+    } = useFieldArray({ control: form.control, name: "documentsFromTendering" as unknown as never });
 
     const {
         fields: docsNeededFields,
         append: appendDocNeeded,
         remove: removeDocNeeded,
-    } = useFieldArray({ control: form.control, name: "documentsNeeded" as any });
+    } = useFieldArray({ control: form.control, name: "documentsNeeded" as unknown as never });
 
     const {
         fields: docsInHouseFields,
         append: appendDocInHouse,
         remove: removeDocInHouse,
-    } = useFieldArray({ control: form.control, name: "documentsInHouse" as any });
+    } = useFieldArray({ control: form.control, name: "documentsInHouse" as unknown as never });
 
-    const { autoSave, isSaving: isAutoSaving } = useAutoSave(woDetailId, 5);
+    const { autoSave, isSaving: isAutoSaving } = useAutoSave(woDetailId, 5, true, 4000, formToApi.page5);
 
     const watchSiteVisitNeeded = form.watch("siteVisitNeeded");
 

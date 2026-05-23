@@ -65,7 +65,7 @@ export const YES_NO_OPTIONS = [
   { value: 'NO', label: 'No' },
 ];
 
-export type YesNoValue = "true" | "false";
+export type YesNoValue = "YES" | "NO";
 
 export const WIZARD_CONFIG = {
   TOTAL_PAGES: 8,

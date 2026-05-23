@@ -13,6 +13,7 @@ import { useFieldArray, useForm, type Resolver } from "react-hook-form";
 import { ConditionalSection } from "@/components/form/ConditionalSection";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
+import { formToApi } from "@/modules/operations/wo-details/helpers/woDetail.mapper";
 import { useAutoSave } from "@/hooks/api/useWoDetails";
 import { WizardNavigation } from "@/modules/operations/wo-details/components/WizardNavigation";
 import { WIZARD_CONFIG, YES_NO_OPTIONS } from "@/modules/operations/wo-details/helpers/constants";
@@ -58,7 +59,7 @@ export function Page7Acceptance({
         remove: removeAmendment,
     } = useFieldArray({ control: form.control, name: "amendments" });
 
-    const { autoSave, isSaving: isAutoSaving } = useAutoSave(woDetailId, 7);
+    const { autoSave, isSaving: isAutoSaving } = useAutoSave(woDetailId, 7, true, 4000, formToApi.page7);
 
     const watchAmendmentNeeded = form.watch("oeWoAmendmentNeeded");
 

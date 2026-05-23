@@ -53,7 +53,7 @@ export function Page1Handover({
     isSaving,
 }: Page1HandoverProps) {
     const form = useForm<Page1FormValues>({
-        resolver: zodResolver(Page1FormSchema),
+        resolver: zodResolver(Page1FormSchema) as any,
         defaultValues: {
             contacts: initialData?.contacts?.length ? initialData.contacts : [defaultContact],
             tenderDocumentsChecklist: initialData?.tenderDocumentsChecklist || defaultChecklist,
@@ -156,7 +156,7 @@ export function Page1Handover({
                                                         name={`contacts.${idx}.departments`}
                                                         options={DEPARTMENT_OPTIONS}
                                                         placeholder="Select"
-                                                        className="h-8 text-xs"
+                                                        label=""
                                                     />
                                                 </td>
                                                 <td className="p-1">

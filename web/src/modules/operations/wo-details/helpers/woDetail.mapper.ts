@@ -8,15 +8,17 @@ import type {
   Page7FormValues,
 } from "./woDetail.types";
 
-const stringToBool = (val: string | undefined): boolean | undefined => {
-  if (val === "true") return true;
-  if (val === "false") return false;
+const stringToBool = (val: string | undefined | null): boolean | undefined => {
+  if (!val) return undefined;
+  const lower = val.toLowerCase();
+  if (lower === "true" || lower === "yes") return true;
+  if (lower === "false" || lower === "no") return false;
   return undefined;
 };
 
 const boolToString = (val: boolean | undefined | null): string | undefined => {
-  if (val === true) return "true";
-  if (val === false) return "false";
+  if (val === true) return "YES";
+  if (val === false) return "NO";
   return undefined;
 };
 

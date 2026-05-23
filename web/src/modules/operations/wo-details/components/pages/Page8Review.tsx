@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useWoDetailWithRelations } from "@/hooks/api/useWoDetails";
 import { AlertCircle, ArrowLeft, Calculator, FileCheck, FileEdit, Loader2, MapPinned, Package, Send, ShieldCheck, SkipForward, TrendingUp, Users } from "lucide-react";
 import { useState } from "react";
-import type { Address, BOQItem, Contact } from "../../helpers/woDetail.types";
+import type { WoBillingAddress, WoBillingBoq, WoContact, WoShippingAddress } from "../../../types/wo.types";
 
 interface Page8ReviewProps {
     woDetailId: number | null;
@@ -213,7 +213,7 @@ export function Page8Review({ woDetailId, onSubmit, onBack }: Page8ReviewProps) 
             <SectionCard pageNum={1} {...pageStatus(1)}>
                 {detail.contacts && detail.contacts.length > 0 ? (
                     <div className="space-y-2">
-                        {detail.contacts.map((c: Contact, i: number) => (
+                        {detail.contacts.map((c: WoContact, i: number) => (
                             <div key={c.id || i} className="text-sm p-2 bg-muted/30 rounded">
                                 <span className="font-medium">{c.name || "—"}</span>
                                 {c.organization && <span className="text-muted-foreground ml-2">({c.organization})</span>}
@@ -290,7 +290,7 @@ export function Page8Review({ woDetailId, onSubmit, onBack }: Page8ReviewProps) 
                 <p className="text-sm font-medium mb-2">Billing BOQ ({detail.billingBoq?.length || 0} items)</p>
                 {detail.billingBoq && detail.billingBoq.length > 0 ? (
                     <div className="border rounded text-sm mb-3">
-                        {detail.billingBoq.map((item: BOQItem, i: number) => (
+                        {detail.billingBoq.map((item: WoBillingBoq, i: number) => (
                             <div key={item.id || i} className="flex justify-between px-3 py-1.5 border-b last:border-0">
                                 <span>{item.itemDescription || "—"}</span>
                                 <span className="text-muted-foreground">
@@ -307,13 +307,13 @@ export function Page8Review({ woDetailId, onSubmit, onBack }: Page8ReviewProps) 
                 <div className="space-y-2">
                     <div>
                         <p className="text-xs text-muted-foreground">Billing:</p>
-                        {detail.billingAddresses?.length ? detail.billingAddresses.map((a: Address, i: number) => (
+                        {detail.billingAddresses?.length ? detail.billingAddresses.map((a: WoBillingAddress, i: number) => (
                             <p key={i} className="text-sm">{a.customerName} — {a.address}</p>
                         )) : <p className="text-sm text-muted-foreground">None</p>}
                     </div>
                     <div>
                         <p className="text-xs text-muted-foreground">Shipping:</p>
-                        {detail.shippingAddresses?.length ? detail.shippingAddresses.map((a: Address, i: number) => (
+                        {detail.shippingAddresses?.length ? detail.shippingAddresses.map((a: WoShippingAddress, i: number) => (
                             <p key={i} className="text-sm">{a.customerName} — {a.address}</p>
                         )) : <p className="text-sm text-muted-foreground">None</p>}
                     </div>

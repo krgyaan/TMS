@@ -254,7 +254,8 @@ export const useAutoSave = (
   woDetailId: number | null,
   pageNum: number,
   enabled: boolean = true,
-  delayMs: number = 4000
+  delayMs: number = 4000,
+  mapper?: (data: any) => any
 ) => {
   const { mutate: saveDraft, isPending } = useSavePageDraft();
   const lastSavedRef = useRef<string | null>(null);
@@ -262,11 +263,12 @@ export const useAutoSave = (
   const debouncedSave = useDebouncedCallback((data: any) => {
     if (!woDetailId || woDetailId <= 0 || !enabled) return;
 
-    const dataString = JSON.stringify(data);
+    const mappedData = mapper ? mapper(data) : data;
+    const dataString = JSON.stringify(mappedData);
     if (dataString === lastSavedRef.current) return;
 
     saveDraft(
-      { woDetailId, pageNum, data },
+      { woDetailId, pageNum, data: mappedData },
       {
         onSuccess: () => {
           lastSavedRef.current = dataString;
@@ -278,9 +280,10 @@ export const useAutoSave = (
   const saveNow = useCallback(
     (data: any) => {
       if (!woDetailId || woDetailId <= 0) return;
-      saveDraft({ woDetailId, pageNum, data });
+      const mappedData = mapper ? mapper(data) : data;
+      saveDraft({ woDetailId, pageNum, data: mappedData });
     },
-    [woDetailId, pageNum, saveDraft]
+    [woDetailId, pageNum, saveDraft, mapper]
   );
 
   return {
