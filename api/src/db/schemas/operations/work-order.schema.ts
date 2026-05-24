@@ -125,13 +125,6 @@ export const woDetails = pgTable("wo_details", {
     discrepancyComments: text("discrepancy_comments"),
     discrepancyNotifiedAt: timestamp("discrepancy_notified_at", { withTimezone: true }),
 
-    budgetPreGst: numeric("budget_pre_gst", { precision: 20, scale: 2 }),
-    budgetSupply: numeric("budget_supply", { precision: 20, scale: 2 }),
-    budgetService: numeric("budget_service", { precision: 20, scale: 2 }),
-    budgetFreight: numeric("budget_freight", { precision: 20, scale: 2 }),
-    budgetAdmin: numeric("budget_admin", { precision: 20, scale: 2 }),
-    budgetBuybackSale: numeric("budget_buyback_sale", { precision: 20, scale: 2 }),
-
     // PAGE 7: WO Acceptance (OE Step)
     oeWoAmendmentNeeded: boolean("oe_wo_amendment_needed"),
     oeAmendmentSubmittedAt: timestamp("oe_amendment_submitted_at", { withTimezone: true }),
