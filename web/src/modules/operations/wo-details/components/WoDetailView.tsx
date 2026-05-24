@@ -1,13 +1,24 @@
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableRow, TableCell, TableHeader, TableHead } from '@/components/ui/table';
-import {
-    Building2, FileText, CheckCircle2, XCircle, AlertCircle,
-    Calculator, Package, MapPin, Truck, Link2, FileEdit, Pen, Clock, TrendingUp
-} from 'lucide-react';
-import { formatINR } from '@/hooks/useINRFormatter';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatDateTime } from '@/hooks/useFormatedDate';
+import { formatINR } from '@/hooks/useINRFormatter';
 import type { WoDetailWithRelations } from '@/modules/operations/types/wo.types';
+import {
+    AlertCircle,
+    Building2,
+    CheckCircle2,
+    Clock,
+    FileEdit,
+    FileText,
+    Link2,
+    MapPin,
+    Package,
+    Pen,
+    TrendingUp,
+    Truck,
+    XCircle
+} from 'lucide-react';
 
 
 export function WoDetailView({ data }: { data: WoDetailWithRelations }) {

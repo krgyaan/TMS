@@ -1,11 +1,11 @@
-import { useParams, useNavigate } from "react-router-dom";
-import { useWoDetailWithRelations } from "@/hooks/api/useWoDetails";
-import { WoDetailView } from "./components/WoDetailView";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useWoDetailWithRelations } from "@/hooks/api/useWoDetails";
+import { ArrowLeft } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
 import BasicDetailView from "../wo-basic-details/components/BasicDetailView";
-import { Card, CardAction } from "@/components/ui/card";
+import { WoDetailView } from "./components/WoDetailView";
 
 const WoDetailShowPage = () => {
     const { id } = useParams<{ id: string }>();

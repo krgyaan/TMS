@@ -1,6 +1,6 @@
+import type { AcceptanceStatus, CreateWoDetailDto, PaginatedResult, RequestAmendmentDto, SlaComplianceReport, UpdateWoDetailDto, WoAcceptanceDecisionDto, WoDetail, WoDetailsDashboardSummary, WoDetailsFilters, WoDetailWithRelations, WoTimeline } from '@/modules/operations/types/wo.types';
+import type { Contact, Page1FormValues, Page2FormValues, Page3FormValues, Page4FormValues, Page5FormValues, Page6FormValues, Page7FormValues, WizardProgress, WizardValidationResult } from '@/modules/operations/wo-details/helpers/woDetail.types';
 import { BaseApiService } from './base.service';
-import type { WoDetail, WoDetailWithRelations, CreateWoDetailDto, UpdateWoDetailDto, WoAcceptanceDecisionDto, WoDetailsFilters, WoTimeline, WoDetailsDashboardSummary, SlaComplianceReport, PaginatedResult, RequestAmendmentDto, AcceptanceStatus } from '@/modules/operations/types/wo.types';
-import type { WizardProgress, WizardValidationResult, Page1FormValues, Page2FormValues, Page3FormValues, Page4FormValues, Page5FormValues, Page6FormValues, Page7FormValues, Contact } from '@/modules/operations/wo-details/helpers/woDetail.types';
 
 // TYPES
 type PageFormValues =
@@ -144,6 +144,11 @@ class WoDetailsService extends BaseApiService {
     data?: WoDetail;
   }> {
     return this.post(`/${woDetailId}/wizard/submit-all`);
+  }
+
+  // STEP STATUSES FOR SHOW PAGE
+  async getStepStatuses(woDetailId: number): Promise<Record<string, boolean>> {
+    return this.get<Record<string, boolean>>(`/${woDetailId}/step-statuses`);
   }
 
   // IMPORT & INTEGRATION METHODS

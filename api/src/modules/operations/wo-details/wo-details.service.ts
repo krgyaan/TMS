@@ -1,17 +1,17 @@
-import { Inject, Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
-import { eq, desc, asc, sql, and, or, isNull, ne, ilike } from 'drizzle-orm';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
-import { woDetails, woBasicDetails, woContacts, woBillingBoq, woBuybackBoq, woBillingAddresses, woShippingAddresses, woAmendments, woQueries, woDocuments, woAcceptance } from '@db/schemas/operations';
-import type { CreateWoDetailDto, UpdateWoDetailDto, WoDetailsListResponseDto, WoDetailsQueryDto, TenderDocumentsChecklist, WoDetailsStatus, WizardValidationResult, WizardInitResponse, ImportContactsResponse } from './dto/wo-details.dto';
-import type { SavePage1Dto, SubmitPage1Dto, Page1ContactDto } from './dto/page1-handover.dto';
+import { DRIZZLE } from '@db/database.module';
+import { woAcceptance, woAmendments, woBasicDetails, woBillingAddresses, woBillingBoq, woBuybackBoq, woContacts, woDetails, woDocuments, woKickoffMeetings, woQueries, woShippingAddresses } from '@db/schemas/operations';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { and, asc, desc, eq, ilike, isNull, ne, or, sql } from 'drizzle-orm';
+import type { Page1ContactDto, SavePage1Dto, SubmitPage1Dto } from './dto/page1-handover.dto';
 import type { SavePage2Dto, SubmitPage2Dto } from './dto/page2-compliance.dto';
 import type { SavePage3Dto, SubmitPage3Dto } from './dto/page3-swot.dto';
 import type { SavePage4Dto, SubmitPage4Dto } from './dto/page4-billing.dto';
 import type { SavePage5Dto, SubmitPage5Dto } from './dto/page5-execution.dto';
 import type { SavePage6Dto, SubmitPage6Dto } from './dto/page6-profitability.dto';
 import type { SavePage7Dto, SubmitPage7Dto } from './dto/page7-acceptance.dto';
+import type { CreateWoDetailDto, ImportContactsResponse, TenderDocumentsChecklist, UpdateWoDetailDto, WizardInitResponse, WizardValidationResult, WoDetailsListResponseDto, WoDetailsQueryDto, WoDetailsStatus } from './dto/wo-details.dto';
 
 export type WoDetailRow = typeof woDetails.$inferSelect;
 
@@ -1558,6 +1558,54 @@ export class WoDetailsService {
       return sum + (isNaN(amount) ? 0 : amount);
     }, 0);
     return total.toFixed(2);
+  }
+
+  // STEP STATUSES
+  async getStepStatuses(woDetailId: number) {
+    const [detail] = await this.db
+      .select({ id: woDetails.id, woBasicDetailId: woDetails.woBasicDetailId })
+      .from(woDetails)
+      .where(eq(woDetails.id, woDetailId))
+      .limit(1);
+
+    if (!detail) {
+      return {
+        'basic-details': false,
+        'wo-details': false,
+        'kick-off': false,
+        'contract-agreement': false,
+        'po-dashboard': false,
+      };
+    }
+
+    const [kickoff, acceptance, poCount] = await Promise.all([
+      this.db
+        .select({ id: woKickoffMeetings.id })
+        .from(woKickoffMeetings)
+        .where(eq(woKickoffMeetings.woDetailId, woDetailId))
+        .limit(1),
+      this.db
+        .select({ id: woAcceptance.id })
+        .from(woAcceptance)
+        .where(eq(woAcceptance.woDetailId, woDetailId))
+        .limit(1),
+      this.db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(woBasicDetails)
+        .where(eq(woBasicDetails.id, detail.woBasicDetailId)),
+    ]);
+
+    // Check if wo-details has at least started the wizard
+    const woDetailStatus = detail.id ? 'completed' as const : 'pending' as const;
+    const hasAcceptance = acceptance.length > 0;
+
+    return {
+      'basic-details': true,
+      'wo-details': woDetailStatus === 'completed' || hasAcceptance,
+      'kick-off': kickoff.length > 0,
+      'contract-agreement': false, // will be enhanced
+      'po-dashboard': false, // will be enhanced
+    };
   }
 
   // DASHBOARD

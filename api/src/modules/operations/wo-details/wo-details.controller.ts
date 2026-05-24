@@ -1,7 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query, BadRequestException } from '@nestjs/common';
-import { WoDetailsService } from './wo-details.service';
-import { CreateWoDetailSchema, UpdateWoDetailSchema, WoDetailsQuerySchema, SkipPageSchema, ImportTenderContactsSchema } from './dto/wo-details.dto';
-import type { CreateWoDetailDto, UpdateWoDetailDto, WoDetailsQueryDto, SkipPageDto } from './dto/wo-details.dto';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import { SavePage1Schema, SubmitPage1Schema } from './dto/page1-handover.dto';
 import { SavePage2Schema, SubmitPage2Schema } from './dto/page2-compliance.dto';
 import { SavePage3Schema, SubmitPage3Schema } from './dto/page3-swot.dto';
@@ -9,6 +6,9 @@ import { SavePage4Schema, SubmitPage4Schema } from './dto/page4-billing.dto';
 import { SavePage5Schema, SubmitPage5Schema } from './dto/page5-execution.dto';
 import { SavePage6Schema, SubmitPage6Schema } from './dto/page6-profitability.dto';
 import { SavePage7Schema, SubmitPage7Schema } from './dto/page7-acceptance.dto';
+import type { CreateWoDetailDto, SkipPageDto, UpdateWoDetailDto, WoDetailsQueryDto } from './dto/wo-details.dto';
+import { CreateWoDetailSchema, ImportTenderContactsSchema, SkipPageSchema, UpdateWoDetailSchema, WoDetailsQuerySchema } from './dto/wo-details.dto';
+import { WoDetailsService } from './wo-details.service';
 
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
@@ -63,6 +63,11 @@ export class WoDetailsController {
   @Get(':id/with-relations')
   async getByIdWithRelations(@Param('id', ParseIntPipe) id: number) {
     return this.woDetailsService.findByIdWithRelations(id);
+  }
+
+  @Get(':id/step-statuses')
+  async getStepStatuses(@Param('id', ParseIntPipe) id: number) {
+    return this.woDetailsService.getStepStatuses(id);
   }
 
   @Get('by-basic-detail/:woBasicDetailId')
