@@ -9,14 +9,14 @@ import { ContractAgreementSection } from "@/modules/operations/contract-agreemen
 import { PoDashboardSection } from "@/modules/operations/project-dashboard/components/PoDashboardSection";
 import { paths } from "@/app/routes/paths";
 
-export default function WoDetailShowPage() {
+export default function ContractAgreementShowPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
     const woId = parseInt(id || "0");
 
     const { steps, woDetailId } = useWoStepStatuses(woId);
 
-    const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["wo-details"]));
+    const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["contract-agreement"]));
 
     const toggleSection = useCallback((id: string) => {
         setExpandedSections((prev) => {
@@ -56,8 +56,8 @@ export default function WoDetailShowPage() {
             onToggleSection={toggleSection}
             onExpandAll={expandAll}
             onCollapseAll={collapseAll}
-            onBack={() => navigate(paths.operations.woDetailAcceptanceListPage)}
-            backLabel="Back to Acceptance List"
+            onBack={() => navigate(paths.operations.contractAgreementListPage)}
+            backLabel="Back to Contract Agreements"
             renderSectionContent={renderSectionContent}
         />
     );

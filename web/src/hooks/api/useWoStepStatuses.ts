@@ -74,6 +74,5 @@ export function useWoStepStatuses(woDetailId?: number | null, woBasicDetailId?: 
         steps,
         isLoading,
         woDetailId: resolvedWoDetailId,
-        woBasicDetailId: woDetailLookup?.woBasicDetailId ?? woBasicDetailId ?? resolvedWoDetailId,
     };
 }
