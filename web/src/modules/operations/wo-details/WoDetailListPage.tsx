@@ -118,7 +118,7 @@ const WoDetailListPage = () => {
         },
         {
             label: 'View Details',
-            onClick: (row) => navigate(paths.operations.woDetailShowPage(row.id)),
+            onClick: (row) => navigate(paths.operations.woDetailShowPage(row.woBasicDetailId)),
             icon: <Eye className="h-4 w-4" />,
         },
         {

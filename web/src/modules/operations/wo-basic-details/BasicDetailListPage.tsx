@@ -106,17 +106,6 @@ const BasicDetailListPage = () => {
     // Action items for each row
     const rowActions: ActionItem<WoBasicDetail>[] = [
         {
-            label: 'View Details',
-            onClick: (row) => navigate(paths.operations.woBasicDetailShowPage((row.id))),
-            icon: <Eye className="h-4 w-4" />,
-        },
-        {
-            label: 'View Project',
-            onClick: (row) => navigate(paths.operations.projectDashboard(row.projectId)),
-            icon: <LayoutDashboard className="h-4 w-4" />,
-            visible: (row) => !!row.projectId,
-        },
-        {
             label: 'Assign OE',
             onClick: (row) => navigate(paths.operations.woAssignOePage((row.id))),
             icon: <UserPlus className="h-4 w-4" />,
@@ -125,6 +114,17 @@ const BasicDetailListPage = () => {
             label: 'WO Details',
             onClick: (row) => navigate(paths.operations.woDetailCreatePage(row.id)),
             icon: <FileText className="h-4 w-4" />,
+        },
+        {
+            label: 'View Details',
+            onClick: (row) => navigate(paths.operations.woBasicDetailShowPage((row.id))),
+            icon: <Eye className="h-4 w-4" />,
+        },
+        {
+            label: 'View Project',
+            onClick: (row) => navigate(paths.operations.projectDashboard(Number(row.projectId))),
+            icon: <LayoutDashboard className="h-4 w-4" />,
+            visible: (row) => !!row.projectId,
         },
         {
             label: 'Edit',
