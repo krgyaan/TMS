@@ -12,6 +12,15 @@ export const WoBasicDetailFormSchema = z.object({
   budgetPreGst: z.coerce.number().nonnegative().optional(),
   receiptPreGst: z.coerce.number().nonnegative().optional(),
   grossMargin: z.coerce.number().nonnegative().optional(),
+  finalPrice: z.coerce.number().nonnegative().optional(),
+  pricesChanged: z.string().default("false"),
+
+  budgetSupply: z.coerce.number().nonnegative().optional(),
+  budgetService: z.coerce.number().nonnegative().optional(),
+  budgetFreight: z.coerce.number().nonnegative().optional(),
+  budgetAdmin: z.coerce.number().nonnegative().optional(),
+  budgetBuybackSale: z.coerce.number().nonnegative().optional(),
+  budgetGemCharges: z.coerce.number().nonnegative().optional(),
 
   projectCode: z.string().optional(),
   projectName: z.string().optional(),

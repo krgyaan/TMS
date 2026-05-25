@@ -1,17 +1,18 @@
-import { Inject, Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
-import { eq, desc, asc, sql, and, or, isNull, ne, ilike } from 'drizzle-orm';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
-import { woDetails, woBasicDetails, woContacts, woBillingBoq, woBuybackBoq, woBillingAddresses, woShippingAddresses, woAmendments, woQueries, woDocuments, woAcceptance } from '@db/schemas/operations';
-import type { CreateWoDetailDto, UpdateWoDetailDto, WoDetailsListResponseDto, WoDetailsQueryDto, TenderDocumentsChecklist, WoDetailsStatus, WizardValidationResult, WizardInitResponse, ImportContactsResponse } from './dto/wo-details.dto';
-import type { SavePage1Dto, SubmitPage1Dto, Page1ContactDto } from './dto/page1-handover.dto';
+import { DRIZZLE } from '@db/database.module';
+import { woAcceptance, woAmendments, woBasicDetails, woBillingAddresses, woBillingBoq, woBuybackBoq, woContacts, woDetails, woDocuments, woKickoffMeetings, woQueries, woShippingAddresses } from '@db/schemas/operations';
+import { rfqs, rfqResponseDocuments, rfqResponses, tenderCostingSheets, tenderInfos } from '@db/schemas/tendering';
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { and, asc, desc, eq, ilike, isNull, ne, or, sql } from 'drizzle-orm';
+import type { Page1ContactDto, SavePage1Dto, SubmitPage1Dto } from './dto/page1-handover.dto';
 import type { SavePage2Dto, SubmitPage2Dto } from './dto/page2-compliance.dto';
 import type { SavePage3Dto, SubmitPage3Dto } from './dto/page3-swot.dto';
 import type { SavePage4Dto, SubmitPage4Dto } from './dto/page4-billing.dto';
 import type { SavePage5Dto, SubmitPage5Dto } from './dto/page5-execution.dto';
 import type { SavePage6Dto, SubmitPage6Dto } from './dto/page6-profitability.dto';
 import type { SavePage7Dto, SubmitPage7Dto } from './dto/page7-acceptance.dto';
+import type { CreateWoDetailDto, ImportContactsResponse, TenderDocumentsChecklist, UpdateWoDetailDto, WizardInitResponse, WizardValidationResult, WoDetailsListResponseDto, WoDetailsQueryDto, WoDetailsStatus } from './dto/wo-details.dto';
 
 export type WoDetailRow = typeof woDetails.$inferSelect;
 
@@ -26,8 +27,6 @@ const TENDER_CHECKLIST_ITEMS = [
   'result',
 ] as const;
 
-const REQUIRED_PAGES = [1, 2, 4, 7] as const;
-const SKIPPABLE_PAGES = [3, 5, 6] as const;
 const TOTAL_PAGES = 7;
 
 // Type union for page data
@@ -82,6 +81,9 @@ export class WoDetailsService {
       swotThreats: row.swotThreats,
       swotCompletedAt: row.swotCompletedAt?.toISOString() ?? null,
 
+      // Page 4
+      buybackBoqApplicable: row.buybackBoqApplicable ?? false,
+
       // Page 5
       siteVisitNeeded: row.siteVisitNeeded ?? false,
       siteVisitPerson: row.siteVisitPerson,
@@ -94,12 +96,6 @@ export class WoDetailsService {
       hasDiscrepancies: row.hasDiscrepancies ?? false,
       discrepancyComments: row.discrepancyComments,
       discrepancyNotifiedAt: row.discrepancyNotifiedAt?.toISOString() ?? null,
-      budgetPreGst: row.budgetPreGst,
-      budgetSupply: row.budgetSupply,
-      budgetService: row.budgetService,
-      budgetFreight: row.budgetFreight,
-      budgetAdmin: row.budgetAdmin,
-      budgetBuybackSale: row.budgetBuybackSale,
 
       // Page 7
       oeWoAmendmentNeeded: row.oeWoAmendmentNeeded,
@@ -178,10 +174,10 @@ export class WoDetailsService {
     const sortBy = filters?.sortBy ?? 'createdAt';
     const search = filters?.search?.trim();
 
-    const orderFn = sortOrder === 'desc' ? desc : asc;
-    const conditions: any[] = [
-        eq(woDetails.status, 'completed')
-    ];
+  const orderFn = sortOrder === 'desc' ? desc : asc;
+  const conditions: any[] = [
+    eq(woDetails.status, 'wo_details_filled')
+  ];
 
     if (filters?.user) {
       conditions.push(
@@ -225,7 +221,7 @@ export class WoDetailsService {
             ne(woAcceptance.decision, 'accepted'),
           ),
           and(
-            eq(woDetails.oeWoAmendmentNeeded, false),
+            or(isNull(woDetails.oeWoAmendmentNeeded), eq(woDetails.oeWoAmendmentNeeded, false)),
             or(
               isNull(woAcceptance.id),
               and(
@@ -527,6 +523,8 @@ export class WoDetailsService {
       updateValues.detailedPoApplicable = data.detailedPoApplicable;
     if (data.detailedPoFollowupId !== undefined)
       updateValues.detailedPoFollowupId = data.detailedPoFollowupId;
+    if (data.buybackBoqApplicable !== undefined)
+      updateValues.buybackBoqApplicable = data.buybackBoqApplicable;
     if (data.swotStrengths !== undefined)
       updateValues.swotStrengths = data.swotStrengths;
     if (data.swotWeaknesses !== undefined)
@@ -551,18 +549,6 @@ export class WoDetailsService {
       updateValues.hasDiscrepancies = data.hasDiscrepancies;
     if (data.discrepancyComments !== undefined)
       updateValues.discrepancyComments = data.discrepancyComments;
-    if (data.budgetPreGst !== undefined)
-      updateValues.budgetPreGst = data.budgetPreGst;
-    if (data.budgetSupply !== undefined)
-      updateValues.budgetSupply = data.budgetSupply;
-    if (data.budgetService !== undefined)
-      updateValues.budgetService = data.budgetService;
-    if (data.budgetFreight !== undefined)
-      updateValues.budgetFreight = data.budgetFreight;
-    if (data.budgetAdmin !== undefined)
-      updateValues.budgetAdmin = data.budgetAdmin;
-    if (data.budgetBuybackSale !== undefined)
-      updateValues.budgetBuybackSale = data.budgetBuybackSale;
     if (data.oeWoAmendmentNeeded !== undefined)
       updateValues.oeWoAmendmentNeeded = data.oeWoAmendmentNeeded;
     if (data.oeSignaturePrepared !== undefined)
@@ -668,12 +654,6 @@ export class WoDetailsService {
   async validateWizard(id: number): Promise<WizardValidationResult> {
     const detail = await this.findByIdWithRelations(id);
     const completedPages = detail.completedPages as number[];
-    const skippedPages = detail.skippedPages as number[];
-
-    const missingRequiredPages = REQUIRED_PAGES.filter(
-      (page) =>
-        !completedPages.includes(page) && !skippedPages.includes(page),
-    );
 
     const incompletePages: number[] = [];
     const errors: Record<number, string[]> = {};
@@ -782,10 +762,6 @@ export class WoDetailsService {
     if (completedPages.includes(6)) {
       const page6Errors: string[] = [];
 
-      if (!detail.budgetPreGst) {
-        page6Errors.push('Budget Pre-GST is required');
-      }
-
       if (detail.hasDiscrepancies && !detail.discrepancyComments?.trim()) {
         page6Errors.push('Discrepancy comments are required');
       }
@@ -822,12 +798,11 @@ export class WoDetailsService {
       }
     }
 
-    const isValid =
-      missingRequiredPages.length === 0 && incompletePages.length === 0;
+    const isValid = incompletePages.length === 0;
 
     return {
       isValid,
-      missingRequiredPages,
+      missingRequiredPages: [],
       incompletePages,
       errors,
     };
@@ -835,28 +810,17 @@ export class WoDetailsService {
 
   private getSubmissionBlockers(detail: any): string[] {
     const blockers: string[] = [];
-    const completedPages = (detail.completedPages as number[]) || [];
 
-    // Check required pages
-    for (const page of REQUIRED_PAGES) {
-      if (!completedPages.includes(page)) {
-        blockers.push(`Page ${page} must be completed`);
-      }
+    if (detail.oeWoAmendmentNeeded === true) {
+      blockers.push('WO Amendment is pending');
     }
 
-    // Page 7 specific checks
-    if (completedPages.includes(7)) {
-      if (detail.oeWoAmendmentNeeded === true) {
-        blockers.push('WO Amendment is pending');
+    if (detail.oeWoAmendmentNeeded === false) {
+      if (!detail.oeSignaturePrepared) {
+        blockers.push('OE Signature must be prepared');
       }
-
-      if (detail.oeWoAmendmentNeeded === false) {
-        if (!detail.oeSignaturePrepared) {
-          blockers.push('OE Signature must be prepared');
-        }
-        if (!detail.courierRequestPrepared) {
-          blockers.push('Courier request must be prepared');
-        }
+      if (!detail.courierRequestPrepared) {
+        blockers.push('Courier request must be prepared');
       }
     }
 
@@ -1006,13 +970,6 @@ export class WoDetailsService {
   ) {
     const detail = await this.findById(id);
 
-    // Check if page can be skipped
-    if (!(SKIPPABLE_PAGES as readonly number[]).includes(pageNum)) {
-      throw new BadRequestException(
-        `Page ${pageNum} cannot be skipped. Required pages: ${REQUIRED_PAGES.join(', ')}`,
-      );
-    }
-
     const now = new Date();
     const updateValues: Record<string, unknown> = {
       updatedAt: now,
@@ -1067,11 +1024,11 @@ export class WoDetailsService {
     }
 
     const now = new Date();
-
+    
     const [row] = await this.db
       .update(woDetails)
       .set({
-        status: 'submitted_for_review',
+        status: 'wo_details_filled',
         completedAt: now,
         updatedAt: now,
         updatedBy: userId ?? null,
@@ -1097,6 +1054,49 @@ export class WoDetailsService {
     return {
       ...this.mapRowToResponse(row!),
       message: 'WO Details submitted for TL review',
+    };
+  }
+
+  async submitAllPages(
+    id: number,
+    userId?: number,
+  ) {
+    const detail = await this.findByIdWithRelations(id);
+    const now = new Date();
+    const allPages = [1, 2, 3, 4, 5, 6, 7];
+
+    const [row] = await this.db
+      .update(woDetails)
+      .set({
+        status: 'wo_details_filled',
+        currentPage: 7,
+        completedPages: allPages,
+        skippedPages: [],
+        completedAt: now,
+        updatedAt: now,
+        updatedBy: userId ?? null,
+      })
+      .where(eq(woDetails.id, id))
+      .returning();
+
+    await this.db
+      .update(woBasicDetails)
+      .set({ currentStage: 'wo_acceptance', updatedAt: now })
+      .where(eq(woBasicDetails.id, detail.woBasicDetailId));
+
+    await this.db.insert(woAcceptance).values({
+      woDetailId: id,
+      status: 'pending_review',
+      createdAt: now,
+      updatedAt: now,
+      createdBy: userId ?? null,
+    });
+
+    return {
+      valid: true,
+      pageErrors: {},
+      message: 'WO Details submitted for TL review',
+      data: this.mapRowToResponse(row!),
     };
   }
   // GET PAGE DATA
@@ -1162,6 +1162,7 @@ export class WoDetailsService {
         const billingTotal = this.calculateTotal(detail.billingBoq);
         const buybackTotal = this.calculateTotal(detail.buybackBoq);
         return {
+          buybackBoqApplicable: detail.buybackBoqApplicable,
           billingBoq: detail.billingBoq.map((item) => ({
             id: item.id,
             srNo: item.srNo,
@@ -1225,13 +1226,6 @@ export class WoDetailsService {
           hasDiscrepancies: detail.hasDiscrepancies,
           discrepancyComments: detail.discrepancyComments,
           discrepancyNotifiedAt: detail.discrepancyNotifiedAt,
-          budgetPreGst: detail.budgetPreGst,
-          budgetSupply: detail.budgetSupply,
-          budgetService: detail.budgetService,
-          budgetFreight: detail.budgetFreight,
-          budgetAdmin: detail.budgetAdmin,
-          budgetBuybackSale: detail.budgetBuybackSale,
-          totalBudget: this.calculateBudgetTotal(detail),
         };
 
       case 7:
@@ -1325,6 +1319,8 @@ export class WoDetailsService {
         break;
 
       case 4:
+        if (data.buybackBoqApplicable !== undefined)
+          updateValues.buybackBoqApplicable = data.buybackBoqApplicable;
         // BOQ and Addresses are handled separately in savePageRelatedData
         break;
 
@@ -1348,35 +1344,6 @@ export class WoDetailsService {
           updateValues.hasDiscrepancies = data.hasDiscrepancies;
         if (data.discrepancyComments !== undefined)
           updateValues.discrepancyComments = data.discrepancyComments;
-        if (data.budgetPreGst !== undefined)
-          updateValues.budgetPreGst = data.budgetPreGst;
-
-        // Handle budget breakdown (nested object from frontend)
-        if (data.budgetBreakdown !== undefined) {
-          const breakdown = data.budgetBreakdown;
-          if (breakdown.supply !== undefined)
-            updateValues.budgetSupply = breakdown.supply;
-          if (breakdown.service !== undefined)
-            updateValues.budgetService = breakdown.service;
-          if (breakdown.freight !== undefined)
-            updateValues.budgetFreight = breakdown.freight;
-          if (breakdown.admin !== undefined)
-            updateValues.budgetAdmin = breakdown.admin;
-          if (breakdown.buybackSale !== undefined)
-            updateValues.budgetBuybackSale = breakdown.buybackSale;
-        }
-
-        // Also handle flat fields (backwards compatibility)
-        if (data.budgetSupply !== undefined)
-          updateValues.budgetSupply = data.budgetSupply;
-        if (data.budgetService !== undefined)
-          updateValues.budgetService = data.budgetService;
-        if (data.budgetFreight !== undefined)
-          updateValues.budgetFreight = data.budgetFreight;
-        if (data.budgetAdmin !== undefined)
-          updateValues.budgetAdmin = data.budgetAdmin;
-        if (data.budgetBuybackSale !== undefined)
-          updateValues.budgetBuybackSale = data.budgetBuybackSale;
         break;
 
       case 7:
@@ -1602,20 +1569,110 @@ export class WoDetailsService {
     return total.toFixed(2);
   }
 
-  private calculateBudgetTotal(detail: any): string {
-    const supply = parseFloat(detail.budgetSupply || '0') || 0;
-    const service = parseFloat(detail.budgetService || '0') || 0;
-    const freight = parseFloat(detail.budgetFreight || '0') || 0;
-    const admin = parseFloat(detail.budgetAdmin || '0') || 0;
-    const buyback = parseFloat(detail.budgetBuybackSale || '0') || 0;
+  // STEP STATUSES
+  async getStepStatuses(woDetailId: number) {
+  const [detail] = await this.db
+    .select({ id: woDetails.id, woBasicDetailId: woDetails.woBasicDetailId, status: woDetails.status })
+    .from(woDetails)
+    .where(eq(woDetails.id, woDetailId))
+    .limit(1);
 
-    const total = supply + service + freight + admin - buyback;
-    return total.toFixed(2);
+    if (!detail) {
+      return {
+        'basic-details': false,
+        'wo-details': false,
+        'kick-off': false,
+        'contract-agreement': false,
+        'po-dashboard': false,
+      };
+    }
+
+    const [kickoff, acceptance, poCount] = await Promise.all([
+      this.db
+        .select({ id: woKickoffMeetings.id })
+        .from(woKickoffMeetings)
+        .where(eq(woKickoffMeetings.woDetailId, woDetailId))
+        .limit(1),
+      this.db
+        .select({ id: woAcceptance.id })
+        .from(woAcceptance)
+        .where(eq(woAcceptance.woDetailId, woDetailId))
+        .limit(1),
+      this.db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(woBasicDetails)
+        .where(eq(woBasicDetails.id, detail.woBasicDetailId)),
+    ]);
+
+    // Determine wo-details step status based on actual status value
+    const woDetailsCompleted = detail.status === 'wo_details_filled';
+    const hasAcceptance = acceptance.length > 0;
+
+    return {
+      'basic-details': true,
+      'wo-details': woDetailsCompleted || hasAcceptance,
+      'kick-off': kickoff.length > 0,
+      'contract-agreement': false, // will be enhanced
+      'po-dashboard': false, // will be enhanced
+    };
   }
+
+  // CONSOLIDATED DATA
+  async getTenderConsolidatedData(tenderId: number) {
+    const { rows } = await this.db.execute(sql`
+      SELECT
+        ti.documents,
+        (SELECT tcs.google_sheet_url
+         FROM ${tenderCostingSheets} tcs
+         WHERE tcs.tender_id = ti.id
+         LIMIT 1) AS costing_sheet_url,
+        (SELECT COALESCE(json_agg(json_build_object('path', rrd.path)), '[]'::json)
+         FROM ${rfqs} r
+         JOIN ${rfqResponses} rr ON rr.rfq_id = r.id
+         JOIN ${rfqResponseDocuments} rrd ON rrd.rfq_response_id = rr.id
+         WHERE r.tender_id = ti.id) AS rfq_response_documents
+      FROM ${tenderInfos} ti
+      WHERE ti.id = ${tenderId}
+    `);
+
+    const row = rows?.[0];
+    if (!row) {
+      throw new NotFoundException(`Tender with ID ${tenderId} not found`);
+    }
+
+    let tenderDocuments: string[] = [];
+    if (row.documents) {
+      try {
+        const parsed = JSON.parse(row.documents as string);
+        tenderDocuments = Array.isArray(parsed) ? parsed.filter(Boolean).map(String) : [];
+      } catch {
+        tenderDocuments = [];
+      }
+    }
+
+    let rfqDocs: { path: string }[] = [];
+    if (row.rfq_response_documents) {
+      try {
+        const raw = typeof row.rfq_response_documents === 'string'
+          ? JSON.parse(row.rfq_response_documents as string)
+          : row.rfq_response_documents;
+        rfqDocs = Array.isArray(raw) ? raw : [];
+      } catch {
+        rfqDocs = [];
+      }
+    }
+
+    return {
+      tenderDocuments,
+      costingSheetUrl: (row.costing_sheet_url as string) ?? null,
+      rfqResponseDocuments: rfqDocs,
+    };
+  }
+
   // DASHBOARD
   async getDashboardSummary(user: ValidatedUser, teamId?: number) {
     const conditions: any[] = [
-        eq(woDetails.status, 'completed')
+        eq(woDetails.status, 'wo_details_filled')
     ];
     if (user) {
       conditions.push(...this.getVisibilityConditions(user, teamId));

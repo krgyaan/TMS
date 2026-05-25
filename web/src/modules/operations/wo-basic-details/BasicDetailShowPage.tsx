@@ -1,186 +1,64 @@
-import { useParams, useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardAction } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ArrowLeft, Edit, AlertCircle, RefreshCw } from "lucide-react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useState, useCallback } from "react";
+import { useWoStepStatuses } from "@/hooks/api/useWoStepStatuses";
+import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
+import { BasicDetailsSection } from "@/modules/operations/wo-basic-details/components/BasicDetailsSection";
+import { WoDetailsSection } from "@/modules/operations/wo-details/components/WoDetailsSection";
+import { KickOffSection } from "@/modules/operations/kick-off/components/KickOffSection";
+import { ContractAgreementSection } from "@/modules/operations/contract-agreement/components/ContractAgreementSection";
+import { PoDashboardSection } from "@/modules/operations/project-dashboard/components/PoDashboardSection";
 import { paths } from "@/app/routes/paths";
-import { useWoBasicDetailWithRelations } from "@/hooks/api/useWoBasicDetails";
-import { useWoContactsByBasicDetail } from "@/hooks/api/useWoContacts";
-import BasicDetailView from "./components/BasicDetailView";
-import { WoDetailView } from '../wo-details/components/WoDetailView';
-import { useWoDetailWithRelations } from '@/hooks/api/useWoDetails';
 
-const BasicDetailShowPage = () => {
+export default function BasicDetailShowPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const woId = id ? parseInt(id, 10) : 0;
+    const woId = parseInt(id || "0");
 
-    // Fetch WO Basic Detail with relations
-    const {
-        data: woBasicDetail,
-        isLoading: isLoadingDetail,
-        isError: isErrorDetail,
-        error: detailError,
-        refetch: refetchDetail,
-    } = useWoBasicDetailWithRelations(woId);
+    const { steps, woDetailId } = useWoStepStatuses(null, woId);
 
-    // Fetch contacts
-    const {
-        data: contacts,
-        isLoading: isLoadingContacts,
-    } = useWoContactsByBasicDetail(woId);
+    const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["basic-details"]));
 
-    const isLoading = isLoadingDetail || isLoadingContacts;
+    const toggleSection = useCallback((id: string) => {
+        setExpandedSections((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    }, []);
 
-    // Handlers
-    const handleEdit = () => {
-        navigate(paths.operations.woBasicDetailEditPage(woId));
-    };
+    const expandAll = useCallback(() => setExpandedSections(new Set(steps.map((s) => s.id))), [steps]);
+    const collapseAll = useCallback(() => setExpandedSections(new Set()), []);
 
-    const handleBack = () => {
-        // history back
-        navigate(-1);
-    };
+    const renderSectionContent = useCallback((stepId: string) => {
+        if (!woDetailId) return null;
+        switch (stepId) {
+            case "basic-details":        return <BasicDetailsSection woDetailId={woDetailId} />;
+            case "wo-details":           return <WoDetailsSection woDetailId={woDetailId} />;
+            case "kick-off":             return <KickOffSection woDetailId={woDetailId} />;
+            case "contract-agreement":   return <ContractAgreementSection woDetailId={woDetailId} />;
+            case "po-dashboard":         return <PoDashboardSection woDetailId={woDetailId} />;
+            default:                     return null;
+        }
+    }, [woDetailId]);
 
-    // Invalid ID
-    if (!woId || isNaN(woId)) {
+    if (!woId) {
         return (
-            <Card>
-                <CardHeader>
-                    <CardTitle>Invalid Work Order</CardTitle>
-                    <CardDescription>The requested work order ID is invalid</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Alert variant="destructive">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertTitle>Error</AlertTitle>
-                        <AlertDescription>
-                            Please provide a valid work order ID in the URL.
-                        </AlertDescription>
-                    </Alert>
-                    <Button
-                        variant="outline"
-                        onClick={handleBack}
-                        className="mt-4"
-                    >
-                        <ArrowLeft className="mr-2 h-4 w-4" />
-                        Back to List
-                    </Button>
-                </CardContent>
-            </Card>
-        );
-    }
-
-    // Loading state
-    if (isLoading) {
-        return (
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center justify-between">
-                        <div className="space-y-2">
-                            <Skeleton className="h-6 w-48" />
-                            <Skeleton className="h-4 w-72" />
-                        </div>
-                        <Skeleton className="h-10 w-24" />
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
-                        {Array.from({ length: 8 }).map((_, i) => (
-                            <Skeleton key={i} className="h-12 w-full" />
-                        ))}
-                    </div>
-                </CardContent>
-            </Card>
-        );
-    }
-
-    // Error state
-    if (isErrorDetail || !woBasicDetail) {
-        return (
-            <Card>
-                <CardHeader>
-                    <CardTitle>Error Loading Work Order</CardTitle>
-                    <CardDescription>Unable to fetch work order details</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <Alert variant="destructive">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertTitle>Error</AlertTitle>
-                        <AlertDescription>
-                            {(detailError as Error)?.message || 'Failed to load work order details. Please try again.'}
-                        </AlertDescription>
-                    </Alert>
-                    <div className="flex gap-2">
-                        <Button
-                            variant="outline"
-                            onClick={handleBack}
-                        >
-                            <ArrowLeft className="mr-2 h-4 w-4" />
-                            Back to List
-                        </Button>
-                        <Button
-                            variant="default"
-                            onClick={() => refetchDetail()}
-                        >
-                            <RefreshCw className="mr-2 h-4 w-4" />
-                            Retry
-                        </Button>
-                    </div>
-                </CardContent>
-            </Card>
+            <div className="p-8 text-center text-muted-foreground">
+                <p>Invalid work order ID.</p>
+            </div>
         );
     }
 
     return (
-        <Card>
-            <CardHeader>
-                <div className="flex items-center justify-between">
-                    <div>
-                        <CardTitle className="flex items-center gap-2">
-                            Work Order Details
-                        </CardTitle>
-                        <CardDescription className="mt-1">
-                            {woBasicDetail.projectName || `WO #${woBasicDetail.woNumber || woId}`}
-                        </CardDescription>
-                    </div>
-                    <CardAction>
-                        <div className="flex items-center gap-2">
-                            {/* Edit Button */}
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={handleEdit}
-                            >
-                                <Edit className="mr-2 h-4 w-4" />
-                                Edit
-                            </Button>
-                            {/* Back Button */}
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleBack}
-                            >
-                                <ArrowLeft className="mr-2 h-4 w-4" />
-                                Back
-                            </Button>
-                        </div>
-                    </CardAction>
-                </div>
-            </CardHeader>
-            <CardContent className="px-0 md:px-6 space-y-4">
-                <BasicDetailView
-                    data={woBasicDetail}
-                    contacts={contacts || []}
-                    isLoading={false}
-                />
-                {woBasicDetail?.woDetail && (
-                    <WoDetailView data={woBasicDetail?.woDetail} />
-                )}
-            </CardContent>
-        </Card>
+        <ShowPageLayout
+            steps={steps}
+            expandedSections={expandedSections}
+            onToggleSection={toggleSection}
+            onExpandAll={expandAll}
+            onCollapseAll={collapseAll}
+            onBack={() => navigate(paths.operations.woBasicDetailListPage)}
+            backLabel="Back to Work Orders"
+            renderSectionContent={renderSectionContent}
+        />
     );
-};
-
-export default BasicDetailShowPage;
+}

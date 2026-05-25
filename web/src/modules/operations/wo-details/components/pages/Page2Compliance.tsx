@@ -1,16 +1,21 @@
-import { useEffect } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
+import { ConditionalSection } from "@/components/form/ConditionalSection";
+import { DateInput } from "@/components/form/DateInput";
+import { FieldWrapper } from "@/components/form/FieldWrapper";
+import { SelectField } from "@/components/form/SelectField";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { ShieldCheck, FileText, Truck, Receipt } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { formToApi } from "../../helpers/woDetail.mapper";
+import { useAutoSave } from "@/hooks/api/useWoDetails";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { FileText, Info, Receipt, ShieldCheck } from "lucide-react";
+import { useCallback, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { WIZARD_CONFIG, YES_NO_OPTIONS } from "../../helpers/constants";
 import { Page2FormSchema } from "../../helpers/woDetail.schema";
 import { WizardNavigation } from "../WizardNavigation";
-import { YES_NO_OPTIONS, WIZARD_CONFIG } from "../../helpers/constants";
-import { SelectField } from "@/components/form/SelectField";
-import { DateInput } from "@/components/form/DateInput";
-import { useAutoSave } from "@/hooks/api/useWoDetails";
 
 import type { Page2FormValues, PageFormProps } from "../../helpers/woDetail.types";
 
@@ -33,11 +38,10 @@ const defaultValues: Page2FormValues = {
 export function Page2Compliance({
     woDetailId,
     initialData,
-    onSubmit,
+    onSaveDraft,
+    onSaveDraftOnly,
     onSkip,
     onBack,
-    onSaveDraft,
-    isLoading,
     isSaving,
 }: Page2ComplianceProps) {
     const form = useForm<Page2FormValues>({
@@ -45,12 +49,11 @@ export function Page2Compliance({
         defaultValues: { ...defaultValues, ...initialData },
     });
 
-    const { autoSave, isSaving: isAutoSaving } = useAutoSave(woDetailId, 2);
+    const { autoSave, isSaving: isAutoSaving } = useAutoSave(woDetailId, 2, true, 4000, formToApi.page2);
 
     const watchLdApplicable = form.watch("ldApplicable");
     const watchPbgApplicable = form.watch("isPbgApplicable");
     const watchContractAgreement = form.watch("isContractAgreement");
-    const watchDetailedPo = form.watch("detailedPoApplicable");
 
     useEffect(() => {
         const subscription = form.watch((values) => {
@@ -65,59 +68,56 @@ export function Page2Compliance({
         }
     }, [initialData, form]);
 
-    const handleFormSubmit = async (values: Page2FormValues) => {
-        await onSubmit(values);
-    };
+    const handleSaveAndContinue = useCallback(async () => {
+        const errors = await onSaveDraft(form.getValues());
+        if (errors?.length) {
+            for (const err of errors) {
+                form.setError(err.field as any, { message: err.message });
+            }
+        }
+    }, [onSaveDraft, form]);
 
-    const handleSaveDraft = async () => {
-        await onSaveDraft(form.getValues());
-    };
+    const handleSaveDraftOnly = useCallback(async () => {
+        const errors = await onSaveDraftOnly(form.getValues());
+        if (errors?.length) {
+            for (const err of errors) {
+                form.setError(err.field as any, { message: err.message });
+            }
+        }
+    }, [onSaveDraftOnly, form]);
 
     return (
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
-                {/* LD Section */}
+            <form onSubmit={(e) => e.preventDefault()} className="space-y-8">
                 <Card>
-                    <CardHeader className="border-b bg-muted/10">
-                        <CardTitle className="flex items-center gap-2">
-                            <ShieldCheck className="h-5 w-5 text-orange-500" />
-                            Liquidated Damages (LD) Settings
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                            <ShieldCheck className="h-5 w-5 text-muted-foreground" />
+                            Compliance Obligations
                         </CardTitle>
-                        <CardDescription>Configure penalties for completion delays.</CardDescription>
                     </CardHeader>
-                    <CardContent className="p-6 space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
-                            <SelectField
-                                control={form.control}
-                                name="ldApplicable"
-                                label="LD Applicable?"
-                                options={YES_NO_OPTIONS}
-                                placeholder="Select"
-                            />
-
-                            {watchLdApplicable === "true" && (
-                                <>
-                                    <FormField
-                                        control={form.control}
-                                        name="maxLd"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel>Max LD %</FormLabel>
-                                                <FormControl>
-                                                    <Input
-                                                        {...field}
-                                                        placeholder="e.g., 10.00"
-                                                        type="number"
-                                                        step="0.01"
-                                                        min="0"
-                                                        max="100"
-                                                    />
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-
+                    <CardContent className="space-y-8">
+                        {/* LD Section */}
+                        <div>
+                            <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                                <ShieldCheck className="h-4 w-4 text-muted-foreground" />
+                                Liquidated Damages (LD)
+                            </h3>
+                            <p className="text-xs text-muted-foreground mb-4">Configure penalties for completion delays.</p>
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <SelectField
+                                    control={form.control}
+                                    name="ldApplicable"
+                                    label="LD Applicable?"
+                                    options={YES_NO_OPTIONS}
+                                    placeholder="Select"
+                                />
+                                <ConditionalSection show={watchLdApplicable === "true"}>
+                                    <FieldWrapper control={form.control} name="maxLd" label="Max LD %">
+                                        {(field) => <Input {...field} placeholder="e.g., 10.00" type="number" step="0.01" min="0" max="100" />}
+                                    </FieldWrapper>
+                                </ConditionalSection>
+                                <ConditionalSection show={watchLdApplicable === "true"}>
                                     <FormField
                                         control={form.control}
                                         name="ldStartDate"
@@ -131,7 +131,8 @@ export function Page2Compliance({
                                             </FormItem>
                                         )}
                                     />
-
+                                </ConditionalSection>
+                                <ConditionalSection show={watchLdApplicable === "true"}>
                                     <FormField
                                         control={form.control}
                                         name="maxLdDate"
@@ -145,148 +146,116 @@ export function Page2Compliance({
                                             </FormItem>
                                         )}
                                     />
-                                </>
-                            )}
+                                </ConditionalSection>
+                            </div>
                         </div>
-                    </CardContent>
-                </Card>
 
-                {/* PBG Section */}
-                <Card>
-                    <CardHeader className="border-b bg-muted/10">
-                        <CardTitle className="flex items-center gap-2">
-                            <FileText className="h-5 w-5 text-orange-500" />
-                            Performance Bank Guarantee (PBG)
-                        </CardTitle>
-                        <CardDescription>Security deposit requirements for project performance.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-6 space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                            <SelectField
-                                control={form.control}
-                                name="isPbgApplicable"
-                                label="PBG Applicable?"
-                                options={YES_NO_OPTIONS}
-                                placeholder="Select"
-                            />
+                        <Separator />
 
-                            {watchPbgApplicable === "true" && (
-                                <FormField
+                        {/* PBG Section */}
+                        <div>
+                            <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                                <FileText className="h-4 w-4 text-muted-foreground" />
+                                Performance Bank Guarantee (PBG)
+                            </h3>
+                            <p className="text-xs text-muted-foreground mb-4">Security deposit requirements for project performance.</p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <SelectField
                                     control={form.control}
-                                    name="filledBgFormat"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>BG Format Required</FormLabel>
-                                            <FormControl>
-                                                <Input {...field} placeholder="Enter BG format name or code" />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
+                                    name="isPbgApplicable"
+                                    label="PBG Applicable?"
+                                    options={YES_NO_OPTIONS}
+                                    placeholder="Select"
                                 />
-                            )}
+                                <ConditionalSection show={watchPbgApplicable === "true"}>
+                                    <FieldWrapper control={form.control} name="filledBgFormat" label="BG Format Required">
+                                        {(field) => <Input {...field} placeholder="Enter BG format name or code" />}
+                                    </FieldWrapper>
+                                </ConditionalSection>
+                            </div>
+                            <ConditionalSection show={watchPbgApplicable === "true"}>
+                                <Alert className="mt-3">
+                                    <Info className="h-4 w-4" />
+                                    <AlertDescription>
+                                        Please fill the BG form (other than tender). This is compulsory for project compliance.
+                                    </AlertDescription>
+                                </Alert>
+                            </ConditionalSection>
                         </div>
 
-                        {watchPbgApplicable === "true" && (
-                            <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-r-lg">
-                                <p className="text-sm text-orange-800">
-                                    <strong>Note:</strong> Please fill the BG form (other than tender). This is compulsory for project compliance.
-                                </p>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                        <Separator />
 
-                {/* Contract Agreement Section */}
-                <Card>
-                    <CardHeader className="border-b bg-muted/10">
-                        <CardTitle className="flex items-center gap-2">
-                            <Receipt className="h-5 w-5 text-orange-500" />
-                            Formal Contract Agreement
-                        </CardTitle>
-                        <CardDescription>Legal contract requirement between client and company.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-6 space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                            <SelectField
-                                control={form.control}
-                                name="isContractAgreement"
-                                label="Contract Agreement Required?"
-                                options={YES_NO_OPTIONS}
-                                placeholder="Select"
-                            />
-
-                            {watchContractAgreement === "true" && (
-                                <FormField
+                        {/* Contract Agreement Section */}
+                        <div>
+                            <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                                <Receipt className="h-4 w-4 text-muted-foreground" />
+                                Formal Contract Agreement
+                            </h3>
+                            <p className="text-xs text-muted-foreground mb-4">Legal contract requirement between client and company.</p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <SelectField
                                     control={form.control}
-                                    name="contractAgreementFormat"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel>Contract Agreement Format</FormLabel>
-                                            <FormControl>
-                                                <Input {...field} placeholder="Specify contract format" />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
+                                    name="isContractAgreement"
+                                    label="Contract Agreement Required?"
+                                    options={YES_NO_OPTIONS}
+                                    placeholder="Select"
                                 />
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Detailed PO Section */}
-                <Card>
-                    <CardHeader className="border-b bg-muted/10">
-                        <CardTitle className="flex items-center gap-2">
-                            <Truck className="h-5 w-5 text-orange-500" />
-                            Detailed PO / FOA Requirements
-                        </CardTitle>
-                        <CardDescription>SAP PO and detailed work order configurations.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-6 space-y-4">
-                        <div className="max-w-xs">
-                            <SelectField
-                                control={form.control}
-                                name="detailedPoApplicable"
-                                label="Detailed PO Applicable?"
-                                options={YES_NO_OPTIONS}
-                                placeholder="Select"
-                            />
+                                <ConditionalSection show={watchContractAgreement === "true"}>
+                                    <FieldWrapper control={form.control} name="contractAgreementFormat" label="Contract Agreement Format">
+                                        {(field) => <Input {...field} placeholder="Specify contract format" />}
+                                    </FieldWrapper>
+                                </ConditionalSection>
+                            </div>
                         </div>
 
-                        {watchDetailedPo === "true" ? (
-                            <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl flex gap-3 items-center">
-                                <div className="p-2 bg-blue-100 rounded-lg text-blue-600">
-                                    <FileText className="h-5 w-5" />
-                                </div>
-                                <p className="text-sm text-blue-800">
-                                    A followup for SAP PO will be automatically initiated once the TL accepts the PO.
-                                </p>
+                        <Separator />
+
+                        {/* PO Section */}
+                        <div>
+                            <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                                <FileText className="h-4 w-4 text-muted-foreground" />
+                                Detailed PO / FOA Requirements
+                            </h3>
+                            <p className="text-xs text-muted-foreground mb-4">SAP PO and detailed work order configurations.</p>
+                            <div className="max-w-xs">
+                                <SelectField
+                                    control={form.control}
+                                    name="detailedPoApplicable"
+                                    label="Detailed PO Applicable?"
+                                    options={YES_NO_OPTIONS}
+                                    placeholder="Select"
+                                />
                             </div>
-                        ) : (
-                            <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex gap-3 items-center">
-                                <div className="p-2 bg-amber-100 rounded-lg text-amber-600">
-                                    <ShieldCheck className="h-5 w-5" />
-                                </div>
-                                <p className="text-sm text-amber-800">
-                                    The WO Upload step will be skipped as Detailed PO is not applicable for this project.
-                                </p>
-                            </div>
-                        )}
+                            <ConditionalSection show={form.watch("detailedPoApplicable") === "true"}>
+                                <Alert className="mt-3">
+                                    <Info className="h-4 w-4" />
+                                    <AlertDescription>
+                                        A followup for SAP PO will be automatically initiated once the TL accepts the PO.
+                                    </AlertDescription>
+                                </Alert>
+                            </ConditionalSection>
+                            <ConditionalSection show={form.watch("detailedPoApplicable") === "false"}>
+                                <Alert className="mt-3">
+                                    <Info className="h-4 w-4" />
+                                    <AlertDescription>
+                                        The WO Upload step will be skipped as Detailed PO is not applicable for this project.
+                                    </AlertDescription>
+                                </Alert>
+                            </ConditionalSection>
+                        </div>
                     </CardContent>
                 </Card>
 
                 <WizardNavigation
                     currentPage={2}
                     totalPages={WIZARD_CONFIG.TOTAL_PAGES}
-                    canSkip={false}
-                    isSubmitting={isLoading}
+                    canSkip={true}
+                    isSubmitting={isSaving}
                     isSaving={isSaving || isAutoSaving}
                     onBack={onBack}
-                    onSubmit={() => form.handleSubmit(handleFormSubmit)()}
+                    onSubmit={handleSaveAndContinue}
                     onSkip={onSkip}
-                    onSaveDraft={handleSaveDraft}
+                    onSaveDraft={handleSaveDraftOnly}
                 />
             </form>
         </Form>

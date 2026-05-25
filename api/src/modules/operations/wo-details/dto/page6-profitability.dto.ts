@@ -1,18 +1,5 @@
 import { z } from "zod";
-import { DecimalSchema } from "./wo-details.dto";
 // PAGE 6: ACTUAL PROJECT PROFITABILITY
-/**
- * Budget Breakdown Schema
- */
-export const BudgetBreakdownSchema = z.object({
-  supply: DecimalSchema.nullable().optional(),
-  service: DecimalSchema.nullable().optional(),
-  freight: DecimalSchema.nullable().optional(),
-  admin: DecimalSchema.nullable().optional(),
-  buybackSale: DecimalSchema.nullable().optional(),
-});
-
-export type BudgetBreakdownDto = z.infer<typeof BudgetBreakdownSchema>;
 
 /**
  * Save Page 6 data (all optional for drafts)
@@ -27,8 +14,6 @@ export const SavePage6Schema = z.object({
     .or(z.literal("")),
   hasDiscrepancies: z.boolean().optional(),
   discrepancyComments: z.string().nullable().optional(),
-  budgetPreGst: DecimalSchema.nullable().optional(),
-  budgetBreakdown: BudgetBreakdownSchema.optional(),
 });
 
 export type SavePage6Dto = z.infer<typeof SavePage6Schema>;
@@ -47,8 +32,6 @@ export const SubmitPage6Schema = z
       .or(z.literal("")),
     hasDiscrepancies: z.boolean(),
     discrepancyComments: z.string().nullable().optional(),
-    budgetPreGst: DecimalSchema,
-    budgetBreakdown: BudgetBreakdownSchema,
   })
   .superRefine((data, ctx) => {
     if (
@@ -73,13 +56,6 @@ export const Page6ResponseSchema = z.object({
   hasDiscrepancies: z.boolean(),
   discrepancyComments: z.string().nullable(),
   discrepancyNotifiedAt: z.string().nullable(),
-  budgetPreGst: z.string().nullable(),
-  budgetSupply: z.string().nullable(),
-  budgetService: z.string().nullable(),
-  budgetFreight: z.string().nullable(),
-  budgetAdmin: z.string().nullable(),
-  budgetBuybackSale: z.string().nullable(),
-  totalBudget: z.string(),
 });
 
 export type Page6ResponseDto = z.infer<typeof Page6ResponseSchema>;

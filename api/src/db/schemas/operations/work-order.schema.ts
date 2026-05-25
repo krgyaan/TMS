@@ -1,5 +1,5 @@
 import { bigserial } from "drizzle-orm/pg-core";
-import { text, integer, index, pgTable, bigint, varchar, timestamp, numeric, date, boolean, jsonb } from "drizzle-orm/pg-core";
+import { text, integer, index, uniqueIndex, pgTable, bigint, varchar, timestamp, numeric, date, boolean, jsonb } from "drizzle-orm/pg-core";
 
 // WO Basic Details - Initial project info filled by TE within 12 hours of PO receipt
 export const woBasicDetails = pgTable("wo_basic_details", {
@@ -25,6 +25,15 @@ export const woBasicDetails = pgTable("wo_basic_details", {
     receiptPreGst: numeric("receipt_pre_gst", { precision: 20, scale: 2 }),
     budgetPreGst: numeric("budget_pre_gst", { precision: 20, scale: 2 }),
     grossMargin: numeric("gross_margin", { precision: 5, scale: 2 }),
+    finalPrice: numeric("final_price", { precision: 20, scale: 2 }),
+
+    // Budget breakdown
+    budgetSupply: numeric("budget_supply", { precision: 20, scale: 2 }),
+    budgetService: numeric("budget_service", { precision: 20, scale: 2 }),
+    budgetFreight: numeric("budget_freight", { precision: 20, scale: 2 }),
+    budgetAdmin: numeric("budget_admin", { precision: 20, scale: 2 }),
+    budgetBuybackSale: numeric("budget_buyback_sale", { precision: 20, scale: 2 }),
+    budgetGemCharges: numeric("budget_gem_charges", { precision: 20, scale: 2 }),
 
     // Document upload
     woDraft: varchar("wo_draft", { length: 255 }),
@@ -102,6 +111,7 @@ export const woDetails = pgTable("wo_details", {
     swotCompletedAt: timestamp("swot_completed_at", { withTimezone: true }),
 
     // PAGE 4: Billing - BOQ in separate tables
+    buybackBoqApplicable: boolean("buyback_boq_applicable").default(false),
 
     // PAGE 5: Project Execution
     siteVisitNeeded: boolean("site_visit_needed").default(false),
@@ -115,13 +125,6 @@ export const woDetails = pgTable("wo_details", {
     hasDiscrepancies: boolean("has_discrepancies").default(false),
     discrepancyComments: text("discrepancy_comments"),
     discrepancyNotifiedAt: timestamp("discrepancy_notified_at", { withTimezone: true }),
-
-    budgetPreGst: numeric("budget_pre_gst", { precision: 20, scale: 2 }),
-    budgetSupply: numeric("budget_supply", { precision: 20, scale: 2 }),
-    budgetService: numeric("budget_service", { precision: 20, scale: 2 }),
-    budgetFreight: numeric("budget_freight", { precision: 20, scale: 2 }),
-    budgetAdmin: numeric("budget_admin", { precision: 20, scale: 2 }),
-    budgetBuybackSale: numeric("budget_buyback_sale", { precision: 20, scale: 2 }),
 
     // PAGE 7: WO Acceptance (OE Step)
     oeWoAmendmentNeeded: boolean("oe_wo_amendment_needed"),
@@ -137,7 +140,7 @@ export const woDetails = pgTable("wo_details", {
     startedAt: timestamp("started_at", { withTimezone: true }),
     completedAt: timestamp("completed_at", { withTimezone: true }),
 
-    // Status: 'draft' | 'in_progress' | 'completed' | 'submitted_for_review'
+    // Status: 'draft' | 'in_progress' | 'wo_details_filled'
     status: varchar("status", { length: 50 }).default('draft'),
 
     // VE Signed Contract Agreement
@@ -154,7 +157,7 @@ export const woDetails = pgTable("wo_details", {
     createdBy: bigint("created_by", { mode: "number" }),
     updatedBy: bigint("updated_by", { mode: "number" }),
 }, (table) => [
-    index("idx_wo_details_basic_detail").on(table.woBasicDetailId),
+    uniqueIndex("uq_wo_details_basic_detail").on(table.woBasicDetailId),
     index("idx_wo_details_status").on(table.status),
 ]);
 

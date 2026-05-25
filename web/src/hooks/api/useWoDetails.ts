@@ -33,17 +33,19 @@ export const woDetailsKeys = {
   pendingQueries: () => [...woDetailsKeys.all, 'pending-queries'] as const,
   amendmentsSummary: () => [...woDetailsKeys.all, 'amendments-summary'] as const,
   slaCompliance: () => [...woDetailsKeys.all, 'sla-compliance'] as const,
+
+  // Consolidated data
+  tenderConsolidatedData: (tenderId: number) => [...woDetailsKeys.all, 'tender-consolidated', tenderId] as const,
 };
 
 // WIZARD QUERY HOOKS (ESSENTIAL - USED BY FORMS)
-console.log('🔷 woDetailsService:', woDetailsService);
-console.log('🔷 Available methods:', Object.keys(woDetailsService));
 
 export const useWoDetailByBasicDetail = (woBasicDetailId: number) => {
   return useQuery({
     queryKey: woDetailsKeys.byBasicDetail(woBasicDetailId),
     queryFn: () => woDetailsService.getByWoBasicDetailId(woBasicDetailId),
     enabled: !!woBasicDetailId && woBasicDetailId > 0,
+    staleTime: 30 * 1000,
   });
 };
 
@@ -117,6 +119,14 @@ export const useInitializeWizard = () => {
     onError: (error: any) => {
       toast.error(handleQueryError(error));
     },
+  });
+};
+
+export const useTenderConsolidatedData = (tenderId: number | null) => {
+  return useQuery({
+    queryKey: woDetailsKeys.tenderConsolidatedData(tenderId ?? 0),
+    queryFn: () => woDetailsService.getTenderConsolidatedData(tenderId!),
+    enabled: !!tenderId,
   });
 };
 
@@ -214,6 +224,25 @@ export const useSkipPage = () => {
   });
 };
 
+// Submit all pages at once (for preview page)
+export const useSubmitAllPages = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (woDetailId: number) => woDetailsService.submitAllPages(woDetailId),
+    onSuccess: (result, woDetailId) => {
+      queryClient.invalidateQueries({ queryKey: woDetailsKeys.all });
+      queryClient.invalidateQueries({ queryKey: woDetailsKeys.detail(woDetailId) });
+      queryClient.invalidateQueries({ queryKey: woDetailsKeys.wizardProgress(woDetailId) });
+      toast.success(result.message);
+      return result;
+    },
+    onError: (error: any) => {
+      toast.error(handleQueryError(error));
+    },
+  });
+};
+
 // Submit wizard for review
 export const useSubmitForReview = () => {
   const queryClient = useQueryClient();
@@ -236,7 +265,9 @@ export const useSubmitForReview = () => {
 export const useAutoSave = (
   woDetailId: number | null,
   pageNum: number,
-  enabled: boolean = true
+  enabled: boolean = true,
+  delayMs: number = 4000,
+  mapper?: (data: any) => any
 ) => {
   const { mutate: saveDraft, isPending } = useSavePageDraft();
   const lastSavedRef = useRef<string | null>(null);
@@ -244,25 +275,27 @@ export const useAutoSave = (
   const debouncedSave = useDebouncedCallback((data: any) => {
     if (!woDetailId || woDetailId <= 0 || !enabled) return;
 
-    const dataString = JSON.stringify(data);
-    if (dataString === lastSavedRef.current) return; // No changes
+    const mappedData = mapper ? mapper(data) : data;
+    const dataString = JSON.stringify(mappedData);
+    if (dataString === lastSavedRef.current) return;
 
     saveDraft(
-      { woDetailId, pageNum, data },
+      { woDetailId, pageNum, data: mappedData },
       {
         onSuccess: () => {
           lastSavedRef.current = dataString;
         },
       }
     );
-  }, 2000);
+  }, delayMs);
 
   const saveNow = useCallback(
     (data: any) => {
       if (!woDetailId || woDetailId <= 0) return;
-      saveDraft({ woDetailId, pageNum, data });
+      const mappedData = mapper ? mapper(data) : data;
+      saveDraft({ woDetailId, pageNum, data: mappedData });
     },
-    [woDetailId, pageNum, saveDraft]
+    [woDetailId, pageNum, saveDraft, mapper]
   );
 
   return {

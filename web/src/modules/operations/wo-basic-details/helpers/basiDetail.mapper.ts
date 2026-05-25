@@ -11,6 +11,14 @@ export const buildDefaultValues = (): WoBasicDetailFormValues => ({
   budgetPreGst: 0,
   receiptPreGst: 0,
   grossMargin: 0,
+  finalPrice: 0,
+  pricesChanged: "false",
+  budgetSupply: 0,
+  budgetService: 0,
+  budgetFreight: 0,
+  budgetAdmin: 0,
+  budgetBuybackSale: 0,
+  budgetGemCharges: 0,
   projectCode: "",
   projectName: "",
   woDraft: [],
@@ -41,6 +49,14 @@ export const mapResponseToForm = (data: WoBasicDetail): WoBasicDetailFormValues 
     budgetPreGst: Number(data.budgetPreGst) || 0,
     receiptPreGst: Number(data.receiptPreGst) || 0,
     grossMargin: Number(data.grossMargin) || 0,
+    finalPrice: Number(data.finalPrice) || 0,
+    pricesChanged: "false",
+    budgetSupply: Number(data.budgetSupply) || 0,
+    budgetService: Number(data.budgetService) || 0,
+    budgetFreight: Number(data.budgetFreight) || 0,
+    budgetAdmin: Number(data.budgetAdmin) || 0,
+    budgetBuybackSale: Number(data.budgetBuybackSale) || 0,
+    budgetGemCharges: Number(data.budgetGemCharges) || 0,
     projectCode: data.projectCode || "",
     projectName: data.projectName || "",
     woDraft: parseFileArray(data.woDraft),
@@ -74,6 +90,13 @@ export const mapFormToCreatePayload = (values: WoBasicDetailFormValues): CreateW
   if (values.budgetPreGst !== undefined) payload.budgetPreGst = String(values.budgetPreGst);
   if (values.receiptPreGst !== undefined) payload.receiptPreGst = String(values.receiptPreGst);
   if (values.grossMargin !== undefined) payload.grossMargin = String(values.grossMargin);
+  if (values.finalPrice !== undefined && values.finalPrice > 0) payload.finalPrice = String(values.finalPrice);
+  if (values.budgetSupply !== undefined && values.budgetSupply > 0) payload.budgetSupply = String(values.budgetSupply);
+  if (values.budgetService !== undefined && values.budgetService > 0) payload.budgetService = String(values.budgetService);
+  if (values.budgetFreight !== undefined && values.budgetFreight > 0) payload.budgetFreight = String(values.budgetFreight);
+  if (values.budgetAdmin !== undefined && values.budgetAdmin > 0) payload.budgetAdmin = String(values.budgetAdmin);
+  if (values.budgetBuybackSale !== undefined && values.budgetBuybackSale > 0) payload.budgetBuybackSale = String(values.budgetBuybackSale);
+  if (values.budgetGemCharges !== undefined && values.budgetGemCharges > 0) payload.budgetGemCharges = String(values.budgetGemCharges);
   if (values.woDraft && values.woDraft.length > 0) payload.woDraft = JSON.stringify(values.woDraft);
 
   return payload;
@@ -93,6 +116,13 @@ export const mapFormToUpdatePayload = (values: WoBasicDetailFormValues): UpdateW
   if (values.budgetPreGst !== undefined) payload.budgetPreGst = String(values.budgetPreGst);
   if (values.receiptPreGst !== undefined) payload.receiptPreGst = String(values.receiptPreGst);
   if (values.grossMargin !== undefined) payload.grossMargin = String(values.grossMargin);
+  if (values.finalPrice !== undefined && values.finalPrice > 0) payload.finalPrice = String(values.finalPrice);
+  if (values.budgetSupply !== undefined && values.budgetSupply > 0) payload.budgetSupply = String(values.budgetSupply);
+  if (values.budgetService !== undefined && values.budgetService > 0) payload.budgetService = String(values.budgetService);
+  if (values.budgetFreight !== undefined && values.budgetFreight > 0) payload.budgetFreight = String(values.budgetFreight);
+  if (values.budgetAdmin !== undefined && values.budgetAdmin > 0) payload.budgetAdmin = String(values.budgetAdmin);
+  if (values.budgetBuybackSale !== undefined && values.budgetBuybackSale > 0) payload.budgetBuybackSale = String(values.budgetBuybackSale);
+  if (values.budgetGemCharges !== undefined && values.budgetGemCharges > 0) payload.budgetGemCharges = String(values.budgetGemCharges);
   if (values.woDraft && values.woDraft.length > 0) payload.woDraft = JSON.stringify(values.woDraft);
 
   return payload;

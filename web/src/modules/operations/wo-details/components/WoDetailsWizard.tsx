@@ -1,21 +1,53 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
+import { WIZARD_CONFIG } from "../helpers/constants";
+import { formToApi } from "../helpers/woDetail.mapper";
 import { WizardStepper } from "./WizardStepper";
-import { Page1Handover } from "./pages/Page1Handover";
-import { Page2Compliance } from "./pages/Page2Compliance";
-import { Page3Swot } from "./pages/Page3Swot";
-import { Page4Billing } from "./pages/Page4Billing";
-import { Page5Execution } from "./pages/Page5Execution";
-import { Page6Profitability } from "./pages/Page6Profitability";
-import { Page7Acceptance } from "./pages/Page7Acceptance";
 
+import { useWoBasicDetailById } from "@/hooks/api/useWoBasicDetails";
+import { useInitializeWizard, useSavePageDraft, useSkipPage, useSubmitAllPages, useSubmitPage, useWoDetailByBasicDetail } from "@/hooks/api/useWoDetails";
 import type { WizardState, WoDetailData } from "../helpers/woDetail.types";
-import { useInitializeWizard, useSubmitForReview, useSubmitPage, useWizardProgress, useWoDetailByBasicDetail } from "@/hooks/api/useWoDetails";
+
+const Page1Handover = lazy(() => import("./pages/Page1Handover").then((m) => ({ default: m.Page1Handover })));
+const Page2Compliance = lazy(() => import("./pages/Page2Compliance").then((m) => ({ default: m.Page2Compliance })));
+const Page3Swot = lazy(() => import("./pages/Page3Swot").then((m) => ({ default: m.Page3Swot })));
+const Page4Billing = lazy(() => import("./pages/Page4Billing").then((m) => ({ default: m.Page4Billing })));
+const Page5Execution = lazy(() => import("./pages/Page5Execution").then((m) => ({ default: m.Page5Execution })));
+const Page6Profitability = lazy(() => import("./pages/Page6Profitability").then((m) => ({ default: m.Page6Profitability })));
+const Page7Acceptance = lazy(() => import("./pages/Page7Acceptance").then((m) => ({ default: m.Page7Acceptance })));
+const Page8Review = lazy(() => import("./pages/Page8Review").then((m) => ({ default: m.Page8Review })));
+
+function PageSkeleton() {
+    return (
+        <Card>
+            <CardContent className="p-12">
+                <div className="space-y-4 animate-pulse">
+                    <div className="h-8 bg-muted rounded w-1/3" />
+                    <div className="h-32 bg-muted rounded" />
+                    <div className="h-32 bg-muted rounded" />
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+function applyMapper(data: Record<string, unknown>, pageNum: number): Record<string, unknown> {
+    switch (pageNum) {
+        case 1: return formToApi.page1(data as Parameters<typeof formToApi.page1>[0]) as unknown as Record<string, unknown>;
+        case 2: return formToApi.page2(data as Parameters<typeof formToApi.page2>[0]) as unknown as Record<string, unknown>;
+        case 3: return formToApi.page3(data as Parameters<typeof formToApi.page3>[0]) as unknown as Record<string, unknown>;
+        case 4: return formToApi.page4(data as Parameters<typeof formToApi.page4>[0]) as unknown as Record<string, unknown>;
+        case 5: return formToApi.page5(data as Parameters<typeof formToApi.page5>[0]) as unknown as Record<string, unknown>;
+        case 6: return formToApi.page6(data as Parameters<typeof formToApi.page6>[0]) as unknown as Record<string, unknown>;
+        case 7: return formToApi.page7(data as Parameters<typeof formToApi.page7>[0]) as unknown as Record<string, unknown>;
+        default: return data;
+    }
+}
 
 interface WoDetailsWizardProps {
     mode: "create" | "edit";
@@ -34,254 +66,172 @@ export function WoDetailsWizard({
 }: WoDetailsWizardProps) {
     const navigate = useNavigate();
 
-    // ADD CONSOLE LOGS
-    console.log('🔷 WoDetailsWizard mounted', {
-        mode,
-        woBasicDetailId,
-        existingWoDetailId,
-        initialPage,
-    });
-    // State
     const [woDetailId, setWoDetailId] = useState<number | null>(existingWoDetailId || null);
-    console.log('🔷 woDetailId state:', woDetailId);
-    // Queries
-    const { data: existingDetail, isLoading: isLoadingExisting } = useWoDetailByBasicDetail(
+    const hasAttemptedInit = useRef(false);
+    const { data: existingDetail, isLoading: isLoadingExisting, isFetching: isFetchingExisting } = useWoDetailByBasicDetail(
         woBasicDetailId
     );
-    console.log('🔷 existingDetail:', existingDetail);
-    const { data: wizardProgress } = useWizardProgress(woDetailId);
-    console.log('🔷 wizardProgress:', wizardProgress);
-    const [isLoading, setIsLoading] = useState(false);
+    const { data: basicDetail } = useWoBasicDetailById(woBasicDetailId);
+    const tenderId = basicDetail?.tenderId;
+    const [isSavingDraft, setIsSavingDraft] = useState(false);
 
-    // Mutations
     const initializeWizard = useInitializeWizard();
+    const savePageDraft = useSavePageDraft();
     const submitPage = useSubmitPage();
-    const submitForReview = useSubmitForReview();
-
-    console.log('🔷 Mutations:', {
-        initializeWizard: initializeWizard.isPending,
-        submitPage: submitPage.isPending,
-        submitForReview: submitForReview.isPending,
-    });
+    const skipPage = useSkipPage();
+    const submitAllPages = useSubmitAllPages();
 
     const [wizardState, setWizardState] = useState<WizardState>({
         currentPage: initialPage,
-        completedPages: existingData?.completedPages || [],
-        skippedPages: existingData?.skippedPages || [],
         woDetailId: existingWoDetailId || null,
         woBasicDetailId,
         status: existingData?.status || "draft",
     });
 
-    // Initialize from existing data in edit mode
     useEffect(() => {
-        console.log('🔷 Initialize effect running', {
-            mode,
-            woDetailId,
-            isLoadingExisting,
-            existingDetail,
-        });
-
-        if (mode === 'create' && !woDetailId && !isLoadingExisting) {
+        if (mode === 'create' && !woDetailId && !isLoadingExisting && !isFetchingExisting && !hasAttemptedInit.current) {
+            hasAttemptedInit.current = true;
             if (existingDetail?.id) {
-                console.log('🔷 Using existing detail:', existingDetail.id);
                 setWoDetailId(existingDetail.id);
                 setWizardState((prev) => ({
                     ...prev,
                     woDetailId: existingDetail.id,
                     currentPage: existingDetail.currentPage || 1,
-                    completedPages: existingDetail.completedPages || [],
-                    skippedPages: existingDetail.skippedPages || [],
                     status: existingDetail.status || 'draft',
                 }));
             } else {
-                console.log('🔷 Calling initializeWizard for:', woBasicDetailId);
-
                 initializeWizard.mutate(woBasicDetailId, {
                     onSuccess: (result) => {
-                        console.log('🔷 Initialize success:', result);
                         setWoDetailId(result.id);
                         setWizardState((prev) => ({
                             ...prev,
                             woDetailId: result.id,
                         }));
                     },
-                    onError: (error) => {
-                        console.error('🔴 Initialize error:', error);
+                    onError: () => {
+                        toast.error("Failed to initialize wizard");
                     },
                 });
             }
         }
-    }, [mode, woDetailId, existingDetail, isLoadingExisting, woBasicDetailId]);
+    }, [mode, woDetailId, existingDetail, isLoadingExisting, isFetchingExisting, woBasicDetailId, initializeWizard]);
 
-    const handleSubmitPage = () => {
-        const { currentPage, completedPages } = wizardState;
-
-        // Mark current page as completed
-        const newCompleted = [...completedPages];
-        if (!newCompleted.includes(currentPage)) {
-            newCompleted.push(currentPage);
-        }
-
-        // Remove from skipped if it was skipped before
-        const newSkipped = wizardState.skippedPages.filter((p) => p !== currentPage);
-
-        if (currentPage < 7) {
-            setWizardState({
-                ...wizardState,
-                currentPage: currentPage + 1,
-                completedPages: newCompleted,
-                skippedPages: newSkipped,
-                status: "in_progress",
-            });
-        } else {
-            // Final submission
-            setWizardState({
-                ...wizardState,
-                completedPages: newCompleted,
-                skippedPages: newSkipped,
-                status: "submitted_for_review",
-            });
-            toast.success("WO Details submitted for review!");
-            // Navigate back to list
-            navigate(-1);
+    const handleSaveAndContinue = async (data: Record<string, unknown>) => {
+        if (!woDetailId) return;
+        setIsSavingDraft(true);
+        try {
+            const mappedData = applyMapper(data, wizardState.currentPage);
+            await submitPage.mutateAsync({ woDetailId, pageNum: wizardState.currentPage, data: mappedData });
+            return [];
+        } catch (error: any) {
+            const serverErrors = error?.response?.data?.errors;
+            if (serverErrors?.length) {
+                return serverErrors;
+            }
+            toast.error(error?.response?.data?.message || "Failed to save");
+        } finally {
+            setIsSavingDraft(false);
         }
     };
 
-    const handleSkipPage = () => {
-        const { currentPage, skippedPages } = wizardState;
-
-        // Mark current page as skipped
-        const newSkipped = [...skippedPages];
-        if (!newSkipped.includes(currentPage)) {
-            newSkipped.push(currentPage);
+    const handleSaveDraftOnly = async (data: Record<string, unknown>) => {
+        if (!woDetailId) return;
+        setIsSavingDraft(true);
+        try {
+            const mappedData = applyMapper(data, wizardState.currentPage);
+            await savePageDraft.mutateAsync({ woDetailId, pageNum: wizardState.currentPage, data: mappedData });
+            toast.success("Draft saved");
+            return [];
+        } catch (error: any) {
+            const serverErrors = error?.response?.data?.errors;
+            if (serverErrors?.length) {
+                return serverErrors;
+            }
+            toast.error(error?.response?.data?.message || "Failed to save draft");
+        } finally {
+            setIsSavingDraft(false);
         }
+    };
 
-        if (currentPage < 7) {
-            setWizardState({
-                ...wizardState,
-                currentPage: currentPage + 1,
-                skippedPages: newSkipped,
-                status: "in_progress",
-            });
+    const handleSkipPage = async () => {
+        if (!woDetailId) return;
+        try {
+            await skipPage.mutateAsync({ woDetailId, pageNum: wizardState.currentPage });
+            if (wizardState.currentPage < WIZARD_CONFIG.TOTAL_PAGES) {
+                setWizardState((prev) => ({
+                    ...prev,
+                    currentPage: prev.currentPage + 1,
+                    status: "in_progress",
+                }));
+            }
+        } catch {
+            toast.error("Failed to skip page");
         }
+    };
+
+    const handleSubmitForReview = async () => {
+        if (!woDetailId) return;
+        await submitAllPages.mutateAsync(woDetailId);
+        navigate(-1);
     };
 
     const handleBack = () => {
         if (wizardState.currentPage > 1) {
-            setWizardState({
-                ...wizardState,
-                currentPage: wizardState.currentPage - 1,
-            });
+            setWizardState((prev) => ({
+                ...prev,
+                currentPage: prev.currentPage - 1,
+            }));
         }
     };
 
     const handlePageClick = (pageNum: number) => {
-        setWizardState({
-            ...wizardState,
+        setWizardState((prev) => ({
+            ...prev,
             currentPage: pageNum,
-        });
-    };
-
-    const getPageData = (pageNum: number) => {
-        if (!existingData) return undefined;
-
-        // Return relevant data for each page from existingData
-        switch (pageNum) {
-            case 1:
-                return {
-                    contacts: existingData.contacts,
-                    tenderDocumentsChecklist: existingData.tenderDocumentsChecklist,
-                };
-            case 2:
-                return {
-                    ldApplicable: existingData.ldApplicable,
-                    maxLd: existingData.maxLd,
-                    ldStartDate: existingData.ldStartDate,
-                    maxLdDate: existingData.maxLdDate,
-                    isPbgApplicable: existingData.isPbgApplicable,
-                    filledBgFormat: existingData.filledBgFormat,
-                    pbgBgId: existingData.pbgBgId,
-                    isContractAgreement: existingData.isContractAgreement,
-                    contractAgreementFormat: existingData.contractAgreementFormat,
-                    detailedPoApplicable: existingData.detailedPoApplicable,
-                    detailedPoFollowupId: existingData.detailedPoFollowupId,
-                };
-            case 3:
-                return {
-                    swotStrengths: existingData.swotStrengths,
-                    swotWeaknesses: existingData.swotWeaknesses,
-                    swotOpportunities: existingData.swotOpportunities,
-                    swotThreats: existingData.swotThreats,
-                };
-            case 4:
-                return {
-                    billingBoq: existingData.billingBoq,
-                    buybackBoq: existingData.buybackBoq,
-                    billingAddresses: existingData.billingAddresses,
-                    shippingAddresses: existingData.shippingAddresses,
-                };
-            case 5:
-                return {
-                    siteVisitNeeded: existingData.siteVisitNeeded,
-                    siteVisitPerson: existingData.siteVisitPerson,
-                    documentsFromTendering: existingData.documentsFromTendering,
-                    documentsNeeded: existingData.documentsNeeded,
-                    documentsInHouse: existingData.documentsInHouse,
-                };
-            case 6:
-                return {
-                    costingSheetLink: existingData.costingSheetLink,
-                    hasDiscrepancies: existingData.hasDiscrepancies,
-                    discrepancyComments: existingData.discrepancyComments,
-                    budgetPreGst: existingData.budgetPreGst,
-                    budgetSupply: existingData.budgetSupply,
-                    budgetService: existingData.budgetService,
-                    budgetFreight: existingData.budgetFreight,
-                    budgetAdmin: existingData.budgetAdmin,
-                    budgetBuybackSale: existingData.budgetBuybackSale,
-                };
-            case 7:
-                return {
-                    oeWoAmendmentNeeded: existingData.oeWoAmendmentNeeded,
-                    amendments: existingData.amendments,
-                    oeSignaturePrepared: existingData.oeSignaturePrepared,
-                    courierRequestPrepared: existingData.courierRequestPrepared,
-                };
-            default:
-                return undefined;
-        }
+        }));
     };
 
     const renderCurrentPage = () => {
+        const isReviewPage = wizardState.currentPage === 8;
+
+        if (isReviewPage) {
+            return (
+                <Page8Review
+                    woDetailId={woDetailId}
+                    onSubmit={handleSubmitForReview}
+                    onBack={handleBack}
+                />
+            );
+        }
+
         const commonProps = {
             woDetailId: woDetailId || 0,
             woBasicDetailId,
-            onSubmit: handleSubmitPage,
+            tenderId,
+            onSaveDraft: handleSaveAndContinue,
+            onSaveDraftOnly: handleSaveDraftOnly,
             onSkip: handleSkipPage,
             onBack: handleBack,
             isFirstPage: wizardState.currentPage === 1,
             isLastPage: wizardState.currentPage === 7,
-            isLoading,
+            isSaving: isSavingDraft,
         };
-
-        const pageData = getPageData(wizardState.currentPage);
 
         switch (wizardState.currentPage) {
             case 1:
-                return <Page1Handover {...commonProps} initialData={pageData} />;
+                return <Page1Handover {...commonProps} />;
             case 2:
-                return <Page2Compliance {...commonProps} initialData={pageData} />;
+                return <Page2Compliance {...commonProps} />;
             case 3:
-                return <Page3Swot {...commonProps} initialData={pageData} />;
+                return <Page3Swot {...commonProps} />;
             case 4:
-                return <Page4Billing {...commonProps} initialData={pageData} />;
+                return <Page4Billing {...commonProps} />;
             case 5:
-                return <Page5Execution {...commonProps} initialData={pageData} />;
+                return <Page5Execution {...commonProps} />;
             case 6:
-                return <Page6Profitability {...commonProps} initialData={pageData} />;
+                return <Page6Profitability {...commonProps} />;
             case 7:
-                return <Page7Acceptance {...commonProps} initialData={pageData} />;
+                return <Page7Acceptance {...commonProps} />;
             default:
                 return null;
         }
@@ -289,7 +239,6 @@ export function WoDetailsWizard({
 
     return (
         <div className="space-y-6">
-            {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold">
@@ -305,20 +254,21 @@ export function WoDetailsWizard({
                 </Button>
             </div>
 
-            {/* Stepper */}
             <Card className="px-0 bg-transparent border-none">
                 <CardContent>
                     <WizardStepper
                         currentPage={wizardState.currentPage}
-                        completedPages={wizardState.completedPages}
-                        skippedPages={wizardState.skippedPages}
+                        completedPages={[]}
+                        skippedPages={[]}
                         onPageClick={handlePageClick}
+                        totalPages={WIZARD_CONFIG.TOTAL_PAGES}
                     />
                 </CardContent>
             </Card>
 
-            {/* Current Page Form */}
-            {renderCurrentPage()}
+            <Suspense fallback={<PageSkeleton />}>
+                {renderCurrentPage()}
+            </Suspense>
         </div>
     );
 }

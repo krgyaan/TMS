@@ -56,6 +56,7 @@ export type AddressDto = z.infer<typeof AddressSchema>;
 export const SavePage4Schema = z.object({
   billingBoq: z.array(BOQItemSchema).optional(),
   buybackBoq: z.array(BOQItemSchema).optional(),
+  buybackBoqApplicable: z.boolean().optional(),
   billingAddresses: z.array(AddressSchema).optional(),
   shippingAddresses: z.array(AddressSchema).optional(),
 });
@@ -70,6 +71,7 @@ export const SubmitPage4Schema = z.object({
     .array(BOQItemSchema)
     .min(1, "At least one billing BOQ item is required"),
   buybackBoq: z.array(BOQItemSchema).optional().default([]),
+  buybackBoqApplicable: z.boolean().optional(),
   billingAddresses: z
     .array(AddressSchema)
     .min(1, "At least one billing address is required"),

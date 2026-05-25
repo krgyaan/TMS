@@ -1,5 +1,5 @@
 import { BaseApiService } from './base.service';
-import type { WoBasicDetail, WoBasicDetailWithRelations, CreateWoBasicDetailDto, UpdateWoBasicDetailDto, AssignOeDto, WoBasicDetailsFilters, OeAssignments, DashboardSummary, PaginatedResult } from '@/modules/operations/types/wo.types';
+import type { WoBasicDetail, WoBasicDetailWithRelations, CreateWoBasicDetailDto, UpdateWoBasicDetailDto, AssignOeDto, WoBasicDetailsFilters, OeAssignments, DashboardSummary, PaginatedResult, WoBasicDetailPrefillData } from '@/modules/operations/types/wo.types';
 
 class WoBasicDetailsService extends BaseApiService {
   constructor() {
@@ -88,6 +88,10 @@ class WoBasicDetailsService extends BaseApiService {
 
   async getByEnquiryId(enquiryId: number): Promise<WoBasicDetail[]> {
     return this.get<WoBasicDetail[]>(`/by-enquiry/${enquiryId}`);
+  }
+
+  async getPrefillData(tenderId: number): Promise<WoBasicDetailPrefillData> {
+    return this.get<WoBasicDetailPrefillData>(`/prefill/${tenderId}`);
   }
 
   // Dashboard/Reporting

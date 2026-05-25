@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { Routes, Route } from "react-router-dom";
+import { Route, Routes } from "react-router-dom";
 import { RouteWrapper } from "../components/RouteWrapper";
 
 const Basic_Details = lazy(() => import("@/modules/operations/wo-basic-details/BasicDetailListPage"));
