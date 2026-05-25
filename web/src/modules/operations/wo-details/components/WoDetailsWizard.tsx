@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -67,7 +67,8 @@ export function WoDetailsWizard({
     const navigate = useNavigate();
 
     const [woDetailId, setWoDetailId] = useState<number | null>(existingWoDetailId || null);
-    const { data: existingDetail, isLoading: isLoadingExisting } = useWoDetailByBasicDetail(
+    const hasAttemptedInit = useRef(false);
+    const { data: existingDetail, isLoading: isLoadingExisting, isFetching: isFetchingExisting } = useWoDetailByBasicDetail(
         woBasicDetailId
     );
     const { data: basicDetail } = useWoBasicDetailById(woBasicDetailId);
@@ -87,7 +88,8 @@ export function WoDetailsWizard({
     });
 
     useEffect(() => {
-        if (mode === 'create' && !woDetailId && !isLoadingExisting) {
+        if (mode === 'create' && !woDetailId && !isLoadingExisting && !isFetchingExisting && !hasAttemptedInit.current) {
+            hasAttemptedInit.current = true;
             if (existingDetail?.id) {
                 setWoDetailId(existingDetail.id);
                 setWizardState((prev) => ({
@@ -111,7 +113,7 @@ export function WoDetailsWizard({
                 });
             }
         }
-    }, [mode, woDetailId, existingDetail, isLoadingExisting, woBasicDetailId, initializeWizard]);
+    }, [mode, woDetailId, existingDetail, isLoadingExisting, isFetchingExisting, woBasicDetailId, initializeWizard]);
 
     const handleSaveAndContinue = async (data: Record<string, unknown>) => {
         if (!woDetailId) return;

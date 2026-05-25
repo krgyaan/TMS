@@ -44,6 +44,11 @@ export class WoDetailsController {
     return this.woDetailsService.findAll({ ...parsed, user });
   }
 
+  @Get('tender/:tenderId/consolidated-data')
+  async getTenderConsolidatedData(@Param('tenderId', ParseIntPipe) tenderId: number) {
+    return this.woDetailsService.getTenderConsolidatedData(tenderId);
+  }
+
   @Get('dashboard/summary')
   async getDashboardSummary(
     @CurrentUser() user: ValidatedUser,

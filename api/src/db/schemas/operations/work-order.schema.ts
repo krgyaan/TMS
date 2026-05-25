@@ -1,5 +1,5 @@
 import { bigserial } from "drizzle-orm/pg-core";
-import { text, integer, index, pgTable, bigint, varchar, timestamp, numeric, date, boolean, jsonb } from "drizzle-orm/pg-core";
+import { text, integer, index, uniqueIndex, pgTable, bigint, varchar, timestamp, numeric, date, boolean, jsonb } from "drizzle-orm/pg-core";
 
 // WO Basic Details - Initial project info filled by TE within 12 hours of PO receipt
 export const woBasicDetails = pgTable("wo_basic_details", {
@@ -157,7 +157,7 @@ export const woDetails = pgTable("wo_details", {
     createdBy: bigint("created_by", { mode: "number" }),
     updatedBy: bigint("updated_by", { mode: "number" }),
 }, (table) => [
-    index("idx_wo_details_basic_detail").on(table.woBasicDetailId),
+    uniqueIndex("uq_wo_details_basic_detail").on(table.woBasicDetailId),
     index("idx_wo_details_status").on(table.status),
 ]);
 

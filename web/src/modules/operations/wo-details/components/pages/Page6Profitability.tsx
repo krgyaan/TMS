@@ -15,8 +15,7 @@ import { SelectField } from "@/components/form/SelectField";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { ConditionalSection } from "@/components/form/ConditionalSection";
 import { formToApi } from "@/modules/operations/wo-details/helpers/woDetail.mapper";
-import { useAutoSave } from "@/hooks/api/useWoDetails";
-import { useCostingSheetByTender } from "@/hooks/api/useCostingSheets";
+import { useAutoSave, useTenderConsolidatedData } from "@/hooks/api/useWoDetails";
 
 import type { Page6FormValues, PageFormProps } from "@/modules/operations/wo-details/helpers/woDetail.types";
 
@@ -46,15 +45,15 @@ export function Page6Profitability({
     });
 
     const { autoSave, isSaving: isAutoSaving } = useAutoSave(woDetailId, 6, true, 4000, formToApi.page6);
-    const { data: costingSheet } = useCostingSheetByTender(tenderId ?? 0);
+    const { data: consolidatedData } = useTenderConsolidatedData(tenderId);
 
     const watchHasDiscrepancies = form.watch("hasDiscrepancies");
 
     useEffect(() => {
-        if (costingSheet?.googleSheetUrl) {
-            form.setValue("costingSheetLink", costingSheet.googleSheetUrl);
+        if (consolidatedData?.costingSheetUrl) {
+            form.setValue("costingSheetLink", consolidatedData.costingSheetUrl);
         }
-    }, [costingSheet, form]);
+    }, [consolidatedData, form]);
 
     useEffect(() => {
         const subscription = form.watch((values) => {

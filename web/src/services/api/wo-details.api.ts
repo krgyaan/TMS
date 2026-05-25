@@ -53,6 +53,12 @@ interface AmendmentsSummary {
   byClause: Array<{ clause: string; count: number }>;
 }
 
+interface TenderConsolidatedData {
+  tenderDocuments: string[];
+  costingSheetUrl: string | null;
+  rfqResponseDocuments: { path: string }[];
+}
+
 interface PendingQueriesResponse {
   count: number;
   data: Array<{
@@ -160,6 +166,10 @@ class WoDetailsService extends BaseApiService {
 
   async getCostingSheetData(woBasicDetailId: number): Promise<CostingSheetData> {
     return this.get<CostingSheetData>(`/costing-sheet/${woBasicDetailId}`);
+  }
+
+  async getTenderConsolidatedData(tenderId: number): Promise<TenderConsolidatedData> {
+    return this.get<TenderConsolidatedData>(`/tender/${tenderId}/consolidated-data`);
   }
 
   // CRUD OPERATIONS

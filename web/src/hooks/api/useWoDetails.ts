@@ -33,6 +33,9 @@ export const woDetailsKeys = {
   pendingQueries: () => [...woDetailsKeys.all, 'pending-queries'] as const,
   amendmentsSummary: () => [...woDetailsKeys.all, 'amendments-summary'] as const,
   slaCompliance: () => [...woDetailsKeys.all, 'sla-compliance'] as const,
+
+  // Consolidated data
+  tenderConsolidatedData: (tenderId: number) => [...woDetailsKeys.all, 'tender-consolidated', tenderId] as const,
 };
 
 // WIZARD QUERY HOOKS (ESSENTIAL - USED BY FORMS)
@@ -42,6 +45,7 @@ export const useWoDetailByBasicDetail = (woBasicDetailId: number) => {
     queryKey: woDetailsKeys.byBasicDetail(woBasicDetailId),
     queryFn: () => woDetailsService.getByWoBasicDetailId(woBasicDetailId),
     enabled: !!woBasicDetailId && woBasicDetailId > 0,
+    staleTime: 30 * 1000,
   });
 };
 
@@ -115,6 +119,14 @@ export const useInitializeWizard = () => {
     onError: (error: any) => {
       toast.error(handleQueryError(error));
     },
+  });
+};
+
+export const useTenderConsolidatedData = (tenderId: number | null) => {
+  return useQuery({
+    queryKey: woDetailsKeys.tenderConsolidatedData(tenderId ?? 0),
+    queryFn: () => woDetailsService.getTenderConsolidatedData(tenderId!),
+    enabled: !!tenderId,
   });
 };
 

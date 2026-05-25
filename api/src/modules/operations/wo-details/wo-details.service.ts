@@ -2,6 +2,7 @@ import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
 import { woAcceptance, woAmendments, woBasicDetails, woBillingAddresses, woBillingBoq, woBuybackBoq, woContacts, woDetails, woDocuments, woKickoffMeetings, woQueries, woShippingAddresses } from '@db/schemas/operations';
+import { rfqs, rfqResponseDocuments, rfqResponses, tenderCostingSheets, tenderInfos } from '@db/schemas/tendering';
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, desc, eq, ilike, isNull, ne, or, sql } from 'drizzle-orm';
 import type { Page1ContactDto, SavePage1Dto, SubmitPage1Dto } from './dto/page1-handover.dto';
@@ -1613,6 +1614,58 @@ export class WoDetailsService {
       'kick-off': kickoff.length > 0,
       'contract-agreement': false, // will be enhanced
       'po-dashboard': false, // will be enhanced
+    };
+  }
+
+  // CONSOLIDATED DATA
+  async getTenderConsolidatedData(tenderId: number) {
+    const { rows } = await this.db.execute(sql`
+      SELECT
+        ti.documents,
+        (SELECT tcs.google_sheet_url
+         FROM ${tenderCostingSheets} tcs
+         WHERE tcs.tender_id = ti.id
+         LIMIT 1) AS costing_sheet_url,
+        (SELECT COALESCE(json_agg(json_build_object('path', rrd.path)), '[]'::json)
+         FROM ${rfqs} r
+         JOIN ${rfqResponses} rr ON rr.rfq_id = r.id
+         JOIN ${rfqResponseDocuments} rrd ON rrd.rfq_response_id = rr.id
+         WHERE r.tender_id = ti.id) AS rfq_response_documents
+      FROM ${tenderInfos} ti
+      WHERE ti.id = ${tenderId}
+    `);
+
+    const row = rows?.[0];
+    if (!row) {
+      throw new NotFoundException(`Tender with ID ${tenderId} not found`);
+    }
+
+    let tenderDocuments: string[] = [];
+    if (row.documents) {
+      try {
+        const parsed = JSON.parse(row.documents as string);
+        tenderDocuments = Array.isArray(parsed) ? parsed.filter(Boolean).map(String) : [];
+      } catch {
+        tenderDocuments = [];
+      }
+    }
+
+    let rfqDocs: { path: string }[] = [];
+    if (row.rfq_response_documents) {
+      try {
+        const raw = typeof row.rfq_response_documents === 'string'
+          ? JSON.parse(row.rfq_response_documents as string)
+          : row.rfq_response_documents;
+        rfqDocs = Array.isArray(raw) ? raw : [];
+      } catch {
+        rfqDocs = [];
+      }
+    }
+
+    return {
+      tenderDocuments,
+      costingSheetUrl: (row.costing_sheet_url as string) ?? null,
+      rfqResponseDocuments: rfqDocs,
     };
   }
 
