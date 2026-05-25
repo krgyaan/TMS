@@ -395,7 +395,7 @@ export class TenderApprovalService {
             })
             .from(tenderInfos)
             .leftJoin(statuses, eq(tenderInfos.status, statuses.id))
-            .leftJoin(vendorOrganizations, sql`${tenderInfos.oemNotAllowed} = ${vendorOrganizations.id}::varchar`)
+            //.leftJoin(vendorOrganizations, sql`${tenderInfos.oemNotAllowed} = ${vendorOrganizations.id}::varchar`)
             .leftJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
             .where(eq(tenderInfos.id, tenderId))
             .limit(1);
