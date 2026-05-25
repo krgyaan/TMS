@@ -161,13 +161,19 @@ export class ReverseAuctionService {
             // Exclude records that have schedule times (they belong in scheduled tab)
             conditions.push(
                 or(
-                    isNull(reverseAuctions.id),
+                    or(
+                        isNull(reverseAuctions.id),
+                        and(
+                            isNull(reverseAuctions.raResult),
+                            isNull(reverseAuctions.raStartTime),
+                            isNull(reverseAuctions.raEndTime)
+                        ) as any
+                    ) as any,
                     and(
-                        isNull(reverseAuctions.raResult),
-                        isNull(reverseAuctions.raStartTime),
-                        isNull(reverseAuctions.raEndTime)
-                    )!
-                )!
+                        isNotNull(tenderResults.id),
+                        eq(tenderResults.raStatus, 'pending')
+                    ) as any
+                ) as any
             );
             conditions.push(
                 eq(bidSubmissions.status, 'Bid Submitted'),
@@ -280,6 +286,7 @@ export class ReverseAuctionService {
                 tenderInformation,
                 eq(tenderInformation.tenderId, tenderInfos.id)
             )
+            .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
             .leftJoin(reverseAuctions, eq(reverseAuctions.tenderId, tenderInfos.id))
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status));
@@ -325,6 +332,7 @@ export class ReverseAuctionService {
                 eq(tenderInformation.tenderId, tenderInfos.id)
             )
             .leftJoin(reverseAuctions, eq(reverseAuctions.tenderId, tenderInfos.id))
+            .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status));
 
@@ -368,13 +376,19 @@ export class ReverseAuctionService {
             ...baseConditions,
             eq(bidSubmissions.status, 'Bid Submitted'),
             or(
-                isNull(reverseAuctions.id),
+                or(
+                    isNull(reverseAuctions.id),
+                    and(
+                        isNull(reverseAuctions.raResult),
+                        isNull(reverseAuctions.raStartTime),
+                        isNull(reverseAuctions.raEndTime)
+                    ) as any
+                ) as any,
                 and(
-                    isNull(reverseAuctions.raResult),
-                    isNull(reverseAuctions.raStartTime),
-                    isNull(reverseAuctions.raEndTime)
-                )!
-            )!,
+                    isNotNull(tenderResults.id),
+                    eq(tenderResults.raStatus, 'pending')
+                ) as any
+            ) as any,
             TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
         ];
 
@@ -409,6 +423,7 @@ export class ReverseAuctionService {
                 .innerJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
                 .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
                 .leftJoin(reverseAuctions, eq(reverseAuctions.tenderId, tenderInfos.id))
+                .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
                 .leftJoin(items, eq(items.id, tenderInfos.item))
                 .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
                 .where(and(...underEvaluationConditions))
@@ -421,6 +436,7 @@ export class ReverseAuctionService {
                 .innerJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
                 .innerJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
                 .leftJoin(reverseAuctions, eq(reverseAuctions.tenderId, tenderInfos.id))
+                .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
                 .leftJoin(items, eq(items.id, tenderInfos.item))
                 .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
                 .where(and(...scheduledConditions))
@@ -433,6 +449,7 @@ export class ReverseAuctionService {
                 .innerJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
                 .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
                 .leftJoin(reverseAuctions, eq(reverseAuctions.tenderId, tenderInfos.id))
+                .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
                 .leftJoin(items, eq(items.id, tenderInfos.item))
                 .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
                 .where(and(...completedConditions))
@@ -730,6 +747,9 @@ export class ReverseAuctionService {
             updateData.status = RA_STATUS.DISQUALIFIED;
             updateData.disqualificationReason = dto.disqualificationReason;
             raStatus = "Disqualified, RA Not Scheduled";
+            // AUTO STATUS CHANGE: Update tender status to 22 (Disqualified)
+            newStatus = 22; // Status ID for "Disqualified (reason)"
+            statusComment = 'Disqualified';
         } else {
             // Qualified - schedule RA
             updateData.status = RA_STATUS.RA_SCHEDULED;
@@ -742,7 +762,7 @@ export class ReverseAuctionService {
             // AUTO STATUS CHANGE: Update tender status to 23 (RA scheduled)
             newStatus = 23; // Status ID for "RA scheduled"
             statusComment = 'RA Scheduled';
-            // raStatus = 'Qualified, RA Scheduled'; -> will think about this later ->  for now we will keep things simple and use 'pending'
+            // raStatus = 'Qualified, RA Scheduled'; 
         }
 
         const result = await this.db.transaction(async (tx) => {
@@ -762,7 +782,7 @@ export class ReverseAuctionService {
 
             // Sync to tender_results
             // already getting synced
-            await this.syncToTenderResult(tenderId, inserted?.id ?? 0, inserted.status, tx, raStatus);
+            await this.syncToTenderResult(tenderId, inserted?.id ?? 0, inserted.status, tx, raStatus, newStatus);
 
             // Update tender status if RA was scheduled
             if (newStatus !== null) {
@@ -821,7 +841,7 @@ export class ReverseAuctionService {
         let raStatus;
 
         let status: string;
-        let newTenderStatus: number | null = null;
+        let newTenderStatus: number;
         let statusComment: string = '';
 
         switch (dto.raResult) {
@@ -871,7 +891,7 @@ export class ReverseAuctionService {
                 .returning();
 
             // Sync to tender_results
-            await this.syncToTenderResult(existing.tenderId, raId, status, tx, raStatus);
+            await this.syncToTenderResult(existing.tenderId, raId, status, tx, raStatus, newTenderStatus);
 
             // Update tender status if H1 Elimination
             if (newTenderStatus !== null) {
@@ -894,34 +914,34 @@ export class ReverseAuctionService {
             return updated;
         });
 
-        // // Send email notification
-        // if (dto.raResult === 'Won' || dto.raResult === 'Lost') {
-        //     const mappedDto: UploadResultDto = {
-        //         technicallyQualified: 'Yes',
-        //         disqualificationReason: null,
-        //         qualifiedPartiesCount: existing.qualifiedPartiesCount ?? null,
-        //         qualifiedPartiesNames: existing.qualifiedPartiesNames ?? [],
-        //         result: dto.raResult as 'Won' | 'Lost',
-        //         resultReason: dto.resultReason ?? null,
-        //         l1Price: dto.raClosePrice ?? null,
-        //         l2Price: dto.raClosePriceL2 ?? null,
-        //         ourPrice: dto.raOurPrice ?? null,
-        //         qualifiedPartiesScreenshot: dto.screenshotQualifiedParties ?? null,
-        //         finalResultScreenshot: dto.finalResultScreenshot ?? null,
-        //     };
+        // Send email notification
+        if (dto.raResult === 'Won' || dto.raResult === 'Lost') {
+            const mappedDto: UploadResultDto = {
+                technicallyQualified: 'Yes',
+                disqualificationReason: null,
+                qualifiedPartiesCount: existing.qualifiedPartiesCount ?? null,
+                qualifiedPartiesNames: existing.qualifiedPartiesNames ?? [],
+                result: dto.raResult as 'Won' | 'Lost',
+                resultReason: dto.resultReason ?? null,
+                l1Price: dto.raClosePrice ?? null,
+                l2Price: dto.raClosePriceL2 ?? null,
+                ourPrice: dto.raOurPrice ?? null,
+                qualifiedPartiesScreenshot: dto.screenshotQualifiedParties ?? null,
+                finalResultScreenshot: dto.finalResultScreenshot ?? null,
+            };
 
-        //     await this.tenderResultService.sendTenderResultEmail(
-        //         existing.tenderId,
-        //         {
-        //             qualifiedPartiesScreenshot: dto.screenshotQualifiedParties ?? null,
-        //             finalResultScreenshot: dto.finalResultScreenshot ?? null,
-        //         },
-        //         changedBy,
-        //         mappedDto
-        //     );
-        // } else {
-        //     await this.sendRaResultEmail(existing.tenderId, result, changedBy, dto);
-        // }
+            await this.tenderResultService.sendTenderResultEmail(
+                existing.tenderId,
+                {
+                    qualifiedPartiesScreenshot: dto.screenshotQualifiedParties ?? null,
+                    finalResultScreenshot: dto.finalResultScreenshot ?? null,
+                },
+                changedBy,
+                mappedDto
+            );
+        } else {
+            await this.sendRaResultEmail(existing.tenderId, result, changedBy, dto);
+        }
 
         return result;
     }
@@ -979,7 +999,7 @@ export class ReverseAuctionService {
         return updated.length;
     }
 
-    private async syncToTenderResult(tenderId: number, raId: number, status: string, dbClient: any = this.db, raStatus?: string) {
+    private async syncToTenderResult(tenderId: number, raId: number, status: string, dbClient: any = this.db, raStatus?: string, newStatus?: number) {
         // Fetch RA Record to sync fields
         const [raRecord] = await dbClient
             .select()
@@ -1020,6 +1040,7 @@ export class ReverseAuctionService {
             updatePayload.technicallyQualified = raRecord.technicallyQualified;
             updatePayload.disqualificationReason = raRecord.disqualificationReason;
             updatePayload.raStatus= raStatus ? raStatus : 'pending';
+            updatePayload.status = newStatus;
         }
 
         // Check if tender_result exists
