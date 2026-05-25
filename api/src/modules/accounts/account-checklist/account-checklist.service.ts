@@ -1110,6 +1110,17 @@ export class AccountChecklistService {
                     `[MAIL-WORKER] Looking up Google connection for responsible user id=${responsibleId}`
                 );
                 let googleConnection = await this.googleService.getSanitizedGoogleConnection(responsibleId);
+                
+                // fixing the issue of email coming from non-ve email ids, we give them fallback by default
+                if (googleConnection) {
+                    const email = googleConnection.providerEmail || "";
+                    if (!email.endsWith('@volksenergie.in')) {
+                        this.logger.warn(
+                            `[MAIL-WORKER] Google connection email '${email}' for id=${responsibleId} is not @volksenergie.in — attempting fallback`
+                        );
+                        googleConnection = null;
+                    }
+                }
 
                 if (!googleConnection) {
                     this.logger.warn(
