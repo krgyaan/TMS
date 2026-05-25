@@ -221,7 +221,7 @@ export class WoDetailsService {
             ne(woAcceptance.decision, 'accepted'),
           ),
           and(
-            eq(woDetails.oeWoAmendmentNeeded, false),
+            or(isNull(woDetails.oeWoAmendmentNeeded), eq(woDetails.oeWoAmendmentNeeded, false)),
             or(
               isNull(woAcceptance.id),
               and(
