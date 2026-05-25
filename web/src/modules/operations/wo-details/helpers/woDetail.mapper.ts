@@ -70,6 +70,7 @@ export const formToApi = {
 
   page4(form: Page4FormValues) {
     return {
+      buybackBoqApplicable: stringToBool(form.buybackBoqApplicable),
       billingBoq: form.billingBoq?.map((item) => ({
         id: item.id,
         srNo: item.srNo,
@@ -182,6 +183,7 @@ export const apiToForm = {
 
   page4(api: ApiResponse): Partial<Page4FormValues> {
     return {
+      buybackBoqApplicable: boolToString(api.buybackBoqApplicable as boolean | undefined | null) ?? "false",
       billingBoq: (api.billingBoq as Page4FormValues["billingBoq"]) ?? undefined,
       buybackBoq: (api.buybackBoq as Page4FormValues["buybackBoq"]) ?? undefined,
       billingAddresses: (api.billingAddresses as Page4FormValues["billingAddresses"]) ?? undefined,

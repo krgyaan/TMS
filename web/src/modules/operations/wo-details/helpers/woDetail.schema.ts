@@ -75,6 +75,7 @@ export const AddressSchema = z.object({
 export const Page4FormSchema = z.object({
   billingBoq: z.array(BOQItemSchema).optional().default([]),
   buybackBoq: z.array(BOQItemSchema).optional().default([]),
+  buybackBoqApplicable: z.string().optional(),
   billingAddresses: z.array(AddressSchema).optional().default([]),
   shippingAddresses: z.array(AddressSchema).optional().default([]),
 });

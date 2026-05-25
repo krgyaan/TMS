@@ -11,6 +11,7 @@ import { formToApi } from "../helpers/woDetail.mapper";
 
 import type { WizardState, WoDetailData } from "../helpers/woDetail.types";
 import { useInitializeWizard, useWoDetailByBasicDetail, useSavePageDraft, useSkipPage, useSubmitAllPages } from "@/hooks/api/useWoDetails";
+import { useWoBasicDetailById } from "@/hooks/api/useWoBasicDetails";
 
 const Page1Handover = lazy(() => import("./pages/Page1Handover").then((m) => ({ default: m.Page1Handover })));
 const Page2Compliance = lazy(() => import("./pages/Page2Compliance").then((m) => ({ default: m.Page2Compliance })));
@@ -69,6 +70,8 @@ export function WoDetailsWizard({
     const { data: existingDetail, isLoading: isLoadingExisting } = useWoDetailByBasicDetail(
         woBasicDetailId
     );
+    const { data: basicDetail } = useWoBasicDetailById(woBasicDetailId);
+    const tenderId = basicDetail?.tenderId;
     const [isSavingDraft, setIsSavingDraft] = useState(false);
 
     const initializeWizard = useInitializeWizard();
@@ -208,6 +211,7 @@ export function WoDetailsWizard({
         const commonProps = {
             woDetailId: woDetailId || 0,
             woBasicDetailId,
+            tenderId,
             onSaveDraft: handleSaveAndContinue,
             onSaveDraftOnly: handleSaveDraftOnly,
             onSkip: handleSkipPage,

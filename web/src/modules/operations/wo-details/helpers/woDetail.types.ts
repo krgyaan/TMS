@@ -85,6 +85,7 @@ export interface ServerFieldError {
 export interface PageFormProps {
   woDetailId: number | null;
   woBasicDetailId: number;
+  tenderId?: number | null;
   onSaveDraft: (data: Record<string, unknown>) => Promise<ServerFieldError[] | void>;
   onSaveDraftOnly: (data: Record<string, unknown>) => Promise<ServerFieldError[] | void>;
   onSkip: () => Promise<void>;
@@ -131,6 +132,7 @@ export interface Page3Data {
 export interface Page4Data {
   billingBoq: BOQItem[];
   buybackBoq: BOQItem[];
+  buybackBoqApplicable: string;
   billingAddresses: Address[];
   shippingAddresses: Address[];
 }
@@ -196,6 +198,7 @@ export interface WoDetailData {
   swotOpportunities: string | null;
   swotThreats: string | null;
 
+  buybackBoqApplicable: string;
   billingBoq?: BOQItem[];
   buybackBoq?: BOQItem[];
   billingAddresses?: Address[];

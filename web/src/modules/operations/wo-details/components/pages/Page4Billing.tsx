@@ -12,9 +12,10 @@ import { useCallback, useEffect, useMemo } from "react";
 import { useFieldArray, useForm, type Resolver } from "react-hook-form";
 
 import { FieldWrapper } from "@/components/form/FieldWrapper";
+import { SelectField } from "@/components/form/SelectField";
 import { useAutoSave } from "@/hooks/api/useWoDetails";
 import { WizardNavigation } from "@/modules/operations/wo-details/components/WizardNavigation";
-import { WIZARD_CONFIG } from "@/modules/operations/wo-details/helpers/constants";
+import { WIZARD_CONFIG, YES_NO_OPTIONS } from "@/modules/operations/wo-details/helpers/constants";
 import { Page4FormSchema } from "@/modules/operations/wo-details/helpers/woDetail.schema";
 
 import type { Address, BOQItem, Page4FormValues, PageFormProps } from "@/modules/operations/wo-details/helpers/woDetail.types";
@@ -55,6 +56,7 @@ export function Page4Billing({
     const form = useForm<Page4FormValues>({
         resolver: zodResolver(Page4FormSchema) as Resolver<Page4FormValues>,
         defaultValues: {
+            buybackBoqApplicable: initialData?.buybackBoqApplicable ?? "false",
             billingBoq: initialData?.billingBoq?.length ? initialData.billingBoq : [defaultBoqItem],
             buybackBoq: initialData?.buybackBoq || [],
             billingAddresses: initialData?.billingAddresses?.length ? initialData.billingAddresses : [defaultAddress],
@@ -90,6 +92,7 @@ export function Page4Billing({
 
     const watchBillingBoq = form.watch("billingBoq");
     const watchBuybackBoq = form.watch("buybackBoq");
+    const watchBuybackBoqApplicable = form.watch("buybackBoqApplicable");
 
     const billingTotal = useMemo(() => {
         return watchBillingBoq.reduce((sum, item) => sum + calculateAmount(item.quantity, item.rate), 0);
@@ -109,6 +112,7 @@ export function Page4Billing({
     useEffect(() => {
         if (initialData) {
             form.reset({
+                buybackBoqApplicable: initialData.buybackBoqApplicable ?? "false",
                 billingBoq: initialData.billingBoq?.length ? initialData.billingBoq : [defaultBoqItem],
                 buybackBoq: initialData.buybackBoq || [],
                 billingAddresses: initialData.billingAddresses?.length ? initialData.billingAddresses : [defaultAddress],
@@ -387,15 +391,37 @@ export function Page4Billing({
 
                         <Separator />
 
-                        {renderBoqTable(
-                            buybackBoqFields,
-                            "buybackBoq",
-                            removeBuybackBoq,
-                            () => appendBuybackBoq({ ...defaultBoqItem, srNo: buybackBoqFields.length + 1 }),
-                            buybackTotal,
-                            "Buyback BOQ (Optional)",
-                            0
-                        )}
+                        <div>
+                            <h3 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                                <Package className="h-4 w-4 text-muted-foreground" />
+                                Buyback BOQ
+                            </h3>
+                            <div className="max-w-xs mb-4">
+                                <SelectField
+                                    control={form.control}
+                                    name="buybackBoqApplicable"
+                                    label="Buyback BOQ Applicable?"
+                                    options={YES_NO_OPTIONS}
+                                    placeholder="Select"
+                                />
+                            </div>
+
+                            {watchBuybackBoqApplicable === "true" ? (
+                                renderBoqTable(
+                                    buybackBoqFields,
+                                    "buybackBoq",
+                                    removeBuybackBoq,
+                                    () => appendBuybackBoq({ ...defaultBoqItem, srNo: buybackBoqFields.length + 1 }),
+                                    buybackTotal,
+                                    "Buyback BOQ Items",
+                                    0
+                                )
+                            ) : (
+                                <p className="text-sm text-muted-foreground italic">
+                                    Buyback BOQ is not applicable for this work order.
+                                </p>
+                            )}
+                        </div>
 
                         <Separator />
 

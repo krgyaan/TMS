@@ -3,10 +3,10 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Link2, AlertCircle, Info } from "lucide-react";
+import { ExternalLink, Link2, AlertCircle, Info } from "lucide-react";
 
 import { Page6FormSchema } from "@/modules/operations/wo-details/helpers/woDetail.schema";
 import { WizardNavigation } from "@/modules/operations/wo-details/components/WizardNavigation";
@@ -16,6 +16,7 @@ import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { ConditionalSection } from "@/components/form/ConditionalSection";
 import { formToApi } from "@/modules/operations/wo-details/helpers/woDetail.mapper";
 import { useAutoSave } from "@/hooks/api/useWoDetails";
+import { useCostingSheetByTender } from "@/hooks/api/useCostingSheets";
 
 import type { Page6FormValues, PageFormProps } from "@/modules/operations/wo-details/helpers/woDetail.types";
 
@@ -31,6 +32,7 @@ const defaultValues: Page6FormValues = {
 
 export function Page6Profitability({
     woDetailId,
+    tenderId,
     initialData,
     onSaveDraft,
     onSaveDraftOnly,
@@ -44,8 +46,15 @@ export function Page6Profitability({
     });
 
     const { autoSave, isSaving: isAutoSaving } = useAutoSave(woDetailId, 6, true, 4000, formToApi.page6);
+    const { data: costingSheet } = useCostingSheetByTender(tenderId ?? 0);
 
     const watchHasDiscrepancies = form.watch("hasDiscrepancies");
+
+    useEffect(() => {
+        if (costingSheet?.googleSheetUrl) {
+            form.setValue("costingSheetLink", costingSheet.googleSheetUrl);
+        }
+    }, [costingSheet, form]);
 
     useEffect(() => {
         const subscription = form.watch((values) => {
@@ -96,9 +105,25 @@ export function Page6Profitability({
                             </h3>
                             <p className="text-xs text-muted-foreground mb-4">Reference the original costing sheet for this project.</p>
                             <div className="max-w-md">
-                                <FieldWrapper control={form.control} name="costingSheetLink" label="Costing Sheet URL">
-                                    {(field) => <Input {...field} type="url" placeholder="https://docs.google.com/spreadsheets/..." />}
-                                </FieldWrapper>
+                                <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                                    Costing Sheet URL
+                                </label>
+                                {form.watch("costingSheetLink") ? (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="gap-2"
+                                        onClick={() => window.open(form.watch("costingSheetLink"), "_blank")}
+                                        type="button"
+                                    >
+                                        <ExternalLink className="h-4 w-4" />
+                                        Open Costing Sheet
+                                    </Button>
+                                ) : (
+                                    <p className="text-sm text-muted-foreground italic">
+                                        No costing sheet available for this tender.
+                                    </p>
+                                )}
                             </div>
                         </div>
 

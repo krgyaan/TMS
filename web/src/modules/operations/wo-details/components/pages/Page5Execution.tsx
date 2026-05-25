@@ -1,10 +1,11 @@
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { FileText, MapPinned, Plus, Trash2, User } from "lucide-react";
+import { ExternalLink, FileText, FolderOpen, MapPinned, Plus, Trash2, User } from "lucide-react";
 import { useCallback, useEffect } from "react";
 import { useFieldArray, useForm, type Resolver } from "react-hook-form";
 
@@ -12,6 +13,9 @@ import { ConditionalSection } from "@/components/form/ConditionalSection";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { useAutoSave } from "@/hooks/api/useWoDetails";
+import { useInfoSheet } from "@/hooks/api/useInfoSheets";
+import { useRfqByTenderId } from "@/hooks/api/useRfqs";
+import { tenderFilesService } from "@/services/api/tender-files.service";
 import { WizardNavigation } from "@/modules/operations/wo-details/components/WizardNavigation";
 import { WIZARD_CONFIG, YES_NO_OPTIONS } from "@/modules/operations/wo-details/helpers/constants";
 import { formToApi } from "@/modules/operations/wo-details/helpers/woDetail.mapper";
@@ -33,6 +37,7 @@ const defaultValues: Page5FormValues = {
 
 export function Page5Execution({
     woDetailId,
+    tenderId,
     initialData,
     onSaveDraft,
     onSaveDraftOnly,
@@ -44,6 +49,16 @@ export function Page5Execution({
         resolver: zodResolver(Page5FormSchema) as Resolver<Page5FormValues>,
         defaultValues: { ...defaultValues, ...initialData },
     });
+
+    const { data: infoSheet } = useInfoSheet(tenderId ?? 0);
+    const { data: rfqData } = useRfqByTenderId(tenderId ?? 0);
+
+    const tenderFormDocs = infoSheet?.technicalWorkOrders?.flatMap((two) => two.poDocument ?? []) ?? [];
+    const tenderCommercialDocs = infoSheet?.commercialDocuments?.flatMap((cd) => cd.documentPath ?? []) ?? [];
+
+    const rfqResponseDocs = Array.isArray(rfqData)
+        ? rfqData.flatMap((rfq) => rfq.documents?.map((d) => d.path) ?? [])
+        : [];
 
     const {
         fields: docsFromTenderingFields,
@@ -210,6 +225,76 @@ export function Page5Execution({
                                 Documentation & OEM Approvals
                             </h3>
                             <p className="text-xs text-muted-foreground mb-4">Identify documents that need to be collected or prepared.</p>
+
+                            {(tenderFormDocs.length > 0 || tenderCommercialDocs.length > 0 || rfqResponseDocs.length > 0) && (
+                                <div className="mb-6 p-4 border border-dashed rounded-lg space-y-4 bg-muted/20">
+                                    <h4 className="text-sm font-semibold flex items-center gap-2">
+                                        <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                                        Documents from Tendering (Read-only)
+                                    </h4>
+                                    {tenderFormDocs.length > 0 && (
+                                        <div>
+                                            <p className="text-xs font-medium text-muted-foreground mb-2">Tender Form Documents</p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {tenderFormDocs.map((doc, idx) => (
+                                                    <Badge key={`tf-${idx}`} variant="outline" className="gap-1">
+                                                        <FileText className="h-3 w-3" />
+                                                        <button
+                                                            type="button"
+                                                            className="hover:underline"
+                                                            onClick={() => window.open(tenderFilesService.getFileUrl(doc), "_blank")}
+                                                        >
+                                                            {doc.split("/").pop() || doc}
+                                                        </button>
+                                                        <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {tenderCommercialDocs.length > 0 && (
+                                        <div>
+                                            <p className="text-xs font-medium text-muted-foreground mb-2">Commercial Documents</p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {tenderCommercialDocs.map((doc, idx) => (
+                                                    <Badge key={`cd-${idx}`} variant="outline" className="gap-1">
+                                                        <FileText className="h-3 w-3" />
+                                                        <button
+                                                            type="button"
+                                                            className="hover:underline"
+                                                            onClick={() => window.open(tenderFilesService.getFileUrl(doc), "_blank")}
+                                                        >
+                                                            {doc.split("/").pop() || doc}
+                                                        </button>
+                                                        <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {rfqResponseDocs.length > 0 && (
+                                        <div>
+                                            <p className="text-xs font-medium text-muted-foreground mb-2">RFQ Response Documents</p>
+                                            <div className="flex flex-wrap gap-2">
+                                                {rfqResponseDocs.map((doc, idx) => (
+                                                    <Badge key={`rfq-${idx}`} variant="outline" className="gap-1">
+                                                        <FileText className="h-3 w-3" />
+                                                        <button
+                                                            type="button"
+                                                            className="hover:underline"
+                                                            onClick={() => window.open(tenderFilesService.getFileUrl(doc), "_blank")}
+                                                        >
+                                                            {doc.split("/").pop() || doc}
+                                                        </button>
+                                                        <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
                             <div className="grid gap-6 md:grid-cols-3">
                                 <DocumentList
                                     title="Available from Tendering"

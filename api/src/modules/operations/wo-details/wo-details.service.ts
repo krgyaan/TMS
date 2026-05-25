@@ -80,6 +80,9 @@ export class WoDetailsService {
       swotThreats: row.swotThreats,
       swotCompletedAt: row.swotCompletedAt?.toISOString() ?? null,
 
+      // Page 4
+      buybackBoqApplicable: row.buybackBoqApplicable ?? false,
+
       // Page 5
       siteVisitNeeded: row.siteVisitNeeded ?? false,
       siteVisitPerson: row.siteVisitPerson,
@@ -519,6 +522,8 @@ export class WoDetailsService {
       updateValues.detailedPoApplicable = data.detailedPoApplicable;
     if (data.detailedPoFollowupId !== undefined)
       updateValues.detailedPoFollowupId = data.detailedPoFollowupId;
+    if (data.buybackBoqApplicable !== undefined)
+      updateValues.buybackBoqApplicable = data.buybackBoqApplicable;
     if (data.swotStrengths !== undefined)
       updateValues.swotStrengths = data.swotStrengths;
     if (data.swotWeaknesses !== undefined)
@@ -1156,6 +1161,7 @@ export class WoDetailsService {
         const billingTotal = this.calculateTotal(detail.billingBoq);
         const buybackTotal = this.calculateTotal(detail.buybackBoq);
         return {
+          buybackBoqApplicable: detail.buybackBoqApplicable,
           billingBoq: detail.billingBoq.map((item) => ({
             id: item.id,
             srNo: item.srNo,
@@ -1312,6 +1318,8 @@ export class WoDetailsService {
         break;
 
       case 4:
+        if (data.buybackBoqApplicable !== undefined)
+          updateValues.buybackBoqApplicable = data.buybackBoqApplicable;
         // BOQ and Addresses are handled separately in savePageRelatedData
         break;
 

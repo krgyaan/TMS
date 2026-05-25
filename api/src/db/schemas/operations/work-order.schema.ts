@@ -111,6 +111,7 @@ export const woDetails = pgTable("wo_details", {
     swotCompletedAt: timestamp("swot_completed_at", { withTimezone: true }),
 
     // PAGE 4: Billing - BOQ in separate tables
+    buybackBoqApplicable: boolean("buyback_boq_applicable").default(false),
 
     // PAGE 5: Project Execution
     siteVisitNeeded: boolean("site_visit_needed").default(false),
