@@ -75,7 +75,7 @@ export interface WizardState {
   status: WizardStatus;
 }
 
-export type WizardStatus = "draft" | "in_progress" | "completed" | "submitted_for_review";
+export type WizardStatus = "draft" | "in_progress" | "wo_details_filled";
 
 export interface ServerFieldError {
   field: string;

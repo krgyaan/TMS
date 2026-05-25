@@ -174,10 +174,10 @@ export class WoDetailsService {
     const sortBy = filters?.sortBy ?? 'createdAt';
     const search = filters?.search?.trim();
 
-    const orderFn = sortOrder === 'desc' ? desc : asc;
-    const conditions: any[] = [
-        eq(woDetails.status, 'completed')
-    ];
+  const orderFn = sortOrder === 'desc' ? desc : asc;
+  const conditions: any[] = [
+    eq(woDetails.status, 'wo_details_filled')
+  ];
 
     if (filters?.user) {
       conditions.push(
@@ -1024,11 +1024,11 @@ export class WoDetailsService {
     }
 
     const now = new Date();
-
+    
     const [row] = await this.db
       .update(woDetails)
       .set({
-        status: 'submitted_for_review',
+        status: 'wo_details_filled',
         completedAt: now,
         updatedAt: now,
         updatedBy: userId ?? null,
@@ -1068,7 +1068,7 @@ export class WoDetailsService {
     const [row] = await this.db
       .update(woDetails)
       .set({
-        status: 'submitted_for_review',
+        status: 'wo_details_filled',
         currentPage: 7,
         completedPages: allPages,
         skippedPages: [],
@@ -1571,11 +1571,11 @@ export class WoDetailsService {
 
   // STEP STATUSES
   async getStepStatuses(woDetailId: number) {
-    const [detail] = await this.db
-      .select({ id: woDetails.id, woBasicDetailId: woDetails.woBasicDetailId })
-      .from(woDetails)
-      .where(eq(woDetails.id, woDetailId))
-      .limit(1);
+  const [detail] = await this.db
+    .select({ id: woDetails.id, woBasicDetailId: woDetails.woBasicDetailId, status: woDetails.status })
+    .from(woDetails)
+    .where(eq(woDetails.id, woDetailId))
+    .limit(1);
 
     if (!detail) {
       return {
@@ -1604,13 +1604,13 @@ export class WoDetailsService {
         .where(eq(woBasicDetails.id, detail.woBasicDetailId)),
     ]);
 
-    // Check if wo-details has at least started the wizard
-    const woDetailStatus = detail.id ? 'completed' as const : 'pending' as const;
+    // Determine wo-details step status based on actual status value
+    const woDetailsCompleted = detail.status === 'wo_details_filled';
     const hasAcceptance = acceptance.length > 0;
 
     return {
       'basic-details': true,
-      'wo-details': woDetailStatus === 'completed' || hasAcceptance,
+      'wo-details': woDetailsCompleted || hasAcceptance,
       'kick-off': kickoff.length > 0,
       'contract-agreement': false, // will be enhanced
       'po-dashboard': false, // will be enhanced
@@ -1672,7 +1672,7 @@ export class WoDetailsService {
   // DASHBOARD
   async getDashboardSummary(user: ValidatedUser, teamId?: number) {
     const conditions: any[] = [
-        eq(woDetails.status, 'completed')
+        eq(woDetails.status, 'wo_details_filled')
     ];
     if (user) {
       conditions.push(...this.getVisibilityConditions(user, teamId));

@@ -1,17 +1,17 @@
-import { useState, useEffect, useRef, lazy, Suspense } from "react";
-import { useNavigate } from "react-router-dom";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
-import { WizardStepper } from "./WizardStepper";
 import { WIZARD_CONFIG } from "../helpers/constants";
 import { formToApi } from "../helpers/woDetail.mapper";
+import { WizardStepper } from "./WizardStepper";
 
-import type { WizardState, WoDetailData } from "../helpers/woDetail.types";
-import { useInitializeWizard, useWoDetailByBasicDetail, useSavePageDraft, useSkipPage, useSubmitAllPages } from "@/hooks/api/useWoDetails";
 import { useWoBasicDetailById } from "@/hooks/api/useWoBasicDetails";
+import { useInitializeWizard, useSavePageDraft, useSkipPage, useSubmitAllPages, useSubmitPage, useWoDetailByBasicDetail } from "@/hooks/api/useWoDetails";
+import type { WizardState, WoDetailData } from "../helpers/woDetail.types";
 
 const Page1Handover = lazy(() => import("./pages/Page1Handover").then((m) => ({ default: m.Page1Handover })));
 const Page2Compliance = lazy(() => import("./pages/Page2Compliance").then((m) => ({ default: m.Page2Compliance })));
@@ -77,6 +77,7 @@ export function WoDetailsWizard({
 
     const initializeWizard = useInitializeWizard();
     const savePageDraft = useSavePageDraft();
+    const submitPage = useSubmitPage();
     const skipPage = useSkipPage();
     const submitAllPages = useSubmitAllPages();
 
@@ -120,14 +121,7 @@ export function WoDetailsWizard({
         setIsSavingDraft(true);
         try {
             const mappedData = applyMapper(data, wizardState.currentPage);
-            await savePageDraft.mutateAsync({ woDetailId, pageNum: wizardState.currentPage, data: mappedData });
-            if (wizardState.currentPage < WIZARD_CONFIG.TOTAL_PAGES) {
-                setWizardState((prev) => ({
-                    ...prev,
-                    currentPage: prev.currentPage + 1,
-                    status: "in_progress",
-                }));
-            }
+            await submitPage.mutateAsync({ woDetailId, pageNum: wizardState.currentPage, data: mappedData });
             return [];
         } catch (error: any) {
             const serverErrors = error?.response?.data?.errors;

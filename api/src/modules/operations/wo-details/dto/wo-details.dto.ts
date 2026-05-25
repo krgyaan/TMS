@@ -26,8 +26,7 @@ const OptionalBooleanSchema = BooleanSchema.optional();
 export const WoDetailsStatusEnum = z.enum([
   'draft',
   'in_progress',
-  'completed',
-  'submitted_for_review',
+  'wo_details_filled',
 ]);
 
 export const WoAcceptanceStatusEnum = z.enum([

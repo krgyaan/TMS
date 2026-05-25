@@ -1,19 +1,18 @@
-import { parseFileArray } from '@/lib/utils';
-import { useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { paths } from '@/app/routes/paths';
 import { TenderFileUploader } from '@/components/tender-file-upload/TenderFileUploader';
-import { useWoDetailWithRelations, useUpdateWoDetail } from '@/hooks/api/useWoDetails';
+import type { TenderFileContext } from '@/components/tender-file-upload/types';
+import { Button } from '@/components/ui/button';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useUpdateWoBasicDetail } from '@/hooks/api/useWoBasicDetails';
-import { useWoDocumentsByType, useUploadWoDocument, useDeleteWoDocument } from '@/hooks/api/useWoDocuments';
+import { useUpdateWoDetail, useWoDetailWithRelations } from '@/hooks/api/useWoDetails';
+import { useDeleteWoDocument, useUploadWoDocument, useWoDocumentsByType } from '@/hooks/api/useWoDocuments';
+import { formatDate } from '@/hooks/useFormatedDate';
+import { parseFileArray } from '@/lib/utils';
 import type { DocumentType } from '@/modules/operations/types/wo.types';
 import { ArrowLeft, Calendar, Hash } from 'lucide-react';
-import { paths } from '@/app/routes/paths';
-import { Skeleton } from '@/components/ui/skeleton';
-import type { TenderFileContext } from '@/components/tender-file-upload/types';
-import { formatDate } from '@/hooks/useFormatedDate';
-import { tenderFilesService } from '@/services/api/tender-files.service';
+import { useMemo } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 
 interface WoDocumentUploaderProps {
@@ -102,7 +101,7 @@ const WoUploadPage = () => {
             // Update WO Detail status to completed
             await updateWoDetail({
                 id: data.id,
-                data: { status: 'completed' }
+                data: { status: 'wo_details_filled' }
             });
 
             toast.success("WO Upload completed successfully");

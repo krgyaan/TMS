@@ -23,8 +23,7 @@ export type WorkflowStage =
 export type WoDetailsStatus =
   | 'draft'
   | 'in_progress'
-  | 'completed'
-  | 'submitted_for_review';
+  | 'wo_details_filled';
 
 export type WoAcceptanceStatus =
   | 'pending_review'

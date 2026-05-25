@@ -140,7 +140,7 @@ export const woDetails = pgTable("wo_details", {
     startedAt: timestamp("started_at", { withTimezone: true }),
     completedAt: timestamp("completed_at", { withTimezone: true }),
 
-    // Status: 'draft' | 'in_progress' | 'completed' | 'submitted_for_review'
+    // Status: 'draft' | 'in_progress' | 'wo_details_filled'
     status: varchar("status", { length: 50 }).default('draft'),
 
     // VE Signed Contract Agreement
