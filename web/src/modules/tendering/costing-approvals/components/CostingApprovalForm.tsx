@@ -18,6 +18,8 @@ import { MultiSelectField } from '@/components/form/MultiSelectField';
 import { useVendorOrganizations } from '@/hooks/api/useVendorOrganizations';
 import { formatINR } from '@/hooks/useINRFormatter';
 import type { VendorOrganization } from '@/types/api.types';
+import { RfqSection } from '@/modules/tendering/rfqs/components/RfqView';
+
 
 // Schema for form values (MultiSelectField returns strings)
 const CostingApprovalFormSchema = z.object({
@@ -188,6 +190,14 @@ export default function CostingApprovalForm({
                                     </p>
                                 </div>
                             </div>
+                        </div>
+
+                        {/* RFQ & Responses Details */}
+                        <div className="space-y-4">
+                            <h4 className="font-semibold text-base text-primary border-b pb-2">
+                                RFQ & Responses Details
+                            </h4>
+                            <RfqSection tenderId={costingSheet.tenderId} />
                         </div>
 
                         {/* Side-by-Side Comparison */}
