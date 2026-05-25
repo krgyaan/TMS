@@ -158,8 +158,8 @@ export class TqManagementService {
         if (activeTab === 'awaited') {
             conditions.push(
                 or(
-                    isNull(latestTq.id as any),
-                    eq(latestTq.status, 'TQ awaited') as any
+                    isNull(tenderResults.id),
+                    eq(tenderResults.tqStatus, 'pending') as any
                 ) as any
             );
             conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
@@ -171,18 +171,42 @@ export class TqManagementService {
             conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
         } else if (activeTab === 'qualified') {
             conditions.push(
+                or (
                 inArray(latestTq.status, [
                     'Qualified, No TQ received',
+                    'Qualified, TQ replied',
+                    'Qualified, TQ Replied',
                     'TQ replied, Qualified',
-                ]) as any
+                    'TQ Replied, Qualified'
+                ]) as any,
+                and (
+                    isNotNull(tenderResults.id),
+                    inArray(tenderResults.tqStatus, 
+                        ['Qualified, No TQ received',
+                        'Qualified, TQ replied',
+                        'Qualified, TQ Replied',
+                        'TQ replied, Qualified',
+                        'TQ Replied, Qualified'])
+                    ) as any,
+                ) as any
             );
             conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
         } else if (activeTab === 'disqualified') {
             conditions.push(
+                or (
                 inArray(latestTq.status, [
                     'Disqualified, No TQ received',
                     'Disqualified, TQ missed',
-                ]) as any
+                    'Disqualified, TQ Missed',
+                ]) as any,
+                and (
+                    isNotNull(tenderResults.id),
+                    inArray(tenderResults.tqStatus, 
+                        ['Disqualified, No TQ received',
+                        'Disqualified, TQ missed',
+                        'Disqualified, TQ Missed'])
+                    ) as any,
+                ) as any
             );
             conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
         } else {
@@ -239,6 +263,7 @@ export class TqManagementService {
             .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
             .from(tenderInfos)
             .leftJoin(latestTq, eq(latestTq.tenderId, tenderInfos.id))
+            .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
             .innerJoin(users, eq(users.id, tenderInfos.teamMember))
             .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(items, eq(items.id, tenderInfos.item))
@@ -284,6 +309,7 @@ export class TqManagementService {
             .leftJoin(latestTq, eq(latestTq.tenderId, tenderInfos.id))
             .leftJoin(tqCount, eq(tqCount.tenderId, tenderInfos.id))
             .innerJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
             .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .innerJoin(
@@ -333,6 +359,8 @@ export class TqManagementService {
         const allTenders = await this.db
             .select({
                 tenderId: tenderInfos.id,
+                tenderResultId: tenderResults.id,
+                tqStatus: tenderResults.tqStatus,
             })
             .from(tenderInfos)
             .leftJoin(
@@ -342,6 +370,7 @@ export class TqManagementService {
                     eq(bidSubmissions.status, 'Bid Submitted')
                 )
             )
+            .leftJoin(tenderResults, eq(tenderResults.tenderId, tenderInfos.id))
             .where(and(...baseConditions));
 
         const tenderIds = allTenders.map(t => t.tenderId);
@@ -384,17 +413,31 @@ export class TqManagementService {
         let qualified = 0;
         let disqualified = 0;
 
-        for (const tenderId of tenderIds) {
-            const status = statusMap.get(tenderId) || 'TQ awaited';
-            if (status === 'TQ awaited') {
+        for (const tender of allTenders) {
+            const tenderId = tender.tenderId;
+            const latestTqStatus = statusMap.get(tenderId) || 'TQ awaited';
+            const trId = tender.tenderResultId;
+            const trTqStatus = tender.tqStatus as string | undefined | null;
+
+            if (!trId || trTqStatus === 'pending') {
                 awaited++;
-            } else if (status === 'TQ received') {
+            }
+            if (latestTqStatus === 'TQ received') {
                 received++;
-            } else if (status === 'TQ replied') {
+            }
+            if (latestTqStatus === 'TQ replied') {
                 replied++;
-            } else if (status === 'Qualified, No TQ received' || status === 'TQ replied, Qualified') {
+            }
+            if (
+                ['Qualified, No TQ received', 'Qualified, TQ replied', 'Qualified, TQ Replied', 'TQ replied, Qualified', 'TQ Replied, Qualified'].includes(latestTqStatus) ||
+                (trId && ['Qualified, No TQ received', 'Qualified, TQ replied', 'Qualified, TQ Replied', 'TQ replied, Qualified', 'TQ Replied, Qualified'].includes(trTqStatus as string))
+            ) {
                 qualified++;
-            } else if (status === 'Disqualified, No TQ received' || status === 'Disqualified, TQ missed') {
+            }
+            if (
+                ['Disqualified, No TQ received', 'Disqualified, TQ missed', 'Disqualified, TQ Missed'].includes(latestTqStatus) ||
+                (trId && ['Disqualified, No TQ received', 'Disqualified, TQ missed', 'Disqualified, TQ Missed'].includes(trTqStatus as string))
+            ) {
                 disqualified++;
             }
         }
@@ -405,7 +448,7 @@ export class TqManagementService {
             replied,
             qualified,
             disqualified,
-            total: awaited + received + replied + qualified + disqualified,
+            total: tenderIds.length,
         };
     }
 
