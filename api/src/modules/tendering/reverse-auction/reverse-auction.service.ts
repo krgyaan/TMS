@@ -161,19 +161,13 @@ export class ReverseAuctionService {
             // Exclude records that have schedule times (they belong in scheduled tab)
             conditions.push(
                 or(
-                    or(
-                        isNull(reverseAuctions.id),
-                        and(
-                            isNull(reverseAuctions.raResult),
-                            isNull(reverseAuctions.raStartTime),
-                            isNull(reverseAuctions.raEndTime)
-                        ) as any
-                    ) as any,
+                    isNull(reverseAuctions.id),
                     and(
-                        isNotNull(tenderResults.id),
-                        eq(tenderResults.raStatus, 'pending')
+                        isNull(reverseAuctions.raResult),
+                        isNull(reverseAuctions.raStartTime),
+                        isNull(reverseAuctions.raEndTime)
                     ) as any
-                ) as any
+                ) as any,
             );
             conditions.push(
                 eq(bidSubmissions.status, 'Bid Submitted'),
@@ -376,17 +370,11 @@ export class ReverseAuctionService {
             ...baseConditions,
             eq(bidSubmissions.status, 'Bid Submitted'),
             or(
-                or(
-                    isNull(reverseAuctions.id),
-                    and(
-                        isNull(reverseAuctions.raResult),
-                        isNull(reverseAuctions.raStartTime),
-                        isNull(reverseAuctions.raEndTime)
-                    ) as any
-                ) as any,
+                isNull(reverseAuctions.id),
                 and(
-                    isNotNull(tenderResults.id),
-                    eq(tenderResults.raStatus, 'pending')
+                    isNull(reverseAuctions.raResult),
+                    isNull(reverseAuctions.raStartTime),
+                    isNull(reverseAuctions.raEndTime)
                 ) as any
             ) as any,
             TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),

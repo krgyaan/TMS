@@ -156,12 +156,12 @@ export class TqManagementService {
 
         // Tab-specific conditions (simple & readable)
         if (activeTab === 'awaited') {
-            conditions.push(
-                or(
-                    isNull(tenderResults.id),
-                    eq(tenderResults.tqStatus, 'pending') as any
-                ) as any
-            );
+            // conditions.push(
+            //     or(
+            //         isNull(tenderResults.id),
+            //         eq(tenderResults.tqStatus, 'pending') as any
+            //     ) as any
+            // );
             conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']));
         } else if (activeTab === 'received') {
             conditions.push(eq(latestTq.status, 'TQ received') as any);
@@ -419,9 +419,11 @@ export class TqManagementService {
             const trId = tender.tenderResultId;
             const trTqStatus = tender.tqStatus as string | undefined | null;
 
-            if (!trId || trTqStatus === 'pending') {
-                awaited++;
-            }
+            // Aligning with the awaited tab condition in getDashboardData
+            // if (!trId || trTqStatus === 'pending') {
+            //     awaited++;
+            // }
+            awaited++;
             if (latestTqStatus === 'TQ received') {
                 received++;
             }
