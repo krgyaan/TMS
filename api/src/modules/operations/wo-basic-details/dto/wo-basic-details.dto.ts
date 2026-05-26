@@ -111,13 +111,13 @@ export const WoBasicDetailsQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1).optional(),
   limit: z.coerce.number().int().positive().max(100).default(10).optional(),
 
+  // Tab-based filter
+  tab: z
+    .enum(["basic_details", "wo_details", "completed"])
+    .optional(),
+
   // Filters
-  tenderId: z.coerce.number().int().positive().optional(),
-  enquiryId: z.coerce.number().int().positive().optional(),
   teamId: z.coerce.number().int().positive().optional(),
-  unallocated: z.coerce.boolean().optional(),
-  projectCode: z.string().max(100).optional(),
-  projectName: z.string().max(255).optional(),
   currentStage: z
     .enum([
       "basic_details",
@@ -130,9 +130,6 @@ export const WoBasicDetailsQuerySchema = z.object({
   woDetailsStatus: z
     .enum(["wo_details_filled"])
     .optional(),
-  oeFirst: z.coerce.number().int().positive().optional(),
-  oeSiteVisit: z.coerce.number().int().positive().optional(),
-  oeDocsPrep: z.coerce.number().int().positive().optional(),
   isWorkflowPaused: z
     .enum(["true", "false"])
     .transform((val) => val === "true")
@@ -161,7 +158,6 @@ export const WoBasicDetailsQuerySchema = z.object({
     .default("woDate")
     .optional(),
   sortOrder: z.enum(["asc", "desc"]).default("desc").optional(),
-  status: z.array(z.coerce.number()).optional(),
   // Search
   search: z.string().max(255).optional(), // Search across projectName, woNumber, projectCode
 });

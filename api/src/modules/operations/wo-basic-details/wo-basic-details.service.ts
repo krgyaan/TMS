@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, ConflictException, Logger, BadRequestException } from '@nestjs/common';
 import { eq, desc, asc, sql, and, or, ilike, isNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { DRIZZLE } from '@db/database.module';
@@ -9,6 +9,7 @@ import type { CreateWoBasicDetailDto, UpdateWoBasicDetailDto, AssignOeDto, BulkA
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { projects, teams, tenderInfos, organizations, items, locations, tenderClients, tenderCostingSheets } from '@/db/schemas';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
+import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 
 const oeFirstUser = alias(users, 'oeFirstUser');
 const oeSiteVisitUser = alias(users, 'oeSiteVisitUser');
@@ -149,7 +150,7 @@ export class WoBasicDetailsService {
             woBasicDetails: {
                 id: woBasicDetails.id,
                 tenderId: woBasicDetails.tenderId,
-                projectId: projects.id,
+                projectId: sql<number | null>`(select ${projects.id} from ${projects} where ${projects.tenderId} = ${woBasicDetails.tenderId} limit 1)::int`,
                 woNumber: woBasicDetails.woNumber,
                 woDate: woBasicDetails.woDate,
                 projectName: woBasicDetails.projectName,
@@ -175,7 +176,6 @@ export class WoBasicDetailsService {
         return this.db
             .select(this.getWoBaseSelect())
             .from(woBasicDetails)
-            .leftJoin(projects, eq(projects.tenderId, woBasicDetails.tenderId))
             .leftJoin(oeFirstUser, eq(oeFirstUser.id, woBasicDetails.oeFirst))
             .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
             .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep));
@@ -198,6 +198,15 @@ export class WoBasicDetailsService {
         const sortBy = filters?.sortBy ?? 'createdAt';
         const search = filters?.search?.trim();
 
+        // Resolve tab to backend filters
+        const tab = filters?.tab;
+        const currentStage = filters?.currentStage;
+        const woDetailsStatus = filters?.woDetailsStatus ?? (tab === 'wo_details' ? 'wo_details_filled' : undefined);
+
+        if (tab && !['basic_details', 'wo_details', 'completed'].includes(tab)) {
+            throw new BadRequestException(`Invalid tab: ${tab}`);
+        }
+
         // 1. Build Conditions
         const conditions: any[] = [];
 
@@ -205,24 +214,15 @@ export class WoBasicDetailsService {
         if (filters?.user) {
             conditions.push(...this.getVisibilityConditions(filters.user, filters.teamId));
         }
-        // Additional filters
-        if (filters?.projectName) {
-            conditions.push(ilike(woBasicDetails.projectName, `%${filters.projectName}%`));
+
+        if (currentStage) {
+            conditions.push(eq(woBasicDetails.currentStage, currentStage));
+        } else if (tab === 'completed') {
+            conditions.push(eq(woBasicDetails.currentStage, 'completed'));
         }
-        if (filters?.currentStage) {
-            conditions.push(eq(woBasicDetails.currentStage, filters.currentStage));
-        }
-        if (filters?.oeFirst) {
-            conditions.push(eq(woBasicDetails.oeFirst, filters.oeFirst));
-        }
-        if (filters?.oeSiteVisit) {
-            conditions.push(eq(woBasicDetails.oeSiteVisit, filters.oeSiteVisit));
-        }
-        if (filters?.oeDocsPrep) {
-            conditions.push(eq(woBasicDetails.oeDocsPrep, filters.oeDocsPrep));
-        }
-        if (filters?.woDetailsStatus) {
-            conditions.push(eq(woDetails.status, filters.woDetailsStatus));
+
+        if (woDetailsStatus) {
+            conditions.push(eq(woDetails.status, woDetailsStatus));
         }
 
         // Search condition (Expanded to joined fields)
@@ -247,7 +247,7 @@ export class WoBasicDetailsService {
             .select({ count: sql<number>`count(distinct ${woBasicDetails.id})::int` })
             .from(woBasicDetails);
 
-        if (filters?.woDetailsStatus) {
+        if (woDetailsStatus) {
             countQuery = countQuery.leftJoin(woDetails, eq(woDetails.woBasicDetailId, woBasicDetails.id));
         }
 
@@ -303,7 +303,7 @@ export class WoBasicDetailsService {
 
         // 4. Get Data
         let query = this.getBaseQueryBuilder();
-        if (filters?.woDetailsStatus) {
+        if (woDetailsStatus) {
             query = query.leftJoin(woDetails, eq(woDetails.woBasicDetailId, woBasicDetails.id));
         }
         const rows = await query
@@ -314,15 +314,7 @@ export class WoBasicDetailsService {
 
         const data = rows.map((r) => this.mapJoinedRowToResponseList(r));
 
-        return {
-            data,
-            meta: {
-                total,
-                page,
-                limit,
-                totalPages: Math.ceil(total / limit) || 1,
-            },
-        };
+        return wrapPaginatedResponse(data, total, page, limit);
     }
 
     async findById(id: number) {
@@ -878,9 +870,9 @@ export class WoBasicDetailsService {
 
         const [stageCounts] = await this.db
             .select({
-                total: sql<number>`count(*)::int`,
-                basicDetails: sql<number>`count(*)::int`,
-                woDetails: sql<number>`count(*) filter (where ${woDetails.status} = 'wo_details_filled')::int`,
+                total: sql<number>`count(distinct ${woBasicDetails.id})::int`,
+                basicDetails: sql<number>`count(distinct ${woBasicDetails.id})::int`,
+                woDetails: sql<number>`count(distinct ${woBasicDetails.id}) filter (where ${woDetails.status} = 'wo_details_filled')::int`,
                 completed: sql<number>`count(*) filter (where ${woBasicDetails.currentStage} = 'completed')::int`,
                 paused: sql<number>`count(*) filter (where ${woBasicDetails.isWorkflowPaused} = true)::int`,
             })

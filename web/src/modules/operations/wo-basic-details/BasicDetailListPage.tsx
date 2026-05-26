@@ -54,27 +54,14 @@ const BasicDetailListPage = () => {
 
     // Build filters based on active tab
     const filters: WoBasicDetailsFilters = useMemo(() => {
-        const baseFilters: WoBasicDetailsFilters = {
+        return {
             page: pagination.pageIndex + 1,
             limit: pagination.pageSize,
             search: debouncedSearch || undefined,
             sortBy: sortModel[0]?.colId || 'woDate',
             sortOrder: sortModel[0]?.sort || 'desc',
+            tab: activeTab,
         };
-
-        // Add tab-specific filters
-        switch (activeTab) {
-            case 'basic_details':
-                break;
-            case 'wo_details':
-                baseFilters.woDetailsStatus = 'wo_details_filled';
-                break;
-            case 'completed':
-                baseFilters.currentStage = 'completed';
-                break;
-        }
-
-        return baseFilters;
     }, [activeTab, pagination, debouncedSearch, sortModel]);
 
     // Fetch data
