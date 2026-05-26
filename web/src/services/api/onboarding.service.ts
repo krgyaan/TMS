@@ -10,6 +10,9 @@ export interface OnboardingRequest {
   status: "pending" | "approved" | "rejected";
   profileStatus: string;
   documentStatus: string;
+  educationStatus: string;
+  experienceStatus: string;
+  bankStatus: string;
   inductionStatus: string;
   progress: number;
   approvedAt: string | null;
@@ -100,6 +103,9 @@ export interface UpdateProfileDto {
   dateOfJoining?: string;
   probationMonths?: number;
   probationEndDate?: string;
+  designationId?: number;
+  departmentId?: number;
+  reportingTl?: number;
   salaryType?: string;
   basicSalary?: string;
   bankName?: string;

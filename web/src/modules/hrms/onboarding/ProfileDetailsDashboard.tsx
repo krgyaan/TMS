@@ -13,6 +13,9 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useProfileList, useProfile, useUpdateProfile } from "./useOnboarding";
+import { useDesignations } from "@/hooks/api/useDesignations";
+import { useTeams } from "@/hooks/api/useTeams";
+import { useUsers } from "@/hooks/api/useUsers";
 import type { ProfileListItem, FullProfile, UpdateProfileDto } from "../../../services/api/onboarding.service";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
@@ -697,6 +700,10 @@ const HRFillModal: React.FC<{
   const { data: fullProfile, isLoading } = useProfile(profile?.id || null);
   const updateMutation = useUpdateProfile(profile?.id || 0);
 
+  const { data: designations = [] } = useDesignations();
+  const { data: teams = [] } = useTeams();
+  const { data: users = [] } = useUsers();
+
   if (!profile) return null;
 
   const sectionPcts = {
@@ -707,6 +714,9 @@ const HRFillModal: React.FC<{
 
   const EMPLOYMENT_FIELDS = [
     { name: "employeeType", label: "Employee Type", type: "select", options: ["Full-Time", "Part-Time", "Contract", "Intern"], required: true },
+    { name: "designationId", label: "Designation", type: "select", options: designations.map(d => ({ label: d.name, value: d.id.toString() })), required: true },
+    { name: "departmentId", label: "Department", type: "select", options: teams.map(t => ({ label: t.name, value: t.id.toString() })), required: true },
+    { name: "reportingTl", label: "Reporting TL", type: "select", options: users.map(u => ({ label: u.name, value: u.id.toString() })) },
     { name: "workLocation", label: "Work Location / Branch", type: "text", placeholder: "e.g. Bengaluru HQ", required: true },
     { name: "dateOfJoining", label: "Date of Joining", type: "date", required: true },
     { name: "probationMonths", label: "Probation Period (months)", type: "number", placeholder: "e.g. 3" },
@@ -740,7 +750,7 @@ const HRFillModal: React.FC<{
     currentFields.forEach(f => {
       const val = formData.get(f.name);
       if (val) {
-        if (f.type === "number") {
+        if (f.type === "number" || f.name === "designationId" || f.name === "departmentId" || f.name === "reportingTl") {
           (dto as any)[f.name] = Number(val);
         } else {
           (dto as any)[f.name] = val.toString();
@@ -845,14 +855,16 @@ const HRFillModal: React.FC<{
                         {field.required && <span className="text-destructive">*</span>}
                       </label>
                       {field.type === "select" ? (
-                        <Select name={field.name} defaultValue={defaultValue || undefined}>
+                        <Select name={field.name} defaultValue={defaultValue?.toString() || undefined}>
                           <SelectTrigger className="h-9 text-sm">
                             <SelectValue placeholder={`Select ${field.label.toLowerCase()}`} />
                           </SelectTrigger>
                           <SelectContent>
-                            {field.options?.map((o) => (
-                              <SelectItem key={o} value={o}>{o}</SelectItem>
-                            ))}
+                            {field.options?.map((o: any) => {
+                              const val = typeof o === 'object' ? o.value : o;
+                              const label = typeof o === 'object' ? o.label : o;
+                              return <SelectItem key={val} value={val}>{label}</SelectItem>;
+                            })}
                           </SelectContent>
                         </Select>
                       ) : (

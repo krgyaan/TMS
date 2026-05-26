@@ -832,72 +832,6 @@ const ViewModal: React.FC<{
 
               <Separator />
 
-              {/* Work Information */}
-              <div className="space-y-4">
-                <SectionHeader icon={Briefcase} title="Work Information" />
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-5 pl-1">
-                  <DataItem
-                    icon={Briefcase}
-                    label="Designation"
-                    value={profile?.designation}
-                  />
-                  <DataItem
-                    icon={Building2}
-                    label="Department"
-                    value={profile?.department}
-                  />
-                  <DataItem
-                    icon={User}
-                    label="Reporting TL"
-                    value={profile?.reportingTl}
-                  />
-                  <DataItem
-                    icon={CalendarDays}
-                    label="Date of Joining"
-                    value={
-                      profile?.dateOfJoining
-                        ? formatDate(profile.dateOfJoining)
-                        : null
-                    }
-                  />
-                  <DataItem
-                    icon={Briefcase}
-                    label="Employee Type"
-                    value={profile?.employeeType}
-                  />
-                  <DataItem
-                    icon={MapPin}
-                    label="Work Location"
-                    value={profile?.workLocation}
-                  />
-                  <DataItem
-                    icon={TrendingUp}
-                    label="Salary Type"
-                    value={profile?.salaryType}
-                  />
-                  <DataItem
-                    icon={CalendarDays}
-                    label="Probation End"
-                    value={
-                      profile?.probationEndDate
-                        ? formatDate(profile.probationEndDate)
-                        : null
-                    }
-                  />
-                  <DataItem
-                    icon={Clock}
-                    label="Probation Period"
-                    value={
-                      profile?.probationMonths
-                        ? `${profile.probationMonths} Months`
-                        : null
-                    }
-                  />
-                </div>
-              </div>
-
-              <Separator />
-
               {/* Bank Details */}
               <div className="space-y-4">
                 <SectionHeader
@@ -1213,6 +1147,77 @@ const ViewModal: React.FC<{
                     No documents uploaded yet
                   </p>
                 )}
+              </div>
+
+              <Separator />
+
+              {/* Work Information */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <SectionHeader icon={Briefcase} title="Work Information" />
+                  <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-200 bg-amber-50 dark:text-amber-400 dark:border-amber-500/30 dark:bg-amber-500/10">
+                    To be filled by Admin
+                  </Badge>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-5 pl-1">
+                  <DataItem
+                    icon={Briefcase}
+                    label="Designation"
+                    value={profile?.designation}
+                  />
+                  <DataItem
+                    icon={Building2}
+                    label="Department"
+                    value={profile?.department}
+                  />
+                  <DataItem
+                    icon={User}
+                    label="Reporting TL"
+                    value={profile?.reportingTl}
+                  />
+                  <DataItem
+                    icon={CalendarDays}
+                    label="Date of Joining"
+                    value={
+                      profile?.dateOfJoining
+                        ? formatDate(profile.dateOfJoining)
+                        : null
+                    }
+                  />
+                  <DataItem
+                    icon={Briefcase}
+                    label="Employee Type"
+                    value={profile?.employeeType}
+                  />
+                  <DataItem
+                    icon={MapPin}
+                    label="Work Location"
+                    value={profile?.workLocation}
+                  />
+                  <DataItem
+                    icon={TrendingUp}
+                    label="Salary Type"
+                    value={profile?.salaryType}
+                  />
+                  <DataItem
+                    icon={CalendarDays}
+                    label="Probation End"
+                    value={
+                      profile?.probationEndDate
+                        ? formatDate(profile.probationEndDate)
+                        : null
+                    }
+                  />
+                  <DataItem
+                    icon={Clock}
+                    label="Probation Period"
+                    value={
+                      profile?.probationMonths
+                        ? `${profile.probationMonths} Months`
+                        : null
+                    }
+                  />
+                </div>
               </div>
 
               {/* Review History */}

@@ -90,6 +90,10 @@ export interface UpdateProfileDto {
   dateOfJoining?: string;
   probationMonths?: number;
   probationEndDate?: string;
+  // Core HR
+  designationId?: number;
+  departmentId?: number;
+  reportingTl?: number;
   // Compensation
   salaryType?: string;
   basicSalary?: string;
@@ -624,6 +628,7 @@ export class OnboardingService {
           profileStatus: onboardingRequests.profileStatus,
           documentStatus: onboardingRequests.documentStatus,
           educationStatus: onboardingRequests.educationStatus,
+          experienceStatus: onboardingRequests.experienceStatus,
           bankStatus: onboardingRequests.bankStatus,
           inductionStatus: onboardingRequests.inductionStatus,
           progress: onboardingRequests.progress,
@@ -694,6 +699,7 @@ export class OnboardingService {
           row.profileStatus,
           row.documentStatus,
           row.educationStatus,
+          row.experienceStatus,
           row.bankStatus,
           row.inductionStatus,
         ];

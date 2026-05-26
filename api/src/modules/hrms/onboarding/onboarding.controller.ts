@@ -76,6 +76,10 @@ const UpdateProfileSchema = z.object({
   dateOfJoining: z.string().optional(),
   probationMonths: z.number().optional(),
   probationEndDate: z.string().optional(),
+  // Core HR
+  designationId: z.number().optional(),
+  departmentId: z.number().optional(),
+  reportingTl: z.number().optional(),
   // Compensation
   salaryType: z.string().optional(),
   basicSalary: z.coerce.string().optional(),

@@ -973,7 +973,7 @@ export class ProfileService {
 
   async updateExperience(userId: number, expId: number, dto: any) {
     const activeReqs = await this.db.select({ id: onboardingRequests.id, status: onboardingRequests.status, progress: onboardingRequests.progress, experienceStatus : onboardingRequests.experienceStatus})
-      .from(onboardingRequests).where(eq(onboardingRequests.userId, userId)).orderBy(desc(onboardingRequests.createdAt)).limit(1);\
+      .from(onboardingRequests).where(eq(onboardingRequests.userId, userId)).orderBy(desc(onboardingRequests.createdAt)).limit(1);
 
     const isOnboarding = activeReqs.length > 0 && activeReqs[0].status == 'pending';
 
