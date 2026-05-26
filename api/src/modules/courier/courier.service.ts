@@ -22,6 +22,7 @@ import { GoogleService } from "@/modules/integrations/google/google.service";
 import { CourierMailTemplates } from "./courier.mail";
 import { fi } from "zod/v4/locales";
 import { stat } from "fs";
+import { format } from "date-fns";
 import { from } from "rxjs";
 
 import { MailAudienceService } from "@/core/mail/mail-audience.service";
@@ -471,9 +472,22 @@ export class CourierService {
                     } else {
                         this.logger.info("Mail recipients resolved", { to: recipientUser.email, cc: ccMail });
 
+                        const formatDate = (date: Date | string | null | undefined) => {
+                            if (!date) return "N/A";
+                            return format(new Date(date), "dd MMM yyyy, hh:mm a");
+                        };
+
                         await this.mailerService.sendMail(
                             CourierMailTemplates.COURIER_STATUS_UPDATE,
-                            { ...updated, fromName: recipientUser.name, cooName: cooUser.name, statusLabel: COURIER_STATUS_LABELS[statusData.status] ?? "-" },
+                            { 
+                                ...updated, 
+                                fromName: recipientUser.name, 
+                                cooName: cooUser.name, 
+                                statusLabel: COURIER_STATUS_LABELS[statusData.status] ?? "-",
+                                pickup: formatDate(updated.pickupDate),
+                                delivery: formatDate(updated.deliveryDate),
+                                withinTimeCheck: updated.withinTime === true ? "Yes" : updated.withinTime === false ? "No" : "N/A"
+                            },
                             {
                                 to: [recipientUser.email],
                                 cc: Array.isArray(ccMail) ? ccMail : [ccMail],
@@ -560,11 +574,21 @@ export class CourierService {
                         cc: ccMail,
                     });
 
+                    const formatDate = (date: Date | string | null | undefined) => {
+                        if (!date) return "N/A";
+                        return format(new Date(date), "dd MMM yyyy, hh:mm a");
+                    };
+
                     await this.mailerService.sendMail(
                         CourierMailTemplates.COURIER_DISPATCH,
                         // [CHANGED] fromName is recipientUser (empFrom user), cooName is COO
                         // mail is sent from COO to empFrom user
-                        { ...courier, fromName: recipientUser.name, cooName: cooUser.name },
+                        { 
+                            ...courier, 
+                            fromName: recipientUser.name, 
+                            cooName: cooUser.name,
+                            pickupDateTime: formatDate(courier.pickupDate)
+                        },
                         {
                             to: [recipientUser.email],
                             // [CHANGED] ccMail now comes from getAdmin() instead of getEmailsByRoleId(2)
