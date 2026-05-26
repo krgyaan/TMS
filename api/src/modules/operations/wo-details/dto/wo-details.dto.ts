@@ -54,6 +54,9 @@ export const WoDetailsListResponseSchema = z.object({
   ldApplicable: z.boolean(),
   isContractAgreement: z.boolean(),
   oeWoAmendmentNeeded: z.boolean(),
+  oeFirstName: z.string().nullable(),
+  oeSiteVisitName: z.string().nullable(),
+  oeDocsPrepName: z.string().nullable(),
   status: WoDetailsStatusEnum,
   woAcceptanceId: z.number().int().positive().nullable(),
   woAcceptanceStatus: WoAcceptanceStatusEnum.nullable(),
@@ -168,6 +171,9 @@ export const WoDetailsQuerySchema = z.object({
       'projectName',
       'woValuePreGst',
       'woValueGstAmt',
+      'oeFirstName',
+      'oeSiteVisitName',
+      'oeDocsPrepName',
     ])
     .default('createdAt')
     .optional(),

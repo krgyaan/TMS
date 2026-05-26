@@ -27,4 +27,7 @@ export interface KickOffMeetingDashboardRow {
     meetingLink: string | null;
     momFilePath: string | null;
     teamMemberName: string | null;
+    oeFirstName: string | null;
+    oeSiteVisitName: string | null;
+    oeDocsPrepName: string | null;
 }

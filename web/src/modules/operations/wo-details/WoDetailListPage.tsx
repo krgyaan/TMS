@@ -12,6 +12,8 @@ import { ActionMenu } from '@/components/ui/ActionMenu';
 import { AlertCircle, Eye, FileX2, Search, Edit, CheckCircle, FileText } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Tooltip, TooltipTrigger } from '@radix-ui/react-tooltip';
+import { TooltipContent } from '@/components/ui/tooltip';
 import { useWoDetails, useWoDetailsDashboardSummary } from '@/hooks/api/useWoDetails';
 import type { WoDetailsListResponseDto, WoDetailsFilters } from '@/modules/operations/types/wo.types';
 import { currencyCol, dateCol } from '@/components/data-grid';
@@ -214,6 +216,55 @@ const WoDetailListPage = () => {
                     return <Badge variant='outline' className="capitalize">
                         {params.value ? params.value?.replaceAll('_', ' ') : 'Pending'}
                     </Badge>
+                },
+            },
+            {
+                field: 'oeFirstName',
+                colId: 'oeFirstName',
+                headerName: 'OE',
+                width: 150,
+                cellRenderer: (params: { value: string | null; data: WoDetailsListResponseDto }) => {
+                    const { oeFirstName, oeSiteVisitName, oeDocsPrepName } = params.data;
+
+                    const uniqueOEs = [...new Set([oeFirstName, oeSiteVisitName, oeDocsPrepName].filter(Boolean))];
+                    const totalUnique = uniqueOEs.length;
+
+                    if (totalUnique === 0) {
+                        return (
+                            <Badge variant="outline" className="text-orange-600 border-orange-300">
+                                Unassigned
+                            </Badge>
+                        );
+                    }
+
+                    const primaryName = uniqueOEs[0];
+                    const additionalCount = totalUnique - 1;
+
+                    return (
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <div className="flex items-center gap-1">
+                                    <Badge variant="outline" className="text-xs cursor-pointer">
+                                        {primaryName}
+                                    </Badge>
+                                    {additionalCount > 0 && (<span>+{additionalCount}</span>)}
+                                </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <div className="text-xs space-y-1">
+                                    <p><strong>Primary OE:</strong>{' '}
+                                        {oeFirstName || <span className="text-muted-foreground">—</span>}
+                                    </p>
+                                    <p><strong>Site Visit:</strong>{' '}
+                                        {oeSiteVisitName || <span className="text-muted-foreground">—</span>}
+                                    </p>
+                                    <p><strong>Docs Prep:</strong>{' '}
+                                        {oeDocsPrepName || <span className="text-muted-foreground">—</span>}
+                                    </p>
+                                </div>
+                            </TooltipContent>
+                        </Tooltip>
+                    );
                 },
             },
             {
