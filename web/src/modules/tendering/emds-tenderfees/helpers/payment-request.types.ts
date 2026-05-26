@@ -165,6 +165,7 @@ export interface PaymentRequestRow {
     requestType: string | null;
     dueDate: string | null;
     bidValid: Date | null;
+    bidSubmissionDate: string | null;
     teamMemberId: number | null;
     teamMember: string | null;
     instrumentId: number | null;
