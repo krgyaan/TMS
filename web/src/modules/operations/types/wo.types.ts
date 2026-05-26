@@ -186,6 +186,7 @@ export interface WoBasicDetailsFilters {
   projectCode?: string;
   projectName?: string;
   currentStage?: WorkflowStage;
+  woDetailsStatus?: 'wo_details_filled';
   oeFirst?: number;
   oeSiteVisit?: number;
   oeDocsPrep?: number;
@@ -194,7 +195,6 @@ export interface WoBasicDetailsFilters {
   woDateTo?: string;
   createdAtFrom?: string;
   createdAtTo?: string;
-  status?: number[];
 }
 
 export interface WoBasicDetailPrefillData {
@@ -234,8 +234,6 @@ export interface WoBasicDetailsDashboardSummary {
     total: number;
     basicDetails: number;
     woDetails: number;
-    woAcceptance: number;
-    woUpload: number;
     completed: number;
     paused: number;
   };

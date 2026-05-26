@@ -127,6 +127,9 @@ export const WoBasicDetailsQuerySchema = z.object({
       "completed",
     ])
     .optional(),
+  woDetailsStatus: z
+    .enum(["wo_details_filled"])
+    .optional(),
   oeFirst: z.coerce.number().int().positive().optional(),
   oeSiteVisit: z.coerce.number().int().positive().optional(),
   oeDocsPrep: z.coerce.number().int().positive().optional(),

@@ -221,6 +221,9 @@ export class WoBasicDetailsService {
         if (filters?.oeDocsPrep) {
             conditions.push(eq(woBasicDetails.oeDocsPrep, filters.oeDocsPrep));
         }
+        if (filters?.woDetailsStatus) {
+            conditions.push(eq(woDetails.status, filters.woDetailsStatus));
+        }
 
         // Search condition (Expanded to joined fields)
         if (search) {
@@ -243,6 +246,10 @@ export class WoBasicDetailsService {
         let countQuery: any = this.db
             .select({ count: sql<number>`count(distinct ${woBasicDetails.id})::int` })
             .from(woBasicDetails);
+
+        if (filters?.woDetailsStatus) {
+            countQuery = countQuery.leftJoin(woDetails, eq(woDetails.woBasicDetailId, woBasicDetails.id));
+        }
 
         // Add joins if search is being used (searches in joined tables)
         if (search) {
@@ -295,7 +302,11 @@ export class WoBasicDetailsService {
         }
 
         // 4. Get Data
-        const rows = await this.getBaseQueryBuilder()
+        let query = this.getBaseQueryBuilder();
+        if (filters?.woDetailsStatus) {
+            query = query.leftJoin(woDetails, eq(woDetails.woBasicDetailId, woBasicDetails.id));
+        }
+        const rows = await query
             .where(whereClause)
             .orderBy(orderByClause)
             .limit(limit)
@@ -868,14 +879,13 @@ export class WoBasicDetailsService {
         const [stageCounts] = await this.db
             .select({
                 total: sql<number>`count(*)::int`,
-                basicDetails: sql<number>`count(*) filter (where ${woBasicDetails.currentStage} = 'basic_details')::int`,
-                woDetails: sql<number>`count(*) filter (where ${woBasicDetails.currentStage} = 'wo_details')::int`,
-                woAcceptance: sql<number>`count(*) filter (where ${woBasicDetails.currentStage} = 'wo_acceptance')::int`,
-                woUpload: sql<number>`count(*) filter (where ${woBasicDetails.currentStage} = 'wo_upload')::int`,
+                basicDetails: sql<number>`count(*)::int`,
+                woDetails: sql<number>`count(*) filter (where ${woDetails.status} = 'wo_details_filled')::int`,
                 completed: sql<number>`count(*) filter (where ${woBasicDetails.currentStage} = 'completed')::int`,
                 paused: sql<number>`count(*) filter (where ${woBasicDetails.isWorkflowPaused} = true)::int`,
             })
             .from(woBasicDetails)
+            .leftJoin(woDetails, eq(woDetails.woBasicDetailId, woBasicDetails.id))
             .where(whereClause);
 
         return {

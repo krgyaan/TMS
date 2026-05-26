@@ -201,7 +201,13 @@ export class WoDetailsService {
     }
 
     if (filters?.woAmendmentNeeded === true) {
-      conditions.push(eq(woDetails.oeWoAmendmentNeeded, true));
+      conditions.push(
+        or(
+          eq(woDetails.oeWoAmendmentNeeded, true),
+          eq(woAcceptance.status, 'awaiting_amendment'),
+          eq(woAcceptance.decision, 'amendment_needed'),
+        ),
+      );
     } else if (filters?.woAcceptance === true) {
       conditions.push(
         and(
