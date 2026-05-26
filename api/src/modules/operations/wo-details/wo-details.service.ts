@@ -148,27 +148,37 @@ export class WoDetailsService {
     };
   }
 
-  private getVisibilityConditions(user: ValidatedUser, teamId?: number) {
+  private buildRoleFilterConditions(user?: ValidatedUser, teamId?: number) {
     const conditions: any[] = [];
 
-    if (user.roleId === 1 || user.roleId === 2) {
+    if (!user) return conditions;
+
+    if (user.dataScope === 'all') {
       if (teamId !== undefined && teamId !== null) {
         conditions.push(eq(woBasicDetails.team, teamId));
       }
-    } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
+    } else if (user.canSwitchTeams && teamId !== undefined && teamId !== null) {
+      conditions.push(eq(woBasicDetails.team, teamId));
+    } else if (user.dataScope === 'team') {
       if (user.teamId) {
         conditions.push(eq(woBasicDetails.team, user.teamId));
+      } else {
+        conditions.push(sql`1 = 0`);
       }
     } else {
-      conditions.push(
-        or(
-          eq(woBasicDetails.createdBy, user.sub),
-          eq(woBasicDetails.oeFirst, user.sub),
-          eq(woBasicDetails.oeSiteVisit, user.sub),
-          eq(woBasicDetails.oeDocsPrep, user.sub),
-          eq(woDetails.createdBy, user.sub),
-        ),
-      );
+      if (user.sub) {
+        conditions.push(
+          or(
+            eq(woBasicDetails.createdBy, user.sub),
+            eq(woBasicDetails.oeFirst, user.sub),
+            eq(woBasicDetails.oeSiteVisit, user.sub),
+            eq(woBasicDetails.oeDocsPrep, user.sub),
+            eq(woDetails.createdBy, user.sub),
+          ),
+        );
+      } else {
+        conditions.push(sql`1 = 0`);
+      }
     }
 
     return conditions;
@@ -190,7 +200,7 @@ export class WoDetailsService {
 
     if (filters?.user) {
       conditions.push(
-        ...this.getVisibilityConditions(filters.user, filters.teamId),
+        ...this.buildRoleFilterConditions(filters.user, filters.teamId),
       );
     }
 
@@ -1711,7 +1721,7 @@ export class WoDetailsService {
         eq(woDetails.status, 'wo_details_filled')
     ];
     if (user) {
-      conditions.push(...this.getVisibilityConditions(user, teamId));
+      conditions.push(...this.buildRoleFilterConditions(user, teamId));
     }
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 

@@ -2,7 +2,7 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from '@nes
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { woKickoffMeetings } from '@db/schemas/operations/kick-off-meetings.schema';
-import { and, asc, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { KickOffMeetingDashboardRow, SaveKickOffMeetingDto, UpdateKickOffMeetingMomDto } from './dto/kick-off-meeting.dto';
 import { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
@@ -27,6 +27,7 @@ export class KickOffMeetingService {
         const conditions: any[] = [
             eq(woAcceptance.status, 'completed')
         ];
+        conditions.push(...this.buildRoleFilterConditions(user, teamId));
         // Tab filter
         if (activeTab === 'not_scheduled') {
             conditions.push(isNull(sql`latest_kickoff.id`));
@@ -188,7 +189,7 @@ export class KickOffMeetingService {
 
     async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<{ 'scheduled': number; 'not_scheduled': number; total: number }> {
         // Apply role-based filtering
-        const roleFilterConditions: any[] = [];
+        const roleFilterConditions: any[] = this.buildRoleFilterConditions(user, teamId);
 
         // Latest Kickoff Subquery (same as in getDashboardData)
         const latestKickoff = this.db
@@ -308,5 +309,40 @@ export class KickOffMeetingService {
     }
 
     return updated;
+  }
+
+  private buildRoleFilterConditions(user?: ValidatedUser, teamId?: number) {
+    const conditions: any[] = [];
+
+    if (!user) return conditions;
+
+    if (user.dataScope === 'all') {
+      if (teamId !== undefined && teamId !== null) {
+        conditions.push(eq(woBasicDetails.team, teamId));
+      }
+    } else if (user.canSwitchTeams && teamId !== undefined && teamId !== null) {
+      conditions.push(eq(woBasicDetails.team, teamId));
+    } else if (user.dataScope === 'team') {
+      if (user.teamId) {
+        conditions.push(eq(woBasicDetails.team, user.teamId));
+      } else {
+        conditions.push(sql`1 = 0`);
+      }
+    } else {
+      if (user.sub) {
+        conditions.push(
+          or(
+            eq(woBasicDetails.createdBy, user.sub),
+            eq(woBasicDetails.oeFirst, user.sub),
+            eq(woBasicDetails.oeSiteVisit, user.sub),
+            eq(woBasicDetails.oeDocsPrep, user.sub),
+          ),
+        );
+      } else {
+        conditions.push(sql`1 = 0`);
+      }
+    }
+
+    return conditions;
   }
 }

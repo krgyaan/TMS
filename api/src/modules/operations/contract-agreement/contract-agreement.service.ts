@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
-import { and, asc, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { ContractAgreementDashboardRow, SaveContractAgreementDto } from './dto/contract-agreement.dto';
 import { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
@@ -26,6 +26,7 @@ export class ContractAgreementService {
         const conditions: any[] = [
             eq(woDetails.isContractAgreement, true),
         ];
+        conditions.push(...this.buildRoleFilterConditions(user, teamId));
         // Tab filter
         if (activeTab === 'not_uploaded') {
             conditions.push(isNull(woDetails.veSigned), isNull(woDetails.clientAndVeSigned));
@@ -154,7 +155,7 @@ export class ContractAgreementService {
 
     async getDashboardCounts(user?: ValidatedUser, teamId?: number): Promise<{ 'uploaded': number; 'not_uploaded': number; total: number }> {
         // Apply role-based filtering
-        const baseConditions = [eq(woDetails.isContractAgreement, true)];
+        const baseConditions = [eq(woDetails.isContractAgreement, true), ...this.buildRoleFilterConditions(user, teamId)];
 
         // Count not_scheduled: kickoff IS NULL
         const notScheduledConditions = [...baseConditions, isNull(woDetails.veSigned), isNull(woDetails.clientAndVeSigned)];
@@ -224,4 +225,39 @@ export class ContractAgreementService {
 
         return updated;
     }
+
+  private buildRoleFilterConditions(user?: ValidatedUser, teamId?: number) {
+    const conditions: any[] = [];
+
+    if (!user) return conditions;
+
+    if (user.dataScope === 'all') {
+      if (teamId !== undefined && teamId !== null) {
+        conditions.push(eq(woBasicDetails.team, teamId));
+      }
+    } else if (user.canSwitchTeams && teamId !== undefined && teamId !== null) {
+      conditions.push(eq(woBasicDetails.team, teamId));
+    } else if (user.dataScope === 'team') {
+      if (user.teamId) {
+        conditions.push(eq(woBasicDetails.team, user.teamId));
+      } else {
+        conditions.push(sql`1 = 0`);
+      }
+    } else {
+      if (user.sub) {
+        conditions.push(
+          or(
+            eq(woBasicDetails.createdBy, user.sub),
+            eq(woBasicDetails.oeFirst, user.sub),
+            eq(woBasicDetails.oeSiteVisit, user.sub),
+            eq(woBasicDetails.oeDocsPrep, user.sub),
+          ),
+        );
+      } else {
+        conditions.push(sql`1 = 0`);
+      }
+    }
+
+    return conditions;
+  }
 }
