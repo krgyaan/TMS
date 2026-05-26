@@ -392,6 +392,9 @@ export interface WoDetailsListResponseDto {
   ldApplicable: boolean;
   isContractAgreement: boolean;
   oeWoAmendmentNeeded: boolean;
+  oeFirstName: string | null;
+  oeSiteVisitName: string | null;
+  oeDocsPrepName: string | null;
   status: WoDetailsStatus;
   woAcceptanceId: number | null;
   woAcceptanceStatus: WoAcceptanceStatus | null;
@@ -1124,6 +1127,9 @@ export interface KickOffListDto {
   meetingLink: string | null;
   momFilePath: string | null;
   teamMember: string;
+  oeFirstName: string | null;
+  oeSiteVisitName: string | null;
+  oeDocsPrepName: string | null;
 }
 
 export interface KickoffMeeting {
@@ -1181,6 +1187,9 @@ export interface ContractAgreementListDto {
   clientAndVeSigned: string | null;
   clientAndVeSignedDate: string | null;
   teamMember: string;
+  oeFirstName: string | null;
+  oeSiteVisitName: string | null;
+  oeDocsPrepName: string | null;
 }
 
 export interface ContractAgreement {

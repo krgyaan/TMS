@@ -3,12 +3,16 @@ import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { woKickoffMeetings } from '@db/schemas/operations/kick-off-meetings.schema';
 import { and, asc, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { KickOffMeetingDashboardRow, SaveKickOffMeetingDto, UpdateKickOffMeetingMomDto } from './dto/kick-off-meeting.dto';
 import { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import { users } from '@/db/schemas';
 import { woAcceptance, woBasicDetails, woDetails } from '@/db/schemas/operations';
+
+const oeSiteVisitUser = alias(users, 'oeSiteVisitUser');
+const oeDocsPrepUser = alias(users, 'oeDocsPrepUser');
 
 @Injectable()
 export class KickOffMeetingService {
@@ -38,7 +42,9 @@ export class KickOffMeetingService {
             ${woBasicDetails.woNumber} ILIKE ${searchStr} OR
             ${woBasicDetails.woValuePreGst}::text ILIKE ${searchStr} OR
             ${woBasicDetails.woValueGstAmt}::text ILIKE ${searchStr} OR
-            ${users.name} ILIKE ${searchStr}
+            ${users.name} ILIKE ${searchStr} OR
+            ${oeSiteVisitUser.name} ILIKE ${searchStr} OR
+            ${oeDocsPrepUser.name} ILIKE ${searchStr}
             )`);
         }
 
@@ -100,6 +106,12 @@ export class KickOffMeetingService {
             case 'woStatus':
                 orderByClause = sortOrder(woDetails.status);
                 break;
+            case 'oeSiteVisitName':
+                orderByClause = sortOrder(oeSiteVisitUser.name);
+                break;
+            case 'oeDocsPrepName':
+                orderByClause = sortOrder(oeDocsPrepUser.name);
+                break;
             }
         }
 
@@ -111,6 +123,8 @@ export class KickOffMeetingService {
             .from(woDetails)
             .leftJoin(woBasicDetails, eq(woBasicDetails.id, woDetails.woBasicDetailId))
             .leftJoin(users, eq(users.id, woBasicDetails.oeFirst))
+            .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
+            .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep))
             .leftJoin(latestKickoff, eq(latestKickoff.woDetailId, woDetails.id))
             .leftJoin(woAcceptance, eq(woAcceptance.woDetailId, woDetails.id))
             .where(whereClause);
@@ -124,6 +138,9 @@ export class KickOffMeetingService {
                 projectName: woBasicDetails.projectName,
                 woNumber: woBasicDetails.woNumber,
                 teamMemberName: users.name,
+                oeFirstName: users.name,
+                oeSiteVisitName: oeSiteVisitUser.name,
+                oeDocsPrepName: oeDocsPrepUser.name,
                 woDate: woBasicDetails.woDate,
                 woValuePreGst: woBasicDetails.woValuePreGst,
                 woValueGstAmt: woBasicDetails.woValueGstAmt,
@@ -138,6 +155,8 @@ export class KickOffMeetingService {
             .from(woDetails)
             .leftJoin(woBasicDetails, eq(woBasicDetails.id, woDetails.woBasicDetailId))
             .leftJoin(users, eq(users.id, woBasicDetails.oeFirst))
+            .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
+            .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep))
             .leftJoin(latestKickoff, eq(latestKickoff.woDetailId, woDetails.id))
             .leftJoin(woAcceptance, eq(woAcceptance.woDetailId, woDetails.id))
             .where(whereClause)
@@ -159,6 +178,9 @@ export class KickOffMeetingService {
             meetingLink: row.meetingLink,
             momFilePath: row.momFilePath,
             teamMemberName: row.teamMemberName,
+            oeFirstName: row.oeFirstName,
+            oeSiteVisitName: row.oeSiteVisitName,
+            oeDocsPrepName: row.oeDocsPrepName,
         }));
 
         return wrapPaginatedResponse(data, total, page, limit);
@@ -203,6 +225,8 @@ export class KickOffMeetingService {
                 .from(woDetails)
                 .leftJoin(woBasicDetails, eq(woBasicDetails.id, woDetails.woBasicDetailId))
                 .leftJoin(users, eq(users.id, woBasicDetails.oeFirst))
+                .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
+                .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep))
                 .leftJoin(latestKickoff, eq(latestKickoff.woDetailId, woDetails.id))
                 .leftJoin(woAcceptance, eq(woAcceptance.woDetailId, woDetails.id))
                 .where(notScheduledConditions.length ? and(...notScheduledConditions) : undefined)
@@ -212,6 +236,8 @@ export class KickOffMeetingService {
                 .from(woDetails)
                 .leftJoin(woBasicDetails, eq(woBasicDetails.id, woDetails.woBasicDetailId))
                 .leftJoin(users, eq(users.id, woBasicDetails.oeFirst))
+                .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
+                .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep))
                 .leftJoin(latestKickoff, eq(latestKickoff.woDetailId, woDetails.id))
                 .leftJoin(woAcceptance, eq(woAcceptance.woDetailId, woDetails.id))
                 .where(scheduledConditions.length ? and(...scheduledConditions) : undefined)

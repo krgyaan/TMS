@@ -5,6 +5,8 @@ import { woAcceptance, woAmendments, woBasicDetails, woBillingAddresses, woBilli
 import { rfqs, rfqResponseDocuments, rfqResponses, tenderCostingSheets, tenderInfos } from '@db/schemas/tendering';
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, desc, eq, ilike, isNull, ne, or, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
+import { users } from '@/db/schemas/auth/users.schema';
 import type { Page1ContactDto, SavePage1Dto, SubmitPage1Dto } from './dto/page1-handover.dto';
 import type { SavePage2Dto, SubmitPage2Dto } from './dto/page2-compliance.dto';
 import type { SavePage3Dto, SubmitPage3Dto } from './dto/page3-swot.dto';
@@ -13,6 +15,10 @@ import type { SavePage5Dto, SubmitPage5Dto } from './dto/page5-execution.dto';
 import type { SavePage6Dto, SubmitPage6Dto } from './dto/page6-profitability.dto';
 import type { SavePage7Dto, SubmitPage7Dto } from './dto/page7-acceptance.dto';
 import type { CreateWoDetailDto, ImportContactsResponse, TenderDocumentsChecklist, UpdateWoDetailDto, WizardInitResponse, WizardValidationResult, WoDetailsListResponseDto, WoDetailsQueryDto, WoDetailsStatus } from './dto/wo-details.dto';
+
+const oeFirstUser = alias(users, 'oeFirstUser');
+const oeSiteVisitUser = alias(users, 'oeSiteVisitUser');
+const oeDocsPrepUser = alias(users, 'oeDocsPrepUser');
 
 export type WoDetailRow = typeof woDetails.$inferSelect;
 
@@ -133,6 +139,9 @@ export class WoDetailsService {
       ldApplicable: !!row.ldApplicable,
       isContractAgreement: !!row.isContractAgreement,
       oeWoAmendmentNeeded: !!row.oeWoAmendmentNeeded,
+      oeFirstName: row.oeFirstName ?? null,
+      oeSiteVisitName: row.oeSiteVisitName ?? null,
+      oeDocsPrepName: row.oeDocsPrepName ?? null,
       status: (row.status as WoDetailsStatus) || 'draft',
       woAcceptanceId: row.woAcceptanceId ?? null,
       woAcceptanceStatus: row.woAcceptanceStatus ?? null,
@@ -247,6 +256,9 @@ export class WoDetailsService {
           ilike(woBasicDetails.projectName, searchStr),
           ilike(woBasicDetails.woNumber, searchStr),
           ilike(woBasicDetails.projectCode, searchStr),
+          ilike(oeFirstUser.name, searchStr),
+          ilike(oeSiteVisitUser.name, searchStr),
+          ilike(oeDocsPrepUser.name, searchStr),
         ),
       );
     }
@@ -279,6 +291,15 @@ export class WoDetailsService {
       case 'currentPage':
         orderByClause = orderFn(woDetails.currentPage);
         break;
+      case 'oeFirstName':
+        orderByClause = orderFn(oeFirstUser.name);
+        break;
+      case 'oeSiteVisitName':
+        orderByClause = orderFn(oeSiteVisitUser.name);
+        break;
+      case 'oeDocsPrepName':
+        orderByClause = orderFn(oeDocsPrepUser.name);
+        break;
       default:
         orderByClause = orderFn(woDetails.createdAt);
     }
@@ -291,6 +312,9 @@ export class WoDetailsService {
           woBasicDetails,
           eq(woDetails.woBasicDetailId, woBasicDetails.id),
         )
+        .leftJoin(oeFirstUser, eq(oeFirstUser.id, woBasicDetails.oeFirst))
+        .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
+        .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep))
         .leftJoin(woAcceptance, eq(woDetails.id, woAcceptance.woDetailId))
         .where(whereClause)
         .then(([r]) => Number(r?.count ?? 0)),
@@ -306,6 +330,9 @@ export class WoDetailsService {
           ldApplicable: woDetails.ldApplicable,
           isContractAgreement: woDetails.isContractAgreement,
           oeWoAmendmentNeeded: woDetails.oeWoAmendmentNeeded,
+          oeFirstName: oeFirstUser.name,
+          oeSiteVisitName: oeSiteVisitUser.name,
+          oeDocsPrepName: oeDocsPrepUser.name,
           status: woDetails.status,
           woAcceptanceId: woAcceptance?.id,
           woAcceptanceStatus: woAcceptance?.status,
@@ -315,6 +342,9 @@ export class WoDetailsService {
           woBasicDetails,
           eq(woDetails.woBasicDetailId, woBasicDetails.id),
         )
+        .leftJoin(oeFirstUser, eq(oeFirstUser.id, woBasicDetails.oeFirst))
+        .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
+        .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep))
         .leftJoin(woAcceptance, eq(woDetails.id, woAcceptance.woDetailId))
         .where(whereClause)
         .orderBy(orderByClause)

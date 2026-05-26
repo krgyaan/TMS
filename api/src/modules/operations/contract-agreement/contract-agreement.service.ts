@@ -2,12 +2,16 @@ import { Inject, Injectable } from '@nestjs/common';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { and, asc, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { ContractAgreementDashboardRow, SaveContractAgreementDto } from './dto/contract-agreement.dto';
 import { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import { users } from '@/db/schemas';
 import { woBasicDetails, woDetails } from '@/db/schemas/operations';
+
+const oeSiteVisitUser = alias(users, 'oeSiteVisitUser');
+const oeDocsPrepUser = alias(users, 'oeDocsPrepUser');
 
 @Injectable()
 export class ContractAgreementService {
@@ -37,7 +41,9 @@ export class ContractAgreementService {
             ${woBasicDetails.woNumber} ILIKE ${searchStr} OR
             ${woBasicDetails.woValuePreGst}::text ILIKE ${searchStr} OR
             ${woBasicDetails.woValueGstAmt}::text ILIKE ${searchStr} OR
-            ${users.name} ILIKE ${searchStr}
+            ${users.name} ILIKE ${searchStr} OR
+            ${oeSiteVisitUser.name} ILIKE ${searchStr} OR
+            ${oeDocsPrepUser.name} ILIKE ${searchStr}
             )`);
         }
 
@@ -71,6 +77,12 @@ export class ContractAgreementService {
             case 'woStatus':
                 orderByClause = sortOrder(woDetails.status);
                 break;
+            case 'oeSiteVisitName':
+                orderByClause = sortOrder(oeSiteVisitUser.name);
+                break;
+            case 'oeDocsPrepName':
+                orderByClause = sortOrder(oeDocsPrepUser.name);
+                break;
             }
         }
 
@@ -80,6 +92,8 @@ export class ContractAgreementService {
             .from(woDetails)
             .leftJoin(woBasicDetails, eq(woBasicDetails.id, woDetails.woBasicDetailId))
             .leftJoin(users, eq(users.id, woBasicDetails.oeFirst))
+            .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
+            .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep))
             .where(whereClause);
 
         const total = Number(countResult?.count || 0);
@@ -91,6 +105,9 @@ export class ContractAgreementService {
                 projectName: woBasicDetails.projectName,
                 woNumber: woBasicDetails.woNumber,
                 teamMemberName: users.name,
+                oeFirstName: users.name,
+                oeSiteVisitName: oeSiteVisitUser.name,
+                oeDocsPrepName: oeDocsPrepUser.name,
                 woDate: woBasicDetails.woDate,
                 woValuePreGst: woBasicDetails.woValuePreGst,
                 woValueGstAmt: woBasicDetails.woValueGstAmt,
@@ -105,6 +122,8 @@ export class ContractAgreementService {
             .from(woDetails)
             .leftJoin(woBasicDetails, eq(woBasicDetails.id, woDetails.woBasicDetailId))
             .leftJoin(users, eq(users.id, woBasicDetails.oeFirst))
+            .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
+            .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep))
             .where(whereClause)
             .orderBy(orderByClause)
             .limit(limit)
@@ -125,6 +144,9 @@ export class ContractAgreementService {
             clientAndVeSigned: row.clientAndVeSigned,
             clientAndVeSignedDate: row.clientAndVeSignedDate ? new Date(row.clientAndVeSignedDate) : null,
             teamMemberName: row.teamMemberName,
+            oeFirstName: row.oeFirstName,
+            oeSiteVisitName: row.oeSiteVisitName,
+            oeDocsPrepName: row.oeDocsPrepName,
         }));
 
         return wrapPaginatedResponse(data, total, page, limit);
@@ -146,6 +168,8 @@ export class ContractAgreementService {
                 .from(woDetails)
                 .leftJoin(woBasicDetails, eq(woBasicDetails.id, woDetails.woBasicDetailId))
                 .leftJoin(users, eq(users.id, woBasicDetails.oeFirst))
+                .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
+                .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep))
                 .where(notScheduledConditions.length ? and(...notScheduledConditions) : undefined)
                 .then(r => Number(r[0]?.count || 0)),
             this.db
@@ -153,6 +177,8 @@ export class ContractAgreementService {
                 .from(woDetails)
                 .leftJoin(woBasicDetails, eq(woBasicDetails.id, woDetails.woBasicDetailId))
                 .leftJoin(users, eq(users.id, woBasicDetails.oeFirst))
+                .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
+                .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep))
                 .where(scheduledConditions.length ? and(...scheduledConditions) : undefined)
                 .then(r => Number(r[0]?.count || 0)),
         ]);
