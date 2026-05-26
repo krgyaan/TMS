@@ -835,7 +835,7 @@ export class TenderApprovalService {
             await this.emailService.sendTenderEmail({
                 tenderId,
                 eventType,
-                fromUserId: 13,
+                fromUserId,
                 to: recipients.to || [],
                 cc: recipients.cc,
                 subject,
