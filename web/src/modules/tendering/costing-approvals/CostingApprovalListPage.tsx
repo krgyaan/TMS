@@ -98,12 +98,12 @@ const CostingApprovalListPage = () => {
             },
             icon: <Eye className="h-4 w-4" />,
         },
-        // {
-        //     label : 'Mark As Missed',
-        //     onClick : (row) => navigate(paths.tendering.bidMissedGlobal(row.tenderId, "costing-approval")),
-        //     icon : <XCircle className='h-4 w-4' />,
-        //     visible : () => hasTenderingPermission && activeTab != 'tender-dnb',
-        // }
+        {
+            label : 'Mark As DNB',
+            onClick : (row) => navigate(paths.tendering.bidMissedGlobal(row.tenderId, "costing-approval")),
+            icon : <XCircle className='h-4 w-4' />,
+            visible : () => hasTenderingPermission && activeTab != 'tender-dnb',
+        }
     ], [navigate, hasTenderingPermission, activeTab]);
 
     const tabsConfig = useMemo(() => {

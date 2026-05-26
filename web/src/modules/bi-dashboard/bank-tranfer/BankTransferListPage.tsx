@@ -9,6 +9,7 @@ import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, FileX2, Search, Eye, Clock, CheckCircle, XCircle, RotateCcw, Wallet, Edit } from 'lucide-react';
+import { QuickFilter } from '@/components/ui/quick-filter';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useBankTransferDashboard, useBankTransferDashboardCounts } from '@/hooks/api/useBankTransfers';
@@ -74,10 +75,13 @@ const BankTransferListPage = () => {
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
     const debouncedSearch = useDebouncedSearch(search, 300);
+    const [teamFilter, setTeamFilter] = useState<string>('All');
+    const teamId = teamFilter === 'All' ? undefined : teamFilter === 'AC' ? 1 : 2;
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, debouncedSearch]);
+    }, [teamFilter]);
+
 
     const handlePageSizeChange = useCallback((newPageSize: number) => {
         setPagination({ pageIndex: 0, pageSize: newPageSize });
@@ -101,6 +105,7 @@ const BankTransferListPage = () => {
         sortBy: sortModel[0]?.colId,
         sortOrder: sortModel[0]?.sort,
         search: debouncedSearch || undefined,
+        team: teamId,
     });
 
     const { data: counts } = useBankTransferDashboardCounts();
@@ -113,7 +118,7 @@ const BankTransferListPage = () => {
             {
                 label: 'View Details',
                 icon: <Eye className="h-4 w-4" />,
-                onClick: (row: BankTransferDashboardRow) => navigate(paths.bi.bankTransferView(row.requestId)),
+                onClick: (row: BankTransferDashboardRow) => navigate(paths.bi.bankTransferView(row.id)),
             },
             {
                 label: 'Action Form',
@@ -334,7 +339,15 @@ const BankTransferListPage = () => {
 
                         {/* Search Row: Quick Filters, Search Bar */}
                         <div className="flex items-center gap-4 px-6 pb-4">
-                            {/* Quick Filters (Left) - Optional, can be added per page */}
+                            {/* Quick Filters (Left) */}
+                            <QuickFilter options={[
+                                { label: 'AC Team', value: 'AC' },
+                                { label: 'DC Team', value: 'DC' },
+                                { label: 'All Team', value: 'All' },
+                            ]}
+                                value={teamFilter}
+                                onChange={(value) => setTeamFilter(value)}
+                            />
 
                             {/* Search Bar (Center) - Flex grow */}
                             <div className="flex-1 flex justify-end">

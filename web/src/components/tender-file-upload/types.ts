@@ -73,7 +73,9 @@ export type TenderFileContext =
     | 'detailed-wo'
     | 'final-wo'
     | 'kickoff-mom'
-    | 'contract-agreement';
+    | 'contract-agreement'
+    | 'cancel-tender'
+    | "payment-proof";
 
 export interface FileConfig {
     context: string;

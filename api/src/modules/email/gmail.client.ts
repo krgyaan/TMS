@@ -132,7 +132,7 @@ export class GmailClient {
     }
 
     /**
-     * Send email via Gmail API
+     * Send email via Gmail API //Yeh dukh khatam kaahe nahi hota
      */
     async send(userId: number, email: ResolvedEmail): Promise<SendResult> {
         const gmail = await this.getGmailClient(userId);

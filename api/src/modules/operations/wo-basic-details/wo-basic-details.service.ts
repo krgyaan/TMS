@@ -7,7 +7,7 @@ import { woBasicDetails, woContacts, woDetails } from '@db/schemas/operations';
 import { users } from '@db/schemas/auth/users.schema';
 import type { CreateWoBasicDetailDto, UpdateWoBasicDetailDto, AssignOeDto, BulkAssignOeDto, RemoveOeAssignmentDto, WoBasicDetailsQueryDto } from './dto/wo-basic-details.dto';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { projects, teams, tenderInfos } from '@/db/schemas';
+import { projects, teams, tenderInfos, organizations, items, locations, tenderClients, tenderCostingSheets } from '@/db/schemas';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 
 const oeFirstUser = alias(users, 'oeFirstUser');
@@ -40,6 +40,13 @@ export class WoBasicDetailsService {
             receiptPreGst: data.receiptPreGst ?? null,
             budgetPreGst: data.budgetPreGst ?? null,
             grossMargin: data.grossMargin ?? null,
+            finalPrice: data.finalPrice ?? null,
+            budgetSupply: data.budgetSupply ?? null,
+            budgetService: data.budgetService ?? null,
+            budgetFreight: data.budgetFreight ?? null,
+            budgetAdmin: data.budgetAdmin ?? null,
+            budgetBuybackSale: data.budgetBuybackSale ?? null,
+            budgetGemCharges: data.budgetGemCharges ?? null,
             woDraft: data.woDraft ?? null,
             teChecklistConfirmed: data.teChecklistConfirmed ?? false,
             tmsDocuments: data.tmsDocuments ?? null,
@@ -63,6 +70,13 @@ export class WoBasicDetailsService {
         if (data.receiptPreGst !== undefined) out.receiptPreGst = data.receiptPreGst;
         if (data.budgetPreGst !== undefined) out.budgetPreGst = data.budgetPreGst;
         if (data.grossMargin !== undefined) out.grossMargin = data.grossMargin;
+        if (data.finalPrice !== undefined) out.finalPrice = data.finalPrice;
+        if (data.budgetSupply !== undefined) out.budgetSupply = data.budgetSupply;
+        if (data.budgetService !== undefined) out.budgetService = data.budgetService;
+        if (data.budgetFreight !== undefined) out.budgetFreight = data.budgetFreight;
+        if (data.budgetAdmin !== undefined) out.budgetAdmin = data.budgetAdmin;
+        if (data.budgetBuybackSale !== undefined) out.budgetBuybackSale = data.budgetBuybackSale;
+        if (data.budgetGemCharges !== undefined) out.budgetGemCharges = data.budgetGemCharges;
         if (data.woDraft !== undefined) out.woDraft = data.woDraft;
         if (data.teChecklistConfirmed !== undefined) out.teChecklistConfirmed = data.teChecklistConfirmed;
         if (data.tmsDocuments !== undefined) out.tmsDocuments = data.tmsDocuments;
@@ -86,6 +100,13 @@ export class WoBasicDetailsService {
             receiptPreGst: row.receiptPreGst,
             budgetPreGst: row.budgetPreGst,
             grossMargin: row.grossMargin,
+            finalPrice: row.finalPrice,
+            budgetSupply: row.budgetSupply,
+            budgetService: row.budgetService,
+            budgetFreight: row.budgetFreight,
+            budgetAdmin: row.budgetAdmin,
+            budgetBuybackSale: row.budgetBuybackSale,
+            budgetGemCharges: row.budgetGemCharges,
             woDraft: row.woDraft,
             tmsDocuments: row.tmsDocuments,
             oeFirst: row.oeFirst,
@@ -750,6 +771,60 @@ export class WoBasicDetailsService {
             .where(eq(woBasicDetails.enquiryId, enquiryId));
 
         return rows.map((r) => this.mapRowToResponse(r));
+    }
+
+    async getPrefillData(tenderId: number) {
+        const [tender] = await this.db
+            .select({
+                team: tenderInfos.team,
+                organizationAcronym: organizations.acronym,
+                itemName: items.name,
+                locationName: locations.name,
+            })
+            .from(tenderInfos)
+            .leftJoin(organizations, eq(organizations.id, tenderInfos.organization))
+            .leftJoin(items, eq(items.id, tenderInfos.item))
+            .leftJoin(locations, eq(locations.id, tenderInfos.location))
+            .where(eq(tenderInfos.id, tenderId))
+            .limit(1);
+
+        const [costingSheet] = await this.db
+            .select({
+                budgetPrice: tenderCostingSheets.budgetPrice,
+                receiptPrice: tenderCostingSheets.receiptPrice,
+                grossMargin: tenderCostingSheets.grossMargin,
+                finalPrice: tenderCostingSheets.finalPrice,
+            })
+            .from(tenderCostingSheets)
+            .where(eq(tenderCostingSheets.tenderId, tenderId))
+            .limit(1);
+
+        const clients = await this.db
+            .select({
+                clientName: tenderClients.clientName,
+                clientDesignation: tenderClients.clientDesignation,
+                clientMobile: tenderClients.clientMobile,
+                clientEmail: tenderClients.clientEmail,
+            })
+            .from(tenderClients)
+            .where(eq(tenderClients.tenderId, tenderId));
+
+        return {
+            team: tender?.team ?? null,
+            organizationAcronym: tender?.organizationAcronym ?? null,
+            itemName: tender?.itemName ?? null,
+            locationName: tender?.locationName ?? null,
+            budgetPrice: costingSheet?.budgetPrice ?? null,
+            receiptPrice: costingSheet?.receiptPrice ?? null,
+            grossMargin: costingSheet?.grossMargin ?? null,
+            finalPrice: costingSheet?.finalPrice ?? null,
+            clients: clients.map(c => ({
+                clientName: c.clientName,
+                clientDesignation: c.clientDesignation,
+                clientMobile: c.clientMobile,
+                clientEmail: c.clientEmail,
+            })),
+        };
     }
 
     // DASHBOARD/REPORTING

@@ -26,8 +26,7 @@ const OptionalBooleanSchema = BooleanSchema.optional();
 export const WoDetailsStatusEnum = z.enum([
   'draft',
   'in_progress',
-  'completed',
-  'submitted_for_review',
+  'wo_details_filled',
 ]);
 
 export const WoAcceptanceStatusEnum = z.enum([
@@ -120,6 +119,9 @@ export const UpdateWoDetailSchema = z.object({
   swotOpportunities: z.string().nullable().optional(),
   swotThreats: z.string().nullable().optional(),
 
+  // Page 4
+  buybackBoqApplicable: z.boolean().optional(),
+
   // Page 5
   siteVisitNeeded: OptionalBooleanSchema,
   siteVisitPerson: SiteVisitPersonSchema.nullable().optional(),
@@ -137,12 +139,6 @@ export const UpdateWoDetailSchema = z.object({
     .or(z.literal('')),
   hasDiscrepancies: OptionalBooleanSchema,
   discrepancyComments: z.string().nullable().optional(),
-  budgetPreGst: DecimalSchema.nullable().optional(),
-  budgetSupply: DecimalSchema.nullable().optional(),
-  budgetService: DecimalSchema.nullable().optional(),
-  budgetFreight: DecimalSchema.nullable().optional(),
-  budgetAdmin: DecimalSchema.nullable().optional(),
-  budgetBuybackSale: DecimalSchema.nullable().optional(),
 
   // Page 7
   oeWoAmendmentNeeded: OptionalBooleanSchema,
@@ -351,6 +347,7 @@ export const AddressSchema = z.object({
 export const SavePage4Schema = z.object({
   billingBoq: z.array(BOQItemSchema).optional(),
   buybackBoq: z.array(BOQItemSchema).optional(),
+  buybackBoqApplicable: z.boolean().optional(),
   billingAddresses: z.array(AddressSchema).optional(),
   shippingAddresses: z.array(AddressSchema).optional(),
 });
@@ -360,6 +357,7 @@ export const SubmitPage4Schema = z.object({
     .array(BOQItemSchema)
     .min(1, 'At least one billing BOQ item is required'),
   buybackBoq: z.array(BOQItemSchema).optional().default([]),
+  buybackBoqApplicable: z.boolean().optional(),
   billingAddresses: z
     .array(AddressSchema)
     .min(1, 'At least one billing address is required'),
@@ -416,12 +414,6 @@ export const SavePage6Schema = z.object({
     .or(z.literal('')),
   hasDiscrepancies: OptionalBooleanSchema,
   discrepancyComments: z.string().nullable().optional(),
-  budgetPreGst: DecimalSchema.nullable().optional(),
-  budgetSupply: DecimalSchema.nullable().optional(),
-  budgetService: DecimalSchema.nullable().optional(),
-  budgetFreight: DecimalSchema.nullable().optional(),
-  budgetAdmin: DecimalSchema.nullable().optional(),
-  budgetBuybackSale: DecimalSchema.nullable().optional(),
 });
 
 export const SubmitPage6Schema = z
@@ -435,12 +427,6 @@ export const SubmitPage6Schema = z
       .or(z.literal('')),
     hasDiscrepancies: BooleanSchema,
     discrepancyComments: z.string().nullable().optional(),
-    budgetPreGst: DecimalSchema,
-    budgetSupply: DecimalSchema.nullable().optional(),
-    budgetService: DecimalSchema.nullable().optional(),
-    budgetFreight: DecimalSchema.nullable().optional(),
-    budgetAdmin: DecimalSchema.nullable().optional(),
-    budgetBuybackSale: DecimalSchema.nullable().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.hasDiscrepancies && !data.discrepancyComments?.trim()) {

@@ -80,11 +80,6 @@ const BidSubmissionListPage = () => {
     };
 
     const bidSubmissionActions: ActionItem<BidSubmissionDashboardRowWithTimer>[] = useMemo(() => [
-        // {
-        //     label: 'Change Status',
-        //     onClick: (row: BidSubmissionDashboardRow) => setChangeStatusModal({ open: true, tenderId: row.tenderId }),
-        //     icon: <RefreshCw className="h-4 w-4" />,
-        // },
         {
             label: 'Submit Bid',
             onClick: (row: BidSubmissionDashboardRow) => {
@@ -94,12 +89,12 @@ const BidSubmissionListPage = () => {
             visible: (row) => row.bidStatus === 'Submission Pending',
         },
         {
-            label: 'Mark as Missed',
+            label: 'Mark as DNB',
             onClick: (row: BidSubmissionDashboardRow) => {
                 navigate(paths.tendering.bidMissedGlobal(row.tenderId, 'bid-submission'));
             },
             icon: <XCircle className="h-4 w-4" />,
-            visible: (row) => hasTenderingPermission && row.bidStatus === 'Submission Pending',
+            visible: (row) => row.bidStatus === 'Submission Pending',
         },
         {
             label: 'Edit Bid',

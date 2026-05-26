@@ -1,9 +1,28 @@
-import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, Query, UseInterceptors, UploadedFiles, Req, BadRequestException } from '@nestjs/common';
 import { TenderResultService } from '@/modules/tendering/tender-result/tender-result.service';
 import type { ResultDashboardType } from '@/modules/tendering/types/shared.types';
-import type { UploadResultDto } from '@/modules/tendering/tender-result/dto/tender-result.dto';
+import type { UploadResultDto, UploadTenderCancelledDto } from '@/modules/tendering/tender-result/dto/tender-result.dto';
+import { UploadTenderCancelledSchema } from '@/modules/tendering/tender-result/dto/tender-result.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
+
+//defining the multer config
+const multerConfig = {
+    storage: diskStorage({
+        destination : './uploads/tendering/result-screenshots',
+        filename: (req, file, callback) => {
+            const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+            const ext = extname(file.originalname);
+            callback(null, `imp-${uniqueSuffix}${ext}`);
+        },
+    }),
+    limits: {
+        fileSize : 10 * 1024 * 1024,
+    }
+}
 
 @Controller('tender-results')
 export class TenderResultController {
@@ -65,6 +84,17 @@ export class TenderResultController {
     @Post('create/:tenderId')
     createForTender(@Param('tenderId', ParseIntPipe) tenderId: number) {
         return this.tenderResultService.createForTender(tenderId);
+    }
+
+    @Post('cancel-tender/:tenderId')
+    cancelTender(
+        @Param('tenderId', ParseIntPipe) tenderId: number,
+        @CurrentUser() user: any,
+        @Body() dto: UploadTenderCancelledDto
+    ){
+        //calling the service function to cancel the tender
+        const result = this.tenderResultService.cancelTender(tenderId , user, dto);
+        return  result;
     }
 
     @Post('upload/:tenderId')

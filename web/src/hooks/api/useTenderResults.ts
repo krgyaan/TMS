@@ -26,7 +26,7 @@ export const useResultDashboard = (
     filters?: ResultDashboardFilters
 ) => {
     const { teamId, userId, dataScope } = useTeamFilter();
-    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const teamIdParam = teamId !== null ? teamId : undefined;
 
     const params: ResultDashboardFilters = {
         ...filters,
@@ -64,7 +64,7 @@ export const useResultDashboard = (
 
 export const useResultDashboardCounts = () => {
     const { teamId, userId, dataScope } = useTeamFilter();
-    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const teamIdParam = teamId !== null ? teamId : undefined;
     const queryKey = [...tenderResultKey.counts(), dataScope, teamId ?? null, userId ?? null];
 
     return useQuery<ResultDashboardCounts>({
@@ -123,5 +123,22 @@ export const useUploadResult = () => {
         },
     });
 };
+
+export const uploadCancelledTenderResult= () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({tenderId, data} : {tenderId: number, data: any}) => tenderResultService.uploadCancelledTenderResult(tenderId, data),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: tenderResultKey.lists() });
+            queryClient.invalidateQueries({ queryKey: tenderResultKey.byTender(variables.tenderId) });
+            queryClient.invalidateQueries({ queryKey: tenderResultKey.counts() });
+            toast.success("Tender cancelled successfully");
+        },
+        onError: error => {
+            toast.error(handleQueryError(error));
+        },
+    })
+}
 
 export type { ResultDashboardRow, ResultDashboardCounts, ResultDashboardResponse };

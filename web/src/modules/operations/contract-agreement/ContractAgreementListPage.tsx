@@ -81,7 +81,7 @@ const ContractAgreementListPage = () => {
         ];
     }, [counts]);
 
-    // Action items for "Not Scheduled" tab
+    // Action items for "Not Uploaded" tab
     const rowActions: ActionItem<ContractAgreementListDto>[] = useMemo(() => [
         {
             label: 'Upload Contract Agreement',
@@ -93,7 +93,7 @@ const ContractAgreementListPage = () => {
         },
         {
             label: 'View Details',
-            onClick: (row) => navigate(paths.operations.woBasicDetailShowPage(row.woDetailId)),
+            onClick: (row) => navigate(paths.operations.contractAgreementShowPage(row.woDetailId)),
             icon: <Eye className="h-4 w-4" />,
         },
     ], [navigate]);

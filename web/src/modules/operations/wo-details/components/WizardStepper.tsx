@@ -6,6 +6,7 @@ interface WizardStepperProps {
     currentPage: number;
     completedPages: number[];
     skippedPages: number[];
+    totalPages?: number;
     onPageClick?: (pageNum: number) => void;
 }
 

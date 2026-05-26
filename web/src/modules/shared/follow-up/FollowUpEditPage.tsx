@@ -11,7 +11,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { TiptapEditor } from "@/components/tiptapeditor";
 import { MockUploadDropzone } from "@/components/mock-uploadthing";
-import { DatePicker } from "@/components/ui/date-picker";
 import { FilePond, registerPlugin } from "react-filepond";
 import FilePondPluginFileValidateType from "filepond-plugin-file-validate-type";
 import FilePondPluginImagePreview from "filepond-plugin-image-preview";
@@ -143,8 +142,31 @@ const FollowUpEditPage: React.FC = () => {
             }
         });
 
-        // 2️⃣ Contacts (existing + new)
-        formData.append("contacts", JSON.stringify([...existingPersons, ...persons]));
+        // 2️⃣ Clean, trim, and filter contacts (existing + new)
+        const cleanedContacts = [...existingPersons, ...persons]
+            .map(c => ({
+                id: c.id,
+                name: c.name?.trim() || "",
+                email: c.email?.trim() === "" ? null : c.email?.trim() || null,
+                phone: c.phone?.trim() === "" ? null : c.phone?.trim() || null,
+                org: c.org?.trim() === "" ? null : c.org?.trim() || null,
+            }))
+            // Filter out completely empty contact rows (where name is blank and other fields are blank/null)
+            .filter(c => c.name !== "" || c.email !== null || c.phone !== null);
+
+        // 3️⃣ Frontend validation for contacts
+        for (const [index, contact] of cleanedContacts.entries()) {
+            if (!contact.email) {
+                toast.error(`Contact #${index + 1} Email is required`);
+                return;
+            }
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email)) {
+                toast.error(`Contact #${index + 1} has an invalid email address`);
+                return;
+            }
+        }
+
+        formData.append("contacts", JSON.stringify(cleanedContacts));
 
         // 3️⃣ Removed attachments
         removedAttachments.forEach(file => formData.append("removedAttachments[]", file));
@@ -165,7 +187,8 @@ const FollowUpEditPage: React.FC = () => {
                     navigate(paths.shared.followUp);
                 },
                 onError: (err: any) => {
-                    toast.error(err?.message || "Failed to update followup");
+                    const message = err?.response?.data?.message || err?.message || "Failed to update followup";
+                    toast.error(typeof message === "object" ? JSON.stringify(message) : message);
                 },
             }
         );
@@ -262,9 +285,10 @@ const FollowUpEditPage: React.FC = () => {
 
                                 <div className="space-y-2">
                                     <Label>Next Follow-up Date</Label>
-                                    <DatePicker
-                                        date={form.watch("startFrom") ? new Date(form.watch("startFrom")!) : undefined}
-                                        onChange={date => form.setValue("startFrom", date ? date.toISOString().slice(0, 10) : undefined)}
+                                    <Input
+                                        type="date"
+                                        value={form.watch("startFrom") ? String(form.watch("startFrom")).split("T")[0] : ""}
+                                        onChange={e => form.setValue("startFrom", e.target.value || undefined)}
                                     />
 
                                     <p className="text-xs text-muted-foreground">Must be today or a future date</p>

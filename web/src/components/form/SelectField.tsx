@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { FieldWrapper } from "./FieldWrapper";
 import { cn } from "@/lib/utils";
 
-export type SelectOption = { id: string; name: string };
+export type SelectOption = { id: string; name: string; description?: string };
 
 type SelectFieldProps<TFieldValues extends FieldValues, TName extends FieldPath<TFieldValues>> = {
     control: Control<TFieldValues>;
@@ -79,7 +79,7 @@ export function Combobox({
     const filtered = React.useMemo(() => {
         const q = query.trim().toLowerCase();
         if (!q) return options;
-        return options.filter(o => o.name.toLowerCase().includes(q));
+        return options.filter(o => (o.name ?? "").toLowerCase().includes(q));
     }, [options, query]);
 
     React.useEffect(() => {
@@ -148,7 +148,10 @@ export function Combobox({
                                         clipRule="evenodd"
                                     />
                                 </svg>
-                                {o.name}
+                                <div className="flex flex-col">
+                                    <span>{o.name}</span>
+                                    {o.description && <span className="text-xs text-muted-foreground">{o.description}</span>}
+                                </div>
                             </DropdownMenuItem>
                         );
                     })}

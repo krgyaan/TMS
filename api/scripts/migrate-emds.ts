@@ -230,7 +230,7 @@ import {
     paymentRequests, paymentInstruments, instrumentDdDetails,
     instrumentFdrDetails, instrumentBgDetails, instrumentChequeDetails,
     instrumentTransferDetails
-} from '@db/schemas/tendering/emds.schema';
+} from '@db/schemas/tendering/payment-requests.schema';
 import { tenderInfos, users } from '@/db/schemas';
 
 // Configuration

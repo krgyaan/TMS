@@ -93,7 +93,7 @@ const KickOffListPage = () => {
         },
         {
             label: 'View Details',
-            onClick: (row) => navigate(paths.operations.woBasicDetailShowPage(row.woDetailId)),
+            onClick: (row) => navigate(paths.operations.woKickOffShowPage(row.woDetailId)),
             icon: <Eye className="h-4 w-4" />,
         },
     ], [navigate]);
@@ -111,7 +111,7 @@ const KickOffListPage = () => {
         },
         {
             label: 'View Details',
-            onClick: (row) => navigate(paths.operations.woBasicDetailShowPage(row.woDetailId)),
+            onClick: (row) => navigate(paths.operations.woKickOffShowPage(row.woDetailId)),
             icon: <Eye className="h-4 w-4" />,
         },
     ], [navigate]);

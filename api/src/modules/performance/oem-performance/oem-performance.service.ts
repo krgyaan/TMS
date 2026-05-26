@@ -194,12 +194,14 @@ export class OemPerformanceService {
 
     // ─── Utilities ────────────────────────────────────────────────────────────
 
-    private fieldContainsOem(field: string | null, oem: number): boolean {
+    private fieldContainsOem(field: string | string[] | null, oem: number): boolean {
         if (!field) return false;
+        if (Array.isArray(field)) {
+            return field.some(v => v.trim() === oem.toString());
+        }
         return field
             .split(",")
-            .map(v => v.trim())
-            .includes(oem.toString());
+            .some(v => v.trim() === oem.toString());
     }
 
     private makeSummaryItem(rows: Array<{ tenderName: string; gstValues: string }>): SummaryItem {

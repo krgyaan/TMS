@@ -136,10 +136,9 @@ export const TenderInformationFormSchema = z.object({
         .optional(),
     netWorthValue: z.coerce.number().nonnegative().optional(),
 
-    // Client Details
     clients: z.array(
         z.object({
-            clientName: z.string().min(1, 'Client name is required'),
+            clientName: z.string().optional(),
             clientDesignation: z.string().optional(),
             clientMobile: z.string().max(200).optional(),
             clientEmail: z
@@ -159,6 +158,11 @@ export const TenderInformationFormSchema = z.object({
     courierCity: z.string().max(100).optional(),
     courierState: z.string().max(100).optional(),
     courierPincode: z.string().max(20).optional(),
+    
+    clientDetailsPresent: z.enum(['YES', 'NO']).optional(),
+    customerInContact: z.enum(['YES', 'NO']).optional(),
+    courierDetailsPresent: z.enum(['YES', 'NO']).optional(),
+
     teRemark: z.string().max(1000).optional(),
 }).superRefine((data, ctx) => {
     if (data.teRecommendation === 'NO') {
@@ -290,4 +294,38 @@ export const TenderInformationFormSchema = z.object({
             });
         }
     }
+
+    // Client and Courier Details Presence
+    if (!data.clientDetailsPresent) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Please select an option',
+            path: ['clientDetailsPresent'],
+        });
+    }
+    if (!data.customerInContact) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Please select an option',
+            path: ['customerInContact'],
+        });
+    }
+    if (!data.courierDetailsPresent) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Please select an option',
+            path: ['courierDetailsPresent'],
+        });
+    }
+
+    // Clients
+    data.clients?.forEach((client, index) => {
+        if (!client.clientName?.trim()) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'Client name is required',
+                path: ['clients', index, 'clientName'],
+            });
+        }
+    });
 });

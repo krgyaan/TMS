@@ -21,4 +21,10 @@ export const UploadResultSchema = z.object({
     finalResultScreenshot: optionalString,
 });
 
+export const UploadTenderCancelledSchema = z.object({
+    finalResultScreenshot : z.string({ required_error: "No screenshot uploaded" }),
+    resultReason: z.string({ required_error: "Reason for Cancellation is required" }),
+});
+
 export type UploadResultDto = z.infer<typeof UploadResultSchema>;
+export type UploadTenderCancelledDto = z.infer<typeof UploadTenderCancelledSchema>;

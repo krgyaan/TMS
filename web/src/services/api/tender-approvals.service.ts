@@ -6,7 +6,7 @@ import type {
     TenderApprovalFilters,
     TenderApprovalDashboardCounts,
 } from '@/modules/tendering/tender-approval/helpers/tenderApproval.types';
-import type { PaginatedResult } from '@/types/api.types';
+import type { PaginatedResult, Status } from '@/types/api.types';
 
 class TenderApprovalsService extends BaseApiService {
     constructor() {
@@ -57,8 +57,8 @@ class TenderApprovalsService extends BaseApiService {
         return this.get<TenderApprovalDashboardCounts>(query ? `/dashboard/counts?${query}` : '/dashboard/counts');
     }
 
-    async getTenderRejectedStatuses(){
-        return this.get('/rejected-statuses');
+    async getTenderRejectedStatuses(): Promise<Status[]> {
+        return this.get<Status[]>('/rejected-statuses');
     }
 }
 

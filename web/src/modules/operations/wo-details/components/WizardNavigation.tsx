@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight, SkipForward, Save, Loader2, Check } from "lucide-react";
-import { WIZARD_CONFIG } from "../helpers/constants";
 
 interface WizardNavigationProps {
     currentPage: number;
@@ -27,7 +26,7 @@ export function WizardNavigation({
 }: WizardNavigationProps) {
     const isFirstPage = currentPage === 1;
     const isLastPage = currentPage === totalPages;
-    const isSkippable = canSkip && WIZARD_CONFIG.SKIPPABLE_PAGES.includes(currentPage);
+    const isSkippable = canSkip && !isLastPage;
 
     return (
         <div className="flex items-center justify-between pt-6 border-t">

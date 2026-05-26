@@ -102,9 +102,9 @@ const TqManagementListPage = () => {
         setNoTqDialogOpen(true);
     };
 
-    const handleNoTqConfirm = async (qualified: boolean) => {
+    const handleNoTqConfirm = async (qualified: boolean, disqualificationReason?: string) => {
         if (pendingTenderId !== null) {
-            await markNoTqMutation.mutateAsync({ tenderId: pendingTenderId, qualified });
+            await markNoTqMutation.mutateAsync({ tenderId: pendingTenderId, qualified, disqualificationReason });
             setPendingTenderId(null);
         }
     };
@@ -114,9 +114,9 @@ const TqManagementListPage = () => {
         setTqQualifiedDialogOpen(true);
     };
 
-    const handleTqQualifiedConfirm = async (qualified: boolean) => {
+    const handleTqQualifiedConfirm = async (qualified: boolean, disqualificationReason?: string) => {
         if (pendingTqId !== null) {
-            await tqQualifiedMutation.mutateAsync({ tqId: pendingTqId, qualified });
+            await tqQualifiedMutation.mutateAsync({ tqId: pendingTqId, qualified, disqualificationReason });
             setPendingTqId(null);
         }
     };

@@ -1,30 +1,31 @@
-import { Inject, Injectable, BadRequestException, NotFoundException } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import { DRIZZLE } from "@db/database.module";
-import type { DbInstance } from "@db";
-import type { TenderApprovalPayload } from "@/modules/tendering/tender-approval/dto/tender-approval.dto";
-import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
-import { eq, and, asc, desc, sql, or, inArray, isNull, SQL, ne, notInArray } from "drizzle-orm";
-import { tenderInformation } from "@db/schemas/tendering/tender-info-sheet.schema";
-import { users } from "@db/schemas/auth/users.schema";
-import { statuses } from "@db/schemas/master/statuses.schema";
-import { items } from "@db/schemas/master/items.schema";
-import { tenderIncompleteFields } from "@db/schemas/tendering/tender-incomplete-fields.schema";
-import { TenderInfosService } from "@/modules/tendering/tenders/tenders.service";
-import type { PaginatedResult } from "@/modules/tendering/types/shared.types";
-import { TenderStatusHistoryService } from "@/modules/tendering/tender-status-history/tender-status-history.service";
-import { EmailService } from "@/modules/email/email.service";
-import { RecipientResolver } from "@/modules/email/recipient.resolver";
-import type { RecipientSource } from "@/modules/email/dto/send-email.dto";
-import { Logger } from "@nestjs/common";
-import { wrapPaginatedResponse } from "@/utils/responseWrapper";
-import { TimersService } from "@/modules/timers/timers.service";
-import { TenderInfoSheetsService } from "../info-sheets/info-sheets.service";
-import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
-import { pqrDocuments } from "@db/schemas/shared/pqr.schema";
-import { financeDocuments } from "@db/schemas/shared/finance_docs.schema";
-import { vendorOrganizations } from "@db/schemas/vendors/vendor-organizations.schema";
-import { bidSubmissions } from "@/db/schemas";
+import { Inject, Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { DRIZZLE } from '@db/database.module';
+import type { DbInstance } from '@db';
+import type { TenderApprovalPayload } from '@/modules/tendering/tender-approval/dto/tender-approval.dto';
+import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
+import { eq, and, asc, desc, sql, or, inArray, isNull, SQL, ne, notInArray } from 'drizzle-orm';
+import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
+import { paymentRequests, paymentInstruments } from '@db/schemas/tendering/payment-requests.schema';
+import { users } from '@db/schemas/auth/users.schema';
+import { statuses } from '@db/schemas/master/statuses.schema';
+import { items } from '@db/schemas/master/items.schema';
+import { tenderIncompleteFields } from '@db/schemas/tendering/tender-incomplete-fields.schema';
+import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
+import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
+import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
+import { EmailService } from '@/modules/email/email.service';
+import { RecipientResolver } from '@/modules/email/recipient.resolver';
+import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
+import { Logger } from '@nestjs/common';
+import { wrapPaginatedResponse } from '@/utils/responseWrapper';
+import { TimersService } from '@/modules/timers/timers.service';
+import { TenderInfoSheetsService } from '../info-sheets/info-sheets.service';
+import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { pqrDocuments } from '@db/schemas/shared/pqr.schema';
+import { financeDocuments } from '@db/schemas/shared/finance_docs.schema';
+import { vendorOrganizations } from '@db/schemas/vendors/vendor-organizations.schema';
+import { bidSubmissions } from '@/db/schemas';
 
 export type TenderApprovalFilters = {
     tlStatus?: "0" | "1" | "2" | "3" | number;
@@ -77,22 +78,24 @@ export class TenderApprovalService {
         const roleFilterConditions: any[] = [];
 
         if (user && user.roleId) {
-            if (user.roleId === 1 || user.roleId === 2) {
+            if (user.dataScope === 'all') {
                 // Super User or Admin: Show all, respect teamId filter if provided
                 if (teamId !== undefined && teamId !== null) {
                     roleFilterConditions.push(eq(tenderInfos.team, teamId));
                 }
-            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
-                // Team Leader, Coordinator, Engineer: Filter by primary_team_id
+            } else if (user.canSwitchTeams && teamId !== undefined && teamId !== null) {
+                // Role can switch teams and selected a specific team
+                roleFilterConditions.push(eq(tenderInfos.team, teamId));
+            } else if (user.dataScope === 'team') {
+                // Team-scoped roles: Filter by primary team
                 if (user.teamId) {
                     roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
                 } else {
                     roleFilterConditions.push(sql`1 = 0`); // Empty results
                 }
             } else {
-                if (teamId !== undefined && teamId !== null) {
-                    roleFilterConditions.push(eq(tenderInfos.team, teamId));
-                } else if (user.sub) {
+                // Self-scoped roles: Show only own records
+                if (user.sub) {
                     roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
                 } else {
                     roleFilterConditions.push(sql`1 = 0`); // Empty results
@@ -392,7 +395,7 @@ export class TenderApprovalService {
             })
             .from(tenderInfos)
             .leftJoin(statuses, eq(tenderInfos.status, statuses.id))
-            .leftJoin(vendorOrganizations, sql`${tenderInfos.oemNotAllowed} = ${vendorOrganizations.id}::varchar`)
+            //.leftJoin(vendorOrganizations, sql`${tenderInfos.oemNotAllowed} = ${vendorOrganizations.id}::varchar`)
             .leftJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
             .where(eq(tenderInfos.id, tenderId))
             .limit(1);
@@ -489,130 +492,49 @@ export class TenderApprovalService {
     }
 
     async updateApproval(tenderId: number, payload: TenderApprovalPayload, changedBy: number) {
-        // Validate tender exists
-        await this.tenderInfosService.validateExists(tenderId);
-
-        // Get current tender status before update
+        console.log('[updateApproval] START', { tenderId, payload, changedBy });
+        
         const currentTender = await this.tenderInfosService.findById(tenderId);
-        const prevStatus = currentTender?.status ?? null;
+        console.log('[updateApproval] currentTender fetched', { tenderId: currentTender?.id, tlStatus: currentTender?.tlStatus });
+        
+        if (!currentTender) throw new Error("Tender not found");
+        const prevStatus = currentTender.status;
+        const isEditMode = String(currentTender?.tlStatus) === payload.tlStatus;
+        
+        console.log('[updateApproval] Mode check', { prevStatus, isEditMode, payloadTlStatus: payload.tlStatus });
 
-        const updateData: any = {
-            tlStatus: payload.tlStatus,
-            updatedAt: new Date(),
-        };
+        const { newStatus, statusComment, updateData } = await this.buildApprovalUpdateData(tenderId, payload, isEditMode);
+        console.log('[updateApproval] buildApprovalUpdateData done', { newStatus, statusComment, updateDataKeys: Object.keys(updateData) });
 
-        let newStatus: number | null = null;
-        let statusComment: string = "";
-
-        // Clear incomplete fields for statuses other than '3'
-        if (payload.tlStatus !== "3") {
-            await this.db.delete(tenderIncompleteFields).where(eq(tenderIncompleteFields.tenderId, tenderId));
-        }
-
-        if (payload.tlStatus === "1") {
-            // Approved - Status 3
-            const rfqToString = payload.rfqTo?.join(",") || "";
-
-            updateData.rfqTo = rfqToString;
-            updateData.rfqRequired = payload.rfqRequired ?? null;
-            updateData.quotationFiles = payload.quotationFiles ? JSON.stringify(payload.quotationFiles) : null;
-            updateData.processingFeeMode = payload.processingFeeMode ?? null;
-            updateData.tenderFeeMode = payload.tenderFeeMode ?? null;
-            updateData.emdMode = payload.emdMode ?? null;
-            updateData.approvePqrSelection = payload.approvePqrSelection ?? null;
-            updateData.approveFinanceDocSelection = payload.approveFinanceDocSelection ?? null;
-
-            updateData.tlApprovalRemarks = payload.tlApprovalRemarks ?? null;
-            updateData.tlRejectionRemarks = null;
-            updateData.tlIncompleteRemarks = null;
-            updateData.oemNotAllowed = null;
-            updateData.status = 3; // Tender Info approved
-            newStatus = 3;
-            statusComment = "Tender info approved";
-
-            updateData.tlApprovalTimestamp = new Date(); // tl approval timestamp
-
-            // Update tender values from info sheet
-            const infoSheet = await this.tenderInfoSheetsService.findByTenderId(tenderId);
-            if (infoSheet) {
-                // Convert numeric values to string for decimal fields
-                if (infoSheet.tenderValue !== null && infoSheet.tenderValue !== undefined) {
-                    updateData.gstValues = String(infoSheet.tenderValue);
-                }
-                if (infoSheet.tenderFeeAmount !== null && infoSheet.tenderFeeAmount !== undefined) {
-                    updateData.tenderFees = String(infoSheet.tenderFeeAmount);
-                }
-                if (infoSheet.emdAmount !== null && infoSheet.emdAmount !== undefined) {
-                    updateData.emd = String(infoSheet.emdAmount);
-                }
-            }
-        } else if (payload.tlStatus === "2") {
-            // Rejected - Use tenderStatus from payload (contains rejection reason status ID)
-            updateData.tlRejectionRemarks = payload.tlRejectionRemarks;
-            updateData.tlIncompleteRemarks = null;
-            updateData.oemNotAllowed = payload.oemNotAllowed;
-
-            if (payload.tenderStatus) {
-                updateData.status = payload.tenderStatus;
-                newStatus = payload.tenderStatus;
-                statusComment = "Tender rejected";
-            }
-
-            updateData.rfqTo = null;
-            updateData.rfqRequired = null;
-            updateData.quotationFiles = null;
-            updateData.processingFeeMode = null;
-            updateData.tenderFeeMode = null;
-            updateData.emdMode = null;
-            updateData.approvePqrSelection = null;
-            updateData.tlApprovalRemarks = null;
-            updateData.approveFinanceDocSelection = null;
-
-            updateData.tlApprovalTimestamp = new Date(); // tl approval timestamp
-        } else if (payload.tlStatus === "3") {
-            // Incomplete - Status 29
-            // Incomplete status - clear approval/rejection fields
-            updateData.rfqTo = null;
-            updateData.rfqRequired = null;
-            updateData.quotationFiles = null;
-            updateData.processingFeeMode = null;
-            updateData.tenderFeeMode = null;
-            updateData.emdMode = null;
-            updateData.approvePqrSelection = null;
-            updateData.approveFinanceDocSelection = null;
-            updateData.tlApprovalRemarks = null;
-            updateData.tlApprovalTimestamp = null;
-            updateData.tlRejectionRemarks = null;
-            updateData.tlIncompleteRemarks = payload.tlIncompleteRemarks;
-            updateData.oemNotAllowed = null;
-            updateData.status = 29; // Tender Info sheet Incomplete
-            newStatus = 29;
-            statusComment = "Tender info sheet incomplete";
-
-            // Delete existing incomplete fields
-            await this.db.delete(tenderIncompleteFields).where(eq(tenderIncompleteFields.tenderId, tenderId));
-
-            // Insert new incomplete fields
-            if (payload.incompleteFields && payload.incompleteFields.length > 0) {
-                const incompleteFieldsData = payload.incompleteFields.map(field => ({
-                    tenderId,
-                    fieldName: field.fieldName,
-                    comment: field.comment,
-                    status: "pending" as const,
-                }));
-
-                await this.db.insert(tenderIncompleteFields).values(incompleteFieldsData);
-            }
-        }
-
-        // Update tender and track status change in transaction
         await this.db.transaction(async tx => {
+            console.log('[updateApproval] Transaction started');
+            
             await tx.update(tenderInfos).set(updateData).where(eq(tenderInfos.id, tenderId)).returning();
+            console.log('[updateApproval] Tender updated');
 
-            // Track status change if status was updated
+            if (isEditMode && payload.tlStatus === "1" && currentTender) {
+                console.log('[updateApproval] Checking payment mode changes', { 
+                    currentEmdMode: currentTender.emdMode, 
+                    newEmdMode: payload.emdMode,
+                    currentTenderFeeMode: currentTender.tenderFeeMode,
+                    newTenderFeeMode: payload.tenderFeeMode,
+                    currentProcessingFeeMode: currentTender.processingFeeMode,
+                    newProcessingFeeMode: payload.processingFeeMode
+                });
+                await this.handlePaymentModeChanges(tx, tenderId, currentTender, payload);
+            }
+
+            if (payload.tlStatus === "1" && payload.emdMode === 'exempt') {
+                console.log('[updateApproval] Handling exempt EMD');
+                await this.handleExemptEmd(tx, tenderId);
+            }
+
             if (newStatus !== null && newStatus !== prevStatus) {
+                console.log('[updateApproval] Tracking status change', { newStatus, prevStatus, statusComment });
                 await this.tenderStatusHistoryService.trackStatusChange(tenderId, newStatus, changedBy, prevStatus, statusComment, tx);
             }
+            
+            console.log('[updateApproval] Transaction committed');
         });
 
         // Send email notification for approval/rejection/review
@@ -655,7 +577,7 @@ export class TenderApprovalService {
             if (infoSheet.emdRequired === "YES" || infoSheet.emdRequired === "1") {
                 stagesToStart.push({ stage: "emd_requested" });
             }
-            if (infoSheet.physicalDocsRequired === "YES") {
+            if (infoSheet.physicalDocsRequired === "YES" && infoSheet.physicalDocType !== "ONLY_EMD") {
                 stagesToStart.push({ stage: "physical_docs" });
             }
             // Always start these timers
@@ -717,9 +639,176 @@ export class TenderApprovalService {
             // Don't fail the entire operation if timer transition fails
         }
 
-        return this.getByTenderId(tenderId);
+        return this.getByTenderId(tenderId);        
     }
 
+    private async buildApprovalUpdateData(tenderId: number, payload: TenderApprovalPayload, isEditMode: boolean) {
+        console.log('[buildApprovalUpdateData] START', { tenderId, tlStatus: payload.tlStatus, isEditMode });
+        
+        const updateData: any = { tlStatus: payload.tlStatus, updatedAt: new Date() };
+        let newStatus: number | null = null;
+        let statusComment = '';
+
+        if (payload.tlStatus !== "3") {
+            await this.db.delete(tenderIncompleteFields).where(eq(tenderIncompleteFields.tenderId, tenderId));
+            console.log('[buildApprovalUpdateData] Cleared incomplete fields');
+        }
+
+        switch (payload.tlStatus) {
+            case "1":
+                console.log('[buildApprovalUpdateData] Processing APPROVED status');
+                Object.assign(updateData, {
+                    rfqTo: payload.rfqTo?.join(",") || "",
+                    rfqRequired: payload.rfqRequired ?? null,
+                    quotationFiles: payload.quotationFiles ? JSON.stringify(payload.quotationFiles) : null,
+                    processingFeeMode: payload.processingFeeMode ?? null,
+                    tenderFeeMode: payload.tenderFeeMode ?? null,
+                    emdMode: payload.emdMode ?? null,
+                    approvePqrSelection: payload.approvePqrSelection ?? null,
+                    approveFinanceDocSelection: payload.approveFinanceDocSelection ?? null,
+                    tlApprovalRemarks: payload.tlApprovalRemarks ?? null,
+                    tlRejectionRemarks: null,
+                    tlIncompleteRemarks: null,
+                    oemNotAllowed: null,
+                    tlApprovalTimestamp: new Date(),
+                });
+
+                if (!isEditMode) {
+                    updateData.status = 3;
+                    newStatus = 3;
+                    statusComment = "Tender info approved";
+                }
+
+                const infoSheet = await this.tenderInfoSheetsService.findByTenderId(tenderId);
+                if (infoSheet) {
+                    if (infoSheet.tenderValue != null) updateData.gstValues = String(infoSheet.tenderValue);
+                    if (infoSheet.tenderFeeAmount != null) updateData.tenderFees = String(infoSheet.tenderFeeAmount);
+                    if (infoSheet.emdAmount != null) updateData.emd = String(infoSheet.emdAmount);
+                }
+                break;
+
+            case "2":
+                console.log('[buildApprovalUpdateData] Processing REJECTED status');
+                Object.assign(updateData, this.getClearedApprovalFields(), {
+                    tlRejectionRemarks: payload.tlRejectionRemarks ?? null,
+                    oemNotAllowed: payload.oemNotAllowed,
+                    tlApprovalTimestamp: new Date(),
+                });
+
+                if (payload.tenderStatus && !isEditMode) {
+                    updateData.status = payload.tenderStatus;
+                    newStatus = payload.tenderStatus;
+                    statusComment = "Tender rejected";
+                }
+                console.log('[buildApprovalUpdateData] Rejected status set', { newStatus, tenderStatus: payload.tenderStatus });
+                break;
+
+            case "3":
+                console.log('[buildApprovalUpdateData] Processing INCOMPLETE status');
+                Object.assign(updateData, this.getClearedApprovalFields(), {
+                    tlIncompleteRemarks: payload.tlIncompleteRemarks ?? null,
+                    tlApprovalTimestamp: null,
+                    oemNotAllowed: null,
+                });
+
+                if (!isEditMode) {
+                    updateData.status = 29;
+                    newStatus = 29;
+                    statusComment = "Tender info sheet incomplete";
+                }
+
+                await this.db.delete(tenderIncompleteFields).where(eq(tenderIncompleteFields.tenderId, tenderId));
+
+                if (payload.incompleteFields?.length) {
+                    const incompleteFieldsData = payload.incompleteFields.map(field => ({
+                        tenderId,
+                        fieldName: field.fieldName,
+                        comment: field.comment,
+                        status: "pending" as const,
+                    }));
+                    await this.db.insert(tenderIncompleteFields).values(incompleteFieldsData);
+                }
+                break;
+        }
+
+        return { newStatus, statusComment, updateData };
+    }
+
+    private getClearedApprovalFields() {
+        return {
+            rfqTo: null,
+            rfqRequired: null,
+            quotationFiles: null,
+            processingFeeMode: null,
+            tenderFeeMode: null,
+            emdMode: null,
+            approvePqrSelection: null,
+            tlApprovalRemarks: null,
+            approveFinanceDocSelection: null,
+        };
+    }
+
+    private async handlePaymentModeChanges(
+        tx: any,
+        tenderId: number,
+        currentTender: typeof tenderInfos.$inferSelect,
+        payload: TenderApprovalPayload
+    ) {
+        const changedModes: ('EMD' | 'Tender Fee' | 'Processing Fee')[] = [];
+
+        if (currentTender.emdMode !== payload.emdMode) changedModes.push('EMD');
+        if (currentTender.tenderFeeMode !== payload.tenderFeeMode) changedModes.push('Tender Fee');
+        if (currentTender.processingFeeMode !== payload.processingFeeMode) changedModes.push('Processing Fee');
+
+        if (!changedModes.length) return;
+
+        const rejectionReason = `Mode changed by TL on ${new Date().toISOString()}`;
+
+        const requestsToReject = await tx
+            .select({ id: paymentRequests.id })
+            .from(paymentRequests)
+            .where(and(
+                eq(paymentRequests.tenderId, tenderId),
+                or(...changedModes.map(mode => eq(paymentRequests.purpose, mode)))
+            ));
+
+        if (!requestsToReject.length) return;
+
+        const requestIds = requestsToReject.map(r => r.id);
+
+        await tx.update(paymentRequests)
+            .set({ status: 'Rejected', remarks: rejectionReason })
+            .where(inArray(paymentRequests.id, requestIds));
+
+        await tx.update(paymentInstruments)
+            .set({ action: 1, status: 'ACCOUNT_FORM_REJECTED', rejectionReason })
+            .where(and(
+                inArray(paymentInstruments.requestId, requestIds),
+                eq(paymentInstruments.action, 0)
+            ));
+    }
+
+    private async handleExemptEmd(tx: any, tenderId: number) {
+        const requestIds = await tx
+            .select({ id: paymentRequests.id })
+            .from(paymentRequests)
+            .where(eq(paymentRequests.tenderId, tenderId));
+
+        if (requestIds.length) {
+            const ids = requestIds.map(r => r.id);
+            await tx.update(paymentInstruments)
+                .set({ action: 1, status: 'ACCOUNT_FORM_REJECTED', rejectionReason: `EMD Exempted By TL on ${new Date().toISOString()}` })
+                .where(and(
+                    inArray(paymentInstruments.requestId, ids),
+                    eq(paymentInstruments.action, 0)
+                ));
+        }
+
+        await tx.update(tenderInformation)
+            .set({ emdRequired: 'EXEMPT' })
+            .where(eq(tenderInformation.tenderId, tenderId));
+    }
+    
     async getRejectionStatuses(){
         let result = this.db
             .select({id : statuses.id, name : statuses.name})
@@ -746,7 +835,7 @@ export class TenderApprovalService {
             await this.emailService.sendTenderEmail({
                 tenderId,
                 eventType,
-                fromUserId,
+                fromUserId: 13,
                 to: recipients.to || [],
                 cc: recipients.cc,
                 subject,

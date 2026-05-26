@@ -77,20 +77,23 @@ export class BidSubmissionsService {
         const roleFilterConditions: any[] = [];
 
         if (user && user.roleId) {
-            if (user.roleId === 1 || user.roleId === 2) {
+            if (user.dataScope === 'all') {
                 // Super User or Admin: Show all, respect teamId filter if provided
                 if (teamId !== undefined && teamId !== null) {
                     roleFilterConditions.push(eq(tenderInfos.team, teamId));
                 }
-            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
-                // Team Leader, Coordinator, Engineer: Filter by primary_team_id
+            } else if (user.canSwitchTeams && teamId !== undefined && teamId !== null) {
+                // Role can switch teams and selected a specific team
+                roleFilterConditions.push(eq(tenderInfos.team, teamId));
+            } else if (user.dataScope === 'team') {
+                // Team-scoped roles: Filter by primary team
                 if (user.teamId) {
                     roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
                 } else {
                     roleFilterConditions.push(sql`1 = 0`); // Empty results
                 }
             } else {
-                // All other roles: Show only own tenders
+                // Self-scoped roles: Show only own records
                 if (user.sub) {
                     roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
                 } else {
@@ -108,7 +111,7 @@ export class BidSubmissionsService {
     /**
      * Get dashboard data by tab - Direct queries without config
      */
-    private buildDashboardConditions(user?: ValidatedUser, teamId?: number, activeTab?: string ){
+    private buildDashboardConditions(user?: ValidatedUser, teamId?: number, activeTab?: string, filters?: BidSubmissionFilters){
         //building the base conditions
         const conditions: any[] = [
             TenderInfosService.getActiveCondition(),
@@ -123,6 +126,7 @@ export class BidSubmissionsService {
         //building the tab conditions
         
         if (activeTab === 'pending') {
+            conditions.push(eq(tenderCostingSheets.status, 'Approved'));
             conditions.push(isNull(bidSubmissions.id));
             conditions.push(TenderInfosService.getExcludeStatusCondition(['lost']));
             conditions.push(or(ne(bidSubmissions.status, 'Tender Missed'), isNull(bidSubmissions.status)));
@@ -145,6 +149,20 @@ export class BidSubmissionsService {
             throw new BadRequestException(`Invalid tab: ${activeTab}`);
         }
 
+
+        if (filters?.search) {
+            const searchStr = `%${filters.search}%`;
+            const searchConditions: any[] = [
+                sql`${tenderInfos.tenderName} ILIKE ${searchStr}`,
+                sql`${tenderInfos.tenderNo} ILIKE ${searchStr}`,
+                sql`${tenderInfos.gstValues}::text ILIKE ${searchStr}`,
+                sql`${tenderInfos.dueDate}::text ILIKE ${searchStr}`,
+                sql`${users.name} ILIKE ${searchStr}`,
+                sql`${statuses.name} ILIKE ${searchStr}`,
+            ];
+            conditions.push(sql`(${sql.join(searchConditions, sql` OR `)})`);
+        }
+
         //returning the tab conditions
         return conditions;
 
@@ -154,7 +172,7 @@ export class BidSubmissionsService {
         user?: ValidatedUser,
         teamId?: number,
         tab?: 'pending' | 'submitted' | 'disqualified' | 'tender-dnb',
-        filters?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'asc' | 'desc'; search?: string }
+        filters?: BidSubmissionFilters
     ): Promise<PaginatedResult<BidSubmissionDashboardRow>> {
         const page = filters?.page || 1;
         const limit = filters?.limit || 50;
@@ -166,7 +184,7 @@ export class BidSubmissionsService {
             throw new BadRequestException(`Invalid Status: ${tab}`);
         }
 
-        const conditions : any[] = this.buildDashboardConditions(user, teamId, tab);
+        const conditions : any[] = this.buildDashboardConditions(user, teamId, tab, filters);
         
         const whereClause = and(...conditions);
 
@@ -568,7 +586,12 @@ export class BidSubmissionsService {
                 throw new Error("tender not found.");
             }
 
-            const prevStatus = tender?.status ?? null; 
+            let prevStatus: any = null;
+            
+            if(tender?.status){
+                const [statusRow] = await this.db.select().from(statuses).where(eq(statuses.id, tender.status));
+                prevStatus = statusRow;
+            }
 
             const [status] = await this.db.select({name: statuses.name, id: statuses.id}).from(statuses).where(eq(statuses.id, data.rejectionStatus));
             const newStatus = status.id;
@@ -597,7 +620,7 @@ export class BidSubmissionsService {
                     data.tenderId,
                     newStatus,
                     data.submittedBy,
-                    prevStatus,
+                    prevStatus?.id,
                     'Tender missed',
                     tx
                 );
@@ -646,8 +669,14 @@ export class BidSubmissionsService {
                 return bidSubmission;
             });
 
-            // Send email notification
-            await this.sendBidMissedEmail(data.tenderId, result, data.submittedBy);
+            if(data.rejectionStatus == 8){
+                //send bid missed email
+                await this.sendBidMissedEmail(data.tenderId, result, data.submittedBy);
+
+            } else {
+                // Send DNB email
+                await this.sendDNBEmail(data.tenderId, {reasonForMissing : result.reasonForMissing, fromStatus: prevStatus?.name || 'Unknown'}, data.submittedBy);
+            }
 
             //stopping all the timers running for this tender
             //for the time being stopping all the running timers
@@ -746,18 +775,18 @@ export class BidSubmissionsService {
                 validStatusIds = [14 ,35]; 
                 break;
             case 'emd':
-                validStatusIds = [8]; 
+                validStatusIds = [33];
             case 'checklist':
                 validStatusIds = [];
                 break;
             case 'costing-sheet':
-                validStatusIds = [8 ,10, 14 ,34 ]; 
+                validStatusIds = [10, 14 ,34, 35, 44, 36]; 
                 break;
             case 'costing-approval':
-                validStatusIds = []; 
+                validStatusIds = [10, 34, 44]; 
                 break;
             case 'bid-submission':
-                validStatusIds = [8 , 10, 16 , 33 , 34, 35 ,36];
+                validStatusIds = [8 , 10, 16 , 33 , 34, 35 ,36, 44];
                 break;
         }
 
@@ -1035,6 +1064,80 @@ export class BidSubmissionsService {
             submittedBy,
             `Bid Submission deadline Missed - ${tender.tenderName}`,
             'bid-missed',
+            emailData,
+            {
+                to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
+                cc: ccRecipients,
+            }
+        );
+    }
+
+    /**
+     * Send dnb  email
+     */
+    private async sendDNBEmail(
+        tenderId: number,
+        bidSubmission: { reasonForMissing: string, fromStatus : string },
+        submittedBy: number
+    ) {
+        const tender = await this.tenderInfosService.findById(tenderId);
+        if (!tender || !tender.teamMember) return;
+
+        // Get Team Leader name
+        const teamLeaderEmails = await this.recipientResolver.getEmailsByRole('Team Leader', tender.team);
+        let tlName = 'Team Leader';
+        if (teamLeaderEmails.length > 0) {
+            const [tlUser] = await this.db
+                .select({ name: users.name })
+                .from(users)
+                .where(eq(users.email, teamLeaderEmails[0]))
+                .limit(1);
+            if (tlUser?.name) {
+                tlName = tlUser.name;
+            }
+        }
+
+        // Get TE name
+        const teUser = await this.recipientResolver.getUserById(tender.teamMember);
+        const teName = teUser?.name || 'Tender Executive';
+
+        // Format due date and time
+        const dueDateTime = tender.dueDate ? new Date(tender.dueDate).toLocaleString('en-IN', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        }) : 'Not specified';
+
+        const emailData = {
+            tl_name: tlName,
+            tender_name: tender.tenderName,
+            due_date_time: dueDateTime,
+            reason: bidSubmission.reasonForMissing || 'Not specified',
+            from_status_name : bidSubmission.fromStatus,
+            te_name: teName,
+        };
+
+        // Get accounts team ID for CC
+        const accountsTeamId = await this.getAccountsTeamId();
+
+        const ccRecipients: RecipientSource[] = [
+            { type: 'role', role: 'Admin', teamId: tender.team },
+            { type: 'role', role: 'Coordinator', teamId: tender.team },
+        ];
+
+        // Add accounts team admin if accounts team exists
+        if (accountsTeamId) {
+            ccRecipients.push({ type: 'role', role: 'Admin', teamId: accountsTeamId });
+        }
+
+        await this.sendEmail(
+            'tender.dnb',
+            tenderId,
+            submittedBy,
+            `Tender moved to DNB - ${tender.tenderName}`,
+            'bid-dnb',
             emailData,
             {
                 to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],

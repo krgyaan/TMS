@@ -82,6 +82,9 @@ async function bootstrap() {
         allowedHeaders: ["Content-Type", "Authorization"],
     });
 
+    process.on('SIGINT', () => console.log('SIGINT'));
+    process.on('SIGTERM', () => console.log('SIGTERM'));
+
     const port = appCfg?.port ?? 3000;
     await app.listen(port);
 

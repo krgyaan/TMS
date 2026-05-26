@@ -9,18 +9,19 @@ import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { Input } from "@/components/ui/input";
 import { DateInput } from "@/components/form/DateInput";
 import { TenderFileUploader } from "@/components/tender-file-upload";
-import { ArrowLeft, Save, Plus, Trash2, Check, HashIcon } from "lucide-react";
+import { ArrowLeft, Save, Plus, Trash2, Check, HashIcon, TrendingUp, Calculator } from "lucide-react";
 import { paths } from "@/app/routes/paths";
 import { WoBasicDetailFormSchema } from "../helpers/basiDetail.schema";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { useInfoSheet } from "@/hooks/api/useInfoSheets";
+import { Separator } from "@/components/ui/separator";
+import { ConditionalSection } from "@/components/form/ConditionalSection";
+import { SelectField } from "@/components/form/SelectField";
+import { YES_NO_OPTIONS } from "../../wo-details/helpers/constants";
 import { useWoContactsByBasicDetail, useCreateBulkWoContacts, useDeleteAllContactsByBasicDetail } from "@/hooks/api/useWoContacts";
 import type { WoBasicDetailFormValues, WoBasicDetail } from "../helpers/basiDetail.types";
 import { buildDefaultValues, mapResponseToForm, mapFormToCreatePayload, mapFormToUpdatePayload } from "../helpers/basiDetail.mapper";
-import { useCreateWoBasicDetail, useUpdateWoBasicDetail } from "@/hooks/api/useWoBasicDetails";
-import { useTender } from "@/hooks/api/useTenders";
-import { useCostingSheetByTender } from "@/hooks/api/useCostingSheets";
+import { useCreateWoBasicDetail, useUpdateWoBasicDetail, useWoBasicDetailPrefill } from "@/hooks/api/useWoBasicDetails";
 import { toast } from "sonner";
 
 interface BasicDetailFormProps {
@@ -61,25 +62,28 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
     const watchWoDate = form.watch("woDate");
     const watchBudget = form.watch("budgetPreGst");
     const watchReceipt = form.watch("receiptPreGst");
+    const watchPricesChanged = form.watch("pricesChanged");
 
     const tenderId = watchTenderId ? Number(watchTenderId) : null;
-    const { data: tenderData } = useTender(tenderId);
-    const { data: costingData } = useCostingSheetByTender(tenderId || 0);
+    const { data: prefillData } = useWoBasicDetailPrefill(tenderId);
 
     // Auto-fill from Costing Sheet
     useEffect(() => {
-        if (mode === "create" && costingData) {
-            if (costingData.budgetPrice && !form.getValues("budgetPreGst")) {
-                form.setValue("budgetPreGst", Number(costingData.budgetPrice));
+        if (mode === "create" && prefillData) {
+            if (prefillData.budgetPrice && !form.getValues("budgetPreGst")) {
+                form.setValue("budgetPreGst", Number(prefillData.budgetPrice));
             }
-            if (costingData.receiptPrice && !form.getValues("receiptPreGst")) {
-                form.setValue("receiptPreGst", Number(costingData.receiptPrice));
+            if (prefillData.receiptPrice && !form.getValues("receiptPreGst")) {
+                form.setValue("receiptPreGst", Number(prefillData.receiptPrice));
             }
-            if (costingData.grossMargin && !form.getValues("grossMargin")) {
-                form.setValue("grossMargin", Number(costingData.grossMargin));
+            if (prefillData.grossMargin && !form.getValues("grossMargin")) {
+                form.setValue("grossMargin", Number(prefillData.grossMargin));
+            }
+            if (prefillData.finalPrice && !form.getValues("finalPrice")) {
+                form.setValue("finalPrice", Number(prefillData.finalPrice));
             }
         }
-    }, [mode, costingData, form]);
+    }, [mode, prefillData, form]);
 
     // Background Project Code/Name Generation
     // Format: teamName/FY/orgAcronym/location/item/last4WoNumber
@@ -93,13 +97,12 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
     };
 
     const { projectCode: derivedCode, projectName: derivedName } = useMemo(() => {
-        if (!tenderData) return { projectCode: "", projectName: "" };
-        const t = tenderData as any;
+        if (!prefillData) return { projectCode: "", projectName: "" };
 
-        const teamName = teamArray.find((team) => team.id === t.team)?.name || "";
-        const orgName = t.organizationAcronym || "";
-        const itemName = t.itemName || "";
-        const locName = t.locationName || "";
+        const teamName = teamArray.find((team) => team.id === prefillData.team)?.name || "";
+        const orgName = prefillData.organizationAcronym || "";
+        const itemName = prefillData.itemName || "";
+        const locName = prefillData.locationName || "";
         const suffix = watchWoNumber ? String(watchWoNumber).slice(-4) : "";
         const yearSegment = watchWoDate ? getFinancialYear(watchWoDate instanceof Date ? watchWoDate : new Date(watchWoDate)) : "";
 
@@ -110,7 +113,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
             projectCode: `${teamName}/${yearSegment}/${orgName}/${locName}/${itemName}/${suffix}`,
             projectName: `${orgName} ${locName} ${itemName}`.trim(),
         };
-    }, [tenderData, watchWoNumber, watchWoDate]);
+    }, [prefillData, watchWoNumber, watchWoDate]);
 
     useEffect(() => {
         if (derivedCode) form.setValue("projectCode", derivedCode);
@@ -119,7 +122,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
 
     // Auto-calculate Margin if manually edited
     useEffect(() => {
-        if (watchBudget && watchReceipt) {
+        if (watchReceipt && watchBudget) {
             const b = Number(watchBudget);
             const r = Number(watchReceipt);
             if (!isNaN(b) && !isNaN(r) && r !== 0) {
@@ -129,9 +132,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
         }
     }, [watchBudget, watchReceipt, form]);
 
-    // Fetch Tender Info for Clients
-    const { data: infoSheetData } = useInfoSheet(tenderId);
-    const tenderClients = infoSheetData?.clients || [];
+    const tenderClients = prefillData?.clients || [];
 
     // WO Contacts (if in edit mode)
     const { data: woContactsData } = useWoContactsByBasicDetail(existingData?.id || 0);
@@ -241,6 +242,16 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
         }
     };
 
+    const budgetTotal = useMemo(() => {
+        const s = Number(form.watch("budgetSupply") || 0);
+        const sv = Number(form.watch("budgetService") || 0);
+        const f = Number(form.watch("budgetFreight") || 0);
+        const a = Number(form.watch("budgetAdmin") || 0);
+        const b = Number(form.watch("budgetBuybackSale") || 0);
+        const g = Number(form.watch("budgetGemCharges") || 0);
+        return s + sv + f + a + b + g;
+    }, [form.watch("budgetSupply"), form.watch("budgetService"), form.watch("budgetFreight"), form.watch("budgetAdmin"), form.watch("budgetBuybackSale"), form.watch("budgetGemCharges")]);
+
     return (
         <Card>
             <CardHeader>
@@ -300,159 +311,237 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                             </FieldWrapper>
                         </div>
 
-                        {/* TE Checklist and TMS Documents Section */}
-                        <div className="grid gap-8 border rounded-xl p-6 shadow-sm bg-card mt-8">
-                            <div>
-                                <h3 className="text-lg font-semibold flex items-center gap-2">
-                                    <Check className="h-5 w-5 text-orange-500" />
-                                    Checklist confirmation from TE
-                                </h3>
-                                <p className="mb-4 text-sm flex items-center gap-2">
-                                    <HashIcon className="h-4 w-4 text-orange-500" />
-                                    All Documents are complete in the TMS
+                        {/* Project Code & Project Name (minimal display below the inputs) */}
+                        <Separator />
+                        <div className="flex gap-8 text-sm">
+                            <div className="space-y-1">
+                                <span className="text-muted-foreground">Project Code</span>
+                                <p className="font-mono font-semibold text-primary">
+                                    {form.watch("projectCode") || "---"}
                                 </p>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 bg-muted/50 rounded-lg border">
-                                    {tmsDocList.map((doc) => (
-                                        <div key={doc} className="flex items-center space-x-2">
-                                            <FieldWrapper control={form.control} name={`tmsDocuments.${doc}`} label="">
-                                                {field => (
-                                                    <div className="flex items-center space-x-2">
-                                                        <Checkbox
-                                                            id={doc}
-                                                            checked={field.value || false}
-                                                            onCheckedChange={field.onChange}
-                                                        />
-                                                        <Label htmlFor={doc} className="text-sm cursor-pointer whitespace-nowrap overflow-hidden text-ellipsis">
-                                                            {doc}
-                                                        </Label>
-                                                    </div>
-                                                )}
-                                            </FieldWrapper>
-                                        </div>
-                                    ))}
-                                </div>
                             </div>
-                            {/* Contact Details Section */}
-                            <div className="mt-8">
-                                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                                    <Plus className="h-5 w-5 text-orange-500" />
-                                    Contact Details
-                                </h3>
-                                <div className="border rounded-lg overflow-hidden">
-                                    <table className="w-full text-sm">
-                                        <thead className="bg-muted">
-                                            <tr>
-                                                <th className="p-3 text-left">Name</th>
-                                                <th className="p-3 text-left">Designation</th>
-                                                <th className="p-3 text-left">Phone</th>
-                                                <th className="p-3 text-left">Email</th>
-                                                <th className="p-3 text-left w-10">Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y">
-                                            {contacts.map((contact: any, idx: number) => (
-                                                <tr key={idx}>
-                                                    <td className="p-2">
-                                                        <Input
-                                                            value={contact.name || ""}
-                                                            onChange={(e) => handleUpdateContact(idx, "name", e.target.value)}
-                                                            placeholder="Name"
-                                                            className="h-8 text-xs"
-                                                        />
-                                                    </td>
-                                                    <td className="p-2">
-                                                        <Input
-                                                            value={contact.designation || ""}
-                                                            onChange={(e) => handleUpdateContact(idx, "designation", e.target.value)}
-                                                            placeholder="Designation"
-                                                            className="h-8 text-xs"
-                                                        />
-                                                    </td>
-                                                    <td className="p-2">
-                                                        <Input
-                                                            value={contact.phone || ""}
-                                                            onChange={(e) => handleUpdateContact(idx, "phone", e.target.value)}
-                                                            placeholder="Phone"
-                                                            className="h-8 text-xs"
-                                                        />
-                                                    </td>
-                                                    <td className="p-2">
-                                                        <Input
-                                                            value={contact.email || ""}
-                                                            onChange={(e) => handleUpdateContact(idx, "email", e.target.value)}
-                                                            placeholder="Email"
-                                                            className="h-8 text-xs"
-                                                        />
-                                                    </td>
-                                                    <td className="p-2">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            type="button"
-                                                            onClick={() => handleRemoveContact(idx)}
-                                                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </Button>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                            {contacts.length === 0 && (
-                                                <tr>
-                                                    <td colSpan={5} className="p-4 text-center text-muted-foreground">
-                                                        No contacts available. Add one using the button below.
-                                                    </td>
-                                                </tr>
+                            <div className="space-y-1">
+                                <span className="text-muted-foreground">Project Name</span>
+                                <p className="font-semibold text-primary">
+                                    {form.watch("projectName") || "---"}
+                                </p>
+                            </div>
+                        </div>
+                        <Separator />
+
+                        {/* Checklist confirmation from TE */}
+                        <div>
+                            <h3 className="text-lg font-semibold flex items-center gap-2 mb-3">
+                                <Check className="h-5 w-5 text-orange-500" />
+                                Checklist confirmation from TE
+                            </h3>
+                            <p className="mb-4 text-sm flex items-center gap-2 text-muted-foreground">
+                                <HashIcon className="h-4 w-4 text-orange-500" />
+                                All Documents are complete in the TMS
+                            </p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4 bg-muted/50 rounded-lg border">
+                                {tmsDocList.map((doc) => (
+                                    <div key={doc} className="flex items-center space-x-2">
+                                        <FieldWrapper control={form.control} name={`tmsDocuments.${doc}`} label="">
+                                            {field => (
+                                                <div className="flex items-center space-x-2">
+                                                    <Checkbox
+                                                        id={doc}
+                                                        checked={field.value || false}
+                                                        onCheckedChange={field.onChange}
+                                                    />
+                                                    <Label htmlFor={doc} className="text-sm cursor-pointer whitespace-nowrap overflow-hidden text-ellipsis">
+                                                        {doc}
+                                                    </Label>
+                                                </div>
                                             )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    className="mt-4"
-                                    onClick={handleAddContact}
-                                >
-                                    <Plus className="h-4 w-4 mr-2" />
-                                    Add Custom Contact
-                                </Button>
-                            </div>
-                            {/* Display Section for Auto-generated/Fetched Data */}
-                            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 p-6 bg-muted/30 rounded-lg border border-border mt-6">
-                                <div className="space-y-1">
-                                    <p className="text-sm font-medium text-muted-foreground">Project Code</p>
-                                    <p className="font-mono font-semibold text-primary">
-                                        {form.watch("projectCode") || "---"}
-                                    </p>
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-sm font-medium text-muted-foreground">Project Name</p>
-                                    <p className="font-semibold text-primary">
-                                        {form.watch("projectName") || "---"}
-                                    </p>
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-sm font-medium text-muted-foreground">Gross Margin %age</p>
-                                    <p className={`font-bold ${Number(form.watch("grossMargin")) < 0 ? 'text-destructive' : 'text-emerald-600'}`}>
-                                        {form.watch("grossMargin") ? `${form.watch("grossMargin")}%` : "---"}
-                                    </p>
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-sm font-medium text-muted-foreground">Budget (Pre GST)</p>
-                                    <p className="font-semibold">
-                                        {form.watch("budgetPreGst") ? `₹${Number(form.watch("budgetPreGst")).toLocaleString()}` : "---"}
-                                    </p>
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-sm font-medium text-muted-foreground">Receipt (Pre GST)</p>
-                                    <p className="font-semibold">
-                                        {form.watch("receiptPreGst") ? `₹${Number(form.watch("receiptPreGst")).toLocaleString()}` : "---"}
-                                    </p>
-                                </div>
+                                        </FieldWrapper>
+                                    </div>
+                                ))}
                             </div>
                         </div>
 
+                        <Separator />
+
+                        {/* Is costing prices changed? section */}
+                        <div>
+                            <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
+                                <TrendingUp className="h-5 w-5 text-orange-500" />
+                                Pricing Details
+                            </h3>
+                            <div className="max-w-xs mb-4">
+                                <SelectField
+                                    control={form.control}
+                                    name="pricesChanged"
+                                    label="Is costing prices changed?"
+                                    options={YES_NO_OPTIONS}
+                                    placeholder="Select..."
+                                />
+                            </div>
+                            <ConditionalSection show={watchPricesChanged === "true"}>
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <FieldWrapper control={form.control} name="budgetPreGst" label="Budget Price">
+                                        {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="receiptPreGst" label="Receipt Price">
+                                        {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="finalPrice" label="Final Price">
+                                        {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="grossMargin" label="Gross Margin %">
+                                        {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
+                                    </FieldWrapper>
+                                </div>
+                            </ConditionalSection>
+                            <ConditionalSection show={watchPricesChanged !== "true"}>
+                                <div className="grid gap-4 md:grid-cols-4 p-4 bg-muted/30 rounded-lg border">
+                                    <div className="space-y-1">
+                                        <p className="text-sm text-muted-foreground">Budget Price</p>
+                                        <p className="font-semibold">₹{Number(form.watch("budgetPreGst") || 0).toLocaleString()}</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-sm text-muted-foreground">Receipt Price</p>
+                                        <p className="font-semibold">₹{Number(form.watch("receiptPreGst") || 0).toLocaleString()}</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-sm text-muted-foreground">Final Price</p>
+                                        <p className="font-semibold">₹{Number(form.watch("finalPrice") || 0).toLocaleString()}</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="text-sm text-muted-foreground">Gross Margin</p>
+                                        <p className={`font-bold ${Number(form.watch("grossMargin")) < 0 ? 'text-destructive' : 'text-emerald-600'}`}>
+                                            {form.watch("grossMargin") ? `${Number(form.watch("grossMargin")).toFixed(2)}%` : "---"}
+                                        </p>
+                                    </div>
+                                </div>
+                            </ConditionalSection>
+                        </div>
+
+                        <Separator />
+
+                        {/* Contact Details Section */}
+                        <div>
+                            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                                <Plus className="h-5 w-5 text-orange-500" />
+                                Contact Details
+                            </h3>
+                            <div className="border rounded-lg overflow-hidden">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-muted">
+                                        <tr>
+                                            <th className="p-3 text-left">Name</th>
+                                            <th className="p-3 text-left">Designation</th>
+                                            <th className="p-3 text-left">Phone</th>
+                                            <th className="p-3 text-left">Email</th>
+                                            <th className="p-3 text-left w-10">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y">
+                                        {contacts.map((contact: any, idx: number) => (
+                                            <tr key={idx}>
+                                                <td className="p-2">
+                                                    <Input
+                                                        value={contact.name || ""}
+                                                        onChange={(e) => handleUpdateContact(idx, "name", e.target.value)}
+                                                        placeholder="Name"
+                                                        className="h-8 text-xs"
+                                                    />
+                                                </td>
+                                                <td className="p-2">
+                                                    <Input
+                                                        value={contact.designation || ""}
+                                                        onChange={(e) => handleUpdateContact(idx, "designation", e.target.value)}
+                                                        placeholder="Designation"
+                                                        className="h-8 text-xs"
+                                                    />
+                                                </td>
+                                                <td className="p-2">
+                                                    <Input
+                                                        value={contact.phone || ""}
+                                                        onChange={(e) => handleUpdateContact(idx, "phone", e.target.value)}
+                                                        placeholder="Phone"
+                                                        className="h-8 text-xs"
+                                                    />
+                                                </td>
+                                                <td className="p-2">
+                                                    <Input
+                                                        value={contact.email || ""}
+                                                        onChange={(e) => handleUpdateContact(idx, "email", e.target.value)}
+                                                        placeholder="Email"
+                                                        className="h-8 text-xs"
+                                                    />
+                                                </td>
+                                                <td className="p-2">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        type="button"
+                                                        onClick={() => handleRemoveContact(idx)}
+                                                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {contacts.length === 0 && (
+                                            <tr>
+                                                <td colSpan={5} className="p-4 text-center text-muted-foreground">
+                                                    No contacts available. Add one using the button below.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="mt-4"
+                                onClick={handleAddContact}
+                            >
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add Custom Contact
+                            </Button>
+                        </div>
+
+                        <Separator />
+
+                        {/* Budget Breakdown Section */}
+                        <div>
+                            <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
+                                <Calculator className="h-5 w-5 text-orange-500" />
+                                Budget Breakdown
+                            </h3>
+                            <div className="grid gap-4 md:grid-cols-3">
+                                <FieldWrapper control={form.control} name="budgetSupply" label="Supply (pre GST)">
+                                    {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
+                                </FieldWrapper>
+                                <FieldWrapper control={form.control} name="budgetService" label="Service (pre GST)">
+                                    {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
+                                </FieldWrapper>
+                                <FieldWrapper control={form.control} name="budgetFreight" label="Freight (pre GST)">
+                                    {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
+                                </FieldWrapper>
+                                <FieldWrapper control={form.control} name="budgetAdmin" label="Admin/Misc. (pre GST)">
+                                    {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
+                                </FieldWrapper>
+                                <FieldWrapper control={form.control} name="budgetBuybackSale" label="Buyback Sale (pre GST)">
+                                    {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
+                                </FieldWrapper>
+                                <FieldWrapper control={form.control} name="budgetGemCharges" label="GEM Charges (pre GST)">
+                                    {field => <Input {...field} placeholder="0.00" type="number" step="0.01" value={field.value || ""} />}
+                                </FieldWrapper>
+                            </div>
+                            <div className="flex justify-end mt-4 p-3 bg-muted/30 rounded-lg border">
+                                <div className="text-right">
+                                    <p className="text-sm text-muted-foreground">Total Budget</p>
+                                    <p className="text-lg font-bold">₹{budgetTotal.toLocaleString()}</p>
+                                </div>
+                            </div>
+                        </div>
 
                         <div className="flex justify-end gap-2 pt-6 border-t">
                             <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={isSubmitting}>

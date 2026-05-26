@@ -5,7 +5,7 @@ import { useCostingSheetByTender } from '@/hooks/api/useCostingSheets';
 import { useInfoSheet } from '@/hooks/api/useInfoSheets';
 import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
 import { useRfqByTenderId } from '@/hooks/api/useRfqs';
-import { usePaymentRequestsByTender } from '@/hooks/api/useEmds';
+import { usePaymentRequestsByTender } from '@/hooks/api/usePaymentRequests';
 import { usePhysicalDocByTenderId } from '@/hooks/api/usePhysicalDocs';
 import { useDocumentChecklistByTender } from '@/hooks/api/useDocumentChecklists';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -43,7 +43,7 @@ export default function CostingSheetSubmitPage() {
     // Checkpoint Logic
     const rfqNA = approval?.rfqRequired === 'no' || tenderDetails.rfqTo === '0' || tenderDetails.rfqTo === '1';
     const emdNA = infoSheet?.emdRequired === 'NO' || infoSheet?.emdRequired === 'EXEMPT';
-    const physicalNA = infoSheet?.physicalDocsRequired === 'NO';
+    const physicalNA = infoSheet?.physicalDocsRequired === 'NO' || infoSheet?.physicalDocType === 'Only EMD' || infoSheet?.physicalDocType === 'ONLY_EMD';
 
     const checkpoints: Checkpoint[] = [
         {
@@ -55,7 +55,7 @@ export default function CostingSheetSubmitPage() {
         {
             id: 'emd',
             label: 'EMD Status',
-            status: emdNA ? 'na' : (paymentRequests?.some(r => r.tenderId === id) ? 'fulfilled' : 'pending'),
+            status: emdNA ? 'na' : (Array.isArray(paymentRequests) && paymentRequests.some(r => r.tenderId === id) ? 'fulfilled' : 'pending'),
             description: emdNA ? 'EMD not required' : 'Process EMD payment'
         },
         {

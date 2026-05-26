@@ -9,6 +9,8 @@ import type {
 } from '@/modules/tendering/ras/helpers/reverseAuction.types';
 import { reverseAuctionService } from '@/services/api/reverse-auction.service';
 import { useTeamFilter } from '@/hooks/useTeamFilter';
+import { toast } from 'sonner';
+import { showErrorToast } from '@/utils/errorToast';
 
 export const reverseAuctionsKey = {
     all: ['reverse-auctions'] as const,
@@ -26,7 +28,7 @@ export const useReverseAuctionDashboard = (
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
     const { teamId, userId, dataScope } = useTeamFilter();
-    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const teamIdParam = teamId !== null ? teamId : undefined;
 
     const effectiveFilters: RaDashboardListParams = {
         ...filters,
@@ -61,7 +63,7 @@ export const useReverseAuctionDashboard = (
 // Fetch only counts (for badges)
 export const useReverseAuctionDashboardCounts = () => {
     const { teamId, userId, dataScope } = useTeamFilter();
-    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const teamIdParam = teamId !== null ? teamId : undefined;
     const queryKey = [...reverseAuctionsKey.counts(), dataScope, teamId ?? null, userId ?? null];
 
     return useQuery<RaDashboardCounts>({
@@ -99,7 +101,9 @@ export const useScheduleRa = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: reverseAuctionsKey.all });
             queryClient.invalidateQueries({ queryKey: reverseAuctionsKey.counts() });
+            toast.success("RA scheduled successfully");
         },
+        onError: showErrorToast,
     });
 };
 
@@ -113,7 +117,9 @@ export const useUploadRaResult = () => {
             queryClient.invalidateQueries({ queryKey: reverseAuctionsKey.all });
             // Explicitly invalidate dashboard counts to ensure they refresh
             queryClient.invalidateQueries({ queryKey: reverseAuctionsKey.counts() });
+            toast.success("RA result uploaded successfully");
         },
+        onError: showErrorToast,
     });
 };
 

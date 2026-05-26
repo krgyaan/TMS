@@ -18,6 +18,7 @@ import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { paths } from '@/app/routes/paths';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { QuickFilter } from '@/components/ui/quick-filter';
 
 const TABS_CONFIG: Array<{ key: PayOnPortalDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -73,10 +74,12 @@ const PayOnPortalListPage = () => {
     const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
     const [search, setSearch] = useState<string>('');
     const debouncedSearch = useDebouncedSearch(search, 300);
+    const [teamFilter, setTeamFilter] = useState<string>('All');
+    const teamId = teamFilter === 'All' ? undefined : teamFilter === 'AC' ? 1 : 2;
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, debouncedSearch]);
+    }, [activeTab, debouncedSearch, teamFilter]);
 
     const handlePageSizeChange = useCallback((newPageSize: number) => {
         setPagination({ pageIndex: 0, pageSize: newPageSize });
@@ -100,6 +103,7 @@ const PayOnPortalListPage = () => {
         sortBy: sortModel[0]?.colId,
         sortOrder: sortModel[0]?.sort,
         search: debouncedSearch || undefined,
+        team: teamId,
     });
 
     const { data: counts } = usePayOnPortalDashboardCounts();
@@ -113,7 +117,7 @@ const PayOnPortalListPage = () => {
             {
                 label: 'View Details',
                 icon: <Eye className="h-4 w-4" />,
-                onClick: (row: PayOnPortalDashboardRow) => navigate(paths.bi.payOnPortalView(row.requestId)),
+                onClick: (row: PayOnPortalDashboardRow) => navigate(paths.bi.payOnPortalView(row.id)),
             },
             {
                 label: 'Action Form',
@@ -222,6 +226,16 @@ const PayOnPortalListPage = () => {
                 },
             },
             {
+                field: 'teamMember',
+                headerName: 'Member',
+                width: 140,
+                maxWidth: 140,
+                colId: 'teamMember',
+                valueGetter: (params) => params.data?.teamMember || '—',
+                sortable: true,
+                filter: true,
+            },
+            {
                 field: 'popStatus',
                 headerName: 'POP Status',
                 width: 110,
@@ -230,7 +244,7 @@ const PayOnPortalListPage = () => {
                 filter: true,
                 cellRenderer: (params: any) => {
                     const status = params.value;
-                    if (!status) return '—';
+                    if (!status) return <Badge variant={'secondary'}>Pending</Badge>;
                     return <Badge variant={getStatusVariant(status) as any}>{status}</Badge>;
                 },
             },
@@ -336,7 +350,15 @@ const PayOnPortalListPage = () => {
 
                         {/* Search Row: Quick Filters, Search Bar */}
                         <div className="flex items-center gap-4 px-6 pb-4">
-                            {/* Quick Filters (Left) - Optional, can be added per page */}
+                            {/* Quick Filters (Left) */}
+                            <QuickFilter options={[
+                                { label: 'AC Team', value: 'AC' },
+                                { label: 'DC Team', value: 'DC' },
+                                { label: 'All Team', value: 'All' },
+                            ]}
+                                value={teamFilter}
+                                onChange={(value) => setTeamFilter(value)}
+                            />
 
                             {/* Search Bar (Center) - Flex grow */}
                             <div className="flex-1 flex justify-end">

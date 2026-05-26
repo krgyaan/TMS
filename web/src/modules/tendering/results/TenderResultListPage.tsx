@@ -20,6 +20,7 @@ import { paths } from '@/app/routes/paths';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { QuickFilter } from '@/components/ui/quick-filter';
 import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
+import { CancelTenderModal } from './components/CancelTenderModal';
 
 const RESULT_STATUS = {
     RESULT_AWAITED: 'Result Awaited',
@@ -84,6 +85,13 @@ const TenderResultListPage = () => {
         open: false,
         tenderId: null
     });
+    
+    //difining the state for the tender cancel modal
+    const [cancelTenderModal , setCancelTenderModal] = useState<{open : boolean , tenderId : number | null; tenderNo?: string; tenderName?: string}>({
+        open : false,
+        tenderId : null
+    })
+
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
@@ -134,6 +142,18 @@ const TenderResultListPage = () => {
                 label: 'Upload Result',
                 icon: <Upload className="h-4 w-4" />,
                 onClick: (row: ResultDashboardRow) => row.id ? navigate(paths.tendering.resultsEdit(row.id)) : navigate(paths.tendering.resultsUpload(row.tenderId)),
+                visible: () => activeTab == 'result-awaited'
+            },
+            {
+                label : 'Tender Cancelled',
+                icon : <XCircle className='h-4 w-4' />,
+                onClick: (row : ResultDashboardRow) => setCancelTenderModal({
+                    open : true,
+                    tenderId: row.tenderId,
+                    tenderNo : row.tenderNo,
+                    tenderName : row.tenderName
+                }),// this will pop the modal for us
+                visible: () => activeTab === 'result-awaited'
             },
             {
                 label: 'Basic Details',
@@ -148,7 +168,7 @@ const TenderResultListPage = () => {
                 visible: (row) => row.raApplicable && !!row.reverseAuctionId,
             },
         ],
-        [navigate]
+        [navigate, activeTab]
     );
 
     const colDefs = useMemo<ColDef<ResultDashboardRow>[]>(
@@ -464,6 +484,16 @@ const TenderResultListPage = () => {
                 currentStatus={changeStatusModal.currentStatus}
                 onSuccess={() => {
                     setChangeStatusModal({ open: false, tenderId: null });
+                }}
+            />
+            <CancelTenderModal
+                open={cancelTenderModal.open}
+                onOpenChange={(open) => setCancelTenderModal({ ...cancelTenderModal, open })}
+                tenderId={cancelTenderModal.tenderId}
+                tenderNo={cancelTenderModal.tenderNo}
+                tenderName={cancelTenderModal.tenderName}
+                onSuccess={() => {
+                    setCancelTenderModal({ open: false, tenderId: null });
                 }}
             />
         </>

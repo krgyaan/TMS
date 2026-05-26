@@ -600,9 +600,9 @@ const AllFieldsTable = ({ infoSheet }: { infoSheet: TenderInfoSheet }) => {
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">Address Line 1</TableCell>
-                            <TableCell className="text-sm">{infoSheet.courierAddressLine1}</TableCell>
+                            <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">{infoSheet.courierAddressLine1}</TableCell>
                             <TableCell className="text-sm font-medium text-muted-foreground">Address Line 2</TableCell>
-                            <TableCell className="text-sm">{infoSheet.courierAddressLine2}</TableCell>
+                            <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">{infoSheet.courierAddressLine2}</TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">City</TableCell>

@@ -20,7 +20,7 @@ export const useContractAgreements = (
 ) => {
     const { teamId, userId, dataScope } = useTeamFilter();
         // Only pass teamId for Super User/Admin (dataScope === 'all') when a team is selected
-        const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+        const teamIdParam = teamId !== null ? teamId : undefined;
 
         const params = {
             ...(tab && { tab }),
@@ -55,7 +55,7 @@ export const useContractAgreements = (
 export const useContractAgreementDashboardCounts = () => {
     const { teamId, dataScope } = useTeamFilter();
     // Only pass teamId for Super User/Admin (dataScope === 'all') when a team is selected
-    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const teamIdParam = teamId !== null ? teamId : undefined;
 
     return useQuery({
         queryKey: CONTRACT_AGREEMENT_KEYS.dashboardCounts(teamIdParam),

@@ -176,7 +176,7 @@ export function TenderApprovalView({
                                 </Badge>
                             </TableCell>
                         </TableRow>
-                        {!!approval.tlStatus && (
+                        {(approval.tlStatus !== undefined && approval.tlStatus !== null) && (
                             <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     Tender Approval Status
@@ -186,13 +186,13 @@ export function TenderApprovalView({
                                 </TableCell>
                             </TableRow>
                         )}
-                        {approval.tlDecision && (
+                        {approval.tlApprovalRemarks && (
                             <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">
                                     TL Remarks
                                 </TableCell>
                                 <TableCell className="text-sm break-words" colSpan={3}>
-                                    {approval.tlDecision}
+                                    {approval.tlApprovalRemarks}
                                 </TableCell>
                             </TableRow>
                         )}
@@ -393,14 +393,28 @@ export function TenderApprovalView({
                         )}
 
                         {/* Incomplete Status - Show Incomplete Fields */}
-                        {approval.tlStatus === 3 && approval.incompleteFields && approval.incompleteFields.length > 0 && (
+                        {approval.tlStatus === 3 && (
                             <>
-                                <TableRow className="bg-muted/50">
-                                    <TableCell colSpan={4} className="font-semibold text-sm">
-                                        Incomplete Fields
-                                    </TableCell>
-                                </TableRow>
-                                {approval.incompleteFields.map((field, index) => (
+                                {((approval.incompleteFields && approval.incompleteFields.length > 0) || approval.tlIncompleteRemarks) && (
+                                    <TableRow className="bg-muted/50">
+                                        <TableCell colSpan={4} className="font-semibold text-sm">
+                                            Incomplete Details
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                                {approval.tlIncompleteRemarks && (
+                                    <TableRow className="hover:bg-muted/30 transition-colors">
+                                        <TableCell className="text-sm font-medium text-muted-foreground">
+                                            Incomplete Remarks
+                                        </TableCell>
+                                        <TableCell className="text-sm" colSpan={3}>
+                                            <div className="bg-yellow-50 dark:bg-yellow-950/20 p-3 rounded-md text-yellow-800 dark:text-yellow-200 break-words">
+                                                {approval.tlIncompleteRemarks}
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                                {approval.incompleteFields?.map((field, index) => (
                                     <TableRow key={index} className="hover:bg-muted/30 transition-colors">
                                         <TableCell className="text-sm font-medium text-muted-foreground">
                                             {field.fieldName}

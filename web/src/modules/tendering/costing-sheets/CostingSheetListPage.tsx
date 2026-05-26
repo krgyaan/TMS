@@ -214,10 +214,10 @@ const CostingSheets = () => {
             icon: <Eye className="h-4 w-4" />,
         },
         {
-            label : 'Mark As Missed',
+            label : 'Mark As DNB',
             onClick: (row) => navigate(paths.tendering.bidMissedGlobal(row.tenderId, 'costing-sheet')),
             icon: <XCircle className ="h-4 w-4" />,
-            visible : () => hasTenderingPermission && activeTab != "tender-dnb"
+            visible : () =>  activeTab != "tender-dnb"
         }
     ], [navigate, handleCreateCosting, isCreating]);
 

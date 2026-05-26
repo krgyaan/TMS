@@ -44,18 +44,18 @@ export function RfqView({ rfq }: RfqViewProps) {
                             </TableCell>
                             <TableCell className="text-sm" colSpan={3}>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {rfq.requestedGroups && rfq.requestedGroups.length > 0 ? (
-                                        rfq.requestedGroups.map((group) => (
+                                    {(rfq.vendorOrganizations || rfq.requestedGroups) && (rfq.vendorOrganizations || rfq.requestedGroups)!.length > 0 ? (
+                                        (rfq.vendorOrganizations || rfq.requestedGroups)!.map((group) => (
                                             <div key={group.organizationId} className="border rounded-md p-3 bg-muted/20">
                                                 <p className="font-semibold text-sm mb-2 border-b pb-1">{group.organizationName}</p>
                                                 <div className="space-y-1.5">
-                                                    {group.vendors.map(v => (
+                                                    {group.vendors?.map(v => (
                                                         <div key={v.id} className="flex flex-col">
                                                             <span className="text-sm font-medium">{v.name}</span>
                                                             <span className="text-xs text-muted-foreground">{v.email}</span>
                                                         </div>
                                                     ))}
-                                                    {group.vendors.length === 0 && (
+                                                    {(!group.vendors || group.vendors.length === 0) && (
                                                         <span className="text-xs text-muted-foreground italic">No specific vendors requested</span>
                                                     )}
                                                 </div>
@@ -65,11 +65,11 @@ export function RfqView({ rfq }: RfqViewProps) {
                                         <div className="flex flex-col gap-2">
                                             <div>
                                                 <p className="text-xs font-medium text-muted-foreground">Organisations</p>
-                                                <p>{rfq.requestedOrganizationNames.join(', ') || '—'}</p>
+                                                <p>{rfq.requestedOrganizationNames?.join(', ') || '—'}</p>
                                             </div>
                                             <div>
                                                 <p className="text-xs font-medium text-muted-foreground">Vendors</p>
-                                                <p>{rfq.requestedVendorNames.join(', ') || '—'}</p>
+                                                <p>{rfq.requestedVendorNames?.join(', ') || '—'}</p>
                                             </div>
                                         </div>
                                     )}
@@ -202,8 +202,12 @@ import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
 
 /** Local component for RFQ item with its responses (from RfqShowPage) */
 function RfqItemWithResponses({ rfq, index }: { rfq: Rfq; index: number }) {
-    const { data: rfqResponses = [], isLoading: rfqResponsesLoading } = useRfqResponses(rfq.id);
+    const { data: rfqResponsesData, isLoading: rfqResponsesLoading } = useRfqResponses(rfq.id);
     if (!rfq) return null;
+
+    const rfqResponses = Array.isArray(rfqResponsesData) 
+        ? rfqResponsesData 
+        : (rfqResponsesData?.currentRfqResponses || []);
 
     const groupedResponses = useMemo(() => {
         const groups: Record<string, typeof rfqResponses> = {};

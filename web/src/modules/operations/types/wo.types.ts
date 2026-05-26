@@ -23,8 +23,7 @@ export type WorkflowStage =
 export type WoDetailsStatus =
   | 'draft'
   | 'in_progress'
-  | 'completed'
-  | 'submitted_for_review';
+  | 'wo_details_filled';
 
 export type WoAcceptanceStatus =
   | 'pending_review'
@@ -98,6 +97,13 @@ export interface WoBasicDetail {
   receiptPreGst: string | null;
   budgetPreGst: string | null;
   grossMargin: string | null;
+  finalPrice: string | null;
+  budgetSupply: string | null;
+  budgetService: string | null;
+  budgetFreight: string | null;
+  budgetAdmin: string | null;
+  budgetBuybackSale: string | null;
+  budgetGemCharges: string | null;
   woDraft: string | null;
   tmsDocuments: TmsDocuments | null;
   oeFirst: number | null;
@@ -139,6 +145,13 @@ export interface CreateWoBasicDetailDto {
   receiptPreGst?: string;
   budgetPreGst?: string;
   grossMargin?: string;
+  finalPrice?: string;
+  budgetSupply?: string;
+  budgetService?: string;
+  budgetFreight?: string;
+  budgetAdmin?: string;
+  budgetBuybackSale?: string;
+  budgetGemCharges?: string;
   woDraft?: string;
   tmsDocuments?: TmsDocuments;
 }
@@ -182,6 +195,23 @@ export interface WoBasicDetailsFilters {
   createdAtFrom?: string;
   createdAtTo?: string;
   status?: number[];
+}
+
+export interface WoBasicDetailPrefillData {
+  team: number | null;
+  organizationAcronym: string | null;
+  itemName: string | null;
+  locationName: string | null;
+  budgetPrice: string | null;
+  receiptPrice: string | null;
+  grossMargin: string | null;
+  finalPrice: string | null;
+  clients: Array<{
+    clientName: string | null;
+    clientDesignation: string | null;
+    clientMobile: string | null;
+    clientEmail: string | null;
+  }>;
 }
 
 export interface OeAssignment {
@@ -326,12 +356,6 @@ export interface WoDetail {
   hasDiscrepancies: boolean;
   discrepancyComments: string | null;
   discrepancyNotifiedAt: string | null;
-  budgetPreGst: string | null;
-  budgetSupply: string | null;
-  budgetService: string | null;
-  budgetFreight: string | null;
-  budgetAdmin: string | null;
-  budgetBuybackSale: string | null;
 
   // Page 7: WO Acceptance (OE Step)
   oeWoAmendmentNeeded: boolean | null;
@@ -422,12 +446,6 @@ export interface UpdateWoDetailDto {
   costingSheetLink?: string;
   hasDiscrepancies?: boolean;
   discrepancyComments?: string;
-  budgetPreGst?: string;
-  budgetSupply?: string;
-  budgetService?: string;
-  budgetFreight?: string;
-  budgetAdmin?: string;
-  budgetBuybackSale?: string;
 
   // Page 7
   oeWoAmendmentNeeded?: boolean;
@@ -1068,13 +1086,6 @@ export interface Page6Data {
   hasDiscrepancies: boolean;
   discrepancyComments: string | null;
   discrepancyNotifiedAt: string | null;
-  budgetPreGst: string | null;
-  budgetSupply: string | null;
-  budgetService: string | null;
-  budgetFreight: string | null;
-  budgetAdmin: string | null;
-  budgetBuybackSale: string | null;
-  totalBudget: string;
 }
 
 export interface Page7Data {

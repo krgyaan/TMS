@@ -10,7 +10,6 @@ import type { EmdResponsibility } from "@/types/api.types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Plus } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { EmdResponsibilityModal } from "./components/EmdResponsibilityModal";
 import { EmdResponsibilityViewModal } from "./components/EmdResponsibilityViewModal";
 
@@ -70,20 +69,30 @@ const EmdResponsibilityPage = () => {
             filter: "agTextColumnFilter",
         },
         {
-            field: "description",
-            headerName: "Description",
-            flex: 2,
-            filter: "agTextColumnFilter",
+            field: "instrumentType",
+            headerName: "Instrument Type",
+            width: 150,
+            filter: "agSetColumnFilter",
             cellRenderer: (params: any) => {
                 return params.value || <span className="text-gray-400">—</span>;
             },
         },
         {
-            field: "status",
-            headerName: "Status",
-            width: 120,
-            filter: "agSetColumnFilter",
-            cellRenderer: (params: any) => <Badge variant={params.value ? "default" : "secondary"}>{params.value ? "Active" : "Inactive"}</Badge>,
+            field: "assignedUserName",
+            headerName: "Assigned User",
+            width: 220,
+            filter: "agTextColumnFilter",
+            cellRenderer: (params: any) => {
+                const name = params.data?.assignedUserName;
+                const email = params.data?.assignedUserEmail;
+                if (!name) return <span className="text-gray-400">—</span>;
+                return (
+                    <div className="flex flex-col py-1">
+                        <span className="text-sm font-medium">{name}</span>
+                        {email && <span className="text-xs text-muted-foreground">{email}</span>}
+                    </div>
+                );
+            },
         },
         {
             headerName: "Actions",
@@ -184,7 +193,6 @@ const EmdResponsibilityPage = () => {
                         enableRowSelection={true}
                         selectionType="multiple"
                         onSelectionChanged={rows => console.log("Selected rows:", rows)}
-                        height="100%"
                     />
                 </CardContent>
             </Card>

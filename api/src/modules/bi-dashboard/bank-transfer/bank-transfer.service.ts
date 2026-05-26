@@ -2,21 +2,18 @@ import { Inject, Injectable, Logger, NotFoundException, BadRequestException } fr
 import { eq, and, inArray, isNull, sql, asc, desc, or } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
-import {
-    paymentRequests,
-    paymentInstruments,
-    instrumentTransferDetails,
-} from '@db/schemas/tendering/emds.schema';
+import { paymentRequests, paymentInstruments, instrumentTransferDetails } from '@db/schemas/tendering/payment-requests.schema';
+import { followUps } from '@/db/schemas/shared/follow-ups.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
-import { users } from '@db/schemas/auth/users.schema';
-import { statuses } from '@db/schemas/master/statuses.schema';
-import { teams } from '@db/schemas/master/teams.schema';
+import { users } from '@/db/schemas/auth/users.schema';
+import { statuses } from '@/db/schemas/master/statuses.schema';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import type { BankTransferDashboardRow, BankTransferDashboardCounts } from '@/modules/bi-dashboard/bank-transfer/helpers/bankTransfer.types';
-import { BT_STATUSES } from '@/modules/tendering/emds/constants/emd-statuses';
+import { BT_STATUSES } from '@/modules/tendering/payment-requests/constants/payment-request-statuses';
 import { FollowUpService } from '@/modules/follow-up/follow-up.service';
 import type { CreateFollowUpDto } from '@/modules/follow-up/zod';
+import { PaymentRequestsNotificationService } from '@/modules/tendering/payment-requests/services/payment-requests-notification.service';
 
 @Injectable()
 export class BankTransferService {
@@ -25,6 +22,7 @@ export class BankTransferService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly followUpService: FollowUpService,
+        private readonly notificationService: PaymentRequestsNotificationService,
     ) { }
 
     private statusMap() {
@@ -54,7 +52,7 @@ export class BankTransferService {
         } else if (tab === 'accepted') {
             conditions.push(
                 inArray(paymentInstruments.action, [1, 2]),
-                eq(paymentInstruments.status, BT_STATUSES.ACCOUNTS_FORM_ACCEPTED)
+                inArray(paymentInstruments.status, [BT_STATUSES.ACCOUNTS_FORM_ACCEPTED, BT_STATUSES.FOLLOWUP_INITIATED])
             );
         } else if (tab === 'rejected') {
             conditions.push(
@@ -82,6 +80,7 @@ export class BankTransferService {
             sortBy?: string;
             sortOrder?: 'asc' | 'desc';
             search?: string;
+            teamId?: number;
         },
     ): Promise<PaginatedResult<BankTransferDashboardRow>> {
         const page = options?.page || 1;
@@ -91,6 +90,12 @@ export class BankTransferService {
         const conditions = this.buildBtDashboardConditions(tab);
 
         const searchTerm = options?.search?.trim();
+
+        // Team filter
+        const teamId = options?.teamId;
+        if (teamId) {
+            conditions.push(sql`COALESCE(${tenderInfos.team}, ${users.team}) = ${teamId}`);
+        }
 
         // Search filter - search across all rendered columns
         if (searchTerm) {
@@ -168,7 +173,7 @@ export class BankTransferService {
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id));
-        if (searchTerm) {
+        if (searchTerm || teamId) {
             countQueryBuilder = countQueryBuilder
                 .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
                 .leftJoin(statuses, eq(statuses.id, tenderInfos.status));
@@ -241,7 +246,6 @@ export class BankTransferService {
     private mapActionToNumber(action: string): number {
         const actionMap: Record<string, number> = {
             'accounts-form': 1,
-            'accounts-form-1': 1,
             'initiate-followup': 2,
             'returned': 3,
             'settled': 4,
@@ -252,7 +256,6 @@ export class BankTransferService {
     async updateAction(
         instrumentId: number,
         body: any,
-        files: Express.Multer.File[],
         user: any,
     ) {
         this.logger.debug('BT updateAction start', {
@@ -285,20 +288,12 @@ export class BankTransferService {
             }
         }
 
-        const filePaths: string[] = [];
-        if (files && files.length > 0) {
-            for (const file of files) {
-                const relativePath = `bi-dashboard/${file.filename}`;
-                filePaths.push(relativePath);
-            }
-        }
-
         const updateData: any = {
             action: actionNumber,
             updatedAt: new Date(),
         };
 
-        if (body.action === 'accounts-form' || body.action === 'accounts-form-1') {
+        if (body.action === 'accounts-form') {
             if (body.bt_req === 'Accepted') {
                 updateData.status = BT_STATUSES.ACCOUNTS_FORM_ACCEPTED;
             } else if (body.bt_req === 'Rejected') {
@@ -328,7 +323,7 @@ export class BankTransferService {
                 .where(eq(paymentInstruments.id, instrumentId));
             // Handle transfer details update or creation
             const transferDetailsUpdate: any = {};
-            if (body.action === 'accounts-form' || body.action === 'accounts-form-1') {
+            if (body.action === 'accounts-form') {
                 if (body.utr_no) transferDetailsUpdate.utrNum = body.utr_no;
                 // Support both payment_datetime (from form) and payment_date (legacy)
                 const paymentDateStr = body.payment_datetime || body.payment_date;
@@ -339,19 +334,14 @@ export class BankTransferService {
                     }
                     transferDetailsUpdate.transactionDate = paymentDate;
                 }
-                if (body.remarks) transferDetailsUpdate.remarks = body.remarks;
                 // Support both utr_message (from form) and utr_mgs (legacy)
                 const utrMsg = body.utr_message || body.utr_mgs;
                 if (utrMsg) transferDetailsUpdate.utrMsg = utrMsg;
             } else if (body.action === 'returned') {
-                // Support both transfer_date (from form) and return_date (legacy)
-                const returnDate = body.transfer_date || body.return_date;
-                if (returnDate) transferDetailsUpdate.returnTransferDate = returnDate;
-                // Support both utr_no (from form) and utr_num (legacy)
-                const returnUtr = body.utr_no || body.utr_num;
-                if (returnUtr) transferDetailsUpdate.returnUtr = returnUtr;
+                if (body.transfer_date) transferDetailsUpdate.returnTransferDate = body.transfer_date;
+                if (body.return_utr) transferDetailsUpdate.returnUtr = body.return_utr;
             } else if (body.action === 'settled') {
-                if (body.action === 'settled') transferDetailsUpdate.action = body.action;
+                if (body.settle_remarks) transferDetailsUpdate.remarks = body.settle_remarks;
             }
 
             if (Object.keys(transferDetailsUpdate).length > 0) {
@@ -377,7 +367,71 @@ export class BankTransferService {
                 }
             }
 
-            // Follow-up creation will be handled by a different service class
+            // Send email notification for accounts-form action
+            if (body.action === 'accounts-form' && body.bt_req) {
+                try {
+                    await this.notificationService.sendBtActionEmail(
+                        instrumentId,
+                        body.purpose,
+                        body.bt_req,
+                        body.payment_datetime ? new Date(body.payment_datetime).toISOString() : undefined,
+                        body.utr_no || undefined,
+                        body.utr_message || undefined,
+                        body.reason_req || undefined
+                    );
+                } catch (error) {
+                    this.logger.warn(`Failed to send BT action email: ${error}`);
+                }
+            }
+
+            // Send email notification for returned action
+            if (body.action === 'returned' && body.return_utr) {
+                try {
+                    await this.notificationService.sendBtReturnEmail(
+                        instrumentId,
+                        body.transfer_date || undefined,
+                        body.return_utr
+                    );
+                } catch (error) {
+                    this.logger.warn(`Failed to send BT return email: ${error}`);
+                }
+            }
+
+            if (body.action === 'initiate-followup' && body.emailBody) {
+                try {
+                    let contacts: any[] = [];
+                    if (body.contacts) {
+                        try {
+                            contacts = typeof body.contacts === 'string' ? JSON.parse(body.contacts) : body.contacts;
+                        } catch (e) {
+                            this.logger.warn('Failed to parse contacts for followup', e);
+                        }
+                    }
+                    const followupDto: CreateFollowUpDto = {
+                        area: (body.area || 'Accounts'),
+                        partyName: body.organisation_name || 'Unknown',
+                        details: body.emailBody,
+                        contacts: contacts.map((c: any) => ({
+                            name: c.name,
+                            email: c.email || null,
+                            phone: c.phone || null,
+                            org: body.organisation_name || null,
+                        })),
+                        frequency: body.frequency || null,
+                        startFrom: body.followup_start_date || undefined,
+                        emdId: instrumentId,
+                        followupFor: 'EMD Refund',
+                        assignedToId: null,
+                        createdById: null,
+                        amount: 0,
+                        attachments: [],
+                        followUpHistory: []
+                    };
+                    await this.followUpService.create(followupDto, user.id || user.sub);
+                } catch (error) {
+                    this.logger.warn(`Failed to create followup for BT instrument ${instrumentId}: ${error}`);
+                }
+            }
 
             this.logger.debug('BT updateAction success', {
                 instrumentId,
@@ -492,5 +546,137 @@ export class BankTransferService {
         }
 
         return result;
+    }
+
+    async getActionFormData(id: number) {
+        const [result] = await this.db
+            .select({
+                id: paymentInstruments.id,
+                action: paymentInstruments.action,
+                status: paymentInstruments.status,
+                amount: paymentInstruments.amount,
+                utr: paymentInstruments.utr,
+                purpose: paymentInstruments.purpose,
+                rejectionReason: instrumentTransferDetails.reason,
+                legacyData: paymentInstruments.legacyData,
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                tenderId: paymentRequests.tenderId,
+                accountName: instrumentTransferDetails.accountName,
+                accountNumber: instrumentTransferDetails.accountNumber,
+                ifsc: instrumentTransferDetails.ifsc,
+                transactionDate: instrumentTransferDetails.transactionDate,
+                paymentMethod: instrumentTransferDetails.paymentMethod,
+                utrMsg: instrumentTransferDetails.utrMsg,
+                utrNum: instrumentTransferDetails.utrNum,
+                returnTransferDate: instrumentTransferDetails.returnTransferDate,
+                returnUtr: instrumentTransferDetails.returnUtr,
+                remarks: instrumentTransferDetails.remarks,
+                tenderStatusName: statuses.name,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .where(and(
+                eq(paymentInstruments.id, id),
+                eq(paymentInstruments.instrumentType, 'Bank Transfer'),
+                eq(paymentInstruments.isActive, true)
+            ))
+            .limit(1);
+
+        if (!result) {
+            throw new NotFoundException(`Payment Instrument with ID ${id} not found`);
+        }
+
+        const legacyData = result.legacyData as Record<string, any> | null;
+        const hasAccountsFormData = !!(
+            (result.status === 'Accepted' || result.status === 'Rejected') ||
+            result.rejectionReason ||
+            result.utr ||
+            result.transactionDate ||
+            result.utrMsg ||
+            legacyData?.date_time
+        );
+        const hasReturnedData = !!(result.returnTransferDate || result.returnUtr);
+        const hasSettledData = result.action === 4;
+
+        return {
+            id: result.id,
+            action: result.action,
+            btStatus: this.statusMap()[result.status],
+            tenderNo: result.tenderNo,
+            tenderName: result.tenderName,
+            tenderId: result.tenderId,
+            amount: result.amount ? Number(result.amount) : null,
+            accountName: result.accountName,
+            accountNumber: result.accountNumber,
+            ifsc: result.ifsc,
+            purpose: result.purpose,
+            utrNo: result.utr || result.utrNum,
+            transactionDate: result.transactionDate ? new Date(result.transactionDate) : null,
+            tenderStatusName: result.tenderStatusName,
+            paymentMethod: result.paymentMethod,
+            utrMsg: result.utrMsg,
+            returnTransferDate: result.returnTransferDate ? new Date(result.returnTransferDate) : null,
+            returnUtr: result.returnUtr,
+            remarks: result.remarks,
+            rejectionReason: result.rejectionReason,
+            paymentDateTime: legacyData?.date_time || null,
+            settledRemarks: hasSettledData ? result.remarks : null,
+            hasAccountsFormData,
+            hasReturnedData,
+            hasSettledData,
+        };
+    }
+
+    async getFollowupData(instrumentId: number) {
+        const [result] = await this.db
+            .select({
+                id: followUps.id,
+                emdId: followUps.emdId,
+                partyName: followUps.partyName,
+                area: followUps.area,
+                amount: followUps.amount,
+                contacts: followUps.contacts,
+                frequency: followUps.frequency,
+                startFrom: followUps.startFrom,
+                nextFollowUpDate: followUps.nextFollowUpDate,
+                stopReason: followUps.stopReason,
+                proofText: followUps.proofText,
+                stopRemarks: followUps.stopRemarks,
+                proofImagePath: followUps.proofImagePath,
+                assignmentStatus: followUps.assignmentStatus,
+                createdAt: followUps.createdAt,
+            })
+            .from(followUps)
+            .where(and(
+                eq(followUps.emdId, instrumentId),
+                isNull(followUps.deletedAt)
+            ))
+            .orderBy(desc(followUps.createdAt))
+            .limit(1);
+
+        if (!result) {
+            return null;
+        }
+
+        return {
+            id: result.id,
+            organisationName: result.partyName,
+            area: result.area,
+            amount: result.amount ? Number(result.amount) : null,
+            contacts: result.contacts || [],
+            frequency: result.frequency,
+            followupStartDate: result.startFrom ? new Date(result.startFrom) : null,
+            nextFollowUpDate: result.nextFollowUpDate ? new Date(result.nextFollowUpDate) : null,
+            stopReason: result.stopReason,
+            proofText: result.proofText,
+            stopRemarks: result.stopRemarks,
+            proofImagePath: result.proofImagePath,
+            assignmentStatus: result.assignmentStatus,
+            createdAt: result.createdAt,
+        };
     }
 }

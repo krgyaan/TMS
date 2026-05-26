@@ -1,13 +1,14 @@
-import { pgTable, bigserial, varchar, boolean, timestamp, text } from "drizzle-orm/pg-core";
+import { pgTable, bigserial, varchar, bigint, timestamp } from "drizzle-orm/pg-core";
+import { users } from "../auth";
 
-export const emdResponsibilityTypes = pgTable("instrument_responsibility_types", {
+export const emdResponsibility = pgTable("emd-responsibilities", {
     id: bigserial("id", { mode: "number" }).primaryKey(),
     name: varchar("name", { length: 255 }),
-    description: text("description"),
-    status: boolean("status").notNull().default(true),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+    instrumentType: varchar("instrument_type", { length: 30 }),
+    assignedUserId: bigint('assigned_user_id', { mode: 'number' }).references(() => users.id),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow()
 });
 
-export type EmdResponsibilityType = typeof emdResponsibilityTypes.$inferSelect;
-export type NewEmdResponsibilityType = typeof emdResponsibilityTypes.$inferInsert;
+export type EmdResponsibility = typeof emdResponsibility.$inferSelect;
+export type NewEmdResponsibility = typeof emdResponsibility.$inferInsert;

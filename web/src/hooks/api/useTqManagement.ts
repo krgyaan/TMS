@@ -20,7 +20,7 @@ export const useTqManagement = (
     filters?: TqManagementFilters,
 ) => {
     const { teamId, userId, dataScope } = useTeamFilter();
-    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const teamIdParam = teamId !== null ? teamId : undefined;
 
     const effectiveFilters: TqManagementFilters | undefined = filters
         ? { ...filters, ...(teamIdParam !== undefined ? { teamId: teamIdParam } : {}) }
@@ -123,8 +123,8 @@ export const useMarkAsNoTq = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ tenderId, qualified }: { tenderId: number; qualified: boolean }) =>
-            tqManagementService.markAsNoTq(tenderId, qualified),
+        mutationFn: ({ tenderId, qualified, disqualificationReason }: { tenderId: number; qualified: boolean; disqualificationReason?: string }) =>
+            tqManagementService.markAsNoTq(tenderId, qualified, disqualificationReason),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: tqManagementKey.all });
             // Explicitly invalidate dashboard counts to ensure they refresh
@@ -141,8 +141,8 @@ export const useTqQualified = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ tqId, qualified }: { tqId: number; qualified: boolean }) =>
-            tqManagementService.tqQualified(tqId, qualified),
+        mutationFn: ({ tqId, qualified, disqualificationReason }: { tqId: number; qualified: boolean; disqualificationReason?: string }) =>
+            tqManagementService.tqQualified(tqId, qualified, disqualificationReason),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: tqManagementKey.all });
             queryClient.invalidateQueries({ queryKey: tqManagementKey.dashboardCounts() });
@@ -174,7 +174,7 @@ export const useUpdateTqReceived = () => {
 
 export const useTqManagementDashboardCounts = () => {
     const { teamId, userId, dataScope } = useTeamFilter();
-    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const teamIdParam = teamId !== null ? teamId : undefined;
     const queryKey = [...tqManagementKey.dashboardCounts(), dataScope, teamId ?? null, userId ?? null];
 
     return useQuery<TqManagementDashboardCounts>({

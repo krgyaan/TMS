@@ -9,7 +9,7 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Form } from "@/components/ui/form";
-import { usePaymentRequest } from "@/hooks/api/useEmds";
+import { usePaymentRequest } from "@/hooks/api/usePaymentRequests";
 import { useTender } from "@/hooks/api/useTenders";
 import { ContactPersonSchema } from "@/modules/shared/follow-up/follow-up.types";
 import { useCreateFollowUp, useUpdateFollowUp, useEmdMailPreview } from "@/modules/shared/follow-up/follow-up.hooks";
@@ -45,8 +45,8 @@ type EmdFollowupForm = z.infer<typeof EmdFollowupSchema>;
 function mapInstrumentTypeToMode(instrumentType: string | null): string | undefined {
     if (!instrumentType) return undefined;
     const mapping: Record<string, string> = {
-        'Bank Transfer': 'BT',
-        'Portal Payment': 'POP',
+        'Bank Transfer': 'BANK_TRANSFER',
+        'Portal Payment': 'PORTAL',
         'DD': 'DD',
         'FDR': 'FDR',
         'BG': 'BG',

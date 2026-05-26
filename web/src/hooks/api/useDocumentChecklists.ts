@@ -20,7 +20,7 @@ export const useDocumentChecklists = (
 ) => {
     const { teamId, userId, dataScope } = useTeamFilter();
     // Only pass teamId for Super User/Admin (dataScope === 'all') when a team is selected
-    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const teamIdParam = teamId !== null ? teamId : undefined;
 
     const params = {
         ...(tab && { tab }),
@@ -98,7 +98,7 @@ export const useUpdateDocumentChecklist = () => {
 export const useChecklistDashboardCounts = () => {
     const { teamId, userId, dataScope } = useTeamFilter();
     // Only pass teamId for Super User/Admin (dataScope === 'all') when a team is selected
-    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const teamIdParam = teamId !== null ? teamId : undefined;
     
     // Include all filter context in query key to ensure proper cache invalidation
     // Use explicit values (including null) so React Query can properly differentiate cache entries

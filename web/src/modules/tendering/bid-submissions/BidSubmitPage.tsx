@@ -5,7 +5,7 @@ import { useCostingSheetByTender } from '@/hooks/api/useCostingSheets';
 import { useInfoSheet } from '@/hooks/api/useInfoSheets';
 import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
 import { useRfqByTenderId } from '@/hooks/api/useRfqs';
-import { usePaymentRequestsByTender } from '@/hooks/api/useEmds';
+import { usePaymentRequestsByTender } from '@/hooks/api/usePaymentRequests';
 import { useDocumentChecklistByTender } from '@/hooks/api/useDocumentChecklists';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -56,7 +56,7 @@ export default function BidSubmitPage() {
         {
             id: 'emd',
             label: 'EMD Status',
-            status: emdNA ? 'na' : (paymentRequests?.some(r => r.tenderId === id) ? 'fulfilled' : 'pending'),
+            status: emdNA ? 'na' : (Array.isArray(paymentRequests) && paymentRequests.some(r => r.tenderId === id) ? 'fulfilled' : 'pending'),
             description: emdNA ? 'EMD not required' : 'Process EMD payment'
         },
         {

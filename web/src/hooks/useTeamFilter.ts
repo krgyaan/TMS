@@ -36,11 +36,15 @@ export function useTeamFilter(): UseTeamFilterResult {
         // Determine effective team ID based on role and selection
         let effectiveTeamId: number | null = null;
 
-        if (dataScope === 'all') {
-            // Admin/Super User: use selected team (null = all teams)
+        if (canSwitchTeams) {
+            // Roles that can switch teams (Admin, Super User, Coordinator):
+            // use the selected team from the switcher (null = all / own team)
+            effectiveTeamId = activeTeamId;
+        } else if (dataScope === 'all') {
+            // Admin/Super User (without canSwitchTeams): use selected team
             effectiveTeamId = activeTeamId;
         } else if (dataScope === 'team') {
-            // Team Leader/Coordinator: always their team
+            // Team-scoped roles without team switching: always their team
             effectiveTeamId = userTeamId;
         } else {
             // Self scope: filter by user, not team
@@ -50,14 +54,10 @@ export function useTeamFilter(): UseTeamFilterResult {
         // Build query params for API
         const queryParams: TeamQueryParams = {};
 
-        if (dataScope === 'all' && effectiveTeamId !== null) {
-            // Admin viewing specific team
-            queryParams.teamId = effectiveTeamId;
-        } else if (dataScope === 'team' && effectiveTeamId !== null) {
-            // Team Leader viewing their team
+        if (effectiveTeamId !== null) {
             queryParams.teamId = effectiveTeamId;
         } else if (dataScope === 'self' && userId !== null) {
-            // Executive/Engineer viewing only their data
+            // Executive/Engineer/Field viewing only their data
             queryParams.userId = userId;
         }
 

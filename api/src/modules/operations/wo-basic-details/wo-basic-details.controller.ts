@@ -39,6 +39,11 @@ export class WoBasicDetailsController {
         return this.woBasicDetailsService.findAll(parsed);
     }
 
+    @Get('prefill/:tenderId')
+    async getPrefillData(@Param('tenderId', ParseIntPipe) tenderId: number) {
+        return this.woBasicDetailsService.getPrefillData(tenderId);
+    }
+
     @Get(':id')
     async getById(@Param('id', ParseIntPipe) id: number) {
         return this.woBasicDetailsService.findById(id);

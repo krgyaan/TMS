@@ -1,15 +1,14 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar } from "@/components/ui/calendar";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Clock, Users, FileText, GanttChart, Plus, Wallet, Truck, Package, Receipt, Banknote, ChevronRight, Send, Briefcase } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { useMemo } from "react";
-import { cn } from "@/lib/utils";
-import { useAuth } from "@/contexts/AuthContext";
 import { paths } from "@/app/routes/paths";
+import { Badge } from "@/components/ui/badge";
+import { Calendar } from "@/components/ui/calendar";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/contexts/AuthContext";
+import { cn } from "@/lib/utils";
+import { ChevronRight, FileText, Landmark, Send, Truck, Wallet } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 // Types
 interface TenderInfo {
@@ -95,7 +94,7 @@ const QuickActionCard = ({ icon: Icon, title, subtitle, color, bgColor, onClick 
             <h3 className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">{title}</h3>
             <p className="text-[10px] text-muted-foreground leading-tight">{subtitle}</p>
         </div>
-        <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity translate-x-1 group-hover:translate-x-0 transition-transform">
+        <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity translate-x-1 group-hover:translate-x-0">
             <ChevronRight className="h-3 w-3 text-muted-foreground" />
         </div>
     </button>
@@ -144,6 +143,14 @@ const Dashboard = () => {
             color: "text-orange-600",
             bgColor: "bg-orange-50 dark:bg-orange-950/30",
             path: paths.shared.followUpCreate
+        },
+        {
+            title: "BI Other Than EMDs",
+            subtitle: "Request New BI",
+            icon: Landmark,
+            color: "text-pink-600",
+            bgColor: "bg-pink-50 dark:bg-pink-950/30",
+            path: paths.tendering.biOtherThanEmdsCreate()
         },
     ];
 

@@ -1,0 +1,426 @@
+import { z } from "zod";
+
+export * from './payment-response.dto';
+
+// ============================================================================
+// Helper Schemas
+// ============================================================================
+
+const optionalString = z
+    .union([z.string(), z.undefined()])
+    .transform(v => {
+        if (typeof v !== "string") return undefined;
+        const trimmed = v.trim();
+        return trimmed.length ? trimmed : undefined;
+    });
+
+const optionalNumber = (
+    schema: z.ZodNumber = z.coerce.number()
+) =>
+    z
+        .union([schema, z.undefined(), z.literal("")])
+        .transform(v => {
+            if (v === "" || v === undefined) return undefined;
+            const num = typeof v === "number" ? v : Number(v);
+            return Number.isNaN(num) ? undefined : num;
+        });
+
+// ============================================================================
+// Instrument Detail Schemas
+// ============================================================================
+
+const ddDetails = z.object({
+    ddAmount: optionalNumber(z.coerce.number().min(0)),
+    ddFavouring: optionalString,
+    ddPayableAt: optionalString,
+    ddDeliverBy: optionalString,
+    ddPurpose: optionalString,
+    ddCourierAddress: optionalString,
+    ddCourierName: optionalString,
+    ddCourierPhone: optionalString,
+    ddCourierAddressLine1: optionalString,
+    ddCourierAddressLine2: optionalString,
+    ddCourierCity: optionalString,
+    ddCourierState: optionalString,
+    ddCourierPincode: optionalString,
+    ddCourierHours: optionalNumber(z.coerce.number().min(0)),
+    ddDate: optionalString,
+    ddRemarks: optionalString,
+});
+
+const fdrDetails = z.object({
+    fdrAmount: optionalNumber(z.coerce.number().min(0)),
+    fdrFavouring: optionalString,
+    fdrExpiryDate: optionalString,
+    fdrDeliverBy: optionalString,
+    fdrPurpose: optionalString,
+    fdrCourierAddress: optionalString,
+    fdrCourierName: optionalString,
+    fdrCourierPhone: optionalString,
+    fdrCourierAddressLine1: optionalString,
+    fdrCourierAddressLine2: optionalString,
+    fdrCourierCity: optionalString,
+    fdrCourierState: optionalString,
+    fdrCourierPincode: optionalString,
+    fdrCourierHours: optionalNumber(z.coerce.number().min(0)),
+    fdrDate: optionalString,
+});
+
+const bgDetails = z.object({
+    bgAmount: optionalNumber(z.coerce.number().min(0)),
+    bgNeededIn: optionalString,
+    bgPurpose: optionalString,
+    bgFavouring: optionalString,
+    bgAddress: optionalString,
+    bgExpiryDate: optionalString,
+    bgClaimPeriod: optionalString,
+    bgStampValue: optionalNumber(z.coerce.number().min(0)),
+    bgFormatFiles: z.array(z.string()).optional(),
+    bgPoFiles: z.array(z.string()).optional(),
+    bgClientUserEmail: z.string().email().optional().or(z.literal("")),
+    bgClientCpEmail: z.string().email().optional().or(z.literal("")),
+    bgClientFinanceEmail: z.string().email().optional().or(z.literal("")),
+    bgCourierAddress: optionalString,
+    bgCourierDays: optionalNumber(z.coerce.number().min(1).max(10)),
+    bgBank: optionalString,
+    bgBankAccountName: optionalString,
+    bgBankAccountNo: optionalString,
+    bgBankIfsc: optionalString,
+});
+
+const chequeDetails = z.object({
+    chequeAmount: optionalNumber(z.coerce.number().min(0)),
+    chequeFavouring: optionalString,
+    chequeDate: optionalString,
+    chequeNeededIn: optionalString,
+    chequePurpose: optionalString,
+    chequeAccount: optionalString,
+    chequeDeliveryMethod: optionalString,
+    chequeHandoverTo: optionalString,
+    chequeCourierName: optionalString,
+    chequeCourierPhone: optionalString,
+    chequeCourierAddressLine1: optionalString,
+    chequeCourierAddressLine2: optionalString,
+    chequeCourierCity: optionalString,
+    chequeCourierState: optionalString,
+    chequeCourierPincode: optionalString,
+});
+
+const bankTransferDetails = z.object({
+    btAmount: optionalNumber(z.coerce.number().min(0)),
+    btPurpose: optionalString,
+    btAccountName: optionalString,
+    btAccountNo: optionalString,
+    btIfsc: optionalString,
+}).superRefine((data, ctx) => {
+    if (!data.btPurpose || (typeof data.btPurpose === 'string' && data.btPurpose.trim() === '')) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Payment Purpose is required',
+            path: ['btPurpose'],
+        });
+    }
+    if (!data.btAccountName || (typeof data.btAccountName === 'string' && data.btAccountName.trim() === '')) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Bank Account Name is required',
+            path: ['btAccountName'],
+        });
+    }
+    if (!data.btAccountNo || (typeof data.btAccountNo === 'string' && data.btAccountNo.trim() === '')) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Bank Account Number is required',
+            path: ['btAccountNo'],
+        });
+    }
+    if (!data.btIfsc || (typeof data.btIfsc === 'string' && data.btIfsc.trim() === '')) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Bank IFSC Code is required',
+            path: ['btIfsc'],
+        });
+    }
+    if (data.btAmount !== undefined && data.btAmount < 0) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Amount must be greater than 0',
+            path: ['btAmount'],
+        });
+    }
+});
+
+const portalDetails = z.object({
+    portalAmount: optionalNumber(z.coerce.number().min(0)),
+    portalPurpose: optionalString,
+    portalName: optionalString,
+    portalNetBanking: z.enum(["YES", "NO"]).optional(),
+    portalDebitCard: z.enum(["YES", "NO"]).optional(),
+}).superRefine((data, ctx) => {
+    if (!data.portalPurpose || (typeof data.portalPurpose === 'string' && data.portalPurpose.trim() === '')) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Payment Purpose is required',
+            path: ['portalPurpose'],
+        });
+    }
+    if (!data.portalName || (typeof data.portalName === 'string' && data.portalName.trim() === '')) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Portal Name is required',
+            path: ['portalName'],
+        });
+    }
+    if (!data.portalNetBanking) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Is Net Banking Available?',
+            path: ['portalNetBanking'],
+        });
+    }
+    if (!data.portalDebitCard) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Is Debit Card Allowed?',
+            path: ['portalDebitCard'],
+        });
+    }
+    if (data.portalAmount !== undefined && data.portalAmount < 0) {
+        ctx.addIssue({
+            code: 'custom',
+            message: 'Amount must be greater than 0',
+            path: ['portalAmount'],
+        });
+    }
+});
+
+// ============================================================================
+// Payment Section Schemas
+// ============================================================================
+
+const emdModeMapping: Record<string, string> = {
+    BT: 'BANK_TRANSFER',
+    POP: 'PORTAL',
+};
+
+const normalizeMode = (data: unknown) => {
+    if (data && typeof data === 'object' && 'mode' in (data as Record<string, unknown>)) {
+        const d = data as Record<string, unknown>;
+        const mapped = emdModeMapping[d.mode as string];
+        return mapped ? { ...d, mode: mapped } : data;
+    }
+    return data;
+};
+
+const emdSection = z.preprocess(normalizeMode, z.discriminatedUnion("mode", [
+    z.object({ mode: z.literal("DD"), details: ddDetails }),
+    z.object({ mode: z.literal("FDR"), details: fdrDetails }),
+    z.object({ mode: z.literal("BG"), details: bgDetails }),
+    z.object({ mode: z.literal("CHEQUE"), details: chequeDetails }),
+    z.object({ mode: z.literal("BANK_TRANSFER"), details: bankTransferDetails }),
+    z.object({ mode: z.literal("PORTAL"), details: portalDetails }),
+])).optional();
+
+const tenderFeeSection = z.preprocess(normalizeMode, z.discriminatedUnion("mode", [
+    z.object({ mode: z.literal("PORTAL"), details: portalDetails }),
+    z.object({ mode: z.literal("BANK_TRANSFER"), details: bankTransferDetails }),
+    z.object({ mode: z.literal("DD"), details: ddDetails }),
+])).optional();
+
+const processingFeeSection = z.preprocess(normalizeMode, z.discriminatedUnion("mode", [
+    z.object({ mode: z.literal("PORTAL"), details: portalDetails }),
+    z.object({ mode: z.literal("BANK_TRANSFER"), details: bankTransferDetails }),
+    z.object({ mode: z.literal("DD"), details: ddDetails }),
+])).optional();
+
+// ============================================================================
+// Create/Update Payment Request Schemas
+// ============================================================================
+
+export const CreatePaymentRequestSchema = z.object({
+    type: z.enum(["TMS", "Other Than TMS", "Old Entries", "Other Than Tender"]).optional(),
+    tenderNo: z.string().optional(),
+    tenderName: z.string().optional(),
+    dueDate: z.string().optional(),
+    team: z.coerce.number().int().positive().optional(),
+
+    EMD: emdSection,
+    TENDER_FEES: tenderFeeSection,
+    PROCESSING_FEES: processingFeeSection,
+});
+
+export type CreatePaymentRequestDto = z.infer<typeof CreatePaymentRequestSchema>;
+
+export const UpdatePaymentRequestSchema = CreatePaymentRequestSchema;
+export type UpdatePaymentRequestDto = z.infer<typeof UpdatePaymentRequestSchema>;
+
+// ============================================================================
+// Status Update Schema
+// ============================================================================
+
+export const UpdateStatusSchema = z.object({
+    status: z.enum([
+        "Pending",
+        "Requested",
+        "Sent",
+        "Approved",
+        "Rejected",
+        "Issued",
+        "Dispatched",
+        "Received",
+        "Returned",
+        "Cancelled",
+        "Refunded",
+        "Encashed",
+        "Extended",
+    ]),
+    remarks: optionalString,
+});
+
+export type UpdateStatusDto = z.infer<typeof UpdateStatusSchema>;
+
+// ============================================================================
+// Dashboard Query Schema
+// ============================================================================
+
+export const DashboardQuerySchema = z.object({
+    tab: z.enum([
+        "pending",
+        "sent",
+        "paid",
+        "rejected",
+        "returned",
+        "fees",
+        "others",
+        "dnb",
+    ]).optional().default("pending"),
+    userId: z.coerce.number().optional(),
+    page: z.coerce.number().int().positive().optional(),
+    limit: z.coerce.number().int().positive().optional(),
+    sortBy: z.string().optional(),
+    sortOrder: z.enum(["asc", "desc"]).optional(),
+    search: z.string().optional(),
+});
+
+export type DashboardQueryDto = z.infer<typeof DashboardQuerySchema>;
+
+// ============================================================================
+// Dashboard Response Types
+// ============================================================================
+
+export type PaymentPurpose = "EMD" | "Tender Fee" | "Processing Fee" | "Security Deposit" | "Performance BG" | "Surety Bond" | "Other Payment";
+
+export type InstrumentType =
+    | "DD"
+    | "FDR"
+    | "BG"
+    | "Cheque"
+    | "Bank Transfer"
+    | "Portal Payment";
+
+export type DashboardRowType = "request" | "missing";
+
+export interface DashboardRow {
+    id: number | null;
+    type: DashboardRowType;
+    purpose: PaymentPurpose;
+    amountRequired: string;
+    status: string;
+    instrumentType: InstrumentType | null;
+    instrumentStatus: string | null;
+    createdAt: Date | null;
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    dueDate: Date | null;
+    teamMemberId: number | null;
+    teamMember: string | null;
+    requestedBy: string | null;
+}
+
+export interface DashboardCounts {
+    pending: number;
+    sent: number;
+    paid: number;
+    rejected: number;
+    returned: number;
+    fees: number;
+    others: number;
+    dnb: number;
+    total: number;
+}
+
+export interface PendingTenderRow {
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    gstValues: string | null;
+    status: number;
+    statusName: string | null;
+    dueDate: Date | null;
+    teamMemberId: number | null;
+    teamMember: string | null;
+    emd: string | null;
+    emdMode: string | null;
+    tenderFee: string | null;
+    tenderFeeMode: string | null;
+    processingFee: string | null;
+    processingFeeMode: string | null;
+}
+
+export interface PaymentRequestRow {
+    id: number;
+    tenderId: number;
+    tenderNo: string;
+    tenderName: string;
+    purpose: PaymentPurpose;
+    amountRequired: string;
+    requestType: string | null;
+    dueDate: Date | null;
+    bidValid: Date | null;
+    teamMember: string | null;
+    instrumentId: number | null;
+    instrumentType: InstrumentType | null;
+    instrumentStatus: string | null;
+    favouring: string | null;
+    displayStatus: string;
+    createdAt: Date | null;
+}
+
+export interface DashboardCounts {
+    pending: number;
+    sent: number;
+    paid: number;
+    rejected: number;
+    returned: number;
+    fees: number;
+    others: number;
+    dnb: number;
+    total: number;
+}
+
+export type DashboardTab = 'pending' | 'sent' | 'paid' | 'rejected' | 'returned' | 'fees' | 'others' | 'dnb';
+
+export interface PendingTabResponse {
+    data: PendingTenderRow[];
+    counts: DashboardCounts;
+    meta?: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
+}
+
+export interface RequestTabResponse {
+    data: PaymentRequestRow[];
+    counts: DashboardCounts;
+    meta?: {
+        total: number;
+        page: number;
+        limit: number;
+        totalPages: number;
+    };
+}
+
+export type DashboardResponse = PendingTabResponse | RequestTabResponse;

@@ -52,6 +52,15 @@ const TenderListPage = () => {
         }  
     }
 
+    const elligibleForEditing = (row) => {
+        if([0,1,2,29].includes(row.status)){
+            return true;
+        } else {
+            return false;
+        }
+
+    }
+
     const handleSortChanged = useCallback((event: any) => {
         const sortModel = event.api.getColumnState()
             .filter((col: any) => col.sort)
@@ -144,6 +153,7 @@ const TenderListPage = () => {
             label: "Fill Info Sheet",
             onClick: (row: TenderWithRelations) => (row.infoSheet ? navigate(paths.tendering.infoSheetEdit(row.id)) : navigate(paths.tendering.infoSheetCreate(row.id))),
             icon: <FilePlus className="h-4 w-4" />,
+            visible: (row) => elligibleForEditing(row), 
         },
         {
             label: "Reject Tender",

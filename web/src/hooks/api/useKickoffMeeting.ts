@@ -20,7 +20,7 @@ export const useKickoffMeetings = (
 ) => {
     const { teamId, userId, dataScope } = useTeamFilter();
         // Only pass teamId for Super User/Admin (dataScope === 'all') when a team is selected
-        const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+        const teamIdParam = teamId !== null ? teamId : undefined;
 
         const params = {
             ...(tab && { tab }),
@@ -55,7 +55,7 @@ export const useKickoffMeetings = (
 export const useKickoffMeetingDashboardCounts = () => {
     const { teamId, dataScope } = useTeamFilter();
     // Only pass teamId for Super User/Admin (dataScope === 'all') when a team is selected
-    const teamIdParam = dataScope === 'all' && teamId !== null ? teamId : undefined;
+    const teamIdParam = teamId !== null ? teamId : undefined;
 
     return useQuery({
         queryKey: KICKOFF_MEETING_KEYS.dashboardCounts(teamIdParam),

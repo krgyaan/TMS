@@ -60,6 +60,8 @@ export type TenderResult = {
     finalResultScreenshot: string | null;
     resultUploadedAt: Date | null;
     resultReason: string | null;
+    tqStatus: string | null,
+    raStatus: string | null,
     createdAt: Date;
     updatedAt: Date;
 };

@@ -11,12 +11,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Form } from "@/components/ui/form";
 import { ArrowLeft, Upload, X, Loader2 } from "lucide-react";
 import { paths } from "@/app/routes/paths";
 
 // API & Hooks
 import { useCreateCourier } from "@/modules/shared/courier/courier.hooks";
 import { useUsers } from "@/hooks/api/useUsers";
+import SelectField, { Combobox } from "@/components/form/SelectField";
 
 // =====================
 // Validation Schema
@@ -68,15 +70,8 @@ const CourierForm = () => {
     // API hooks
     const createMutation = useCreateCourier();
     const { data: employees = [], isLoading: employeesLoading } = useUsers();
-
     // Form setup
-    const {
-        register,
-        handleSubmit,
-        formState: { errors },
-        setValue,
-        watch,
-    } = useForm<CourierFormData>({
+    const form = useForm<CourierFormData>({
         resolver: zodResolver(courierFormSchema),
         defaultValues: {
             toOrg: "",
@@ -89,6 +84,15 @@ const CourierForm = () => {
             urgency: undefined,
         },
     });
+
+    const {
+        register,
+        handleSubmit,
+        formState: { errors },
+        setValue,
+        control,
+        watch,
+    } = form;
 
     // Guard against duplicate submissions:
     // Once the request is fired, we lock the form — even if the network times out
@@ -205,7 +209,8 @@ const CourierForm = () => {
                     <CardDescription>Fill in the details below to create a new courier dispatch request</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                    <Form {...form}>
+                        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                         {/* Courier To Section */}
                         <div className="space-y-4">
                             <Label className="text-lg font-semibold">Courier to:</Label>
@@ -262,24 +267,22 @@ const CourierForm = () => {
                         <div className="space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {/* Courier From - Employee Select */}
-                                <div className="space-y-2">
-                                    <Label htmlFor="emp_from">
-                                        Courier from <span className="text-red-500">*</span>
-                                    </Label>
-                                    <Select onValueChange={value => setValue("empFrom", Number(value))} disabled={isSubmitting || employeesLoading}>
-                                        <SelectTrigger className="w-full">
-                                            <SelectValue placeholder={employeesLoading ? "Loading employees..." : "Select Employee"} />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {employees.map(employee => (
-                                                <SelectItem key={employee.id} value={String(employee.id)}>
-                                                    {employee.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    {errors.empFrom && <p className="text-sm text-destructive">{errors.empFrom.message}</p>}
-                                </div>
+                                <SelectField
+                                    control={control}
+                                    name="empFrom"
+                                    label={
+                                        <span>
+                                            Courier from <span className="text-red-500">*</span>
+                                        </span>
+                                    }
+                                    options={employees.map(e => ({
+                                        id: String(e.id),
+                                        name: e.name,
+                                        description: e.email,
+                                    }))}
+                                    placeholder={employeesLoading ? "Loading employees..." : "Select Employee"}
+                                    disabled={isSubmitting || employeesLoading}
+                                />
 
                                 {/* Expected Delivery Date */}
                                 <div className="space-y-2">
@@ -374,6 +377,7 @@ const CourierForm = () => {
                             </Button>
                         </div>
                     </form>
+                </Form>
                 </CardContent>
             </Card>
         </div>

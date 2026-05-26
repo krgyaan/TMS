@@ -1,130 +1,252 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm, type Resolver } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
-import { SelectField } from '@/components/form/SelectField';
 import { Input } from '@/components/ui/input';
-import { NumberInput } from '@/components/form/NumberInput';
 import { ContactPersonFields } from '@/components/form/ContactPersonFields';
 import { FollowUpFrequencySelect } from '@/components/form/FollowUpFrequencySelect';
-import { StopReasonFields } from '@/components/form/StopReasonFields';
+import { FollowupEmailEditor } from '@/components/form/FollowupEmailEditor';
+import { infoSheetsService } from '@/services/api/info-sheet.service';
 import { ConditionalSection } from '@/components/form/ConditionalSection';
 import DateInput from '@/components/form/DateInput';
 import DateTimeInput from '@/components/form/DateTimeInput';
-import { PayOnPortalActionFormSchema, type PayOnPortalActionFormValues } from '../helpers/payOnPortalActionForm.schema';
+import { PayOnPortalActionFormSchema, type PayOnPortalActionFormValues, type PayOnPortalActionPayload } from '../helpers/payOnPortalActionForm.schema';
 import { useUpdatePayOnPortalAction } from '@/hooks/api/usePayOnPortals';
 import { toast } from 'sonner';
 import { useWatch } from 'react-hook-form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { FileText, Users, Banknote, CheckCircle, CheckCircle2, Info } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { TenderFileUploader } from '@/components/tender-file-upload';
+import { ALL_ACTION_OPTIONS, type PayOnPortalActionFormProps } from '../helpers/payOnPortal.types';
 
-const ACTION_OPTIONS = [
-    { value: 'accounts-form-1', label: 'Accounts Form' },
-    { value: 'initiate-followup', label: 'Initiate Followup' },
-    { value: 'returned', label: 'Returned via Bank Transfer' },
-    { value: 'settled', label: 'Settled with Project Account' },
-];
-
-interface PayOnPortalActionFormProps {
-    instrumentId: number;
-    instrumentData?: {
-        utrNo?: string;
-        portalName?: string;
-        amount?: number;
-        tenderName?: string;
-        tenderNo?: string;
-    };
-}
-
-export function PayOnPortalActionForm({ instrumentId, instrumentData }: PayOnPortalActionFormProps) {
+export function PayOnPortalActionForm({ instrumentId, action, formHistory, tenderId, instrumentData }: PayOnPortalActionFormProps) {
     const navigate = useNavigate();
     const updateMutation = useUpdatePayOnPortalAction();
 
+    const hasAccountsFormData = !!(formHistory?.accountsForm?.popReq);
+    const hasFollowupData = !!(formHistory?.initiateFollowup?.organisationName);
+    const hasReturnedData = !!(formHistory?.returned?.transferDate);
+    const hasSettledData = !!(formHistory?.settled?.remarks);
+
+    const getSubmittedBadge = (hasData: boolean) => {
+        if (!hasData) return <Badge variant={'secondary'} className="rounded-full p-2">
+            <Info className="h-3 w-3" />
+        </Badge>;
+        return (
+            <Badge variant={'success'} className="rounded-full p-2">
+                <CheckCircle className="h-3 w-3" />
+            </Badge>
+        );
+    };
+
+    const availableActions = action === 0
+        ? ALL_ACTION_OPTIONS.filter(opt => opt.value === 'accounts-form')
+        : ALL_ACTION_OPTIONS;
+
+    const defaultValues: PayOnPortalActionFormValues = {
+        action: '',
+        contacts: [],
+    };
+
+    if (formHistory?.accountsForm) {
+        defaultValues.pop_req = formHistory.accountsForm.popReq;
+        defaultValues.reason_req = formHistory.accountsForm.reasonReq;
+        defaultValues.payment_datetime = formHistory.accountsForm.paymentDatetime;
+        defaultValues.utr_no = formHistory.accountsForm.utrNo;
+        defaultValues.utr_message = formHistory.accountsForm.utrMessage;
+        defaultValues.payment_proof = formHistory.accountsForm.paymentProof;
+    }
+
+    if (formHistory?.initiateFollowup) {
+        defaultValues.organisation_name = formHistory.initiateFollowup.organisationName;
+        defaultValues.contacts = formHistory.initiateFollowup.contacts?.map(c => ({
+            name: c.name,
+            phone: c.phone ?? '',
+            email: c.email ?? '',
+        })) || [];
+        defaultValues.followup_start_date = formHistory.initiateFollowup.followupStartDate;
+        defaultValues.frequency = formHistory.initiateFollowup.frequency;
+    }
+
+    if (formHistory?.returned) {
+        defaultValues.transfer_date = formHistory.returned.transferDate;
+        defaultValues.return_utr = formHistory.returned.returnUtr;
+    }
+
+    if (formHistory?.settled) {
+        defaultValues.settle_remarks = formHistory.settled.remarks;
+    }
+
     const form = useForm<PayOnPortalActionFormValues>({
         resolver: zodResolver(PayOnPortalActionFormSchema) as Resolver<PayOnPortalActionFormValues>,
-        defaultValues: {
-            action: '',
-            contacts: [],
-        },
+        defaultValues,
     });
 
-    const action = useWatch({ control: form.control, name: 'action' });
+    const selectedAction = useWatch({ control: form.control, name: 'action' });
     const popReq = useWatch({ control: form.control, name: 'pop_req' });
+    const emailBody = useWatch({ control: form.control, name: 'emailBody' });
+
+    useEffect(() => {
+        if (formHistory?.accountsForm?.popReq) {
+            form.setValue('pop_req', formHistory.accountsForm.popReq, { shouldValidate: false });
+        }
+        if (formHistory?.accountsForm?.reasonReq) {
+            form.setValue('reason_req', formHistory.accountsForm.reasonReq, { shouldValidate: false });
+        }
+        if (formHistory?.accountsForm?.paymentDatetime) {
+            form.setValue('payment_datetime', formHistory.accountsForm.paymentDatetime, { shouldValidate: false });
+        }
+        if (formHistory?.accountsForm?.utrNo) {
+            form.setValue('utr_no', formHistory.accountsForm.utrNo, { shouldValidate: false });
+        }
+        if (formHistory?.accountsForm?.utrMessage) {
+            form.setValue('utr_message', formHistory.accountsForm.utrMessage, { shouldValidate: false });
+        }
+
+        if (formHistory?.initiateFollowup?.organisationName) {
+            form.setValue('organisation_name', formHistory.initiateFollowup.organisationName, { shouldValidate: false });
+        }
+        if (formHistory?.initiateFollowup?.contacts) {
+            form.setValue('contacts', formHistory.initiateFollowup.contacts.map(c => ({
+                name: c.name,
+                phone: c.phone ?? '',
+                email: c.email ?? '',
+            })), { shouldValidate: false });
+        }
+        if (formHistory?.initiateFollowup?.followupStartDate) {
+            form.setValue('followup_start_date', formHistory.initiateFollowup.followupStartDate, { shouldValidate: false });
+        }
+        if (formHistory?.initiateFollowup?.frequency) {
+            form.setValue('frequency', formHistory.initiateFollowup.frequency, { shouldValidate: false });
+        }
+
+        if (formHistory?.returned?.transferDate) {
+            form.setValue('transfer_date', formHistory.returned.transferDate, { shouldValidate: false });
+        }
+        if (formHistory?.returned?.returnUtr) {
+            form.setValue('return_utr', formHistory.returned.returnUtr, { shouldValidate: false });
+        }
+
+        if (formHistory?.settled?.remarks) {
+            form.setValue('settle_remarks', formHistory.settled.remarks, { shouldValidate: false });
+        }
+    }, [formHistory, form]);
+
+    useEffect(() => {
+        if (selectedAction === 'initiate-followup' && tenderId && tenderId > 0) {
+            (async () => {
+                try {
+                    const result = await infoSheetsService.getTenderContacts(tenderId);
+                    if (result?.organisationName) {
+                        const currentOrg = form.getValues('organisation_name');
+                        if (!currentOrg) {
+                            form.setValue('organisation_name', result.organisationName, { shouldValidate: false });
+                        }
+                    }
+                    if (result?.contacts?.length > 0) {
+                        const currentContacts = form.getValues('contacts');
+                        if (!currentContacts || currentContacts.length === 0) {
+                            form.setValue('contacts', result.contacts.map(c => ({
+                                name: c.name,
+                                phone: c.phone ?? '',
+                                email: c.email ?? '',
+                            })), { shouldValidate: false });
+                        }
+                    }
+                } catch (err) {
+                    console.error('Failed to load tender contacts:', err);
+                }
+            })();
+        }
+    }, [selectedAction, tenderId, form]);
 
     const isSubmitting = form.formState.isSubmitting || updateMutation.isPending;
 
     const handleSubmit = async (values: PayOnPortalActionFormValues) => {
         try {
-            const formData = new FormData();
+            const payload: PayOnPortalActionPayload = {
+                action: values.action,
+                ...(values.pop_req && { pop_req: values.pop_req }),
+                ...(values.reason_req && { reason_req: values.reason_req }),
+                ...(values.payment_datetime && { payment_datetime: values.payment_datetime }),
+                ...(values.utr_no && { utr_no: values.utr_no }),
+                ...(values.utr_message && { utr_message: values.utr_message }),
+                ...(values.amount !== undefined && { amount: values.amount }),
+                ...(values.payment_proof && { payment_proof: values.payment_proof }),
+                ...(values.organisation_name && { organisation_name: values.organisation_name }),
+                ...(values.contacts && { contacts: values.contacts }),
+                ...(values.followup_start_date && { followup_start_date: values.followup_start_date }),
+                ...(values.frequency && { frequency: Number(values.frequency) }),
+                ...(values.emailBody && { emailBody: values.emailBody }),
+                ...(values.transfer_date && { transfer_date: values.transfer_date }),
+                ...(values.return_utr && { return_utr: values.return_utr }),
+                ...(values.settle_remarks && { settle_remarks: values.settle_remarks }),
+            };
 
-            Object.entries(values).forEach(([key, value]) => {
-                // Skip follow-up fields - handled by different service
-                if (key === 'contacts' ||
-                    key === 'organisation_name' ||
-                    key === 'followup_start_date' ||
-                    key === 'frequency' ||
-                    key === 'stop_reason' ||
-                    key === 'proof_text' ||
-                    key === 'stop_remarks' ||
-                    key === 'proof_image') {
-                    return;
-                }
-
-                // Handle File objects (non-followup files)
-                if (value instanceof File) {
-                    formData.append(key, value);
-                    return;
-                }
-
-                // Handle arrays of Files
-                if (Array.isArray(value) && value.length > 0 && value[0] instanceof File) {
-                    value.forEach((file) => formData.append(key, file));
-                    return;
-                }
-
-                // Handle all other values (strings, numbers, dates, file paths, etc.)
-                if (value === undefined || value === null || value === '') return;
-                if (value instanceof Date) {
-                    formData.append(key, value.toISOString());
-                } else if (typeof value === 'object') {
-                    formData.append(key, JSON.stringify(value));
-                } else {
-                    formData.append(key, String(value));
-                }
-            });
-
-            await updateMutation.mutateAsync({ id: instrumentId, formData });
-            toast.success('Action submitted successfully');
+            await updateMutation.mutateAsync({ id: instrumentId, data: payload });
+            toast.success('Payment data updated successfully');
+            localStorage.removeItem('pay_on_portal_action_data');
             navigate(-1);
             form.reset();
         } catch (error: any) {
-            toast.error(error?.message || 'Failed to submit action');
-            console.error('Error submitting action:', error);
+            toast.error(error?.message || 'Failed to update payment data');
+            console.error('Error updating payment data:', error);
         }
     };
 
     return (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                <div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
-                    <SelectField
-                        label="Choose What to do"
-                        control={form.control}
-                        name="action"
-                        options={ACTION_OPTIONS}
-                        placeholder="Select an option"
-                    />
+                <div className="space-y-3">
+                    <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                        Choose What to do
+                    </label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                        {availableActions.map((option) => {
+                            const hasHistory =
+                                (option.value === 'accounts-form' && hasAccountsFormData) ||
+                                (option.value === 'initiate-followup' && hasFollowupData) ||
+                                (option.value === 'returned' && hasReturnedData) ||
+                                (option.value === 'settled' && hasSettledData);
+
+                            return (
+                                <div
+                                    key={option.value}
+                                    className={`relative flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all hover:bg-muted/50 ${selectedAction === option.value ? 'border-primary' : '' }`}
+                                    onClick={() => form.setValue('action', option.value, { shouldValidate: true })}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        {getSubmittedBadge(hasHistory)}
+                                        <div className="font-medium text-sm flex items-center">
+                                            {option.label}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    {form.formState.errors.action && (
+                        <p className="text-sm text-destructive mt-1">{form.formState.errors.action.message}</p>
+                    )}
                 </div>
 
-                {/* Accounts Form (POP) 1 */}
-                <ConditionalSection show={action === 'accounts-form-1'}>
-                    <div className="space-y-4 border rounded-lg p-4">
-                        <h4 className="font-semibold text-base">Accounts Form (POP) 1 - Request to Portal</h4>
+                <ConditionalSection show={selectedAction === 'accounts-form'}>
+                    <div className="space-y-4 border rounded-lg p-4 bg-background">
+                        <div className="flex items-center gap-2 pb-3 border-b">
+                            <FileText className="h-5 w-5 text-primary" />
+                            <h4 className="font-semibold text-base">Accounts Form</h4>
+                        </div>
+                        <p className="text-sm text-muted-foreground -mt-2">
+                            Process the payment request through accounts department
+                        </p>
 
-                        <FieldWrapper control={form.control} name="pop_req" label="POP Request">
+                        <FieldWrapper control={form.control} name="pop_req" label="Pay On Portal Request">
                             {(field) => (
                                 <RadioGroup
                                     value={field.value}
@@ -156,8 +278,8 @@ export function PayOnPortalActionForm({ instrumentId, instrumentData }: PayOnPor
                         )}
 
                         {popReq === 'Accepted' && (
-                            <>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3 gap-y-4">
+                            <div className="space-y-4 pt-3">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <FieldWrapper control={form.control} name="payment_datetime" label="Date and Time of Payment">
                                         {(field) => (
                                             <DateTimeInput
@@ -174,70 +296,110 @@ export function PayOnPortalActionForm({ instrumentId, instrumentData }: PayOnPor
                                         {(field) => <Input {...field} placeholder="Enter UTR message" />}
                                     </FieldWrapper>
                                 </div>
-                            </>
+                                <FieldWrapper control={form.control} name="payment_proof" label="Payment Proof (Screenshot)">
+                                    {(field) => (
+                                        <TenderFileUploader
+                                            context="payment-proof"
+                                            value={field.value || []}
+                                            onChange={field.onChange}
+                                            disabled={false}
+                                        />
+                                    )}
+                                </FieldWrapper>
+                            </div>
                         )}
                     </div>
                 </ConditionalSection>
 
-                {/* Initiate Followup */}
-                <ConditionalSection show={action === 'initiate-followup'}>
-                    <div className="space-y-4 border rounded-lg p-4">
-                        <h4 className="font-semibold text-base">Initiate Followup</h4>
+                <ConditionalSection show={selectedAction === 'initiate-followup'}>
+                    <div className="space-y-4 border rounded-lg p-4 bg-background">
+                        <div className="flex items-center gap-2 pb-3 border-b">
+                            <Users className="h-5 w-5 text-primary" />
+                            <h4 className="font-semibold text-base">Initiate Followup</h4>
+                        </div>
+                        <p className="text-sm text-muted-foreground -mt-2">
+                            Start a follow-up process with organisation contacts
+                        </p>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3 gap-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <FieldWrapper control={form.control} name="organisation_name" label="Organisation Name">
                                 {(field) => <Input {...field} placeholder="Enter organisation name" />}
                             </FieldWrapper>
                         </div>
 
-                        <div className="col-span-3">
+                        <div>
                             <ContactPersonFields control={form.control} name="contacts" />
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3 gap-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <FieldWrapper control={form.control} name="followup_start_date" label="Follow-up Start Date">
                                 {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                             </FieldWrapper>
                             <FollowUpFrequencySelect control={form.control} name="frequency" />
                         </div>
 
-                        <div className="col-span-3">
-                            <StopReasonFields
-                                control={form.control}
-                                frequencyFieldName="frequency"
-                                stopReasonFieldName="stop_reason"
-                                proofTextFieldName="proof_text"
-                                stopRemarksFieldName="stop_remarks"
-                                proofImageFieldName="proof_image"
+                        <div className="pt-4 border-t">
+                            <FollowupEmailEditor
+                                instrumentType="Portal Payment"
+                                templateData={{
+                                    tenderNo: instrumentData?.tenderNo,
+                                    projectName: instrumentData?.tenderName,
+                                    amount: instrumentData?.amount,
+                                    utrNo: instrumentData?.utrNo,
+                                    status: instrumentData?.tenderStatusName,
+                                    transactionDate: instrumentData?.transactionDate ? new Date(instrumentData.transactionDate).toISOString() : undefined,
+                                }}
+                                onEmailBodyChange={(html) => form.setValue('emailBody', html, { shouldValidate: false })}
+                                initialEmailBody={formHistory?.initiateFollowup ? undefined : emailBody}
                             />
                         </div>
                     </div>
                 </ConditionalSection>
 
-                {/* Returned via Bank Transfer */}
-                <ConditionalSection show={action === 'returned'}>
-                    <div className="space-y-4 border rounded-lg p-4">
-                        <h4 className="font-semibold text-base">Returned via Bank Transfer</h4>
+                <ConditionalSection show={selectedAction === 'returned'}>
+                    <div className="space-y-4 border rounded-lg p-4 bg-background">
+                        <div className="flex items-center gap-2 pb-3 border-b">
+                            <Banknote className="h-5 w-5 text-primary" />
+                            <h4 className="font-semibold text-base">Returned via Bank Transfer</h4>
+                        </div>
+                        <p className="text-sm text-muted-foreground -mt-2">
+                            Record return of payment through bank transfer
+                        </p>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-start pt-3 gap-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <FieldWrapper control={form.control} name="transfer_date" label="Transfer Date">
                                 {(field) => <DateInput value={field.value} onChange={field.onChange} />}
                             </FieldWrapper>
-                            <FieldWrapper control={form.control} name="utr_no" label="UTR Number">
-                                {(field) => <Input {...field} placeholder="Enter UTR number" />}
+                            <FieldWrapper control={form.control} name="return_utr" label="Return UTR">
+                                {(field) => <Input {...field} placeholder="Enter Return UTR number" />}
                             </FieldWrapper>
                         </div>
                     </div>
                 </ConditionalSection>
 
-                {/* Settled with Project Account */}
-                <ConditionalSection show={action === 'settled'}>
-                    <div className="space-y-4 border rounded-lg p-4">
-                        <h4 className="font-semibold text-base">Settled with Project Account</h4>
+                <ConditionalSection show={selectedAction === 'settled'}>
+                    <div className="space-y-4 border rounded-lg p-4 bg-background">
+                        <div className="flex items-center gap-2 pb-3 border-b">
+                            <CheckCircle2 className="h-5 w-5 text-primary" />
+                            <h4 className="font-semibold text-base">Settled with Project Account</h4>
+                            {getSubmittedBadge(hasSettledData)}
+                        </div>
+                        <p className="text-sm text-muted-foreground -mt-2">
+                            Mark payment as settled with project account
+                        </p>
+                        <FieldWrapper control={form.control} name="settle_remarks" label="Remarks">
+                            {(field) => (
+                                <Textarea
+                                    {...field}
+                                    placeholder="Enter settlement remarks"
+                                    className="min-h-[80px]"
+                                />
+                            )}
+                        </FieldWrapper>
                     </div>
                 </ConditionalSection>
 
-                <div className="flex justify-end gap-4 pt-4">
+                <div className="flex justify-end gap-4 pt-4 border-t">
                     <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={isSubmitting}>
                         Cancel
                     </Button>

@@ -99,6 +99,11 @@ export interface SaveTenderInfoSheetDto {
     courierCity: string | null;
     courierState: string | null;
     courierPincode: string | null;
+    
+    clientDetailsPresent: 'YES' | 'NO' | null;
+    customerInContact: 'YES' | 'NO' | null;
+    courierDetailsPresent: 'YES' | 'NO' | null;
+
     clients: TenderClientDto[];
 
     teFinalRemark: string | null;
@@ -187,6 +192,10 @@ export interface TenderInfoSheetResponse {
     courierState: string | null;
     courierPincode: string | null;
 
+    clientDetailsPresent: 'YES' | 'NO' | null;
+    customerInContact: 'YES' | 'NO' | null;
+    courierDetailsPresent: 'YES' | 'NO' | null;
+
     clients: Array<{
         id?: number;
         clientName: string | null;
@@ -235,20 +244,20 @@ export const emdRequiredOptions = [
 
 export const processingFeeOptions = [
     { value: "DD", label: "Demand Draft" },
-    { value: 'POP', label: 'Pay on Portal' },
-    { value: 'BT', label: 'Bank Transfer' },
+    { value: 'PORTAL', label: 'Pay on Portal' },
+    { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
 ];
 
 export const tenderFeeOptions = [
     { value: "DD", label: "Demand Draft" },
-    { value: 'POP', label: 'Pay on Portal' },
-    { value: 'BT', label: 'Bank Transfer' },
+    { value: 'PORTAL', label: 'Pay on Portal' },
+    { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
 ];
 
 export const paymentModeOptions = [
     { value: 'DD', label: 'Demand Draft' },
-    { value: 'POP', label: 'Pay on Portal' },
-    { value: 'BT', label: 'Bank Transfer' },
+    { value: 'PORTAL', label: 'Pay on Portal' },
+    { value: 'BANK_TRANSFER', label: 'Bank Transfer' },
     { value: 'FDR', label: 'Fixed Deposit Receipt' },
     { value: 'BG', label: 'Bank Guarantee' },
     { value: 'SB', label: 'Surety Bond' },

@@ -11,10 +11,19 @@ export const UserMiniSchema = z.object({
 ===================================== */
 
 export const ContactPersonSchema = z.object({
-    name: z.string(),
-    email: z.string().email().nullable().optional(),
-    phone: z.string().nullable().optional(),
-    org: z.string().nullable().optional(),
+    name: z.preprocess(
+        (val) => (typeof val === "string" && val.trim() === "" ? null : val),
+        z.string().trim().nullable().optional()
+    ),
+    email: z.string().trim().min(1, "Email is required").email("Invalid email address"),
+    phone: z.preprocess(
+        (val) => (typeof val === "string" && val.trim() === "" ? null : val),
+        z.string().trim().nullable().optional()
+    ),
+    org: z.preprocess(
+        (val) => (typeof val === "string" && val.trim() === "" ? null : val),
+        z.string().trim().nullable().optional()
+    ),
 });
 
 export type ContactPersonDto = z.infer<typeof ContactPersonSchema>;

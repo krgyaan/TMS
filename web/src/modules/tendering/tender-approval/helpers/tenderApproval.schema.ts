@@ -47,13 +47,13 @@ export const TenderApprovalFormSchema = z.object({
     })).optional(),
 
     // InfoSheet context fields (for conditional validation - not submitted to API)
-    processingFeeRequired: z.enum(['YES', 'NO']).optional(),
+    processingFeeRequired: z.enum(['YES', 'NO']).nullable().optional(),
     processingFeeAmount: z.number().optional(),
     processingFeeModes: z.array(z.string()).optional(),
-    tenderFeeRequired: z.enum(['YES', 'NO']).optional(),
+    tenderFeeRequired: z.enum(['YES', 'NO']).nullable().optional(),
     tenderFeeAmount: z.number().optional(),
     tenderFeeModes: z.array(z.string()).optional(),
-    emdRequired: z.enum(['YES', 'NO', 'EXEMPT']).optional(),
+    emdRequired: z.enum(['YES', 'NO', 'EXEMPT']).nullable().optional(),
     emdAmount: z.number().optional(),
     emdModes: z.array(z.string()).optional(),
 }).refine((data) => {

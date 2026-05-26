@@ -1,13 +1,24 @@
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableRow, TableCell, TableHeader, TableHead } from '@/components/ui/table';
-import {
-    Building2, FileText, CheckCircle2, XCircle, AlertCircle,
-    Calculator, Package, MapPin, Truck, Link2, FileEdit, Pen, Clock, TrendingUp
-} from 'lucide-react';
-import { formatINR } from '@/hooks/useINRFormatter';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatDateTime } from '@/hooks/useFormatedDate';
+import { formatINR } from '@/hooks/useINRFormatter';
 import type { WoDetailWithRelations } from '@/modules/operations/types/wo.types';
+import {
+    AlertCircle,
+    Building2,
+    CheckCircle2,
+    Clock,
+    FileEdit,
+    FileText,
+    Link2,
+    MapPin,
+    Package,
+    Pen,
+    TrendingUp,
+    Truck,
+    XCircle
+} from 'lucide-react';
 
 
 export function WoDetailView({ data }: { data: WoDetailWithRelations }) {
@@ -490,40 +501,6 @@ export function WoDetailView({ data }: { data: WoDetailWithRelations }) {
                                         </div>
                                     </div>
                                 </TableCell>
-                            </TableRow>
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
-
-            {/* DETAILED BUDGET */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                        <Calculator className="h-5 w-5 text-orange-500" />
-                        Detailed Budget (Pre-GST)
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-4">
-                    <Table>
-                        <TableBody>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="font-medium text-muted-foreground w-1/4">Supply Budget</TableCell>
-                                <TableCell className="font-semibold w-1/4">{formatINR(parseFloat(data.budgetSupply || '0'))}</TableCell>
-                                <TableCell className="font-medium text-muted-foreground w-1/4">Service Budget</TableCell>
-                                <TableCell className="font-semibold w-1/4">{formatINR(parseFloat(data.budgetService || '0'))}</TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="font-medium text-muted-foreground">Freight Budget</TableCell>
-                                <TableCell className="font-semibold">{formatINR(parseFloat(data.budgetFreight || '0'))}</TableCell>
-                                <TableCell className="font-medium text-muted-foreground">Admin Budget</TableCell>
-                                <TableCell className="font-semibold">{formatINR(parseFloat(data.budgetAdmin || '0'))}</TableCell>
-                            </TableRow>
-                            <TableRow className="hover:bg-muted/30 transition-colors">
-                                <TableCell className="font-medium text-muted-foreground">Buyback Sale</TableCell>
-                                <TableCell className="font-semibold text-destructive">{formatINR(parseFloat(data.budgetBuybackSale || '0'))}</TableCell>
-                                <TableCell className="font-bold text-primary">Total Budget (Pre-GST)</TableCell>
-                                <TableCell className="text-xl font-bold">{formatINR(parseFloat(data.budgetPreGst || '0'))}</TableCell>
                             </TableRow>
                         </TableBody>
                     </Table>

@@ -1,74 +1,64 @@
 import { useParams, useNavigate } from "react-router-dom";
-import { useWoDetailWithRelations } from "@/hooks/api/useWoDetails";
-import { WoDetailView } from "./components/WoDetailView";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
-import BasicDetailView from "../wo-basic-details/components/BasicDetailView";
-import { Card, CardAction } from "@/components/ui/card";
+import { useState, useCallback } from "react";
+import { useWoStepStatuses } from "@/hooks/api/useWoStepStatuses";
+import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
+import { BasicDetailsSection } from "@/modules/operations/wo-basic-details/components/BasicDetailsSection";
+import { WoDetailsSection } from "@/modules/operations/wo-details/components/WoDetailsSection";
+import { KickOffSection } from "@/modules/operations/kick-off/components/KickOffSection";
+import { ContractAgreementSection } from "@/modules/operations/contract-agreement/components/ContractAgreementSection";
+import { PoDashboardSection } from "@/modules/operations/project-dashboard/components/PoDashboardSection";
+import { paths } from "@/app/routes/paths";
 
-const WoDetailShowPage = () => {
+export default function WoDetailShowPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const woDetailId = parseInt(id || "0");
+    const woId = parseInt(id || "0");
 
-    const { data: woDetail, isLoading: isWoDetailLoading, error: woDetailError } = useWoDetailWithRelations(woDetailId);
+    const { steps, woDetailId } = useWoStepStatuses(woId);
 
-    if (woDetailError) {
-        return (
-            <div className="p-8">
-                <div className="p-8 text-center bg-destructive/10 text-destructive rounded-lg border border-destructive/20 mb-6">
-                    <h2 className="text-xl font-bold mb-2">Error Loading Details</h2>
-                    <p>Could not fetch the work order details. Please try again later.</p>
-                    <Button variant="outline" className="mt-4" onClick={() => navigate(-1)}>
-                        <ArrowLeft className="h-4 w-4 mr-2" /> Back to List
-                    </Button>
-                </div>
-            </div>
-        );
-    }
+    const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["wo-details"]));
 
-    if (isWoDetailLoading) {
-        return (
-            <div className="p-6 space-y-6">
-                <Skeleton className="h-10 w-24" />
-                <Skeleton className="h-12 w-1/3" />
-                <div className="space-y-4">
-                    <Skeleton className="h-16 w-full" />
-                    <Skeleton className="h-16 w-full" />
-                    <Skeleton className="h-16 w-full" />
-                </div>
-                <Skeleton className="h-[600px] w-full" />
-            </div>
-        );
-    }
+    const toggleSection = useCallback((id: string) => {
+        setExpandedSections((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    }, []);
 
-    if (!woDetail) {
+    const expandAll = useCallback(() => setExpandedSections(new Set(steps.map((s) => s.id))), [steps]);
+    const collapseAll = useCallback(() => setExpandedSections(new Set()), []);
+
+    const renderSectionContent = useCallback((stepId: string) => {
+        if (!woDetailId) return null;
+        switch (stepId) {
+            case "basic-details":        return <BasicDetailsSection woDetailId={woDetailId} />;
+            case "wo-details":           return <WoDetailsSection woDetailId={woDetailId} />;
+            case "kick-off":             return <KickOffSection woDetailId={woDetailId} />;
+            case "contract-agreement":   return <ContractAgreementSection woDetailId={woDetailId} />;
+            case "po-dashboard":         return <PoDashboardSection woDetailId={woDetailId} />;
+            default:                     return null;
+        }
+    }, [woDetailId]);
+
+    if (!woId) {
         return (
             <div className="p-8 text-center text-muted-foreground">
-                <p>No work order details found.</p>
-                <Button variant="outline" className="mt-4" onClick={() => navigate(-1)}>
-                    <ArrowLeft className="h-4 w-4 mr-2" /> Back to List
-                </Button>
+                <p>Invalid work order ID.</p>
             </div>
         );
     }
 
     return (
-        <div>
-            <Button className="justify-start mb-4" variant="outline" onClick={() => navigate(-1)}>
-                <ArrowLeft className="h-4 w-4 mr-2" /> Back
-            </Button>
-            <Card className="px-0 md:px-6 space-y-4">
-                {/* Use woBasicDetail from woDetail directly if available */}
-                {woDetail.woBasicDetail && (
-                    <BasicDetailView data={woDetail.woBasicDetail} />
-                )}
-
-                <WoDetailView data={woDetail} />
-            </Card>
-        </div>
+        <ShowPageLayout
+            steps={steps}
+            expandedSections={expandedSections}
+            onToggleSection={toggleSection}
+            onExpandAll={expandAll}
+            onCollapseAll={collapseAll}
+            onBack={() => navigate(paths.operations.woDetailAcceptanceListPage)}
+            backLabel="Back to Acceptance List"
+            renderSectionContent={renderSectionContent}
+        />
     );
-};
-
-export default WoDetailShowPage;
+}

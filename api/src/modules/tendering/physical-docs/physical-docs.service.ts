@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
-import { and, eq, asc, desc, sql, isNull, isNotNull, inArray, notInArray, SQL, ne, or } from "drizzle-orm";
+import { and, eq, asc, desc, sql, isNull, isNotNull, inArray, notInArray, SQL, ne, or, ilike } from "drizzle-orm";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
 import { tenderInfos } from "@db/schemas/tendering/tenders.schema";
@@ -17,7 +17,6 @@ import { RecipientResolver } from "@/modules/email/recipient.resolver";
 import type { RecipientSource } from "@/modules/email/dto/send-email.dto";
 import { Logger } from "@nestjs/common";
 import { tenderClients } from "@db/schemas/tendering/tender-info-sheet.schema";
-import { StatusCache } from "@/utils/status-cache";
 import { wrapPaginatedResponse } from "@/utils/responseWrapper";
 import { TimersService } from "@/modules/timers/timers.service";
 import { couriers } from "@db/schemas/shared/couriers.schema";
@@ -94,20 +93,23 @@ export class PhysicalDocsService {
         const roleFilterConditions: any[] = [];
 
         if (user && user.roleId) {
-            if (user.roleId === 1 || user.roleId === 2) {
+            if (user.dataScope === 'all') {
                 // Super User or Admin: Show all, respect teamId filter if provided
                 if (teamId !== undefined && teamId !== null) {
                     roleFilterConditions.push(eq(tenderInfos.team, teamId));
                 }
-            } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
-                // Team Leader, Coordinator, Engineer: Filter by primary_team_id
+            } else if (user.canSwitchTeams && teamId !== undefined && teamId !== null) {
+                // Role can switch teams and selected a specific team
+                roleFilterConditions.push(eq(tenderInfos.team, teamId));
+            } else if (user.dataScope === 'team') {
+                // Team-scoped roles: Filter by primary team
                 if (user.teamId) {
                     roleFilterConditions.push(eq(tenderInfos.team, user.teamId));
                 } else {
                     roleFilterConditions.push(sql`1 = 0`); // Empty results
                 }
             } else {
-                // All other roles: Show only own tenders
+                // Self-scoped roles: Show only own records
                 if (user.sub) {
                     roleFilterConditions.push(eq(tenderInfos.teamMember, user.sub));
                 } else {
@@ -218,7 +220,7 @@ export class PhysicalDocsService {
             //we will be getting all the tenders whose phy doc sent and bid missed
             conditions.push(and(
                 (eq(bidSubmissions.status, "Tender Missed")),
-                (isNotNull(physicalDocs.id))
+                (ilike(tenderInformation.physicalDocsRequired,'Yes'))
             ));
         } else {
             throw new BadRequestException(`Invalid tab: ${activeTab}`);
@@ -236,7 +238,7 @@ export class PhysicalDocsService {
                 sql`${statuses.name} ILIKE ${searchStr}`,
                 sql`${tenderInformation.courierAddress} ILIKE ${searchStr}`,
                 sql`${tenderInformation.physicalDocsDeadline}::text ILIKE ${searchStr}`,
-                sql`${physicalDocs.courierNo} ILIKE ${searchStr}`,
+                sql`${physicalDocs.courierNo}::text ILIKE ${searchStr}`,
             ];
             conditions.push(sql`(${sql.join(searchConditions, sql` OR `)})`);
         }
@@ -353,16 +355,18 @@ export class PhysicalDocsService {
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
             // TenderInfosService.getExcludeStatusCondition(['dnb', 'lost']),
-            eq(tenderInformation.physicalDocsRequired, "Yes"),
+            or(
+                inArray(tenderInformation.physicalDocsRequired, ["Yes", "YES"]),
+                inArray(tenderInformation.physicalDocType, ["EMD_AND_OTHER_DOCUMENTS", "ONLY_OTHER_DOCUMENT"])
+            ),
             ...roleFilterConditions,
         ];
 
-        const dnbCondition = [ne(bidSubmissions.status, "Tender Missed")];
+        // Count pending: physicalDocsId IS NULL, not bid missed
+        const pendingConditions = [...baseConditions, isNull(physicalDocs.id), or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status))];
+        
 
-        // Count pending: status = 3, physicalDocsId IS NULL
-        const pendingConditions = [...baseConditions, or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)) ];
-
-        // Count sent: status = 30, physicalDocsId IS NOT NULL
+        // Count sent: physicalDocsId IS NOT NULL, not bid missed
         const sentConditions = [...baseConditions, or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)), isNotNull(physicalDocs.id)];
 
         const counts = await Promise.all([
@@ -373,6 +377,7 @@ export class PhysicalDocsService {
                 .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
                 .leftJoin(items, eq(items.id, tenderInfos.item))
                 .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
+                .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
                 .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
                 .where(and(...pendingConditions))
                 .then(([result]) => Number(result?.count || 0)),
@@ -383,6 +388,7 @@ export class PhysicalDocsService {
                 .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
                 .leftJoin(items, eq(items.id, tenderInfos.item))
                 .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
+                .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
                 .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
                 .where(and(...sentConditions))
                 .then(([result]) => Number(result?.count || 0)),
@@ -393,8 +399,10 @@ export class PhysicalDocsService {
                 .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
                 .leftJoin(items, eq(items.id, tenderInfos.item))
                 .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
+                .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
                 .leftJoin(physicalDocs, eq(tenderInfos.id, physicalDocs.tenderId))
                 .where(and(
+                    ...baseConditions,
                     eq(bidSubmissions.status, 'Tender Missed'),
                     isNotNull(physicalDocs.id),
                 ))

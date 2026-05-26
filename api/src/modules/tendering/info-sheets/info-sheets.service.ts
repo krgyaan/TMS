@@ -177,6 +177,29 @@ export class TenderInfoSheetsService {
         };
     }
 
+    async getTenderContacts(tenderId: number) {
+        const [tender] = await this.db
+            .select({ organisationName: organizations.name })
+            .from(tenderInfos)
+            .leftJoin(organizations, eq(organizations.id, tenderInfos.organization))
+            .where(eq(tenderInfos.id, tenderId))
+            .limit(1);
+
+        const clients = await this.db
+            .select()
+            .from(tenderClients)
+            .where(eq(tenderClients.tenderId, tenderId));
+
+        return {
+            organisationName: tender?.organisationName || "",
+            contacts: clients.map(c => ({
+                name: c.clientName || "",
+                phone: c.clientMobile || null,
+                email: c.clientEmail || null,
+            })),
+        };
+    }
+
     async findByTenderIdWithTender(tenderId: number) {
         const [infoSheet, tender] = await Promise.all([
             this.findByTenderId(tenderId),
@@ -199,6 +222,9 @@ export class TenderInfoSheetsService {
             { name: 'physicalDocsRequired', value: payload.physicalDocsRequired },
             { name: 'reverseAuctionApplicable', value: payload.reverseAuctionApplicable },
             { name: 'oemExperience', value: payload.oemExperience },
+            { name: 'clientDetailsPresent', value: payload.clientDetailsPresent },
+            { name: 'customerInContact', value: payload.customerInContact },
+            { name: 'courierDetailsPresent', value: payload.courierDetailsPresent },
         ];
 
         const invalidFields: string[] = [];
@@ -536,6 +562,17 @@ export class TenderInfoSheetsService {
                         courierPincode: isRejection
                             ? null
                             : (payload.courierPincode ?? null),
+
+                        clientDetailsPresent: isRejection
+                            ? null
+                            : (payload.clientDetailsPresent ?? null),
+                        customerInContact: isRejection
+                            ? null
+                            : (payload.customerInContact ?? null),
+                        courierDetailsPresent: isRejection
+                            ? null
+                            : (payload.courierDetailsPresent ?? null),
+
                         teFinalRemark: isRejection
                             ? null
                             : (payload.teFinalRemark ?? null),
@@ -935,6 +972,17 @@ export class TenderInfoSheetsService {
                         courierPincode: isRejection
                             ? null
                             : (payload.courierPincode ?? null),
+
+                        clientDetailsPresent: isRejection
+                            ? null
+                            : (payload.clientDetailsPresent ?? null),
+                        customerInContact: isRejection
+                            ? null
+                            : (payload.customerInContact ?? null),
+                        courierDetailsPresent: isRejection
+                            ? null
+                            : (payload.courierDetailsPresent ?? null),
+
                         teFinalRemark: isRejection
                             ? null
                             : (payload.teFinalRemark ?? null),
