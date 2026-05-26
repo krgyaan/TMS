@@ -6,6 +6,7 @@ import { eq, and, or, inArray, gt, sql, desc, asc, not } from 'drizzle-orm';
 import { paymentRequests, paymentInstruments, instrumentDdDetails, instrumentFdrDetails, instrumentBgDetails, instrumentChequeDetails, instrumentTransferDetails } from '@db/schemas/tendering/payment-requests.schema';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { tenderInformation } from '@/db/schemas/tendering/tender-info-sheet.schema';
+import { bidSubmissions } from '@db/schemas/tendering/bid-submissions.schema';
 import { couriers } from '@/db/schemas/shared/couriers.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { statuses } from '@/db/schemas/master/statuses.schema';
@@ -413,11 +414,15 @@ export class PaymentRequestsQueryService {
                 instrumentType: paymentInstruments.instrumentType,
                 instrumentStatus: paymentInstruments.status,
                 favouring: paymentInstruments.favouring,
+                bidSubmissionDate: bidSubmissions.submissionDatetime,
                 createdAt: paymentRequests.createdAt,
             })
             .from(paymentRequests)
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
+            .leftJoin(bidSubmissions, and(
+                eq(bidSubmissions.tenderId, tenderInfos.id),
+            ))
             .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
             .leftJoin(paymentInstruments, and(
                 eq(paymentInstruments.requestId, paymentRequests.id),
@@ -454,6 +459,7 @@ export class PaymentRequestsQueryService {
                 instrumentStatus: row.instrumentStatus,
                 favouring: row.favouring,
                 displayStatus: deriveDisplayStatus(row.instrumentStatus),
+                bidSubmissionDate: row.bidSubmissionDate,
                 createdAt: row.createdAt,
             };
         });
