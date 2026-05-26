@@ -136,7 +136,7 @@ export class TqManagementController {
         @Body() dto: TqQualifiedDto,
         @CurrentUser() user: ValidatedUser
     ) {
-        return this.tqManagementService.tqQualified(id, user.sub, dto.qualified ?? true);
+        return this.tqManagementService.tqQualified(id, user.sub, dto.qualified ?? true, dto.disqualificationReason ?? undefined);
     }
 
     @Post('no-tq')
@@ -144,8 +144,9 @@ export class TqManagementController {
         @Body() dto: MarkAsNoTqDto,
         @CurrentUser() user: ValidatedUser
     ) {
+        // Building the no TQ again
         // Default to qualified=true, can be extended to accept qualification status from DTO
-        return this.tqManagementService.markAsNoTq(dto.tenderId, user.sub, dto.qualified ?? true);
+        return this.tqManagementService.markAsNoTq(dto.tenderId, user.sub, dto.qualified ?? true, dto.disqualificationReason ?? undefined);
     }
 
     @Patch(':id/received')

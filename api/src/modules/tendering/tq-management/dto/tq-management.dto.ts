@@ -59,6 +59,7 @@ export type UpdateTqMissedDto = z.infer<typeof UpdateTqMissedSchema>;
 export const MarkAsNoTqSchema = z.object({
     tenderId: bigintField().positive('Tender ID must be positive'),
     qualified: booleanField(true),
+    disqualificationReason: optionalString,
 });
 
 export type MarkAsNoTqDto = z.infer<typeof MarkAsNoTqSchema>;
@@ -79,6 +80,7 @@ export type UpdateTqReceivedDto = z.infer<typeof UpdateTqReceivedSchema>;
  */
 export const TqQualifiedSchema = z.object({
     qualified: booleanField(true),
+    disqualificationReason: optionalString,
 });
 
 export type TqQualifiedDto = z.infer<typeof TqQualifiedSchema>;

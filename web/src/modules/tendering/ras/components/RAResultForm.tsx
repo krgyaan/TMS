@@ -23,6 +23,7 @@ import {
 import { Save, IndianRupee } from 'lucide-react';
 import { useUploadRaResult } from '@/hooks/api/useReverseAuctions';
 import { TenderFileUploader } from '@/components/tender-file-upload';
+import { showErrorToast } from '@/utils/errorToast';
 
 const UploadRaResultSchema = z.object({
     raResult: z.enum(['Won', 'Lost', 'H1 Elimination']),
@@ -89,7 +90,7 @@ export default function RAResultForm({
             const finalResultScreenshotPath = data.finalResultScreenshot.length > 0 ? data.finalResultScreenshot[0] : null;
 
             await uploadResultMutation.mutateAsync({
-                id: raId,
+                raId: raId,
                 data: {
                     raResult: data.raResult,
                     veL1AtStart: data.veL1AtStart,
@@ -108,6 +109,7 @@ export default function RAResultForm({
             form.reset();
         } catch (error) {
             console.error('Error uploading RA result:', error);
+            showErrorToast(error);
         }
     };
 
