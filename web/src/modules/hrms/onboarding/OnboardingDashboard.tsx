@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Dialog,
   DialogContent,
@@ -285,6 +285,9 @@ const JoineeCard: React.FC<JoineeCardProps> = ({
         {/* Top row: avatar, name, status */}
         <div className="flex items-start gap-4">
           <Avatar className="h-12 w-12 rounded-xl flex-shrink-0 ring-1 ring-border/50">
+            {(joinee as any).profilePhoto && (
+              <AvatarImage src={(joinee as any).profilePhoto} alt={joinee.name} className="object-cover" />
+            )}
             <AvatarFallback
               className={cn(
                 "rounded-xl text-sm font-bold",
@@ -327,8 +330,53 @@ const JoineeCard: React.FC<JoineeCardProps> = ({
         </div>
 
         {/* Progress */}
-        <div className="mt-4">
-          <ProgressIndicator value={joinee.progress} />
+        <div className="mt-5 grid grid-cols-2 gap-4 pt-4 border-t">
+          {/* Employee Progress (Discrete Track) */}
+          <div>
+            <div className="flex items-center justify-between text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+              <span>Employee</span>
+              <span className="text-blue-600 dark:text-blue-400 tabular-nums">{joinee.employeeProgress}%</span>
+            </div>
+            <div className="flex gap-1 h-1.5">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div 
+                  key={i} 
+                  className={cn(
+                    "flex-1 rounded-full transition-colors", 
+                    Math.round((joinee.employeeProgress / 100) * 6) > i 
+                      ? "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" 
+                      : "bg-muted"
+                  )} 
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* HR Progress (Continuous Line) */}
+          <div>
+            <div className="flex items-center justify-between text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+              <span>HR Approval</span>
+              <span className={cn(
+                "tabular-nums",
+                joinee.progress >= 80 ? "text-emerald-600 dark:text-emerald-400" :
+                joinee.progress >= 50 ? "text-amber-600 dark:text-amber-400" :
+                "text-orange-600 dark:text-orange-400"
+              )}>
+                {joinee.progress}%
+              </span>
+            </div>
+            <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden relative">
+              <div
+                className={cn(
+                  "h-full rounded-full transition-all duration-500",
+                  joinee.progress >= 80 ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" :
+                  joinee.progress >= 50 ? "bg-amber-500" :
+                  "bg-orange-500"
+                )}
+                style={{ width: `${joinee.progress}%` }}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -584,6 +632,9 @@ const ViewModal: React.FC<{
         <DialogHeader className="px-8 py-3 border-b">
           <div className="flex items-center gap-5">
             <Avatar className="h-14 w-14 rounded-2xl ring-2 ring-border/50">
+              {(joinee as any).profilePhoto && (
+                <AvatarImage src={(joinee as any).profilePhoto} alt={joinee.name} className="object-cover" />
+              )}
               <AvatarFallback
                 className={cn(
                   "rounded-2xl text-lg font-bold",

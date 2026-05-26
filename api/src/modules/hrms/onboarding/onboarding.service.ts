@@ -20,6 +20,7 @@ import {
   onboardingEducation,
   onboardingExperience,
   onboardingBankDetails,
+  OnboardingRequest,
 } from '@/db/schemas/hrms/onboarding';
 import { users } from '@/db/schemas/auth/users.schema';
 import { userProfiles } from '@/db/schemas/auth/user-profiles.schema';
@@ -35,6 +36,7 @@ import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import { Logger } from 'winston';
 import * as crypto from 'crypto';
 import * as argon2 from 'argon2';
+import { oauthAccounts } from '@/db/schemas';
 
 // ─── DTOs ─────────────────────────────────────────────────────────────────────
 
@@ -612,6 +614,31 @@ export class OnboardingService {
     }
   }
 
+  //writing the function to get the profile submission status progress
+  async findSubmissionProgress(onboardingRequest : OnboardingRequest) {
+    // we need to calculate the total progress of each request
+    const statuses = [
+      onboardingRequest?.profileStatus,
+      onboardingRequest?.documentStatus,
+      onboardingRequest?.educationStatus,
+      onboardingRequest?.experienceStatus,
+      onboardingRequest?.bankStatus,
+      onboardingRequest?.inductionStatus,
+    ];
+
+    // Filter out undefined/null statuses to handle optional fields safely
+    const validStatuses = statuses.filter((s) => s !== undefined && s !== null);
+    if (validStatuses.length === 0) return 0;
+
+    // A detail is considered submitted if the status is not 'pending'
+    const submittedCount = validStatuses.filter((s) => s == 'submitted').length;
+    
+    // If all details are submitted, progress is 100%
+    const progress = Math.round((submittedCount / validStatuses.length) * 100);
+
+    return progress;
+  }
+
   /**
    * GET /hrms/onboarding/dashboard
    * All requests joined with reviewer name — used by the HR dashboard.
@@ -622,6 +649,7 @@ export class OnboardingService {
         .select({
           id: onboardingRequests.id,
           name: onboardingRequests.name,
+          userId : onboardingRequests.userId,
           email: onboardingRequests.email,
           phone: onboardingRequests.phone,
           status: onboardingRequests.status,
@@ -646,15 +674,18 @@ export class OnboardingService {
       }
 
       const requestIds = rows.map((r) => r.id);
+      const userIds = rows.map((r) => r.userId).filter(Boolean) as number[];
 
-      const [profiles, documents, education, experience, bankDetails, induction] = await Promise.all([
+      const [profiles, documents, education, experience, bankDetails, induction, oauthAccs] = await Promise.all([
         this.db.select().from(onboardingProfiles).where(inArray(onboardingProfiles.onboardingId, requestIds)),
         this.db.select().from(onboardingDocuments).where(inArray(onboardingDocuments.onboardingId, requestIds)),
         this.db.select().from(onboardingEducation).where(inArray(onboardingEducation.onboardingId, requestIds)),
         this.db.select().from(onboardingExperience).where(inArray(onboardingExperience.onboardingId, requestIds)),
         this.db.select().from(onboardingBankDetails).where(inArray(onboardingBankDetails.onboardingId, requestIds)),
         this.db.select().from(onboardingInduction).where(inArray(onboardingInduction.onboardingId, requestIds)),
+        userIds.length > 0 ? this.db.select().from(oauthAccounts).where(inArray(oauthAccounts.userId, userIds)) : Promise.resolve([] as any[]),
       ]);
+
 
       const calculateHrStatus = (items: any[]) => {
         if (!items || items.length === 0) return 'pending';
@@ -701,9 +732,10 @@ export class OnboardingService {
           row.educationStatus,
           row.experienceStatus,
           row.bankStatus,
-          row.inductionStatus,
+          // row.inductionStatus,
         ];
-        const submittedCount = statuses.filter((s) => s !== 'pending').length;
+
+        const submittedCount = statuses.filter((s) => s == 'submitted').length;
         const employeeProgressPercent = Math.round((submittedCount / statuses.length) * 100);
 
         // 3. HR Progress Calculations
@@ -719,9 +751,14 @@ export class OnboardingService {
           }
         }
 
+        const oauthPhoto = oauthAccs.find((o) => o.userId === row.userId)?.avatar;
+        const docProfilePhoto = rowDocs.find((d) => d.docType === 'Passport Size Photo')?.fileUrl;
+        const profilePhoto = docProfilePhoto || oauthPhoto || null;
+
         return {
           ...row,
-          employeeProgressPercent,
+          employeeProgress: employeeProgressPercent,
+          profilePhoto : profilePhoto,
 
           // The raw arrays/objects so the frontend can display remarks/details
           profile: rowProfile,
@@ -729,7 +766,7 @@ export class OnboardingService {
           education: rowEdu,
           experience: rowExp,
           bankDetails: rowBank,
-          induction: rowInduction,
+          // induction: rowInduction,
 
           // Aggregated top-level statuses (rejected if one rejected, etc.)
           hrStatuses: {
