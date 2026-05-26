@@ -1,32 +1,17 @@
 import React, { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useProfileList, useProfile, useUpdateProfile } from "./useOnboarding";
-import { useDesignations } from "@/hooks/api/useDesignations";
-import { useTeams } from "@/hooks/api/useTeams";
-import { useUsers } from "@/hooks/api/useUsers";
-import type { ProfileListItem, FullProfile, UpdateProfileDto } from "../../../services/api/onboarding.service";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
 import {
   Tooltip,
   TooltipContent,
@@ -34,1127 +19,754 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Search,
-  Users,
-  Clock,
   CheckCircle2,
-  AlertCircle,
+  XCircle,
   Eye,
-  Edit3,
-  UserCheck,
+  Loader2,
+  AlertCircle,
+  RefreshCw,
+  User,
+  Mail,
+  Phone,
+  MapPin,
+  Calendar,
+  Building2,
+  GraduationCap,
   Briefcase,
   CreditCard,
-  Building2,
-  User,
-  MapPin,
-  GraduationCap,
-  Phone,
-  Shield,
+  Heart,
   ChevronRight,
-  Timer,
-  TrendingUp,
-  Filter,
-  ArrowUpDown,
-  CalendarDays,
-  Mail,
-  Loader2,
-  CircleDashed,
-  CheckCheck,
-  XCircle,
-  Info,
-  Hash,
-  Landmark,
-  HeartHandshake,
-  BookOpen,
+  Clock,
+  Check,
+  X,
+  AlertTriangle,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useProfileList, useProfile, useUpdateProfile } from "./useOnboarding";
+import type { ProfileListItem, FullProfile, UpdateProfileDto } from "../../../services/api/onboarding.service";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type SectionStatus = "not_started" | "in_progress" | "completed";
-type ProfileTab = "all" | "pending" | "in_progress" | "completed";
-type FilterDept = "all" | string;
+type TabValue = "pending" | "approved" | "rejected";
 
-interface SectionProgress {
-  status: SectionStatus;
-  completedFields: number;
-  totalFields: number;
-}
-
-interface HRSections {
-  employment: SectionProgress;
-  compensation: SectionProgress;
-  bankDetails: SectionProgress;
-}
-
-interface EmployeeSections {
-  personalInfo: SectionProgress;
-  currentAddress: SectionProgress;
-  permanentAddress: SectionProgress;
-  emergencyContact: SectionProgress;
-  education: SectionProgress;
-  experience: SectionProgress;
-}
-
-interface EmployeeProfile {
+interface ProfileSummary {
   id: number;
-  employeeId: string;
-  firstName: string;
-  lastName: string;
-  middleName?: string;
+  name: string;
   email: string;
   phone: string;
-  designation: string;
-  department: string;
-  dateOfJoining: string;
-  approvedAt: string;
-  hrSections: HRSections;
-  employeeSections: EmployeeSections;
-  hrTimer: number; // minutes elapsed since approval
-  lastUpdated: string;
-  hrFilledBy?: string;
+  submittedAt: string;
+  hrStatus: "pending" | "approved" | "rejected";
+  hrRemark?: string;
+  employeeCompleted: boolean;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const mapToEmployeeProfile = (item: ProfileListItem): EmployeeProfile => {
-  const hrFieldsCount = {
-    employment: [item.employeeType, item.workLocation, item.dateOfJoining].filter(Boolean).length,
-    compensation: [item.salaryType, item.basicSalary].filter(Boolean).length,
-    bankDetails: [item.bankName, item.accountNumber, item.ifscCode].filter(Boolean).length,
-  };
+const mapProfile = (item: ProfileListItem): ProfileSummary => ({
+  id: item.id,
+  name: item.name || `${item.firstName ?? ""} ${item.lastName ?? ""}`.trim() || "Unknown",
+  email: item.email,
+  phone: item.phone || "—",
+  submittedAt: item.updatedAt || item.createdAt || new Date().toISOString(),
+  hrStatus: (item.hrStatus as ProfileSummary["hrStatus"]) || "pending",
+  hrRemark: item.hrRemark || undefined,
+  employeeCompleted: item.employeeCompleted ?? false,
+});
 
-  const hrStatus = (done: number, total: number): SectionStatus =>
-    done === total ? "completed" : done > 0 ? "in_progress" : "not_started";
-
-  return {
-    id: item.id,
-    employeeId: `EMP-${item.id.toString().padStart(4, '0')}`,
-    firstName: item.firstName || item.name.split(" ")[0] || "Unknown",
-    lastName: item.lastName || item.name.split(" ").slice(1).join(" ") || "—",
-    email: item.email,
-    phone: item.phone || "—",
-    designation: item.employeeType || "Pending",
-    department: "TBD", // To be filled if we add department to list
-    dateOfJoining: item.dateOfJoining || new Date().toISOString(),
-    approvedAt: item.approvedAt || new Date().toISOString(),
-    hrTimer: item.approvedAt ? Math.floor((Date.now() - new Date(item.approvedAt).getTime()) / 60000) : 0,
-    lastUpdated: item.updatedAt,
-    hrFilledBy: item.reviewedBy || undefined,
-    hrSections: {
-      employment: { status: hrStatus(hrFieldsCount.employment, 3), completedFields: hrFieldsCount.employment, totalFields: 3 },
-      compensation: { status: hrStatus(hrFieldsCount.compensation, 2), completedFields: hrFieldsCount.compensation, totalFields: 2 },
-      bankDetails: { status: hrStatus(hrFieldsCount.bankDetails, 3), completedFields: hrFieldsCount.bankDetails, totalFields: 3 },
-    },
-    employeeSections: {
-      personalInfo: { status: item.employeeCompleted ? "completed" : "in_progress", completedFields: item.employeeCompleted ? 14 : 7, totalFields: 14 },
-      currentAddress: { status: item.employeeCompleted ? "completed" : "in_progress", completedFields: item.employeeCompleted ? 6 : 3, totalFields: 6 },
-      permanentAddress: { status: item.employeeCompleted ? "completed" : "in_progress", completedFields: item.employeeCompleted ? 6 : 3, totalFields: 6 },
-      emergencyContact: { status: item.employeeCompleted ? "completed" : "not_started", completedFields: item.employeeCompleted ? 5 : 0, totalFields: 5 },
-      education: { status: item.employeeCompleted ? "completed" : "not_started", completedFields: item.employeeCompleted ? 6 : 0, totalFields: 6 },
-      experience: { status: item.employeeCompleted ? "completed" : "not_started", completedFields: item.employeeCompleted ? 6 : 0, totalFields: 6 },
-    }
-  };
+const getInitials = (name: string) => {
+  const parts = name.split(" ").filter(Boolean);
+  if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  return name.slice(0, 2).toUpperCase();
 };
-
-const DEPARTMENTS = [
-  "Information Technology", "Operations", "Design",
-  "Finance", "Human Resources", "Sales", "Marketing", "Engineering",
-];
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-const getInitials = (first: string, last: string) =>
-  `${first[0]}${last[0]}`.toUpperCase();
 
 const formatDate = (d: string) =>
   new Date(d).toLocaleDateString("en-GB", {
-    day: "2-digit", month: "short", year: "numeric",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
   });
 
-const formatTimer = (minutes: number): string => {
-  if (minutes < 60) return `${minutes}m`;
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+const timeAgo = (d: string) => {
+  const diff = Date.now() - new Date(d).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
 };
 
-const computeOverallProgress = (profile: EmployeeProfile): number => {
-  const allSections = [
-    ...Object.values(profile.hrSections),
-    ...Object.values(profile.employeeSections),
-  ];
-  const total = allSections.reduce((a, s) => a + s.totalFields, 0);
-  const completed = allSections.reduce((a, s) => a + s.completedFields, 0);
-  return total === 0 ? 0 : Math.round((completed / total) * 100);
-};
+// ─── Status config ────────────────────────────────────────────────────────────
 
-const computeHRProgress = (hr: HRSections): number => {
-  const sections = Object.values(hr);
-  const total = sections.reduce((a, s) => a + s.totalFields, 0);
-  const done = sections.reduce((a, s) => a + s.completedFields, 0);
-  return total === 0 ? 0 : Math.round((done / total) * 100);
-};
-
-const computeEmployeeProgress = (emp: EmployeeSections): number => {
-  const sections = Object.values(emp);
-  const total = sections.reduce((a, s) => a + s.totalFields, 0);
-  const done = sections.reduce((a, s) => a + s.completedFields, 0);
-  return total === 0 ? 0 : Math.round((done / total) * 100);
-};
-
-const getProfileStatus = (profile: EmployeeProfile): ProfileTab => {
-  const pct = computeOverallProgress(profile);
-  if (pct === 100) return "completed";
-  if (pct === 0) return "pending";
-  return "in_progress";
-};
-
-const isTimerAlert = (minutes: number) => minutes > 240; // > 4 hours
-
-// ─── Status Config ────────────────────────────────────────────────────────────
-
-const SECTION_STATUS_CONFIG: Record<SectionStatus, {
-  label: string;
-  icon: React.ElementType;
-  className: string;
-  dot: string;
-}> = {
-  not_started: {
-    label: "Not Started",
-    icon: CircleDashed,
-    className: "text-muted-foreground",
-    dot: "bg-muted-foreground/40",
-  },
-  in_progress: {
-    label: "In Progress",
+const STATUS_CONFIG = {
+  pending: {
+    label: "Pending Review",
+    color: "text-amber-600 dark:text-amber-400",
+    bg: "bg-amber-50 dark:bg-amber-950/30",
+    border: "border-amber-200 dark:border-amber-800",
+    badge: "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300",
     icon: Clock,
-    className: "text-amber-600 dark:text-amber-400",
-    dot: "bg-amber-500",
   },
-  completed: {
-    label: "Completed",
+  approved: {
+    label: "Approved",
+    color: "text-emerald-600 dark:text-emerald-400",
+    bg: "bg-emerald-50 dark:bg-emerald-950/30",
+    border: "border-emerald-200 dark:border-emerald-800",
+    badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300",
     icon: CheckCircle2,
-    className: "text-green-600 dark:text-green-400",
-    dot: "bg-green-500",
   },
-};
+  rejected: {
+    label: "Rejected",
+    color: "text-red-600 dark:text-red-400",
+    bg: "bg-red-50 dark:bg-red-950/30",
+    border: "border-red-200 dark:border-red-800",
+    badge: "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300",
+    icon: XCircle,
+  },
+} as const;
 
-// ─── Section Config ───────────────────────────────────────────────────────────
+// ─── Detail Section Component ─────────────────────────────────────────────────
 
-const HR_SECTION_CONFIG: { key: keyof HRSections; label: string; icon: React.ElementType }[] = [
-  { key: "employment", label: "Employment", icon: Briefcase },
-  { key: "compensation", label: "Compensation", icon: CreditCard },
-  { key: "bankDetails", label: "Bank Details", icon: Landmark },
-];
+interface DetailSectionProps {
+  icon: React.ElementType;
+  title: string;
+  children: React.ReactNode;
+  className?: string;
+}
 
-const EMP_SECTION_CONFIG: { key: keyof EmployeeSections; label: string; icon: React.ElementType }[] = [
-  { key: "personalInfo", label: "Personal Info", icon: User },
-  { key: "currentAddress", label: "Current Address", icon: MapPin },
-  { key: "permanentAddress", label: "Permanent Address", icon: Building2 },
-  { key: "emergencyContact", label: "Emergency Contact", icon: HeartHandshake },
-  { key: "education", label: "Education", icon: GraduationCap },
-  { key: "experience", label: "Experience", icon: BookOpen },
-];
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-const SectionPill: React.FC<{ status: SectionStatus; label: string; icon: React.ElementType }> = ({
-  status, label, icon: Icon,
-}) => {
-  const cfg = SECTION_STATUS_CONFIG[status];
-  return (
-    <TooltipProvider delayDuration={100}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className={cn(
-            "flex items-center justify-center w-7 h-7 rounded-full border transition-colors",
-            status === "completed" && "bg-green-50 border-green-200 dark:bg-green-900/30 dark:border-green-800",
-            status === "in_progress" && "bg-amber-50 border-amber-200 dark:bg-amber-900/30 dark:border-amber-800",
-            status === "not_started" && "bg-muted border-border",
-          )}>
-            <Icon className={cn("h-3.5 w-3.5", cfg.className)} />
-          </div>
-        </TooltipTrigger>
-        <TooltipContent side="top" className="text-xs">
-          <span className="font-medium">{label}</span>
-          <span className="text-muted-foreground ml-1">· {cfg.label}</span>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
-  );
-};
-
-const StatCard: React.FC<{
-  label: string; value: number; sub?: string;
-  icon: React.ElementType; highlight?: boolean;
-}> = ({ label, value, sub, icon: Icon, highlight }) => (
-  <div className={cn(
-    "rounded-xl border p-4 flex items-center gap-3 transition-shadow hover:shadow-sm",
-    highlight ? "bg-primary/5 border-primary/20" : "bg-card",
-  )}>
-    <div className={cn(
-      "w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0",
-      highlight ? "bg-primary/10" : "bg-muted",
-    )}>
-      <Icon className={cn("h-5 w-5", highlight ? "text-primary" : "text-muted-foreground")} />
+const DetailSection: React.FC<DetailSectionProps> = ({
+  icon: Icon,
+  title,
+  children,
+  className,
+}) => (
+  <div className={cn("space-y-3", className)}>
+    <div className="flex items-center gap-2">
+      <div className="h-6 w-6 rounded-md bg-muted flex items-center justify-center">
+        <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+      </div>
+      <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        {title}
+      </h4>
     </div>
-    <div className="min-w-0">
-      <p className="text-2xl font-bold tracking-tight leading-none">{value}</p>
-      <p className="text-xs font-medium text-muted-foreground mt-0.5">{label}</p>
-      {sub && <p className="text-[10px] text-muted-foreground/70">{sub}</p>}
-    </div>
+    <div className="grid grid-cols-2 gap-x-6 gap-y-3">{children}</div>
   </div>
 );
 
-const ProgressRing: React.FC<{ pct: number; size?: number; stroke?: number; className?: string }> = ({
-  pct, size = 36, stroke = 3, className,
-}) => {
-  const r = (size - stroke) / 2;
-  const circ = 2 * Math.PI * r;
-  const offset = circ - (pct / 100) * circ;
-  const color = pct === 100 ? "stroke-green-500" : pct > 0 ? "stroke-amber-500" : "stroke-muted-foreground/30";
+const Field: React.FC<{ label: string; value?: string | number | null; full?: boolean }> = ({
+  label,
+  value,
+  full,
+}) => (
+  <div className={cn(full && "col-span-2")}>
+    <p className="text-[11px] text-muted-foreground">{label}</p>
+    <p className="text-sm font-medium text-foreground mt-0.5 break-words">
+      {value || <span className="text-muted-foreground/50 italic">Not provided</span>}
+    </p>
+  </div>
+);
+
+// ─── Profile Review Modal ─────────────────────────────────────────────────────
+
+interface ReviewModalProps {
+  profileId: number | null;
+  open: boolean;
+  onClose: () => void;
+}
+
+const ReviewModal: React.FC<ReviewModalProps> = ({ profileId, open, onClose }) => {
+  const { data: profile, isLoading, isError } = useProfile(profileId);
+  const updateMutation = useUpdateProfile(profileId ?? 0);
+
+  const [showReject, setShowReject] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
+  const [actionDone, setActionDone] = useState<"approved" | "rejected" | null>(null);
+
+  const handleClose = () => {
+    setShowReject(false);
+    setRejectReason("");
+    setActionDone(null);
+    onClose();
+  };
+
+  const handleApprove = () => {
+    updateMutation.mutate(
+      { hrStatus: "approved" } as UpdateProfileDto,
+      {
+        onSuccess: () => setActionDone("approved"),
+      }
+    );
+  };
+
+  const handleReject = () => {
+    if (!rejectReason.trim()) return;
+    updateMutation.mutate(
+      { hrStatus: "rejected", hrRemark: rejectReason.trim() } as UpdateProfileDto,
+      {
+        onSuccess: () => setActionDone("rejected"),
+      }
+    );
+  };
+
+  const currentAddress = profile?.currentAddress as Record<string, string> | undefined;
+  const permanentAddress = profile?.permanentAddress as Record<string, string> | undefined;
+  const emergencyContact = profile?.emergencyContact as Record<string, string> | undefined;
+
+  const formatAddress = (addr?: Record<string, string> | null) => {
+    if (!addr) return null;
+    return [addr.line1, addr.line2, addr.city, addr.state, addr.pincode, addr.country]
+      .filter(Boolean)
+      .join(", ");
+  };
+
   return (
-    <svg width={size} height={size} className={cn("rotate-[-90deg]", className)}>
-      <circle cx={size / 2} cy={size / 2} r={r} strokeWidth={stroke}
-        className="stroke-muted fill-none" />
-      <circle cx={size / 2} cy={size / 2} r={r} strokeWidth={stroke}
-        strokeDasharray={circ} strokeDashoffset={offset}
-        strokeLinecap="round"
-        className={cn("fill-none transition-all duration-700", color)} />
-    </svg>
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="sm:max-w-2xl p-0 gap-0 max-h-[92vh] flex flex-col">
+        {/* Header */}
+        <div className="px-6 pt-5 pb-4 border-b flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-xl bg-primary/8 flex items-center justify-center">
+                <FileText className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <h2 className="text-sm font-semibold">Profile Review</h2>
+                {profile && (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {profile.firstName} {profile.lastName} · Submitted{" "}
+                    {formatDate(profile.updatedAt as string)}
+                  </p>
+                )}
+              </div>
+            </div>
+            {profile && (
+              <Badge
+                variant="outline"
+                className={cn(
+                  "text-[10px] font-medium border-0",
+                  STATUS_CONFIG[
+                    actionDone ?? ((profile.hrStatus as keyof typeof STATUS_CONFIG) || "pending")
+                  ].badge
+                )}
+              >
+                {STATUS_CONFIG[
+                  actionDone ?? ((profile.hrStatus as keyof typeof STATUS_CONFIG) || "pending")
+                ].label}
+              </Badge>
+            )}
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto">
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              <p className="text-xs text-muted-foreground">Loading profile…</p>
+            </div>
+          ) : isError || !profile ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <AlertCircle className="h-5 w-5 text-destructive" />
+              <p className="text-xs text-muted-foreground">Failed to load profile data.</p>
+            </div>
+          ) : actionDone ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-4">
+              {actionDone === "approved" ? (
+                <>
+                  <div className="h-12 w-12 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                    <CheckCircle2 className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-semibold">Profile Approved</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {profile.firstName}'s details have been approved and saved.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="h-12 w-12 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                    <XCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-semibold">Profile Rejected</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {profile.firstName} will be notified to re-submit.
+                    </p>
+                  </div>
+                </>
+              )}
+              <Button variant="outline" size="sm" onClick={handleClose} className="mt-2">
+                Close
+              </Button>
+            </div>
+          ) : (
+            <div className="px-6 py-5 space-y-6">
+              {/* Personal Info */}
+              <DetailSection icon={User} title="Personal Information">
+                <Field label="First Name" value={profile.firstName} />
+                <Field label="Middle Name" value={profile.middleName} />
+                <Field label="Last Name" value={profile.lastName} />
+                <Field label="Date of Birth" value={profile.dob ? formatDate(profile.dob) : null} />
+                <Field label="Gender" value={profile.gender} />
+                <Field label="Marital Status" value={profile.maritalStatus} />
+                <Field label="Nationality" value={profile.nationality} />
+                <Field label="Blood Group" value={profile.bloodGroup} />
+              </DetailSection>
+
+              <Separator />
+
+              {/* Contact */}
+              <DetailSection icon={Phone} title="Contact Details">
+                <Field label="Email" value={profile.email} />
+                <Field label="Phone" value={profile.phone} />
+                <Field label="LinkedIn" value={profile.linkedinProfile} full />
+              </DetailSection>
+
+              <Separator />
+
+              {/* ID Documents */}
+              <DetailSection icon={CreditCard} title="Identity Documents">
+                <Field label="Aadhar Number" value={profile.aadharNumber} />
+                <Field label="PAN Number" value={profile.panNumber} />
+              </DetailSection>
+
+              <Separator />
+
+              {/* Current Address */}
+              <DetailSection icon={MapPin} title="Current Address">
+                <Field
+                  label="Address"
+                  value={formatAddress(currentAddress)}
+                  full
+                />
+              </DetailSection>
+
+              <Separator />
+
+              {/* Permanent Address */}
+              <DetailSection icon={Building2} title="Permanent Address">
+                <Field
+                  label="Address"
+                  value={formatAddress(permanentAddress)}
+                  full
+                />
+              </DetailSection>
+
+              <Separator />
+
+              {/* Emergency Contact */}
+              <DetailSection icon={Heart} title="Emergency Contact">
+                <Field label="Name" value={emergencyContact?.name} />
+                <Field label="Relationship" value={emergencyContact?.relationship} />
+                <Field label="Phone" value={emergencyContact?.phone} />
+                <Field label="Email" value={emergencyContact?.email} />
+              </DetailSection>
+
+              {/* Rejection reason display if already rejected */}
+              {profile.hrStatus === "rejected" && profile.hrRemark && (
+                <>
+                  <Separator />
+                  <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-xs font-medium text-red-700 dark:text-red-400">
+                          Rejection Reason
+                        </p>
+                        <p className="text-xs text-red-600 dark:text-red-300 mt-1">
+                          {profile.hrRemark}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer — only show actions for pending profiles that haven't been acted on */}
+        {!isLoading && !isError && profile && !actionDone && profile.hrStatus === "pending" && (
+          <div className="px-6 py-4 border-t flex-shrink-0 bg-muted/10">
+            {showReject ? (
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-medium text-foreground">
+                    Reason for rejection <span className="text-destructive">*</span>
+                  </label>
+                  <Textarea
+                    className="mt-1.5 text-sm resize-none"
+                    placeholder="Describe what needs to be corrected…"
+                    rows={3}
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+                <div className="flex items-center justify-end gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setShowReject(false);
+                      setRejectReason("");
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={!rejectReason.trim() || updateMutation.isPending}
+                    onClick={handleReject}
+                  >
+                    {updateMutation.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                    ) : (
+                      <X className="h-3.5 w-3.5 mr-1.5" />
+                    )}
+                    Confirm Rejection
+                  </Button>
+                </div>
+                {updateMutation.isError && (
+                  <p className="text-xs text-destructive flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    {(updateMutation.error as Error)?.message || "Something went wrong."}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs text-muted-foreground">
+                  Review all details before approving.
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowReject(true)}
+                    className="text-red-600 hover:text-red-700 border-red-200 hover:bg-red-50
+                      dark:text-red-400 dark:border-red-800 dark:hover:bg-red-950/30"
+                  >
+                    <X className="h-3.5 w-3.5 mr-1.5" />
+                    Reject
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={updateMutation.isPending}
+                    onClick={handleApprove}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  >
+                    {updateMutation.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                    ) : (
+                      <Check className="h-3.5 w-3.5 mr-1.5" />
+                    )}
+                    Approve
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 };
 
 // ─── Profile Row ──────────────────────────────────────────────────────────────
 
 interface ProfileRowProps {
-  profile: EmployeeProfile;
-  onView: (p: EmployeeProfile) => void;
-  onEdit: (p: EmployeeProfile) => void;
+  profile: ProfileSummary;
+  onReview: (id: number) => void;
 }
 
-const ProfileRow: React.FC<ProfileRowProps> = ({ profile, onView, onEdit }) => {
-  const overall = computeOverallProgress(profile);
-  const hrPct = computeHRProgress(profile.hrSections);
-  const empPct = computeEmployeeProgress(profile.employeeSections);
-  const timerAlert = isTimerAlert(profile.hrTimer);
+const ProfileRow: React.FC<ProfileRowProps> = ({ profile, onReview }) => {
+  const cfg = STATUS_CONFIG[profile.hrStatus];
+  const StatusIcon = cfg.icon;
 
   return (
-    <div
-      className="group flex flex-col sm:flex-row sm:items-center gap-4 px-4 py-4 rounded-xl border bg-card hover:bg-muted/30 transition-all cursor-pointer"
-      onClick={() => onView(profile)}
+    <button
+      onClick={() => onReview(profile.id)}
+      className={cn(
+        "w-full text-left group flex items-center gap-4 px-4 py-3.5 rounded-xl",
+        "border bg-card transition-all duration-150",
+        "hover:shadow-sm hover:border-border/80 hover:-translate-y-px",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+      )}
     >
-      {/* Avatar + Name */}
-      <div className="flex items-center gap-3 flex-1 min-w-0">
-        <div className="relative flex-shrink-0">
-          <Avatar className="h-10 w-10">
-            <AvatarFallback className="text-xs font-bold bg-primary/10 text-primary">
-              {getInitials(profile.firstName, profile.lastName)}
-            </AvatarFallback>
-          </Avatar>
-          <div className={cn(
-            "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-background",
-            overall === 100 ? "bg-green-500" : overall > 0 ? "bg-amber-500" : "bg-muted-foreground/40",
-          )} />
-        </div>
+      {/* Avatar */}
+      <Avatar className="h-9 w-9 flex-shrink-0">
+        <AvatarFallback className="text-[11px] font-semibold bg-primary/8 text-primary">
+          {getInitials(profile.name)}
+        </AvatarFallback>
+      </Avatar>
 
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-sm font-semibold leading-none">
-              {profile.firstName} {profile.middleName ? `${profile.middleName} ` : ""}{profile.lastName}
-            </p>
-            <span className="text-[10px] font-mono bg-muted text-muted-foreground px-1.5 py-0.5 rounded">
-              {profile.employeeId}
-            </span>
-          </div>
-          <p className="text-xs text-muted-foreground mt-0.5 truncate">
-            {profile.designation} · {profile.department}
+      {/* Info */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium truncate">{profile.name}</span>
+          <span
+            className={cn(
+              "inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full",
+              cfg.badge
+            )}
+          >
+            <StatusIcon className="h-3 w-3" />
+            {cfg.label}
+          </span>
+        </div>
+        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1 truncate">
+            <Mail className="h-3 w-3 flex-shrink-0" />
+            {profile.email}
+          </span>
+          <span className="hidden sm:flex items-center gap-1">
+            <Clock className="h-3 w-3 flex-shrink-0" />
+            {timeAgo(profile.submittedAt)}
+          </span>
+        </div>
+        {/* Show rejection reason if rejected */}
+        {profile.hrStatus === "rejected" && profile.hrRemark && (
+          <p className="text-[11px] text-red-500 dark:text-red-400 mt-1.5 truncate">
+            Reason: {profile.hrRemark}
           </p>
-        </div>
-      </div>
-
-      {/* HR Section Icons */}
-      <div className="flex flex-col gap-1 min-w-0 w-40">
-        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">HR Fills</p>
-        <div className="flex items-center gap-1.5">
-          {HR_SECTION_CONFIG.map(({ key, label, icon }) => (
-            <SectionPill key={key} status={profile.hrSections[key].status} label={label} icon={icon} />
-          ))}
-          <span className="text-xs text-muted-foreground ml-1">{hrPct}%</span>
-        </div>
-      </div>
-
-      {/* Employee Section Icons */}
-      <div className="flex flex-col gap-1 min-w-0 w-52">
-        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Employee Fills</p>
-        <div className="flex items-center gap-1.5">
-          {EMP_SECTION_CONFIG.map(({ key, label, icon }) => (
-            <SectionPill key={key} status={profile.employeeSections[key].status} label={label} icon={icon} />
-          ))}
-          <span className="text-xs text-muted-foreground ml-1">{empPct}%</span>
-        </div>
-      </div>
-
-      {/* Overall Progress */}
-      <div className="flex items-center gap-3 w-28">
-        <div className="relative flex items-center justify-center">
-          <ProgressRing pct={overall} size={40} stroke={3} />
-          <span className="absolute text-[10px] font-bold">{overall}%</span>
-        </div>
-        <div>
-          <p className="text-xs font-semibold leading-none">{overall}%</p>
-          <p className="text-[10px] text-muted-foreground mt-0.5">
-            {overall === 100 ? "Complete" : overall === 0 ? "Not started" : "In progress"}
-          </p>
-        </div>
-      </div>
-
-      {/* HR Timer */}
-      <div className={cn(
-        "flex items-center gap-1.5 text-xs w-20",
-        timerAlert ? "text-destructive" : "text-muted-foreground",
-      )}>
-        <Timer className="h-3.5 w-3.5 flex-shrink-0" />
-        <span className="font-medium">{formatTimer(profile.hrTimer)}</span>
-        {timerAlert && (
-          <TooltipProvider delayDuration={100}>
-            <Tooltip>
-              <TooltipTrigger>
-                <AlertCircle className="h-3.5 w-3.5" />
-              </TooltipTrigger>
-              <TooltipContent className="text-xs">HR filling overdue (&gt;4h)</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
         )}
       </div>
 
-      {/* Actions */}
-      <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-        onClick={(e) => e.stopPropagation()}>
-        <TooltipProvider delayDuration={100}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={(e) => { e.stopPropagation(); onView(profile); }}
-                className="h-7 w-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-              >
-                <Eye className="h-4 w-4" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent className="text-xs">View details</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-        <TooltipProvider delayDuration={100}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={(e) => { e.stopPropagation(); onEdit(profile); }}
-                className="h-7 w-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-              >
-                <Edit3 className="h-4 w-4" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent className="text-xs">Fill HR details</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+      {/* Review button */}
+      <div className="flex-shrink-0 flex items-center gap-2">
+        <span className="text-xs text-muted-foreground hidden sm:block opacity-0 group-hover:opacity-100 transition-opacity">
+          {profile.hrStatus === "pending" ? "Review" : "View"}
+        </span>
+        <ChevronRight className="h-4 w-4 text-muted-foreground/50 group-hover:text-foreground transition-colors" />
       </div>
-    </div>
-  );
-};
-
-// ─── Detail Modal ─────────────────────────────────────────────────────────────
-
-const DetailModal: React.FC<{
-  profile: EmployeeProfile | null;
-  open: boolean;
-  onClose: () => void;
-  onEdit: () => void;
-}> = ({ profile, open, onClose, onEdit }) => {
-  if (!profile) return null;
-
-  const overall = computeOverallProgress(profile);
-  const hrPct = computeHRProgress(profile.hrSections);
-  const empPct = computeEmployeeProgress(profile.employeeSections);
-
-  return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-2xl p-0 gap-0 overflow-hidden max-h-[90vh]">
-        {/* Header */}
-        <DialogHeader className="px-6 py-4 border-b bg-muted/30 flex-shrink-0">
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <Avatar className="h-12 w-12">
-                <AvatarFallback className="text-sm font-bold bg-primary/10 text-primary">
-                  {getInitials(profile.firstName, profile.lastName)}
-                </AvatarFallback>
-              </Avatar>
-              <div className={cn(
-                "absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-background",
-                overall === 100 ? "bg-green-500" : overall > 0 ? "bg-amber-500" : "bg-muted-foreground/40",
-              )} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <DialogTitle className="text-base">
-                  {profile.firstName} {profile.middleName ? `${profile.middleName} ` : ""}{profile.lastName}
-                </DialogTitle>
-                <span className="text-[10px] font-mono bg-muted text-muted-foreground px-1.5 py-0.5 rounded">
-                  {profile.employeeId}
-                </span>
-              </div>
-              <DialogDescription className="mt-0.5 text-xs">
-                {profile.designation} · {profile.department} · Joining {formatDate(profile.dateOfJoining)}
-              </DialogDescription>
-            </div>
-            {/* Overall ring */}
-            <div className="relative flex items-center justify-center flex-shrink-0">
-              <ProgressRing pct={overall} size={52} stroke={4} />
-              <span className="absolute text-xs font-bold">{overall}%</span>
-            </div>
-          </div>
-        </DialogHeader>
-
-        <div className="overflow-y-auto">
-          <div className="px-6 py-5 space-y-6">
-            {/* Contact Info */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {[
-                { icon: Mail, value: profile.email },
-                { icon: Phone, value: profile.phone },
-                { icon: CalendarDays, value: `DOJ: ${formatDate(profile.dateOfJoining)}` },
-              ].map(({ icon: Icon, value }) => (
-                <div key={value} className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Icon className="h-3.5 w-3.5 flex-shrink-0" />
-                  <span className="truncate">{value}</span>
-                </div>
-              ))}
-            </div>
-
-            <Separator />
-
-            {/* HR Timer Banner */}
-            <div className={cn(
-              "flex items-center gap-3 px-4 py-3 rounded-lg border text-sm",
-              isTimerAlert(profile.hrTimer)
-                ? "bg-destructive/5 border-destructive/20"
-                : "bg-muted/50 border-border",
-            )}>
-              <Timer className={cn(
-                "h-4 w-4 flex-shrink-0",
-                isTimerAlert(profile.hrTimer) ? "text-destructive" : "text-muted-foreground",
-              )} />
-              <div className="flex-1">
-                <span className="font-medium">HR Filling Time: </span>
-                <span className={isTimerAlert(profile.hrTimer) ? "text-destructive font-semibold" : ""}>
-                  {formatTimer(profile.hrTimer)}
-                </span>
-                {profile.hrFilledBy && (
-                  <span className="text-muted-foreground ml-2">· Assigned to {profile.hrFilledBy}</span>
-                )}
-              </div>
-              {isTimerAlert(profile.hrTimer) && (
-                <Badge variant="destructive" className="text-[10px]">Overdue</Badge>
-              )}
-            </div>
-
-            {/* HR Sections */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Shield className="h-4 w-4 text-primary" />
-                  <h3 className="text-sm font-semibold">HR Filled Sections</h3>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Progress value={hrPct} className="w-20 h-1.5" />
-                  <span className="text-xs font-medium text-muted-foreground">{hrPct}%</span>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {HR_SECTION_CONFIG.map(({ key, label, icon: Icon }) => {
-                  const sec = profile.hrSections[key];
-                  const cfg = SECTION_STATUS_CONFIG[sec.status];
-                  const SIcon = cfg.icon;
-                  return (
-                    <div key={key} className={cn(
-                      "p-3 rounded-lg border space-y-2",
-                      sec.status === "completed" && "bg-green-50/50 border-green-200 dark:bg-green-900/10 dark:border-green-900",
-                      sec.status === "in_progress" && "bg-amber-50/50 border-amber-200 dark:bg-amber-900/10 dark:border-amber-900",
-                      sec.status === "not_started" && "bg-muted/40 border-border",
-                    )}>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 text-xs font-medium">
-                          <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-                          {label}
-                        </div>
-                        <SIcon className={cn("h-3.5 w-3.5", cfg.className)} />
-                      </div>
-                      <div className="space-y-1">
-                        <Progress
-                          value={sec.totalFields > 0 ? (sec.completedFields / sec.totalFields) * 100 : 0}
-                          className="h-1"
-                        />
-                        <p className="text-[10px] text-muted-foreground">
-                          {sec.completedFields}/{sec.totalFields} fields
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Employee Sections */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <User className="h-4 w-4 text-primary" />
-                  <h3 className="text-sm font-semibold">Employee Filled Sections</h3>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Progress value={empPct} className="w-20 h-1.5" />
-                  <span className="text-xs font-medium text-muted-foreground">{empPct}%</span>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {EMP_SECTION_CONFIG.map(({ key, label, icon: Icon }) => {
-                  const sec = profile.employeeSections[key];
-                  const cfg = SECTION_STATUS_CONFIG[sec.status];
-                  const SIcon = cfg.icon;
-                  return (
-                    <div key={key} className={cn(
-                      "p-3 rounded-lg border flex items-center gap-3",
-                      sec.status === "completed" && "bg-green-50/50 border-green-200 dark:bg-green-900/10 dark:border-green-900",
-                      sec.status === "in_progress" && "bg-amber-50/50 border-amber-200 dark:bg-amber-900/10 dark:border-amber-900",
-                      sec.status === "not_started" && "bg-muted/40 border-border",
-                    )}>
-                      <div className={cn(
-                        "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0",
-                        sec.status === "completed" && "bg-green-100 dark:bg-green-900/40",
-                        sec.status === "in_progress" && "bg-amber-100 dark:bg-amber-900/40",
-                        sec.status === "not_started" && "bg-muted",
-                      )}>
-                        <Icon className={cn("h-4 w-4", cfg.className)} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs font-medium">{label}</p>
-                          <span className={cn("text-[10px] font-medium", cfg.className)}>
-                            {cfg.label}
-                          </span>
-                        </div>
-                        <div className="mt-1 space-y-0.5">
-                          <Progress
-                            value={sec.totalFields > 0 ? (sec.completedFields / sec.totalFields) * 100 : 0}
-                            className="h-1"
-                          />
-                          <p className="text-[10px] text-muted-foreground">
-                            {sec.completedFields}/{sec.totalFields} fields
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <DialogFooter className="px-6 py-4 border-t bg-muted/30 flex-shrink-0">
-          <div className="flex items-center justify-between w-full gap-3">
-            <p className="text-xs text-muted-foreground">
-              Last updated {formatDate(profile.lastUpdated)}
-            </p>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={onClose}>Close</Button>
-              <Button size="sm" onClick={onEdit}>
-                <Edit3 className="h-3.5 w-3.5 mr-1.5" />
-                Fill HR Details
-              </Button>
-            </div>
-          </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-};
-
-// ─── HR Fill Modal (functional) ────────────────────────────────────────────────
-
-const HRFillModal: React.FC<{
-  profile: EmployeeProfile | null;
-  open: boolean;
-  onClose: () => void;
-}> = ({ profile, open, onClose }) => {
-  const [activeSection, setActiveSection] = useState<keyof HRSections>("employment");
-  
-  const { data: fullProfile, isLoading } = useProfile(profile?.id || null);
-  const updateMutation = useUpdateProfile(profile?.id || 0);
-
-  const { data: designations = [] } = useDesignations();
-  const { data: teams = [] } = useTeams();
-  const { data: users = [] } = useUsers();
-
-  if (!profile) return null;
-
-  const sectionPcts = {
-    employment: profile.hrSections.employment,
-    compensation: profile.hrSections.compensation,
-    bankDetails: profile.hrSections.bankDetails,
-  };
-
-  const EMPLOYMENT_FIELDS = [
-    { name: "employeeType", label: "Employee Type", type: "select", options: ["Full-Time", "Part-Time", "Contract", "Intern"], required: true },
-    { name: "designationId", label: "Designation", type: "select", options: designations.map(d => ({ label: d.name, value: d.id.toString() })), required: true },
-    { name: "departmentId", label: "Department", type: "select", options: teams.map(t => ({ label: t.name, value: t.id.toString() })), required: true },
-    { name: "reportingTl", label: "Reporting TL", type: "select", options: users.map(u => ({ label: u.name, value: u.id.toString() })) },
-    { name: "workLocation", label: "Work Location / Branch", type: "text", placeholder: "e.g. Bengaluru HQ", required: true },
-    { name: "dateOfJoining", label: "Date of Joining", type: "date", required: true },
-    { name: "probationMonths", label: "Probation Period (months)", type: "number", placeholder: "e.g. 3" },
-    { name: "probationEndDate", label: "Probation End Date", type: "date" },
-  ];
-
-  const COMPENSATION_FIELDS = [
-    { name: "salaryType", label: "Salary Type", type: "select", options: ["Monthly", "Hourly", "Annual"], required: true },
-    { name: "basicSalary", label: "Basic Salary / CTC", type: "number", placeholder: "e.g. 50000", required: true },
-  ];
-
-  const BANK_FIELDS = [
-    { name: "bankName", label: "Bank Name", type: "text", placeholder: "e.g. State Bank of India", required: true },
-    { name: "accountNumber", label: "Account Number", type: "text", placeholder: "XXXXXXXXXXXX", required: true },
-    { name: "ifscCode", label: "IFSC Code", type: "text", placeholder: "e.g. SBIN0001234", required: true },
-  ];
-
-  const SECTION_FIELDS: Record<keyof HRSections, typeof EMPLOYMENT_FIELDS> = {
-    employment: EMPLOYMENT_FIELDS,
-    compensation: COMPENSATION_FIELDS,
-    bankDetails: BANK_FIELDS,
-  };
-
-  const currentFields = SECTION_FIELDS[activeSection];
-
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const dto: UpdateProfileDto = {};
-    
-    currentFields.forEach(f => {
-      const val = formData.get(f.name);
-      if (val) {
-        if (f.type === "number" || f.name === "designationId" || f.name === "departmentId" || f.name === "reportingTl") {
-          (dto as any)[f.name] = Number(val);
-        } else {
-          (dto as any)[f.name] = val.toString();
-        }
-      }
-    });
-
-    updateMutation.mutate(dto, {
-      onSuccess: () => {
-        // Optionally close or stay open. We stay open to let them fill next section.
-      }
-    });
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-2xl p-0 gap-0 overflow-hidden max-h-[90vh]">
-        {/* Header */}
-        <DialogHeader className="px-6 py-4 border-b bg-muted/30 flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-              <Shield className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <DialogTitle className="text-base">Fill HR Details</DialogTitle>
-              <DialogDescription className="text-xs mt-0.5">
-                {profile.firstName} {profile.lastName} · {profile.employeeId}
-              </DialogDescription>
-            </div>
-          </div>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row flex-1 overflow-hidden min-h-0">
-          {/* Section Sidebar */}
-          <div className="sm:w-44 border-b sm:border-b-0 sm:border-r bg-muted/20 flex sm:flex-col flex-row overflow-x-auto sm:overflow-y-auto flex-shrink-0">
-            {HR_SECTION_CONFIG.map(({ key, label, icon: Icon }) => {
-              const sec = sectionPcts[key];
-              const isActive = activeSection === key;
-              const cfg = SECTION_STATUS_CONFIG[sec.status];
-              const SIcon = cfg.icon;
-              return (
-                <button
-                  type="button"
-                  key={key}
-                  onClick={() => setActiveSection(key)}
-                  className={cn(
-                    "flex items-center gap-2.5 px-4 py-3 text-left transition-colors text-sm w-full flex-shrink-0",
-                    "sm:border-b last:border-b-0 border-r sm:border-r-0 last:border-r-0",
-                    isActive
-                      ? "bg-background border-r-2 border-primary text-foreground font-medium sm:border-r-2 sm:border-b-0"
-                      : "text-muted-foreground hover:bg-muted/50",
-                  )}
-                >
-                  <Icon className="h-4 w-4 flex-shrink-0" />
-                  <div className="flex-1 min-w-0 hidden sm:block">
-                    <p className="text-xs font-medium truncate">{label}</p>
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <SIcon className={cn("h-3 w-3", cfg.className)} />
-                      <span className="text-[10px] text-muted-foreground">
-                        {sec.completedFields}/{sec.totalFields}
-                      </span>
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Form Area */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-4">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-semibold">
-                {HR_SECTION_CONFIG.find(s => s.key === activeSection)?.label}
-              </h4>
-              <div className="flex items-center gap-2">
-                <Progress
-                  value={sectionPcts[activeSection].totalFields > 0
-                    ? (sectionPcts[activeSection].completedFields / sectionPcts[activeSection].totalFields) * 100
-                    : 0}
-                  className="w-20 h-1.5"
-                />
-                <span className="text-xs text-muted-foreground">
-                  {sectionPcts[activeSection].completedFields}/{sectionPcts[activeSection].totalFields}
-                </span>
-              </div>
-            </div>
-
-            {isLoading ? (
-              <div className="py-10 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {currentFields.map((field) => {
-                  const defaultValue = fullProfile ? (fullProfile as any)[field.name] : "";
-                  
-                  return (
-                    <div key={field.name} className={cn(
-                      "space-y-1.5",
-                      field.type === "text" && field.label.includes("Address") && "sm:col-span-2",
-                    )}>
-                      <label htmlFor={field.name} className="text-xs font-medium text-foreground flex items-center gap-1">
-                        {field.label}
-                        {field.required && <span className="text-destructive">*</span>}
-                      </label>
-                      {field.type === "select" ? (
-                        <Select name={field.name} defaultValue={defaultValue?.toString() || undefined}>
-                          <SelectTrigger className="h-9 text-sm">
-                            <SelectValue placeholder={`Select ${field.label.toLowerCase()}`} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {field.options?.map((o: any) => {
-                              const val = typeof o === 'object' ? o.value : o;
-                              const label = typeof o === 'object' ? o.label : o;
-                              return <SelectItem key={val} value={val}>{label}</SelectItem>;
-                            })}
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <Input
-                          id={field.name}
-                          name={field.name}
-                          type={field.type}
-                          placeholder={"placeholder" in field ? field.placeholder : undefined}
-                          defaultValue={defaultValue || ""}
-                          required={field.required}
-                          className="h-9 text-sm"
-                        />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            
-            {/* Footer embedded in Form to have submit logic */}
-            <div className="mt-8 pt-4 border-t flex flex-col sm:flex-row items-center justify-between gap-3">
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <Info className="h-3 w-3" />
-                Saves automatically to {activeSection} section
-              </p>
-              <div className="flex gap-2 w-full sm:w-auto">
-                <Button type="button" variant="outline" size="sm" onClick={onClose} className="flex-1 sm:flex-none">Cancel</Button>
-                <Button type="submit" size="sm" disabled={updateMutation.isPending} className="flex-1 sm:flex-none">
-                  {updateMutation.isPending ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <CheckCheck className="h-3.5 w-3.5 mr-1.5" />}
-                  Save Section
-                </Button>
-              </div>
-            </div>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+    </button>
   );
 };
 
 // ─── Empty State ──────────────────────────────────────────────────────────────
 
-const EmptyState: React.FC<{ search: string; tab: ProfileTab }> = ({ search, tab }) => (
-  <div className="flex flex-col items-center justify-center py-16 text-center">
-    <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mb-4">
-      <Users className="h-7 w-7 text-muted-foreground/50" />
+const EmptyState: React.FC<{ tab: TabValue; hasSearch: boolean }> = ({ tab, hasSearch }) => {
+  const messages = {
+    pending: {
+      title: "No pending reviews",
+      desc: "All submitted profiles have been reviewed.",
+    },
+    approved: {
+      title: "No approved profiles",
+      desc: "Approved profiles will appear here.",
+    },
+    rejected: {
+      title: "No rejected profiles",
+      desc: "Rejected profiles will appear here.",
+    },
+  };
+
+  const msg = messages[tab];
+
+  return (
+    <div className="flex flex-col items-center justify-center py-16 gap-3">
+      <div className="w-11 h-11 rounded-xl bg-muted flex items-center justify-center">
+        {tab === "approved" ? (
+          <CheckCircle2 className="h-5 w-5 text-muted-foreground/40" />
+        ) : tab === "rejected" ? (
+          <XCircle className="h-5 w-5 text-muted-foreground/40" />
+        ) : (
+          <Clock className="h-5 w-5 text-muted-foreground/40" />
+        )}
+      </div>
+      <div className="text-center">
+        <p className="text-sm font-medium">{hasSearch ? "No results found" : msg.title}</p>
+        <p className="text-xs text-muted-foreground mt-1 max-w-xs">
+          {hasSearch ? "Try a different search term." : msg.desc}
+        </p>
+      </div>
     </div>
-    <p className="text-sm font-medium">
-      {search ? "No matching profiles" : `No ${tab === "all" ? "" : tab} profiles`}
-    </p>
-    <p className="text-xs text-muted-foreground mt-1">
-      {search
-        ? `Try adjusting your search — "${search}"`
-        : "Approved employees will appear here for profile completion."}
-    </p>
-  </div>
-);
+  );
+};
 
-// ─── Legend ───────────────────────────────────────────────────────────────────
-
-const Legend: React.FC = () => (
-  <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
-    {Object.entries(SECTION_STATUS_CONFIG).map(([key, cfg]) => {
-      const Icon = cfg.icon;
-      return (
-        <div key={key} className="flex items-center gap-1.5">
-          <Icon className={cn("h-3.5 w-3.5", cfg.className)} />
-          <span>{cfg.label}</span>
-        </div>
-      );
-    })}
-    <div className="flex items-center gap-1.5">
-      <Timer className="h-3.5 w-3.5 text-destructive" />
-      <span>HR timer &gt;4h = overdue</span>
-    </div>
-  </div>
-);
-
-// ─── Main Dashboard ───────────────────────────────────────────────────────────
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
 const ProfileDetailsDashboard: React.FC = () => {
-  const { data: rawProfiles = [], isLoading, isError } = useProfileList();
-  
-  const profiles = useMemo(() => rawProfiles.map(mapToEmployeeProfile), [rawProfiles]);
-  const [activeTab, setActiveTab] = useState<ProfileTab>("all");
+  const { data: rawProfiles = [], isLoading, isError, refetch } = useProfileList();
+  const profiles = useMemo(() => rawProfiles.map(mapProfile), [rawProfiles]);
+
+  const [activeTab, setActiveTab] = useState<TabValue>("pending");
   const [searchQuery, setSearchQuery] = useState("");
-  const [deptFilter, setDeptFilter] = useState<FilterDept>("all");
-  const [sortBy, setSortBy] = useState<"name" | "progress" | "timer" | "joined">("timer");
+  const [reviewId, setReviewId] = useState<number | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
-  // Modals
-  const [viewProfile, setViewProfile] = useState<EmployeeProfile | null>(null);
-  const [viewOpen, setViewOpen] = useState(false);
-  const [editProfile, setEditProfile] = useState<EmployeeProfile | null>(null);
-  const [editOpen, setEditOpen] = useState(false);
+  // Counts
+  const counts = useMemo(
+    () => ({
+      pending: profiles.filter((p) => p.hrStatus === "pending").length,
+      approved: profiles.filter((p) => p.hrStatus === "approved").length,
+      rejected: profiles.filter((p) => p.hrStatus === "rejected").length,
+    }),
+    [profiles]
+  );
 
-  // Stats
-  const stats = useMemo(() => {
-    const total = profiles.length;
-    const pending = profiles.filter(p => getProfileStatus(p) === "pending").length;
-    const inProgress = profiles.filter(p => getProfileStatus(p) === "in_progress").length;
-    const completed = profiles.filter(p => getProfileStatus(p) === "completed").length;
-    const overdue = profiles.filter(p => isTimerAlert(p.hrTimer)).length;
-    return { total, pending, inProgress, completed, overdue };
-  }, [profiles]);
-
-  // Filtered + sorted
+  // Filtered list
   const filtered = useMemo(() => {
-    let list = profiles.filter(p => {
-      const matchTab = activeTab === "all" || getProfileStatus(p) === activeTab;
-      const q = searchQuery.toLowerCase();
-      const matchSearch = !q ||
-        `${p.firstName} ${p.lastName}`.toLowerCase().includes(q) ||
-        p.employeeId.toLowerCase().includes(q) ||
-        p.designation.toLowerCase().includes(q) ||
-        p.department.toLowerCase().includes(q);
-      const matchDept = deptFilter === "all" || p.department === deptFilter;
-      return matchTab && matchSearch && matchDept;
-    });
+    const q = searchQuery.toLowerCase();
+    return profiles
+      .filter((p) => p.hrStatus === activeTab)
+      .filter(
+        (p) =>
+          !q ||
+          p.name.toLowerCase().includes(q) ||
+          p.email.toLowerCase().includes(q)
+      )
+      .sort(
+        (a, b) =>
+          new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+      );
+  }, [profiles, activeTab, searchQuery]);
 
-    list = [...list].sort((a, b) => {
-      if (sortBy === "name") return `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`);
-      if (sortBy === "progress") return computeOverallProgress(b) - computeOverallProgress(a);
-      if (sortBy === "timer") return b.hrTimer - a.hrTimer;
-      if (sortBy === "joined") return new Date(a.dateOfJoining).getTime() - new Date(b.dateOfJoining).getTime();
-      return 0;
-    });
+  const openReview = (id: number) => {
+    setReviewId(id);
+    setModalOpen(true);
+  };
 
-    return list;
-  }, [profiles, activeTab, searchQuery, deptFilter, sortBy]);
-
-  const tabs: { value: ProfileTab; label: string; icon: React.ElementType; count: number }[] = [
-    { value: "all", label: "All", icon: Users, count: stats.total },
-    { value: "pending", label: "Not Started", icon: CircleDashed, count: stats.pending },
-    { value: "in_progress", label: "In Progress", icon: Clock, count: stats.inProgress },
-    { value: "completed", label: "Completed", icon: CheckCheck, count: stats.completed },
+  const tabs: { value: TabValue; label: string; icon: React.ElementType }[] = [
+    { value: "pending", label: "Pending", icon: Clock },
+    { value: "approved", label: "Approved", icon: CheckCircle2 },
+    { value: "rejected", label: "Rejected", icon: XCircle },
   ];
-
-  const openView = (p: EmployeeProfile) => { setViewProfile(p); setViewOpen(true); };
-  const openEdit = (p: EmployeeProfile) => { setEditProfile(p); setEditOpen(true); };
-
-  if (isLoading) return <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
-  if (isError) return <div className="p-8 text-center text-destructive">Failed to load profiles.</div>;
 
   return (
     <TooltipProvider>
-      <Card className="flex flex-col h-full min-h-0">
-        {/* ── Header ── */}
-        <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0 pb-4 flex-wrap">
-          <div className="space-y-1">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <UserCheck className="h-5 w-5 text-primary" />
-              Profile Details
-            </CardTitle>
-            <CardDescription>
-              Track HR and employee profile completion for all approved joiners
-            </CardDescription>
+      <div className="flex flex-col gap-6 h-full min-h-0 max-w-4xl mx-auto w-full">
+        {/* Page header */}
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight">Profile Reviews</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            Review and approve employee-submitted profile details.
+          </p>
+        </div>
+
+        {/* Tabs + Search */}
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            {/* Tab pills */}
+            <div className="flex items-center gap-1 bg-muted/50 rounded-xl p-1">
+              {tabs.map((tab) => {
+                const isActive = activeTab === tab.value;
+                const Icon = tab.icon;
+                const count = counts[tab.value];
+                return (
+                  <button
+                    key={tab.value}
+                    onClick={() => setActiveTab(tab.value)}
+                    className={cn(
+                      "flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-medium",
+                      "transition-all duration-150",
+                      isActive
+                        ? "bg-background shadow-sm text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <Icon
+                      className={cn(
+                        "h-3.5 w-3.5",
+                        isActive
+                          ? tab.value === "approved"
+                            ? "text-emerald-600"
+                            : tab.value === "rejected"
+                            ? "text-red-500"
+                            : "text-amber-600"
+                          : ""
+                      )}
+                    />
+                    {tab.label}
+                    <span
+                      className={cn(
+                        "text-[10px] px-1.5 py-0.5 rounded-full font-semibold tabular-nums min-w-[20px] text-center",
+                        isActive
+                          ? tab.value === "pending"
+                            ? "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300"
+                            : tab.value === "approved"
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300"
+                            : "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300"
+                          : "bg-muted text-muted-foreground"
+                      )}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Search */}
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <Input
+                className="pl-9 h-9 text-sm bg-card"
+                placeholder="Search by name or email…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
           </div>
-          {stats.overdue > 0 && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-destructive/5 border border-destructive/20 text-xs">
-              <AlertCircle className="h-4 w-4 text-destructive flex-shrink-0" />
-              <span className="text-destructive font-medium">
-                {stats.overdue} profile{stats.overdue > 1 ? "s" : ""} overdue HR filling
-              </span>
+
+          {/* Result count */}
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">{filtered.length}</span>{" "}
+              {activeTab} {filtered.length === 1 ? "profile" : "profiles"}
+            </p>
+          </div>
+        </div>
+
+        {/* List */}
+        <div className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1">
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              <p className="text-xs text-muted-foreground">Loading profiles…</p>
+            </div>
+          ) : isError ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-4">
+              <div className="w-11 h-11 rounded-xl bg-destructive/10 flex items-center justify-center">
+                <AlertCircle className="h-5 w-5 text-destructive" />
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-medium">Failed to load profiles</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Please try again in a moment.
+                </p>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>
+                <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                Retry
+              </Button>
+            </div>
+          ) : filtered.length === 0 ? (
+            <EmptyState tab={activeTab} hasSearch={!!searchQuery} />
+          ) : (
+            <div className="space-y-2">
+              {filtered.map((p) => (
+                <ProfileRow key={p.id} profile={p} onReview={openReview} />
+              ))}
             </div>
           )}
-        </CardHeader>
+        </div>
 
-        <CardContent className="flex-1 min-h-0 flex flex-col gap-5">
-          {/* ── Stats ── */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <StatCard label="Total Profiles" value={stats.total} icon={Users} />
-            <StatCard label="Not Started" value={stats.pending} icon={CircleDashed} highlight={stats.pending > 0} />
-            <StatCard label="In Progress" value={stats.inProgress} icon={TrendingUp} />
-            <StatCard label="Completed" value={stats.completed} icon={CheckCircle2} />
-          </div>
-
-          {/* ── Toolbar ── */}
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-              {/* Tabs */}
-              <Tabs value={activeTab} onValueChange={v => setActiveTab(v as ProfileTab)}>
-                <TabsList className="h-9">
-                  {tabs.map(tab => (
-                    <TabsTrigger key={tab.value} value={tab.value} className="gap-1.5 text-xs px-3">
-                      <tab.icon className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">{tab.label}</span>
-                      <span className={cn(
-                        "ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium",
-                        activeTab === tab.value ? "bg-background text-foreground" : "bg-muted text-muted-foreground",
-                      )}>
-                        {tab.count}
-                      </span>
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
-
-              <div className="flex items-center gap-2 ml-auto flex-wrap">
-                {/* Dept Filter */}
-                <Select value={deptFilter} onValueChange={setDeptFilter}>
-                  <SelectTrigger className="h-9 w-44 text-xs">
-                    <Filter className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
-                    <SelectValue placeholder="Department" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Departments</SelectItem>
-                    {DEPARTMENTS.map(d => (
-                      <SelectItem key={d} value={d}>{d}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                {/* Sort */}
-                <Select value={sortBy} onValueChange={v => setSortBy(v as typeof sortBy)}>
-                  <SelectTrigger className="h-9 w-36 text-xs">
-                    <ArrowUpDown className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="timer">Sort: HR Timer</SelectItem>
-                    <SelectItem value="progress">Sort: Progress</SelectItem>
-                    <SelectItem value="name">Sort: Name</SelectItem>
-                    <SelectItem value="joined">Sort: Joining</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                {/* Search */}
-                <div className="relative w-full sm:w-56">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                  <Input
-                    className="pl-9 h-9 text-sm"
-                    placeholder="Search name, ID, role…"
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Legend + count */}
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <Legend />
-              <p className="text-xs text-muted-foreground">
-                <span className="font-medium text-foreground">{filtered.length}</span> of {stats.total} profiles
-              </p>
-            </div>
-          </div>
-
-          {/* ── Column Headers ── */}
-          <div className="hidden sm:flex items-center gap-4 px-4 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
-            <div className="flex-1">Employee</div>
-            <div className="w-40">HR Sections</div>
-            <div className="w-52">Employee Sections</div>
-            <div className="w-28">Overall</div>
-            <div className="w-20">HR Timer</div>
-            <div className="w-16" />
-          </div>
-
-          {/* ── List ── */}
-          <div className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1">
-            {filtered.length === 0 ? (
-              <EmptyState search={searchQuery} tab={activeTab} />
-            ) : (
-              <div className="space-y-2">
-                {filtered.map(p => (
-                  <ProfileRow
-                    key={p.id}
-                    profile={p}
-                    onView={openView}
-                    onEdit={openEdit}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        </CardContent>
-
-        {/* ── Modals ── */}
-        <DetailModal
-          profile={viewProfile}
-          open={viewOpen}
-          onClose={() => setViewOpen(false)}
-          onEdit={() => { setViewOpen(false); if (viewProfile) openEdit(viewProfile); }}
+        {/* Review Modal */}
+        <ReviewModal
+          profileId={reviewId}
+          open={modalOpen}
+          onClose={() => {
+            setModalOpen(false);
+            setReviewId(null);
+          }}
         />
-        <HRFillModal
-          profile={editProfile}
-          open={editOpen}
-          onClose={() => setEditOpen(false)}
-        />
-      </Card>
+      </div>
     </TooltipProvider>
   );
 };
