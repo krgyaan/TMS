@@ -685,6 +685,11 @@ export class ImprestAdminService {
         if (approve && voucher.adminSignedBy) {
             throw new BadRequestException("Voucher already approved by admin");
         }
+        
+        //check for ceo approval w/o accounts approval
+        if(approve && !voucher.accountsSignedBy){
+            throw new BadRequestException("Admin Approval can only be done once the Account Approval has been submitted");
+        }
 
         // 3️⃣ Fetch user signature
         const [profile] = await this.db.select({ signature: userProfiles.signature }).from(userProfiles).where(eq(userProfiles.userId, user.id)).limit(1);
