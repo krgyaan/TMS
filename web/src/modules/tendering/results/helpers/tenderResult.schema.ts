@@ -24,11 +24,12 @@ export const UploadResultSchema = z.object({
     path: ['disqualificationReason'],
 });
 
-export const CancelTenderSchema = z.object({
+export const ChangeStatusSchema = z.object({
+    statusId: z.number({ required_error: 'Status is required' }),
     resultReason: z.string().min(5, { message: 'Reason must be at least 5 characters long' }),
     finalResultScreenshot: z.string().min(1, { message: 'Proof of cancellation is required' }),
 });
 
 
 export type UploadResultFormValues = z.infer<typeof UploadResultSchema>;
-export type CancelTenderDto = z.infer<typeof CancelTenderSchema>;
+export type ChangeStatusDto = z.infer<typeof ChangeStatusSchema>;

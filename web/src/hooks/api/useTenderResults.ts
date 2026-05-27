@@ -124,11 +124,11 @@ export const useUploadResult = () => {
     });
 };
 
-export const uploadCancelledTenderResult= () => {
+export const uploadChangeStatusResult= () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({tenderId, data} : {tenderId: number, data: any}) => tenderResultService.uploadCancelledTenderResult(tenderId, data),
+        mutationFn: ({tenderId, data} : {tenderId: number, data: any}) => tenderResultService.uploadChangeStatusResult(tenderId, data),
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: tenderResultKey.lists() });
             queryClient.invalidateQueries({ queryKey: tenderResultKey.byTender(variables.tenderId) });

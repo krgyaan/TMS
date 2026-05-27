@@ -52,6 +52,8 @@ export const tenderResults = pgTable(
         // When result was uploaded
         resultUploadedAt: timestamp("result_uploaded_at", { withTimezone: true }),
 
+        tenderCancelledScreenshot: text("tender_cancelled_screenshot"),
+
         raStatus : varchar("ra_status" , {length : 50}),
         tqStatus : varchar("tq_status" , {length : 50}),
 

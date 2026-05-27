@@ -21,7 +21,7 @@ import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import { paymentInstruments, paymentRequests, tenderStatusHistory } from '@/db/schemas';
-import type { UploadResultDto, UploadTenderCancelledDto } from '@/modules/tendering/tender-result/dto/tender-result.dto';
+import type { UploadResultDto, UploadChangeStatusResultDto } from '@/modules/tendering/tender-result/dto/tender-result.dto';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { isThisSecond } from 'date-fns';
 
@@ -706,6 +706,15 @@ export class TenderResultService {
             );
         }
 
+        const isCompleteResult = dto.technicallyQualified === 'No' || !!dto.result;
+        if (isCompleteResult) {
+            if (existing.raStatus === 'pending' || existing.tqStatus === 'pending') {
+                throw new BadRequestException(
+                    'Cannot upload complete result while RA Status or TQ Status is pending.'
+                );
+            }
+        }
+
         const currentTender = await this.tenderInfosService.findById(tenderId);
         const prevStatus = currentTender?.status ?? null;
 
@@ -794,9 +803,31 @@ export class TenderResultService {
         return result;
     }
 
-    async cancelTender(tenderId : number, user: any, dto: UploadTenderCancelledDto){
+    async changeTenderResult(tenderId : number, user: any, dto: UploadChangeStatusResultDto){
+        //Formulating the logic for changing status
+        //-> entry inside result table
+        //-> entry inside the tender table
+        //-> entry inside tenderStatus
+
+        let validStatuses = [21, 18, 45, 46];
+        
         try{
-        //involves the logic for cancelling the tender
+        //getting the status info
+        let [status] = await this
+                        .db
+                        .select()
+                        .from(statuses)
+                        .where(eq(statuses.id, dto.statusId));
+
+        if(!status){
+            throw new NotFoundException("Requested Status not Found!");
+        }
+
+        if(!validStatuses.includes(status.id)){
+            throw new BadRequestException("Invalid status request made");
+        }
+
+        //involves the logic for changing the tender status
         const [tender] = await this.db.select()
             .from(tenderInfos)
             .where(eq(tenderInfos.id, tenderId));
@@ -805,7 +836,7 @@ export class TenderResultService {
             throw new NotFoundException(`Tender not found with id : ${tenderId}`);
         }
 
-        if(tender.status === 18){
+        if(tender.status === status.id){
             return { message: "Status already updated" };
         }
 
@@ -814,20 +845,51 @@ export class TenderResultService {
         //we will update the status
         await this.db
             .update(tenderInfos)
-            .set({status : 18})
+            .set({status : status.id})
             .where(eq(tenderInfos.id, tenderId));
 
         // Get or create tender result record
         const { id: resultId } = await this.getOrCreateForTender(tenderId);
 
-        // Update the tender result record with cancellation details
+        let newResultStatus: typeof RESULT_STATUS[keyof typeof RESULT_STATUS];
+        let result: string;
+
+        //we will use a switch statement to decide what all values will  be assigned 
+        // on the basis of the status that has been selected
+        switch (status.id) {
+            case 21: {
+                newResultStatus = RESULT_STATUS.DISQUALIFIED;
+                result = "EMD Paid Late";
+                break;
+            }
+            case 18: {
+                newResultStatus = RESULT_STATUS.CANCELLED;
+                result = "Tender Cancelled After Bidding";
+                break;
+            }
+            case 45: {
+                newResultStatus = RESULT_STATUS.LOST;
+                result = "PO not awarded (after L1, MSME Match)";
+                break;
+            }
+            case 46: {
+                newResultStatus = RESULT_STATUS.LOST;
+                result = "PO not awarded (Single Party)";
+                break;
+            }
+            default: {
+                throw new BadRequestException("Unhandled status id");
+            }
+        }
+
+        // Update the tender result record with new status details
         await this.db
             .update(tenderResults)
             .set({
-                status: RESULT_STATUS.CANCELLED,
-                result: 'Lost',
+                status: newResultStatus,
+                result: result,
                 resultReason: dto.resultReason,
-                finalResultScreenshot: dto.finalResultScreenshot,
+                tenderCancelledScreenshot: dto.finalResultScreenshot,
                 resultUploadedAt: new Date(),
                 updatedAt: new Date(),
             })
@@ -836,29 +898,29 @@ export class TenderResultService {
         //create tenderstatushistory log 
         await this.tenderStatusHistoryService.trackStatusChange(
             tenderId,
-            18,
+            status.id,
             user.sub,
             prevStatus,
-            "Tender Cancelled"
+            status.name,
         );
 
         //tender cancelled email sent
-        await this.sendTenderCancelledEmail(
-            {
-                tenderId: tenderId,
-                tenderName: tender.tenderName,
-                tenderLink: `${process.env.FRONTEND_URL}/tendering/results/${tenderId}`,
-                tenderNo: tender.tenderNo,
-                finalScreenshot: dto.finalResultScreenshot,
-                team: tender.team
-            },
-            dto,
-            user.sub
-        );
+        // await this.sendTenderCancelledEmail(
+        //     {
+        //         tenderId: tenderId,
+        //         tenderName: tender.tenderName,
+        //         tenderLink: `${process.env.FRONTEND_URL}/tendering/results/${tenderId}`,
+        //         tenderNo: tender.tenderNo,
+        //         finalScreenshot: dto.finalResultScreenshot,
+        //         team: tender.team
+        //     },
+        //     dto,
+        //     user.sub
+        // );
 
         // return the result
         return {
-            message: "Tender Cancelled Successfully"
+            message: "Tender Status Updated Successfully"
         }
         
         } catch (e){
