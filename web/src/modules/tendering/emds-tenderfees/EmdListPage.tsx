@@ -508,11 +508,16 @@ const EmdsAndTenderFeesPage = () => {
                 field: 'purpose',
                 headerName: 'Purpose',
                 width: 130,
-                cellRenderer: (params: any) => (
-                    <Badge variant="outline" className={`${PURPOSE_COLORS[params.value] || ''} font-medium`}>
-                        {params.value}
-                    </Badge>
-                ),
+                cellRenderer: (params: any) => {
+                    const displayValue = activeTab === 'others'
+                        ? (params.data?.detailPurpose || params.value)
+                        : params.value;
+                    return (
+                        <Badge variant="outline" className={`${PURPOSE_COLORS[displayValue] || ''} font-medium`}>
+                            {displayValue}
+                        </Badge>
+                    );
+                },
             },
             currencyCol<any>('amountRequired', {
                 field: "amountRequired",
@@ -527,8 +532,9 @@ const EmdsAndTenderFeesPage = () => {
                 headerName: 'Mode',
                 width: 120,
                 cellRenderer: (params: any) => {
+                    const reqType = activeTab === 'others' ? params.data?.requestType : '';
                     if (!params.value) return <span className="text-gray-400 text-sm">—</span>;
-                    return <span>{INSTRUMENT_LABELS[params.value] || params.value}</span>;
+                    return <span>{INSTRUMENT_LABELS[params.value] || params.value} <br />{reqType && <span className="text-xs text-muted-foreground">({reqType})</span>}</span>;
                 },
             },
             ...(activeTab === 'others' ? [{
@@ -555,6 +561,7 @@ const EmdsAndTenderFeesPage = () => {
                     if (!params.value) return <span className="text-gray-400">—</span>;
                     return formatDateTime(params.value);
                 },
+                hide: activeTab === 'others',
             },
             {
                 field: 'dueDate',

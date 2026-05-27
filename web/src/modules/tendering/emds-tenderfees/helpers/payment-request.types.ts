@@ -173,6 +173,7 @@ export interface PaymentRequestRow {
     instrumentStatus: string | null;
     displayStatus: string;
     createdAt: string | null;
+    detailPurpose: string | null;
 }
 
 export interface PaymentRequestRowWithTimer extends PaymentRequestRow {
