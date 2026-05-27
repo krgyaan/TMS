@@ -222,92 +222,84 @@ const ImprestAdminIndex: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <Card className="overflow-hidden border shadow-sm transition-all hover:shadow-md">
                     <CardContent className="p-0">
-                        <div className="p-5 pb-4">
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="p-2.5 bg-chart-3/10 rounded-xl text-chart-3 ring-1 ring-inset ring-chart-3/20">
-                                    <IndianRupee className="h-5 w-5" />
+                        <div className="p-3 pb-2">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="p-2 bg-chart-3/10 rounded-lg text-chart-3 ring-1 ring-inset ring-chart-3/20">
+                                    <IndianRupee className="h-4 w-4" />
                                 </div>
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/60 px-2.5 py-1 rounded-full border border-border/50">Current FY</span>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full border border-border/50">Current FY</span>
                             </div>
                             <div>
-                                <p className="text-sm font-medium text-muted-foreground mb-1">Amount Received</p>
-                                <h3 className="text-3xl font-bold text-foreground tracking-tight">{formatINR(totals.received.current)}</h3>
+                                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Amount Received</p>
+                                <h3 className="text-2xl font-bold text-foreground tracking-tight">{formatINR(totals.received.current)}</h3>
                             </div>
                         </div>
-                        <div className="bg-muted/30 border-t px-5 py-3">
-                            <div className="flex justify-between items-center">
-                                <span className="text-xs font-medium text-muted-foreground">Previous FY</span>
-                                <span className="text-xs font-bold text-foreground">{formatINR(totals.received.previous)}</span>
-                            </div>
+                        <div className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
+                            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Previous FY</span>
+                            <span className="text-[11px] font-bold text-foreground">{formatINR(totals.received.previous)}</span>
                         </div>
                     </CardContent>
                 </Card>
 
                 <Card className="overflow-hidden border shadow-sm transition-all hover:shadow-md">
                     <CardContent className="p-0">
-                        <div className="p-5 pb-4">
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="p-2.5 bg-primary/10 rounded-xl text-primary ring-1 ring-inset ring-primary/20">
-                                    <Receipt className="h-5 w-5" />
+                        <div className="p-3 pb-2">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="p-2 bg-primary/10 rounded-lg text-primary ring-1 ring-inset ring-primary/20">
+                                    <Receipt className="h-4 w-4" />
                                 </div>
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/60 px-2.5 py-1 rounded-full border border-border/50">Current FY</span>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full border border-border/50">Current FY</span>
                             </div>
                             <div>
-                                <p className="text-sm font-medium text-muted-foreground mb-1">Amount Spent</p>
-                                <h3 className="text-3xl font-bold text-foreground tracking-tight">{formatINR(totals.spent.current)}</h3>
+                                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Amount Spent</p>
+                                <h3 className="text-2xl font-bold text-foreground tracking-tight">{formatINR(totals.spent.current)}</h3>
                             </div>
                         </div>
-                        <div className="bg-muted/30 border-t px-5 py-3">
-                            <div className="flex justify-between items-center">
-                                <span className="text-xs font-medium text-muted-foreground">Previous FY</span>
-                                <span className="text-xs font-bold text-foreground">{formatINR(totals.spent.previous)}</span>
-                            </div>
+                        <div className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
+                            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Previous FY</span>
+                            <span className="text-[11px] font-bold text-foreground">{formatINR(totals.spent.previous)}</span>
                         </div>
                     </CardContent>
                 </Card>
 
                 <Card className="overflow-hidden border shadow-sm transition-all hover:shadow-md">
                     <CardContent className="p-0">
-                        <div className="p-5 pb-4">
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="p-2.5 bg-chart-2/10 rounded-xl text-chart-2 ring-1 ring-inset ring-chart-2/20">
-                                    <FileText className="h-5 w-5" />
+                        <div className="p-3 pb-2">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="p-2 bg-chart-2/10 rounded-lg text-chart-2 ring-1 ring-inset ring-chart-2/20">
+                                    <FileText className="h-4 w-4" />
                                 </div>
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/60 px-2.5 py-1 rounded-full border border-border/50">Current FY</span>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full border border-border/50">Current FY</span>
                             </div>
                             <div>
-                                <p className="text-sm font-medium text-muted-foreground mb-1">Amount Approved</p>
-                                <h3 className="text-3xl font-bold text-foreground tracking-tight">{formatINR(totals.approved.current)}</h3>
+                                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Amount Approved</p>
+                                <h3 className="text-2xl font-bold text-foreground tracking-tight">{formatINR(totals.approved.current)}</h3>
                             </div>
                         </div>
-                        <div className="bg-muted/30 border-t px-5 py-3">
-                            <div className="flex justify-between items-center">
-                                <span className="text-xs font-medium text-muted-foreground">Previous FY</span>
-                                <span className="text-xs font-bold text-foreground">{formatINR(totals.approved.previous)}</span>
-                            </div>
+                        <div className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
+                            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Previous FY</span>
+                            <span className="text-[11px] font-bold text-foreground">{formatINR(totals.approved.previous)}</span>
                         </div>
                     </CardContent>
                 </Card>
 
                 <Card className="overflow-hidden border shadow-sm transition-all hover:shadow-md">
                     <CardContent className="p-0">
-                        <div className="p-5 pb-4">
-                            <div className="flex items-center justify-between mb-4">
-                                <div className="p-2.5 bg-chart-5/10 rounded-xl text-chart-5 ring-1 ring-inset ring-chart-5/20">
-                                    <LayoutDashboard className="h-5 w-5" />
+                        <div className="p-3 pb-2">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="p-2 bg-chart-5/10 rounded-lg text-chart-5 ring-1 ring-inset ring-chart-5/20">
+                                    <LayoutDashboard className="h-4 w-4" />
                                 </div>
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/60 px-2.5 py-1 rounded-full border border-border/50">Current FY</span>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full border border-border/50">Current FY</span>
                             </div>
                             <div>
-                                <p className="text-sm font-medium text-muted-foreground mb-1">Amount Left</p>
-                                <h3 className="text-3xl font-bold text-foreground tracking-tight">{formatINR(totals.left.current)}</h3>
+                                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Amount Left</p>
+                                <h3 className="text-2xl font-bold text-foreground tracking-tight">{formatINR(totals.left.current)}</h3>
                             </div>
                         </div>
-                        <div className="bg-muted/30 border-t px-5 py-3">
-                            <div className="flex justify-between items-center">
-                                <span className="text-xs font-medium text-muted-foreground">Previous FY</span>
-                                <span className="text-xs font-bold text-foreground">{formatINR(totals.left.previous)}</span>
-                            </div>
+                        <div className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
+                            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Previous FY</span>
+                            <span className="text-[11px] font-bold text-foreground">{formatINR(totals.left.previous)}</span>
                         </div>
                     </CardContent>
                 </Card>
@@ -317,7 +309,7 @@ const ImprestAdminIndex: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card className="overflow-hidden border shadow-sm transition-all hover:shadow-md">
                     <CardContent className="p-0">
-                        <div className="p-4 pb-3 flex items-center justify-between">
+                        <div className="p-3 pb-2 flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-muted rounded-lg text-muted-foreground ring-1 ring-inset ring-border/50">
                                     <FileText className="h-4 w-4" />
@@ -329,7 +321,7 @@ const ImprestAdminIndex: React.FC = () => {
                             </div>
                             <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/40 px-2 py-0.5 rounded-full">Current FY</span>
                         </div>
-                        <div className="bg-muted/30 border-t px-4 py-2 flex justify-between items-center">
+                        <div className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
                             <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Previous FY</span>
                             <span className="text-[11px] font-bold text-foreground">{totals.totalVouchers.previous}</span>
                         </div>
@@ -338,7 +330,7 @@ const ImprestAdminIndex: React.FC = () => {
 
                 <Card className="overflow-hidden border shadow-sm transition-all hover:shadow-md">
                     <CardContent className="p-0">
-                        <div className="p-4 pb-3 flex items-center justify-between">
+                        <div className="p-3 pb-2 flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-primary/10 rounded-lg text-primary ring-1 ring-inset ring-primary/20">
                                     <FileText className="h-4 w-4" />
@@ -350,7 +342,7 @@ const ImprestAdminIndex: React.FC = () => {
                             </div>
                             <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/40 px-2 py-0.5 rounded-full">Current FY</span>
                         </div>
-                        <div className="bg-muted/30 border-t px-4 py-2 flex justify-between items-center">
+                        <div className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
                             <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Previous FY</span>
                             <span className="text-[11px] font-bold text-foreground">{totals.accountsApproved.previous}</span>
                         </div>
@@ -359,7 +351,7 @@ const ImprestAdminIndex: React.FC = () => {
 
                 <Card className="overflow-hidden border shadow-sm transition-all hover:shadow-md">
                     <CardContent className="p-0">
-                        <div className="p-4 pb-3 flex items-center justify-between">
+                        <div className="p-3 pb-2 flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <div className="p-2 bg-chart-2/10 rounded-lg text-chart-2 ring-1 ring-inset ring-chart-2/20">
                                     <FileText className="h-4 w-4" />
@@ -371,7 +363,7 @@ const ImprestAdminIndex: React.FC = () => {
                             </div>
                             <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/40 px-2 py-0.5 rounded-full">Current FY</span>
                         </div>
-                        <div className="bg-muted/30 border-t px-4 py-2 flex justify-between items-center">
+                        <div className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
                             <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Previous FY</span>
                             <span className="text-[11px] font-bold text-foreground">{totals.adminApproved.previous}</span>
                         </div>
