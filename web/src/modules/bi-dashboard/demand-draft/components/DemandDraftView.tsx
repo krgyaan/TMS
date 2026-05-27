@@ -61,7 +61,6 @@ function CourierAddressBlock({ addressJson, address }: { addressJson: Record<str
 
 function CourierDetailsBlock({ details }: { details: any }) {
     if (!details) return <span className="text-muted-foreground italic">Not available</span>;
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1';
     return (
         <div className="space-y-0.5">
             <div><span className="font-medium">Organisation:</span> {details.toOrg || '—'}</div>
@@ -74,7 +73,7 @@ function CourierDetailsBlock({ details }: { details: any }) {
             {details.docketSlip && (
                 <div>
                     <span className="font-medium">Docket Slip:</span>{' '}
-                    <a href={`${apiUrl}/tender-files/serve/${details.docketSlip}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
+                    <a href={`/uploads/courier/${details.docketSlip}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
                         <Eye className="h-3 w-3" /> View
                     </a>
                 </div>
@@ -82,12 +81,28 @@ function CourierDetailsBlock({ details }: { details: any }) {
             {details.deliveryPod && (
                 <div>
                     <span className="font-medium">Proof of Delivery:</span>{' '}
-                    <a href={`${apiUrl}/tender-files/serve/${details.deliveryPod}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
+                    <a href={`/uploads/courier/${details.deliveryPod}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
                         <Eye className="h-3 w-3" /> View
                     </a>
                 </div>
             )}
+            {details.pickupDate && <div><span className="font-medium">Pickup Date:</span> {formatDate(details.pickupDate)}</div>}
             {details.deliveryDate && <div><span className="font-medium">Delivery Date:</span> {formatDate(details.deliveryDate)}</div>}
+            {details.courierDocs && details.courierDocs.length > 0 && (
+                <div>
+                    <span className="font-medium">Courier Docs:</span>
+                    <div className="ml-4 space-y-1 mt-1">
+                        {details.courierDocs.map((doc: string, i: number) => (
+                            <div key={i} className="flex items-center gap-2">
+                                <span className="text-sm text-muted-foreground">{doc}</span>
+                                <a href={`/uploads/courier/${doc}`} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1">
+                                    <Eye className="h-3 w-3" /> View
+                                </a>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -181,47 +196,47 @@ export function DemandDraftView({
                             <TableCell className="text-sm">
                                 {data.ddPurpose || '—'}
                             </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 DD Needed In
                             </TableCell>
                             <TableCell className="text-sm">
                                 {data.ddNeeds || '—'} Hours
                             </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Favouring
                             </TableCell>
                             <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
                                 {data.favouring || '—'}
                             </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Payable At
                             </TableCell>
                             <TableCell className="text-sm">
                                 {data.payableAt || '—'}
                             </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Issue Date
                             </TableCell>
                             <TableCell className="text-sm">
                                 {data.issueDate ? formatDate(data.issueDate) : '—'}
                             </TableCell>
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Requested By
-                            </TableCell>
-                            <TableCell className="text-sm">
-                                {data.requestedByName || '—'}
-                            </TableCell>
                         </TableRow>
                         <TableRow className="hover:bg-muted/30 transition-colors">
                             <TableCell className="text-sm font-medium text-muted-foreground">
                                 Courier Address
                             </TableCell>
-                            <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]" colSpan={3}>
+                            <TableCell className="text-sm whitespace-normal [overflow-wrap:anywhere]">
                                 <CourierAddressBlock addressJson={data.courierAddressJson} address={data.courierAddress} />
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Requested By
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {data.requestedByName || '—'}
                             </TableCell>
                         </TableRow>
                         {data.requestRemarks && (

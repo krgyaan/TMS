@@ -556,6 +556,33 @@ const EmdsAndTenderFeesPage = () => {
                     return formatDateTime(params.value);
                 },
             },
+            {
+                field: 'dueDate',
+                headerName: 'Due Date',
+                width: 140,
+                cellRenderer: (params: any) => {
+                    if (!params.value) return <span className="text-gray-400">—</span>;
+                    const dueDate = new Date(params.value);
+                    const isOverdue = dueDate < new Date();
+                    const isUpcoming = dueDate <= new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+                    return (
+                        <span className={`${isOverdue ? 'text-red-600 font-medium' : isUpcoming ? 'text-orange-600' : ''}`}>
+                            {formatDateTime(params.value)}
+                        </span>
+                    );
+                },
+                sortable: true,
+            },
+            ...(activeTab === 'paid' ? [{
+                field: 'bidSubmissionDate' as const,
+                headerName: 'Bid Submission Date',
+                width: 160,
+                cellRenderer: (params: any) => {
+                    if (!params.value) return <span className="text-gray-400">—</span>;
+                    return formatDateTime(params.value);
+                },
+                sortable: true,
+            }] : []),
             teamMemberCol,
             timerCol,
             actionCol,

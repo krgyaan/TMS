@@ -378,6 +378,7 @@ export interface PaymentRequestRow {
     requestType: string | null;
     dueDate: Date | null;
     bidValid: Date | null;
+    bidSubmissionDate: Date | null;
     teamMember: string | null;
     instrumentId: number | null;
     instrumentType: InstrumentType | null;

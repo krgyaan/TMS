@@ -16,17 +16,10 @@ class WoBasicDetailsService extends BaseApiService {
     if (filters.sortBy) params.set('sortBy', filters.sortBy);
     if (filters.sortOrder) params.set('sortOrder', filters.sortOrder);
     if (filters.search) params.set('search', filters.search);
-    if (filters.tenderId) params.set('tenderId', String(filters.tenderId));
-    if (filters.enquiryId) params.set('enquiryId', String(filters.enquiryId));
-    if (filters.projectCode) params.set('projectCode', filters.projectCode);
-    if (filters.projectName) params.set('projectName', filters.projectName);
-    if (filters.currentStage) params.set('currentStage', filters.currentStage);
+    if (filters.tab) params.set('tab', filters.tab);
     if (filters.teamId) params.set('teamId', String(filters.teamId));
     if (filters.userId) params.set('userId', String(filters.userId));
     if (filters.dataScope) params.set('dataScope', filters.dataScope);
-    if (filters.oeFirst) params.set('oeFirst', String(filters.oeFirst));
-    if (filters.oeSiteVisit) params.set('oeSiteVisit', String(filters.oeSiteVisit));
-    if (filters.oeDocsPrep) params.set('oeDocsPrep', String(filters.oeDocsPrep));
     if (filters.isWorkflowPaused !== undefined) {
       params.set('isWorkflowPaused', String(filters.isWorkflowPaused));
     }

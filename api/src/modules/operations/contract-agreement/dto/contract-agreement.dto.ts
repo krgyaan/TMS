@@ -26,4 +26,7 @@ export interface ContractAgreementDashboardRow {
     clientAndVeSigned: string | null;
     clientAndVeSignedDate: Date | null;
     teamMemberName: string | null;
+    oeFirstName: string | null;
+    oeSiteVisitName: string | null;
+    oeDocsPrepName: string | null;
 }

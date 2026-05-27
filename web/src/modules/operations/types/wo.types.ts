@@ -177,24 +177,15 @@ export interface WoBasicDetailsFilters {
   search?: string;
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
-  tenderId?: number;
-  enquiryId?: number;
+  tab?: 'basic_details' | 'wo_details' | 'completed';
   teamId?: number;
   userId?: number;
   dataScope?: string;
-  unallocated?: boolean;
-  projectCode?: string;
-  projectName?: string;
-  currentStage?: WorkflowStage;
-  oeFirst?: number;
-  oeSiteVisit?: number;
-  oeDocsPrep?: number;
   isWorkflowPaused?: boolean;
   woDateFrom?: string;
   woDateTo?: string;
   createdAtFrom?: string;
   createdAtTo?: string;
-  status?: number[];
 }
 
 export interface WoBasicDetailPrefillData {
@@ -234,8 +225,6 @@ export interface WoBasicDetailsDashboardSummary {
     total: number;
     basicDetails: number;
     woDetails: number;
-    woAcceptance: number;
-    woUpload: number;
     completed: number;
     paused: number;
   };
@@ -403,6 +392,9 @@ export interface WoDetailsListResponseDto {
   ldApplicable: boolean;
   isContractAgreement: boolean;
   oeWoAmendmentNeeded: boolean;
+  oeFirstName: string | null;
+  oeSiteVisitName: string | null;
+  oeDocsPrepName: string | null;
   status: WoDetailsStatus;
   woAcceptanceId: number | null;
   woAcceptanceStatus: WoAcceptanceStatus | null;
@@ -1135,6 +1127,9 @@ export interface KickOffListDto {
   meetingLink: string | null;
   momFilePath: string | null;
   teamMember: string;
+  oeFirstName: string | null;
+  oeSiteVisitName: string | null;
+  oeDocsPrepName: string | null;
 }
 
 export interface KickoffMeeting {
@@ -1192,6 +1187,9 @@ export interface ContractAgreementListDto {
   clientAndVeSigned: string | null;
   clientAndVeSignedDate: string | null;
   teamMember: string;
+  oeFirstName: string | null;
+  oeSiteVisitName: string | null;
+  oeDocsPrepName: string | null;
 }
 
 export interface ContractAgreement {
