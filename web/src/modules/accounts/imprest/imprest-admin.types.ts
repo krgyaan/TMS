@@ -1,11 +1,35 @@
+export interface ImprestStats {
+    amountSpent: number;
+    amountApproved: number;
+    amountReceived: number;
+    amountLeft: number;
+
+    voucherInfo?: {
+        totalVouchers: number;
+        accountsApproved: number;
+        adminApproved: number;
+    };
+}
+
 export interface EmployeeImprestSummary {
     userId: number;
     userName: string;
 
+    // Totals
     amountReceived: number;
     amountSpent: number;
     amountApproved: number;
     amountLeft: number;
+
+    voucherInfo?: {
+        totalVouchers: number;
+        accountsApproved: number;
+        adminApproved: number;
+    };
+
+    // Segregated
+    current: ImprestStats;
+    previous: ImprestStats;
 }
 
 export interface CreateImprestCreditPayload {
