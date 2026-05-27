@@ -63,7 +63,6 @@ const ImprestVoucherList: React.FC = () => {
                     return p.data?.voucherCode ? p.data.voucherCode : "-";
                 },
             },
-
             // ✅ Voucher Period column (Year + Week + Range)
             {
                 headerName: "Voucher Period",
@@ -94,7 +93,7 @@ const ImprestVoucherList: React.FC = () => {
                 headerName: "Accountant Approval",
                 autoHeight: true,
                 cellRenderer: (p: any) => {
-                    const remark = p.data?.accountantRemark;
+                    const remark = p.data?.accountsRemark;
 
                     return (
                         <div className="flex flex-col gap-1 py-2">
