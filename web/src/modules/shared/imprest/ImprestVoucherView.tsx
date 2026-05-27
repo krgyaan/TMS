@@ -619,23 +619,30 @@ const ImprestVoucherView: React.FC = () => {
                             />
                         </div>
 
-                        <div className="flex items-start gap-3 p-4 bg-muted/40 border rounded-lg">
-                            <input 
-                                type="checkbox" 
-                                id="acc-approve"
-                                checked={accApprove} 
-                                onChange={e => setAccApprove(e.target.checked)} 
-                                className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                            />
-                            <div className="space-y-1">
-                                <label htmlFor="acc-approve" className="text-sm font-medium leading-none cursor-pointer">
-                                    Approve Voucher
-                        </label> 
+                        {!voucher?.accountsSignedBy ? (
+                            <div className="flex items-start gap-3 p-4 bg-muted/40 border rounded-lg">
+                                <input 
+                                    type="checkbox" 
+                                    id="acc-approve"
+                                    checked={accApprove} 
+                                    onChange={e => setAccApprove(e.target.checked)} 
+                                    className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                />
+                                <div className="space-y-1">
+                                    <label htmlFor="acc-approve" className="text-sm font-medium leading-none cursor-pointer">
+                                        Approve Voucher
+                                    </label> 
                                 {/* <p className="text-sm text-muted-foreground">
                                     By checking this, you officially mark the voucher as Accounts Approved.
                                 </p> */}
+                                </div>
                             </div>
-                        </div>
+                        ) : (
+                            <div className="flex items-center gap-2 p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                                <CheckCircle className="h-5 w-5 text-green-600" />
+                                <span className="text-sm font-medium text-green-700">Already Approved by Accounts</span>
+                            </div>
+                        )}
 
                         <div className="flex justify-end gap-3 pt-2">
                             <Button type="button" variant="outline" onClick={() => setAccModalOpen(false)} className="w-24">
@@ -671,26 +678,33 @@ const ImprestVoucherView: React.FC = () => {
                             />
                         </div>
 
-                        <div className={`flex items-start gap-3 p-4 border rounded-lg ${!voucher?.accountsSignedBy ? "bg-muted/60 opacity-80" : "bg-muted/40"}`}>
-                            <input 
-                                type="checkbox" 
-                                id="admin-approve"
-                                checked={adminApprove} 
-                                disabled={!voucher?.accountsSignedBy}
-                                onChange={e => setAdminApprove(e.target.checked)} 
-                                className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary disabled:cursor-not-allowed"
-                            />
-                            <div className="space-y-1">
-                                <label htmlFor="admin-approve" className={`text-sm font-medium leading-none ${!voucher?.accountsSignedBy ? "cursor-not-allowed" : "cursor-pointer"}`}>
-                                    Approve this voucher
-                                </label>
-                                {!voucher?.accountsSignedBy && (
-                                    <p className="text-xs font-medium text-destructive mt-1">
-                                        Accounts approval is required first.
-                                    </p>
-                                )}
+                        {!voucher?.adminSignedBy ? (
+                            <div className={`flex items-start gap-3 p-4 border rounded-lg ${!voucher?.accountsSignedBy ? "bg-muted/60 opacity-80" : "bg-muted/40"}`}>
+                                <input 
+                                    type="checkbox" 
+                                    id="admin-approve"
+                                    checked={adminApprove} 
+                                    disabled={!voucher?.accountsSignedBy}
+                                    onChange={e => setAdminApprove(e.target.checked)} 
+                                    className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary disabled:cursor-not-allowed"
+                                />
+                                <div className="space-y-1">
+                                    <label htmlFor="admin-approve" className={`text-sm font-medium leading-none ${!voucher?.accountsSignedBy ? "cursor-not-allowed" : "cursor-pointer"}`}>
+                                        Approve this voucher
+                                    </label>
+                                    {!voucher?.accountsSignedBy && (
+                                        <p className="text-xs font-medium text-destructive mt-1">
+                                            Accounts approval is required first.
+                                        </p>
+                                    )}
+                                </div>
                             </div>
-                        </div>
+                        ) : (
+                            <div className="flex items-center gap-2 p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                                <CheckCircle className="h-5 w-5 text-green-600" />
+                                <span className="text-sm font-medium text-green-700">Already Approved by CEO</span>
+                            </div>
+                        )}
 
                         <div className="flex justify-end gap-3 pt-2">
                             <Button type="button" variant="outline" onClick={() => setAdminModalOpen(false)} className="w-24">
