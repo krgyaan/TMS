@@ -1,9 +1,9 @@
 import React, { useEffect } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, MessageSquare, CheckCircle, Printer, Loader2, ShieldAlert, AlertCircle, FileQuestion } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 
 import { useImprestVoucherView, useAccountApproveVoucher, useAdminApproveVoucher } from "./imprest.hooks";
@@ -93,15 +93,64 @@ const ImprestVoucherView: React.FC = () => {
     }, [proofs, preview])
 
     if (!canRead("shared.imprests")) {
-        return <div className="p-6">Access denied</div>;
+        return (
+            <div className="flex h-[80vh] flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in duration-300">
+                <div className="bg-destructive/10 p-4 rounded-full mb-4">
+                    <ShieldAlert className="h-10 w-10 text-destructive" />
+                </div>
+                <h2 className="text-2xl font-semibold tracking-tight">Access Denied</h2>
+                <p className="text-muted-foreground mt-2 max-w-sm">
+                    You do not have the required permissions to view imprest vouchers. Please contact your administrator.
+                </p>
+                <Button variant="outline" className="mt-6" onClick={() => navigate(-1)}>
+                    <ArrowLeft className="h-4 w-4 mr-2" /> Go Back
+                </Button>
+            </div>
+        );
     }
     
     if (!userId || !from || !to) {
-        return <div className="p-6">Invalid voucher link</div>;
+        return (
+            <div className="flex h-[80vh] flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in duration-300">
+                <div className="bg-orange-500/10 p-4 rounded-full mb-4">
+                    <AlertCircle className="h-10 w-10 text-orange-500" />
+                </div>
+                <h2 className="text-2xl font-semibold tracking-tight">Invalid Link</h2>
+                <p className="text-muted-foreground mt-2 max-w-sm">
+                    The voucher link is incomplete or malformed. Please verify the URL and try again.
+                </p>
+                <Button variant="outline" className="mt-6" onClick={() => navigate(-1)}>
+                    <ArrowLeft className="h-4 w-4 mr-2" /> Go Back
+                </Button>
+            </div>
+        );
     }
     
-    if (isLoading) return <div className="p-6">Loading…</div>;
-    if (!data) return <div className="p-6">Voucher not found</div>;
+    if (isLoading) {
+        return (
+            <div className="flex h-[80vh] flex-col items-center justify-center p-6 text-center">
+                <Loader2 className="h-10 w-10 text-primary animate-spin mb-4" />
+                <h2 className="text-xl font-medium text-muted-foreground animate-pulse">Loading Voucher...</h2>
+            </div>
+        );
+    }
+
+    if (!data) {
+        return (
+            <div className="flex h-[80vh] flex-col items-center justify-center p-6 text-center animate-in fade-in zoom-in duration-300">
+                <div className="bg-muted p-4 rounded-full mb-4">
+                    <FileQuestion className="h-10 w-10 text-muted-foreground" />
+                </div>
+                <h2 className="text-2xl font-semibold tracking-tight">Voucher Not Found</h2>
+                <p className="text-muted-foreground mt-2 max-w-sm">
+                    We couldn't find the voucher you're looking for. It may have been deleted or the dates might be incorrect.
+                </p>
+                <Button variant="outline" className="mt-6" onClick={() => navigate(-1)}>
+                    <ArrowLeft className="h-4 w-4 mr-2" /> Go Back
+                </Button>
+            </div>
+        );
+    }
 
 
     const totalAmount = items.reduce((sum, i) => sum + i.amount, 0);
@@ -352,21 +401,72 @@ const ImprestVoucherView: React.FC = () => {
                 </table>
             </div>
 
-            {/* ---------------- Actions ---------------- */}
-            <div className="voucher-actions">
-                {canMutateStatus &&  (
-                    <Button variant="outline" onClick={() => setAccModalOpen(true)}>
-                        Approve by Accounts
-                    </Button>
-                )}
+            {/* ---------------- Remarks & Actions ---------------- */}
+            <div className="mt-8 flex flex-col gap-6 border-t pt-6 print:hidden">
+                {/* Remarks Section */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="bg-muted/30 border border-border/50 rounded-xl p-4 flex gap-3 items-start transition-colors hover:bg-muted/50">
+                        <div className="p-2 bg-muted text-muted-foreground rounded-lg shrink-0">
+                            <MessageSquare className="h-4 w-4" />
+                        </div>
+                        <div className="space-y-1 mt-0.5">
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Accounts Comment</p>
+                            {voucher?.accountsRemark ? (
+                                <p className="text-sm font-medium text-foreground">{voucher.accountsRemark}</p>
+                            ) : (
+                                <span className="inline-flex items-center rounded-md bg-muted/60 px-2 py-0.5 text-xs font-medium text-muted-foreground ring-1 ring-inset ring-border italic">
+                                    No comment added
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                    <div className="bg-muted/30 border border-border/50 rounded-xl p-4 flex gap-3 items-start transition-colors hover:bg-muted/50">
+                        <div className="p-2 bg-muted text-muted-foreground rounded-lg shrink-0">
+                            <MessageSquare className="h-4 w-4" />
+                        </div>
+                        <div className="space-y-1 mt-0.5">
+                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">CEO Comment</p>
+                            {voucher?.adminRemark ? (
+                                <p className="text-sm font-medium text-foreground">{voucher.adminRemark}</p>
+                            ) : (
+                                <span className="inline-flex items-center rounded-md bg-muted/60 px-2 py-0.5 text-xs font-medium text-muted-foreground ring-1 ring-inset ring-border italic">
+                                    No comment added
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                </div>
 
-                {canMutateStatus &&  (
-                    <Button variant="outline" onClick={() => setAdminModalOpen(true)}>
-                        Approve by CEO
-                    </Button>
-                )}
+                {/* Actions Section */}
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                    {canMutateStatus && (
+                        <Button 
+                            variant="default" 
+                            onClick={() => setAccModalOpen(true)}
+                        >
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Approve by Accounts
+                        </Button>
+                    )}
 
-                <Button onClick={handleExportPDF}>Print</Button>
+                    {canMutateStatus && (
+                        <Button 
+                            variant="default" 
+                            onClick={() => setAdminModalOpen(true)}
+                        >
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Approve by CEO
+                        </Button>
+                    )}
+
+                    <Button 
+                        variant="outline" 
+                        onClick={handleExportPDF}
+                    >
+                        <Printer className="h-4 w-4 mr-2" />
+                        Print Voucher
+                    </Button>
+                </div>
             </div>
 
             {/* ---------------- Proofs ---------------- */}
@@ -500,24 +600,56 @@ const ImprestVoucherView: React.FC = () => {
 
             {/* Accounts Modal */}
             <Dialog open={accModalOpen} onOpenChange={setAccModalOpen}>
-                <DialogContent>
+                <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Approve by Accounts</DialogTitle>
+                        <DialogTitle className="text-xl">Accounts Approval</DialogTitle>
+                        <DialogDescription>
+                            Add an optional remark and confirm your approval for this imprest voucher.
+                        </DialogDescription>
                     </DialogHeader>
 
-                    <form onSubmit={handleAccountSubmit} className="space-y-4">
-                        <Textarea placeholder="Remark" value={remark} onChange={e => setRemark(e.target.value)} />
+                    <form onSubmit={handleAccountSubmit} className="space-y-6 pt-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-semibold text-foreground">Remark (Optional)</label>
+                            <Textarea 
+                                placeholder="Add any comments or notes here..." 
+                                value={remark} 
+                                onChange={e => setRemark(e.target.value)} 
+                                className="resize-none h-24 p-2"
+                            />
+                        </div>
 
-                        <label className="flex items-center gap-2">
-                            <input type="checkbox" checked={accApprove} onChange={e => setAccApprove(e.target.checked)} />
-                            Approve it
-                        </label>
+                        {!voucher?.accountsSignedBy ? (
+                            <div className="flex items-start gap-3 p-4 bg-muted/40 border rounded-lg">
+                                <input 
+                                    type="checkbox" 
+                                    id="acc-approve"
+                                    checked={accApprove} 
+                                    onChange={e => setAccApprove(e.target.checked)} 
+                                    className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                />
+                                <div className="space-y-1">
+                                    <label htmlFor="acc-approve" className="text-sm font-medium leading-none cursor-pointer">
+                                        Approve Voucher
+                                    </label> 
+                                {/* <p className="text-sm text-muted-foreground">
+                                    By checking this, you officially mark the voucher as Accounts Approved.
+                                </p> */}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-2 p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                                <CheckCircle className="h-5 w-5 text-green-600" />
+                                <span className="text-sm font-medium text-green-700">Already Approved by Accounts</span>
+                            </div>
+                        )}
 
-                        <div className="flex justify-end gap-2">
-                            <Button type="button" variant="outline" onClick={() => setAccModalOpen(false)}>
+                        <div className="flex justify-end gap-3 pt-2">
+                            <Button type="button" variant="outline" onClick={() => setAccModalOpen(false)} className="w-24">
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={accountApproveMutation.isLoading}>
+                            <Button type="submit" disabled={accountApproveMutation.isLoading} className="w-32">
+                                {accountApproveMutation.isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-2" />}
                                 Submit
                             </Button>
                         </div>
@@ -527,24 +659,59 @@ const ImprestVoucherView: React.FC = () => {
 
             {/* Admin Modal */}
             <Dialog open={adminModalOpen} onOpenChange={setAdminModalOpen}>
-                <DialogContent>
+                <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Approve by CEO</DialogTitle>
+                        <DialogTitle className="text-xl">CEO Approval</DialogTitle>
+                        <DialogDescription>
+                            Add an optional remark and confirm your approval for this imprest voucher.
+                        </DialogDescription>
                     </DialogHeader>
 
-                    <form onSubmit={handleAdminSubmit} className="space-y-4">
-                        <Textarea placeholder="Remark" value={remark} onChange={e => setRemark(e.target.value)} />
+                    <form onSubmit={handleAdminSubmit} className="space-y-6 pt-4">
+                        <div className="space-y-2">
+                            <label className="text-sm font-semibold text-foreground">Remark (Optional)</label>
+                            <Textarea 
+                                placeholder="Add any comments or notes here..." 
+                                value={remark} 
+                                onChange={e => setRemark(e.target.value)} 
+                                className="resize-none h-24 p-2"
+                            />
+                        </div>
 
-                        <label className="flex items-center gap-2">
-                            <input type="checkbox" checked={adminApprove} onChange={e => setAdminApprove(e.target.checked)} />
-                            Approve it
-                        </label>
+                        {!voucher?.adminSignedBy ? (
+                            <div className={`flex items-start gap-3 p-4 border rounded-lg ${!voucher?.accountsSignedBy ? "bg-muted/60 opacity-80" : "bg-muted/40"}`}>
+                                <input 
+                                    type="checkbox" 
+                                    id="admin-approve"
+                                    checked={adminApprove} 
+                                    disabled={!voucher?.accountsSignedBy}
+                                    onChange={e => setAdminApprove(e.target.checked)} 
+                                    className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary disabled:cursor-not-allowed"
+                                />
+                                <div className="space-y-1">
+                                    <label htmlFor="admin-approve" className={`text-sm font-medium leading-none ${!voucher?.accountsSignedBy ? "cursor-not-allowed" : "cursor-pointer"}`}>
+                                        Approve this voucher
+                                    </label>
+                                    {!voucher?.accountsSignedBy && (
+                                        <p className="text-xs font-medium text-destructive mt-1">
+                                            Accounts approval is required first.
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-2 p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                                <CheckCircle className="h-5 w-5 text-green-600" />
+                                <span className="text-sm font-medium text-green-700">Already Approved by CEO</span>
+                            </div>
+                        )}
 
-                        <div className="flex justify-end gap-2">
-                            <Button type="button" variant="outline" onClick={() => setAdminModalOpen(false)}>
+                        <div className="flex justify-end gap-3 pt-2">
+                            <Button type="button" variant="outline" onClick={() => setAdminModalOpen(false)} className="w-24">
                                 Cancel
                             </Button>
-                            <Button type="submit" disabled={adminApproveMutation.isLoading}>
+                            <Button type="submit" disabled={adminApproveMutation.isLoading} className="w-32">
+                                {adminApproveMutation.isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-2" />}
                                 Submit
                             </Button>
                         </div>
