@@ -143,17 +143,29 @@ const ImprestAdminIndex: React.FC = () => {
                 cellStyle: { textAlign: "center" },
             },
             {
-                headerName: "Accounts Approved",
-                field: "voucherInfo.accountsApproved",
+                headerName: "Accounts Pending",
+                wrapHeaderText: true,
+                autoHeaderHeight: true,
+                valueGetter: (p: any) => {
+                    const total = p.data?.voucherInfo?.totalVouchers || 0;
+                    const approved = p.data?.voucherInfo?.accountsApproved || 0;
+                    return total - approved;
+                },
                 filter: "agNumberColumnFilter",
                 width: 160,
                 cellStyle: { textAlign: "center" },
             },
             {
-                headerName: "Admin Approved",
-                field: "voucherInfo.adminApproved",
+                headerName: "Admin Pending",
+                wrapHeaderText: true,
+                autoHeaderHeight: true,
+                valueGetter: (p: any) => {
+                    const total = p.data?.voucherInfo?.totalVouchers || 0;
+                    const approved = p.data?.voucherInfo?.adminApproved || 0;
+                    return total - approved;
+                },
                 filter: "agNumberColumnFilter",
-                width: 140,
+                width: 160,
                 cellStyle: { textAlign: "center" },
             },
 
