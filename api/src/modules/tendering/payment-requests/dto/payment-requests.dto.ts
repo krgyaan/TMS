@@ -386,6 +386,7 @@ export interface PaymentRequestRow {
     favouring: string | null;
     displayStatus: string;
     createdAt: Date | null;
+    detailPurpose: string | null;
 }
 
 export interface DashboardCounts {

@@ -389,6 +389,10 @@ export class PaymentRequestsQueryService {
                 eq(paymentInstruments.isActive, true)
             ))
             .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(instrumentDdDetails, eq(instrumentDdDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(instrumentFdrDetails, eq(instrumentFdrDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id))
             .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
             .where(whereClause);
 
@@ -416,6 +420,15 @@ export class PaymentRequestsQueryService {
                 favouring: paymentInstruments.favouring,
                 bidSubmissionDate: bidSubmissions.submissionDatetime,
                 createdAt: paymentRequests.createdAt,
+                detailPurpose: sql<string>`
+                    CASE
+                        WHEN ${paymentInstruments.instrumentType} = 'DD' THEN ${instrumentDdDetails.ddPurpose}
+                        WHEN ${paymentInstruments.instrumentType} = 'FDR' THEN ${instrumentFdrDetails.fdrPurpose}
+                        WHEN ${paymentInstruments.instrumentType} = 'BG' THEN ${instrumentBgDetails.bgPurpose}
+                        WHEN ${paymentInstruments.instrumentType} = 'Cheque' THEN ${instrumentChequeDetails.chequeReason}
+                        ELSE NULL
+                    END
+                `,
             })
             .from(paymentRequests)
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
@@ -429,6 +442,10 @@ export class PaymentRequestsQueryService {
                 eq(paymentInstruments.isActive, true)
             ))
             .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(instrumentDdDetails, eq(instrumentDdDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(instrumentFdrDetails, eq(instrumentFdrDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id))
             .where(whereClause)
             .orderBy(orderClause)
             .limit(limit)
@@ -458,6 +475,7 @@ export class PaymentRequestsQueryService {
                 instrumentType: row.instrumentType as any,
                 instrumentStatus: row.instrumentStatus,
                 favouring: row.favouring,
+                detailPurpose: (row as any).detailPurpose,
                 displayStatus: deriveDisplayStatus(row.instrumentStatus),
                 bidSubmissionDate: row.bidSubmissionDate,
                 createdAt: row.createdAt,
