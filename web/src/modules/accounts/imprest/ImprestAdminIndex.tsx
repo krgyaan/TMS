@@ -83,18 +83,38 @@ const ImprestAdminIndex: React.FC = () => {
     const totals = useMemo(() => {
         return data.reduce(
             (acc, e) => {
-                acc.received += e.amountReceived;
-                acc.spent += e.amountSpent;
-                acc.approved += e.amountApproved;
-                acc.left += e.amountLeft;
+                acc.received.current += e.current.amountReceived;
+                acc.received.previous += e.previous.amountReceived;
+                
+                acc.spent.current += e.current.amountSpent;
+                acc.spent.previous += e.previous.amountSpent;
+                
+                acc.approved.current += e.current.amountApproved;
+                acc.approved.previous += e.previous.amountApproved;
+                
+                acc.left.current += e.current.amountLeft;
+                acc.left.previous += e.previous.amountLeft;
 
-                acc.totalVouchers += e.voucherInfo?.totalVouchers || 0;
-                acc.accountsApproved += e.voucherInfo?.accountsApproved || 0;
-                acc.adminApproved += e.voucherInfo?.adminApproved || 0;
+                acc.totalVouchers.current += e.current.voucherInfo?.totalVouchers || 0;
+                acc.totalVouchers.previous += e.previous.voucherInfo?.totalVouchers || 0;
+                
+                acc.accountsApproved.current += e.current.voucherInfo?.accountsApproved || 0;
+                acc.accountsApproved.previous += e.previous.voucherInfo?.accountsApproved || 0;
+                
+                acc.adminApproved.current += e.current.voucherInfo?.adminApproved || 0;
+                acc.adminApproved.previous += e.previous.voucherInfo?.adminApproved || 0;
 
                 return acc;
             },
-            { received: 0, spent: 0, approved: 0, left: 0, totalVouchers: 0, accountsApproved: 0, adminApproved: 0 }
+            {
+                received: { current: 0, previous: 0 },
+                spent: { current: 0, previous: 0 },
+                approved: { current: 0, previous: 0 },
+                left: { current: 0, previous: 0 },
+                totalVouchers: { current: 0, previous: 0 },
+                accountsApproved: { current: 0, previous: 0 },
+                adminApproved: { current: 0, previous: 0 },
+            }
         );
     }, [data]);
 
@@ -200,55 +220,86 @@ const ImprestAdminIndex: React.FC = () => {
         <div className="space-y-6">
             {/* SUMMARY */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Card>
-                    <CardContent className="pt-6">
-                        <div className="flex items-center justify-between">
+                <Card className="overflow-hidden border shadow-sm transition-all hover:shadow-md">
+                    <CardContent className="p-0">
+                        <div className="p-3 pb-2">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="p-2 bg-chart-3/10 rounded-lg text-chart-3 ring-1 ring-inset ring-chart-3/20">
+                                    <IndianRupee className="h-4 w-4" />
+                                </div>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full border border-border/50">Current FY</span>
+                            </div>
                             <div>
-                                <p className="text-sm font-medium text-muted-foreground mb-1">Amount Received</p>
-                                <h3 className="text-2xl font-bold text-foreground">{formatINR(totals.received)}</h3>
+                                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Amount Received</p>
+                                <h3 className="text-2xl font-bold text-foreground tracking-tight">{formatINR(totals.received.current)}</h3>
                             </div>
-                            <div className="p-2 bg-chart-3/10 rounded-lg text-chart-3">
-                                <IndianRupee className="h-5 w-5" />
-                            </div>
+                        </div>
+                        <div className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
+                            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Previous FY</span>
+                            <span className="text-[11px] font-bold text-foreground">{formatINR(totals.received.previous)}</span>
                         </div>
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardContent className="pt-6">
-                        <div className="flex items-center justify-between">
+
+                <Card className="overflow-hidden border shadow-sm transition-all hover:shadow-md">
+                    <CardContent className="p-0">
+                        <div className="p-3 pb-2">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="p-2 bg-primary/10 rounded-lg text-primary ring-1 ring-inset ring-primary/20">
+                                    <Receipt className="h-4 w-4" />
+                                </div>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full border border-border/50">Current FY</span>
+                            </div>
                             <div>
-                                <p className="text-sm font-medium text-muted-foreground mb-1">Amount Spent</p>
-                                <h3 className="text-2xl font-bold text-foreground">{formatINR(totals.spent)}</h3>
+                                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Amount Spent</p>
+                                <h3 className="text-2xl font-bold text-foreground tracking-tight">{formatINR(totals.spent.current)}</h3>
                             </div>
-                            <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                                <Receipt className="h-5 w-5" />
-                            </div>
+                        </div>
+                        <div className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
+                            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Previous FY</span>
+                            <span className="text-[11px] font-bold text-foreground">{formatINR(totals.spent.previous)}</span>
                         </div>
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardContent className="pt-6">
-                        <div className="flex items-center justify-between">
+
+                <Card className="overflow-hidden border shadow-sm transition-all hover:shadow-md">
+                    <CardContent className="p-0">
+                        <div className="p-3 pb-2">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="p-2 bg-chart-2/10 rounded-lg text-chart-2 ring-1 ring-inset ring-chart-2/20">
+                                    <FileText className="h-4 w-4" />
+                                </div>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full border border-border/50">Current FY</span>
+                            </div>
                             <div>
-                                <p className="text-sm font-medium text-muted-foreground mb-1">Amount Approved</p>
-                                <h3 className="text-2xl font-bold text-foreground">{formatINR(totals.approved)}</h3>
+                                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Amount Approved</p>
+                                <h3 className="text-2xl font-bold text-foreground tracking-tight">{formatINR(totals.approved.current)}</h3>
                             </div>
-                            <div className="p-2 bg-chart-2/10 rounded-lg text-chart-2">
-                                <FileText className="h-5 w-5" />
-                            </div>
+                        </div>
+                        <div className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
+                            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Previous FY</span>
+                            <span className="text-[11px] font-bold text-foreground">{formatINR(totals.approved.previous)}</span>
                         </div>
                     </CardContent>
                 </Card>
-                <Card>
-                    <CardContent className="pt-6">
-                        <div className="flex items-center justify-between">
+
+                <Card className="overflow-hidden border shadow-sm transition-all hover:shadow-md">
+                    <CardContent className="p-0">
+                        <div className="p-3 pb-2">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="p-2 bg-chart-5/10 rounded-lg text-chart-5 ring-1 ring-inset ring-chart-5/20">
+                                    <LayoutDashboard className="h-4 w-4" />
+                                </div>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full border border-border/50">Current FY</span>
+                            </div>
                             <div>
-                                <p className="text-sm font-medium text-muted-foreground mb-1">Amount Left</p>
-                                <h3 className="text-2xl font-bold text-foreground">{formatINR(totals.left)}</h3>
+                                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Amount Left</p>
+                                <h3 className="text-2xl font-bold text-foreground tracking-tight">{formatINR(totals.left.current)}</h3>
                             </div>
-                            <div className="p-2 bg-chart-5/10 rounded-lg text-chart-5">
-                                <LayoutDashboard className="h-5 w-5" />
-                            </div>
+                        </div>
+                        <div className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
+                            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Previous FY</span>
+                            <span className="text-[11px] font-bold text-foreground">{formatINR(totals.left.previous)}</span>
                         </div>
                     </CardContent>
                 </Card>
@@ -256,44 +307,65 @@ const ImprestAdminIndex: React.FC = () => {
 
             {/* VOUCHER SUMMARY */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card>
-                    <CardContent className="pt-4 pb-4">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-muted rounded-md text-muted-foreground">
-                                <FileText className="h-4 w-4" />
+                <Card className="overflow-hidden border shadow-sm transition-all hover:shadow-md">
+                    <CardContent className="p-0">
+                        <div className="p-3 pb-2 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-muted rounded-lg text-muted-foreground ring-1 ring-inset ring-border/50">
+                                    <FileText className="h-4 w-4" />
+                                </div>
+                                <div>
+                                    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Total Vouchers</p>
+                                    <p className="text-2xl font-bold text-foreground tracking-tight leading-none mt-1">{totals.totalVouchers.current}</p>
+                                </div>
                             </div>
-                            <div>
-                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Vouchers</p>
-                                <p className="text-xl font-bold text-foreground">{totals.totalVouchers}</p>
-                            </div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/40 px-2 py-0.5 rounded-full">Current FY</span>
+                        </div>
+                        <div className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
+                            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Previous FY</span>
+                            <span className="text-[11px] font-bold text-foreground">{totals.totalVouchers.previous}</span>
                         </div>
                     </CardContent>
                 </Card>
 
-                <Card>
-                    <CardContent className="pt-4 pb-4">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-primary/10 rounded-md text-primary">
-                                <FileText className="h-4 w-4" />
+                <Card className="overflow-hidden border shadow-sm transition-all hover:shadow-md">
+                    <CardContent className="p-0">
+                        <div className="p-3 pb-2 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-primary/10 rounded-lg text-primary ring-1 ring-inset ring-primary/20">
+                                    <FileText className="h-4 w-4" />
+                                </div>
+                                <div>
+                                    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Accounts Approved</p>
+                                    <p className="text-2xl font-bold text-foreground tracking-tight leading-none mt-1">{totals.accountsApproved.current}</p>
+                                </div>
                             </div>
-                            <div>
-                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Accounts Approved</p>
-                                <p className="text-xl font-bold text-foreground">{totals.accountsApproved}</p>
-                            </div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/40 px-2 py-0.5 rounded-full">Current FY</span>
+                        </div>
+                        <div className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
+                            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Previous FY</span>
+                            <span className="text-[11px] font-bold text-foreground">{totals.accountsApproved.previous}</span>
                         </div>
                     </CardContent>
                 </Card>
 
-                <Card>
-                    <CardContent className="pt-4 pb-4">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-chart-2/10 rounded-md text-chart-2">
-                                <FileText className="h-4 w-4" />
+                <Card className="overflow-hidden border shadow-sm transition-all hover:shadow-md">
+                    <CardContent className="p-0">
+                        <div className="p-3 pb-2 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-chart-2/10 rounded-lg text-chart-2 ring-1 ring-inset ring-chart-2/20">
+                                    <FileText className="h-4 w-4" />
+                                </div>
+                                <div>
+                                    <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Admin Approved</p>
+                                    <p className="text-2xl font-bold text-foreground tracking-tight leading-none mt-1">{totals.adminApproved.current}</p>
+                                </div>
                             </div>
-                            <div>
-                                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Admin Approved</p>
-                                <p className="text-xl font-bold text-foreground">{totals.adminApproved}</p>
-                            </div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/40 px-2 py-0.5 rounded-full">Current FY</span>
+                        </div>
+                        <div className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
+                            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Previous FY</span>
+                            <span className="text-[11px] font-bold text-foreground">{totals.adminApproved.previous}</span>
                         </div>
                     </CardContent>
                 </Card>
