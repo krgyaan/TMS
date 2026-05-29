@@ -38,7 +38,7 @@ export const onboardingRequests = pgTable('hrms_onboarding_requests', {
   documentStatus: varchar('document_status', { length: 50 }).default('pending'),
   inductionStatus: varchar('induction_status', { length: 50 }).default('pending'),
 
-  progress: integer('progress').default(0),
+  progress: varchar('progress', {length : 50 }).default('pending'),
 
   approvedBy: bigint('approved_by', { mode: 'number' }),
   approvedAt: timestamp('approved_at', { withTimezone: true }),

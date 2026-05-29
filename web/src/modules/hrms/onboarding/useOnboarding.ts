@@ -146,3 +146,83 @@ export const useUpdateInductionTask = (onboardingId: number) => {
     },
   });
 };
+
+
+// ─── List all onboarding users with their stage statuses ──────────────────────
+
+export const useOnboardingList = () =>
+  useQuery({
+    queryKey: ["onboarding", "list"],
+    queryFn: onboardingService.getOnboardingList,
+  });
+
+// ─── Fetch entries per stage ──────────────────────────────────────────────────
+
+export const useEducation = (onboardingId: number | null) =>
+  useQuery({
+    queryKey: ["onboarding", "education", onboardingId],
+    queryFn: () => onboardingService.getStageEducation(onboardingId!),
+    enabled: !!onboardingId,
+  });
+
+export const useExperience = (onboardingId: number | null) =>
+  useQuery({
+    queryKey: ["onboarding", "experience", onboardingId],
+    queryFn: () => onboardingService.getStageExperience(onboardingId!),
+    enabled: !!onboardingId,
+  });
+
+export const useDocuments = (onboardingId: number | null) =>
+  useQuery({
+    queryKey: ["onboarding", "documents", onboardingId],
+    queryFn: () => onboardingService.getStageDocuments(onboardingId!),
+    enabled: !!onboardingId,
+  });
+
+export const useBankDetails = (onboardingId: number | null) =>
+  useQuery({
+    queryKey: ["onboarding", "bankDetails", onboardingId],
+    queryFn: () => onboardingService.getStageBankDetails(onboardingId!),
+    enabled: !!onboardingId,
+  });
+
+// ─── Approve / Reject mutations ───────────────────────────────────────────────
+
+type StageKey = "education" | "experience" | "documents" | "bankDetails";
+
+const STAGE_ENDPOINTS: Record<StageKey, string> = {
+  education: "education",
+  experience: "experience",
+  documents: "documents",
+  bankDetails: "bank-details",
+};
+
+export const useUpdateEntryStatus = (stageKey: StageKey) => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      entryId,
+      onboardingId,
+      status,
+      reason,
+    }: {
+      entryId: number;
+      onboardingId: number;
+      status: 'approved' | 'rejected';
+      reason?: string;
+    }) => {
+      const endpoint = STAGE_ENDPOINTS[stageKey];
+      return onboardingService.updateStageEntryStatus(onboardingId, endpoint, entryId, status, reason);
+    },
+    onSuccess: (_, { onboardingId, status }) => {
+      qc.invalidateQueries({
+        queryKey: ["onboarding", stageKey, onboardingId],
+      });
+      qc.invalidateQueries({ queryKey: ["onboarding", "list"] });
+      toast.success(`Entry ${status} successfully`);
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || "Failed to update entry status");
+    },
+  });
+};

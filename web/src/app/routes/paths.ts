@@ -364,6 +364,7 @@ export const paths = {
         onboardingDashboard: "/hrms/onboarding/dashboard",
         profileDetailsDashboard: "/hrms/onboarding/profile-details",
         documentDashboard: "/hrms/onboarding/documents",
+        approvalDashboard: "/hrms/onboarding/approval",
         inductionDashboard: "/hrms/onboarding/induction",
     },
 };

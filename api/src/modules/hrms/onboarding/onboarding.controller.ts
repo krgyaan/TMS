@@ -76,6 +76,10 @@ const UpdateProfileSchema = z.object({
   dateOfJoining: z.string().optional(),
   probationMonths: z.number().optional(),
   probationEndDate: z.string().optional(),
+  // Core HR
+  designationId: z.number().optional(),
+  departmentId: z.number().optional(),
+  reportingTl: z.number().optional(),
   // Compensation
   salaryType: z.string().optional(),
   basicSalary: z.coerce.string().optional(),
@@ -176,20 +180,30 @@ export class OnboardingController {
   }
 
   /**
-   * PATCH /hrms/onboarding/:id/documents/:docId/verify  — Protected: HR only
+   * GET /hrms/onboarding/:id/education  — Protected: HR only
    */
-  @Patch(':id/documents/:docId/verify')
+  @Get(':id/education')
   @UseGuards(JwtAuthGuard)
-  async verifyDocument(
-    @Param('id', ParseIntPipe) id: number,
-    @Param('docId', ParseIntPipe) docId: number,
-    @Body() body: { status: string; reason?: string },
-    @Req() req: any,
-  ) {
-    if (!['verified', 'rejected'].includes(body.status)) {
-      throw new BadRequestException('Invalid status');
-    }
-    return this.onboardingService.verifyDocument(id, docId, body.status, body.reason, req.user.id);
+  async getEmployeeEducation(@Param('id', ParseIntPipe) id: number) {
+    return this.onboardingService.getEmployeeEducation(id);
+  }
+
+  /**
+   * GET /hrms/onboarding/:id/experience  — Protected: HR only
+   */
+  @Get(':id/experience')
+  @UseGuards(JwtAuthGuard)
+  async getEmployeeExperience(@Param('id', ParseIntPipe) id: number) {
+    return this.onboardingService.getEmployeeExperience(id);
+  }
+
+  /**
+   * GET /hrms/onboarding/:id/bank-details  — Protected: HR only
+   */
+  @Get(':id/bank-details')
+  @UseGuards(JwtAuthGuard)
+  async getEmployeeBankDetails(@Param('id', ParseIntPipe) id: number) {
+    return this.onboardingService.getEmployeeBankDetails(id);
   }
 
   // ─── Induction Endpoints ────────────────────────────────────────────────────
@@ -278,44 +292,34 @@ export class OnboardingController {
   }
 
   /**
-   * PATCH /hrms/onboarding/:id/approve-education/:eduId
+   * PATCH /hrms/onboarding/:id/:stage/:entryId/approve
+   * Dynamic endpoint for approving or rejecting stage entries (education, experience, bank-details, documents)
    */
-  @Patch(':id/approve-education/:eduId')
+  @Patch(':id/:stage/:entryId/approve')
   @UseGuards(JwtAuthGuard)
-  async approveEducation(
+  async approveStageEntry(
     @Param('id', ParseIntPipe) id: number,
-    @Param('eduId', ParseIntPipe) eduId: number,
-    @Body() body: { status: 'approved' | 'rejected'; remark: string },
+    @Param('stage') stage: string,
+    @Param('entryId', ParseIntPipe) entryId: number,
+    @Body() body: { status: 'approved' | 'rejected'; remark?: string },
     @Req() req: any,
   ) {
-    return this.onboardingService.approveEducationRecord(id, eduId, body.status, body.remark, req.user.id);
-  }
+    const adminId = req.user.id;
+    const status = body.status;
+    const remark = body.remark || '';
 
-  /**
-   * PATCH /hrms/onboarding/:id/approve-experience/:expId
-   */
-  @Patch(':id/approve-experience/:expId')
-  @UseGuards(JwtAuthGuard)
-  async approveExperience(
-    @Param('id', ParseIntPipe) id: number,
-    @Param('expId', ParseIntPipe) expId: number,
-    @Body() body: { status: 'approved' | 'rejected'; remark: string },
-    @Req() req: any,
-  ) {
-    return this.onboardingService.approveExperienceRecord(id, expId, body.status, body.remark, req.user.id);
-  }
-
-  /**
-   * PATCH /hrms/onboarding/:id/approve-bank/:bankId
-   */
-  @Patch(':id/approve-bank/:bankId')
-  @UseGuards(JwtAuthGuard)
-  async approveBank(
-    @Param('id', ParseIntPipe) id: number,
-    @Param('bankId', ParseIntPipe) bankId: number,
-    @Body() body: { status: 'approved' | 'rejected'; remark: string },
-    @Req() req: any,
-  ) {
-    return this.onboardingService.approveBankRecord(id, bankId, body.status, body.remark, req.user.id);
+    switch (stage) {
+      case 'education':
+        return this.onboardingService.approveEducationRecord(id, entryId, status, adminId, remark);
+      case 'experience':
+        return this.onboardingService.approveExperienceRecord(id, entryId, status, remark, adminId);
+      case 'bank-details':
+        return this.onboardingService.approveBankRecord(id, entryId, status, remark, adminId);
+      case 'documents':
+        const docStatus = status === 'approved' ? 'verified' : 'rejected';
+        return this.onboardingService.verifyDocument(id, entryId, docStatus, remark, adminId);
+      default:
+        throw new BadRequestException(`Invalid stage endpoint: ${stage}`);
+    }
   }
 }
