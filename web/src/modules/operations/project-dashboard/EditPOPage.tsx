@@ -1,93 +1,24 @@
-// src/pages/project-dashboard/EditPurchaseOrder.tsx
-
-import React, { useState, useMemo, useEffect } from "react";
+import { AlertCircle, ArrowLeft, Building2, Calculator, Calendar, Copy, FileText, Hash, Info, Loader2, Mail, MapPin, Package, Plus, Receipt, Save, Trash2, Truck, UserPlus } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import {
-  ArrowLeft,
-  Plus,
-  Trash2,
-  Package,
-  Building2,
-  Truck,
-  FileText,
-  UserPlus,
-  Calculator,
-  Calendar,
-  Hash,
-  Mail,
-  MapPin,
-  Loader2,
-  CheckCircle2,
-  AlertCircle,
-  Info,
-  Receipt,
-  ChevronDown,
-  ChevronUp,
-  Copy,
-  Save,
-} from "lucide-react";
-
-/* UI Components */
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-  TableFooter,
-} from "@/components/ui/table";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-  TooltipProvider,
-} from "@/components/ui/tooltip";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
-
-// Hooks
-import {
-  usePoParties,
-  usePurchaseOrderDetails,
-  useUpdatePurchaseOrder,
-  useCreatePoParty,
-} from "./project-dashboard.hooks";
-import type { UpdatePurchaseOrderDTO, CreatePartyDTO } from "./project-dashboard.api";
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { toast } from "sonner";
 import { paths } from "@/app/routes/paths";
+import { useCreatePoParty, usePoParties, usePurchaseOrderDetails, useUpdatePurchaseOrder } from "@/hooks/api/useProjectDashboard";
+import type { CreatePartyDTO, UpdatePurchaseOrderDTO } from "./helpers/projectDashboard.types";
 
-/* ================================
-   TYPES
-================================ */
 interface Party {
   id: number;
   name: string;

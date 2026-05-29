@@ -1,166 +1,19 @@
-// src/pages/project-dashboard/ViewPO.tsx
-
+import { paths } from "@/app/routes/paths";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { usePurchaseOrderDetails } from "@/hooks/api/useProjectDashboard";
+import { formatDate, formatDateTime } from "@/hooks/useFormatedDate";
+import { formatINR } from "@/hooks/useINRFormatter";
+import { ArrowLeft, Building2, Calendar, Copy, CreditCard, Download, Edit, FileText, Hash, Mail, MapPin, Package, Printer, Receipt, Truck, User } from "lucide-react";
 import React from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import {
-  ArrowLeft,
-  Package,
-  Building2,
-  Truck,
-  FileText,
-  Calendar,
-  Hash,
-  Mail,
-  MapPin,
-  Loader2,
-  Receipt,
-  Printer,
-  Download,
-  Edit,
-  Copy,
-  CheckCircle,
-  Clock,
-  AlertCircle,
-  MoreHorizontal,
-  Send,
-  Trash2,
-  FileCheck,
-  CreditCard,
-  XCircle,
-  User,
-  ExternalLink,
-  RefreshCw,
-} from "lucide-react";
-
-/* UI Components */
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-  TableFooter,
-} from "@/components/ui/table";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-  TooltipProvider,
-} from "@/components/ui/tooltip";
-
-import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 
-// Hooks - Update these imports based on your actual API hooks
-// import { usePurchaseOrderDetails } from "./project-dashboard.hooks";
-import { paths } from "@/app/routes/paths";
-import { usePurchaseOrderDetails } from "./project-dashboard.hooks";
-/* ================================
-   TYPES
-================================ */
-interface Product {
-  id: number;
-  description: string;
-  hsnSac: string;
-  qty: number;
-  rate: number;
-  gstRate: number;
-}
-
-interface PurchaseOrder {
-  id: number;
-  poNumber: string;
-  poDate: string;
-  status:
-    | "draft"
-    | "pending"
-    | "approved"
-    | "sent"
-    | "acknowledged"
-    | "completed"
-    | "cancelled";
-  projectName: string;
-  tenderNumber: string;
-
-  // Seller Information
-  sellerId?: number;
-  sellerName: string;
-  sellerEmail: string;
-  sellerAddress: string;
-  sellerGstNo: string;
-  sellerPanNo: string;
-  sellerMsmeNo: string;
-
-  // Ship To Information
-  shipToName: string;
-  shippingAddress: string;
-  shipToGst: string;
-  shipToPan: string;
-
-  // Products
-  products: Product[];
-
-  // Additional Details
-  quotationNo?: string;
-  quotationDate?: string;
-  paymentTerms?: string;
-  deliveryPeriod?: string;
-  remarks?: string;
-
-  // Totals
-  subtotal: number;
-  totalGst: number;
-  grandTotal: number;
-
-  // Metadata
-  createdAt: string;
-  createdBy: string;
-  updatedAt?: string;
-}
-
-/* ================================
-   HELPERS
-================================ */
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 2,
-  }).format(amount);
-};
-
-const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-};
-
-const formatDateTime = (dateString: string) => {
-  return new Date(dateString).toLocaleString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-};
-
-/* ================================
-   LOADING SKELETON
-================================ */
 const ViewSkeleton = () => (
   <div className="space-y-6">
     <div className="flex items-center justify-between">
@@ -499,7 +352,7 @@ export default function ViewPOPage() {
                     Total Value
                   </p>
                   <p className="text-lg font-bold truncate print:text-base">
-                    {formatCurrency(poData.total.totalWithGst)}
+                    {formatINR(poData.total.totalWithGst)}
                   </p>
                 </div>
               </div>
@@ -650,7 +503,7 @@ export default function ViewPOPage() {
                           {product.qty.toLocaleString("en-IN")}
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">
-                          {formatCurrency(Number(product.rate))}
+                          {formatINR(Number(product.rate))}
                         </TableCell>
                         <TableCell className="text-center">
                           <Badge variant="outline" className="text-xs">
@@ -658,10 +511,10 @@ export default function ViewPOPage() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">
-                          {formatCurrency(Number(product.itemTotal))}
+                          {formatINR(Number(product.itemTotal))}
                         </TableCell>
                         <TableCell className="text-right font-mono font-semibold">
-                          {formatCurrency(Number(product.itemTotalWithGst))}
+                          {formatINR(Number(product.itemTotalWithGst))}
                         </TableCell>
                       </TableRow>
                     );
@@ -676,7 +529,7 @@ export default function ViewPOPage() {
                       Subtotal (before tax)
                     </TableCell>
                     <TableCell className="text-right font-mono font-medium">
-                      {formatCurrency(poData.total.total)}
+                      {formatINR(poData.total.total)}
                     </TableCell>
                   </TableRow>
                   <TableRow>
@@ -687,7 +540,7 @@ export default function ViewPOPage() {
                       Total GST
                     </TableCell>
                     <TableCell className="text-right font-mono font-medium">
-                      {formatCurrency(poData.total.totalGst)}
+                      {formatINR(poData.total.totalGst)}
                     </TableCell>
                   </TableRow>
                   <TableRow className="bg-muted/50 text-lg">
@@ -695,7 +548,7 @@ export default function ViewPOPage() {
                       Grand Total
                     </TableCell>
                     <TableCell className="text-right font-mono font-bold">
-                      {formatCurrency(poData.total.totalWithGst)}
+                      {formatINR(poData.total.totalWithGst)}
                     </TableCell>
                   </TableRow>
                 </TableFooter>
