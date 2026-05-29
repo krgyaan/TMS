@@ -102,7 +102,7 @@ export const WorkOrdersSection: React.FC<WorkOrdersSectionProps> = ({
             sortable: false,
             cellRenderer: createActionColumnRenderer<any>(woActions),
             width: 80,
-            pinned: "right",
+            pinned: "right" as "right" | "left" | undefined
         },
     ], []);
 

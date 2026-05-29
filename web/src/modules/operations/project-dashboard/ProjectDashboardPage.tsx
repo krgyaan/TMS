@@ -19,13 +19,13 @@ export default function ProjectDashboardPage() {
     const { isTeamLeader, isAdmin, isSuperUser, teamId } = useAuth();
     const isOpsTeamLeader = isTeamLeader && Number(teamId) == 3;
     const id = searchParams.get("id");
-    const form = useForm<{ projectId: number | null }>({
+    const form = useForm<{ projectId: string | null }>({
         defaultValues: { projectId: id },
     });
     const projectId = form.watch("projectId");
 
     const { data: projects = [] } = useProjectsMaster();
-    const { data: projectDetails, isLoading } = useProjectDashboardDetails(projectId);
+    const { data: projectDetails, isLoading } = useProjectDashboardDetails(Number(projectId));
 
     if (isLoading && !projectId) {
         return (
@@ -125,7 +125,7 @@ export default function ProjectDashboardPage() {
                 {projectId && projectDetails && (
                     <>
                         <ProjectOverviewSection
-                            projectId={projectId}
+                            projectId={Number(projectId)}
                             projectDetails={projectDetails}
                         />
                         <PurchaseOrdersSection

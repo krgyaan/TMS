@@ -102,7 +102,7 @@ export const PurchaseOrdersSection: React.FC<PurchaseOrdersSectionProps> = ({
             sortable: false,
             cellRenderer: createActionColumnRenderer<any>(poActions),
             width: 80,
-            pinned: "right",
+            pinned: "right" as "right" | "left" | undefined,
         },
     ], [navigate]);
 
