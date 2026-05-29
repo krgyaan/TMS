@@ -3,22 +3,22 @@ import { Image as ImageIcon, Search, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import DataTable from "@/components/ui/data-table";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { GridApi } from "ag-grid-community";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
+import { useProjectImprests } from "@/hooks/api/useProjectDashboard";
 import { ProofViewer } from "../components/ProofViewer";
 
 interface EmployeeImprestsSectionProps {
-    imprests: any[];
-    imprestSum: number;
+    projectId: number | null;
 }
 
 export const EmployeeImprestsSection: React.FC<EmployeeImprestsSectionProps> = ({
-    imprests,
-    imprestSum,
+    projectId,
 }) => {
     const [imprestGridApi, setImprestGridApi] = useState<GridApi | null>(null);
     const [imprestSearch, setImprestSearch] = useState("");
@@ -31,6 +31,10 @@ export const EmployeeImprestsSection: React.FC<EmployeeImprestsSectionProps> = (
         partyName?: string;
         remark?: string;
     } | null>(null);
+
+    const { data, isLoading } = useProjectImprests(projectId!);
+    const imprests = data?.imprests ?? [];
+    const imprestSum = data?.imprestSum ?? 0;
 
     const handleViewProofs = useCallback((imprest: any) => {
         setSelectedProofs(imprest.proof || []);
@@ -175,6 +179,22 @@ export const EmployeeImprestsSection: React.FC<EmployeeImprestsSectionProps> = (
             },
         },
     ], [handleViewProofs]);
+
+    if (!projectId) return null;
+
+    if (isLoading) {
+        return (
+            <Card>
+                <CardHeader className="pb-4">
+                    <Skeleton className="h-6 w-48" />
+                    <Skeleton className="h-4 w-32" />
+                </CardHeader>
+                <CardContent>
+                    <Skeleton className="h-56 w-full rounded-lg" />
+                </CardContent>
+            </Card>
+        );
+    }
 
     return (
         <>

@@ -6,17 +6,48 @@ export const projectsDashboardKeys = {
     all: ["projects-dashboard"] as const,
     lists: () => [...projectsDashboardKeys.all, "list"] as const,
     poParties: () => [...projectsDashboardKeys.all, "po-parties"] as const,
-    detail: (id: number) => [...projectsDashboardKeys.all, "detail", id] as const,
     purchaseOrder: (id: number) => [...projectsDashboardKeys.all, "purchase-order", id] as const,
+    overview: (id: number) => [...projectsDashboardKeys.all, "overview", id] as const,
+    workOrders: (id: number) => [...projectsDashboardKeys.all, "work-orders", id] as const,
+    projectPurchaseOrders: (id: number) => [...projectsDashboardKeys.all, "purchase-orders", id] as const,
+    imprests: (id: number) => [...projectsDashboardKeys.all, "imprests", id] as const,
 };
 
-export const useProjectDashboardDetails = (id: number) => {
+// ── Individual parallel hooks ──
+
+export const useProjectOverview = (id: number) => {
     return useQuery({
-        queryKey: projectsDashboardKeys.detail(id),
-        queryFn: () => projectDashboardApi.getDashboardDetails(id),
+        queryKey: projectsDashboardKeys.overview(id),
+        queryFn: () => projectDashboardApi.getOverview(id),
         enabled: !!id,
     });
 };
+
+export const useProjectWorkOrders = (id: number) => {
+    return useQuery({
+        queryKey: projectsDashboardKeys.workOrders(id),
+        queryFn: () => projectDashboardApi.getWorkOrders(id),
+        enabled: !!id,
+    });
+};
+
+export const useProjectPurchaseOrders = (id: number) => {
+    return useQuery({
+        queryKey: projectsDashboardKeys.projectPurchaseOrders(id),
+        queryFn: () => projectDashboardApi.getProjectPurchaseOrders(id),
+        enabled: !!id,
+    });
+};
+
+export const useProjectImprests = (id: number) => {
+    return useQuery({
+        queryKey: projectsDashboardKeys.imprests(id),
+        queryFn: () => projectDashboardApi.getImprests(id),
+        enabled: !!id,
+    });
+};
+
+
 
 export const usePoParties = () => {
     return useQuery({

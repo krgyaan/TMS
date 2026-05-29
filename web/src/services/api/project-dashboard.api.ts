@@ -4,15 +4,28 @@ import type {
     UpdatePurchaseOrderDTO,
     CreatePartyDTO,
 } from '@/modules/operations/project-dashboard/helpers/projectDashboard.types';
-import type { ProjectDashboardResponse } from '@/modules/operations/project-dashboard/helpers/projectDashboard.types';
 
 class ProjectDashboardApiService extends BaseApiService {
     constructor() {
         super('/projects');
     }
 
-    async getDashboardDetails(id: number): Promise<ProjectDashboardResponse> {
-        return this.get(`/details/${id}`);
+    // ── Parallel dashboard endpoints ──
+
+    async getOverview(id: number): Promise<{ project: any; tender: any }> {
+        return this.get(`/${id}/overview`);
+    }
+
+    async getWorkOrders(id: number): Promise<{ woBasicDetail: any }> {
+        return this.get(`/${id}/work-orders`);
+    }
+
+    async getProjectPurchaseOrders(id: number): Promise<{ purchaseOrders: any[] }> {
+        return this.get(`/${id}/purchase-orders`);
+    }
+
+    async getImprests(id: number): Promise<{ imprests: any[]; imprestSum: number }> {
+        return this.get(`/${id}/imprests`);
     }
 
     async getPoParties(): Promise<any> {

@@ -1,15 +1,3 @@
-// ===================== API RESPONSE TYPES =====================
-export interface ProjectDashboardResponse {
-    project: any;
-    tender: any;
-    woBasicDetail: any;
-    woDetail: any;
-    woAcceptanceYes: any;
-    imprests: any[];
-    imprestSum: number;
-    purchaseOrders: any[];
-}
-
 // ===================== DTO TYPES =====================
 export interface CreatePurchaseOrderDTO {
     tenderId: number;

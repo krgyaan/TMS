@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
-import { Download, Edit, Eye } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Download, Edit, Eye, Plus } from "lucide-react";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import DataTable from "@/components/ui/data-table";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
@@ -10,16 +11,21 @@ import { useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
+import { useProjectPurchaseOrders } from "@/hooks/api/useProjectDashboard";
+import { Button } from "@/components/ui/button";
 
 interface PurchaseOrdersSectionProps {
-    purchaseOrders: any[];
+    projectId: number | null;
 }
 
 export const PurchaseOrdersSection: React.FC<PurchaseOrdersSectionProps> = ({
-    purchaseOrders,
+    projectId,
 }) => {
     const navigate = useNavigate();
     const [poGridApi, setPoGridApi] = useState<GridApi | null>(null);
+    const { data, isLoading } = useProjectPurchaseOrders(projectId!);
+
+    const purchaseOrders = data?.purchaseOrders ?? [];
 
     const poActions: ActionItem<any>[] = useMemo(() => [
         {
@@ -102,17 +108,40 @@ export const PurchaseOrdersSection: React.FC<PurchaseOrdersSectionProps> = ({
             sortable: false,
             cellRenderer: createActionColumnRenderer<any>(poActions),
             width: 80,
-            pinned: "right" as "right" | "left" | undefined,
         },
     ], [navigate]);
+
+    if (!projectId) return null;
+
+    if (isLoading) {
+        return (
+            <Card>
+                <CardHeader className="pb-4">
+                    <Skeleton className="h-6 w-48" />
+                    <Skeleton className="h-4 w-32" />
+                </CardHeader>
+                <CardContent>
+                    <Skeleton className="h-48 w-full rounded-lg" />
+                </CardContent>
+            </Card>
+        );
+    }
 
     return (
         <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-                <div>
-                    <CardTitle className="text-base font-semibold">
-                        Purchase Orders
-                    </CardTitle>
+                <div className="w-full">
+                    <div className="flex justify-between items-center gap-2">
+                        <CardTitle className="text-base font-semibold">
+                            Purchase Orders
+                        </CardTitle>
+                        <CardAction>
+                            <Button size="sm" variant="default" onClick={() => navigate(paths.operations.raisePoForm(projectId))}>
+                                <Plus className="mr-1.5 h-4 w-4" />
+                                Raise Purchase Order
+                            </Button>
+                        </CardAction>
+                    </div>
                     <CardDescription>
                         {purchaseOrders.length} order{purchaseOrders.length !== 1 ? 's' : ''} found
                     </CardDescription>

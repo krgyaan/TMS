@@ -28,57 +28,80 @@ export class ProjectsService {
         private readonly logger: Logger,
     ) {}
 
-    // ================= DASHBOARD =================
-    async getDashboardData(projectId: number) {
+    // ─────────────────────────────────────────────
+    //  PARALLEL DASHBOARD ENDPOINTS
+    //  Each does its own project lookup (PK — fast)
+    //  so the frontend can fire all 4 in parallel.
+    // ─────────────────────────────────────────────
+
+    private async resolveProject(projectId: number) {
         const project = (await this.db.select().from(projects).where(eq(projects.id, projectId)))[0];
-
         if (!project) throw new NotFoundException("Project not found");
-        let projectName = project.projectName;
+        return project;
+    }
 
-        const tender = project.tenderId ? (await this.db.select().from(tenderInfos).where(eq(tenderInfos.id, project.tenderId)))[0] : undefined;
+    private async resolveTender(tenderId: number | null | undefined) {
+        if (!tenderId) return undefined;
+        return (await this.db.select().from(tenderInfos).where(eq(tenderInfos.id, tenderId)))[0];
+    }
 
-        const basicDetail = tender ? (await this.db.select().from(woBasicDetails).where(eq(woBasicDetails.tenderId, tender.id)))[0] : undefined;
+    // GET /projects/:id/overview
+    async getOverview(projectId: number) {
+        const project = await this.resolveProject(projectId);
+        const tender = await this.resolveTender(project.tenderId);
+        return { project, tender };
+    }
 
-        const woDetail = basicDetail ? (await this.db.select().from(woDetails).where(eq(woDetails.woBasicDetailId, basicDetail.id)))[0] : undefined;
+    // GET /projects/:id/work-orders
+    async getWorkOrders(projectId: number) {
+        const project = await this.resolveProject(projectId);
+        const tender = await this.resolveTender(project.tenderId);
+        const basicDetail = tender
+            ? (await this.db.select().from(woBasicDetails).where(eq(woBasicDetails.tenderId, tender.id)))[0]
+            : undefined;
+        return { woBasicDetail: basicDetail ?? {} };
+    }
 
-        const woAcceptance = basicDetail ? (await this.db.select().from(woDetails).where(eq(woDetails.woBasicDetailId, basicDetail.id)))[0] : undefined;
+    // GET /projects/:id/purchase-orders
+    async getPurchaseOrders(projectId: number) {
+        const project = await this.resolveProject(projectId);
+        const tender = await this.resolveTender(project.tenderId);
+        const purchaseOrdersData = tender
+            ? await this.db.select().from(purchaseOrders).where(eq(purchaseOrders.tenderId, tender.id))
+            : [];
+        return { purchaseOrders: purchaseOrdersData };
+    }
 
-        const imprests = project.projectName ? await this.db.select({
-            id: employeeImprests.id,
-            amount: employeeImprests.amount,
-            projectName: employeeImprests.projectName,
-            partyName: employeeImprests.partyName,
-            category: imprestCategories.name,
-            status: employeeImprests.status,
-            approvalStatus: employeeImprests.status,
-            approvalDate: employeeImprests.approvedDate,
-            proof: employeeImprests.invoiceProof,
-            remark: employeeImprests.remark,
-            userId: employeeImprests.userId,
-            userName: users.name,
-        })
-        .from(employeeImprests)
-        .innerJoin(users, eq(users.id, employeeImprests.userId))
-        .innerJoin(imprestCategories, eq(imprestCategories.id, employeeImprests.categoryId))
-        .where(eq(employeeImprests.projectName, project.projectName)) : [];
-
+    // GET /projects/:id/imprests
+    async getImprests(projectId: number) {
+        const project = await this.resolveProject(projectId);
+        const imprests = project.projectName
+            ? await this.db.select({
+                id: employeeImprests.id,
+                amount: employeeImprests.amount,
+                projectName: employeeImprests.projectName,
+                partyName: employeeImprests.partyName,
+                category: imprestCategories.name,
+                status: employeeImprests.status,
+                approvalStatus: employeeImprests.status,
+                approvalDate: employeeImprests.approvedDate,
+                proof: employeeImprests.invoiceProof,
+                remark: employeeImprests.remark,
+                userId: employeeImprests.userId,
+                userName: users.name,
+            })
+            .from(employeeImprests)
+            .innerJoin(users, eq(users.id, employeeImprests.userId))
+            .innerJoin(imprestCategories, eq(imprestCategories.id, employeeImprests.categoryId))
+            .where(eq(employeeImprests.projectName, project.projectName))
+            : [];
         const imprestSum = imprests.reduce((sum: number, item) => {
             return sum + Number(item.amount ?? 0);
         }, 0);
-
-        const purchaseOrdersData = tender ? await this.db.select().from(purchaseOrders).where(eq(purchaseOrders.tenderId, tender.id)) : [];
-
-        return {
-            project,
-            tender,
-            woBasicDetail: basicDetail,
-            woDetail,
-            woAcceptanceYes: woAcceptance,
-            imprests,
-            imprestSum,
-            purchaseOrders: purchaseOrdersData,
-        };
+        return { imprests, imprestSum };
     }
+
+
 
     // ================= PO NUMBER =================
     private async generatePONumber(tenderId: number) {

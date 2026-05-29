@@ -1,11 +1,8 @@
-import SelectField from "@/components/form/SelectField";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { FileText } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import SelectField from "@/components/form/SelectField";
 import { useAuth } from "@/contexts/AuthContext";
-import { useProjectDashboardDetails } from "@/hooks/api/useProjectDashboard";
 import { useProjectsMaster } from "@/hooks/api/useProjects";
-import { AlertCircle, Edit, FileText } from "lucide-react";
 import { FormProvider, useForm } from "react-hook-form";
 import { useSearchParams } from "react-router-dom";
 
@@ -25,18 +22,6 @@ export default function ProjectDashboardPage() {
     const projectId = form.watch("projectId");
 
     const { data: projects = [] } = useProjectsMaster();
-    const { data: projectDetails, isLoading } = useProjectDashboardDetails(Number(projectId));
-
-    if (isLoading && !projectId) {
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="flex flex-col items-center gap-3">
-                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-                    <p className="text-sm text-muted-foreground">Loading...</p>
-                </div>
-            </div>
-        );
-    }
 
     return (
         <div className="min-h-screen bg-background">
@@ -77,69 +62,11 @@ export default function ProjectDashboardPage() {
                     </Card>
                 )}
 
-                {projectId && isLoading && (
-                    <Card>
-                        <CardContent className="flex items-center justify-center py-12">
-                            <div className="flex flex-col items-center gap-3">
-                                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-                                <p className="text-sm text-muted-foreground">
-                                    Loading project details...
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {projectDetails && !projectDetails?.tender && (
-                    <div className="group relative overflow-hidden rounded-2xl border border-border bg-card p-5 transition-all hover:shadow-sm animate-in fade-in slide-in-from-top-2 duration-500">
-                        <div className="flex items-center gap-5">
-                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary shadow-sm group-hover:scale-105 transition-transform">
-                                <AlertCircle className="h-6 w-6" />
-                            </div>
-                            <div className="flex-1 space-y-1">
-                                <div className="flex items-center gap-2">
-                                    <h3 className="text-lg font-bold">Tender Not Linked</h3>
-                                    <Badge variant="outline" className="text-[10px] uppercase tracking-wider font-bold h-5 px-1.5 border-primary/20 text-primary bg-primary/5">
-                                        Action Required
-                                    </Badge>
-                                </div>
-                                <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">
-                                    This project does not have a linked tender record. Linking a tender is essential for accurate budget tracking, compliance monitoring, and automated work order generation.
-                                </p>
-                            </div>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="hidden md:flex gap-2 border-primary/20 hover:bg-primary/5 hover:text-primary transition-colors"
-                            >
-                                <Edit className="h-4 w-4" />
-                                Link Tender
-                            </Button>
-                        </div>
-                        <div className="absolute -right-10 -bottom-6 opacity-[0.03] text-foreground pointer-events-none">
-                            <AlertCircle size={120} />
-                        </div>
-                    </div>
-                )}
-
-                {projectId && projectDetails && (
-                    <>
-                        <ProjectOverviewSection
-                            projectId={Number(projectId)}
-                            projectDetails={projectDetails}
-                        />
-                        <PurchaseOrdersSection
-                            purchaseOrders={projectDetails?.purchaseOrders ?? []}
-                        />
-                        <WorkOrdersSection
-                            woBasicDetail={projectDetails?.woBasicDetail ?? {}}
-                        />
-                        <EmployeeImprestsSection
-                            imprests={projectDetails?.imprests ?? []}
-                            imprestSum={projectDetails?.imprestSum ?? 0}
-                        />
-                    </>
-                )}
+                {/* Sections — each fetches its own data in parallel */}
+                <ProjectOverviewSection projectId={Number(projectId)} />
+                <PurchaseOrdersSection projectId={Number(projectId)} />
+                <WorkOrdersSection projectId={Number(projectId)} />
+                <EmployeeImprestsSection projectId={Number(projectId)} />
 
                 {/* Empty State */}
                 {!projectId && (

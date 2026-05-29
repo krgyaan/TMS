@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useCreatePoParty, useCreatePurchaseOrder, usePoParties, useProjectDashboardDetails } from "@/hooks/api/useProjectDashboard";
+import { useCreatePoParty, useCreatePurchaseOrder, usePoParties, useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { AlertCircle, ArrowLeft, Building2, Calculator, Calendar, CheckCircle2, Copy, FileText, Hash, Info, Loader2, Mail, MapPin, Package, Plus, Receipt, Trash2, Truck, UserPlus } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -132,8 +132,7 @@ export default function RaisePoFormPage() {
   const projectId = Number(id);
 
   // API Hooks
-  const { data: projectDetails, isLoading: isProjectLoading } = useProjectDashboardDetails(projectId);
-  console.log(projectDetails);
+  const { data: overview, isLoading: isProjectLoading } = useProjectOverview(projectId);
 
   const { data: partiesData, isLoading: isPartiesLoading } = usePoParties();
   const createPOMutation = useCreatePurchaseOrder();
@@ -354,7 +353,7 @@ export default function RaisePoFormPage() {
       return;
     }
 
-    // if (!projectDetails?.tender?.id) {
+    // if (!overview?.tender?.id) {
     //   toast.error("Project tender information not found.");
     //   return;
     // }
@@ -371,7 +370,7 @@ export default function RaisePoFormPage() {
         }));
 
       const poData: CreatePurchaseOrderDTO = {
-        tenderId: projectDetails?.tender?.id || 3613,
+        tenderId: overview?.tender?.id || 3613,
         poDate: currentDate,
         sellerId: sellerInfo.sellerId ? Number(sellerInfo.sellerId) : undefined,
         sellerName: sellerInfo.sellerName,
@@ -431,14 +430,14 @@ export default function RaisePoFormPage() {
                 Raise Purchase Order
               </h1>
               <p className="text-muted-foreground">
-                {projectDetails?.project?.projectName || "Loading..."}
+                {overview?.project?.projectName || "Loading..."}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <Badge variant="outline" className="text-sm">
               <FileText className="mr-2 h-3 w-3" />
-              {projectDetails?.tender?.tenderNumber || "N/A"}
+              {overview?.tender?.tenderNumber || "N/A"}
             </Badge>
             <Badge variant="secondary" className="text-sm">
               <Calendar className="mr-2 h-3 w-3" />
@@ -488,7 +487,7 @@ export default function RaisePoFormPage() {
                   </Label>
                   <Input
                     className="bg-muted"
-                    value={projectDetails?.project?.projectName || ""}
+                    value={overview?.project?.projectName || ""}
                     readOnly
                   />
                 </div>
