@@ -21,7 +21,7 @@ import { QuickFilter } from '@/components/ui/quick-filter';
 import { Tooltip, TooltipTrigger } from '@radix-ui/react-tooltip';
 import { TooltipContent } from '@/components/ui/tooltip';
 
-type TabKey = 'basic_details' | 'wo_details' | 'wo_acceptance' | 'wo_upload' | 'completed';
+type TabKey = 'basic_details' | 'wo_details' | 'completed';
 
 const BasicDetailListPage = () => {
     const [activeTab, setActiveTab] = useState<TabKey>('basic_details');
@@ -54,35 +54,14 @@ const BasicDetailListPage = () => {
 
     // Build filters based on active tab
     const filters: WoBasicDetailsFilters = useMemo(() => {
-        const baseFilters: WoBasicDetailsFilters = {
+        return {
             page: pagination.pageIndex + 1,
             limit: pagination.pageSize,
             search: debouncedSearch || undefined,
             sortBy: sortModel[0]?.colId || 'woDate',
             sortOrder: sortModel[0]?.sort || 'desc',
+            tab: activeTab,
         };
-
-        // Add tab-specific filters
-        switch (activeTab) {
-            case 'basic_details':
-                baseFilters.currentStage = 'basic_details';
-                baseFilters.status = [26];
-                break;
-            case 'wo_details':
-                baseFilters.currentStage = 'wo_details';
-                baseFilters.status = [27];
-                break;
-            case 'wo_acceptance':
-                baseFilters.currentStage = 'wo_acceptance';
-                baseFilters.status = [42];
-                break;
-            case 'completed':
-                baseFilters.currentStage = 'completed';
-                baseFilters.status = [44];
-                break;
-        }
-
-        return baseFilters;
     }, [activeTab, pagination, debouncedSearch, sortModel]);
 
     // Fetch data
@@ -98,7 +77,6 @@ const BasicDetailListPage = () => {
         return [
             { key: 'basic_details' as const, name: 'Basic Details', count: summary?.basicDetails ?? 0 },
             { key: 'wo_details' as const, name: 'WO Details', count: summary?.woDetails ?? 0 },
-            { key: 'wo_acceptance' as const, name: 'Acceptance', count: summary?.woAcceptance ?? 0 },
             { key: 'completed' as const, name: 'Completed', count: summary?.completed ?? 0 },
         ];
     }, [dashboardSummary]);

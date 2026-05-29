@@ -26,13 +26,9 @@ export class WoBasicDetailsController {
         @Query('sortOrder') sortOrder?: 'asc' | 'desc',
         @Query('search') search?: string,
         @Query('teamId') teamId?: string,
-        @Query('projectName') projectName?: string,
-        @Query('currentStage') currentStage?: string,
-        @Query('oeFirst') oeFirst?: string,
-        @Query('oeSiteVisit') oeSiteVisit?: string,
-        @Query('oeDocsPrep') oeDocsPrep?: string,
+        @Query('tab') tab?: string,
     ) {
-        const rawFilters = { page, limit, sortBy, sortOrder, search, teamId, projectName, currentStage, oeFirst, oeSiteVisit, oeDocsPrep };
+        const rawFilters = { page, limit, sortBy, sortOrder, search, teamId, tab };
 
         const parsed = WoBasicDetailsQuerySchema.parse(rawFilters) as WoBasicDetailsQueryDto;
         parsed.user = user;

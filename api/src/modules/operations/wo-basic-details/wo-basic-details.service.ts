@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException, ConflictException, Logger } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, ConflictException, Logger, BadRequestException } from '@nestjs/common';
 import { eq, desc, asc, sql, and, or, ilike, isNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { DRIZZLE } from '@db/database.module';
@@ -9,6 +9,7 @@ import type { CreateWoBasicDetailDto, UpdateWoBasicDetailDto, AssignOeDto, BulkA
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { projects, teams, tenderInfos, organizations, items, locations, tenderClients, tenderCostingSheets } from '@/db/schemas';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
+import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 
 const oeFirstUser = alias(users, 'oeFirstUser');
 const oeSiteVisitUser = alias(users, 'oeSiteVisitUser');
@@ -149,7 +150,7 @@ export class WoBasicDetailsService {
             woBasicDetails: {
                 id: woBasicDetails.id,
                 tenderId: woBasicDetails.tenderId,
-                projectId: projects.id,
+                projectId: sql<number | null>`(select ${projects.id} from ${projects} where ${projects.tenderId} = ${woBasicDetails.tenderId} limit 1)::int`,
                 woNumber: woBasicDetails.woNumber,
                 woDate: woBasicDetails.woDate,
                 projectName: woBasicDetails.projectName,
@@ -175,7 +176,6 @@ export class WoBasicDetailsService {
         return this.db
             .select(this.getWoBaseSelect())
             .from(woBasicDetails)
-            .leftJoin(projects, eq(projects.tenderId, woBasicDetails.tenderId))
             .leftJoin(oeFirstUser, eq(oeFirstUser.id, woBasicDetails.oeFirst))
             .leftJoin(oeSiteVisitUser, eq(oeSiteVisitUser.id, woBasicDetails.oeSiteVisit))
             .leftJoin(oeDocsPrepUser, eq(oeDocsPrepUser.id, woBasicDetails.oeDocsPrep));
@@ -198,28 +198,31 @@ export class WoBasicDetailsService {
         const sortBy = filters?.sortBy ?? 'createdAt';
         const search = filters?.search?.trim();
 
+        // Resolve tab to backend filters
+        const tab = filters?.tab;
+        const currentStage = filters?.currentStage;
+        const woDetailsStatus = filters?.woDetailsStatus ?? (tab === 'wo_details' ? 'wo_details_filled' : undefined);
+
+        if (tab && !['basic_details', 'wo_details', 'completed'].includes(tab)) {
+            throw new BadRequestException(`Invalid tab: ${tab}`);
+        }
+
         // 1. Build Conditions
         const conditions: any[] = [];
 
         // Apply role-based filtering
         if (filters?.user) {
-            conditions.push(...this.getVisibilityConditions(filters.user, filters.teamId));
+            conditions.push(...this.buildRoleFilterConditions(filters.user, filters.teamId));
         }
-        // Additional filters
-        if (filters?.projectName) {
-            conditions.push(ilike(woBasicDetails.projectName, `%${filters.projectName}%`));
+
+        if (currentStage) {
+            conditions.push(eq(woBasicDetails.currentStage, currentStage));
+        } else if (tab === 'completed') {
+            conditions.push(eq(woBasicDetails.currentStage, 'completed'));
         }
-        if (filters?.currentStage) {
-            conditions.push(eq(woBasicDetails.currentStage, filters.currentStage));
-        }
-        if (filters?.oeFirst) {
-            conditions.push(eq(woBasicDetails.oeFirst, filters.oeFirst));
-        }
-        if (filters?.oeSiteVisit) {
-            conditions.push(eq(woBasicDetails.oeSiteVisit, filters.oeSiteVisit));
-        }
-        if (filters?.oeDocsPrep) {
-            conditions.push(eq(woBasicDetails.oeDocsPrep, filters.oeDocsPrep));
+
+        if (woDetailsStatus) {
+            conditions.push(eq(woDetails.status, woDetailsStatus));
         }
 
         // Search condition (Expanded to joined fields)
@@ -243,6 +246,10 @@ export class WoBasicDetailsService {
         let countQuery: any = this.db
             .select({ count: sql<number>`count(distinct ${woBasicDetails.id})::int` })
             .from(woBasicDetails);
+
+        if (woDetailsStatus) {
+            countQuery = countQuery.leftJoin(woDetails, eq(woDetails.woBasicDetailId, woBasicDetails.id));
+        }
 
         // Add joins if search is being used (searches in joined tables)
         if (search) {
@@ -295,7 +302,11 @@ export class WoBasicDetailsService {
         }
 
         // 4. Get Data
-        const rows = await this.getBaseQueryBuilder()
+        let query = this.getBaseQueryBuilder();
+        if (woDetailsStatus) {
+            query = query.leftJoin(woDetails, eq(woDetails.woBasicDetailId, woBasicDetails.id));
+        }
+        const rows = await query
             .where(whereClause)
             .orderBy(orderByClause)
             .limit(limit)
@@ -303,15 +314,7 @@ export class WoBasicDetailsService {
 
         const data = rows.map((r) => this.mapJoinedRowToResponseList(r));
 
-        return {
-            data,
-            meta: {
-                total,
-                page,
-                limit,
-                totalPages: Math.ceil(total / limit) || 1,
-            },
-        };
+        return wrapPaginatedResponse(data, total, page, limit);
     }
 
     async findById(id: number) {
@@ -828,31 +831,40 @@ export class WoBasicDetailsService {
     }
 
     // DASHBOARD/REPORTING
-    private getVisibilityConditions(user: ValidatedUser, teamId?: number) {
+    private buildRoleFilterConditions(user?: ValidatedUser, teamId?: number) {
         const conditions: any[] = [];
 
-        // Role ID 1 = Super User, 2 = Admin: Show all, respect teamId filter if provided
-        // const hasAdminViewPermission = user?.permissions.includes("ops.admin:read");
+        if (!user) return conditions;
 
-        if (user.roleId === 1 || user.roleId === 2 ) {
+        if (user.dataScope === 'all') {
+            // Super User / Admin: Show all, respect teamId filter if provided
             if (teamId !== undefined && teamId !== null) {
                 conditions.push(eq(woBasicDetails.team, teamId));
             }
-        } else if (user.roleId === 3 || user.roleId === 4 || user.roleId === 6) {
-            // Team Leader, Coordinator, Engineer: Filter by teamId
+        } else if (user.canSwitchTeams && teamId !== undefined && teamId !== null) {
+            // Coordinator with team switcher: filter by selected team
+            conditions.push(eq(woBasicDetails.team, teamId));
+        } else if (user.dataScope === 'team') {
+            // Team-scoped: filter by user's own team
             if (user.teamId) {
                 conditions.push(eq(woBasicDetails.team, user.teamId));
+            } else {
+                conditions.push(sql`1 = 0`);
             }
         } else {
-            // Other roles: Show where they created or are assigned as OE
-            conditions.push(
-                or(
-                    eq(woBasicDetails.createdBy, user.sub),
-                    eq(woBasicDetails.oeFirst, user.sub),
-                    eq(woBasicDetails.oeSiteVisit, user.sub),
-                    eq(woBasicDetails.oeDocsPrep, user.sub),
-                ),
-            );
+            // Self-scoped: Show where they created or are assigned as any OE role
+            if (user.sub) {
+                conditions.push(
+                    or(
+                        eq(woBasicDetails.createdBy, user.sub),
+                        eq(woBasicDetails.oeFirst, user.sub),
+                        eq(woBasicDetails.oeSiteVisit, user.sub),
+                        eq(woBasicDetails.oeDocsPrep, user.sub),
+                    ),
+                );
+            } else {
+                conditions.push(sql`1 = 0`);
+            }
         }
 
         return conditions;
@@ -861,21 +873,20 @@ export class WoBasicDetailsService {
     async getDashboardSummary(user?: ValidatedUser, teamId?: number) {
         const conditions: any[] = [];
         if (user) {
-            conditions.push(...this.getVisibilityConditions(user, teamId));
+            conditions.push(...this.buildRoleFilterConditions(user, teamId));
         }
         const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
         const [stageCounts] = await this.db
             .select({
-                total: sql<number>`count(*)::int`,
-                basicDetails: sql<number>`count(*) filter (where ${woBasicDetails.currentStage} = 'basic_details')::int`,
-                woDetails: sql<number>`count(*) filter (where ${woBasicDetails.currentStage} = 'wo_details')::int`,
-                woAcceptance: sql<number>`count(*) filter (where ${woBasicDetails.currentStage} = 'wo_acceptance')::int`,
-                woUpload: sql<number>`count(*) filter (where ${woBasicDetails.currentStage} = 'wo_upload')::int`,
+                total: sql<number>`count(distinct ${woBasicDetails.id})::int`,
+                basicDetails: sql<number>`count(distinct ${woBasicDetails.id})::int`,
+                woDetails: sql<number>`count(distinct ${woBasicDetails.id}) filter (where ${woDetails.status} = 'wo_details_filled')::int`,
                 completed: sql<number>`count(*) filter (where ${woBasicDetails.currentStage} = 'completed')::int`,
                 paused: sql<number>`count(*) filter (where ${woBasicDetails.isWorkflowPaused} = true)::int`,
             })
             .from(woBasicDetails)
+            .leftJoin(woDetails, eq(woDetails.woBasicDetailId, woBasicDetails.id))
             .where(whereClause);
 
         return {
@@ -890,7 +901,7 @@ export class WoBasicDetailsService {
             eq(woBasicDetails.currentStage, 'basic_details'),
         ];
         if (user) {
-            conditions.push(...this.getVisibilityConditions(user, teamId));
+            conditions.push(...this.buildRoleFilterConditions(user, teamId));
         }
 
         const rows = await this.db
@@ -908,7 +919,7 @@ export class WoBasicDetailsService {
     async getWorkflowStatusSummary(user?: ValidatedUser, teamId?: number) {
         const conditions: any[] = [];
         if (user) {
-            conditions.push(...this.getVisibilityConditions(user, teamId));
+            conditions.push(...this.buildRoleFilterConditions(user, teamId));
         }
         const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 

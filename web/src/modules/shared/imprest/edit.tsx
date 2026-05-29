@@ -665,7 +665,7 @@ const EmployeeImprestEditForm: React.FC = () => {
                                     </div>
 
                                     {/* Approval Date */}
-                                    <div className="space-y-2">
+                                    {/* <div className="space-y-2">
                                         <Label className="flex items-center gap-2">
                                             <Calendar className="h-4 w-4" />
                                             Approval Date
@@ -680,7 +680,7 @@ const EmployeeImprestEditForm: React.FC = () => {
                                         <p className="text-xs text-muted-foreground">
                                             Set a custom approval date for this imprest
                                         </p>
-                                    </div>
+                                    </div> */}
 
                                     <Separator />
 
