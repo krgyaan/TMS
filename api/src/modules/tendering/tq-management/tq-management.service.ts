@@ -731,7 +731,7 @@ export class TqManagementService {
                 .update(tenderResults)
                 .set({
                     technicallyQualified: qualified ? "Yes" : "No",
-                    status : qualified ? "Under Evaluation" : "Disqualified",
+                    status: qualified ? sql`CASE WHEN ${tenderResults.status} IS NULL OR ${tenderResults.status} = '' THEN 'Under Evaluation' ELSE ${tenderResults.status} END` : "Disqualified",
                     disqualificationReason: qualified ? null : (disqualificationReason || null),
                     tqStatus : tqStatus
                 })
