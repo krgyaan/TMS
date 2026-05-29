@@ -1427,7 +1427,7 @@ export class OnboardingService {
     });
   }
 
-  async approveEducationRecord(id: number, eduId: number, hrStatus: 'approved' | 'rejected', hrRemark: string, adminId: number) {
+  async approveEducationRecord(id: number, eduId: number, hrStatus: 'approved' | 'rejected', adminId: number, hrRemark?: string, ) {
     return this.db.transaction(async (tx) => {
       const [edu] = await tx.select().from(onboardingEducation).where(eq(onboardingEducation.id, eduId)).limit(1);
       if (!edu) throw new NotFoundException('Education record not found');
@@ -1569,13 +1569,20 @@ export class OnboardingService {
   }
 
   private async syncEducationToEmployee(tx: any, userId: number, edu: any) {
+    let yearOfCompletion = new Date().getFullYear();
+    if (edu.endDate) {
+      const parsedYear = new Date(edu.endDate).getFullYear();
+      if (!isNaN(parsedYear)) {
+        yearOfCompletion = parsedYear;
+      }
+    }
+
     await tx.insert(employeeEducation).values({
       userId,
       degree: edu.degree,
       institution: edu.institution,
       fieldOfStudy: edu.fieldOfStudy,
-      startDate: edu.startDate,
-      endDate: edu.endDate,
+      yearOfCompletion,
       grade: edu.grade,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -1618,5 +1625,19 @@ export class OnboardingService {
    */
   async delete(id: number): Promise<void> {
     await this.db.delete(onboardingRequests).where(eq(onboardingRequests.id, id));
+  }
+
+  // ── Stage Details Getters ──────────────────────────────────────────────────
+
+  async getEmployeeEducation(onboardingId: number) {
+    return this.db.select().from(onboardingEducation).where(eq(onboardingEducation.onboardingId, onboardingId)).orderBy(desc(onboardingEducation.id));
+  }
+
+  async getEmployeeExperience(onboardingId: number) {
+    return this.db.select().from(onboardingExperience).where(eq(onboardingExperience.onboardingId, onboardingId)).orderBy(desc(onboardingExperience.id));
+  }
+
+  async getEmployeeBankDetails(onboardingId: number) {
+    return this.db.select().from(onboardingBankDetails).where(eq(onboardingBankDetails.onboardingId, onboardingId)).orderBy(desc(onboardingBankDetails.id));
   }
 }
