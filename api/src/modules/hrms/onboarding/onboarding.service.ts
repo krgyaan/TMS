@@ -757,6 +757,7 @@ export class OnboardingService {
 
         return {
           ...row,
+          progress: row.progress === 'pending' || !row.progress ? 0 : Number(row.progress) || 0,
           employeeProgress: employeeProgressPercent,
           profilePhoto : profilePhoto,
 
