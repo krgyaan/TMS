@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { FileText, ExternalLink, Download, Calendar, Hash, Building2, Users, Clock, FileCheck, TrendingUp, CheckCircle2, XCircle, Pause, Play, Phone, Mail, User, Briefcase } from 'lucide-react';
+import { FileText, ExternalLink, Download, Calendar, Hash, Building2, Users, Clock, FileCheck, TrendingUp, Calculator, CheckCircle2, XCircle, Pause, Play, Phone, Mail, User, Briefcase } from 'lucide-react';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import type { WoBasicDetail, WorkflowStage } from '../helpers/basiDetail.types';
@@ -289,6 +289,95 @@ export function BasicDetailView({
                                 </TableCell>
                             </TableRow>
                         )}
+                        {data.finalPrice && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Final Price
+                                </TableCell>
+                                <TableCell className="text-sm font-semibold">
+                                    {formatINR(parseFloat(String(data.finalPrice)))}
+                                </TableCell>
+                                <TableCell colSpan={2} />
+                            </TableRow>
+                        )}
+
+                        {/* Budget Breakdown */}
+                        <TableRow className="bg-muted/50">
+                            <TableCell colSpan={4} className="font-semibold text-sm">
+                                <div className="flex items-center gap-2">
+                                    <Calculator className="h-4 w-4" />
+                                    Budget Breakdown
+                                </div>
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Supply (pre GST)
+                            </TableCell>
+                            <TableCell className="text-sm font-semibold">
+                                {data.budgetSupply
+                                    ? formatINR(parseFloat(String(data.budgetSupply)))
+                                    : '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Service (pre GST)
+                            </TableCell>
+                            <TableCell className="text-sm font-semibold">
+                                {data.budgetService
+                                    ? formatINR(parseFloat(String(data.budgetService)))
+                                    : '—'}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Freight (pre GST)
+                            </TableCell>
+                            <TableCell className="text-sm font-semibold">
+                                {data.budgetFreight
+                                    ? formatINR(parseFloat(String(data.budgetFreight)))
+                                    : '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Admin/Misc (pre GST)
+                            </TableCell>
+                            <TableCell className="text-sm font-semibold">
+                                {data.budgetAdmin
+                                    ? formatINR(parseFloat(String(data.budgetAdmin)))
+                                    : '—'}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                Buyback Sale (pre GST)
+                            </TableCell>
+                            <TableCell className="text-sm font-semibold">
+                                {data.budgetBuybackSale
+                                    ? formatINR(parseFloat(String(data.budgetBuybackSale)))
+                                    : '—'}
+                            </TableCell>
+                            <TableCell className="text-sm font-medium text-muted-foreground">
+                                GEM Charges (pre GST)
+                            </TableCell>
+                            <TableCell className="text-sm font-semibold">
+                                {data.budgetGemCharges
+                                    ? formatINR(parseFloat(String(data.budgetGemCharges)))
+                                    : '—'}
+                            </TableCell>
+                        </TableRow>
+                        <TableRow className="font-bold hover:bg-muted/30 transition-colors">
+                            <TableCell className="text-sm font-medium">Total Budget</TableCell>
+                            <TableCell className="text-sm font-semibold text-primary">
+                                {formatINR(
+                                    (parseFloat(String(data.budgetSupply || '0'))) +
+                                    (parseFloat(String(data.budgetService || '0'))) +
+                                    (parseFloat(String(data.budgetFreight || '0'))) +
+                                    (parseFloat(String(data.budgetAdmin || '0'))) +
+                                    (parseFloat(String(data.budgetBuybackSale || '0'))) +
+                                    (parseFloat(String(data.budgetGemCharges || '0')))
+                                )}
+                            </TableCell>
+                            <TableCell colSpan={2} />
+                        </TableRow>
 
                         {/* Operations Executive Assignments */}
                         {hasOeAssignments && (
