@@ -21,6 +21,7 @@ export default function KickOffShowPage() {
 
     const { data: woDetailRelations } = useWoDetailWithRelations(woDetailId ?? 0);
     const tenderId = woDetailRelations?.woBasicDetail?.tenderId ?? null;
+    const woBasicDetailId = woDetailRelations?.woBasicDetail?.id ?? null;
 
     const [activeTab, setActiveTab] = useState<"operation" | "tendering">("operation");
 
@@ -38,16 +39,21 @@ export default function KickOffShowPage() {
     const collapseAll = useCallback(() => setExpandedSections(new Set()), []);
 
     const renderSectionContent = useCallback((stepId: string) => {
-        if (!woDetailId) return null;
         switch (stepId) {
-            case "basic-details":        return <BasicDetailsSection woDetailId={woDetailId} />;
-            case "wo-details":           return <WoDetailsSection woDetailId={woDetailId} />;
-            case "kick-off":             return <KickOffSection woDetailId={woDetailId} />;
-            case "contract-agreement":   return <ContractAgreementSection woDetailId={woDetailId} />;
-            case "po-dashboard":         return <PoDashboardSection woDetailId={woDetailId} />;
-            default:                     return null;
+            case "basic-details":
+                return woBasicDetailId ? <BasicDetailsSection woBasicDetailId={woBasicDetailId} /> : null;
+            case "wo-details":
+                return woDetailId ? <WoDetailsSection woDetailId={woDetailId} /> : null;
+            case "kick-off":
+                return woDetailId ? <KickOffSection woDetailId={woDetailId} /> : null;
+            case "contract-agreement":
+                return woDetailId ? <ContractAgreementSection woDetailId={woDetailId} /> : null;
+            case "po-dashboard":
+                return woDetailId ? <PoDashboardSection woDetailId={woDetailId} /> : null;
+            default:
+                return null;
         }
-    }, [woDetailId]);
+    }, [woDetailId, woBasicDetailId]);
 
     if (!woId) {
         return (
