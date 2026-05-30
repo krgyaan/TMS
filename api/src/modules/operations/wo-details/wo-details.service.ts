@@ -3,7 +3,7 @@ import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
 import { woAcceptance, woAmendments, woBasicDetails, woBillingAddresses, woBillingBoq, woBuybackBoq, woContacts, woDetails, woDocuments, woKickoffMeetings, woQueries, woShippingAddresses } from '@db/schemas/operations';
 import { rfqs, rfqResponseDocuments, rfqResponses, tenderCostingSheets, tenderInfos } from '@db/schemas/tendering';
-import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { and, asc, desc, eq, ilike, isNull, ne, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { users } from '@/db/schemas/auth/users.schema';
@@ -54,6 +54,7 @@ type PageData =
 
 @Injectable()
 export class WoDetailsService {
+  private readonly logger = new Logger(WoDetailsService.name);
   constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
 
   private mapRowToResponse(row: WoDetailRow) {
@@ -388,6 +389,8 @@ export class WoDetailsService {
   }
 
   async findByIdWithRelations(id: number) {
+    this.logger.log(`findByIdWithRelations: fetching woDetail id=${id} with all relations`);
+
     const [row] = await this.db
       .select()
       .from(woDetails)
@@ -395,6 +398,7 @@ export class WoDetailsService {
       .limit(1);
 
     if (!row) {
+      this.logger.warn(`findByIdWithRelations: woDetail id=${id} not found`);
       throw new NotFoundException(`WO Detail with ID ${id} not found`);
     }
 
@@ -459,6 +463,9 @@ export class WoDetailsService {
         .limit(1),
     ]);
 
+    const tenderId = basicDetail[0]?.tenderId ?? null;
+    this.logger.log(`findByIdWithRelations: woDetail id=${id} loaded — tenderId=${tenderId}`);
+
     return {
       ...this.mapRowToResponse(row),
       woBasicDetail: basicDetail[0] ?? null,
@@ -475,6 +482,8 @@ export class WoDetailsService {
   }
 
   async findByWoBasicDetailId(woBasicDetailId: number) {
+    this.logger.log(`findByWoBasicDetailId: looking up woDetail for woBasicDetailId=${woBasicDetailId}`);
+
     const [row] = await this.db
       .select()
       .from(woDetails)
@@ -482,9 +491,11 @@ export class WoDetailsService {
       .limit(1);
 
     if (!row) {
+      this.logger.warn(`findByWoBasicDetailId: no woDetail found for woBasicDetailId=${woBasicDetailId}`);
       return null;
     }
 
+    this.logger.log(`findByWoBasicDetailId: woDetail found id=${row.id} for woBasicDetailId=${woBasicDetailId}`);
     return this.mapRowToResponse(row);
   }
 
@@ -1617,13 +1628,16 @@ export class WoDetailsService {
 
   // STEP STATUSES
   async getStepStatuses(woDetailId: number) {
-  const [detail] = await this.db
-    .select({ id: woDetails.id, woBasicDetailId: woDetails.woBasicDetailId, status: woDetails.status })
-    .from(woDetails)
-    .where(eq(woDetails.id, woDetailId))
-    .limit(1);
+    this.logger.log(`getStepStatuses: computing step statuses for woDetailId=${woDetailId}`);
+
+    const [detail] = await this.db
+      .select({ id: woDetails.id, woBasicDetailId: woDetails.woBasicDetailId, status: woDetails.status })
+      .from(woDetails)
+      .where(eq(woDetails.id, woDetailId))
+      .limit(1);
 
     if (!detail) {
+      this.logger.warn(`getStepStatuses: woDetail id=${woDetailId} not found — all steps false`);
       return {
         'basic-details': false,
         'wo-details': false,
@@ -1654,13 +1668,16 @@ export class WoDetailsService {
     const woDetailsCompleted = detail.status === 'wo_details_filled';
     const hasAcceptance = acceptance.length > 0;
 
-    return {
+    const result = {
       'basic-details': true,
       'wo-details': woDetailsCompleted || hasAcceptance,
       'kick-off': kickoff.length > 0,
       'contract-agreement': false, // will be enhanced
       'po-dashboard': false, // will be enhanced
     };
+
+    this.logger.log(`getStepStatuses: woDetailId=${woDetailId} → ${JSON.stringify(result)}`);
+    return result;
   }
 
   // CONSOLIDATED DATA
