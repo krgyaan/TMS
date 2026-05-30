@@ -12,7 +12,7 @@ class ProjectDashboardApiService extends BaseApiService {
 
     // ── Parallel dashboard endpoints ──
 
-    async getOverview(id: number): Promise<{ project: any; tender: any }> {
+    async getOverview(id: number): Promise<{ project: any; tender: any, woBasicDetail: any }> {
         return this.get(`/${id}/overview`);
     }
 

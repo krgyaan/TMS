@@ -1,7 +1,10 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useState, useCallback } from "react";
 import { useWoStepStatuses } from "@/hooks/api/useWoStepStatuses";
+import { useWoDetailWithRelations } from "@/hooks/api/useWoDetails";
 import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TenderViewPage } from "@/modules/tendering/tenders/TenderViewPage";
 import { BasicDetailsSection } from "@/modules/operations/wo-basic-details/components/BasicDetailsSection";
 import { WoDetailsSection } from "@/modules/operations/wo-details/components/WoDetailsSection";
 import { KickOffSection } from "@/modules/operations/kick-off/components/KickOffSection";
@@ -15,6 +18,11 @@ export default function WoDetailShowPage() {
     const woId = parseInt(id || "0");
 
     const { steps, woDetailId } = useWoStepStatuses(woId);
+
+    const { data: woDetailRelations } = useWoDetailWithRelations(woDetailId ?? 0);
+    const tenderId = woDetailRelations?.woBasicDetail?.tenderId ?? null;
+
+    const [activeTab, setActiveTab] = useState<"operation" | "tendering">("operation");
 
     const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["wo-details"]));
 
@@ -50,15 +58,36 @@ export default function WoDetailShowPage() {
     }
 
     return (
-        <ShowPageLayout
-            steps={steps}
-            expandedSections={expandedSections}
-            onToggleSection={toggleSection}
-            onExpandAll={expandAll}
-            onCollapseAll={collapseAll}
-            onBack={() => navigate(paths.operations.woDetailAcceptanceListPage)}
-            backLabel="Back to Acceptance List"
-            renderSectionContent={renderSectionContent}
-        />
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "operation" | "tendering")}>
+            <TabsList className="mb-4">
+                <TabsTrigger value="operation">Operation Details</TabsTrigger>
+                <TabsTrigger value="tendering">Tendering Details</TabsTrigger>
+            </TabsList>
+            <TabsContent value="operation">
+                <ShowPageLayout
+                    steps={steps}
+                    expandedSections={expandedSections}
+                    onToggleSection={toggleSection}
+                    onExpandAll={expandAll}
+                    onCollapseAll={collapseAll}
+                    onBack={() => navigate(paths.operations.woDetailAcceptanceListPage)}
+                    backLabel="Back to Acceptance List"
+                    renderSectionContent={renderSectionContent}
+                />
+            </TabsContent>
+            <TabsContent value="tendering">
+                {activeTab === "tendering" && tenderId ? (
+                    <TenderViewPage
+                        tenderId={tenderId}
+                        onBack={() => navigate(paths.operations.woDetailAcceptanceListPage)}
+                        backLabel="Back to Acceptance List"
+                    />
+                ) : (
+                    <div className="p-8 text-center text-muted-foreground">
+                        <p>No tendering data linked to this work order.</p>
+                    </div>
+                )}
+            </TabsContent>
+        </Tabs>
     );
 }
