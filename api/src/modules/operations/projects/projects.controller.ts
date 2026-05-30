@@ -16,10 +16,29 @@ import { ProjectsService } from "./projects.service";
 export class ProjectsController {
   constructor(private readonly service: ProjectsService) {}
 
-  @Get("/details/:projectId")
-  getDashboard(@Param("projectId", ParseIntPipe) projectId: number) {
-    return this.service.getDashboardData(projectId);
+  // ── Parallel dashboard endpoints ──
+
+  @Get(":id/overview")
+  getOverview(@Param("id", ParseIntPipe) id: number) {
+    return this.service.getOverview(id);
   }
+
+  @Get(":id/work-orders")
+  getWorkOrders(@Param("id", ParseIntPipe) id: number) {
+    return this.service.getWorkOrders(id);
+  }
+
+  @Get(":id/purchase-orders")
+  getProjectPurchaseOrders(@Param("id", ParseIntPipe) id: number) {
+    return this.service.getPurchaseOrders(id);
+  }
+
+  @Get(":id/imprests")
+  getImprests(@Param("id", ParseIntPipe) id: number) {
+    return this.service.getImprests(id);
+  }
+
+
 
   // Create Purchase Order
   @Post("purchase-orders")

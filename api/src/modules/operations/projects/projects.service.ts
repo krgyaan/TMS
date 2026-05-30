@@ -28,59 +28,115 @@ export class ProjectsService {
         private readonly logger: Logger,
     ) {}
 
-    // ================= DASHBOARD =================
-    async getDashboardData(projectId: number) {
-        const project = (await this.db.select().from(projects).where(eq(projects.id, projectId)))[0];
-
+    async getOverview(projectId: number) {
+        const [project] = await this.db
+            .select({
+                projectName: projects.projectName,
+                tenderId: projects.tenderId,
+            })
+            .from(projects)
+            .where(eq(projects.id, projectId));
         if (!project) throw new NotFoundException("Project not found");
-        let projectName = project.projectName;
 
-        const tender = project.tenderId ? (await this.db.select().from(tenderInfos).where(eq(tenderInfos.id, project.tenderId)))[0] : undefined;
+        const [tender] = project.tenderId
+            ? await this.db
+                .select({ id: tenderInfos.id, tenderNumber: tenderInfos.tenderNo })
+                .from(tenderInfos)
+                .where(eq(tenderInfos.id, project.tenderId))
+            : [];
 
-        const basicDetail = tender ? (await this.db.select().from(woBasicDetails).where(eq(woBasicDetails.tenderId, tender.id)))[0] : undefined;
-
-        const woDetail = basicDetail ? (await this.db.select().from(woDetails).where(eq(woDetails.woBasicDetailId, basicDetail.id)))[0] : undefined;
-
-        const woAcceptance = basicDetail ? (await this.db.select().from(woDetails).where(eq(woDetails.woBasicDetailId, basicDetail.id)))[0] : undefined;
-
-        const imprests = project.projectName ? await this.db.select({
-            id: employeeImprests.id,
-            amount: employeeImprests.amount,
-            projectName: employeeImprests.projectName,
-            partyName: employeeImprests.partyName,
-            category: imprestCategories.name,
-            status: employeeImprests.status,
-            approvalStatus: employeeImprests.status,
-            approvalDate: employeeImprests.approvedDate,
-            proof: employeeImprests.invoiceProof,
-            remark: employeeImprests.remark,
-            userId: employeeImprests.userId,
-            userName: users.name,
-        })
-        .from(employeeImprests)
-        .innerJoin(users, eq(users.id, employeeImprests.userId))
-        .innerJoin(imprestCategories, eq(imprestCategories.id, employeeImprests.categoryId))
-        .where(eq(employeeImprests.projectName, project.projectName)) : [];
-
-        const imprestSum = imprests.reduce((sum: number, item) => {
-            return sum + Number(item.amount ?? 0);
-        }, 0);
-
-        const purchaseOrdersData = tender ? await this.db.select().from(purchaseOrders).where(eq(purchaseOrders.tenderId, tender.id)) : [];
+        const [basicDetail] = tender
+            ? await this.db
+                .select({
+                    woValuePreGst: woBasicDetails.woValuePreGst,
+                    woValueGstAmt: woBasicDetails.woValueGstAmt,
+                    budget: woBasicDetails.budgetPreGst,
+                })
+                .from(woBasicDetails)
+                .where(eq(woBasicDetails.tenderId, tender.id))
+            : [];
 
         return {
-            project,
-            tender,
-            woBasicDetail: basicDetail,
-            woDetail,
-            woAcceptanceYes: woAcceptance,
-            imprests,
-            imprestSum,
-            purchaseOrders: purchaseOrdersData,
+            project: { projectName: project.projectName },
+            tender: tender ?? undefined,
+            woBasicDetail: basicDetail ?? {},
         };
     }
 
-    // ================= PO NUMBER =================
+    async getWorkOrders(projectId: number) {
+        const [project] = await this.db
+            .select({ tenderId: projects.tenderId })
+            .from(projects)
+            .where(eq(projects.id, projectId));
+        if (!project) throw new NotFoundException("Project not found");
+
+        const [tender] = project.tenderId
+            ? await this.db
+                .select({ id: tenderInfos.id })
+                .from(tenderInfos)
+                .where(eq(tenderInfos.id, project.tenderId))
+            : [];
+
+        const [basicDetail] = tender
+            ? await this.db
+                .select({
+                    number: woBasicDetails.woNumber,
+                    ldStartDate: woDetails.ldStartDate,
+                    maxLdDate: woDetails.maxLdDate,
+                    pbgApplicable: woDetails.isPbgApplicable,
+                    contractAgreement: woDetails.isContractAgreement,
+                })
+                .from(woBasicDetails)
+                .leftJoin(woDetails, eq(woDetails.woBasicDetailId, woBasicDetails.id))
+                .where(eq(woBasicDetails.tenderId, tender.id))
+            : [];
+
+        return { woBasicDetail: basicDetail ?? {} };
+    }
+
+    async getPurchaseOrders(projectId: number) {
+        const purchaseOrdersData = await this.db
+                .select({
+                    id: purchaseOrders.id,
+                    poNumber: purchaseOrders.poNumber,
+                    createdAt: purchaseOrders.createdAt,
+                    sellerName: purchaseOrders.sellerName,
+                })
+                .from(purchaseOrders)
+                .where(eq(purchaseOrders.projectId, projectId));
+
+        return { purchaseOrders: purchaseOrdersData };
+    }
+
+    async getImprests(projectId: number) {
+        const [project] = await this.db
+            .select({ projectName: projects.projectName })
+            .from(projects)
+            .where(eq(projects.id, projectId));
+        if (!project) throw new NotFoundException("Project not found");
+
+        const imprests = project.projectName
+            ? await this.db.select({
+                userName: users.name,
+                partyName: employeeImprests.partyName,
+                amount: employeeImprests.amount,
+                category: imprestCategories.name,
+                remark: employeeImprests.remark,
+                approvalStatus: employeeImprests.approvalStatus,
+                approvalDate: employeeImprests.approvedDate,
+                proof: employeeImprests.invoiceProof,
+            })
+            .from(employeeImprests)
+            .innerJoin(users, eq(users.id, employeeImprests.userId))
+            .innerJoin(imprestCategories, eq(imprestCategories.id, employeeImprests.categoryId))
+            .where(eq(employeeImprests.projectName, project.projectName))
+            : [];
+        const imprestSum = imprests.reduce((sum: number, item) => {
+            return sum + Number(item.amount ?? 0);
+        }, 0);
+        return { imprests, imprestSum };
+    }
+
     private async generatePONumber(tenderId: number) {
         const tender = (await this.db.select().from(tenderInfos).where(eq(tenderInfos.id, tenderId)))[0];
 
@@ -119,7 +175,6 @@ export class ProjectsService {
         return `${prefix}/${next.toString().padStart(4, "0")}`;
     }
 
-    // ================= CREATE PO =================
     async createPurchaseOrder(body: any) {
     const poNumber = await this.generatePONumber(body.tenderId);
 
@@ -207,7 +262,6 @@ export class ProjectsService {
         return { ...po, products: enrichedProducts, total };
     }
 
-    // ================Getting the total Product sum ============= //
     private getTotalProductValues(products: any[]) {
 
         let total = 0;

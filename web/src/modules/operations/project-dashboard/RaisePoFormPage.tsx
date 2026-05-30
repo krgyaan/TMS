@@ -1,92 +1,24 @@
-// src/pages/project-dashboard/RaisePO.tsx
-
-import React, { useState, useMemo } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import {
-  ArrowLeft,
-  Plus,
-  Trash2,
-  Package,
-  Building2,
-  Truck,
-  FileText,
-  UserPlus,
-  Calculator,
-  Calendar,
-  Hash,
-  Mail,
-  MapPin,
-  Loader2,
-  CheckCircle2,
-  AlertCircle,
-  Info,
-  Receipt,
-  ChevronDown,
-  ChevronUp,
-  Copy,
-} from "lucide-react";
-
-/* UI Components */
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { paths } from "@/app/routes/paths";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-  TableFooter,
-} from "@/components/ui/table";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-  TooltipProvider,
-} from "@/components/ui/tooltip";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useCreatePoParty, useCreatePurchaseOrder, usePoParties, useProjectOverview } from "@/hooks/api/useProjectDashboard";
+import { AlertCircle, ArrowLeft, Building2, Calculator, Calendar, CheckCircle2, Copy, FileText, Hash, Info, Loader2, Mail, MapPin, Package, Plus, Receipt, Trash2, Truck, UserPlus } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
+import type { CreatePartyDTO, CreatePurchaseOrderDTO } from "./helpers/projectDashboard.types";
 
-// Hooks
-import {
-  usePoParties,
-  useProjectDashboardDetails,
-  useCreatePurchaseOrder,
-  useCreatePoParty,
-} from "./project-dashboard.hooks";
-import type { CreatePurchaseOrderDTO, CreatePartyDTO } from "./project-dashboard.api";
-import { paths } from "@/app/routes/paths";
-
-/* ================================
-   TYPES
-================================ */
 interface Party {
   id: number;
   name: string;
@@ -200,8 +132,7 @@ export default function RaisePoFormPage() {
   const projectId = Number(id);
 
   // API Hooks
-  const { data: projectDetails, isLoading: isProjectLoading } = useProjectDashboardDetails(projectId);
-  console.log(projectDetails);
+  const { data: overview, isLoading: isProjectLoading } = useProjectOverview(projectId);
 
   const { data: partiesData, isLoading: isPartiesLoading } = usePoParties();
   const createPOMutation = useCreatePurchaseOrder();
@@ -422,10 +353,10 @@ export default function RaisePoFormPage() {
       return;
     }
 
-    if (!projectDetails?.tender?.id) {
-      toast.error("Project tender information not found.");
-      return;
-    }
+    // if (!overview?.tender?.id) {
+    //   toast.error("Project tender information not found.");
+    //   return;
+    // }
 
     try {
       const validProducts = products
@@ -439,7 +370,7 @@ export default function RaisePoFormPage() {
         }));
 
       const poData: CreatePurchaseOrderDTO = {
-        tenderId: projectDetails.tender.id,
+        tenderId: overview?.tender?.id || 3613,
         poDate: currentDate,
         sellerId: sellerInfo.sellerId ? Number(sellerInfo.sellerId) : undefined,
         sellerName: sellerInfo.sellerName,
@@ -499,14 +430,14 @@ export default function RaisePoFormPage() {
                 Raise Purchase Order
               </h1>
               <p className="text-muted-foreground">
-                {projectDetails?.project?.projectName || "Loading..."}
+                {overview?.project?.projectName || "Loading..."}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-3">
             <Badge variant="outline" className="text-sm">
               <FileText className="mr-2 h-3 w-3" />
-              {projectDetails?.tender?.tenderNumber || "N/A"}
+              {overview?.tender?.tenderNumber || "N/A"}
             </Badge>
             <Badge variant="secondary" className="text-sm">
               <Calendar className="mr-2 h-3 w-3" />
@@ -556,7 +487,7 @@ export default function RaisePoFormPage() {
                   </Label>
                   <Input
                     className="bg-muted"
-                    value={projectDetails?.project?.projectName || ""}
+                    value={overview?.project?.projectName || ""}
                     readOnly
                   />
                 </div>
