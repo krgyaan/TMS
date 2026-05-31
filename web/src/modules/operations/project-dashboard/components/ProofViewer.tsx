@@ -1,30 +1,15 @@
 import { Button } from "@/components/ui/button";
 import { ScrollBar, ScrollArea } from "@/components/ui/scroll-area";
-import { 
-    Tooltip, 
-    TooltipContent, 
-    TooltipProvider, 
-    TooltipTrigger 
-} from "@/components/ui/tooltip";
-import { AlertCircle, Badge, ChevronLeft, ChevronRight, Download, ExternalLink, FileText, Maximize2, RotateCw, ZoomIn, ZoomOut } from "lucide-react";
+import {  Tooltip,  TooltipContent,  TooltipProvider,  TooltipTrigger } from "@/components/ui/tooltip";
+import { AlertCircle, ChevronLeft, ChevronRight, Download, ExternalLink, FileText, Maximize2, RotateCw, ZoomIn, ZoomOut } from "lucide-react";
 import React from "react"
 import {useState} from  "react";
-import { 
-    Sheet, 
-    SheetContent, 
-    SheetHeader, 
-    SheetTitle, 
-    SheetDescription 
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import { formatCurrency } from "@/modules/performance/tender-executive/components/emd-helpers";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
-
-
-/* ================================
-   ENHANCED PROOF VIEWER SHEET
-================================ */
 export interface ProofViewerProps {
     isOpen: boolean;
     onClose: () => void;
@@ -479,10 +464,7 @@ export const ProofViewer: React.FC<ProofViewerProps> = ({
 
                                 {/* File type badge for non-images */}
                                 {(fileType !== 'image' || imageError) && (
-                                    <Badge 
-                                        variant={fileType === 'pdf' ? 'destructive' : 'outline'} 
-                                        className="text-xs uppercase"
-                                    >
+                                    <Badge variant={fileType === 'pdf' ? 'destructive' : 'outline'} className="text-xs uppercase">
                                         {fileType}
                                     </Badge>
                                 )}

@@ -20,7 +20,7 @@ import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 
 @Injectable()
-export class ProjectsService {
+export class ProjectDashboardService {
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
         
@@ -64,34 +64,17 @@ export class ProjectsService {
     }
 
     async getWorkOrders(projectId: number) {
-        const [project] = await this.db
-            .select({ tenderId: projects.tenderId })
-            .from(projects)
-            .where(eq(projects.id, projectId));
-        if (!project) throw new NotFoundException("Project not found");
-
-        const [tender] = project.tenderId
-            ? await this.db
-                .select({ id: tenderInfos.id })
-                .from(tenderInfos)
-                .where(eq(tenderInfos.id, project.tenderId))
-            : [];
-
-        const [basicDetail] = tender
-            ? await this.db
+        const workOrders = await this.db
                 .select({
-                    number: woBasicDetails.woNumber,
-                    ldStartDate: woDetails.ldStartDate,
-                    maxLdDate: woDetails.maxLdDate,
-                    pbgApplicable: woDetails.isPbgApplicable,
-                    contractAgreement: woDetails.isContractAgreement,
+                    id: purchaseOrders.id,
+                    poNumber: purchaseOrders.poNumber,
+                    createdAt: purchaseOrders.createdAt,
+                    sellerName: purchaseOrders.sellerName,
                 })
-                .from(woBasicDetails)
-                .leftJoin(woDetails, eq(woDetails.woBasicDetailId, woBasicDetails.id))
-                .where(eq(woBasicDetails.tenderId, tender.id))
-            : [];
+                .from(purchaseOrders)
+                .where(eq(purchaseOrders.projectId, projectId));
 
-        return { woBasicDetail: basicDetail ?? {} };
+        return { woBasicDetail: workOrders };
     }
 
     async getPurchaseOrders(projectId: number) {

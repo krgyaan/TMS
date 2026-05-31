@@ -10,11 +10,11 @@ import {
   Put,
 } from "@nestjs/common";
 
-import { ProjectsService } from "./projects.service";
+import { ProjectDashboardService } from "./project-dashboard.service";
 
 @Controller("projects")
-export class ProjectsController {
-  constructor(private readonly service: ProjectsService) {}
+export class ProjectDashboardController {
+  constructor(private readonly service: ProjectDashboardService) {}
 
   // ── Parallel dashboard endpoints ──
 
@@ -37,8 +37,6 @@ export class ProjectsController {
   getImprests(@Param("id", ParseIntPipe) id: number) {
     return this.service.getImprests(id);
   }
-
-
 
   // Create Purchase Order
   @Post("purchase-orders")
