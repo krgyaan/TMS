@@ -1,10 +1,12 @@
-import { FileText } from "lucide-react";
+import { FileText, Eye } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import SelectField from "@/components/form/SelectField";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProjectsMaster } from "@/hooks/api/useProjects";
 import { FormProvider, useForm } from "react-hook-form";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
+import { paths } from "@/app/routes/paths";
 
 import { EmployeeImprestsSection } from "./sections/EmployeeImprestsSection";
 import { ProjectOverviewSection } from "./sections/ProjectOverviewSection";
@@ -22,6 +24,7 @@ export default function ProjectDashboardPage() {
     const projectId = form.watch("projectId");
 
     const { data: projects = [] } = useProjectsMaster();
+    const navigate = useNavigate();
 
     return (
         <div className="min-h-screen bg-background">
@@ -43,7 +46,7 @@ export default function ProjectDashboardPage() {
                     <Card>
                         <CardContent className="pt-6">
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div className="md:col-span-1">
+                                <div className="md:col-span-2">
                                     <FormProvider {...form}>
                                         <SelectField
                                             control={form.control}
@@ -57,6 +60,17 @@ export default function ProjectDashboardPage() {
                                         />
                                     </FormProvider>
                                 </div>
+                                {projectId && (
+                                    <div className="flex items-end">
+                                        <Button
+                                            onClick={() => navigate(paths.operations.projectShowPage(Number(projectId)))}
+                                            className="gap-2"
+                                        >
+                                            <Eye className="h-4 w-4" />
+                                            View Full Details
+                                        </Button>
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
