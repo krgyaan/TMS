@@ -125,6 +125,43 @@ export const ProjectOverviewSection: React.FC<ProjectOverviewSectionProps> = ({
                         />
                         <StatCard label="Planned GP" value="-" />
                         <StatCard label="Actual GP" value="-" />
+                        
+                        <StatCard
+                            label="Budget for Supply"
+                            value={woBasicDetail?.budgetSupply
+                                ? formatINR(Number(woBasicDetail?.budgetSupply))
+                                : "-"}
+                        />
+                        <StatCard
+                            label="Budget for Service"
+                            value={woBasicDetail?.budgetService
+                                ? formatINR(Number(woBasicDetail?.budgetService))
+                                : "-"}
+                        />
+                        <StatCard
+                            label="Budget for Freight"
+                            value={woBasicDetail?.budgetFreight
+                                ? formatINR(Number(woBasicDetail?.budgetFreight))
+                                : "-"}
+                        />
+                        <StatCard
+                            label="Budget for Admin/Misc."
+                            value={woBasicDetail?.budgetAdmin
+                                ? formatINR(Number(woBasicDetail?.budgetAdmin))
+                                : "-"}
+                        />
+                        <StatCard
+                            label="Budget for Buyback/Sale"
+                            value={woBasicDetail?.budgetBuybackSale
+                                ? formatINR(Number(woBasicDetail?.budgetBuybackSale))
+                                : "-"}
+                        />
+                        <StatCard
+                            label="GEM Charges"
+                            value={woBasicDetail?.budgetGemCharges
+                                ? formatINR(Number(woBasicDetail?.budgetGemCharges))
+                                : "-"}
+                        />
                     </div>
                 </CardContent>
             </Card>

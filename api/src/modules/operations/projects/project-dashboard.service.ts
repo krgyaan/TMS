@@ -51,6 +51,12 @@ export class ProjectDashboardService {
                     woValuePreGst: woBasicDetails.woValuePreGst,
                     woValueGstAmt: woBasicDetails.woValueGstAmt,
                     budget: woBasicDetails.budgetPreGst,
+                    budgetSupply: woBasicDetails.budgetSupply,
+                    budgetService: woBasicDetails.budgetService,
+                    budgetFreight: woBasicDetails.budgetFreight,
+                    budgetAdmin: woBasicDetails.budgetAdmin,
+                    budgetBuybackSale: woBasicDetails.budgetBuybackSale,
+                    budgetGemCharges: woBasicDetails.budgetGemCharges,
                 })
                 .from(woBasicDetails)
                 .where(eq(woBasicDetails.tenderId, tender.id))
