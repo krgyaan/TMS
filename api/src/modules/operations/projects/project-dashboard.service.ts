@@ -15,7 +15,7 @@ import { teams } from "@/db/schemas/master/teams.schema";
 import { organizations } from "@/db/schemas/master/organizations.schema";
 import { items } from "@/db/schemas/master/items.schema";
 import { locations } from "@/db/schemas/master/locations.schema";
-import { imprestCategories, users } from "@/db/schemas";
+import { imprestCategories, users, tenderInformation } from "@/db/schemas";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 
@@ -48,6 +48,7 @@ export class ProjectDashboardService {
         const [basicDetail] = tender
             ? await this.db
                 .select({
+                    id: woBasicDetails.id,
                     woValuePreGst: woBasicDetails.woValuePreGst,
                     woValueGstAmt: woBasicDetails.woValueGstAmt,
                     budget: woBasicDetails.budgetPreGst,
@@ -62,10 +63,35 @@ export class ProjectDashboardService {
                 .where(eq(woBasicDetails.tenderId, tender.id))
             : [];
 
+        const [woDetail] = basicDetail
+            ? await this.db
+                .select({
+                    ldApplicable: woDetails.ldApplicable,
+                    maxLd: woDetails.maxLd,
+                    ldStartDate: woDetails.ldStartDate,
+                    maxLdDate: woDetails.maxLdDate,
+                })
+                .from(woDetails)
+                .where(eq(woDetails.woBasicDetailId, basicDetail.id))
+            : [];
+
+        const [tenderInfo] = tender
+            ? await this.db
+                .select({
+                    ldRequired: tenderInformation.ldRequired,
+                    ldPercentagePerWeek: tenderInformation.ldPercentagePerWeek,
+                    maxLdPercentage: tenderInformation.maxLdPercentage,
+                })
+                .from(tenderInformation)
+                .where(eq(tenderInformation.tenderId, tender.id))
+            : [];
+
         return {
             project: { projectName: project.projectName },
             tender: tender ?? undefined,
             woBasicDetail: basicDetail ?? {},
+            woDetail: woDetail ?? undefined,
+            tenderInfoSheet: tenderInfo ?? undefined,
         };
     }
 

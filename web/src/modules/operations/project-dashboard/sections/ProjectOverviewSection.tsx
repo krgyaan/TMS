@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StatCard } from "../components/StatCard";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
+import { formatDate } from "@/hooks/useFormatedDate";
 
 interface ProjectOverviewSectionProps {
     projectId: number | null;
@@ -38,6 +39,20 @@ export const ProjectOverviewSection: React.FC<ProjectOverviewSectionProps> = ({
     }
 
     const woBasicDetail = data?.woBasicDetail ?? {};
+    const woDetail = data?.woDetail ?? {};
+    const infoSheet = data?.tenderInfoSheet ?? {};
+
+    function daysRemaining(dateStr: string | null | undefined): number | null {
+        if (!dateStr) return null;
+        const target = new Date(dateStr);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    }
+
+    const ldStartRemaining = daysRemaining(woDetail.ldStartDate);
+    const maxLdRemaining = daysRemaining(woDetail.maxLdDate);
+    const showLdStatus = woDetail?.ldApplicable && (ldStartRemaining !== null || maxLdRemaining !== null);
 
     return (
         <>
@@ -86,6 +101,53 @@ export const ProjectOverviewSection: React.FC<ProjectOverviewSectionProps> = ({
                     </div>
                 </CardHeader>
                 <CardContent>
+                    <p className="text-sm text-muted-foreground">
+                        {(infoSheet?.ldRequired || infoSheet?.ldPercentagePerWeek) && (
+                            <>
+                                In Tender Info Sheet, LD is{" "}
+                                {infoSheet.ldRequired === "YES" ? "applicable" : "not applicable"},
+                                at{" "}
+                                <Badge variant="secondary" className="mx-1">
+                                    {infoSheet?.ldPercentagePerWeek ?? "-"}%
+                                </Badge>
+                                LD per week and at{" "}
+                                <Badge variant="secondary" className="mx-1">
+                                    {infoSheet?.maxLdPercentage ?? "-"}%
+                                </Badge>
+                                Max LD.
+                            </>
+                        )}
+                    </p>
+
+                    <p className="text-sm text-muted-foreground">
+                        {woDetail?.ldApplicable && (
+                            <>
+                                Work Order has LD applicable with Start Date on{" "}
+                                <Badge variant="outline" className="mx-1">
+                                    {formatDate(woDetail.ldStartDate)}
+                                </Badge>
+                                and Max LD Date on{" "}
+                                <Badge variant="outline" className="mx-1">
+                                    {formatDate(woDetail.maxLdDate)}
+                                </Badge>
+                                .
+                            </>
+                        )}
+                    </p>
+                    {showLdStatus && (
+                        <div className="flex items-center gap-3 my-4 text-sm">
+                            {ldStartRemaining !== null && (
+                                <Badge variant={ldStartRemaining > 0 ? "success" : "destructive"}>
+                                    Days remaining to LD start: {ldStartRemaining > 0 ? `${ldStartRemaining} days` : `Overdue ${Math.abs(ldStartRemaining)} days`}
+                                </Badge>
+                            )}
+                            {maxLdRemaining !== null && (
+                                <Badge variant={maxLdRemaining > 0 ? "success" : "destructive"}>
+                                    Days remaining to Max LD: {maxLdRemaining > 0 ? `${maxLdRemaining} days` : `Overdue ${Math.abs(maxLdRemaining)} days`}
+                                </Badge>
+                            )}
+                        </div>
+                    )}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <StatCard
                             label="WO Value (Pre GST)"
