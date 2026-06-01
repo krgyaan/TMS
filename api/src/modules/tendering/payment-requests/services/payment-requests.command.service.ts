@@ -466,6 +466,7 @@ export class PaymentRequestsCommandService {
                 courierAddress: (details[`${shorthand}CourierAddress`] || details.bgCourierAddress || details.ddCourierAddress || details.fdrCourierAddress) || null,
                 courierAddressJson,
                 courierDeadline: (details[`${shorthand}CourierHours`] || details.bgCourierDays || details.ddCourierHours || details.fdrCourierHours) || null,
+                status: 'PENDING',
                 isActive: true,
                 createdBy: userId,
             })
@@ -588,6 +589,7 @@ export class PaymentRequestsCommandService {
                 issueDate: today,
                 courierDeadline: ddFdrInstrument.courierDeadline,
                 courierAddress: ddFdrInstrument.courierAddress,
+                status: 'PENDING',
                 isActive: true,
                 createdBy: userId,
             })
@@ -599,8 +601,8 @@ export class PaymentRequestsCommandService {
             .values({
                 instrumentId: chequeInstrument.id,
                 chequeDate: today,
-                chequeReason: ddFdrInstrument.purpose,
-                chequeNeeds: ddFdrInstrument.isActive ? 'DD/FDR' : null,
+                chequeReason: ddFdrInstrument.instrumentType,
+                chequeNeeds: 3, // Default to 3 hrs for auto-created Cheque
                 linkedDdId: ddFdrInstrument.instrumentType === 'DD' ? ddFdrInstrument.id : null,
                 linkedFdrId: ddFdrInstrument.instrumentType === 'FDR' ? ddFdrInstrument.id : null,
             })
