@@ -7,9 +7,7 @@ import { NumberInput } from "@/components/form/NumberInput";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Plus, Copy, Trash2, AlertCircle, Calculator } from "lucide-react";
 import { calculateTotals, formatCurrency } from "../helpers/projectDashboard.mapper";
 import type { PurchaseOrderFormValues } from "../helpers/purchaseOrder.schema";
@@ -64,12 +62,12 @@ export function ProductsField({ control }: ProductsFieldProps) {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-[5%] text-center">#</TableHead>
-                            <TableHead className="w-[22%]">Description *</TableHead>
+                            <TableHead className="w-[5%]">#</TableHead>
+                            <TableHead className="w-[50%]">Description *</TableHead>
                             <TableHead className="w-[10%]">HSN/SAC *</TableHead>
-                            <TableHead className="w-[9%] text-right">Qty *</TableHead>
-                            <TableHead className="w-[11%] text-right">Rate (₹) *</TableHead>
-                            <TableHead className="w-[9%] text-right">GST % *</TableHead>
+                            <TableHead className="w-[9%]">Qty *</TableHead>
+                            <TableHead className="w-[11%]">Rate (₹) *</TableHead>
+                            <TableHead className="w-[9%]">GST % *</TableHead>
                             <TableHead className="w-[12%] text-right">Taxable</TableHead>
                             <TableHead className="w-[10%] text-right">GST</TableHead>
                             <TableHead className="w-[12%] text-right">Total</TableHead>
@@ -88,7 +86,7 @@ export function ProductsField({ control }: ProductsFieldProps) {
 
                             return (
                                 <TableRow key={field.id} className="group">
-                                    <TableCell className="text-center text-muted-foreground font-medium align-top pt-4">
+                                    <TableCell className="text-muted-foreground font-medium align-top pt-4">
                                         {index + 1}
                                     </TableCell>
                                     <TableCell className="p-1 align-top pt-2">
@@ -160,32 +158,7 @@ export function ProductsField({ control }: ProductsFieldProps) {
                                         {qty > 0 && rate > 0 ? formatCurrency(gstAmount) : "-"}
                                     </TableCell>
                                     <TableCell className="p-1 text-right align-top pt-4">
-                                        <TooltipProvider>
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <span className="font-semibold tabular-nums cursor-help">
-                                                        {qty > 0 && rate > 0 ? formatCurrency(total) : "-"}
-                                                    </span>
-                                                </TooltipTrigger>
-                                                <TooltipContent side="left" className="p-3">
-                                                    <div className="text-sm space-y-1">
-                                                        <div className="flex justify-between gap-4">
-                                                            <span className="text-muted-foreground">Taxable:</span>
-                                                            <span className="font-medium">{formatCurrency(lineTotal)}</span>
-                                                        </div>
-                                                        <div className="flex justify-between gap-4">
-                                                            <span className="text-muted-foreground">GST ({gstRate}%):</span>
-                                                            <span className="font-medium">{formatCurrency(gstAmount)}</span>
-                                                        </div>
-                                                        <Separator className="my-1" />
-                                                        <div className="flex justify-between gap-4 font-semibold">
-                                                            <span>Total:</span>
-                                                            <span>{formatCurrency(total)}</span>
-                                                        </div>
-                                                    </div>
-                                                </TooltipContent>
-                                            </Tooltip>
-                                        </TooltipProvider>
+                                        {qty > 0 && rate > 0 ? formatCurrency(total) : "-"}
                                     </TableCell>
                                     <TableCell className="p-1 align-top pt-2">
                                         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">

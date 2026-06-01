@@ -9,22 +9,22 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useCreatePoParty, useCreatePurchaseOrder, usePoParties, useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCreatePoParty, useCreatePurchaseOrder, usePoParties, useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { useGetTeamMembers } from "@/hooks/api/useUsers";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Building2, Calculator, Calendar, FileText, Hash, Info, Loader2, Mail, MapPin, Phone, Receipt, UserCheck, UserPlus } from "lucide-react";
+import { ArrowLeft, Building2, Calendar, FileText, Hash, Info, Loader2, Mail, MapPin, Phone, Receipt, UserPlus } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ProductsField } from "./components/ProductsField";
-import { calculateTotals, formatCurrency, formatDateForInput, mapFormToCreateDTO } from "./helpers/projectDashboard.mapper";
+import { formatDateForInput, mapFormToCreateDTO } from "./helpers/projectDashboard.mapper";
 import type { CreatePartyDTO } from "./helpers/projectDashboard.types";
 import { purchaseOrderFormSchema, type PurchaseOrderFormValues } from "./helpers/purchaseOrder.schema";
 
@@ -115,8 +115,6 @@ export default function RaisePoFormPage() {
     resolver: zodResolver(purchaseOrderFormSchema) as any,
     defaultValues: defaultFormValues,
   });
-  const products = form.watch("products");
-  const calculations = calculateTotals(products || []);
   const selectedSellerId = form.watch("sellerId");
   const selectedPartyId = form.watch("partyId");
 
@@ -361,7 +359,7 @@ export default function RaisePoFormPage() {
 
               <Separator className="my-6" />
               <p className="text-sm font-medium text-muted-foreground mb-4">Contact Person</p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
                     Quick Fill from Team Member
