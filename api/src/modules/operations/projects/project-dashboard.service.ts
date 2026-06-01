@@ -217,6 +217,10 @@ export class ProjectDashboardService {
             sellerGstNo: body.sellerGstNo,
             sellerPanNo: body.sellerPanNo,
             sellerMsmeNo: body.sellerMsmeNo,
+            sellerCinNo: body.sellerCinNo,
+            contactPersonName: body.contactPersonName,
+            contactPersonPhone: body.contactPersonPhone,
+            contactPersonEmail: body.contactPersonEmail,
             
             // Ship To Info
             shipToName: body.shipToName,
@@ -230,6 +234,14 @@ export class ProjectDashboardService {
             paymentTerms: body.paymentTerms,
             deliveryPeriod: body.deliveryPeriod,
             remarks: body.remarks,
+            warrantyDispatch: body.warrantyDispatch,
+            warrantyInstallation: body.warrantyInstallation,
+            freight: body.freight,
+            transitInsurance: body.transitInsurance,
+            materialUnloading: body.materialUnloading,
+            technicalSpecifications: body.technicalSpecifications,
+            documentation: body.documentation,
+            poRaisedBy: body.poRaisedBy,
             projectId: project?.id,
         })
         .returning()
@@ -238,13 +250,23 @@ export class ProjectDashboardService {
     // Insert products
     if (body.products && body.products.length > 0) {
         for (const product of body.products) {
+        const qty = Number(product.qty);
+        const rate = Number(product.rate);
+        const gstRate = Number(product.gstRate);
+        const taxableAmount = qty * rate;
+        const gstAmount = (taxableAmount * gstRate) / 100;
+        const totalAmount = taxableAmount + gstAmount;
+
         await this.db.insert(purchaseOrderProducts).values({
             purchaseOrderId: po.id,
             description: product.description,
             hsnSac: product.hsnSac,
             qty: product.qty,
             rate: product.rate.toString(),
+            taxableAmount: taxableAmount.toString(),
             gstRate: product.gstRate.toString(),
+            gstAmount: gstAmount.toString(),
+            totalAmount: totalAmount.toString(),
         });
         }
     }
@@ -336,6 +358,10 @@ export class ProjectDashboardService {
                     sellerGstNo: body.sellerGstNo,
                     sellerPanNo: body.sellerPanNo,
                     sellerMsmeNo: body.sellerMsmeNo,
+                    sellerCinNo: body.sellerCinNo,
+                    contactPersonName: body.contactPersonName,
+                    contactPersonPhone: body.contactPersonPhone,
+                    contactPersonEmail: body.contactPersonEmail,
                     
                     shipToName: body.shipToName,
                     shippingAddress: body.shippingAddress,
@@ -348,6 +374,14 @@ export class ProjectDashboardService {
                     paymentTerms: body.paymentTerms,
                     deliveryPeriod: body.deliveryPeriod,
                     remarks: body.remarks,
+                    warrantyDispatch: body.warrantyDispatch,
+                    warrantyInstallation: body.warrantyInstallation,
+                    freight: body.freight,
+                    transitInsurance: body.transitInsurance,
+                    materialUnloading: body.materialUnloading,
+                    technicalSpecifications: body.technicalSpecifications,
+                    documentation: body.documentation,
+                    poRaisedBy: body.poRaisedBy,
                     
                     updatedAt: new Date(),
                 })
@@ -363,13 +397,23 @@ export class ProjectDashboardService {
         // Insert updated products
         if (body.products && body.products.length > 0) {
             for (const product of body.products) {
+                const qty = Number(product.qty);
+                const rate = Number(product.rate);
+                const gstRate = Number(product.gstRate);
+                const taxableAmount = qty * rate;
+                const gstAmount = (taxableAmount * gstRate) / 100;
+                const totalAmount = taxableAmount + gstAmount;
+
                 await this.db.insert(purchaseOrderProducts).values({
                     purchaseOrderId: id,
                     description: product.description,
                     hsnSac: product.hsnSac,
                     qty: product.qty,
                     rate: product.rate.toString(),
+                    taxableAmount: taxableAmount.toString(),
                     gstRate: product.gstRate.toString(),
+                    gstAmount: gstAmount.toString(),
+                    totalAmount: totalAmount.toString(),
                 });
             }
         }
