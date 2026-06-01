@@ -38,7 +38,6 @@ export const PhysicalDocsFormSchema = z.object({
         else if (!/^\d{6}$/.test(data.toPin)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Pin code must be 6 digits', path: ['toPin'] });
         
         if (!data.toMobile) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Mobile number is required', path: ['toMobile'] });
-        else if (!/^\d{10}$/.test(data.toMobile)) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Mobile number must be 10 digits', path: ['toMobile'] });
         
         if (!data.empFrom) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Employee is required', path: ['empFrom'] });
         if (!data.delDate) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Delivery date is required', path: ['delDate'] });
