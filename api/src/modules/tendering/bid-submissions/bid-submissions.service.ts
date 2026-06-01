@@ -766,13 +766,13 @@ export class BidSubmissionsService {
                 validStatusIds = [9, 10, 11, 12, 13, 14, 15, 31, 32];
                 break;
             case 'tender-info-approval':
-                validStatusIds = [9, 10, 11, 12, 13, 14, 15, 31, 32]; 
+                validStatusIds = [8, 9, 10, 11, 12, 13, 14, 15, 31, 32]; 
                 break;
             case 'phy-doc':
                 validStatusIds = []; 
                 break;
             case 'rfq':
-                validStatusIds = [14 ,35]; 
+                validStatusIds = [14 ,35, 47]; 
                 break;
             case 'emd':
                 validStatusIds = [33];
@@ -780,13 +780,13 @@ export class BidSubmissionsService {
                 validStatusIds = [];
                 break;
             case 'costing-sheet':
-                validStatusIds = [10, 14 ,34, 35, 44, 36]; 
+                validStatusIds = [10, 14 ,34, 35, 36, 44, 47 ]; 
                 break;
             case 'costing-approval':
-                validStatusIds = [10, 34, 44]; 
+                validStatusIds = [10, 34, 44, 47]; 
                 break;
             case 'bid-submission':
-                validStatusIds = [8 , 10, 16 , 33 , 34, 35 ,36, 44];
+                validStatusIds = [8 , 10, 16 , 33 , 34, 35 ,36, 44, 47];
                 break;
         }
 
