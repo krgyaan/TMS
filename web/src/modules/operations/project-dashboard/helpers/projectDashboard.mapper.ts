@@ -1,136 +1,123 @@
-import type {
-    CreatePurchaseOrderDTO,
-    UpdatePurchaseOrderDTO,
-} from "./projectDashboard.types";
+import type { CreatePurchaseOrderDTO, UpdatePurchaseOrderDTO } from "./projectDashboard.types";
+import type { PurchaseOrderFormValues } from "./purchaseOrder.schema";
 
-interface ProductFormItem {
-    id: string;
-    description: string;
-    hsnSac: string;
-    qty: number;
-    rate: number;
-    gstRate: number;
+export function formatDateForInput(date: Date | string): string {
+    const d = typeof date === "string" ? new Date(date) : date;
+    return d.toISOString().split("T")[0];
 }
 
-interface SellerFormInfo {
-    sellerId: string;
-    sellerName: string;
-    sellerEmail: string;
-    sellerAddress: string;
-    sellerGstNo: string;
-    sellerPanNo: string;
-    sellerMsmeNo: string;
-}
-
-interface ShipToFormInfo {
-    partyId: string;
-    shipToName: string;
-    shippingAddress: string;
-    shipToGst: string;
-    shipToPan: string;
-}
-
-export function mapProductsToDTO(products: ProductFormItem[]) {
-    return products
-        .filter((p) => p.description.trim() && p.qty > 0 && p.rate > 0)
-        .map((p) => ({
-            description: p.description,
-            hsnSac: p.hsnSac,
-            qty: p.qty,
-            rate: p.rate,
-            gstRate: p.gstRate,
-        }));
-}
-
-export function mapFormToCreatePayload(
+export function mapFormToCreateDTO(
+    values: PurchaseOrderFormValues,
     tenderId: number,
-    poDate: string,
-    sellerInfo: SellerFormInfo,
-    shipToInfo: ShipToFormInfo,
-    products: ProductFormItem[],
-    optional: {
-        quotationNo?: string;
-        quotationDate?: string;
-        paymentTerms?: string;
-        deliveryPeriod?: string;
-        remarks?: string;
-    }
 ): CreatePurchaseOrderDTO {
     return {
         tenderId,
-        poDate,
-        sellerId: sellerInfo.sellerId ? Number(sellerInfo.sellerId) : undefined,
-        sellerName: sellerInfo.sellerName,
-        sellerEmail: sellerInfo.sellerEmail,
-        sellerAddress: sellerInfo.sellerAddress,
-        sellerGstNo: sellerInfo.sellerGstNo,
-        sellerPanNo: sellerInfo.sellerPanNo,
-        sellerMsmeNo: sellerInfo.sellerMsmeNo,
-        shipToName: shipToInfo.shipToName,
-        shippingAddress: shipToInfo.shippingAddress,
-        shipToGst: shipToInfo.shipToGst,
-        shipToPan: shipToInfo.shipToPan,
-        products: mapProductsToDTO(products),
-        ...optional,
+        poDate: values.poDate,
+        sellerId: values.sellerId ? Number(values.sellerId) : undefined,
+        sellerName: values.sellerName,
+        sellerEmail: values.sellerEmail || undefined,
+        sellerAddress: values.sellerAddress || undefined,
+        sellerGstNo: values.sellerGstNo || undefined,
+        sellerPanNo: values.sellerPanNo || undefined,
+        sellerMsmeNo: values.sellerMsmeNo || undefined,
+        sellerCinNo: values.sellerCinNo || undefined,
+        contactPersonName: values.contactPersonName || undefined,
+        contactPersonPhone: values.contactPersonPhone || undefined,
+        contactPersonEmail: values.contactPersonEmail || undefined,
+        shipToName: values.shipToName,
+        shippingAddress: values.shippingAddress,
+        shipToGst: values.shipToGst || undefined,
+        shipToPan: values.shipToPan || undefined,
+        products: values.products
+            .filter(p => p.description && p.qty !== null && p.rate !== null && p.qty > 0)
+            .map(p => ({
+                description: p.description,
+                hsnSac: p.hsnSac,
+                qty: p.qty!,
+                rate: p.rate!,
+                gstRate: p.gstRate,
+            })),
+        quotationNo: values.quotationNo || undefined,
+        quotationDate: values.quotationDate || undefined,
+        paymentTerms: values.paymentTerms || undefined,
+        deliveryPeriod: values.deliveryPeriod || undefined,
+        remarks: values.remarks || undefined,
+        warrantyDispatch: values.warrantyDispatch || undefined,
+        warrantyInstallation: values.warrantyInstallation || undefined,
+        freight: values.freight || undefined,
+        transitInsurance: values.transitInsurance || undefined,
+        materialUnloading: values.materialUnloading || undefined,
+        technicalSpecifications: values.technicalSpecifications || undefined,
+        documentation: values.documentation || undefined,
+        poRaisedBy: values.poRaisedBy ? Number(values.poRaisedBy) || undefined : undefined,
     };
 }
 
-export function mapFormToUpdatePayload(
-    poDate: string,
-    sellerInfo: SellerFormInfo,
-    shipToInfo: ShipToFormInfo,
-    products: ProductFormItem[],
-    optional: {
-        quotationNo?: string;
-        quotationDate?: string;
-        paymentTerms?: string;
-        deliveryPeriod?: string;
-        remarks?: string;
-    }
+export function mapFormToUpdateDTO(
+    values: PurchaseOrderFormValues,
 ): UpdatePurchaseOrderDTO {
     return {
-        poDate,
-        sellerId: sellerInfo.sellerId ? Number(sellerInfo.sellerId) : undefined,
-        sellerName: sellerInfo.sellerName,
-        sellerEmail: sellerInfo.sellerEmail,
-        sellerAddress: sellerInfo.sellerAddress,
-        sellerGstNo: sellerInfo.sellerGstNo,
-        sellerPanNo: sellerInfo.sellerPanNo,
-        sellerMsmeNo: sellerInfo.sellerMsmeNo,
-        shipToName: shipToInfo.shipToName,
-        shippingAddress: shipToInfo.shippingAddress,
-        shipToGst: shipToInfo.shipToGst,
-        shipToPan: shipToInfo.shipToPan,
-        products: mapProductsToDTO(products),
-        ...optional,
+        poDate: values.poDate,
+        sellerId: values.sellerId ? Number(values.sellerId) : undefined,
+        sellerName: values.sellerName,
+        sellerEmail: values.sellerEmail || undefined,
+        sellerAddress: values.sellerAddress || undefined,
+        sellerGstNo: values.sellerGstNo || undefined,
+        sellerPanNo: values.sellerPanNo || undefined,
+        sellerMsmeNo: values.sellerMsmeNo || undefined,
+        sellerCinNo: values.sellerCinNo || undefined,
+        contactPersonName: values.contactPersonName || undefined,
+        contactPersonPhone: values.contactPersonPhone || undefined,
+        contactPersonEmail: values.contactPersonEmail || undefined,
+        shipToName: values.shipToName,
+        shippingAddress: values.shippingAddress,
+        shipToGst: values.shipToGst || undefined,
+        shipToPan: values.shipToPan || undefined,
+        products: values.products
+            .filter(p => p.description && p.qty !== null && p.rate !== null && p.qty > 0)
+            .map(p => ({
+                description: p.description,
+                hsnSac: p.hsnSac,
+                qty: p.qty!,
+                rate: p.rate!,
+                gstRate: p.gstRate,
+            })),
+        quotationNo: values.quotationNo || undefined,
+        quotationDate: values.quotationDate || undefined,
+        paymentTerms: values.paymentTerms || undefined,
+        deliveryPeriod: values.deliveryPeriod || undefined,
+        remarks: values.remarks || undefined,
+        warrantyDispatch: values.warrantyDispatch || undefined,
+        warrantyInstallation: values.warrantyInstallation || undefined,
+        freight: values.freight || undefined,
+        transitInsurance: values.transitInsurance || undefined,
+        materialUnloading: values.materialUnloading || undefined,
+        technicalSpecifications: values.technicalSpecifications || undefined,
+        documentation: values.documentation || undefined,
+        poRaisedBy: values.poRaisedBy ? Number(values.poRaisedBy) || undefined : undefined,
     };
 }
 
-export function mapProductToForm(product: any): ProductFormItem {
-    return {
-        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        description: product.description || "",
-        hsnSac: product.hsnSac || "",
-        qty: Number(product.qty) || 0,
-        rate: Number(product.rate) || 0,
-        gstRate: Number(product.gstRate) || 18,
-    };
-}
-
-export function calculateProductTotals(products: ProductFormItem[]) {
+export function calculateTotals(products: Array<{ qty: number | null; rate: number | null; gstRate: number }>) {
     let subtotal = 0;
     let totalGst = 0;
 
-    products.forEach((product) => {
-        const lineTotal = product.qty * product.rate;
-        const gstAmount = (lineTotal * product.gstRate) / 100;
+    products.forEach(p => {
+        const qty = p.qty ?? 0;
+        const rate = p.rate ?? 0;
+        const lineTotal = qty * rate;
+        const gst = (lineTotal * p.gstRate) / 100;
         subtotal += lineTotal;
-        totalGst += gstAmount;
+        totalGst += gst;
     });
 
-    return {
-        subtotal,
-        totalGst,
-        grandTotal: subtotal + totalGst,
-    };
+    return { subtotal, totalGst, grandTotal: subtotal + totalGst };
 }
+
+export const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("en-IN", {
+        style: "currency",
+        currency: "INR",
+        maximumFractionDigits: 2,
+    }).format(amount);
+};

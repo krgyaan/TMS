@@ -9,6 +9,10 @@ export interface CreatePurchaseOrderDTO {
     sellerGstNo: string;
     sellerPanNo: string;
     sellerMsmeNo: string;
+    sellerCinNo?: string;
+    contactPersonName?: string;
+    contactPersonPhone?: string;
+    contactPersonEmail?: string;
     shipToName: string;
     shippingAddress: string;
     shipToGst: string;
@@ -19,6 +23,14 @@ export interface CreatePurchaseOrderDTO {
     paymentTerms?: string;
     deliveryPeriod?: string;
     remarks?: string;
+    warrantyDispatch?: string;
+    warrantyInstallation?: string;
+    freight?: string;
+    transitInsurance?: string;
+    materialUnloading?: string;
+    technicalSpecifications?: string;
+    documentation?: string;
+    poRaisedBy?: number;
 }
 
 export interface CreateProductDTO {
@@ -27,6 +39,9 @@ export interface CreateProductDTO {
     qty: number;
     rate: number;
     gstRate: number;
+    taxableAmount?: number;
+    gstAmount?: number;
+    totalAmount?: number;
 }
 
 export interface CreatePartyDTO {
@@ -47,6 +62,10 @@ export interface UpdatePurchaseOrderDTO {
     sellerGstNo: string;
     sellerPanNo: string;
     sellerMsmeNo: string;
+    sellerCinNo?: string;
+    contactPersonName?: string;
+    contactPersonPhone?: string;
+    contactPersonEmail?: string;
     shipToName: string;
     shippingAddress: string;
     shipToGst: string;
@@ -57,4 +76,12 @@ export interface UpdatePurchaseOrderDTO {
     paymentTerms?: string;
     deliveryPeriod?: string;
     remarks?: string;
+    warrantyDispatch?: string;
+    warrantyInstallation?: string;
+    freight?: string;
+    transitInsurance?: string;
+    materialUnloading?: string;
+    technicalSpecifications?: string;
+    documentation?: string;
+    poRaisedBy?: number;
 }
