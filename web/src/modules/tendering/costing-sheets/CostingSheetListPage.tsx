@@ -188,7 +188,7 @@ const CostingSheets = () => {
                 navigate(paths.tendering.costingSheetSubmit(row.tenderId));
             },
             icon: <Send className="h-4 w-4" />,
-            visible: (row) => row.googleSheetUrl ? true : false,
+            visible: (row) => Boolean(row.googleSheetUrl) && activeTab === 'pending',
         },
         {
             label: 'Edit Costing',
