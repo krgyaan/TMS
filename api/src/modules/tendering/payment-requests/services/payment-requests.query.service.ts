@@ -1,9 +1,11 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, StreamableFile } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { eq, and, or, inArray, gt, sql, desc, asc, not } from 'drizzle-orm';
 import { paymentRequests, paymentInstruments, instrumentDdDetails, instrumentFdrDetails, instrumentBgDetails, instrumentChequeDetails, instrumentTransferDetails } from '@db/schemas/tendering/payment-requests.schema';
+import { createReadStream, existsSync } from 'fs';
+import * as path from 'path';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { tenderInformation } from '@/db/schemas/tendering/tender-info-sheet.schema';
 import { bidSubmissions } from '@db/schemas/tendering/bid-submissions.schema';
@@ -1414,5 +1416,29 @@ export class PaymentRequestsQueryService {
             chequePurpose: details?.chequeReason || '',
             chequeAccount: details?.bankName || instrument?.bankName || '',
         };
+    }
+
+    async serveGeneratedPdf(instrumentId: number): Promise<StreamableFile> {
+        const [instrument] = await this.db
+            .select({ generatedPdf: paymentInstruments.generatedPdf })
+            .from(paymentInstruments)
+            .where(eq(paymentInstruments.id, instrumentId))
+            .limit(1);
+
+        if (!instrument?.generatedPdf) {
+            throw new NotFoundException('No generated PDF found for this instrument');
+        }
+
+        const absolutePath = path.join(process.cwd(), 'uploads', 'tendering', instrument.generatedPdf);
+
+        if (!existsSync(absolutePath)) {
+            throw new NotFoundException('PDF file not found on disk');
+        }
+
+        const fileStream = createReadStream(absolutePath);
+        return new StreamableFile(fileStream, {
+            type: 'application/pdf',
+            disposition: `inline; filename="${path.basename(absolutePath)}"`,
+        });
     }
 }
