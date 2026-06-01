@@ -556,11 +556,19 @@ export class PhysicalDocsService {
                     }));
                 }
 
-                // Update tender status
-                await tx.update(tenderInfos).set({ status: newStatus, updatedAt: new Date() }).where(eq(tenderInfos.id, data.tenderId));
-
-                // Track status change
-                await this.tenderStatusHistoryService.trackStatusChange(data.tenderId, newStatus, changedBy, prevStatus, "Physical docs submitted", tx);
+                // Update tender status only if there are no existing bid submissions
+                let [bidSubmission] = await tx
+                                .select()
+                                .from(bidSubmissions)
+                                .where(eq(bidSubmissions.tenderId, data.tenderId));
+                
+                if(!bidSubmission){
+                    // update only when no bid submission found
+                    await tx.update(tenderInfos).set({ status: newStatus, updatedAt: new Date() }).where(eq(tenderInfos.id, data.tenderId));
+                    
+                    // Track status change (only track it if the status actually changed)
+                    await this.tenderStatusHistoryService.trackStatusChange(data.tenderId, newStatus, changedBy, prevStatus, "Physical docs submitted", tx);
+                }
 
                 const submittedDocsList = await this.getSubmittedDocsDetails(physicalDoc.submittedDocs, tx);
 
