@@ -10,6 +10,7 @@ import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TenderFileUploader } from "@/components/tender-file-upload";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -67,6 +68,12 @@ const defaultFormValues: PurchaseOrderFormValues = {
   paymentTerms: "30% Advance with the PO and remaining 70% before dispatch against PI.",
   poRaisedBy: "",
   technicalSpecifications: "As per approved drawing",
+  technicalSpecsAttachments: [],
+  accessoriesPackagingList: "",
+  accessoriesPackagingListAttachments: [],
+  preDispatchInspection: "",
+  deliveryLocation: "",
+  acceptanceOfOrder: "",
   documentation: "The party shall confirm acceptance to this Purchase Order by duly Stamping and signing on each page of the technical specifications as well as attached documents (If Any).",
   remarks: "",
 };
@@ -511,6 +518,44 @@ export default function RaisePoFormPage() {
                 <FieldWrapper control={form.control} name="materialUnloading" label="Material Unloading">
                   {(field) => <Textarea {...field} placeholder="e.g. At buyer's responsibility" rows={2} />}
                 </FieldWrapper>
+                <FieldWrapper control={form.control} name="preDispatchInspection" label="Pre-Dispatch Inspection">
+                  {(field) => <Textarea {...field} placeholder="e.g. To be carried out by seller before dispatch" rows={2} />}
+                </FieldWrapper>
+                <FieldWrapper control={form.control} name="deliveryLocation" label="Delivery Location">
+                  {(field) => <Input {...field} placeholder="e.g. Site location - Mumbai Warehouse" />}
+                </FieldWrapper>
+              </div>
+
+              <Separator className="my-6" />
+              <p className="text-sm font-medium text-muted-foreground mb-3">Technical Specifications</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FieldWrapper control={form.control} name="technicalSpecifications" label="Technical Specifications">
+                  {(field) => <Textarea {...field} placeholder="Enter any technical specifications or requirements..." rows={3} />}
+                </FieldWrapper>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Upload Attachments</Label>
+                  <TenderFileUploader
+                    context="tender-documents"
+                    value={form.watch("technicalSpecsAttachments")}
+                    onChange={(paths) => form.setValue("technicalSpecsAttachments", paths)}
+                  />
+                </div>
+              </div>
+
+              <Separator className="my-6" />
+              <p className="text-sm font-medium text-muted-foreground mb-3">Accessories / Packaging List</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FieldWrapper control={form.control} name="accessoriesPackagingList" label="Accessories / Packaging List">
+                  {(field) => <Textarea {...field} placeholder="List of accessories and packaging details..." rows={3} />}
+                </FieldWrapper>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">Upload Attachments</Label>
+                  <TenderFileUploader
+                    context="tender-documents"
+                    value={form.watch("accessoriesPackagingListAttachments")}
+                    onChange={(paths) => form.setValue("accessoriesPackagingListAttachments", paths)}
+                  />
+                </div>
               </div>
 
               <Separator className="my-6" />
@@ -523,8 +568,8 @@ export default function RaisePoFormPage() {
                   {(field) => <Input {...field} placeholder="Enter name" />}
                 </FieldWrapper>
 
-                <FieldWrapper control={form.control} name="technicalSpecifications" label="Technical Specifications">
-                  {(field) => <Textarea {...field} placeholder="Enter any technical specifications or requirements..." rows={3} />}
+                <FieldWrapper control={form.control} name="acceptanceOfOrder" label="Acceptance of Order">
+                  {(field) => <Textarea {...field} placeholder="e.g. Order shall be deemed accepted within 7 days..." rows={2} />}
                 </FieldWrapper>
 
                 <FieldWrapper control={form.control} name="documentation" label="Documentation">

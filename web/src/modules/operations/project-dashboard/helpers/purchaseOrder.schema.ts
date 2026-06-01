@@ -42,6 +42,12 @@ export const purchaseOrderFormSchema = z.object({
     paymentTerms: z.string().default(""),
     poRaisedBy: z.string().default(""),
     technicalSpecifications: z.string().default(""),
+    technicalSpecsAttachments: z.array(z.string()).default([]),
+    accessoriesPackagingList: z.string().default(""),
+    accessoriesPackagingListAttachments: z.array(z.string()).default([]),
+    preDispatchInspection: z.string().default(""),
+    deliveryLocation: z.string().default(""),
+    acceptanceOfOrder: z.string().default(""),
     documentation: z.string().default(""),
     remarks: z.string().default(""),
 });

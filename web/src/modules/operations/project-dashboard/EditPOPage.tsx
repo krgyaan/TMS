@@ -17,6 +17,7 @@ import { useCreatePoParty, usePoParties, usePurchaseOrderDetails, useUpdatePurch
 import { useAuth } from "@/contexts/AuthContext";
 import { useGetTeamMembers } from "@/hooks/api/useUsers";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TenderFileUploader } from "@/components/tender-file-upload";
 import { AlertCircle, ArrowLeft, Building2, Calculator, Calendar, FileText, Hash, Info, Loader2, Mail, MapPin, Phone, Receipt, Save, UserCheck, UserPlus } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -67,6 +68,12 @@ const defaultFormValues: PurchaseOrderFormValues = {
     paymentTerms: "",
     poRaisedBy: "",
     technicalSpecifications: "",
+    technicalSpecsAttachments: [],
+    accessoriesPackagingList: "",
+    accessoriesPackagingListAttachments: [],
+    preDispatchInspection: "",
+    deliveryLocation: "",
+    acceptanceOfOrder: "",
     documentation: "",
     remarks: "",
 };
@@ -221,6 +228,12 @@ export default function EditPOPage() {
             paymentTerms: poData.paymentTerms || "",
             poRaisedBy: poData.poRaisedBy ? String(poData.poRaisedBy) : "",
             technicalSpecifications: poData.technicalSpecifications || "",
+            technicalSpecsAttachments: poData.technicalSpecsAttachments ? (typeof poData.technicalSpecsAttachments === 'string' ? JSON.parse(poData.technicalSpecsAttachments) : poData.technicalSpecsAttachments) : [],
+            accessoriesPackagingList: poData.accessoriesPackagingList || "",
+            accessoriesPackagingListAttachments: poData.accessoriesPackagingListAttachments ? (typeof poData.accessoriesPackagingListAttachments === 'string' ? JSON.parse(poData.accessoriesPackagingListAttachments) : poData.accessoriesPackagingListAttachments) : [],
+            preDispatchInspection: poData.preDispatchInspection || "",
+            deliveryLocation: poData.deliveryLocation || "",
+            acceptanceOfOrder: poData.acceptanceOfOrder || "",
             documentation: poData.documentation || "",
             remarks: poData.remarks || "",
         });
@@ -587,6 +600,46 @@ export default function EditPOPage() {
                                         {(field) => <Textarea {...field} placeholder="e.g. At buyer's responsibility" rows={2} />}
                                     </FieldWrapper>
                                 </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                                    <FieldWrapper control={form.control} name="preDispatchInspection" label="Pre-Dispatch Inspection">
+                                        {(field) => <Textarea {...field} placeholder="e.g. To be carried out by seller before dispatch" rows={2} />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="deliveryLocation" label="Delivery Location">
+                                        {(field) => <Input {...field} placeholder="e.g. Site location - Mumbai Warehouse" />}
+                                    </FieldWrapper>
+                                </div>
+
+                                <Separator className="my-6" />
+                                <p className="text-sm font-medium text-muted-foreground mb-3">Technical Specifications</p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <FieldWrapper control={form.control} name="technicalSpecifications" label="Technical Specifications">
+                                        {(field) => <Textarea {...field} placeholder="Enter any technical specifications or requirements..." rows={3} />}
+                                    </FieldWrapper>
+                                    <div className="space-y-2">
+                                        <Label className="text-sm font-medium">Upload Attachments</Label>
+                                        <TenderFileUploader
+                                            context="tender-documents"
+                                            value={form.watch("technicalSpecsAttachments")}
+                                            onChange={(paths) => form.setValue("technicalSpecsAttachments", paths)}
+                                        />
+                                    </div>
+                                </div>
+
+                                <Separator className="my-6" />
+                                <p className="text-sm font-medium text-muted-foreground mb-3">Accessories / Packaging List</p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <FieldWrapper control={form.control} name="accessoriesPackagingList" label="Accessories / Packaging List">
+                                        {(field) => <Textarea {...field} placeholder="List of accessories and packaging details..." rows={3} />}
+                                    </FieldWrapper>
+                                    <div className="space-y-2">
+                                        <Label className="text-sm font-medium">Upload Attachments</Label>
+                                        <TenderFileUploader
+                                            context="tender-documents"
+                                            value={form.watch("accessoriesPackagingListAttachments")}
+                                            onChange={(paths) => form.setValue("accessoriesPackagingListAttachments", paths)}
+                                        />
+                                    </div>
+                                </div>
 
                                 <Separator className="my-6" />
                                 <p className="text-sm font-medium text-muted-foreground mb-3">Terms & Documentation</p>
@@ -598,12 +651,10 @@ export default function EditPOPage() {
                                         {(field) => <Input {...field} placeholder="Enter name" />}
                                     </FieldWrapper>
                                 </div>
-                                <div className="mt-6">
-                                    <FieldWrapper control={form.control} name="technicalSpecifications" label="Technical Specifications">
-                                        {(field) => <Textarea {...field} placeholder="Enter any technical specifications or requirements..." rows={3} />}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                                    <FieldWrapper control={form.control} name="acceptanceOfOrder" label="Acceptance of Order">
+                                        {(field) => <Textarea {...field} placeholder="e.g. Order shall be deemed accepted within 7 days..." rows={2} />}
                                     </FieldWrapper>
-                                </div>
-                                <div className="mt-6">
                                     <FieldWrapper control={form.control} name="documentation" label="Documentation">
                                         {(field) => <Textarea {...field} placeholder="List of required documents..." rows={3} />}
                                     </FieldWrapper>

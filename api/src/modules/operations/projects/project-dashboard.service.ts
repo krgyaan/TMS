@@ -11,10 +11,7 @@ import { employeeImprests } from "@/db/schemas/shared/employee-imprest.schema";
 import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
 import { purchaseOrderProducts } from "@/db/schemas/operations/purchase-order-products.schema";
 import { projectParties } from "@/db/schemas/operations/project-parties.schema";
-import { teams } from "@/db/schemas/master/teams.schema";
-import { organizations } from "@/db/schemas/master/organizations.schema";
-import { items } from "@/db/schemas/master/items.schema";
-import { locations } from "@/db/schemas/master/locations.schema";
+
 import { imprestCategories, users, tenderInformation } from "@/db/schemas";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
@@ -152,20 +149,15 @@ export class ProjectDashboardService {
         return { imprests, imprestSum };
     }
 
-    private async generatePONumber(tenderId: number) {
-        const tender = (await this.db.select().from(tenderInfos).where(eq(tenderInfos.id, tenderId)))[0];
+    private sanitizeProjectName(name: string): string {
+        return name
+            .toUpperCase()
+            .replace(/[^A-Z0-9\s-]/g, '')
+            .trim()
+            .replace(/[\s-]+/g, '_');
+    }
 
-        const team = (await this.db.select().from(teams).where(eq(teams.id, tender.team)))[0];
-        const item = (await this.db.select().from(items).where(eq(items.id, tender.item)))[0];
-        const org = tender.organization ? (await this.db.select().from(organizations).where(eq(organizations.id, tender.organization)))[0] : undefined;
-
-        const location = tender.location ? (await this.db.select().from(locations).where(eq(locations.id, tender.location)))[0] : undefined;
-
-        const teamName = team?.name?.toUpperCase() ?? "TEAM";
-        const orgCode = org?.acronym?.toUpperCase() ?? "ORG";
-        const itemName = item?.name?.toUpperCase() ?? "ITEM";
-        const locCode = location?.acronym?.toUpperCase() ?? "LOC";
-
+    private async generatePONumber(projectName?: string) {
         const now = new Date();
         const year = now.getFullYear();
         const month = now.getMonth() + 1;
@@ -173,32 +165,33 @@ export class ProjectDashboardService {
         const to = ((parseInt(from) + 1) % 100).toString().padStart(2, "0");
         const fy = `${from}${to}`;
 
-        const prefix = `${teamName}/${fy}/${orgCode}/${itemName}/${locCode}`;
+        const sanitizedName = projectName ? this.sanitizeProjectName(projectName) : "PROJECT";
+        const prefix = `VE/${sanitizedName}/${fy}`;
 
         const last = await this.db
             .select()
             .from(purchaseOrders)
-            .where(like(purchaseOrders.poNumber, `${prefix}/%`))
+            .where(like(purchaseOrders.poNumber, `${prefix}/PO%`))
             .orderBy(desc(purchaseOrders.id));
 
         let next = 1;
         if (last[0]?.poNumber) {
-            const match = last[0].poNumber.match(/(\d{4})$/);
+            const match = last[0].poNumber.match(/PO(\d{4})$/);
             if (match) next = parseInt(match[1]) + 1;
         }
 
-        return `${prefix}/${next.toString().padStart(4, "0")}`;
+        return `${prefix}/PO${next.toString().padStart(4, "0")}`;
     }
 
     async createPurchaseOrder(body: any) {
-    const poNumber = await this.generatePONumber(body.tenderId);
-
     const project = (
         await this.db
         .select()
         .from(projects)
         .where(eq(projects.tenderId, body.tenderId))
     )[0];
+
+    const poNumber = await this.generatePONumber(project?.projectName ?? undefined);
 
     // Insert the purchase order
     const po = (
@@ -240,6 +233,12 @@ export class ProjectDashboardService {
             transitInsurance: body.transitInsurance,
             materialUnloading: body.materialUnloading,
             technicalSpecifications: body.technicalSpecifications,
+            technicalSpecsAttachments: body.technicalSpecsAttachments,
+            accessoriesPackagingList: body.accessoriesPackagingList,
+            accessoriesPackagingListAttachments: body.accessoriesPackagingListAttachments,
+            preDispatchInspection: body.preDispatchInspection,
+            deliveryLocation: body.deliveryLocation,
+            acceptanceOfOrder: body.acceptanceOfOrder,
             documentation: body.documentation,
             poRaisedBy: body.poRaisedBy,
             projectId: project?.id,
@@ -380,6 +379,12 @@ export class ProjectDashboardService {
                     transitInsurance: body.transitInsurance,
                     materialUnloading: body.materialUnloading,
                     technicalSpecifications: body.technicalSpecifications,
+                    technicalSpecsAttachments: body.technicalSpecsAttachments,
+                    accessoriesPackagingList: body.accessoriesPackagingList,
+                    accessoriesPackagingListAttachments: body.accessoriesPackagingListAttachments,
+                    preDispatchInspection: body.preDispatchInspection,
+                    deliveryLocation: body.deliveryLocation,
+                    acceptanceOfOrder: body.acceptanceOfOrder,
                     documentation: body.documentation,
                     poRaisedBy: body.poRaisedBy,
                     

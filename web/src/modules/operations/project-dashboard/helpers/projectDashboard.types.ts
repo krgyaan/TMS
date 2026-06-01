@@ -29,6 +29,12 @@ export interface CreatePurchaseOrderDTO {
     transitInsurance?: string;
     materialUnloading?: string;
     technicalSpecifications?: string;
+    technicalSpecsAttachments?: string;
+    accessoriesPackagingList?: string;
+    accessoriesPackagingListAttachments?: string;
+    preDispatchInspection?: string;
+    deliveryLocation?: string;
+    acceptanceOfOrder?: string;
     documentation?: string;
     poRaisedBy?: number;
 }
@@ -82,6 +88,12 @@ export interface UpdatePurchaseOrderDTO {
     transitInsurance?: string;
     materialUnloading?: string;
     technicalSpecifications?: string;
+    technicalSpecsAttachments?: string;
+    accessoriesPackagingList?: string;
+    accessoriesPackagingListAttachments?: string;
+    preDispatchInspection?: string;
+    deliveryLocation?: string;
+    acceptanceOfOrder?: string;
     documentation?: string;
     poRaisedBy?: number;
 }
