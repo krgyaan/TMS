@@ -110,6 +110,12 @@ export const PDF_CONFIG = {
             directory: '.',
             templates: ['po-template'],
             storagePath: 'po',
+            margin: {
+                top: '10mm',
+                right: '7.5mm',
+                bottom: '10mm',
+                left: '7.5mm',
+            },
         },
     },
 

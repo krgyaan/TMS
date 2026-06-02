@@ -111,3 +111,10 @@ export const formatCurrency = (amount: number) => {
         maximumFractionDigits: 2,
     }).format(amount);
 };
+
+export const formatINR = (amount: number) => {
+    return amount.toLocaleString("en-IN", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
+};

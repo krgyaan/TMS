@@ -282,21 +282,21 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
         // Increment helper (for 1-based index)
         Handlebars.registerHelper('inc', (value: number) => value + 1);
 
-        // Format date helper
+        // Format date helper (dd-mm-yyyy)
         Handlebars.registerHelper('formatDate', (date: Date | string | null | undefined) => {
             if (!date) return 'N/A';
-            return new Date(date).toLocaleDateString('en-IN', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-            });
+            const d = new Date(date);
+            const day = String(d.getDate()).padStart(2, '0');
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const year = d.getFullYear();
+            return `${day}-${month}-${year}`;
         });
 
-        // Format currency helper
+        // Format currency helper (INR with commas, no symbol)
         Handlebars.registerHelper('formatCurrency', (amount: number | string | null | undefined) => {
-            if (amount == null) return '₹0.00';
+            if (amount == null) return '0.00';
             const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
-            return `₹${numAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            return numAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         });
 
         // Format date time helper
@@ -325,6 +325,44 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
             }
             return options.inverse(this);
         });
+    }
+
+    /**
+     * Convert number to words in Indian numbering system (lakhs, crores)
+     */
+    public grandTotalInWords(num: number): string {
+        if (num === 0) return 'Zero Only';
+
+        const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+            'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+        const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+        const convertBelow1000 = (n: number): string => {
+            if (n === 0) return '';
+            if (n < 20) return ones[n];
+            if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 ? ' ' + ones[n % 10] : '');
+            return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 ? ' ' + convertBelow1000(n % 100) : '');
+        };
+
+        const wholePart = Math.floor(num);
+        const decimalPart = Math.round((num - wholePart) * 100);
+
+        const crore = Math.floor(wholePart / 10000000);
+        const lakh = Math.floor((wholePart % 10000000) / 100000);
+        const thousand = Math.floor((wholePart % 100000) / 1000);
+        const remainder = wholePart % 1000;
+
+        let result = '';
+        if (crore) result += convertBelow1000(crore) + ' Crore ';
+        if (lakh) result += convertBelow1000(lakh) + ' Lakh ';
+        if (thousand) result += convertBelow1000(thousand) + ' Thousand ';
+        if (remainder) result += convertBelow1000(remainder);
+
+        if (decimalPart > 0) {
+            result += ' and ' + convertBelow1000(decimalPart) + ' Paise';
+        }
+
+        return result.trim() + ' Only';
     }
 
     /**

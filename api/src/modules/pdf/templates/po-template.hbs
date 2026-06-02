@@ -24,7 +24,7 @@
             <td style="width: 40%; vertical-align: top; border: 1px solid #000; padding: 8px;">
                 <strong>Volks Energie Pvt. Ltd.</strong><br>
                 B-1/D8, 2nd floor, Mohan Cooperative Industrial Estate,<br>
-                New Delhi – 110044<br>
+                New Delhi - 110044<br>
                 Mob: +91 9650393636<br>
                 email: goyal@volksenergie.in<br>
                 PAN No.: AADCV9396C<br>
@@ -32,7 +32,7 @@
             </td>
 
             <td style="width: 45%; vertical-align: top; border: 1px solid #000; padding: 8px;">
-                <strong>Date:</strong> {{po_date}}<br>
+                <strong>Date:</strong> {{formatDate po_date}}<br>
                 <strong>PO No.:</strong> {{po_number}}<br>
                 <strong>Project Name:</strong> {{project_name}}<br>
                 <strong>Contact Person:</strong> {{oe_name}}<br>
@@ -88,11 +88,11 @@
             <td style="border: 1px solid #000; padding: 5px;">{{description}}</td>
             <td style="border: 1px solid #000; padding: 5px;">{{hsn}}</td>
             <td style="border: 1px solid #000; padding: 5px;">{{quantity}}</td>
-            <td style="border: 1px solid #000; padding: 5px;">{{rate}}</td>
-            <td style="border: 1px solid #000; padding: 5px;">{{amount}}</td>
+            <td style="border: 1px solid #000; padding: 5px;">{{formatCurrency rate}}</td>
+            <td style="border: 1px solid #000; padding: 5px;">{{formatCurrency amount}}</td>
             <td style="border: 1px solid #000; padding: 5px;">{{gst_rate}}</td>
-            <td style="border: 1px solid #000; padding: 5px;">{{gst_amount}}</td>
-            <td style="border: 1px solid #000; padding: 5px;">{{total}}</td>
+            <td style="border: 1px solid #000; padding: 5px;">{{formatCurrency gst_amount}}</td>
+            <td style="border: 1px solid #000; padding: 5px;">{{formatCurrency total}}</td>
         </tr>
         {{/each}}
 
@@ -101,10 +101,10 @@
             <td colspan="5" style="border: 1px solid #000; padding: 5px; text-align: right;">
                 <strong>Total Amount</strong>
             </td>
-            <td style="border: 1px solid #000; padding: 5px;">{{total_amount}}</td>
+            <td style="border: 1px solid #000; padding: 5px;">{{formatCurrency total_amount}}</td>
             <td></td>
-            <td style="border: 1px solid #000; padding: 5px;">{{total_gst_amt}}</td>
-            <td style="border: 1px solid #000; padding: 5px;">{{grand_total}}</td>
+            <td style="border: 1px solid #000; padding: 5px;">{{formatCurrency total_gst_amt}}</td>
+            <td style="border: 1px solid #000; padding: 5px;">{{formatCurrency grand_total}}</td>
         </tr>
     </table>
 
@@ -131,8 +131,12 @@
 
     <table style="width: 100%; margin-top: 40px;">
         <tr>
+            <td style="text-align: center;">
+                Read understood and unconditionally accepted for and on behalf of
+            </td>
+        </tr>
+        <tr>
             <td style="text-align: left;">
-                Read understood and unconditionally accepted for and on behalf of<br><br>
                 For M/s Volks Energie Pvt Ltd<br><br><br><br><br><br><br>
                 Authorized Signatory
             </td>

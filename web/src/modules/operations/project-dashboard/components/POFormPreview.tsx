@@ -1,30 +1,16 @@
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
   ArrowLeft,
-  Building2,
-  Calendar,
-  Hash,
   Loader2,
-  Mail,
-  MapPin,
-  Phone,
   Receipt,
-  ShieldCheck,
-  FileText,
 } from "lucide-react";
 import type { PurchaseOrderFormValues, ProductFormItem } from "../helpers/purchaseOrder.schema";
-import { calculateTotals, formatCurrency } from "../helpers/projectDashboard.mapper";
+import { calculateTotals, formatINR } from "../helpers/projectDashboard.mapper";
 
 function numberToWords(num: number): string {
-  if (num === 0) return "Zero";
+  if (num === 0) return "Zero Only";
 
   const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
     "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
@@ -37,10 +23,13 @@ function numberToWords(num: number): string {
     return ones[Math.floor(n / 100)] + " Hundred" + (n % 100 ? " " + convertBelow1000(n % 100) : "");
   };
 
-  const crore = Math.floor(num / 10000000);
-  const lakh = Math.floor((num % 10000000) / 100000);
-  const thousand = Math.floor((num % 100000) / 1000);
-  const remainder = Math.round(num % 1000);
+  const wholePart = Math.floor(num);
+  const decimalPart = Math.round((num - wholePart) * 100);
+
+  const crore = Math.floor(wholePart / 10000000);
+  const lakh = Math.floor((wholePart % 10000000) / 100000);
+  const thousand = Math.floor((wholePart % 100000) / 1000);
+  const remainder = wholePart % 1000;
 
   let result = "";
   if (crore) result += convertBelow1000(crore) + " Crore ";
@@ -48,38 +37,11 @@ function numberToWords(num: number): string {
   if (thousand) result += convertBelow1000(thousand) + " Thousand ";
   if (remainder) result += convertBelow1000(remainder);
 
+  if (decimalPart > 0) {
+    result += " and " + convertBelow1000(decimalPart) + " Paise";
+  }
+
   return result.trim() + " Only";
-}
-
-function SummaryRow({ label, value }: { label: string; value: string | undefined | null }) {
-  return (
-    <div className="flex justify-between py-1.5 border-b border-dashed last:border-0">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <span className="text-sm font-medium text-right max-w-[60%]">{value || "—"}</span>
-    </div>
-  );
-}
-
-function SectionCard({
-  title,
-  icon,
-  children,
-}: {
-  title: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
-  return (
-    <Card>
-      <CardHeader className="py-3">
-        <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-          <span className="text-muted-foreground">{icon}</span>
-          {title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="p-4">{children}</CardContent>
-    </Card>
-  );
 }
 
 function ProductRow({ index, product }: { index: number; product: ProductFormItem }) {
@@ -95,11 +57,11 @@ function ProductRow({ index, product }: { index: number; product: ProductFormIte
       <td className="py-2 px-2 text-sm">{product.description}</td>
       <td className="py-2 px-2 text-sm font-mono">{product.hsnSac}</td>
       <td className="py-2 px-2 text-sm text-right">{qty}</td>
-      <td className="py-2 px-2 text-sm text-right">{formatCurrency(rate)}</td>
-      <td className="py-2 px-2 text-sm text-right">{formatCurrency(amount)}</td>
+      <td className="py-2 px-2 text-sm text-right">{formatINR(rate)}</td>
+      <td className="py-2 px-2 text-sm text-right">{formatINR(amount)}</td>
       <td className="py-2 px-2 text-sm text-center">{product.gstRate}%</td>
-      <td className="py-2 px-2 text-sm text-right">{formatCurrency(gstAmount)}</td>
-      <td className="py-2 px-2 text-sm text-right font-medium">{formatCurrency(total)}</td>
+      <td className="py-2 px-2 text-sm text-right">{formatINR(gstAmount)}</td>
+      <td className="py-2 px-2 text-sm text-right font-medium">{formatINR(total)}</td>
     </tr>
   );
 }
@@ -141,7 +103,6 @@ export function POFormPreview({
         </Button>
       </div>
 
-      {/* Company Header */}
       <Card>
         <CardHeader className="py-3 border-b bg-muted/20">
           <CardTitle className="text-center text-base font-bold">
@@ -149,6 +110,7 @@ export function POFormPreview({
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
+          {/* Company Header Table */}
           <table className="w-full text-sm">
             <tbody>
               <tr className="border-b">
@@ -194,100 +156,102 @@ export function POFormPreview({
               </tr>
             </tbody>
           </table>
+
+          {/* Intro */}
+          <p className="text-sm text-muted-foreground italic px-4 py-3">
+            This is in reference to your offer and subsequent discussion with you.
+            We are pleased to place this PO to your company {formValues.shipToName || "—"}
+          </p>
+
+          {/* Items Table */}
+          <div className="border-t">
+            <div className="p-0 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/10">
+                    <th className="py-2 px-2 text-left text-xs font-medium text-muted-foreground">Sr. No</th>
+                    <th className="py-2 px-2 text-left text-xs font-medium text-muted-foreground">Item Description</th>
+                    <th className="py-2 px-2 text-left text-xs font-medium text-muted-foreground">HSN</th>
+                    <th className="py-2 px-2 text-right text-xs font-medium text-muted-foreground">Quantity</th>
+                    <th className="py-2 px-2 text-right text-xs font-medium text-muted-foreground">Rate (Rs.)</th>
+                    <th className="py-2 px-2 text-right text-xs font-medium text-muted-foreground">Amount</th>
+                    <th className="py-2 px-2 text-center text-xs font-medium text-muted-foreground">GST Rate</th>
+                    <th className="py-2 px-2 text-right text-xs font-medium text-muted-foreground">GST Amount</th>
+                    <th className="py-2 px-2 text-right text-xs font-medium text-muted-foreground">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {validProducts.map((p, i) => (
+                    <ProductRow key={i} index={i} product={p} />
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t bg-muted/5 font-medium">
+                    <td colSpan={5} className="py-2 px-2 text-right text-sm">Total Amount</td>
+                    <td className="py-2 px-2 text-right text-sm">{formatINR(subtotal)}</td>
+                    <td></td>
+                    <td className="py-2 px-2 text-right text-sm">{formatINR(totalGst)}</td>
+                    <td className="py-2 px-2 text-right text-sm font-bold">{formatINR(grandTotal)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          {/* Total Amount in Words */}
+          <p className="text-sm px-4 py-3 border-t">
+            <strong>Total Amount (In Words):</strong>{" "}
+            {numberToWords(grandTotal)}
+          </p>
+
+          {/* Terms & Conditions */}
+          <div className="px-4 py-3 border-t">
+            <strong>Terms and conditions:</strong><br />
+            {formValues.termsAndConditions?.map((term, i) =>
+              term.value ? (
+                <span key={i}>
+                  <b>{term.field}:</b> {term.value}.<br />
+                </span>
+              ) : null
+            )}
+          </div>
+
+          {/* Additional Details inline */}
+          {(formValues.quotationNo || formValues.quotationDate || formValues.remarks) && (
+            <div className="px-4 py-3 border-t text-sm text-muted-foreground">
+              {formValues.quotationNo && <span><strong>Quotation No:</strong> {formValues.quotationNo}<br /></span>}
+              {formValues.quotationDate && <span><strong>Quotation Date:</strong> {formValues.quotationDate}<br /></span>}
+              {formValues.remarks && <span><strong>Remarks:</strong> {formValues.remarks}<br /></span>}
+            </div>
+          )}
+
+          {/* Footer disclaimer */}
+          <p className="text-xs text-center text-muted-foreground px-4 py-3 border-t">
+            *** This is electronically generated document. It does not require any signature from M/s. Volks Energie Pvt. Ltd. ***
+          </p>
+
+          {/* Signature Area */}
+          <div className="grid grid-cols-2 gap-8 px-4 py-6 border-t">
+            <div>
+              <p className="text-sm">
+                Read understood and unconditionally accepted for and on behalf of
+              </p>
+              <p className="text-sm font-medium mt-1">For M/s Volks Energie Pvt Ltd</p>
+              <div className="mt-12 border-t border-dashed pt-1">
+                <p className="text-xs text-muted-foreground">Authorized Signatory</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-medium">For M/s {formValues.sellerName || "—"}</p>
+              <div className="mt-16 border-t border-dashed pt-1">
+                <p className="text-xs text-muted-foreground">Authorized Signatory</p>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
-
-      {/* Intro */}
-      <p className="text-sm text-muted-foreground italic px-1">
-        This is in reference to your offer and subsequent discussion with you.
-        We are pleased to place this PO to your company {formValues.shipToName || "—"}
-      </p>
-
-      {/* Products Table */}
-      <Card>
-        <CardHeader className="py-3 border-b bg-muted/20">
-          <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <Receipt className="h-4 w-4" />
-            Items ({validProducts.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/10">
-                <th className="py-2 px-2 text-left text-xs font-medium text-muted-foreground">#</th>
-                <th className="py-2 px-2 text-left text-xs font-medium text-muted-foreground">Item Description</th>
-                <th className="py-2 px-2 text-left text-xs font-medium text-muted-foreground">HSN</th>
-                <th className="py-2 px-2 text-right text-xs font-medium text-muted-foreground">Qty</th>
-                <th className="py-2 px-2 text-right text-xs font-medium text-muted-foreground">Rate</th>
-                <th className="py-2 px-2 text-right text-xs font-medium text-muted-foreground">Amount</th>
-                <th className="py-2 px-2 text-center text-xs font-medium text-muted-foreground">GST%</th>
-                <th className="py-2 px-2 text-right text-xs font-medium text-muted-foreground">GST Amt</th>
-                <th className="py-2 px-2 text-right text-xs font-medium text-muted-foreground">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {validProducts.map((p, i) => (
-                <ProductRow key={i} index={i} product={p} />
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="border-t bg-muted/5 font-medium">
-                <td colSpan={5} className="py-2 px-2 text-right text-sm">Total Amount</td>
-                <td className="py-2 px-2 text-right text-sm">{formatCurrency(subtotal)}</td>
-                <td></td>
-                <td className="py-2 px-2 text-right text-sm">{formatCurrency(totalGst)}</td>
-                <td className="py-2 px-2 text-right text-sm font-bold">{formatCurrency(grandTotal)}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </CardContent>
-      </Card>
-
-      <p className="text-sm">
-        <strong>Total Amount (In Words):</strong>{" "}
-        {numberToWords(Math.round(grandTotal))}
-      </p>
-
-      {/* Terms & Conditions */}
-      <SectionCard title="Terms & Conditions" icon={<ShieldCheck className="h-4 w-4" />}>
-        {formValues.termsAndConditions?.map((term, i) => (
-          term.value ? <SummaryRow key={i} label={term.field} value={term.value} /> : null
-        ))}
-      </SectionCard>
-
-      {/* Additional Details */}
-      <SectionCard title="Additional Details" icon={<FileText className="h-4 w-4" />}>
-        {formValues.quotationNo && <SummaryRow label="Quotation No" value={formValues.quotationNo} />}
-        {formValues.quotationDate && <SummaryRow label="Quotation Date" value={formValues.quotationDate} />}
-        {formValues.remarks && <SummaryRow label="Remarks" value={formValues.remarks} />}
-      </SectionCard>
 
       <Separator />
-
-      {/* Footer disclaimer */}
-      <p className="text-xs text-center text-muted-foreground">
-        *** This is electronically generated document. It does not require any signature from M/s. Volks Energie Pvt. Ltd. ***
-      </p>
-
-      {/* Signature Area */}
-      <div className="grid grid-cols-2 gap-8 pt-4">
-        <div>
-          <p className="text-sm">
-            Read understood and unconditionally accepted for and on behalf of
-          </p>
-          <p className="text-sm font-medium mt-1">For M/s Volks Energie Pvt Ltd</p>
-          <div className="mt-12 border-t border-dashed pt-1">
-            <p className="text-xs text-muted-foreground">Authorized Signatory</p>
-          </div>
-        </div>
-        <div className="text-right">
-          <p className="text-sm font-medium">For M/s {formValues.sellerName || "—"}</p>
-          <div className="mt-16 border-t border-dashed pt-1">
-            <p className="text-xs text-muted-foreground">Authorized Signatory</p>
-          </div>
-        </div>
-      </div>
 
       {/* Action Buttons */}
       <div className="flex justify-between pt-4 border-t">

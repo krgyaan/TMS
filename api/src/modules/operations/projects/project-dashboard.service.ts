@@ -318,6 +318,7 @@ export class ProjectDashboardService {
             total_amount: totalAmount,
             total_gst_amt: totalGstAmt,
             grand_total: grandTotal,
+            grand_total_in_words: this.pdfGenerator.grandTotalInWords(grandTotal),
             payment_terms: termsMap["Payment Terms"] || "",
             freight: termsMap["Freight"] || "",
             transit_insurance: termsMap["Transit Insurance"] || "",
