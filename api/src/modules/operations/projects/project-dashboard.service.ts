@@ -3,6 +3,7 @@ import { eq, like, desc } from "drizzle-orm";
 
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
+import { PdfGeneratorService } from "@/modules/pdf/pdf-generator.service";
 
 import { projects } from "@/db/schemas/operations/projects.schema";
 import { tenderInfos } from "@/db/schemas/tendering/tenders.schema";
@@ -23,6 +24,8 @@ export class ProjectDashboardService {
         
         @Inject(WINSTON_MODULE_PROVIDER)
         private readonly logger: Logger,
+
+        private readonly pdfGenerator: PdfGeneratorService,
     ) {}
 
     async getOverview(projectId: number) {
@@ -170,7 +173,7 @@ export class ProjectDashboardService {
         const last = await this.db
             .select()
             .from(purchaseOrders)
-            .where(like(purchaseOrders.poNumber, `${prefix}/PO%`))
+            .where(like(purchaseOrders.poNumber, `VE/%/${fy}/PO%`))
             .orderBy(desc(purchaseOrders.id));
 
         let next = 1;
@@ -262,8 +265,83 @@ export class ProjectDashboardService {
         }
     }
 
-    this.logger.info(`Purchase Order created: ${poNumber}`);
-    return po;
+        this.logger.info(`Purchase Order created: ${poNumber}`);
+
+        // Generate PDF asynchronously (don't block response)
+        this.generatePdfForPO(po, body.products).catch((err) => {
+            this.logger.error(`Failed to generate PO PDF: ${err.message}`);
+        });
+
+        // Return enriched PO data
+        return this.getPurchaseOrder(po.id);
+    }
+
+    private async generatePdfForPO(po: any, products: any[]) {
+        const items = (products || []).map((p: any, i: number) => {
+            const qty = Number(p.qty);
+            const rate = Number(p.rate);
+            const gstRate = Number(p.gstRate);
+            const amount = qty * rate;
+            const gstAmount = (amount * gstRate) / 100;
+            const total = amount + gstAmount;
+            return {
+                description: p.description || "",
+                hsn: p.hsnSac || "",
+                quantity: qty,
+                rate,
+                amount,
+                gst_rate: gstRate,
+                gst_amount: gstAmount,
+                total,
+            };
+        });
+
+        const totalAmount = items.reduce((s: number, i: any) => s + i.amount, 0);
+        const totalGstAmt = items.reduce((s: number, i: any) => s + i.gst_amount, 0);
+        const grandTotal = totalAmount + totalGstAmt;
+
+        const data = {
+            po_date: po.poDate || "",
+            po_number: po.poNumber || "",
+            project_name: po.projectName || "",
+            oe_name: po.contactPersonName || "",
+            oe_number: po.contactPersonPhone || "",
+            oe_email: po.contactPersonEmail || "",
+            seller_name: po.sellerName || "",
+            seller_address: po.sellerAddress || "",
+            seller_pan: po.sellerPanNo || "",
+            seller_gst: po.sellerGstNo || "",
+            seller_msme: po.sellerMsmeNo || "",
+            shipping_to_name: po.shipToName || "",
+            shipping_to_address: po.shippingAddress || "",
+            shipping_to_pan: po.shipToPan || "",
+            shipping_to_gst: po.shipToGst || "",
+            items,
+            total_amount: totalAmount,
+            total_gst_amt: totalGstAmt,
+            grand_total: grandTotal,
+            payment_terms: po.paymentTerms || "",
+            freight: po.freight || "",
+            transit_insurance: po.transitInsurance || "",
+            pre_dispatch_inspection: po.preDispatchInspection || "",
+            warranty: po.warrantyDispatch || "",
+            delivery_location: po.deliveryLocation || "",
+            technical_specification: po.technicalSpecifications || "",
+            delivery_period: po.deliveryPeriod || "",
+            acceptance_of_order: po.acceptanceOfOrder || "",
+        };
+
+        try {
+            const pdfPaths = await this.pdfGenerator.generatePdfs('po', data, po.id, 'PO');
+            if (pdfPaths.length > 0) {
+                await this.db
+                    .update(purchaseOrders)
+                    .set({ generatedPdf: pdfPaths[0] })
+                    .where(eq(purchaseOrders.id, po.id));
+            }
+        } catch (error) {
+            this.logger.error(`PDF generation failed for PO ${po.id}: ${error instanceof Error ? error.message : String(error)}`);
+        }
     }
 
     async getPurchaseOrder(id: number) {
@@ -288,6 +366,16 @@ export class ProjectDashboardService {
 
         this.logger.debug("po details ", po);
         return { ...po, products: enrichedProducts, total };
+    }
+
+    async getPurchaseOrderPdf(id: number): Promise<{ path: string; filename: string }> {
+        const po = (await this.db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id)))[0];
+        if (!po) throw new NotFoundException("Purchase Order not found");
+        if (!po.generatedPdf) throw new NotFoundException("PDF not yet generated for this Purchase Order");
+        return {
+            path: po.generatedPdf,
+            filename: `PO_${po.poNumber?.replace(/\//g, "_") || id}.pdf`,
+        };
     }
 
     private getTotalProductValues(products: any[]) {

@@ -21,6 +21,7 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
     }
 
     async onModuleInit() {
+        this.registerHandlebarsHelpers();
         try {
             this.browser = await puppeteer.launch(PDF_CONFIG.browserOptions);
             this.logger.log('Puppeteer browser launched successfully');
@@ -278,6 +279,9 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
      * Register Handlebars helpers for PDF templates
      */
     private registerHandlebarsHelpers() {
+        // Increment helper (for 1-based index)
+        Handlebars.registerHelper('inc', (value: number) => value + 1);
+
         // Format date helper
         Handlebars.registerHelper('formatDate', (date: Date | string | null | undefined) => {
             if (!date) return 'N/A';

@@ -106,6 +106,11 @@ export const PDF_CONFIG = {
             storagePath: 'ddformat',
             paperSize: [0, 0, 900, 500], // Custom size: width=900pt, height=500pt
         },
+        po: {
+            directory: '.',
+            templates: ['po-template'],
+            storagePath: 'po',
+        },
     },
 
     /**

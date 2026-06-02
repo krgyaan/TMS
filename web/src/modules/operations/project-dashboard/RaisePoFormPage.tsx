@@ -19,11 +19,12 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCreatePoParty, useCreatePurchaseOrder, useNextPONumber, usePoParties, useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { useGetTeamMembers } from "@/hooks/api/useUsers";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Building2, Calendar, FileText, Hash, Info, Loader2, Mail, MapPin, Phone, Receipt, UserCheck, UserPlus } from "lucide-react";
+import { ArrowLeft, Building2, Calendar, Eye, FileText, Hash, Info, Loader2, Mail, MapPin, Phone, Receipt, UserCheck, UserPlus } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
+import { POFormPreview } from "./components/POFormPreview";
 import { ProductsField } from "./components/ProductsField";
 import { formatDateForInput, mapFormToCreateDTO } from "./helpers/projectDashboard.mapper";
 import type { CreatePartyDTO } from "./helpers/projectDashboard.types";
@@ -62,14 +63,14 @@ const defaultFormValues: PurchaseOrderFormValues = {
   warrantyDispatch: "25 Years",
   warrantyInstallation: "",
   freight: "Extra as per actual.",
-  deliveryPeriod: "2 Weeks",
+  deliveryPeriod: "within 4 weeks",
   transitInsurance: "Inclusive",
   materialUnloading: "",
   paymentTerms: "30% Advance with the PO and remaining 70% before dispatch against PI.",
   poRaisedBy: "",
   technicalSpecifications: "As per approved drawing",
   technicalSpecsAttachments: [],
-  accessoriesPackagingList: "",
+  accessoriesPackagingList: "NA",
   accessoriesPackagingListAttachments: [],
   preDispatchInspection: "",
   deliveryLocation: "",
@@ -117,6 +118,7 @@ export default function RaisePoFormPage() {
 
   const parties = partiesData || [];
 
+  const [showPreview, setShowPreview] = useState(false);
   const [isAddPartyOpen, setIsAddPartyOpen] = useState(false);
   const [isShipToPartyOpen, setIsShipToPartyOpen] = useState(false);
   const [newParty, setNewParty] = useState<NewPartyForm>({ name: "", email: "", address: "", gstNo: "", pan: "", msme: "" });
@@ -197,6 +199,13 @@ export default function RaisePoFormPage() {
     }
   };
 
+  const handlePreview = async () => {
+    const isValid = await form.trigger();
+    if (isValid) {
+      setShowPreview(true);
+    }
+  };
+
   const handleSubmit = async (values: PurchaseOrderFormValues) => {
     try {
       const poData = mapFormToCreateDTO(values, overview?.tender?.id || 3613, projectId, overview?.project?.projectName);
@@ -207,6 +216,21 @@ export default function RaisePoFormPage() {
       toast.error(error?.message || "Failed to create purchase order. Please try again.");
     }
   };
+
+  if (showPreview) {
+    return (
+      <div className="container mx-auto py-6 max-w-6xl">
+        <POFormPreview
+          formValues={form.getValues()}
+          projectName={overview?.project?.projectName}
+          nextPONumber={nextPONumber}
+          isSubmitting={createPOMutation.isPending}
+          onBack={() => setShowPreview(false)}
+          onSubmit={form.handleSubmit(handleSubmit)}
+        />
+      </div>
+    );
+  }
 
   if (isProjectLoading) {
     return (
@@ -256,7 +280,7 @@ export default function RaisePoFormPage() {
                     <Hash className="h-3.5 w-3.5 text-muted-foreground" />
                     PO Number
                   </Label>
-                  <Input value={nextPONumber || "Loading..."} disabled className="bg-muted font-mono" />
+                  <Input value={nextPONumber || "Loading..."} readOnly className="bg-muted font-mono w-full" title={nextPONumber || "Loading..."} />
                   <p className="text-xs text-muted-foreground">Preview — final number is assigned upon creation</p>
                 </div>
                 <div className="space-y-2">
@@ -264,7 +288,7 @@ export default function RaisePoFormPage() {
                     <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
                     Project Name
                   </Label>
-                  <Input value={overview?.project?.projectName || ""} disabled className="bg-muted" />
+                  <Input value={overview?.project?.projectName || ""} readOnly className="bg-muted" />
                 </div>
                 <FieldWrapper control={form.control} name="poDate" label={<><Calendar className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />PO Date <span className="text-destructive">*</span></>}>
                   {(field) => <DateInput value={field.value} onChange={field.onChange} />}
@@ -596,12 +620,9 @@ export default function RaisePoFormPage() {
                 <Button type="button" variant="outline" onClick={() => navigate(-1)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={createPOMutation.isPending} className="min-w-[160px]">
-                  {createPOMutation.isPending ? (
-                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creating PO...</>
-                  ) : (
-                    <><Receipt className="mr-2 h-4 w-4" />Create PO</>
-                  )}
+                <Button type="button" onClick={handlePreview} className="min-w-[160px]">
+                  <Eye className="mr-2 h-4 w-4" />
+                  Preview & Create
                 </Button>
               </div>
             </div>

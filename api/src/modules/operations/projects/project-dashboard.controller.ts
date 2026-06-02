@@ -9,7 +9,11 @@ import {
   HttpCode,
   HttpStatus,
   Put,
+  Res,
 } from "@nestjs/common";
+import { createReadStream } from "fs";
+import { join } from "path";
+import type { Response } from "express";
 
 import { ProjectDashboardService } from "./project-dashboard.service";
 
@@ -63,6 +67,19 @@ export class ProjectDashboardController {
   @Get("purchase-orders/next-number")
   getNextPONumber(@Query("projectName") projectName: string) {
     return this.service.generatePONumber(projectName);
+  }
+
+  // Serve PO PDF
+  @Get("purchase-orders/:id/pdf")
+  async getPurchaseOrderPdf(@Param("id", ParseIntPipe) id: number, @Res() res: Response) {
+    const { path: relPath, filename } = await this.service.getPurchaseOrderPdf(id);
+    const absolutePath = join(process.cwd(), "uploads", "tendering", relPath);
+    const fileStream = createReadStream(absolutePath);
+    res.set({
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `inline; filename="${filename}"`,
+    });
+    fileStream.pipe(res);
   }
 
   // Get Purchase Order by ID
