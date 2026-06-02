@@ -10,7 +10,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -54,6 +53,7 @@ const defaultFormValues: PurchaseOrderFormValues = {
   contactPersonPhone: "",
   contactPersonEmail: "",
   partyId: "",
+  selectedUserId: "",
   shipToName: "",
   shippingAddress: "",
   shipToGst: "",
@@ -121,7 +121,11 @@ export default function RaisePoFormPage() {
 
   const { effectiveTeamId } = useAuth();
   const { data: teamMembers = [] } = useGetTeamMembers(effectiveTeamId ?? 2);
-  const [selectedUserId, setSelectedUserId] = useState("");
+  const selectedUserId = form.watch("selectedUserId");
+  const activeTeamMembers = useMemo(
+    () => (teamMembers || []).filter((u: any) => u.isActive),
+    [teamMembers]
+  );
 
   const sellerOptions = useMemo(() => [
     ...(parties || [])
@@ -460,20 +464,13 @@ export default function RaisePoFormPage() {
 
             <Separator />
             <div className="mb-4">
-              <p className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
-                <UserCheck className="h-3.5 w-3.5" />
-                Quick Fill from Team Member
-              </p>
-              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                <SelectTrigger className="w-full md:w-1/2">
-                  <SelectValue placeholder="Select a user to auto-fill contact details..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {teamMembers.map((u: any) => (
-                    <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <SelectField
+                control={form.control}
+                name="selectedUserId"
+                label={<><UserCheck className="h-3.5 w-3.5 inline mr-1" />Quick Fill from Team Member</>}
+                options={activeTeamMembers.map((u: any) => ({ id: String(u.id), name: u.name }))}
+                placeholder="Select a user to auto-fill contact details..."
+              />
               <p className="text-xs text-muted-foreground mt-1">Selecting a user will populate the contact person fields below</p>
             </div>
             <p className="text-sm font-medium text-muted-foreground mb-4">Contact Person</p>
