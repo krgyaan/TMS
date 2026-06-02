@@ -689,7 +689,7 @@ export class TenderApprovalService {
 
             case "2":
                 console.log('[buildApprovalUpdateData] Processing REJECTED status');
-                Object.assign(updateData, this.getClearedApprovalFields(), {
+                Object.assign(updateData, {
                     tlRejectionRemarks: payload.tlRejectionRemarks ?? null,
                     oemNotAllowed: payload.oemNotAllowed,
                     tlApprovalTimestamp: new Date(),
@@ -705,7 +705,7 @@ export class TenderApprovalService {
 
             case "3":
                 console.log('[buildApprovalUpdateData] Processing INCOMPLETE status');
-                Object.assign(updateData, this.getClearedApprovalFields(), {
+                Object.assign(updateData, {
                     tlIncompleteRemarks: payload.tlIncompleteRemarks ?? null,
                     tlApprovalTimestamp: null,
                     oemNotAllowed: null,
@@ -732,20 +732,6 @@ export class TenderApprovalService {
         }
 
         return { newStatus, statusComment, updateData };
-    }
-
-    private getClearedApprovalFields() {
-        return {
-            rfqTo: null,
-            rfqRequired: null,
-            quotationFiles: null,
-            processingFeeMode: null,
-            tenderFeeMode: null,
-            emdMode: null,
-            approvePqrSelection: null,
-            tlApprovalRemarks: null,
-            approveFinanceDocSelection: null,
-        };
     }
 
     private async handlePaymentModeChanges(

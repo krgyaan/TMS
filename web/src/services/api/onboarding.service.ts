@@ -10,6 +10,9 @@ export interface OnboardingRequest {
   status: "pending" | "approved" | "rejected";
   profileStatus: string;
   documentStatus: string;
+  educationStatus: string;
+  experienceStatus: string;
+  bankStatus: string;
   inductionStatus: string;
   progress: number;
   approvedAt: string | null;
@@ -100,6 +103,9 @@ export interface UpdateProfileDto {
   dateOfJoining?: string;
   probationMonths?: number;
   probationEndDate?: string;
+  designationId?: number;
+  departmentId?: number;
+  reportingTl?: number;
   salaryType?: string;
   basicSalary?: string;
   bankName?: string;
@@ -170,5 +176,45 @@ export const onboardingService = {
 
   updateInductionTask: async (id: number, taskId: number, updates: { status?: string; remarks?: string }): Promise<void> => {
     await axiosInstance.patch(`/hrms/onboarding/${id}/induction/${taskId}`, updates);
+  },
+
+  // ─── Stage Specific Methods ───────────────────────────────────────────────────
+
+  getOnboardingList: async (): Promise<any> => {
+    const { data } = await axiosInstance.get("/hrms/onboarding/dashboard");
+    return data;
+  },
+
+  getStageEducation: async (id: number): Promise<any> => {
+    const { data } = await axiosInstance.get(`/hrms/onboarding/${id}/education`);
+    return data;
+  },
+
+  getStageExperience: async (id: number): Promise<any> => {
+    const { data } = await axiosInstance.get(`/hrms/onboarding/${id}/experience`);
+    return data;
+  },
+
+  getStageDocuments: async (id: number): Promise<any> => {
+    const { data } = await axiosInstance.get(`/hrms/onboarding/${id}/documents`);
+    return data;
+  },
+
+  getStageBankDetails: async (id: number): Promise<any> => {
+    const { data } = await axiosInstance.get(`/hrms/onboarding/${id}/bank-details`);
+    return data;
+  },
+
+  updateStageEntryStatus: async (
+    id: number,
+    stageEndpoint: string,
+    entryId: number,
+    status: 'approved' | 'rejected',
+    reason?: string
+  ): Promise<any> => {
+    const url = `/hrms/onboarding/${id}/${stageEndpoint}/${entryId}/approve`;
+    const payload = { status, remark: reason || '' };
+    const { data } = await axiosInstance.patch(url, payload);
+    return data;
   },
 };

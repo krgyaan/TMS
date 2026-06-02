@@ -74,6 +74,12 @@ export interface DDActionFormData {
         courierProvider: string | null;
         docketNo: string | null;
         status: string | null;
+        docketSlip: string | null;
+        deliveryPod: string | null;
+        deliveryDate: string | null;
+        pickupDate: string | null;
+        courierDocs: string[] | null;
+        courierStatusName: string | null;
     } | null;
     hasAccountsFormData: boolean;
     hasReturnedData: boolean;

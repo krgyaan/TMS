@@ -1,5 +1,6 @@
 import { useTender } from "@/hooks/api/useTenders";
 import { useTenderApproval } from "@/hooks/api/useTenderApprovals";
+import { useInfoSheet } from "@/hooks/api/useInfoSheets";
 import { usePhysicalDocByTenderId } from "@/hooks/api/usePhysicalDocs";
 import { useRfqByTenderId } from "@/hooks/api/useRfqs";
 import { usePaymentRequestsByTender } from "@/hooks/api/usePaymentRequests";
@@ -40,6 +41,7 @@ export function useTenderStepStatuses(tenderId: number | null, options: UseTende
 
     const { data: tender, isLoading: l1 } = useTender(resolvedTenderId);
     const { data: approval, isLoading: l2 } = useTenderApproval(resolvedTenderId);
+    const { data: infoSheet, isLoading: lInfo } = useInfoSheet(resolvedTenderId);
     const { data: physicalDoc, isLoading: l3 } = usePhysicalDocByTenderId(resolvedTenderId);
     const { data: rfq, isLoading: l4 } = useRfqByTenderId(resolvedTenderId);
     const { data: paymentReqs, isLoading: l5 } = usePaymentRequestsByTender(resolvedTenderId);
@@ -65,9 +67,9 @@ export function useTenderStepStatuses(tenderId: number | null, options: UseTende
             label: "Physical Documents",
             shortLabel: "Physical Docs",
             stepNumber: 2,
-            hasData: !!physicalDoc,
-            isLoading: l3,
-            status: deriveStatus(!!physicalDoc, l3),
+            hasData: !!physicalDoc || infoSheet?.physicalDocType === 'ONLY_EMD',
+            isLoading: l3 || lInfo,
+            status: infoSheet?.physicalDocType === 'ONLY_EMD' ? 'completed' : deriveStatus(!!physicalDoc, l3),
         },
         {
             id: "rfq",

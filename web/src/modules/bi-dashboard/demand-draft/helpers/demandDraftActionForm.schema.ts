@@ -66,6 +66,7 @@ export const DemandDraftActionFormSchema = BaseActionFormSchema.extend({
             return !!data.dd_date && !!data.dd_no &&
                 !!data.courierOrg && !!data.courierName && !!data.courierPhone &&
                 !!data.courierAddrLine1 && !!data.courierPincode &&
+                /^\d{6}$/.test(data.courierPincode || '') &&
                 !!data.empFrom && !!data.delDate && !!data.urgency;
         }
         return true;

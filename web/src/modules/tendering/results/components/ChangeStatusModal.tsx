@@ -10,41 +10,78 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { TenderFileUploader } from '@/components/tender-file-upload';
-import { uploadCancelledTenderResult } from '@/hooks/api/useTenderResults';
+import { uploadChangeStatusResult } from '@/hooks/api/useTenderResults';
 import { XCircle, AlertTriangle, ArrowLeft, CheckCircle2 } from 'lucide-react';
-import { CancelTenderSchema } from "../helpers/tenderResult.schema" 
-import type {CancelTenderDto as FormValues} from "../helpers/tenderResult.schema";
+import { ChangeStatusSchema } from "../helpers/tenderResult.schema" 
+import type {ChangeStatusDto as FormValues} from "../helpers/tenderResult.schema";
 
-interface CancelTenderModalProps {
+interface ChangeStatusModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     tenderId: number | null;
     tenderNo?: string;
     tenderName?: string;
+    activeTab?: string;
     onSuccess?: () => void;
 }
 
-export function CancelTenderModal({
+interface StatusVals {
+    id : number,
+    label : string,
+    tab : string
+}
+
+const statuses : StatusVals[] = [
+    {
+        id : 21,
+        label : "EMD Paid Late",
+        tab : 'result-awaited'
+    },
+    {
+        id : 18,
+        label : "Tender Cancelled After Bidding",
+        tab : 'result-awaited'
+    },
+    {
+        id : 45,
+        label : "PO not awarded (after L1, MSME Match)",
+        tab : 'won'
+    },
+    {
+        id : 46,
+        label : "PO not awarded (Single Party)",
+        tab : 'won'
+    },
+]
+
+export function ChangeStatusModal({
     open,
     onOpenChange,
     tenderId,
     tenderNo = '',
     tenderName = '',
+    activeTab = '',
     onSuccess,
-}: CancelTenderModalProps) {
-    const uploadResultMutation = uploadCancelledTenderResult();
+}: ChangeStatusModalProps) {
+    const uploadResultMutation = uploadChangeStatusResult();
     const [step, setStep] = useState<'form' | 'confirm'>('form');
     const [savedData, setSavedData] = useState<FormValues | null>(null);
 
+    const availableStatuses = statuses.filter(
+        (s) => s.tab === activeTab
+    );
+
     const form = useForm<FormValues>({
-        resolver: zodResolver(CancelTenderSchema),
+        resolver: zodResolver(ChangeStatusSchema),
         defaultValues: {
+            statusId: undefined as unknown as number,
             resultReason: '',
             finalResultScreenshot: '',
         },
@@ -57,6 +94,7 @@ export function CancelTenderModal({
     useEffect(() => {
         if (open) {
             form.reset({
+                statusId: undefined as unknown as number,
                 resultReason: '',
                 finalResultScreenshot: '',
             });
@@ -77,6 +115,7 @@ export function CancelTenderModal({
             await uploadResultMutation.mutateAsync({
                 tenderId,
                 data: {
+                    statusId: savedData.statusId,
                     resultReason: savedData.resultReason,
                     finalResultScreenshot: savedData.finalResultScreenshot || null,
                 },
@@ -84,7 +123,7 @@ export function CancelTenderModal({
             if (onSuccess) onSuccess();
             onOpenChange(false);
         } catch (error) {
-            console.error('Error cancelling tender:', error);
+            console.error('Error changing tender status:', error);
         }
     };
 
@@ -100,7 +139,7 @@ export function CancelTenderModal({
                                 </div>
                                 <div>
                                     <DialogTitle className="text-lg font-bold text-destructive">
-                                        Cancel Tender
+                                        Change Status
                                     </DialogTitle>
                                     <DialogDescription className="text-xs text-muted-foreground mt-1">
                                         {tenderNo} - {tenderName}
@@ -111,18 +150,45 @@ export function CancelTenderModal({
 
                         <Form {...form}>
                             <form onSubmit={form.handleSubmit(handleFormSubmit)} className="p-6 space-y-5">
+                                {/* Status Select */}
+                                <FieldWrapper
+                                    control={form.control}
+                                    name="statusId"
+                                    label="Select Status"
+                                    description="Choose the new status for this tender."
+                                >
+                                    {(field) => (
+                                        <Select
+                                            onValueChange={(val) => field.onChange(Number(val))}
+                                            value={field.value ? field.value.toString() : ''}
+                                            disabled={isSubmitting}
+                                        >
+                                            <SelectTrigger className="w-full">
+                                                <SelectValue placeholder="Select a status..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {availableStatuses.map((status) => (
+                                                    <SelectItem key={status.id} value={status.id.toString()}>
+                                                        {status.label}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    )}
+                                </FieldWrapper>
+
                                 {/* Reason textarea */}
                                 <FieldWrapper
                                     control={form.control}
                                     name="resultReason"
-                                    label="Reason for Cancellation"
-                                    description="Provide a clear explanation of why this tender was cancelled."
+                                    label="Reason for Status Change"
+                                    description="Provide a clear explanation for this status change."
                                 >
                                     {(field) => (
                                         <Textarea
                                             {...field}
                                             rows={4}
-                                            placeholder="e.g. Department cancelled the tender, technical requirements changed, or budget got rejected..."
+                                            placeholder="e.g. Department cancelled the tender, technical requirements changed, EMD was paid late..."
                                             className="border-destructive/20 focus:ring-destructive/30 focus:border-destructive/30"
                                         />
                                     )}
@@ -134,7 +200,7 @@ export function CancelTenderModal({
                                         Upload Proof <span className="text-destructive">*</span>
                                     </label>
                                     <p className="text-xs text-muted-foreground">
-                                        Upload official cancellation order, corrigendum notice, or portal screenshot.
+                                        Upload relevant official document, notice, or portal screenshot.
                                     </p>
                                     <div className="border border-dashed border-destructive/20 rounded-xl p-3 bg-destructive/5 mt-2">
                                         <TenderFileUploader
@@ -166,7 +232,7 @@ export function CancelTenderModal({
                                         variant="destructive"
                                         disabled={isSubmitting}
                                     >
-                                        Proceed to Cancel
+                                        Proceed to Change Status
                                     </Button>
                                 </DialogFooter>
                             </form>
@@ -180,18 +246,22 @@ export function CancelTenderModal({
 
                         <div className="space-y-2">
                             <h3 className="text-lg font-bold text-foreground">
-                                Confirm Permanent Cancellation?
+                                Confirm Status Change?
                             </h3>
                             <p className="text-sm text-muted-foreground max-w-sm mx-auto leading-relaxed">
-                                Are you absolutely sure you want to cancel the tender <strong className="text-foreground">{tenderNo}</strong>?
+                                Are you sure you want to change the status of the tender <strong className="text-foreground">{tenderNo}</strong>?
                             </p>
                             <p className="text-xs text-destructive/80 font-medium">
-                                This action will update the status to "Tender Cancelled" and cannot be undone.
+                                This action will update the status and cannot be undone.
                             </p>
                         </div>
 
                         {/* Summary details in confirmation step */}
                         <div className="bg-muted/30 border rounded-xl p-3 text-left text-xs space-y-2 max-w-sm mx-auto">
+                            <div className="flex gap-2">
+                                <span className="font-semibold text-muted-foreground min-w-[70px]">Status:</span>
+                                <span className="text-foreground line-clamp-2">{statuses.find(s => s.id === savedData?.statusId)?.label}</span>
+                            </div>
                             <div className="flex gap-2">
                                 <span className="font-semibold text-muted-foreground min-w-[70px]">Reason:</span>
                                 <span className="text-foreground line-clamp-2">{savedData?.resultReason}</span>
@@ -219,10 +289,10 @@ export function CancelTenderModal({
                                 variant="destructive"
                                 onClick={handleConfirmCancel}
                                 disabled={isSubmitting}
-                                className="w-36 font-semibold"
+                                className="w-40 font-semibold"
                             >
                                 {isSubmitting && <span className="animate-spin mr-2">⏳</span>}
-                                Confirm Cancel
+                                Confirm Change
                             </Button>
                         </div>
                     </div>

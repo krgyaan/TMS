@@ -1,8 +1,8 @@
 import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, Query, UseInterceptors, UploadedFiles, Req, BadRequestException } from '@nestjs/common';
 import { TenderResultService } from '@/modules/tendering/tender-result/tender-result.service';
 import type { ResultDashboardType } from '@/modules/tendering/types/shared.types';
-import type { UploadResultDto, UploadTenderCancelledDto } from '@/modules/tendering/tender-result/dto/tender-result.dto';
-import { UploadTenderCancelledSchema } from '@/modules/tendering/tender-result/dto/tender-result.dto';
+import type { UploadResultDto, UploadChangeStatusResultDto } from '@/modules/tendering/tender-result/dto/tender-result.dto';
+import { UploadChangeStatusResultSchema } from '@/modules/tendering/tender-result/dto/tender-result.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { FilesInterceptor } from '@nestjs/platform-express';
@@ -86,14 +86,14 @@ export class TenderResultController {
         return this.tenderResultService.createForTender(tenderId);
     }
 
-    @Post('cancel-tender/:tenderId')
-    cancelTender(
+    @Post('change-status/:tenderId')
+    changeTenderResult(
         @Param('tenderId', ParseIntPipe) tenderId: number,
         @CurrentUser() user: any,
-        @Body() dto: UploadTenderCancelledDto
+        @Body() dto: UploadChangeStatusResultDto
     ){
         //calling the service function to cancel the tender
-        const result = this.tenderResultService.cancelTender(tenderId , user, dto);
+        const result = this.tenderResultService.changeTenderResult(tenderId , user, dto);
         return  result;
     }
 

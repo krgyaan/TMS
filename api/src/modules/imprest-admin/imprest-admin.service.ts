@@ -59,23 +59,28 @@ export class ImprestAdminService {
     async getEmployeeSummary(): Promise<EmployeeImprestSummaryDto[]> {
         this.logger.info("Fetching employee imprest summary");
 
+        const now = new Date();
+        const currentMonth = now.getMonth(); // 0 = Jan, 2 = Mar, 3 = Apr
+        const fyStartYear = currentMonth >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+        const fyStartDate = `${fyStartYear}-04-01`;
+
         try {
             const rawQuery = sql`
                 WITH imprest_agg AS (
                     SELECT
                         user_id,
-                        COALESCE(SUM(amount), 0) AS amount_spent,
-                        COALESCE(
-                            SUM(CASE WHEN approval_status = 1 THEN amount ELSE 0 END),
-                            0
-                        ) AS amount_approved
+                        COALESCE(SUM(CASE WHEN COALESCE(approved_date, created_at) >= ${fyStartDate}::date THEN amount ELSE 0 END), 0) AS amount_spent_current,
+                        COALESCE(SUM(CASE WHEN COALESCE(approved_date, created_at) < ${fyStartDate}::date THEN amount ELSE 0 END), 0) AS amount_spent_previous,
+                        COALESCE(SUM(CASE WHEN approval_status = 1 AND COALESCE(approved_date, created_at) >= ${fyStartDate}::date THEN amount ELSE 0 END), 0) AS amount_approved_current,
+                        COALESCE(SUM(CASE WHEN approval_status = 1 AND COALESCE(approved_date, created_at) < ${fyStartDate}::date THEN amount ELSE 0 END), 0) AS amount_approved_previous
                     FROM employee_imprests
                     GROUP BY user_id
                 ),
                 txn_agg AS (
                     SELECT
                         user_id,
-                        COALESCE(SUM(amount), 0) AS amount_received
+                        COALESCE(SUM(CASE WHEN txn_date >= ${fyStartDate}::date THEN amount ELSE 0 END), 0) AS amount_received_current,
+                        COALESCE(SUM(CASE WHEN txn_date < ${fyStartDate}::date THEN amount ELSE 0 END), 0) AS amount_received_previous
                     FROM employee_imprest_transactions
                     GROUP BY user_id
                 ),
@@ -98,16 +103,20 @@ export class ImprestAdminService {
                                 (6 - ((EXTRACT(DOW FROM MIN(effective_date)) + 6) % 7))
                                 * INTERVAL '1 day'
                             )
-                        )::date AS end_date
+                        )::date AS end_date,
+                        MAX(effective_date) AS max_effective_date
                     FROM voucher_base
                     GROUP BY user_id, year, week
                 ),
                 voucher_agg AS (
                     SELECT
                         a.user_id,
-                        COUNT(a.year) AS total_vouchers,
-                        SUM(CASE WHEN v.accounts_signed_by IS NOT NULL THEN 1 ELSE 0 END) AS accounts_approved,
-                        SUM(CASE WHEN v.admin_signed_by IS NOT NULL THEN 1 ELSE 0 END) AS admin_approved
+                        COUNT(CASE WHEN a.max_effective_date >= ${fyStartDate}::date THEN a.year END) AS total_vouchers_current,
+                        COUNT(CASE WHEN a.max_effective_date < ${fyStartDate}::date THEN a.year END) AS total_vouchers_previous,
+                        SUM(CASE WHEN v.accounts_signed_by IS NOT NULL AND TRIM(v.accounts_signed_by) <> '' AND a.max_effective_date >= ${fyStartDate}::date THEN 1 ELSE 0 END) AS accounts_approved_current,
+                        SUM(CASE WHEN v.accounts_signed_by IS NOT NULL AND TRIM(v.accounts_signed_by) <> '' AND a.max_effective_date < ${fyStartDate}::date THEN 1 ELSE 0 END) AS accounts_approved_previous,
+                        SUM(CASE WHEN v.admin_signed_by IS NOT NULL AND TRIM(v.admin_signed_by) <> '' AND a.max_effective_date >= ${fyStartDate}::date THEN 1 ELSE 0 END) AS admin_approved_current,
+                        SUM(CASE WHEN v.admin_signed_by IS NOT NULL AND TRIM(v.admin_signed_by) <> '' AND a.max_effective_date < ${fyStartDate}::date THEN 1 ELSE 0 END) AS admin_approved_previous
                     FROM voucher_amounts a
                     LEFT JOIN employee_imprest_vouchers v
                         ON v.beneficiary_name = a.user_id::text
@@ -118,12 +127,24 @@ export class ImprestAdminService {
                 SELECT
                     u.id AS "userId",
                     u.name AS "userName",
-                    COALESCE(i.amount_spent, 0) AS "amountSpent",
-                    COALESCE(i.amount_approved, 0) AS "amountApproved",
-                    COALESCE(t.amount_received, 0) AS "amountReceived",
-                    COALESCE(v.total_vouchers, 0) AS "totalVouchers",
-                    COALESCE(v.accounts_approved, 0) AS "accountsApproved",
-                    COALESCE(v.admin_approved, 0) AS "adminApproved"
+                    
+                    COALESCE(i.amount_spent_current, 0) AS "amountSpentCurrent",
+                    COALESCE(i.amount_spent_previous, 0) AS "amountSpentPrevious",
+                    
+                    COALESCE(i.amount_approved_current, 0) AS "amountApprovedCurrent",
+                    COALESCE(i.amount_approved_previous, 0) AS "amountApprovedPrevious",
+                    
+                    COALESCE(t.amount_received_current, 0) AS "amountReceivedCurrent",
+                    COALESCE(t.amount_received_previous, 0) AS "amountReceivedPrevious",
+                    
+                    COALESCE(v.total_vouchers_current, 0) AS "totalVouchersCurrent",
+                    COALESCE(v.total_vouchers_previous, 0) AS "totalVouchersPrevious",
+                    
+                    COALESCE(v.accounts_approved_current, 0) AS "accountsApprovedCurrent",
+                    COALESCE(v.accounts_approved_previous, 0) AS "accountsApprovedPrevious",
+                    
+                    COALESCE(v.admin_approved_current, 0) AS "adminApprovedCurrent",
+                    COALESCE(v.admin_approved_previous, 0) AS "adminApprovedPrevious"
                 FROM users u
                 INNER JOIN imprest_agg i ON i.user_id = u.id
                 LEFT JOIN txn_agg t ON t.user_id = u.id
@@ -142,23 +163,53 @@ export class ImprestAdminService {
             // ==============================
             // 5️⃣ Map Result
             // ==============================
-            const result = rows.map((row: any) => ({
-                userId: row.userId!,
-                userName: row.userName,
+            const result = rows.map((row: any) => {
+                const currentApproved = Number(row.amountApprovedCurrent);
+                const currentReceived = Number(row.amountReceivedCurrent);
+                const previousApproved = Number(row.amountApprovedPrevious);
+                const previousReceived = Number(row.amountReceivedPrevious);
 
-                amountSpent: Number(row.amountSpent),
-                amountApproved: Number(row.amountApproved),
-                amountReceived: Number(row.amountReceived),
+                return {
+                    userId: row.userId!,
+                    userName: row.userName,
 
-                // Laravel logic: approved - received
-                amountLeft: Number(row.amountApproved) - Number(row.amountReceived),
+                    // Total for table
+                    amountSpent: Number(row.amountSpentCurrent) + Number(row.amountSpentPrevious),
+                    amountApproved: currentApproved + previousApproved,
+                    amountReceived: currentReceived + previousReceived,
+                    amountLeft: (currentApproved + previousApproved) - (currentReceived + previousReceived),
 
-                voucherInfo: {
-                    totalVouchers: Number(row.totalVouchers),
-                    accountsApproved: Number(row.accountsApproved),
-                    adminApproved: Number(row.adminApproved),
-                },
-            }));
+                    voucherInfo: {
+                        totalVouchers: Number(row.totalVouchersCurrent) + Number(row.totalVouchersPrevious),
+                        accountsApproved: Number(row.accountsApprovedCurrent) + Number(row.accountsApprovedPrevious),
+                        adminApproved: Number(row.adminApprovedCurrent) + Number(row.adminApprovedPrevious),
+                    },
+                    
+                    // Segregated for summary cards
+                    current: {
+                        amountSpent: Number(row.amountSpentCurrent),
+                        amountApproved: currentApproved,
+                        amountReceived: currentReceived,
+                        amountLeft: currentApproved - currentReceived,
+                        voucherInfo: {
+                            totalVouchers: Number(row.totalVouchersCurrent),
+                            accountsApproved: Number(row.accountsApprovedCurrent),
+                            adminApproved: Number(row.adminApprovedCurrent),
+                        }
+                    },
+                    previous: {
+                        amountSpent: Number(row.amountSpentPrevious),
+                        amountApproved: previousApproved,
+                        amountReceived: previousReceived,
+                        amountLeft: previousApproved - previousReceived,
+                        voucherInfo: {
+                            totalVouchers: Number(row.totalVouchersPrevious),
+                            accountsApproved: Number(row.accountsApprovedPrevious),
+                            adminApproved: Number(row.adminApprovedPrevious),
+                        }
+                    }
+                };
+            });
 
             this.logger.debug("Employee summary mapped successfully");
 
@@ -684,6 +735,11 @@ export class ImprestAdminService {
         // 2️⃣ Check already signed
         if (approve && voucher.adminSignedBy) {
             throw new BadRequestException("Voucher already approved by admin");
+        }
+        
+        //check for ceo approval w/o accounts approval
+        if(approve && !voucher.accountsSignedBy){
+            throw new BadRequestException("Admin Approval can only be done once the Account Approval has been submitted");
         }
 
         // 3️⃣ Fetch user signature

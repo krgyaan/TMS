@@ -20,6 +20,7 @@ import {
   onboardingEducation,
   onboardingExperience,
   onboardingBankDetails,
+  OnboardingRequest,
 } from '@/db/schemas/hrms/onboarding';
 import { users } from '@/db/schemas/auth/users.schema';
 import { userProfiles } from '@/db/schemas/auth/user-profiles.schema';
@@ -28,13 +29,14 @@ import { employeeEducation } from '@/db/schemas/hrms/employee-education.schema';
 import { employeeExperience } from '@/db/schemas/hrms/employee-experience.schema';
 import { employeeDocuments } from '@/db/schemas/hrms/employee-documents.schema';
 import { employeeBankDetails } from '@/db/schemas/hrms/employee-bank-details.schema';
-import { eq, desc, aliasedTable } from 'drizzle-orm';
+import { eq, desc, aliasedTable, inArray } from 'drizzle-orm';
 import { designations } from '@/db/schemas/master/designations.schema';
 import { teams } from '@/db/schemas/master/teams.schema';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
 import { Logger } from 'winston';
 import * as crypto from 'crypto';
 import * as argon2 from 'argon2';
+import { oauthAccounts } from '@/db/schemas';
 
 // ─── DTOs ─────────────────────────────────────────────────────────────────────
 
@@ -90,6 +92,10 @@ export interface UpdateProfileDto {
   dateOfJoining?: string;
   probationMonths?: number;
   probationEndDate?: string;
+  // Core HR
+  designationId?: number;
+  departmentId?: number;
+  reportingTl?: number;
   // Compensation
   salaryType?: string;
   basicSalary?: string;
@@ -608,6 +614,31 @@ export class OnboardingService {
     }
   }
 
+  //writing the function to get the profile submission status progress
+  async findSubmissionProgress(onboardingRequest : OnboardingRequest) {
+    // we need to calculate the total progress of each request
+    const statuses = [
+      onboardingRequest?.profileStatus,
+      onboardingRequest?.documentStatus,
+      onboardingRequest?.educationStatus,
+      onboardingRequest?.experienceStatus,
+      onboardingRequest?.bankStatus,
+      onboardingRequest?.inductionStatus,
+    ];
+
+    // Filter out undefined/null statuses to handle optional fields safely
+    const validStatuses = statuses.filter((s) => s !== undefined && s !== null);
+    if (validStatuses.length === 0) return 0;
+
+    // A detail is considered submitted if the status is not 'pending'
+    const submittedCount = validStatuses.filter((s) => s == 'submitted').length;
+    
+    // If all details are submitted, progress is 100%
+    const progress = Math.round((submittedCount / validStatuses.length) * 100);
+
+    return progress;
+  }
+
   /**
    * GET /hrms/onboarding/dashboard
    * All requests joined with reviewer name — used by the HR dashboard.
@@ -618,11 +649,15 @@ export class OnboardingService {
         .select({
           id: onboardingRequests.id,
           name: onboardingRequests.name,
+          userId : onboardingRequests.userId,
           email: onboardingRequests.email,
           phone: onboardingRequests.phone,
           status: onboardingRequests.status,
           profileStatus: onboardingRequests.profileStatus,
           documentStatus: onboardingRequests.documentStatus,
+          educationStatus: onboardingRequests.educationStatus,
+          experienceStatus: onboardingRequests.experienceStatus,
+          bankStatus: onboardingRequests.bankStatus,
           inductionStatus: onboardingRequests.inductionStatus,
           progress: onboardingRequests.progress,
           approvedAt: onboardingRequests.approvedAt,
@@ -634,7 +669,129 @@ export class OnboardingService {
         .leftJoin(users, eq(onboardingRequests.approvedBy, users.id))
         .orderBy(desc(onboardingRequests.createdAt));
 
-      return rows;
+      if (rows.length === 0) {
+        return [];
+      }
+
+      const requestIds = rows.map((r) => r.id);
+      const userIds = rows.map((r) => r.userId).filter(Boolean) as number[];
+
+      const [profiles, documents, education, experience, bankDetails, induction, oauthAccs] = await Promise.all([
+        this.db.select().from(onboardingProfiles).where(inArray(onboardingProfiles.onboardingId, requestIds)),
+        this.db.select().from(onboardingDocuments).where(inArray(onboardingDocuments.onboardingId, requestIds)),
+        this.db.select().from(onboardingEducation).where(inArray(onboardingEducation.onboardingId, requestIds)),
+        this.db.select().from(onboardingExperience).where(inArray(onboardingExperience.onboardingId, requestIds)),
+        this.db.select().from(onboardingBankDetails).where(inArray(onboardingBankDetails.onboardingId, requestIds)),
+        this.db.select().from(onboardingInduction).where(inArray(onboardingInduction.onboardingId, requestIds)),
+        userIds.length > 0 ? this.db.select().from(oauthAccounts).where(inArray(oauthAccounts.userId, userIds)) : Promise.resolve([] as any[]),
+      ]);
+
+
+      const calculateHrStatus = (items: any[]) => {
+        if (!items || items.length === 0) return 'pending';
+        if (items.some((i) => i.hrStatus === 'rejected')) return 'rejected';
+        if (items.every((i) => i.hrStatus === 'approved')) return 'approved';
+        return 'pending';
+      };
+
+      const calculateHrRate = (items: any[]) => {
+        if (!items || items.length === 0) return { text: '0/0', percentage: 0 };
+        const approvedCount = items.filter((i) => i.hrStatus === 'approved').length;
+        const totalPercentage = Math.round((approvedCount / items.length) * 100);
+        return { text: `${approvedCount}/${items.length}`, percentage: totalPercentage };
+      };
+
+      // Induction uses 'status' instead of 'hrStatus'
+      const calculateInductionHrStatus = (items: any[]) => {
+        if (!items || items.length === 0) return 'pending';
+        if (items.every((i) => i.status === 'completed')) return 'approved';
+        return 'pending';
+      };
+
+      const calculateInductionRate = (items: any[]) => {
+        if (!items || items.length === 0) return { text: '0/0', percentage: 0 };
+        const completedCount = items.filter((i) => i.status === 'completed').length;
+        const totalPercentage = Math.round((completedCount / items.length) * 100);
+        return { text: `${completedCount}/${items.length}`, percentage: totalPercentage };
+      };
+
+      const enrichedRows = rows.map((row) => {
+        // 1. Filter child items for this row
+        const rowProfile = profiles.find((p) => p.onboardingId === row.id) || null;
+        const rowDocs = documents.filter((d) => d.onboardingId === row.id);
+        const rowEdu = education.filter((e) => e.onboardingId === row.id);
+        const rowExp = experience.filter((e) => e.onboardingId === row.id);
+        const rowBank = bankDetails.filter((b) => b.onboardingId === row.id);
+        const rowInduction = induction.filter((i) => i.onboardingId === row.id);
+
+        // 2. Employee Progress %
+        // We look at the 5 main statuses tracked on the base request
+        const statuses = [
+          row.profileStatus,
+          row.documentStatus,
+          row.educationStatus,
+          row.experienceStatus,
+          row.bankStatus,
+          // row.inductionStatus,
+        ];
+
+        const submittedCount = statuses.filter((s) => s == 'submitted').length;
+        const employeeProgressPercent = Math.round((submittedCount / statuses.length) * 100);
+
+        // 3. HR Progress Calculations
+        let profileHrStatus = 'pending';
+        let profileHrRate = { text: '0/0', percentage: 0 };
+        if (rowProfile) {
+          if (rowProfile.hrStatus === 'rejected') profileHrStatus = 'rejected';
+          else if (rowProfile.hrStatus === 'approved') {
+            profileHrStatus = 'approved';
+            profileHrRate = { text: '1/1', percentage: 100 };
+          } else {
+            profileHrRate = { text: '0/1', percentage: 0 };
+          }
+        }
+
+        const oauthPhoto = oauthAccs.find((o) => o.userId === row.userId)?.avatar;
+        const docProfilePhoto = rowDocs.find((d) => d.docType === 'Passport Size Photo')?.fileUrl;
+        const profilePhoto = docProfilePhoto || oauthPhoto || null;
+
+        return {
+          ...row,
+          progress: row.progress === 'pending' || !row.progress ? 0 : Number(row.progress) || 0,
+          employeeProgress: employeeProgressPercent,
+          profilePhoto : profilePhoto,
+
+          // The raw arrays/objects so the frontend can display remarks/details
+          profile: rowProfile,
+          documents: rowDocs,
+          education: rowEdu,
+          experience: rowExp,
+          bankDetails: rowBank,
+          // induction: rowInduction,
+
+          // Aggregated top-level statuses (rejected if one rejected, etc.)
+          hrStatuses: {
+            profile: profileHrStatus,
+            documents: calculateHrStatus(rowDocs),
+            education: calculateHrStatus(rowEdu),
+            experience: calculateHrStatus(rowExp),
+            bankDetails: calculateHrStatus(rowBank),
+            induction: calculateInductionHrStatus(rowInduction),
+          },
+
+          // HR Approval fractions & percentages
+          hrRates: {
+            profile: profileHrRate,
+            documents: calculateHrRate(rowDocs),
+            education: calculateHrRate(rowEdu),
+            experience: calculateHrRate(rowExp),
+            bankDetails: calculateHrRate(rowBank),
+            induction: calculateInductionRate(rowInduction),
+          },
+        };
+      });
+
+      return enrichedRows;
     } catch (err) {
       this.logger.error('OnboardingService.findAll failed', { err });
       throw err;
@@ -1271,7 +1428,7 @@ export class OnboardingService {
     });
   }
 
-  async approveEducationRecord(id: number, eduId: number, hrStatus: 'approved' | 'rejected', hrRemark: string, adminId: number) {
+  async approveEducationRecord(id: number, eduId: number, hrStatus: 'approved' | 'rejected', adminId: number, hrRemark?: string, ) {
     return this.db.transaction(async (tx) => {
       const [edu] = await tx.select().from(onboardingEducation).where(eq(onboardingEducation.id, eduId)).limit(1);
       if (!edu) throw new NotFoundException('Education record not found');
@@ -1413,13 +1570,20 @@ export class OnboardingService {
   }
 
   private async syncEducationToEmployee(tx: any, userId: number, edu: any) {
+    let yearOfCompletion = new Date().getFullYear();
+    if (edu.endDate) {
+      const parsedYear = new Date(edu.endDate).getFullYear();
+      if (!isNaN(parsedYear)) {
+        yearOfCompletion = parsedYear;
+      }
+    }
+
     await tx.insert(employeeEducation).values({
       userId,
       degree: edu.degree,
       institution: edu.institution,
       fieldOfStudy: edu.fieldOfStudy,
-      startDate: edu.startDate,
-      endDate: edu.endDate,
+      yearOfCompletion,
       grade: edu.grade,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -1462,5 +1626,19 @@ export class OnboardingService {
    */
   async delete(id: number): Promise<void> {
     await this.db.delete(onboardingRequests).where(eq(onboardingRequests.id, id));
+  }
+
+  // ── Stage Details Getters ──────────────────────────────────────────────────
+
+  async getEmployeeEducation(onboardingId: number) {
+    return this.db.select().from(onboardingEducation).where(eq(onboardingEducation.onboardingId, onboardingId)).orderBy(desc(onboardingEducation.id));
+  }
+
+  async getEmployeeExperience(onboardingId: number) {
+    return this.db.select().from(onboardingExperience).where(eq(onboardingExperience.onboardingId, onboardingId)).orderBy(desc(onboardingExperience.id));
+  }
+
+  async getEmployeeBankDetails(onboardingId: number) {
+    return this.db.select().from(onboardingBankDetails).where(eq(onboardingBankDetails.onboardingId, onboardingId)).orderBy(desc(onboardingBankDetails.id));
   }
 }

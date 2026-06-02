@@ -6,6 +6,7 @@ import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
 import { instrumentChequeDetails, instrumentTransferDetails, paymentInstruments, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import * as path from 'path';
 import { ConfigService } from '@nestjs/config';
 import { and, eq } from 'drizzle-orm';
 
@@ -119,15 +120,38 @@ export class PaymentRequestsNotificationService {
         const toEmails = await this.getResponsibleUserEmailByMode('DD');
         
         const apiUrl = this.configService.get<string>('app.apiUrl') || '';
-        const baseUrl = apiUrl.replace('/api/v1', '');
 
         const softCopyChequeUrl = chequeDetails.chequeImagePath
-            ? `${baseUrl}/uploads/tendering/${chequeDetails.chequeImagePath}`
+            ? `${apiUrl.replace('/api/v1', '')}/uploads/tendering/${chequeDetails.chequeImagePath}`
             : '';
 
-        const receivingChequeUrl = chequeDetails.handover
-            ? `${baseUrl}/uploads/tendering/${chequeDetails.handover}`
-            : '';
+        let receivingChequeUrl = '';
+        if (chequeInstrument.generatedPdf) {
+            receivingChequeUrl = `${apiUrl}/payment-requests/instruments/${chequeInstrument.id}/pdf`;
+        } else {
+            try {
+                const chequeDate = this.formatDateDDMMYYYY(chequeInstrument.issueDate) || this.formatDateDDMMYYYY(new Date().toISOString());
+                const pdfPaths = await this.pdfGenerator.generatePdfs(
+                    'chqCret',
+                    {
+                        cheque_date: chequeDate,
+                        cheque_amt: chequeInstrument.amount,
+                        cheque_favour: chequeInstrument.favouring || 'Not specified',
+                    },
+                    chequeInstrument.id,
+                    'DD'
+                );
+                if (pdfPaths.length > 0) {
+                    await this.db
+                        .update(paymentInstruments)
+                        .set({ generatedPdf: pdfPaths[0] })
+                        .where(eq(paymentInstruments.id, chequeInstrument.id));
+                    receivingChequeUrl = `${apiUrl}/payment-requests/instruments/${chequeInstrument.id}/pdf`;
+                }
+            } catch (error) {
+                this.logger.error(`Failed to generate receiving PDF for cheque ${chequeInstrument.id}:`, error);
+            }
+        }
 
         const [ddPaymentReq] = await this.db
             .select({ requestedBy: paymentRequests.requestedBy })
@@ -198,15 +222,38 @@ export class PaymentRequestsNotificationService {
         const toEmails = await this.getResponsibleUserEmailByMode('FDR');
 
         const apiUrl = this.configService.get<string>('app.apiUrl') || '';
-        const baseUrl = apiUrl.replace('/api/v1', '');
 
         const softCopyChequeUrl = chequeDetails.chequeImagePath
-            ? `${baseUrl}/uploads/tendering/${chequeDetails.chequeImagePath}`
+            ? `${apiUrl.replace('/api/v1', '')}/uploads/tendering/${chequeDetails.chequeImagePath}`
             : '';
 
-        const receivingChequeUrl = chequeDetails.handover
-            ? `${baseUrl}/uploads/tendering/${chequeDetails.handover}`
-            : '';
+        let receivingChequeUrl = '';
+        if (chequeInstrument.generatedPdf) {
+            receivingChequeUrl = `${apiUrl}/payment-requests/instruments/${chequeInstrument.id}/pdf`;
+        } else {
+            try {
+                const chequeDate = this.formatDateDDMMYYYY(chequeInstrument.issueDate) || this.formatDateDDMMYYYY(new Date().toISOString());
+                const pdfPaths = await this.pdfGenerator.generatePdfs(
+                    'chqCret',
+                    {
+                        cheque_date: chequeDate,
+                        cheque_amt: chequeInstrument.amount,
+                        cheque_favour: chequeInstrument.favouring || 'Not specified',
+                    },
+                    chequeInstrument.id,
+                    'FDR'
+                );
+                if (pdfPaths.length > 0) {
+                    await this.db
+                        .update(paymentInstruments)
+                        .set({ generatedPdf: pdfPaths[0] })
+                        .where(eq(paymentInstruments.id, chequeInstrument.id));
+                    receivingChequeUrl = `${apiUrl}/payment-requests/instruments/${chequeInstrument.id}/pdf`;
+                }
+            } catch (error) {
+                this.logger.error(`Failed to generate receiving PDF for cheque ${chequeInstrument.id}:`, error);
+            }
+        }
 
         const [fdrPaymentReq] = await this.db
             .select({ requestedBy: paymentRequests.requestedBy })
@@ -522,7 +569,7 @@ export class PaymentRequestsNotificationService {
             : '';
 
         const receivingPdfUrl = instrument.generatedPdf
-            ? `${baseUrl}/uploads/tendering/${instrument.generatedPdf}`
+            ? `${apiUrl}/payment-requests/instruments/${instrumentId}/pdf`
             : '';
 
         const deliveryMethod = chequeDetails?.deliveryMethod || '';
@@ -789,8 +836,7 @@ export class PaymentRequestsNotificationService {
                             .where(eq(paymentInstruments.id, instrumentId));
 
                         const apiUrl = this.configService.get<string>('app.apiUrl') || '';
-                        const baseUrl = apiUrl.replace('/api/v1', '');
-                        receivingPdfUrl = `${baseUrl}/uploads/tendering/${pdfPaths[0]}`;
+                        receivingPdfUrl = `${apiUrl}/payment-requests/instruments/${instrumentId}/pdf`;
                     }
                 } catch (error) {
                     this.logger.error(`Failed to generate receiving PDF for cheque ${instrumentId}:`, error);

@@ -68,8 +68,8 @@ class TenderResultService extends BaseApiService {
         return this.post<TenderResult>(`/upload/${tenderId}`, data);
     }
 
-    async uploadCancelledTenderResult(tenderId: number, data:any)  {
-        return this.post(`/cancel-tender/${tenderId}`, data)
+    async uploadChangeStatusResult(tenderId: number, data:any)  {
+        return this.post(`/change-status/${tenderId}`, data)
     }
 
     async getCounts(teamId?: number): Promise<ResultDashboardCounts> {

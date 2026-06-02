@@ -1,33 +1,31 @@
-import { useEffect, useMemo } from 'react';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { type SubmitHandler, useForm, useFieldArray, type Resolver } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Form } from '@/components/ui/form';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Skeleton } from '@/components/ui/skeleton';
+import { paths } from '@/app/routes/paths';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
-import { Input } from '@/components/ui/input';
 import { MultiSelectField } from '@/components/form/MultiSelectField';
 import { SelectField } from '@/components/form/SelectField';
-import { ArrowLeft, Save, AlertCircle, Plus, Trash2, User, Mail, Phone, MapPin } from 'lucide-react';
-import { paths } from '@/app/routes/paths';
-import { useCreatePhysicalDoc, useUpdatePhysicalDoc } from '@/hooks/api/usePhysicalDocs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Form } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useInfoSheet } from '@/hooks/api/useInfoSheets';
+import { useCreatePhysicalDoc, useUpdatePhysicalDoc } from '@/hooks/api/usePhysicalDocs';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { AlertCircle, ArrowLeft, Mail, MapPin, Phone, Plus, Save, Trash2, User } from 'lucide-react';
+import { useEffect, useMemo } from 'react';
+import { useFieldArray, useForm, type Resolver, type SubmitHandler } from 'react-hook-form';
+import { useNavigate } from 'react-router-dom';
 // Import from helpers
+import { Label } from '@/components/ui/label';
+import { useUsers } from '@/hooks/api/useUsers';
+import { useCreateCourier } from '@/modules/shared/courier/courier.hooks';
+import { Upload, X } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { buildDefaultValues, mapFormToCreatePayload, mapFormToUpdatePayload, mapResponseToForm } from '../helpers/physicalDocs.mappers';
 import { PhysicalDocsFormSchema } from '../helpers/physicalDocs.schema';
 import type { PhysicalDocsFormValues, PhysicalDocsResponse } from '../helpers/physicalDocs.types';
 import { useDocumentSubmittedOptions } from '../helpers/physicalDocs.types';
-import { buildDefaultValues, mapResponseToForm, mapFormToCreatePayload, mapFormToUpdatePayload } from '../helpers/physicalDocs.mappers';
-import { useCourierOptions, useCreateCourier } from '@/modules/shared/courier/courier.hooks';
-import { useUsers } from '@/hooks/api/useUsers';
-import { toast } from 'sonner';
-import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Upload, X, Loader2 } from 'lucide-react';
-import { useState, useRef } from 'react';
 
 interface PhysicalDocsFormProps {
     tenderId: number;
@@ -51,14 +49,13 @@ export function PhysicalDocsForm({ tenderId, mode, existingData }: PhysicalDocsF
     const navigate = useNavigate();
 
     const documentSubmittedOptions = useDocumentSubmittedOptions();
-    const courierOptions = useCourierOptions();
     // Fetch info sheet to pre-fill clients
     const { data: infoSheet, isLoading: isInfoSheetLoading } = useInfoSheet(tenderId);
 
     const createMutation = useCreatePhysicalDoc();
     const updateMutation = useUpdatePhysicalDoc();
     const createCourierMutation = useCreateCourier();
-    const { data: employees = [], isLoading: employeesLoading } = useUsers();
+    const { data: employees = [] } = useUsers();
 
     const [files, setFiles] = useState<File[]>([]);
     const hasSubmittedRef = useRef(false);
@@ -177,50 +174,42 @@ export function PhysicalDocsForm({ tenderId, mode, existingData }: PhysicalDocsF
                             <h4 className="font-semibold text-base text-primary border-b pb-2">
                                 Courier Information
                             </h4>
-                            
-                            <FormField
-                                control={form.control}
-                                name="isCourierRequested"
-                                render={({ field }) => (
-                                    <FormItem className="space-y-3">
-                                        <FormLabel>Was the courier already requested?</FormLabel>
-                                        <FormControl>
-                                            <RadioGroup
-                                                onValueChange={field.onChange}
-                                                defaultValue={field.value}
-                                                className="flex flex-row space-x-4"
-                                            >
-                                                <FormItem className="flex items-center space-x-2 space-y-0">
-                                                    <FormControl>
-                                                        <RadioGroupItem value="yes" />
-                                                    </FormControl>
-                                                    <FormLabel className="font-normal cursor-pointer">
-                                                        Yes (Select Tracking No)
-                                                    </FormLabel>
-                                                </FormItem>
-                                                <FormItem className="flex items-center space-x-2 space-y-0">
-                                                    <FormControl>
-                                                        <RadioGroupItem value="no" />
-                                                    </FormControl>
-                                                    <FormLabel className="font-normal cursor-pointer">
-                                                        No (Request Now)
-                                                    </FormLabel>
-                                                </FormItem>
-                                            </RadioGroup>
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-
-                            {form.watch('isCourierRequested') === 'yes' ? (
-                                <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    <FieldWrapper control={form.control} name="toOrg" label="Organization Name">
+                                        {(fieldProps) => <Input {...fieldProps} placeholder="Enter organization name" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="toName" label="Name">
+                                        {(fieldProps) => <Input {...fieldProps} placeholder="Enter name" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="toAddr" label="Address">
+                                        {(fieldProps) => <Input {...fieldProps} placeholder="Enter complete address" />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="toPin" label="Pin Code">
+                                        {(fieldProps) => <Input {...fieldProps} placeholder="Enter 6-digit pin code" maxLength={6} />}
+                                    </FieldWrapper>
+                                    <FieldWrapper control={form.control} name="toMobile" label="Mobile Number">
+                                        {(fieldProps) => <Input {...fieldProps} placeholder="Enter 10-digit mobile number" maxLength={10} />}
+                                    </FieldWrapper>
                                     <SelectField
                                         control={form.control}
-                                        name="courierNo"
-                                        label="Courier/Tracking Number"
-                                        options={courierOptions}
-                                        placeholder="Select courier number"
+                                        name="empFrom"
+                                        label="Courier From"
+                                        options={employees.map(e => ({ value: String(e.id), label: e.name }))}
+                                        placeholder="Select Employee"
+                                    />
+                                    <FieldWrapper control={form.control} name="delDate" label="Expected Delivery Date">
+                                        {(fieldProps) => <Input {...fieldProps} type="date" min={new Date().toISOString().split('T')[0]} />}
+                                    </FieldWrapper>
+                                    <SelectField
+                                        control={form.control}
+                                        name="urgency"
+                                        label="Dispatch Urgency"
+                                        options={[
+                                            { value: '1', label: 'Same Day (Urgent)' },
+                                            { value: '2', label: 'Next Day' }
+                                        ]}
+                                        placeholder="Select Urgency"
                                     />
                                     <MultiSelectField
                                         control={form.control}
@@ -230,85 +219,38 @@ export function PhysicalDocsForm({ tenderId, mode, existingData }: PhysicalDocsF
                                         placeholder="Select documents"
                                     />
                                 </div>
-                            ) : (
-                                <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        <FieldWrapper control={form.control} name="toOrg" label="Organization Name">
-                                            {(fieldProps) => <Input {...fieldProps} placeholder="Enter organization name" />}
-                                        </FieldWrapper>
-                                        <FieldWrapper control={form.control} name="toName" label="Name">
-                                            {(fieldProps) => <Input {...fieldProps} placeholder="Enter name" />}
-                                        </FieldWrapper>
-                                        <FieldWrapper control={form.control} name="toAddr" label="Address">
-                                            {(fieldProps) => <Input {...fieldProps} placeholder="Enter complete address" />}
-                                        </FieldWrapper>
-                                        <FieldWrapper control={form.control} name="toPin" label="Pin Code">
-                                            {(fieldProps) => <Input {...fieldProps} placeholder="Enter 6-digit pin code" maxLength={6} />}
-                                        </FieldWrapper>
-                                        <FieldWrapper control={form.control} name="toMobile" label="Mobile Number">
-                                            {(fieldProps) => <Input {...fieldProps} placeholder="Enter 10-digit mobile number" maxLength={10} />}
-                                        </FieldWrapper>
-                                        <SelectField
-                                            control={form.control}
-                                            name="empFrom"
-                                            label="Courier From"
-                                            options={employees.map(e => ({ value: String(e.id), label: e.name }))}
-                                            placeholder="Select Employee"
-                                        />
-                                        <FieldWrapper control={form.control} name="delDate" label="Expected Delivery Date">
-                                            {(fieldProps) => <Input {...fieldProps} type="date" min={new Date().toISOString().split('T')[0]} />}
-                                        </FieldWrapper>
-                                        <SelectField
-                                            control={form.control}
-                                            name="urgency"
-                                            label="Dispatch Urgency"
-                                            options={[
-                                                { value: '1', label: 'Same Day (Urgent)' },
-                                                { value: '2', label: 'Next Day' }
-                                            ]}
-                                            placeholder="Select Urgency"
-                                        />
-                                        <MultiSelectField
-                                            control={form.control}
-                                            name="submittedDocs"
-                                            label="Submitted Documents"
-                                            options={documentSubmittedOptions}
-                                            placeholder="Select documents"
-                                        />
-                                    </div>
 
-                                    {/* File Upload Section */}
-                                    <div className="space-y-2">
-                                        <Label>Soft Copy of the documents</Label>
-                                        <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 text-center hover:border-muted-foreground/50 transition-colors">
-                                            <Input
-                                                id="courier_docs"
-                                                type="file"
-                                                className="hidden"
-                                                multiple
-                                                onChange={handleFileChange}
-                                                disabled={isSubmitting}
-                                            />
-                                            <Label htmlFor="courier_docs" className="cursor-pointer flex flex-col items-center justify-center space-y-1">
-                                                <Upload className="h-6 w-6 text-muted-foreground" />
-                                                <div className="text-sm text-muted-foreground">Click to upload or drag and drop</div>
-                                            </Label>
-                                        </div>
-                                        {files.length > 0 && (
-                                            <div className="flex flex-wrap gap-2 mt-2">
-                                                {files.map((file, index) => (
-                                                    <div key={index} className="flex items-center gap-2 bg-muted px-2 py-1 rounded text-xs">
-                                                        <span className="truncate max-w-[150px]">{file.name}</span>
-                                                        <button type="button" onClick={() => removeFile(index)} className="text-destructive">
-                                                            <X className="h-3 w-3" />
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
+                                {/* File Upload Section */}
+                                <div className="space-y-2">
+                                    <Label>Soft Copy of the documents</Label>
+                                    <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 text-center hover:border-muted-foreground/50 transition-colors">
+                                        <Input
+                                            id="courier_docs"
+                                            type="file"
+                                            className="hidden"
+                                            multiple
+                                            onChange={handleFileChange}
+                                            disabled={isSubmitting}
+                                        />
+                                        <Label htmlFor="courier_docs" className="cursor-pointer flex flex-col items-center justify-center space-y-1">
+                                            <Upload className="h-6 w-6 text-muted-foreground" />
+                                            <div className="text-sm text-muted-foreground">Click to upload or drag and drop</div>
+                                        </Label>
                                     </div>
+                                    {files.length > 0 && (
+                                        <div className="flex flex-wrap gap-2 mt-2">
+                                            {files.map((file, index) => (
+                                                <div key={index} className="flex items-center gap-2 bg-muted px-2 py-1 rounded text-xs">
+                                                    <span className="truncate max-w-[150px]">{file.name}</span>
+                                                    <button type="button" onClick={() => removeFile(index)} className="text-destructive">
+                                                        <X className="h-3 w-3" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
-                            )}
+                            </div>
 
                             {/* Courier Address from Info Sheet */}
                             {infoSheet?.courierAddress && (

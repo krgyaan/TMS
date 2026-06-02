@@ -19,8 +19,7 @@ import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { QuickFilter } from '@/components/ui/quick-filter';
-import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
-import { CancelTenderModal } from './components/CancelTenderModal';
+import { ChangeStatusModal } from './components/ChangeStatusModal';
 
 const RESULT_STATUS = {
     RESULT_AWAITED: 'Result Awaited',
@@ -86,12 +85,6 @@ const TenderResultListPage = () => {
         tenderId: null
     });
     
-    //difining the state for the tender cancel modal
-    const [cancelTenderModal , setCancelTenderModal] = useState<{open : boolean , tenderId : number | null; tenderNo?: string; tenderName?: string}>({
-        open : false,
-        tenderId : null
-    })
-
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
@@ -145,15 +138,15 @@ const TenderResultListPage = () => {
                 visible: () => activeTab == 'result-awaited'
             },
             {
-                label : 'Tender Cancelled',
+                label : 'Change Status',
                 icon : <XCircle className='h-4 w-4' />,
-                onClick: (row : ResultDashboardRow) => setCancelTenderModal({
+                onClick: (row : ResultDashboardRow) => setChangeStatusModal({
                     open : true,
                     tenderId: row.tenderId,
                     tenderNo : row.tenderNo,
                     tenderName : row.tenderName
                 }),// this will pop the modal for us
-                visible: () => activeTab === 'result-awaited'
+                visible: () => activeTab === 'result-awaited' || activeTab == 'won',
             },
             {
                 label: 'Basic Details',
@@ -481,19 +474,11 @@ const TenderResultListPage = () => {
                 open={changeStatusModal.open}
                 onOpenChange={(open) => setChangeStatusModal({ ...changeStatusModal, open })}
                 tenderId={changeStatusModal.tenderId}
-                currentStatus={changeStatusModal.currentStatus}
+                tenderNo={changeStatusModal.tenderNo}
+                tenderName={changeStatusModal.tenderName}
+                activeTab={activeTab}
                 onSuccess={() => {
                     setChangeStatusModal({ open: false, tenderId: null });
-                }}
-            />
-            <CancelTenderModal
-                open={cancelTenderModal.open}
-                onOpenChange={(open) => setCancelTenderModal({ ...cancelTenderModal, open })}
-                tenderId={cancelTenderModal.tenderId}
-                tenderNo={cancelTenderModal.tenderNo}
-                tenderName={cancelTenderModal.tenderName}
-                onSuccess={() => {
-                    setCancelTenderModal({ open: false, tenderId: null });
                 }}
             />
         </>
