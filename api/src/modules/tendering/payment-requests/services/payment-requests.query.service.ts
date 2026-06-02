@@ -670,6 +670,7 @@ export class PaymentRequestsQueryService {
                 courierDeadline: paymentInstruments.courierDeadline,
                 status: paymentInstruments.status,
                 isActive: paymentInstruments.isActive,
+                reqNo: paymentInstruments.reqNo,
             })
             .from(paymentInstruments)
             .where(and(
@@ -677,10 +678,29 @@ export class PaymentRequestsQueryService {
                 eq(paymentInstruments.isActive, true)
             ));
 
+        const instrumentsWithDetails = await Promise.all(prInstruments.map(async (instrument) => {
+            const base = this.mapInstrumentBase(instrument);
+            let details: any = null;
+            if (instrument.instrumentType === 'DD') {
+                [details] = await this.db.select({
+                    reqNo: instrumentDdDetails.reqNo,
+                }).from(instrumentDdDetails).where(eq(instrumentDdDetails.instrumentId, instrument.id)).limit(1);
+            } else if (instrument.instrumentType === 'BG') {
+                [details] = await this.db.select({
+                    courierNo: instrumentBgDetails.courierNo,
+                }).from(instrumentBgDetails).where(eq(instrumentBgDetails.instrumentId, instrument.id)).limit(1);
+            }
+            return {
+                ...base,
+                reqNo: base.reqNo || details?.reqNo || null,
+                courierNo: details?.courierNo || null,
+            };
+        }));
+
         return {
             requests: requests.map(req => ({
                 ...this.mapPaymentRequest(req),
-                instruments: prInstruments.filter(i => i.requestId === req.id).map(i => this.mapInstrumentBase(i)),
+                instruments: instrumentsWithDetails.filter(i => i.requestId === req.id),
             })),
         };
     }
@@ -747,6 +767,7 @@ export class PaymentRequestsQueryService {
                 courierDeadline: paymentInstruments.courierDeadline,
                 status: paymentInstruments.status,
                 isActive: paymentInstruments.isActive,
+                reqNo: paymentInstruments.reqNo,
             })
             .from(paymentInstruments)
             .where(and(
@@ -800,6 +821,7 @@ export class PaymentRequestsQueryService {
                 courierDeadline: paymentInstruments.courierDeadline,
                 status: paymentInstruments.status,
                 isActive: paymentInstruments.isActive,
+                reqNo: paymentInstruments.reqNo,
             })
             .from(paymentInstruments)
             .where(and(
@@ -1172,6 +1194,8 @@ export class PaymentRequestsQueryService {
             courierDeadline: instrument.courierDeadline != null ? Number(instrument.courierDeadline) : null,
             status: instrument.status,
             isActive: instrument.isActive,
+            reqNo: instrument.reqNo,
+            details: null, // to be filled in mapInstrumentResponse
         };
     }
 

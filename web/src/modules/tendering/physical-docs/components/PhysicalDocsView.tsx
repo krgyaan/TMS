@@ -8,6 +8,8 @@ import type { PhysicalDocs } from '../helpers/physicalDocs.types';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { usePhysicalDocByTenderId } from '@/hooks/api/usePhysicalDocs';
 import { useInfoSheet } from '@/hooks/api/useInfoSheets';
+import { CourierCard } from '@/modules/shared/courier/CourierCard';
+import { PaymentRequestCourierInfo } from './PaymentRequestCourierInfo';
 
 interface PhysicalDocsViewProps {
     physicalDoc?: PhysicalDocs | null;
@@ -102,6 +104,11 @@ export function PhysicalDocsView({ physicalDoc }: PhysicalDocsViewProps) {
                         )}
                     </TableBody>
                 </Table>
+                {physicalDoc.courierNo && (
+                    <div className="mt-4">
+                        <CourierCard courierId={physicalDoc.courierNo} title="Courier Details" />
+                    </div>
+                )}
             </CardContent>
         </Card>
     );
@@ -140,9 +147,7 @@ export function PhysicalDocsSection({ tenderId }: { tenderId: number | null }) {
                 </div>
             </Card>
         );
-    }
-
-    else if (infoSheet.physicalDocsRequired == 'NO' || infoSheet.physicalDocsRequired == null || infoSheet.physicalDocType === 'ONLY_EMD') {
+    } else if (infoSheet.physicalDocsRequired == 'NO') {
         return (
             <Card>
                 <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
@@ -150,6 +155,33 @@ export function PhysicalDocsSection({ tenderId }: { tenderId: number | null }) {
                     <p className="text-sm">Physical Docs Not Required</p>
                 </div>
             </Card>
+        );
+    } else if (infoSheet.physicalDocsRequired == null) {
+        return (
+            <Card>
+                <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                    <Package className="h-8 w-8 mb-2 opacity-50" />
+                    <p className="text-sm">Physical Docs Requirement Not Selected in Tender Info Sheet</p>
+                </div>
+            </Card>
+        );
+    }
+
+    if (infoSheet.physicalDocType === 'ONLY_EMD') {
+        return (
+            <>
+                {physicalDoc ? (
+                    <PhysicalDocsView physicalDoc={physicalDoc} />
+                ) : (
+                    <Card>
+                        <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                            <Package className="h-8 w-8 mb-2 opacity-50" />
+                            <p className="text-sm">Physical Docs Required Only for EMD</p>
+                        </div>
+                    </Card>
+                )}
+                {tenderId && <PaymentRequestCourierInfo tenderId={tenderId} />}
+            </>
         );
     }
 
@@ -177,5 +209,10 @@ export function PhysicalDocsSection({ tenderId }: { tenderId: number | null }) {
         );
     }
 
-    return <PhysicalDocsView physicalDoc={physicalDoc}/>;
+    return (
+        <>
+            <PhysicalDocsView physicalDoc={physicalDoc} />
+            {tenderId && <PaymentRequestCourierInfo tenderId={tenderId} />}
+        </>
+    );
 }
