@@ -4,6 +4,7 @@ import {
   Post,
   Param,
   Body,
+  Query,
   ParseIntPipe,
   HttpCode,
   HttpStatus,
@@ -56,6 +57,12 @@ export class ProjectDashboardController {
   @Get("purchase-orders/parties")
   listParties() {
     return this.service.listParties();
+  }
+
+  // Get next PO number preview
+  @Get("purchase-orders/next-number")
+  getNextPONumber(@Query("projectName") projectName: string) {
+    return this.service.generatePONumber(projectName);
   }
 
   // Get Purchase Order by ID

@@ -16,7 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/contexts/AuthContext";
-import { useCreatePoParty, useCreatePurchaseOrder, usePoParties, useProjectOverview } from "@/hooks/api/useProjectDashboard";
+import { useCreatePoParty, useCreatePurchaseOrder, useNextPONumber, usePoParties, useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { useGetTeamMembers } from "@/hooks/api/useUsers";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Building2, Calendar, FileText, Hash, Info, Loader2, Mail, MapPin, Phone, Receipt, UserCheck, UserPlus } from "lucide-react";
@@ -112,6 +112,8 @@ export default function RaisePoFormPage() {
   const { data: partiesData } = usePoParties();
   const createPOMutation = useCreatePurchaseOrder();
   const createPartyMutation = useCreatePoParty();
+
+  const { data: nextPONumber } = useNextPONumber(overview?.project?.projectName);
 
   const parties = partiesData || [];
 
@@ -248,14 +250,14 @@ export default function RaisePoFormPage() {
             {/* ── PO Details ── */}
             <div>
               <h3 className="text-lg font-semibold mb-4">PO Details</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2">
                     <Hash className="h-3.5 w-3.5 text-muted-foreground" />
                     PO Number
                   </Label>
-                  <Input value="Auto-generated" disabled className="bg-muted" />
-                  <p className="text-xs text-muted-foreground">Will be generated upon submission</p>
+                  <Input value={nextPONumber || "Loading..."} disabled className="bg-muted font-mono" />
+                  <p className="text-xs text-muted-foreground">Preview — final number is assigned upon creation</p>
                 </div>
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2">

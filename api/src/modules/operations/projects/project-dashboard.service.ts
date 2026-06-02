@@ -156,7 +156,7 @@ export class ProjectDashboardService {
             .replace(/[\s-]+/g, '_');
     }
 
-    private async generatePONumber(projectName?: string) {
+    async generatePONumber(projectName?: string) {
         const now = new Date();
         const year = now.getFullYear();
         const month = now.getMonth() + 1;

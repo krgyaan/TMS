@@ -32,6 +32,10 @@ class ProjectDashboardApiService extends BaseApiService {
         return this.get('/purchase-orders/parties');
     }
 
+    async getNextPONumber(projectName: string): Promise<string> {
+        return this.get(`/purchase-orders/next-number?projectName=${encodeURIComponent(projectName)}`);
+    }
+
     async createPurchaseOrder(data: CreatePurchaseOrderDTO): Promise<any> {
         return this.post('/purchase-orders', data);
     }

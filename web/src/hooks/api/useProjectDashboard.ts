@@ -57,6 +57,15 @@ export const usePoParties = () => {
     });
 };
 
+export const useNextPONumber = (projectName: string | undefined) => {
+    return useQuery({
+        queryKey: [...projectsDashboardKeys.all, "next-po-number", projectName],
+        queryFn: () => projectDashboardApi.getNextPONumber(projectName!),
+        enabled: !!projectName,
+        staleTime: 5 * 60 * 1000,
+    });
+};
+
 export const usePurchaseOrderDetails = (id: number) => {
     return useQuery({
         queryKey: projectsDashboardKeys.purchaseOrder(id),

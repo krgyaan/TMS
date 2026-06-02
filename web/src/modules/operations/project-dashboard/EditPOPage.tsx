@@ -327,7 +327,7 @@ export default function EditPOPage() {
                             {/* ── PO Details ── */}
                             <div>
                                 <h3 className="text-lg font-semibold mb-4">PO Details</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
                                     <div className="space-y-2">
                                         <Label className="flex items-center gap-2">
                                             <Hash className="h-3.5 w-3.5 text-muted-foreground" />
@@ -386,7 +386,7 @@ export default function EditPOPage() {
                                 </div>
 
                                 {selectedSellerId && selectedSellerId !== "" && (
-                                    <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-6 items-start">
                                         <FieldWrapper control={form.control} name="sellerName" label={<>Seller Name <span className="text-destructive">*</span></>}>
                                             {(field) => <Input {...field} placeholder="Enter seller name" />}
                                         </FieldWrapper>
