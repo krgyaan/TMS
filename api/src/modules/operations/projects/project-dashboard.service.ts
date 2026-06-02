@@ -226,6 +226,7 @@ export class ProjectDashboardService {
             technicalSpecsAttachments: body.technicalSpecsAttachments,
             accessoriesPackagingListAttachments: body.accessoriesPackagingListAttachments,
             remarks: body.remarks,
+            certRecipient: body.certRecipient,
             poRaisedBy: userId,
             projectId: body.projectId,
         })
@@ -313,6 +314,9 @@ export class ProjectDashboardService {
             grand_total: grandTotal,
             grand_total_in_words: this.pdfGenerator.grandTotalInWords(grandTotal),
             terms_and_conditions: Array.isArray(po.termsAndConditions) ? po.termsAndConditions : [],
+            test_certificate_email: po.certRecipient
+                ? ((await this.db.select().from(users).where(eq(users.id, po.certRecipient)))[0]?.email ?? "")
+                : "",
         };
 
         try {
@@ -439,6 +443,7 @@ export class ProjectDashboardService {
                     technicalSpecsAttachments: body.technicalSpecsAttachments,
                     accessoriesPackagingListAttachments: body.accessoriesPackagingListAttachments,
                     remarks: body.remarks,
+                    certRecipient: body.certRecipient,
                     poRaisedBy: userId ?? body.poRaisedBy,
                     
                     updatedAt: new Date(),

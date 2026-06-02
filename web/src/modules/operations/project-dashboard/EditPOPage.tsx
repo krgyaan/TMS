@@ -51,6 +51,7 @@ const defaultFormValues: PurchaseOrderFormValues = {
     contactPersonEmail: "",
     partyId: "",
     selectedUserId: "",
+    selectedCertRecipient: "",
     shipToName: "",
     shippingAddress: "",
     shipToGst: "",
@@ -198,6 +199,7 @@ export default function EditPOPage() {
             contactPersonEmail: poData.contactPersonEmail || "",
             partyId: "",
             selectedUserId: "",
+            selectedCertRecipient: String(poData.certRecipient ?? ""),
             shipToName: poData.shipToName || "",
             shippingAddress: poData.shippingAddress || "",
             shipToGst: poData.shipToGst || "",
@@ -489,6 +491,21 @@ export default function EditPOPage() {
                             <FieldWrapper control={form.control} name="contactPersonEmail" label={<><Mail className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Contact Person Email</>}>
                                 {(field) => <Input {...field} type="email" placeholder="contact@example.com" />}
                             </FieldWrapper>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 my-6">
+                            <div className="space-y-1">
+                                <SelectField
+                                    control={form.control}
+                                    name="selectedCertRecipient"
+                                    label="Test Certificate Recipient"
+                                    options={activeTeamMembers.map((u: any) => ({ id: String(u.id), name: u.name }))}
+                                    placeholder="Select recipient for test certificate..."
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    Select the team member who should receive the test certificate and invoice via email
+                                </p>
+                            </div>
                         </div>
 
                         {/* ── Products ── */}

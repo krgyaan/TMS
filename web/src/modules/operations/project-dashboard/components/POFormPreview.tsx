@@ -73,6 +73,7 @@ interface POFormPreviewProps {
   isSubmitting: boolean;
   onBack: () => void;
   onSubmit: () => void;
+  teamMembers?: any[];
 }
 
 export function POFormPreview({
@@ -82,7 +83,13 @@ export function POFormPreview({
   isSubmitting,
   onBack,
   onSubmit,
+  teamMembers,
 }: POFormPreviewProps) {
+  const certRecipientUser = formValues.selectedCertRecipient
+    ? teamMembers?.find((u: any) => String(u.id) === formValues.selectedCertRecipient)
+    : undefined;
+  const certRecipientEmail = certRecipientUser?.email || "goyal@volksenergie.in";
+
   const validProducts = formValues.products.filter(
     (p) => p.description && p.qty !== null && p.rate !== null && p.qty > 0
   );
@@ -202,6 +209,11 @@ export function POFormPreview({
           <p className="text-sm px-4 py-3 border-t">
             <strong>Total Amount (In Words):</strong>{" "}
             {numberToWords(grandTotal)}
+          </p>
+
+          {/* Test Certificate Email */}
+          <p className="text-sm px-4 py-3 border-t">
+            Test certificate and invoice with machine serial no. need to be shared on {certRecipientEmail}
           </p>
 
           {/* Terms & Conditions */}

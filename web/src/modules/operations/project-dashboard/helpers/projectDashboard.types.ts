@@ -21,6 +21,7 @@ export interface CreatePurchaseOrderDTO {
     contactPersonName?: string;
     contactPersonPhone?: string;
     contactPersonEmail?: string;
+    certRecipient?: number;
     shipToName: string;
     shippingAddress: string;
     shipToGst?: string;
@@ -68,6 +69,7 @@ export interface UpdatePurchaseOrderDTO {
     contactPersonName?: string;
     contactPersonPhone?: string;
     contactPersonEmail?: string;
+    certRecipient?: number;
     shipToName: string;
     shippingAddress: string;
     shipToGst?: string;
