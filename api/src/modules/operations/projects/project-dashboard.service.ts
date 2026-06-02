@@ -291,13 +291,6 @@ export class ProjectDashboardService {
         const totalGstAmt = items.reduce((s: number, i: any) => s + i.gst_amount, 0);
         const grandTotal = totalAmount + totalGstAmt;
 
-        const termsMap: Record<string, string> = {};
-        if (Array.isArray(po.termsAndConditions)) {
-            for (const t of po.termsAndConditions) {
-                if (t.field) termsMap[t.field] = t.value || "";
-            }
-        }
-
         const data = {
             po_date: po.poDate || "",
             po_number: po.poNumber || "",
@@ -319,15 +312,7 @@ export class ProjectDashboardService {
             total_gst_amt: totalGstAmt,
             grand_total: grandTotal,
             grand_total_in_words: this.pdfGenerator.grandTotalInWords(grandTotal),
-            payment_terms: termsMap["Payment Terms"] || "",
-            freight: termsMap["Freight"] || "",
-            transit_insurance: termsMap["Transit Insurance"] || "",
-            pre_dispatch_inspection: termsMap["Pre-Dispatch Inspection"] || "",
-            warranty: termsMap["Warranty (Dispatch)"] || termsMap["Warranty (Installation)"] || "",
-            delivery_location: termsMap["Delivery Location"] || "",
-            technical_specification: termsMap["Technical Specifications"] || "",
-            delivery_period: termsMap["Delivery Period"] || "",
-            acceptance_of_order: termsMap["Acceptance of Order"] || "",
+            terms_and_conditions: Array.isArray(po.termsAndConditions) ? po.termsAndConditions : [],
         };
 
         try {

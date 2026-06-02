@@ -1,13 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { formatDate } from "@/hooks/useFormatedDate";
 import {
   ArrowLeft,
   Loader2,
   Receipt,
 } from "lucide-react";
-import type { PurchaseOrderFormValues, ProductFormItem } from "../helpers/purchaseOrder.schema";
 import { calculateTotals, formatINR } from "../helpers/projectDashboard.mapper";
+import type { ProductFormItem, PurchaseOrderFormValues } from "../helpers/purchaseOrder.schema";
 
 function numberToWords(num: number): string {
   if (num === 0) return "Zero Only";
@@ -122,14 +122,14 @@ export function POFormPreview({
                 <td className="p-4 w-2/5 align-top">
                   <strong>Volks Energie Pvt. Ltd.</strong><br />
                   B-1/D8, 2nd floor, Mohan Cooperative Industrial Estate,<br />
-                  New Delhi – 110044<br />
+                  New Delhi - 110044<br />
                   Mob: +91 9650393636<br />
                   email: goyal@volksenergie.in<br />
                   PAN No.: AADCV9396C<br />
                   GST No.: 07AADCV9396C1Z
                 </td>
                 <td className="p-4 w-2/5 align-top">
-                  <strong>Date:</strong> {formValues.poDate || "—"}<br />
+                  <strong>Date:</strong> {formatDate(formValues.poDate) || "—"}<br />
                   <strong>PO No.:</strong> {nextPONumber || "—"}<br />
                   <strong>Project Name:</strong> {projectName || "—"}<br />
                   <strong>Contact Person:</strong> {formValues.contactPersonName || "—"}<br />
@@ -231,27 +231,25 @@ export function POFormPreview({
           </p>
 
           {/* Signature Area */}
-          <div className="grid grid-cols-2 gap-8 px-4 py-6 border-t">
-            <div>
-              <p className="text-sm">
-                Read understood and unconditionally accepted for and on behalf of
-              </p>
+          <p className="text-center text-sm">
+            Read understood and unconditionally accepted for and on behalf of
+          </p>
+          <div className="grid grid-cols-2 gap-8 px-4 py-6">
+            <div className="text-left">
               <p className="text-sm font-medium mt-1">For M/s Volks Energie Pvt Ltd</p>
-              <div className="mt-12 border-t border-dashed pt-1">
+              <div className="mt-12">
                 <p className="text-xs text-muted-foreground">Authorized Signatory</p>
               </div>
             </div>
             <div className="text-right">
               <p className="text-sm font-medium">For M/s {formValues.sellerName || "—"}</p>
-              <div className="mt-16 border-t border-dashed pt-1">
+              <div className="mt-16">
                 <p className="text-xs text-muted-foreground">Authorized Signatory</p>
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
-
-      <Separator />
 
       {/* Action Buttons */}
       <div className="flex justify-between pt-4 border-t">

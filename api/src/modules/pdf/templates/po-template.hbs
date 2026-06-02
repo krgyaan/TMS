@@ -113,16 +113,14 @@
     <!-- Terms -->
     <div>
         <strong>Terms and conditions:</strong><br>
-        <b>Payment Terms:</b> {{payment_terms}}.<br>
-        <b>Freight:</b> {{freight}}.<br>
-        <b>Transit Insurance:</b> {{transit_insurance}}.<br>
-        <b>Pre-Dispatch Inspection:</b> {{pre_dispatch_inspection}}.<br>
-        <b>Warranty:</b> {{warranty}}.<br>
-        <b>Delivery Location:</b> {{delivery_location}}.<br>
-        <b>Technical Specifications:</b> {{technical_specification}}.<br>
-        <b>Delivery Period:</b> {{delivery_period}}.<br>
-        <b>Acceptance of Order:</b> {{acceptance_of_order}}.
+        {{#each terms_and_conditions}}
+        <b>{{this.field}}:</b> {{this.value}}.<br>
+        {{/each}}
     </div>
+
+    <p style="margin-top: 20px;">
+        Test certificate and invoice with machine serial no. need to be shared on {{test_certificate_email}}.
+    </p>
 
     <!-- Footer -->
     <p style="margin-top: 20px; text-align: center;">
@@ -130,7 +128,7 @@
     </p>
 
     <table style="width: 100%; margin-top: 40px;">
-        <tr>
+        <tr style="text-align: center;">
             <td style="text-align: center;">
                 Read understood and unconditionally accepted for and on behalf of
             </td>
