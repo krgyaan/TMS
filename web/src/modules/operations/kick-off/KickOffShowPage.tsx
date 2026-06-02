@@ -20,8 +20,9 @@ export default function KickOffShowPage() {
     const { steps, woDetailId } = useWoStepStatuses(woId);
 
     const { data: woDetailRelations } = useWoDetailWithRelations(woDetailId ?? 0);
-    const tenderId = woDetailRelations?.woBasicDetail?.tenderId ?? null;
-    const woBasicDetailId = woDetailRelations?.woBasicDetail?.id ?? null;
+    const woBasicDetail = woDetailRelations?.woBasicDetail;
+    const tenderId = woBasicDetail?.tenderId ?? null;
+    const woBasicDetailId = woBasicDetail?.id ?? null;
 
     const [activeTab, setActiveTab] = useState<"operation" | "tendering">("operation");
 

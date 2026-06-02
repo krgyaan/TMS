@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useState, useCallback } from "react";
 import { useWoStepStatuses } from "@/hooks/api/useWoStepStatuses";
-import { useWoDetailWithRelations } from "@/hooks/api/useWoDetails";
+import { useWoBasicDetailById } from "@/hooks/api/useWoBasicDetails";
 import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TenderViewPage } from "@/modules/tendering/tenders/TenderViewPage";
@@ -19,8 +19,8 @@ export default function BasicDetailShowPage() {
 
     const { steps, woDetailId } = useWoStepStatuses(null, woId);
 
-    const { data: woDetailRelations } = useWoDetailWithRelations(woDetailId ?? 0);
-    const tenderId = woDetailRelations?.woBasicDetail?.tenderId ?? null;
+    const { data: woBasicDetail } = useWoBasicDetailById(woId);
+    const tenderId = woBasicDetail?.tenderId ?? null;
 
     const [activeTab, setActiveTab] = useState<"operation" | "tendering">("operation");
 
