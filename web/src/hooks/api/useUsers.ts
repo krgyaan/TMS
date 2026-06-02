@@ -94,6 +94,7 @@ export const useGetTeamMembers = (teamId: number) => {
     return useQuery({
         queryKey: [...userKeys.lists(), "team", teamId, "members"],
         queryFn: () => usersService.getTeamMembers(teamId),
-        enabled: !!teamId,
+        enabled: teamId !== undefined && teamId !== null,
+        staleTime: 5 * 60 * 1000, // 5 minutes
     });
 };

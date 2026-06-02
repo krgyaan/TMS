@@ -171,7 +171,10 @@ export class ProjectDashboardService {
         const prefix = `VE/${sanitizedName}/${fy}`;
 
         const last = await this.db
-            .select()
+            .select({
+                id: purchaseOrders.id,
+                poNumber: purchaseOrders.poNumber
+            })
             .from(purchaseOrders)
             .where(like(purchaseOrders.poNumber, `VE/%/${fy}/PO%`))
             .orderBy(desc(purchaseOrders.id));

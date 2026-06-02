@@ -10,15 +10,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useAuth } from "@/contexts/AuthContext";
 import { useCreatePoParty, useCreatePurchaseOrder, useNextPONumber, usePoParties, useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { useGetTeamMembers } from "@/hooks/api/useUsers";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Building2, Calendar, Eye, FileText, Hash, Info, Loader2, Mail, MapPin, Phone, Receipt, UserCheck, UserPlus } from "lucide-react";
+import { ArrowLeft, Building2, Calendar, Eye, Hash, Info, Loader2, Mail, MapPin, Phone, UserCheck, UserPlus } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
@@ -119,8 +117,8 @@ export default function RaisePoFormPage() {
   const selectedSellerId = form.watch("sellerId");
   const selectedPartyId = form.watch("partyId");
 
-  const { effectiveTeamId } = useAuth();
-  const { data: teamMembers = [] } = useGetTeamMembers(effectiveTeamId ?? 2);
+  const { data: teamMembers = [] } = useGetTeamMembers(0); // all active team members across teams
+  console.log("Team Members for PO Form:", teamMembers);
   const selectedUserId = form.watch("selectedUserId");
   const activeTeamMembers = useMemo(
     () => (teamMembers || []).filter((u: any) => u.isActive),
@@ -237,233 +235,214 @@ export default function RaisePoFormPage() {
   }
 
   return (
-    <Form {...form}>
-      <form onSubmit={form.handleSubmit(handleSubmit)}>
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-2xl font-bold tracking-tight flex items-center gap-2">
-                  <Receipt className="h-6 w-6" />
-                  Raise Purchase Order
-                </CardTitle>
-                <CardDescription>
-                  <div className="flex items-center gap-3">
-                    <Badge variant="outline" className="text-sm">
-                      {overview?.tender?.tenderNumber || "N/A"}
-                    </Badge>
-                    <Badge variant="secondary" className="text-sm">
-                      {overview?.project?.projectName || "N/A"}
-                    </Badge>
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Raise Purchase Order</CardTitle>
+            <CardDescription className="mt-2">
+              <div className="flex items-center gap-3">
+                <Badge variant="outline">
+                  {overview?.tender?.tenderNumber || "N/A"}
+                </Badge>
+                <Badge variant="secondary">
+                  {overview?.project?.projectName || "N/A"}
+                </Badge>
+              </div>
+            </CardDescription>
+          </div>
+          <CardAction>
+            <Button variant="outline" size="sm" type="button" onClick={() => navigate(-1)} className="flex items-center space-x-2">
+              <ArrowLeft className="h-4 w-4" />
+              <span>Go Back</span>
+            </Button>
+          </CardAction>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-8">
+        {/* ── PO Details ── */}
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Hash className="h-3.5 w-3.5 text-muted-foreground" />
+                  PO Number
+                </Label>
+                <Input value={nextPONumber || "Loading..."} readOnly className="bg-muted font-mono w-full" title={nextPONumber || "Loading..."} />
+                <p className="text-xs text-muted-foreground">Preview — final number is assigned upon creation</p>
+              </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                  Project Name
+                </Label>
+                <Input value={overview?.project?.projectName || ""} readOnly className="bg-muted" />
+              </div>
+              <FieldWrapper control={form.control} name="poDate" label={<><Calendar className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />PO Date <span className="text-destructive">*</span></>}>
+                {(field) => <DateInput value={field.value} onChange={field.onChange} />}
+              </FieldWrapper>
+            </div>
+
+            <div className="flex flex-col md:flex-row gap-6 mt-6">
+              {/* ── Seller Information ── */}
+              <div className="border rounded-lg border-primary border-dashed p-2 my-3 w-full md:w-1/2">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <Building2 className="h-5 w-5" />
+                    Seller Information
+                  </h3>
+                  <Dialog open={isAddPartyOpen} onOpenChange={(open) => { setIsAddPartyOpen(open); if (open) setPartyCreationType("seller"); }}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm" type="button" onClick={() => setPartyCreationType("seller")}>
+                        <UserPlus className="mr-2 h-4 w-4" />
+                        Add New Seller
+                      </Button>
+                    </DialogTrigger>
+                    <AddPartyDialog
+                      newParty={newParty}
+                      setNewParty={setNewParty}
+                      onSubmit={handleAddNewParty}
+                      onClose={() => setIsAddPartyOpen(false)}
+                      isLoading={createPartyMutation.isPending}
+                    />
+                  </Dialog>
+                </div>
+                <p className="text-sm text-muted-foreground mb-4">Select or enter seller/vendor details</p>
+                <div className="mb-6 max-w-md">
+                  <SelectField
+                    control={form.control}
+                    name="sellerId"
+                    label="Select Existing Seller"
+                    options={sellerOptions}
+                    placeholder="Choose a seller..."
+                  />
+                </div>
+                {selectedSellerId && selectedSellerId !== "" && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FieldWrapper control={form.control} name="sellerName" label={<>Seller Name <span className="text-destructive">*</span></>}>
+                      {(field) => <Input {...field} placeholder="Enter seller name" />}
+                    </FieldWrapper>
+                    <FieldWrapper control={form.control} name="sellerEmail" label={<><Mail className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Seller Email</>}>
+                      {(field) => <Input {...field} type="email" placeholder="seller@example.com" />}
+                    </FieldWrapper>
+                    <FieldWrapper control={form.control} name="sellerGstNo" label="GST Number">
+                      {(field) => (
+                        <Input
+                          {...field}
+                          placeholder="e.g. 27ABCDE1234F1Z5"
+                          className="font-mono"
+                          maxLength={15}
+                          onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                        />
+                      )}
+                    </FieldWrapper>
+                    <FieldWrapper control={form.control} name="sellerAddress" label={<><MapPin className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Seller Address</>}>
+                      {(field) => <Textarea {...field} placeholder="Enter complete address" rows={2} />}
+                    </FieldWrapper>
+                    <FieldWrapper control={form.control} name="sellerPanNo" label="PAN Number">
+                      {(field) => (
+                        <Input
+                          {...field}
+                          placeholder="e.g. ABCDE1234F"
+                          className="font-mono"
+                          maxLength={10}
+                          onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                        />
+                      )}
+                    </FieldWrapper>
+                    <FieldWrapper control={form.control} name="sellerMsmeNo" label="MSME Number">
+                      {(field) => (
+                        <Input
+                          {...field}
+                          placeholder="e.g. UDYAM-XX-00-0000000"
+                          className="font-mono"
+                          onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                        />
+                      )}
+                    </FieldWrapper>
+                    <FieldWrapper control={form.control} name="sellerCinNo" label={<><Building2 className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Seller CIN Number</>}>
+                      {(field) => (
+                        <Input
+                          {...field}
+                          placeholder="e.g. U74999KA2020PTC123456"
+                          className="font-mono"
+                          onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                        />
+                      )}
+                    </FieldWrapper>
                   </div>
-                </CardDescription>
+                )}
               </div>
-              <CardAction>
-                <Button variant="outline" size="sm" type="button" onClick={() => navigate(-1)} className="flex items-center space-x-2">
-                  <ArrowLeft className="h-4 w-4" />
-                  <span>Go Back</span>
-                </Button>
-              </CardAction>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-8">
-            {/* ── PO Details ── */}
-            <div>
-              <h3 className="text-lg font-semibold mb-4">PO Details</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <Hash className="h-3.5 w-3.5 text-muted-foreground" />
-                    PO Number
-                  </Label>
-                  <Input value={nextPONumber || "Loading..."} readOnly className="bg-muted font-mono w-full" title={nextPONumber || "Loading..."} />
-                  <p className="text-xs text-muted-foreground">Preview — final number is assigned upon creation</p>
+              {/* ── Ship To Details ── */}
+              <div className="border rounded-lg border-sidebar-primary-foreground border-dashed p-2 my-3 w-full md:w-1/2">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <MapPin className="h-5 w-5" />
+                    Ship To Details
+                  </h3>
+                  <Dialog open={isShipToPartyOpen} onOpenChange={(open) => { setIsShipToPartyOpen(open); if (open) setPartyCreationType("ship_to"); }}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm" type="button" onClick={() => setPartyCreationType("ship_to")}>
+                        <UserPlus className="mr-2 h-4 w-4" />
+                        Add New Ship To
+                      </Button>
+                    </DialogTrigger>
+                    <AddPartyDialog
+                      newParty={newParty}
+                      setNewParty={setNewParty}
+                      onSubmit={handleAddNewParty}
+                      onClose={() => setIsShipToPartyOpen(false)}
+                      isLoading={createPartyMutation.isPending}
+                    />
+                  </Dialog>
                 </div>
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-                    Project Name
-                  </Label>
-                  <Input value={overview?.project?.projectName || ""} readOnly className="bg-muted" />
-                </div>
-                <FieldWrapper control={form.control} name="poDate" label={<><Calendar className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />PO Date <span className="text-destructive">*</span></>}>
-                  {(field) => <DateInput value={field.value} onChange={field.onChange} />}
-                </FieldWrapper>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* ── Seller Information ── */}
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <Building2 className="h-5 w-5" />
-                  Seller Information
-                </h3>
-                <Dialog open={isAddPartyOpen} onOpenChange={(open) => { setIsAddPartyOpen(open); if (open) setPartyCreationType("seller"); }}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" type="button" onClick={() => setPartyCreationType("seller")}>
-                      <UserPlus className="mr-2 h-4 w-4" />
-                      Add New Seller
-                    </Button>
-                  </DialogTrigger>
-                  <AddPartyDialog
-                    newParty={newParty}
-                    setNewParty={setNewParty}
-                    onSubmit={handleAddNewParty}
-                    onClose={() => setIsAddPartyOpen(false)}
-                    isLoading={createPartyMutation.isPending}
+                <p className="text-sm text-muted-foreground mb-4">Delivery destination information</p>
+                <div className="mb-6 max-w-md">
+                  <SelectField
+                    control={form.control}
+                    name="partyId"
+                    label="Select Destination"
+                    options={partyOptions}
+                    placeholder="Choose shipping destination..."
                   />
-                </Dialog>
-              </div>
-              <p className="text-sm text-muted-foreground mb-4">Select or enter seller/vendor details</p>
-
-              <div className="mb-6 max-w-md">
-                <SelectField
-                  control={form.control}
-                  name="sellerId"
-                  label="Select Existing Seller"
-                  options={sellerOptions}
-                  placeholder="Choose a seller..."
-                />
-              </div>
-
-              {selectedSellerId && selectedSellerId !== "" && (
-                <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-6">
-                  <FieldWrapper control={form.control} name="sellerName" label={<>Seller Name <span className="text-destructive">*</span></>}>
-                    {(field) => <Input {...field} placeholder="Enter seller name" />}
-                  </FieldWrapper>
-                  <FieldWrapper control={form.control} name="sellerEmail" label={<><Mail className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Seller Email</>}>
-                    {(field) => <Input {...field} type="email" placeholder="seller@example.com" />}
-                  </FieldWrapper>
-                  <FieldWrapper control={form.control} name="sellerGstNo" label="GST Number">
-                    {(field) => (
-                      <Input
-                        {...field}
-                        placeholder="e.g. 27ABCDE1234F1Z5"
-                        className="font-mono"
-                        maxLength={15}
-                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                      />
-                    )}
-                  </FieldWrapper>
-
-                  <FieldWrapper control={form.control} name="sellerAddress" label={<><MapPin className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Seller Address</>}>
-                    {(field) => <Textarea {...field} placeholder="Enter complete address" rows={2} />}
-                  </FieldWrapper>
-
-                  <FieldWrapper control={form.control} name="sellerPanNo" label="PAN Number">
-                    {(field) => (
-                      <Input
-                        {...field}
-                        placeholder="e.g. ABCDE1234F"
-                        className="font-mono"
-                        maxLength={10}
-                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                      />
-                    )}
-                  </FieldWrapper>
-                  <FieldWrapper control={form.control} name="sellerMsmeNo" label="MSME Number">
-                    {(field) => (
-                      <Input
-                        {...field}
-                        placeholder="e.g. UDYAM-XX-00-0000000"
-                        className="font-mono"
-                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                      />
-                    )}
-                  </FieldWrapper>
-
-                  <FieldWrapper control={form.control} name="sellerCinNo" label={<><Building2 className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Seller CIN Number</>}>
-                    {(field) => (
-                      <Input
-                        {...field}
-                        placeholder="e.g. U74999KA2020PTC123456"
-                        className="font-mono"
-                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                      />
-                    )}
-                  </FieldWrapper>
                 </div>
-              )}
+                {selectedPartyId && selectedPartyId !== "" && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FieldWrapper control={form.control} name="shipToName" label={<>Ship To Name <span className="text-destructive">*</span></>}>
+                      {(field) => <Input {...field} placeholder="Enter recipient name" />}
+                    </FieldWrapper>
+                    <FieldWrapper control={form.control} name="shippingAddress" label={<><MapPin className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Shipping Address <span className="text-destructive">*</span></>}>
+                      {(field) => <Textarea {...field} placeholder="Enter complete shipping address" rows={3} />}
+                    </FieldWrapper>
+                    <FieldWrapper control={form.control} name="shipToGst" label="GST Number">
+                      {(field) => (
+                        <Input
+                          {...field}
+                          placeholder="e.g. 27ABCDE1234F1Z5"
+                          className="font-mono"
+                          maxLength={15}
+                          onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                        />
+                      )}
+                    </FieldWrapper>
+                    <FieldWrapper control={form.control} name="shipToPan" label="PAN Number">
+                      {(field) => (
+                        <Input
+                          {...field}
+                          placeholder="e.g. ABCDE1234F"
+                          className="font-mono"
+                          maxLength={10}
+                          onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                        />
+                      )}
+                    </FieldWrapper>
+                  </div>
+                )}
+              </div>
             </div>
 
-            <Separator />
-
-            {/* ── Ship To Details ── */}
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <MapPin className="h-5 w-5" />
-                  Ship To Details
-                </h3>
-                <Dialog open={isShipToPartyOpen} onOpenChange={(open) => { setIsShipToPartyOpen(open); if (open) setPartyCreationType("ship_to"); }}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" type="button" onClick={() => setPartyCreationType("ship_to")}>
-                      <UserPlus className="mr-2 h-4 w-4" />
-                      Add New Ship To
-                    </Button>
-                  </DialogTrigger>
-                  <AddPartyDialog
-                    newParty={newParty}
-                    setNewParty={setNewParty}
-                    onSubmit={handleAddNewParty}
-                    onClose={() => setIsShipToPartyOpen(false)}
-                    isLoading={createPartyMutation.isPending}
-                  />
-                </Dialog>
-              </div>
-              <p className="text-sm text-muted-foreground mb-4">Delivery destination information</p>
-
-              <div className="mb-6 max-w-md">
-                <SelectField
-                  control={form.control}
-                  name="partyId"
-                  label="Select Destination"
-                  options={partyOptions}
-                  placeholder="Choose shipping destination..."
-                />
-              </div>
-
-              {selectedPartyId && selectedPartyId !== "" && (
-                <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-6">
-                  <FieldWrapper control={form.control} name="shipToName" label={<>Ship To Name <span className="text-destructive">*</span></>}>
-                    {(field) => <Input {...field} placeholder="Enter recipient name" />}
-                  </FieldWrapper>
-
-                  <FieldWrapper control={form.control} name="shippingAddress" label={<><MapPin className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Shipping Address <span className="text-destructive">*</span></>}>
-                    {(field) => <Textarea {...field} placeholder="Enter complete shipping address" rows={3} />}
-                  </FieldWrapper>
-
-                  <FieldWrapper control={form.control} name="shipToGst" label="GST Number">
-                    {(field) => (
-                      <Input
-                        {...field}
-                        placeholder="e.g. 27ABCDE1234F1Z5"
-                        className="font-mono"
-                        maxLength={15}
-                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                      />
-                    )}
-                  </FieldWrapper>
-                  <FieldWrapper control={form.control} name="shipToPan" label="PAN Number">
-                    {(field) => (
-                      <Input
-                        {...field}
-                        placeholder="e.g. ABCDE1234F"
-                        className="font-mono"
-                        maxLength={10}
-                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-                      />
-                    )}
-                  </FieldWrapper>
-                </div>
-              )}
-            </div>
-
-            <Separator />
-            <div className="mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 my-6">
               <SelectField
                 control={form.control}
                 name="selectedUserId"
@@ -471,10 +450,6 @@ export default function RaisePoFormPage() {
                 options={activeTeamMembers.map((u: any) => ({ id: String(u.id), name: u.name }))}
                 placeholder="Select a user to auto-fill contact details..."
               />
-              <p className="text-xs text-muted-foreground mt-1">Selecting a user will populate the contact person fields below</p>
-            </div>
-            <p className="text-sm font-medium text-muted-foreground mb-4">Contact Person</p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <FieldWrapper control={form.control} name="contactPersonName" label="Contact Person Name">
                 {(field) => <Input {...field} placeholder="Enter contact person name" />}
               </FieldWrapper>
@@ -486,21 +461,11 @@ export default function RaisePoFormPage() {
               </FieldWrapper>
             </div>
 
-            <Separator />
-
             {/* ── Products ── */}
             <ProductsField control={form.control} />
 
-            <Separator />
-
             {/* ── Additional Details ── */}
-            <div>
-              <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
-                <FileText className="h-5 w-5" />
-                Additional Details
-              </h3>
-
-              <p className="text-sm font-medium text-muted-foreground mb-3">Quotation</p>
+            <div className="border rounded-lg border-secondary border-dashed p-4 space-y-6 mt-6">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
                 <FieldWrapper control={form.control} name="quotationNo" label="Quotation Number">
                   {(field) => <Input {...field} placeholder="e.g. QTN-2024-001" />}
@@ -510,31 +475,26 @@ export default function RaisePoFormPage() {
                 </FieldWrapper>
               </div>
 
-              <Separator className="my-6" />
               <TermsField control={form.control} />
 
-              <Separator className="my-6" />
-              <p className="text-sm font-medium text-muted-foreground mb-3">Attachments & Remarks</p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
-                  <TenderFileUploader
-                    label="Technical Specs Attachments"
-                    context="tender-documents"
-                    value={form.watch("technicalSpecsAttachments")}
-                    onChange={(paths) => form.setValue("technicalSpecsAttachments", paths)}
-                  />
-                  <TenderFileUploader
-                    label="Accessories / Packaging List Attachments"
-                    context="tender-documents"
-                    value={form.watch("accessoriesPackagingListAttachments")}
-                    onChange={(paths) => form.setValue("accessoriesPackagingListAttachments", paths)}
-                  />
-                  <FieldWrapper control={form.control} name="remarks" label="Remarks">
-                    {(field) => <Textarea {...field} placeholder="Any additional notes or remarks..." rows={3} />}
-                  </FieldWrapper>
+                <TenderFileUploader
+                  label="Technical Specs Attachments"
+                  context="tender-documents"
+                  value={form.watch("technicalSpecsAttachments")}
+                  onChange={(paths) => form.setValue("technicalSpecsAttachments", paths)}
+                />
+                <TenderFileUploader
+                  label="Accessories / Packaging List Attachments"
+                  context="tender-documents"
+                  value={form.watch("accessoriesPackagingListAttachments")}
+                  onChange={(paths) => form.setValue("accessoriesPackagingListAttachments", paths)}
+                />
+                <FieldWrapper control={form.control} name="remarks" label="Remarks">
+                  {(field) => <Textarea {...field} placeholder="Any additional notes or remarks..." rows={3} />}
+                </FieldWrapper>
               </div>
             </div>
-
-            <Separator />
 
             {/* ── Footer ── */}
             <div className="flex items-end justify-end">
@@ -548,10 +508,10 @@ export default function RaisePoFormPage() {
                 </Button>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </form>
-    </Form>
+          </form>
+        </Form>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -588,7 +548,6 @@ const AddPartyDialog: React.FC<AddPartyDialogProps> = ({ newParty, setNewParty, 
           <Label>Address</Label>
           <Textarea value={newParty.address} onChange={(e) => setNewParty({ ...newParty, address: e.target.value })} placeholder="Enter complete address" rows={2} />
         </div>
-        <Separator />
         <div className="grid grid-cols-3 gap-4">
           <div className="space-y-2">
             <Label className="flex items-center gap-2">

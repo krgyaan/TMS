@@ -5,27 +5,25 @@ import { SelectField } from "@/components/form/SelectField";
 import { TenderFileUploader } from "@/components/tender-file-upload";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useAuth } from "@/contexts/AuthContext";
 import { useCreatePoParty, usePoParties, usePurchaseOrderDetails, useUpdatePurchaseOrder } from "@/hooks/api/useProjectDashboard";
 import { useGetTeamMembers } from "@/hooks/api/useUsers";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertCircle, ArrowLeft, Building2, Calculator, Calendar, FileText, Hash, Info, Loader2, Mail, MapPin, Phone, Receipt, Save, UserCheck, UserPlus } from "lucide-react";
+import { AlertCircle, ArrowLeft, Building2, Calendar, Hash, Info, Loader2, Mail, MapPin, Phone, Save, UserCheck, UserPlus } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ProductsField } from "./components/ProductsField";
 import { TermsField } from "./components/TermsField";
-import { calculateTotals, formatCurrency, formatDateForInput, mapFormToUpdateDTO } from "./helpers/projectDashboard.mapper";
+import { formatDateForInput, mapFormToUpdateDTO } from "./helpers/projectDashboard.mapper";
 import type { CreatePartyDTO } from "./helpers/projectDashboard.types";
 import { purchaseOrderFormSchema, type PurchaseOrderFormValues } from "./helpers/purchaseOrder.schema";
 
@@ -130,17 +128,14 @@ export default function EditPOPage() {
         resolver: zodResolver(purchaseOrderFormSchema) as any,
         defaultValues: defaultFormValues,
     });
-    const products = form.watch("products");
-    const calculations = calculateTotals(products || []);
     const selectedSellerId = form.watch("sellerId");
     const selectedPartyId = form.watch("partyId");
 
-    const { effectiveTeamId } = useAuth();
-    const { data: teamMembers = [] } = useGetTeamMembers(effectiveTeamId ?? 2);
+    const { data: teamMembers = [] } = useGetTeamMembers(0); // all active team members across teams
     const selectedUserId = form.watch("selectedUserId");
     const activeTeamMembers = useMemo(
-      () => (teamMembers || []).filter((u: any) => u.isActive),
-      [teamMembers]
+        () => (teamMembers || []).filter((u: any) => u.isActive),
+        [teamMembers]
     );
 
     const sellerOptions = useMemo(() => [
@@ -201,9 +196,9 @@ export default function EditPOPage() {
             contactPersonName: poData.contactPersonName || "",
             contactPersonPhone: poData.contactPersonPhone || "",
             contactPersonEmail: poData.contactPersonEmail || "",
-    partyId: "",
-    selectedUserId: "",
-    shipToName: poData.shipToName || "",
+            partyId: "",
+            selectedUserId: "",
+            shipToName: poData.shipToName || "",
             shippingAddress: poData.shippingAddress || "",
             shipToGst: poData.shipToGst || "",
             shipToPan: poData.shipToPan || "",
@@ -277,65 +272,57 @@ export default function EditPOPage() {
     }
 
     return (
-        <div className="container mx-auto py-6 max-w-6xl">
-            <Form {...form}>
-                <form onSubmit={form.handleSubmit(handleSubmit)}>
-                    <Card>
-                        <CardHeader>
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center space-x-4">
-                                    <Button variant="outline" size="sm" type="button" onClick={() => navigate(-1)} className="flex items-center space-x-2">
-                                        <ArrowLeft className="h-4 w-4" />
-                                        <span>Back</span>
-                                    </Button>
-                                    <div>
-                                        <CardTitle className="text-2xl font-bold tracking-tight flex items-center gap-2">
-                                            <Receipt className="h-6 w-6" />
-                                            Edit Purchase Order
-                                        </CardTitle>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <Badge variant="secondary" className="text-sm font-mono">
-                                        <Hash className="mr-1 h-3 w-3" />
-                                        {poData?.poNumber || "N/A"}
-                                    </Badge>
-                                    <Badge variant="outline" className="text-sm">
-                                        <Calendar className="mr-2 h-3 w-3" />
-                                        Created: {new Date(poData?.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
-                                    </Badge>
-                                </div>
+        <Card>
+            <CardHeader>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <CardTitle>Edit Purchase Order</CardTitle>
+                        <CardDescription className="mt-2">
+                            <div className="flex items-center gap-3">
+                                <Badge variant="outline">
+                                    {poData?.poNumber || "N/A"}
+                                </Badge>
+                                <Badge variant="secondary">
+                                    Created At {new Date(poData?.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                                </Badge>
                             </div>
-                        </CardHeader>
-                        <CardContent className="space-y-8">
-                            {/* ── PO Details ── */}
-                            <div>
-                                <h3 className="text-lg font-semibold mb-4">PO Details</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
-                                    <div className="space-y-2">
-                                        <Label className="flex items-center gap-2">
-                                            <Hash className="h-3.5 w-3.5 text-muted-foreground" />
-                                            PO Number
-                                        </Label>
-                                        <Input value={poData?.poNumber || "N/A"} disabled className="bg-muted font-mono" />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label className="flex items-center gap-2">
-                                            <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
-                                            Project Name
-                                        </Label>
-                                        <Input value={poData?.projectName || ""} disabled className="bg-muted" />
-                                    </div>
-                                    <FieldWrapper control={form.control} name="poDate" label={<><Calendar className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />PO Date <span className="text-destructive">*</span></>}>
-                                        {(field) => <DateInput value={field.value} onChange={field.onChange} />}
-                                    </FieldWrapper>
-                                </div>
+                        </CardDescription>
+                    </div>
+                    <CardAction>
+                        <Button variant="outline" size="sm" type="button" onClick={() => navigate(-1)} className="flex items-center space-x-2">
+                            <ArrowLeft className="h-4 w-4" />
+                            <span>Go Back</span>
+                        </Button>
+                    </CardAction>
+                </div>
+            </CardHeader>
+            <CardContent className="space-y-8">
+                {/* ── PO Details ── */}
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(handleSubmit)}>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+                            <div className="space-y-2">
+                                <Label className="flex items-center gap-2">
+                                    <Hash className="h-3.5 w-3.5 text-muted-foreground" />
+                                    PO Number
+                                </Label>
+                                <Input value={poData?.poNumber || "N/A"} disabled className="bg-muted font-mono" />
                             </div>
+                            <div className="space-y-2">
+                                <Label className="flex items-center gap-2">
+                                    <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
+                                    Project Name
+                                </Label>
+                                <Input value={poData?.projectName || ""} disabled className="bg-muted" />
+                            </div>
+                            <FieldWrapper control={form.control} name="poDate" label={<><Calendar className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />PO Date <span className="text-destructive">*</span></>}>
+                                {(field) => <DateInput value={field.value} onChange={field.onChange} />}
+                            </FieldWrapper>
+                        </div>
 
-                            <Separator />
-
+                        <div className="flex flex-col md:flex-row gap-6 mt-6">
                             {/* ── Seller Information ── */}
-                            <div>
+                            <div className="border rounded-lg border-primary border-dashed p-2 my-3 w-full md:w-1/2">
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="text-lg font-semibold flex items-center gap-2">
                                         <Building2 className="h-5 w-5" />
@@ -357,9 +344,7 @@ export default function EditPOPage() {
                                         />
                                     </Dialog>
                                 </div>
-                                <p className="text-sm text-muted-foreground mb-4">Select or enter seller/vendor details</p>
-
-                                <div className="mb-6 max-w-md">
+                                <div className="grid grid-cols-1 md:grid-cols-4 mb-6">
                                     <SelectField
                                         control={form.control}
                                         name="sellerId"
@@ -368,9 +353,8 @@ export default function EditPOPage() {
                                         placeholder="Choose a seller..."
                                     />
                                 </div>
-
                                 {selectedSellerId && selectedSellerId !== "" && (
-                                    <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-6 items-start">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                                         <FieldWrapper control={form.control} name="sellerName" label={<>Seller Name <span className="text-destructive">*</span></>}>
                                             {(field) => <Input {...field} placeholder="Enter seller name" />}
                                         </FieldWrapper>
@@ -388,11 +372,9 @@ export default function EditPOPage() {
                                                 />
                                             )}
                                         </FieldWrapper>
-
                                         <FieldWrapper control={form.control} name="sellerAddress" label={<><MapPin className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Seller Address</>}>
                                             {(field) => <Textarea {...field} placeholder="Enter complete address" rows={2} />}
                                         </FieldWrapper>
-
                                         <FieldWrapper control={form.control} name="sellerPanNo" label="PAN Number">
                                             {(field) => (
                                                 <Input
@@ -414,7 +396,6 @@ export default function EditPOPage() {
                                                 />
                                             )}
                                         </FieldWrapper>
-
                                         <FieldWrapper control={form.control} name="sellerCinNo" label={<><Building2 className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Seller CIN Number</>}>
                                             {(field) => (
                                                 <Input
@@ -428,11 +409,8 @@ export default function EditPOPage() {
                                     </div>
                                 )}
                             </div>
-
-                            <Separator />
-
                             {/* ── Ship To Details ── */}
-                            <div>
+                            <div className="border rounded-lg border-sidebar-primary-foreground border-dashed p-2 my-3 w-full md:w-1/2">
                                 <div className="flex items-center justify-between mb-4">
                                     <h3 className="text-lg font-semibold flex items-center gap-2">
                                         <MapPin className="h-5 w-5" />
@@ -454,9 +432,7 @@ export default function EditPOPage() {
                                         />
                                     </Dialog>
                                 </div>
-                                <p className="text-sm text-muted-foreground mb-4">Delivery destination information</p>
-
-                                <div className="mb-6 max-w-md">
+                                <div className="grid grid-cols-1 md:grid-cols-4 mb-6">
                                     <SelectField
                                         control={form.control}
                                         name="partyId"
@@ -465,17 +441,14 @@ export default function EditPOPage() {
                                         placeholder="Choose shipping destination..."
                                     />
                                 </div>
-
                                 {selectedPartyId && selectedPartyId !== "" && (
-                                    <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-4 gap-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <FieldWrapper control={form.control} name="shipToName" label={<>Ship To Name <span className="text-destructive">*</span></>}>
                                             {(field) => <Input {...field} placeholder="Enter recipient name" />}
                                         </FieldWrapper>
-
                                         <FieldWrapper control={form.control} name="shippingAddress" label={<><MapPin className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Shipping Address <span className="text-destructive">*</span></>}>
                                             {(field) => <Textarea {...field} placeholder="Enter complete shipping address" rows={3} />}
                                         </FieldWrapper>
-
                                         <FieldWrapper control={form.control} name="shipToGst" label="GST Number">
                                             {(field) => (
                                                 <Input
@@ -501,134 +474,81 @@ export default function EditPOPage() {
                                     </div>
                                 )}
                             </div>
+                        </div>
 
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 my-6">
+                            <SelectField
+                                control={form.control}
+                                name="selectedUserId"
+                                label={<><UserCheck className="h-3.5 w-3.5 inline mr-1" />Quick Fill from Team Member</>}
+                                options={activeTeamMembers.map((u: any) => ({ id: String(u.id), name: u.name }))}
+                                placeholder="Select a user to auto-fill contact details..."
+                            />
+                            <FieldWrapper control={form.control} name="contactPersonName" label="Contact Person Name">
+                                {(field) => <Input {...field} placeholder="Enter contact person name" />}
+                            </FieldWrapper>
+                            <FieldWrapper control={form.control} name="contactPersonPhone" label={<><Phone className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Contact Person Phone</>}>
+                                {(field) => <Input {...field} placeholder="e.g. +91-9876543210" />}
+                            </FieldWrapper>
+                            <FieldWrapper control={form.control} name="contactPersonEmail" label={<><Mail className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Contact Person Email</>}>
+                                {(field) => <Input {...field} type="email" placeholder="contact@example.com" />}
+                            </FieldWrapper>
+                        </div>
 
-                            <Separator />
-                            
-                            <div className="mb-4">
-                                <SelectField
-                                    control={form.control}
-                                    name="selectedUserId"
-                                    label={<><UserCheck className="h-3.5 w-3.5 inline mr-1" />Quick Fill from Team Member</>}
-                                    options={activeTeamMembers.map((u: any) => ({ id: String(u.id), name: u.name }))}
-                                    placeholder="Select a user to auto-fill contact details..."
+                        {/* ── Products ── */}
+                        <ProductsField control={form.control} />
+
+                        {/* ── Additional Details ── */}
+                        <div className="border rounded-lg border-secondary border-dashed p-4 space-y-6 mt-6">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
+                                <FieldWrapper control={form.control} name="quotationNo" label="Quotation Number">
+                                    {(field) => <Input {...field} placeholder="e.g. QTN-2024-001" />}
+                                </FieldWrapper>
+                                <FieldWrapper control={form.control} name="quotationDate" label="Quotation Date">
+                                    {(field) => <DateInput value={field.value} onChange={field.onChange} />}
+                                </FieldWrapper>
+                            </div>
+
+                            <TermsField control={form.control} />
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+                                <TenderFileUploader
+                                    label="Technical Specifications Attachments"
+                                    context="tender-documents"
+                                    value={form.watch("technicalSpecsAttachments")}
+                                    onChange={(paths) => form.setValue("technicalSpecsAttachments", paths)}
                                 />
-                                <p className="text-xs text-muted-foreground mt-1">Selecting a user will populate the contact person fields below</p>
-                            </div>
-                            <p className="text-sm font-medium text-muted-foreground mb-4">Contact Person</p>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <FieldWrapper control={form.control} name="contactPersonName" label="Contact Person Name">
-                                    {(field) => <Input {...field} placeholder="Enter contact person name" />}
-                                </FieldWrapper>
-                                <FieldWrapper control={form.control} name="contactPersonPhone" label={<><Phone className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Contact Person Phone</>}>
-                                    {(field) => <Input {...field} placeholder="e.g. +91-9876543210" />}
-                                </FieldWrapper>
-                                <FieldWrapper control={form.control} name="contactPersonEmail" label={<><Mail className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Contact Person Email</>}>
-                                    {(field) => <Input {...field} type="email" placeholder="contact@example.com" />}
+                                <TenderFileUploader
+                                    label="Accessories / Packaging List Attachments"
+                                    context="tender-documents"
+                                    value={form.watch("accessoriesPackagingListAttachments")}
+                                    onChange={(paths) => form.setValue("accessoriesPackagingListAttachments", paths)}
+                                />
+                                <FieldWrapper control={form.control} name="remarks" label="Remarks">
+                                    {(field) => <Textarea {...field} placeholder="Any additional notes or remarks..." rows={3} />}
                                 </FieldWrapper>
                             </div>
+                        </div>
 
-                            <Separator />
-
-                            {/* ── Products ── */}
-                            <ProductsField control={form.control} />
-
-                            <Separator />
-
-                            {/* ── Additional Details ── */}
-                            <div>
-                                <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
-                                    <FileText className="h-5 w-5" />
-                                    Additional Details
-                                </h3>
-
-                                <p className="text-sm font-medium text-muted-foreground mb-3">Quotation</p>
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
-                                    <FieldWrapper control={form.control} name="quotationNo" label="Quotation Number">
-                                        {(field) => <Input {...field} placeholder="e.g. QTN-2024-001" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="quotationDate" label="Quotation Date">
-                                        {(field) => <DateInput value={field.value} onChange={field.onChange} />}
-                                    </FieldWrapper>
-                                </div>
-
-                                <Separator className="my-6" />
-                                <TermsField control={form.control} />
-
-                                <Separator className="my-6" />
-                                <p className="text-sm font-medium text-muted-foreground mb-3">Attachments</p>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                                    <div className="space-y-2">
-                                        <Label>Technical Specs Attachments</Label>
-                                        <TenderFileUploader
-                                            context="tender-documents"
-                                            value={form.watch("technicalSpecsAttachments")}
-                                            onChange={(paths) => form.setValue("technicalSpecsAttachments", paths)}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Accessories / Packaging List Attachments</Label>
-                                        <TenderFileUploader
-                                            context="tender-documents"
-                                            value={form.watch("accessoriesPackagingListAttachments")}
-                                            onChange={(paths) => form.setValue("accessoriesPackagingListAttachments", paths)}
-                                        />
-                                    </div>
-                                </div>
-
-                                <Separator className="my-6" />
-                                <p className="text-sm font-medium text-muted-foreground mb-3">Remarks</p>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                                    <FieldWrapper control={form.control} name="remarks" label="Remarks">
-                                        {(field) => <Textarea {...field} placeholder="Any additional notes or remarks..." rows={3} />}
-                                    </FieldWrapper>
-                                </div>
+                        {/* ── Footer ── */}
+                        <div className="flex items-center justify-end gap-4 mt-3">
+                            <div className="flex items-center gap-4">
+                                <Button type="button" variant="outline" onClick={() => navigate(-1)}>
+                                    Cancel
+                                </Button>
+                                <Button type="submit" disabled={updatePOMutation.isPending} className="min-w-[160px]">
+                                    {updatePOMutation.isPending ? (
+                                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</>
+                                    ) : (
+                                        <><Save className="mr-2 h-4 w-4" />Save Changes</>
+                                    )}
+                                </Button>
                             </div>
-
-                            <Separator />
-
-                            {/* ── Footer ── */}
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <Calculator className="h-5 w-5 text-muted-foreground" />
-                                    <div>
-                                        <p className="text-sm text-muted-foreground">Total PO Value</p>
-                                        <p className="text-2xl font-bold">{formatCurrency(calculations.grandTotal)}</p>
-                                    </div>
-                                    <Separator orientation="vertical" className="h-12" />
-                                    <div className="flex gap-6 text-sm">
-                                        <div>
-                                            <p className="text-muted-foreground">Items</p>
-                                            <p className="font-semibold">{products?.length || 0}</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-muted-foreground">Subtotal</p>
-                                            <p className="font-semibold">{formatCurrency(calculations.subtotal)}</p>
-                                        </div>
-                                        <div>
-                                            <p className="text-muted-foreground">GST</p>
-                                            <p className="font-semibold">{formatCurrency(calculations.totalGst)}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-4">
-                                    <Button type="button" variant="outline" onClick={() => navigate(-1)}>
-                                        Cancel
-                                    </Button>
-                                    <Button type="submit" disabled={updatePOMutation.isPending} className="min-w-[160px]">
-                                        {updatePOMutation.isPending ? (
-                                            <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</>
-                                        ) : (
-                                            <><Save className="mr-2 h-4 w-4" />Save Changes</>
-                                        )}
-                                    </Button>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </form>
-            </Form>
-        </div>
+                        </div>
+                    </form>
+                </Form>
+            </CardContent>
+        </Card>
     );
 }
 
@@ -665,7 +585,6 @@ const AddPartyDialog: React.FC<AddPartyDialogProps> = ({ newParty, setNewParty, 
                     <Label>Address</Label>
                     <Textarea value={newParty.address} onChange={(e) => setNewParty({ ...newParty, address: e.target.value })} placeholder="Enter complete address" rows={2} />
                 </div>
-                <Separator />
                 <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-2">
                         <Label className="flex items-center gap-2">

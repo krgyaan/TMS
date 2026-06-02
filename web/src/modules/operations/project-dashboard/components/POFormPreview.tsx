@@ -18,8 +18,6 @@ import {
   Phone,
   Receipt,
   ShieldCheck,
-  Truck,
-  UserCheck,
   FileText,
 } from "lucide-react";
 import type { PurchaseOrderFormValues, ProductFormItem } from "../helpers/purchaseOrder.schema";
@@ -253,36 +251,16 @@ export function POFormPreview({
 
       {/* Terms & Conditions */}
       <SectionCard title="Terms & Conditions" icon={<ShieldCheck className="h-4 w-4" />}>
-        {formValues.paymentTerms && <SummaryRow label="Payment Terms" value={formValues.paymentTerms} />}
-        {formValues.freight && <SummaryRow label="Freight" value={formValues.freight} />}
-        {formValues.transitInsurance && <SummaryRow label="Transit Insurance" value={formValues.transitInsurance} />}
-        {formValues.preDispatchInspection && (
-          <SummaryRow label="Pre-Dispatch Inspection" value={formValues.preDispatchInspection} />
-        )}
-        {formValues.warrantyDispatch && <SummaryRow label="Warranty" value={formValues.warrantyDispatch} />}
-        {formValues.warrantyInstallation && (
-          <SummaryRow label="Warranty (Installation)" value={formValues.warrantyInstallation} />
-        )}
-        {formValues.deliveryLocation && <SummaryRow label="Delivery Location" value={formValues.deliveryLocation} />}
-        {formValues.technicalSpecifications && (
-          <SummaryRow label="Technical Specifications" value={formValues.technicalSpecifications} />
-        )}
-        {formValues.deliveryPeriod && <SummaryRow label="Delivery Period" value={formValues.deliveryPeriod} />}
-        {formValues.acceptanceOfOrder && <SummaryRow label="Acceptance of Order" value={formValues.acceptanceOfOrder} />}
-        {formValues.documentation && <SummaryRow label="Documentation" value={formValues.documentation} />}
-        {formValues.remarks && <SummaryRow label="Remarks" value={formValues.remarks} />}
+        {formValues.termsAndConditions?.map((term, i) => (
+          term.value ? <SummaryRow key={i} label={term.field} value={term.value} /> : null
+        ))}
       </SectionCard>
 
-      {/* Terms from Additional Details */}
+      {/* Additional Details */}
       <SectionCard title="Additional Details" icon={<FileText className="h-4 w-4" />}>
         {formValues.quotationNo && <SummaryRow label="Quotation No" value={formValues.quotationNo} />}
         {formValues.quotationDate && <SummaryRow label="Quotation Date" value={formValues.quotationDate} />}
-        {formValues.materialUnloading && (
-          <SummaryRow label="Material Unloading" value={formValues.materialUnloading} />
-        )}
-        {formValues.accessoriesPackagingList && (
-          <SummaryRow label="Accessories / Packaging" value={formValues.accessoriesPackagingList} />
-        )}
+        {formValues.remarks && <SummaryRow label="Remarks" value={formValues.remarks} />}
       </SectionCard>
 
       <Separator />

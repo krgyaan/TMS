@@ -38,7 +38,7 @@ export function ProductsField({ control }: ProductsFieldProps) {
     };
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-6">
             <div className="flex items-center justify-between flex-wrap gap-4">
                 <div>
                     <h4 className="font-semibold text-base text-primary flex items-center gap-2">
