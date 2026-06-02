@@ -192,6 +192,7 @@ export class PhysicalDocsService {
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
             inArray(tenderInformation.physicalDocsRequired, ["Yes", "YES"]),
+            or(isNull(tenderInformation.physicalDocType), ne(tenderInformation.physicalDocType, "ONLY_EMD")),
         ];
 
         // Apply role-based filtering
@@ -359,6 +360,7 @@ export class PhysicalDocsService {
                 inArray(tenderInformation.physicalDocsRequired, ["Yes", "YES"]),
                 inArray(tenderInformation.physicalDocType, ["EMD_AND_OTHER_DOCUMENTS", "ONLY_OTHER_DOCUMENT"])
             ),
+            or(isNull(tenderInformation.physicalDocType), ne(tenderInformation.physicalDocType, "ONLY_EMD")),
             ...roleFilterConditions,
         ];
 

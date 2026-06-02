@@ -142,7 +142,7 @@ export function PhysicalDocsSection({ tenderId }: { tenderId: number | null }) {
         );
     }
 
-    else if (infoSheet && infoSheet.physicalDocsRequired == 'NO' || infoSheet.physicalDocsRequired == null) {
+    else if (infoSheet.physicalDocsRequired == 'NO' || infoSheet.physicalDocsRequired == null || infoSheet.physicalDocType === 'ONLY_EMD') {
         return (
             <Card>
                 <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
