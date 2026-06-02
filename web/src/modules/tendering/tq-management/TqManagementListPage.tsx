@@ -171,7 +171,7 @@ const TqManagementListPage = () => {
             visible: (row) => row.tqStatus === 'TQ received' && row.tqId !== null,
         },
         {
-            label: 'Edit TQ Reply',
+            label: 'Edit Submit TQ',
             onClick: (row: TqManagementDashboardRowWithTimer) => {
                 navigate(paths.tendering.tqEditReplied(row.tqId!));
             },
