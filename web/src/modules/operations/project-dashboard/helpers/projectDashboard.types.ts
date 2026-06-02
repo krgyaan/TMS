@@ -52,6 +52,7 @@ export interface CreatePartyDTO {
     gstNo?: string;
     pan?: string;
     msme?: string;
+    type?: string;
 }
 
 export interface UpdatePurchaseOrderDTO {

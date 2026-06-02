@@ -403,11 +403,12 @@ export class ProjectDashboardService {
                 gstNo: body.gstNo || null,
                 pan: body.pan || null,
                 msme: body.msme || null,
+                type: body.type || "seller",
             })
             .returning()
         )[0];
 
-        this.logger.info(`Party created: ${party.name} (ID: ${party.id})`);
+        this.logger.info(`Party created: ${party.name} (ID: ${party.id}, type: ${party.type})`);
         return party;
     }
 
@@ -490,11 +491,12 @@ export class ProjectDashboardService {
         return updatedPO;
     }
 
-    async listParties() {
-    const res = await this.db
-        .select()
-        .from(projectParties)
-        .orderBy(desc(projectParties.createdAt));
-    return res;
+    async listParties(type?: string) {
+        let query = this.db.select().from(projectParties);
+        if (type) {
+            query = query.where(eq(projectParties.type, type)) as any;
+        }
+        const res = await query.orderBy(desc(projectParties.createdAt));
+        return res;
     }
 }

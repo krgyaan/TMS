@@ -8,6 +8,7 @@ export const projectParties = pgTable("project_parties", {
     pan: varchar("pan", { length: 100 }),
     address: text("address"),
     email: varchar("email", { length: 100 }),
+    type: varchar("type", { length: 20 }).notNull().default("seller"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

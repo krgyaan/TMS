@@ -61,8 +61,8 @@ export class ProjectDashboardController {
 
   // List Parties
   @Get("purchase-orders/parties")
-  listParties() {
-    return this.service.listParties();
+  listParties(@Query("type") type?: string) {
+    return this.service.listParties(type);
   }
 
   // Get next PO number preview

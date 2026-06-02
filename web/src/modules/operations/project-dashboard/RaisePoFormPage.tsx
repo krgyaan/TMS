@@ -2,6 +2,7 @@ import { paths } from "@/app/routes/paths";
 import { DateInput } from "@/components/form/DateInput";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
+import { TenderFileUploader } from "@/components/tender-file-upload";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +11,6 @@ import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TenderFileUploader } from "@/components/tender-file-upload";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,7 +26,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { POFormPreview } from "./components/POFormPreview";
 import { ProductsField } from "./components/ProductsField";
-import { TermsField, DEFAULT_TERMS_ROWS } from "./components/TermsField";
+import { DEFAULT_TERMS_ROWS, TermsField } from "./components/TermsField";
 import { formatDateForInput, mapFormToCreateDTO } from "./helpers/projectDashboard.mapper";
 import type { CreatePartyDTO } from "./helpers/projectDashboard.types";
 import { purchaseOrderFormSchema, type PurchaseOrderFormValues } from "./helpers/purchaseOrder.schema";
@@ -109,6 +109,7 @@ export default function RaisePoFormPage() {
   const [showPreview, setShowPreview] = useState(false);
   const [isAddPartyOpen, setIsAddPartyOpen] = useState(false);
   const [isShipToPartyOpen, setIsShipToPartyOpen] = useState(false);
+  const [partyCreationType, setPartyCreationType] = useState<"seller" | "ship_to">("seller");
   const [newParty, setNewParty] = useState<NewPartyForm>({ name: "", email: "", address: "", gstNo: "", pan: "", msme: "" });
 
   const form = useForm<PurchaseOrderFormValues>({
@@ -123,13 +124,15 @@ export default function RaisePoFormPage() {
   const [selectedUserId, setSelectedUserId] = useState("");
 
   const sellerOptions = useMemo(() => [
-    { id: "__create_new__", name: "Create New" },
-    ...(parties || []).map((p: any) => ({ id: String(p.id), name: p.name })),
+    ...(parties || [])
+      .filter((p: any) => !p.type || p.type === "seller")
+      .map((p: any) => ({ id: String(p.id), name: p.name })),
   ], [parties]);
 
   const partyOptions = useMemo(() => [
-    { id: "__create_new__", name: "Create New" },
-    ...(parties || []).map((p: any) => ({ id: String(p.id), name: p.name })),
+    ...(parties || [])
+      .filter((p: any) => p.type === "ship_to")
+      .map((p: any) => ({ id: String(p.id), name: p.name })),
   ], [parties]);
 
   useEffect(() => {
@@ -176,6 +179,7 @@ export default function RaisePoFormPage() {
         gstNo: newParty.gstNo || undefined,
         pan: newParty.pan || undefined,
         msme: newParty.msme || undefined,
+        type: partyCreationType,
       };
       await createPartyMutation.mutateAsync(partyData);
       toast.success(`Party "${newParty.name}" has been added successfully.`);
@@ -293,11 +297,11 @@ export default function RaisePoFormPage() {
                   <Building2 className="h-5 w-5" />
                   Seller Information
                 </h3>
-                <Dialog open={isAddPartyOpen} onOpenChange={setIsAddPartyOpen}>
+                <Dialog open={isAddPartyOpen} onOpenChange={(open) => { setIsAddPartyOpen(open); if (open) setPartyCreationType("seller"); }}>
                   <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" type="button">
+                    <Button variant="outline" size="sm" type="button" onClick={() => setPartyCreationType("seller")}>
                       <UserPlus className="mr-2 h-4 w-4" />
-                      Add New Party
+                      Add New Seller
                     </Button>
                   </DialogTrigger>
                   <AddPartyDialog
@@ -379,37 +383,6 @@ export default function RaisePoFormPage() {
                   </FieldWrapper>
                 </div>
               )}
-
-              <Separator className="my-6" />
-              <div className="mb-4">
-                <p className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
-                  <UserCheck className="h-3.5 w-3.5" />
-                  Quick Fill from Team Member
-                </p>
-                <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                  <SelectTrigger className="w-full md:w-1/2">
-                    <SelectValue placeholder="Select a user to auto-fill contact details..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {teamMembers.map((u: any) => (
-                      <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground mt-1">Selecting a user will populate the contact person fields below</p>
-              </div>
-              <p className="text-sm font-medium text-muted-foreground mb-4">Contact Person</p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <FieldWrapper control={form.control} name="contactPersonName" label="Contact Person Name">
-                  {(field) => <Input {...field} placeholder="Enter contact person name" />}
-                </FieldWrapper>
-                <FieldWrapper control={form.control} name="contactPersonPhone" label={<><Phone className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Contact Person Phone</>}>
-                  {(field) => <Input {...field} placeholder="e.g. +91-9876543210" />}
-                </FieldWrapper>
-                <FieldWrapper control={form.control} name="contactPersonEmail" label={<><Mail className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Contact Person Email</>}>
-                  {(field) => <Input {...field} type="email" placeholder="contact@example.com" />}
-                </FieldWrapper>
-              </div>
             </div>
 
             <Separator />
@@ -421,11 +394,11 @@ export default function RaisePoFormPage() {
                   <MapPin className="h-5 w-5" />
                   Ship To Details
                 </h3>
-                <Dialog open={isShipToPartyOpen} onOpenChange={setIsShipToPartyOpen}>
+                <Dialog open={isShipToPartyOpen} onOpenChange={(open) => { setIsShipToPartyOpen(open); if (open) setPartyCreationType("ship_to"); }}>
                   <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" type="button">
+                    <Button variant="outline" size="sm" type="button" onClick={() => setPartyCreationType("ship_to")}>
                       <UserPlus className="mr-2 h-4 w-4" />
-                      Add New Party
+                      Add New Ship To
                     </Button>
                   </DialogTrigger>
                   <AddPartyDialog
@@ -483,6 +456,37 @@ export default function RaisePoFormPage() {
                   </FieldWrapper>
                 </div>
               )}
+            </div>
+
+            <Separator />
+            <div className="mb-4">
+              <p className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                <UserCheck className="h-3.5 w-3.5" />
+                Quick Fill from Team Member
+              </p>
+              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                <SelectTrigger className="w-full md:w-1/2">
+                  <SelectValue placeholder="Select a user to auto-fill contact details..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {teamMembers.map((u: any) => (
+                    <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">Selecting a user will populate the contact person fields below</p>
+            </div>
+            <p className="text-sm font-medium text-muted-foreground mb-4">Contact Person</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <FieldWrapper control={form.control} name="contactPersonName" label="Contact Person Name">
+                {(field) => <Input {...field} placeholder="Enter contact person name" />}
+              </FieldWrapper>
+              <FieldWrapper control={form.control} name="contactPersonPhone" label={<><Phone className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Contact Person Phone</>}>
+                {(field) => <Input {...field} placeholder="e.g. +91-9876543210" />}
+              </FieldWrapper>
+              <FieldWrapper control={form.control} name="contactPersonEmail" label={<><Mail className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Contact Person Email</>}>
+                {(field) => <Input {...field} type="email" placeholder="contact@example.com" />}
+              </FieldWrapper>
             </div>
 
             <Separator />
