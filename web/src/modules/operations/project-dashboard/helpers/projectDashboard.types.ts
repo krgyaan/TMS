@@ -1,3 +1,9 @@
+// ===================== TERMS ROW =====================
+export interface TermRow {
+    field: string;
+    value: string;
+}
+
 // ===================== DTO TYPES =====================
 export interface CreatePurchaseOrderDTO {
     tenderId: number;
@@ -22,23 +28,10 @@ export interface CreatePurchaseOrderDTO {
     products: CreateProductDTO[];
     quotationNo?: string;
     quotationDate?: string;
-    paymentTerms?: string;
-    deliveryPeriod?: string;
+    termsAndConditions?: TermRow[];
     remarks?: string;
-    warrantyDispatch?: string;
-    warrantyInstallation?: string;
-    freight?: string;
-    transitInsurance?: string;
-    materialUnloading?: string;
-    technicalSpecifications?: string;
     technicalSpecsAttachments?: string;
-    accessoriesPackagingList?: string;
     accessoriesPackagingListAttachments?: string;
-    preDispatchInspection?: string;
-    deliveryLocation?: string;
-    acceptanceOfOrder?: string;
-    documentation?: string;
-    poRaisedBy?: number;
 }
 
 export interface CreateProductDTO {
@@ -81,21 +74,8 @@ export interface UpdatePurchaseOrderDTO {
     products: CreateProductDTO[];
     quotationNo?: string;
     quotationDate?: string;
-    paymentTerms?: string;
-    deliveryPeriod?: string;
+    termsAndConditions?: TermRow[];
     remarks?: string;
-    warrantyDispatch?: string;
-    warrantyInstallation?: string;
-    freight?: string;
-    transitInsurance?: string;
-    materialUnloading?: string;
-    technicalSpecifications?: string;
     technicalSpecsAttachments?: string;
-    accessoriesPackagingList?: string;
     accessoriesPackagingListAttachments?: string;
-    preDispatchInspection?: string;
-    deliveryLocation?: string;
-    acceptanceOfOrder?: string;
-    documentation?: string;
-    poRaisedBy?: number;
 }

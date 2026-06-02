@@ -27,6 +27,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { purchaseOrderFormSchema, type PurchaseOrderFormValues } from "./helpers/purchaseOrder.schema";
 import { mapFormToUpdateDTO, formatDateForInput, calculateTotals, formatCurrency } from "./helpers/projectDashboard.mapper";
 import { ProductsField } from "./components/ProductsField";
+import { TermsField, DEFAULT_TERMS_ROWS } from "./components/TermsField";
 import type { CreatePartyDTO } from "./helpers/projectDashboard.types";
 
 interface NewPartyForm {
@@ -59,22 +60,9 @@ const defaultFormValues: PurchaseOrderFormValues = {
     products: [],
     quotationNo: "",
     quotationDate: "",
-    warrantyDispatch: "",
-    warrantyInstallation: "",
-    freight: "",
-    deliveryPeriod: "",
-    transitInsurance: "",
-    materialUnloading: "",
-    paymentTerms: "",
-    poRaisedBy: "",
-    technicalSpecifications: "",
     technicalSpecsAttachments: [],
-    accessoriesPackagingList: "",
     accessoriesPackagingListAttachments: [],
-    preDispatchInspection: "",
-    deliveryLocation: "",
-    acceptanceOfOrder: "",
-    documentation: "",
+    termsAndConditions: [],
     remarks: "",
 };
 
@@ -220,22 +208,9 @@ export default function EditPOPage() {
             })),
             quotationNo: poData.quotationNo || "",
             quotationDate: poData.quotationDate ? formatDateForInput(poData.quotationDate) : "",
-            warrantyDispatch: poData.warrantyDispatch || "",
-            warrantyInstallation: poData.warrantyInstallation || "",
-            freight: poData.freight || "",
-            deliveryPeriod: poData.deliveryPeriod || "",
-            transitInsurance: poData.transitInsurance || "",
-            materialUnloading: poData.materialUnloading || "",
-            paymentTerms: poData.paymentTerms || "",
-            poRaisedBy: poData.poRaisedBy ? String(poData.poRaisedBy) : "",
-            technicalSpecifications: poData.technicalSpecifications || "",
             technicalSpecsAttachments: poData.technicalSpecsAttachments ? (typeof poData.technicalSpecsAttachments === 'string' ? JSON.parse(poData.technicalSpecsAttachments) : poData.technicalSpecsAttachments) : [],
-            accessoriesPackagingList: poData.accessoriesPackagingList || "",
             accessoriesPackagingListAttachments: poData.accessoriesPackagingListAttachments ? (typeof poData.accessoriesPackagingListAttachments === 'string' ? JSON.parse(poData.accessoriesPackagingListAttachments) : poData.accessoriesPackagingListAttachments) : [],
-            preDispatchInspection: poData.preDispatchInspection || "",
-            deliveryLocation: poData.deliveryLocation || "",
-            acceptanceOfOrder: poData.acceptanceOfOrder || "",
-            documentation: poData.documentation || "",
+            termsAndConditions: poData.termsAndConditions ? (typeof poData.termsAndConditions === 'string' ? JSON.parse(poData.termsAndConditions) : poData.termsAndConditions) : [],
             remarks: poData.remarks || "",
         });
     }, [poData, form]);
@@ -556,7 +531,7 @@ export default function EditPOPage() {
 
                             <Separator />
 
-                            {/* ── Additional Details (always visible) ── */}
+                            {/* ── Additional Details ── */}
                             <div>
                                 <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
                                     <FileText className="h-5 w-5" />
@@ -574,63 +549,21 @@ export default function EditPOPage() {
                                 </div>
 
                                 <Separator className="my-6" />
-                                <p className="text-sm font-medium text-muted-foreground mb-3">Warranty</p>
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                                    <FieldWrapper control={form.control} name="warrantyDispatch" label="Warranty (Dispatch)">
-                                        {(field) => <Input {...field} placeholder="e.g. 12 months from dispatch" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="warrantyInstallation" label="Warranty (Installation)">
-                                        {(field) => <Input {...field} placeholder="e.g. 24 months from installation" />}
-                                    </FieldWrapper>
-                                </div>
+                                <TermsField control={form.control} />
 
                                 <Separator className="my-6" />
-                                <p className="text-sm font-medium text-muted-foreground mb-3">Shipping & Logistics</p>
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
-                                    <FieldWrapper control={form.control} name="freight" label="Freight">
-                                        {(field) => <Input {...field} placeholder="e.g. Paid by seller" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="deliveryPeriod" label="Delivery Period">
-                                        {(field) => <Input {...field} placeholder="e.g. 15-20 working days" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="transitInsurance" label="Transit Insurance">
-                                        {(field) => <Textarea {...field} placeholder="e.g. To be covered by buyer" rows={2} />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="materialUnloading" label="Material Unloading">
-                                        {(field) => <Textarea {...field} placeholder="e.g. At buyer's responsibility" rows={2} />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="preDispatchInspection" label="Pre-Dispatch Inspection">
-                                        {(field) => <Textarea {...field} placeholder="e.g. To be carried out by seller before dispatch" rows={2} />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="deliveryLocation" label="Delivery Location">
-                                        {(field) => <Input {...field} placeholder="e.g. Site location - Mumbai Warehouse" />}
-                                    </FieldWrapper>
-                                </div>
-
-                                <Separator className="my-6" />
-                                <p className="text-sm font-medium text-muted-foreground mb-3">Technical Specifications</p>
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
-                                    <FieldWrapper control={form.control} name="technicalSpecifications" label="Technical Specifications">
-                                        {(field) => <Textarea {...field} placeholder="Enter any technical specifications or requirements..." rows={3} />}
-                                    </FieldWrapper>
+                                <p className="text-sm font-medium text-muted-foreground mb-3">Attachments</p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                                     <div className="space-y-2">
-                                        <Label className="text-sm font-medium">Upload Attachments</Label>
+                                        <Label>Technical Specs Attachments</Label>
                                         <TenderFileUploader
                                             context="tender-documents"
                                             value={form.watch("technicalSpecsAttachments")}
                                             onChange={(paths) => form.setValue("technicalSpecsAttachments", paths)}
                                         />
                                     </div>
-                                </div>
-
-                                <Separator className="my-6" />
-                                <p className="text-sm font-medium text-muted-foreground mb-3">Accessories / Packaging List</p>
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
-                                    <FieldWrapper control={form.control} name="accessoriesPackagingList" label="Accessories / Packaging List">
-                                        {(field) => <Textarea {...field} placeholder="List of accessories and packaging details..." rows={3} />}
-                                    </FieldWrapper>
                                     <div className="space-y-2">
-                                        <Label className="text-sm font-medium">Upload Attachments</Label>
+                                        <Label>Accessories / Packaging List Attachments</Label>
                                         <TenderFileUploader
                                             context="tender-documents"
                                             value={form.watch("accessoriesPackagingListAttachments")}
@@ -640,20 +573,8 @@ export default function EditPOPage() {
                                 </div>
 
                                 <Separator className="my-6" />
-                                <p className="text-sm font-medium text-muted-foreground mb-3">Terms & Documentation</p>
-                                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
-                                    <FieldWrapper control={form.control} name="paymentTerms" label="Payment Terms">
-                                        {(field) => <Textarea {...field} placeholder="e.g. 30 days from invoice date" rows={2} />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="poRaisedBy" label={<><UserPlus className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />PO Raised By</>}>
-                                        {(field) => <Input {...field} placeholder="Enter name" />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="acceptanceOfOrder" label="Acceptance of Order">
-                                        {(field) => <Textarea {...field} placeholder="e.g. Order shall be deemed accepted within 7 days..." rows={2} />}
-                                    </FieldWrapper>
-                                    <FieldWrapper control={form.control} name="documentation" label="Documentation">
-                                        {(field) => <Textarea {...field} placeholder="List of required documents..." rows={3} />}
-                                    </FieldWrapper>
+                                <p className="text-sm font-medium text-muted-foreground mb-3">Remarks</p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
                                     <FieldWrapper control={form.control} name="remarks" label="Remarks">
                                         {(field) => <Textarea {...field} placeholder="Any additional notes or remarks..." rows={3} />}
                                     </FieldWrapper>

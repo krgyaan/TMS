@@ -8,6 +8,11 @@ const productItemSchema = z.object({
     gstRate: z.number().default(18),
 });
 
+const termRowSchema = z.object({
+    field: z.string().min(1, "Field is required"),
+    value: z.string().default(""),
+});
+
 export const purchaseOrderFormSchema = z.object({
     poDate: z.string().min(1, "PO date is required"),
 
@@ -33,24 +38,12 @@ export const purchaseOrderFormSchema = z.object({
 
     quotationNo: z.string().default(""),
     quotationDate: z.string().default(""),
-    warrantyDispatch: z.string().default(""),
-    warrantyInstallation: z.string().default(""),
-    freight: z.string().default(""),
-    deliveryPeriod: z.string().default(""),
-    transitInsurance: z.string().default(""),
-    materialUnloading: z.string().default(""),
-    paymentTerms: z.string().default(""),
-    technicalSpecifications: z.string().default(""),
+    termsAndConditions: z.array(termRowSchema).default([]),
     technicalSpecsAttachments: z.array(z.string()).default([]),
-    accessoriesPackagingList: z.string().default(""),
     accessoriesPackagingListAttachments: z.array(z.string()).default([]),
-    preDispatchInspection: z.string().default(""),
-    deliveryLocation: z.string().default(""),
-    acceptanceOfOrder: z.string().default(""),
-    documentation: z.string().default(""),
-    poRaisedBy: z.string().default(""),
     remarks: z.string().default(""),
 });
 
 export type PurchaseOrderFormValues = z.infer<typeof purchaseOrderFormSchema>;
 export type ProductFormItem = z.infer<typeof productItemSchema>;
+export type TermFormItem = z.infer<typeof termRowSchema>;

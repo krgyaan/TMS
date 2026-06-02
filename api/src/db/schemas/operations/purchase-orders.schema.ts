@@ -1,4 +1,4 @@
-import { pgTable, bigserial, bigint, varchar, text, date, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, bigserial, bigint, varchar, text, date, timestamp, jsonb, index } from "drizzle-orm/pg-core";
 
 export const purchaseOrders = pgTable(
     "purchase_orders",
@@ -23,23 +23,11 @@ export const purchaseOrders = pgTable(
         quotationDate: date("quotation_date"),
         poDate: date("po_date"),
         poNumber: varchar("po_number", { length: 255 }),
-        warrantyDispatch: varchar("warranty_dispatch", { length: 50 }),
-        warrantyInstallation: varchar("warranty_installation", { length: 50 }),
-        freight: varchar("freight", { length: 50 }),
-        paymentTerms: text("payment_terms"),
-        transitInsurance: text("transit_insurance"),
-        materialUnloading: text("material_unloading"),
-        technicalSpecifications: text("technical_specifications"),
-        deliveryPeriod: varchar("delivery_period", { length: 100 }),
-        documentation: text("documentation"),
+        termsAndConditions: jsonb("terms_and_conditions").notNull().default('[]'),
         poRaisedBy: bigint("po_raised_by", { mode: "number" }),
         remarks: text("remarks"),
-        preDispatchInspection: text("pre_dispatch_inspection"),
-        deliveryLocation: text("delivery_location"),
         technicalSpecsAttachments: text("technical_specs_attachments"),
-        accessoriesPackagingList: text("accessories_packaging_list"),
         accessoriesPackagingListAttachments: text("accessories_packaging_list_attachments"),
-        acceptanceOfOrder: text("acceptance_of_order"),
         tenderId: bigint("tender_id", { mode: "number" }).notNull(),
         projectId: bigint("project_id", { mode: "number" }).notNull(),
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

@@ -26,6 +26,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { POFormPreview } from "./components/POFormPreview";
 import { ProductsField } from "./components/ProductsField";
+import { TermsField, DEFAULT_TERMS_ROWS } from "./components/TermsField";
 import { formatDateForInput, mapFormToCreateDTO } from "./helpers/projectDashboard.mapper";
 import type { CreatePartyDTO } from "./helpers/projectDashboard.types";
 import { purchaseOrderFormSchema, type PurchaseOrderFormValues } from "./helpers/purchaseOrder.schema";
@@ -60,22 +61,9 @@ const defaultFormValues: PurchaseOrderFormValues = {
   products: [{ description: "", hsnSac: "", qty: null, rate: null, gstRate: 18 }],
   quotationNo: "",
   quotationDate: "",
-  warrantyDispatch: "25 Years",
-  warrantyInstallation: "",
-  freight: "Extra as per actual.",
-  deliveryPeriod: "within 4 weeks",
-  transitInsurance: "Inclusive",
-  materialUnloading: "",
-  paymentTerms: "30% Advance with the PO and remaining 70% before dispatch against PI.",
-  poRaisedBy: "",
-  technicalSpecifications: "As per approved drawing",
   technicalSpecsAttachments: [],
-  accessoriesPackagingList: "NA",
   accessoriesPackagingListAttachments: [],
-  preDispatchInspection: "",
-  deliveryLocation: "",
-  acceptanceOfOrder: "",
-  documentation: "The party shall confirm acceptance to this Purchase Order by duly Stamping and signing on each page of the technical specifications as well as attached documents (If Any).",
+  termsAndConditions: DEFAULT_TERMS_ROWS,
   remarks: "",
 };
 
@@ -504,7 +492,7 @@ export default function RaisePoFormPage() {
 
             <Separator />
 
-            {/* ── Additional Details (always visible) ── */}
+            {/* ── Additional Details ── */}
             <div>
               <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
                 <FileText className="h-5 w-5" />
@@ -522,93 +510,26 @@ export default function RaisePoFormPage() {
               </div>
 
               <Separator className="my-6" />
-              <p className="text-sm font-medium text-muted-foreground mb-3">Warranty</p>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
-                <FieldWrapper control={form.control} name="warrantyDispatch" label="Warranty (Dispatch)">
-                  {(field) => <Input {...field} placeholder="e.g. 12 months from dispatch" />}
-                </FieldWrapper>
-                <FieldWrapper control={form.control} name="warrantyInstallation" label="Warranty (Installation)">
-                  {(field) => <Input {...field} placeholder="e.g. 24 months from installation" />}
-                </FieldWrapper>
-              </div>
+              <TermsField control={form.control} />
 
               <Separator className="my-6" />
-              <p className="text-sm font-medium text-muted-foreground mb-3">Shipping & Logistics</p>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
-                <FieldWrapper control={form.control} name="freight" label="Freight">
-                  {(field) => <Input {...field} placeholder="e.g. Paid by seller" />}
-                </FieldWrapper>
-                <FieldWrapper control={form.control} name="deliveryPeriod" label="Delivery Period">
-                  {(field) => <Input {...field} placeholder="e.g. 15-20 working days" />}
-                </FieldWrapper>
-
-                <FieldWrapper control={form.control} name="transitInsurance" label="Transit Insurance">
-                  {(field) => <Textarea {...field} placeholder="e.g. To be covered by buyer" rows={2} />}
-                </FieldWrapper>
-                <FieldWrapper control={form.control} name="materialUnloading" label="Material Unloading">
-                  {(field) => <Textarea {...field} placeholder="e.g. At buyer's responsibility" rows={2} />}
-                </FieldWrapper>
-                <FieldWrapper control={form.control} name="preDispatchInspection" label="Pre-Dispatch Inspection">
-                  {(field) => <Textarea {...field} placeholder="e.g. To be carried out by seller before dispatch" rows={2} />}
-                </FieldWrapper>
-                <FieldWrapper control={form.control} name="deliveryLocation" label="Delivery Location">
-                  {(field) => <Input {...field} placeholder="e.g. Site location - Mumbai Warehouse" />}
-                </FieldWrapper>
-              </div>
-
-              <Separator className="my-6" />
-              <p className="text-sm font-medium text-muted-foreground mb-3">Technical Specifications</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                <FieldWrapper control={form.control} name="technicalSpecifications" label="Technical Specifications">
-                  {(field) => <Textarea {...field} placeholder="Enter any technical specifications or requirements..." rows={3} />}
-                </FieldWrapper>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Upload Attachments</Label>
+              <p className="text-sm font-medium text-muted-foreground mb-3">Attachments & Remarks</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
                   <TenderFileUploader
+                    label="Technical Specs Attachments"
                     context="tender-documents"
                     value={form.watch("technicalSpecsAttachments")}
                     onChange={(paths) => form.setValue("technicalSpecsAttachments", paths)}
                   />
-                </div>
-              </div>
-
-              <Separator className="my-6" />
-              <p className="text-sm font-medium text-muted-foreground mb-3">Accessories / Packaging List</p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-                <FieldWrapper control={form.control} name="accessoriesPackagingList" label="Accessories / Packaging List">
-                  {(field) => <Textarea {...field} placeholder="List of accessories and packaging details..." rows={3} />}
-                </FieldWrapper>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">Upload Attachments</Label>
                   <TenderFileUploader
+                    label="Accessories / Packaging List Attachments"
                     context="tender-documents"
                     value={form.watch("accessoriesPackagingListAttachments")}
                     onChange={(paths) => form.setValue("accessoriesPackagingListAttachments", paths)}
                   />
-                </div>
-              </div>
-
-              <Separator className="my-6" />
-              <p className="text-sm font-medium text-muted-foreground mb-3">Terms & Documentation</p>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
-                <FieldWrapper control={form.control} name="paymentTerms" label="Payment Terms">
-                  {(field) => <Textarea {...field} placeholder="e.g. 30 days from invoice date" rows={2} />}
-                </FieldWrapper>
-                <FieldWrapper control={form.control} name="poRaisedBy" label={<><UserPlus className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />PO Raised By</>}>
-                  {(field) => <Input {...field} placeholder="Enter name" />}
-                </FieldWrapper>
-
-                <FieldWrapper control={form.control} name="acceptanceOfOrder" label="Acceptance of Order">
-                  {(field) => <Textarea {...field} placeholder="e.g. Order shall be deemed accepted within 7 days..." rows={2} />}
-                </FieldWrapper>
-
-                <FieldWrapper control={form.control} name="documentation" label="Documentation">
-                  {(field) => <Textarea {...field} placeholder="List of required documents..." rows={3} />}
-                </FieldWrapper>
-
-                <FieldWrapper control={form.control} name="remarks" label="Remarks">
-                  {(field) => <Textarea {...field} placeholder="Any additional notes or remarks..." rows={3} />}
-                </FieldWrapper>
+                  <FieldWrapper control={form.control} name="remarks" label="Remarks">
+                    {(field) => <Textarea {...field} placeholder="Any additional notes or remarks..." rows={3} />}
+                  </FieldWrapper>
               </div>
             </div>
 

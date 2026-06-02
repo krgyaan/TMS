@@ -185,7 +185,7 @@ export class ProjectDashboardService {
         return `${prefix}/PO${next.toString().padStart(4, "0")}`;
     }
 
-    async createPurchaseOrder(body: any) {
+    async createPurchaseOrder(body: any, userId: number) {
     const poNumber = await this.generatePONumber(body.projectName);
 
     // Insert the purchase order
@@ -219,23 +219,11 @@ export class ProjectDashboardService {
             // Optional fields
             quotationNo: body.quotationNo,
             quotationDate: body.quotationDate,
-            paymentTerms: body.paymentTerms,
-            deliveryPeriod: body.deliveryPeriod,
-            remarks: body.remarks,
-            warrantyDispatch: body.warrantyDispatch,
-            warrantyInstallation: body.warrantyInstallation,
-            freight: body.freight,
-            transitInsurance: body.transitInsurance,
-            materialUnloading: body.materialUnloading,
-            technicalSpecifications: body.technicalSpecifications,
+            termsAndConditions: body.termsAndConditions ? (typeof body.termsAndConditions === 'string' ? JSON.parse(body.termsAndConditions) : body.termsAndConditions) : [],
             technicalSpecsAttachments: body.technicalSpecsAttachments,
-            accessoriesPackagingList: body.accessoriesPackagingList,
             accessoriesPackagingListAttachments: body.accessoriesPackagingListAttachments,
-            preDispatchInspection: body.preDispatchInspection,
-            deliveryLocation: body.deliveryLocation,
-            acceptanceOfOrder: body.acceptanceOfOrder,
-            documentation: body.documentation,
-            poRaisedBy: body.poRaisedBy,
+            remarks: body.remarks,
+            poRaisedBy: userId,
             projectId: body.projectId,
         })
         .returning()
@@ -300,6 +288,13 @@ export class ProjectDashboardService {
         const totalGstAmt = items.reduce((s: number, i: any) => s + i.gst_amount, 0);
         const grandTotal = totalAmount + totalGstAmt;
 
+        const termsMap: Record<string, string> = {};
+        if (Array.isArray(po.termsAndConditions)) {
+            for (const t of po.termsAndConditions) {
+                if (t.field) termsMap[t.field] = t.value || "";
+            }
+        }
+
         const data = {
             po_date: po.poDate || "",
             po_number: po.poNumber || "",
@@ -320,15 +315,15 @@ export class ProjectDashboardService {
             total_amount: totalAmount,
             total_gst_amt: totalGstAmt,
             grand_total: grandTotal,
-            payment_terms: po.paymentTerms || "",
-            freight: po.freight || "",
-            transit_insurance: po.transitInsurance || "",
-            pre_dispatch_inspection: po.preDispatchInspection || "",
-            warranty: po.warrantyDispatch || "",
-            delivery_location: po.deliveryLocation || "",
-            technical_specification: po.technicalSpecifications || "",
-            delivery_period: po.deliveryPeriod || "",
-            acceptance_of_order: po.acceptanceOfOrder || "",
+            payment_terms: termsMap["Payment Terms"] || "",
+            freight: termsMap["Freight"] || "",
+            transit_insurance: termsMap["Transit Insurance"] || "",
+            pre_dispatch_inspection: termsMap["Pre-Dispatch Inspection"] || "",
+            warranty: termsMap["Warranty (Dispatch)"] || termsMap["Warranty (Installation)"] || "",
+            delivery_location: termsMap["Delivery Location"] || "",
+            technical_specification: termsMap["Technical Specifications"] || "",
+            delivery_period: termsMap["Delivery Period"] || "",
+            acceptance_of_order: termsMap["Acceptance of Order"] || "",
         };
 
         try {
@@ -416,7 +411,7 @@ export class ProjectDashboardService {
         return party;
     }
 
-    async updatePurchaseOrder(id: number, body: any) {
+    async updatePurchaseOrder(id: number, body: any, userId?: number) {
         const existingPO = (
             await this.db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id))
         )[0];
@@ -450,23 +445,11 @@ export class ProjectDashboardService {
                     // Optional fields
                     quotationNo: body.quotationNo,
                     quotationDate: body.quotationDate,
-                    paymentTerms: body.paymentTerms,
-                    deliveryPeriod: body.deliveryPeriod,
-                    remarks: body.remarks,
-                    warrantyDispatch: body.warrantyDispatch,
-                    warrantyInstallation: body.warrantyInstallation,
-                    freight: body.freight,
-                    transitInsurance: body.transitInsurance,
-                    materialUnloading: body.materialUnloading,
-                    technicalSpecifications: body.technicalSpecifications,
+                    termsAndConditions: body.termsAndConditions ? (typeof body.termsAndConditions === 'string' ? JSON.parse(body.termsAndConditions) : body.termsAndConditions) : [],
                     technicalSpecsAttachments: body.technicalSpecsAttachments,
-                    accessoriesPackagingList: body.accessoriesPackagingList,
                     accessoriesPackagingListAttachments: body.accessoriesPackagingListAttachments,
-                    preDispatchInspection: body.preDispatchInspection,
-                    deliveryLocation: body.deliveryLocation,
-                    acceptanceOfOrder: body.acceptanceOfOrder,
-                    documentation: body.documentation,
-                    poRaisedBy: body.poRaisedBy,
+                    remarks: body.remarks,
+                    poRaisedBy: userId ?? body.poRaisedBy,
                     
                     updatedAt: new Date(),
                 })

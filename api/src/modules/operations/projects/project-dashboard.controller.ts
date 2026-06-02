@@ -16,6 +16,8 @@ import { join } from "path";
 import type { Response } from "express";
 
 import { ProjectDashboardService } from "./project-dashboard.service";
+import { CurrentUser } from "@/modules/auth/decorators/current-user.decorator";
+import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
 
 @Controller("projects")
 export class ProjectDashboardController {
@@ -46,8 +48,8 @@ export class ProjectDashboardController {
   // Create Purchase Order
   @Post("purchase-orders")
   @HttpCode(HttpStatus.CREATED)
-  createPurchaseOrder(@Body() body: any) {
-    return this.service.createPurchaseOrder(body);
+  createPurchaseOrder(@Body() body: any, @CurrentUser() user: ValidatedUser) {
+    return this.service.createPurchaseOrder(body, user.id);
   }
 
   // Create Party
@@ -92,8 +94,9 @@ export class ProjectDashboardController {
   @HttpCode(HttpStatus.OK)
   updatePurchaseOrder(
       @Param("id", ParseIntPipe) id: number,
-      @Body() body: any
+      @Body() body: any,
+      @CurrentUser() user: ValidatedUser,
   ) {
-      return this.service.updatePurchaseOrder(id, body);
+      return this.service.updatePurchaseOrder(id, body, user.id);
 }
 }
