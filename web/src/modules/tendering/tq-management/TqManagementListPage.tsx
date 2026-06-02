@@ -20,6 +20,7 @@ import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { QuickFilter } from '@/components/ui/quick-filter';
 import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
+import { useTenderingPermissions } from '../hooks/useTenderingPermissions';
 
 
 const TqManagementListPage = () => {
@@ -75,6 +76,8 @@ const TqManagementListPage = () => {
     const totalRows = apiResponse?.meta?.total || 0;
     const markNoTqMutation = useMarkAsNoTq();
     const tqQualifiedMutation = useTqQualified();
+
+    const { hasTenderingPermission } = useTenderingPermissions();
 
     const getStatusVariant = (status: string) => {
         switch (status) {
@@ -144,7 +147,7 @@ const TqManagementListPage = () => {
             visible: (row) => row.tqStatus === 'TQ awaited',
         },
         {
-            label: 'TQ Replied',
+            label: 'Submit TQ',
             onClick: (row: TqManagementDashboardRowWithTimer) => {
                 navigate(paths.tendering.tqReplied(row.tqId!));
             },
@@ -168,7 +171,7 @@ const TqManagementListPage = () => {
             visible: (row) => row.tqStatus === 'TQ received' && row.tqId !== null,
         },
         {
-            label: 'Edit TQ Reply',
+            label: 'Edit Submit TQ',
             onClick: (row: TqManagementDashboardRowWithTimer) => {
                 navigate(paths.tendering.tqEditReplied(row.tqId!));
             },
@@ -181,7 +184,7 @@ const TqManagementListPage = () => {
                 navigate(paths.tendering.tqEditMissed(row.tqId!));
             },
             icon: <Edit className="h-4 w-4" />,
-            visible: (row) => row.tqStatus === 'Disqualified, TQ missed' && row.tqId !== null,
+            visible: (row) => hasTenderingPermission && row.tqStatus === 'Disqualified, TQ missed' && row.tqId !== null,
         },
         {
             label: 'TQ Qualified',
@@ -214,7 +217,7 @@ const TqManagementListPage = () => {
             },
             {
                 key: 'replied' as TabKey,
-                name: 'TQ Replied',
+                name: 'TQ Submitted',
                 count: counts?.replied ?? 0,
             },
             {
