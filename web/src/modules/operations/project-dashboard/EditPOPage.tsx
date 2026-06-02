@@ -127,13 +127,14 @@ export default function EditPOPage() {
     const { data: poData, isLoading: isPOLoading, isError: isPOError, error: poError } = usePurchaseOrderDetails(purchaseOrderId);
     const projectId = poData?.projectId;
 
-    const { data: partiesData, isLoading: isPartiesLoading } = usePoParties();
+    const { data: partiesData } = usePoParties();
     const updatePOMutation = useUpdatePurchaseOrder();
     const createPartyMutation = useCreatePoParty();
 
     const parties = partiesData || [];
 
     const [isAddPartyOpen, setIsAddPartyOpen] = useState(false);
+    const [isShipToPartyOpen, setIsShipToPartyOpen] = useState(false);
     const [newParty, setNewParty] = useState<NewPartyForm>({ name: "", email: "", address: "", gstNo: "", pan: "", msme: "" });
 
     const form = useForm<PurchaseOrderFormValues>({
@@ -257,6 +258,7 @@ export default function EditPOPage() {
             toast.success(`Party "${newParty.name}" has been added successfully.`);
             setNewParty({ name: "", email: "", address: "", gstNo: "", pan: "", msme: "" });
             setIsAddPartyOpen(false);
+            setIsShipToPartyOpen(false);
         } catch (error: any) {
             toast.error(error?.message || "Failed to add party. Please try again.");
         }
@@ -483,7 +485,7 @@ export default function EditPOPage() {
                                         <MapPin className="h-5 w-5" />
                                         Ship To Details
                                     </h3>
-                                    <Dialog>
+                                    <Dialog open={isShipToPartyOpen} onOpenChange={setIsShipToPartyOpen}>
                                         <DialogTrigger asChild>
                                             <Button variant="outline" size="sm" type="button">
                                                 <UserPlus className="mr-2 h-4 w-4" />
@@ -494,7 +496,7 @@ export default function EditPOPage() {
                                             newParty={newParty}
                                             setNewParty={setNewParty}
                                             onSubmit={handleAddNewParty}
-                                            onClose={() => {}}
+                                            onClose={() => setIsShipToPartyOpen(false)}
                                             isLoading={createPartyMutation.isPending}
                                         />
                                     </Dialog>
@@ -562,7 +564,7 @@ export default function EditPOPage() {
                                 </h3>
 
                                 <p className="text-sm font-medium text-muted-foreground mb-3">Quotation</p>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
                                     <FieldWrapper control={form.control} name="quotationNo" label="Quotation Number">
                                         {(field) => <Input {...field} placeholder="e.g. QTN-2024-001" />}
                                     </FieldWrapper>
@@ -573,7 +575,7 @@ export default function EditPOPage() {
 
                                 <Separator className="my-6" />
                                 <p className="text-sm font-medium text-muted-foreground mb-3">Warranty</p>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                                     <FieldWrapper control={form.control} name="warrantyDispatch" label="Warranty (Dispatch)">
                                         {(field) => <Input {...field} placeholder="e.g. 12 months from dispatch" />}
                                     </FieldWrapper>
@@ -584,23 +586,19 @@ export default function EditPOPage() {
 
                                 <Separator className="my-6" />
                                 <p className="text-sm font-medium text-muted-foreground mb-3">Shipping & Logistics</p>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
                                     <FieldWrapper control={form.control} name="freight" label="Freight">
                                         {(field) => <Input {...field} placeholder="e.g. Paid by seller" />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="deliveryPeriod" label="Delivery Period">
                                         {(field) => <Input {...field} placeholder="e.g. 15-20 working days" />}
                                     </FieldWrapper>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
                                     <FieldWrapper control={form.control} name="transitInsurance" label="Transit Insurance">
                                         {(field) => <Textarea {...field} placeholder="e.g. To be covered by buyer" rows={2} />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="materialUnloading" label="Material Unloading">
                                         {(field) => <Textarea {...field} placeholder="e.g. At buyer's responsibility" rows={2} />}
                                     </FieldWrapper>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
                                     <FieldWrapper control={form.control} name="preDispatchInspection" label="Pre-Dispatch Inspection">
                                         {(field) => <Textarea {...field} placeholder="e.g. To be carried out by seller before dispatch" rows={2} />}
                                     </FieldWrapper>
@@ -611,7 +609,7 @@ export default function EditPOPage() {
 
                                 <Separator className="my-6" />
                                 <p className="text-sm font-medium text-muted-foreground mb-3">Technical Specifications</p>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
                                     <FieldWrapper control={form.control} name="technicalSpecifications" label="Technical Specifications">
                                         {(field) => <Textarea {...field} placeholder="Enter any technical specifications or requirements..." rows={3} />}
                                     </FieldWrapper>
@@ -627,7 +625,7 @@ export default function EditPOPage() {
 
                                 <Separator className="my-6" />
                                 <p className="text-sm font-medium text-muted-foreground mb-3">Accessories / Packaging List</p>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
                                     <FieldWrapper control={form.control} name="accessoriesPackagingList" label="Accessories / Packaging List">
                                         {(field) => <Textarea {...field} placeholder="List of accessories and packaging details..." rows={3} />}
                                     </FieldWrapper>
@@ -643,23 +641,19 @@ export default function EditPOPage() {
 
                                 <Separator className="my-6" />
                                 <p className="text-sm font-medium text-muted-foreground mb-3">Terms & Documentation</p>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-start">
                                     <FieldWrapper control={form.control} name="paymentTerms" label="Payment Terms">
                                         {(field) => <Textarea {...field} placeholder="e.g. 30 days from invoice date" rows={2} />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="poRaisedBy" label={<><UserPlus className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />PO Raised By</>}>
                                         {(field) => <Input {...field} placeholder="Enter name" />}
                                     </FieldWrapper>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
                                     <FieldWrapper control={form.control} name="acceptanceOfOrder" label="Acceptance of Order">
                                         {(field) => <Textarea {...field} placeholder="e.g. Order shall be deemed accepted within 7 days..." rows={2} />}
                                     </FieldWrapper>
                                     <FieldWrapper control={form.control} name="documentation" label="Documentation">
                                         {(field) => <Textarea {...field} placeholder="List of required documents..." rows={3} />}
                                     </FieldWrapper>
-                                </div>
-                                <div className="mt-6">
                                     <FieldWrapper control={form.control} name="remarks" label="Remarks">
                                         {(field) => <Textarea {...field} placeholder="Any additional notes or remarks..." rows={3} />}
                                     </FieldWrapper>
