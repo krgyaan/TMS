@@ -113,10 +113,10 @@ export class ImprestAdminService {
                         a.user_id,
                         COUNT(CASE WHEN a.max_effective_date >= ${fyStartDate}::date THEN a.year END) AS total_vouchers_current,
                         COUNT(CASE WHEN a.max_effective_date < ${fyStartDate}::date THEN a.year END) AS total_vouchers_previous,
-                        SUM(CASE WHEN v.accounts_signed_by IS NOT NULL AND a.max_effective_date >= ${fyStartDate}::date THEN 1 ELSE 0 END) AS accounts_approved_current,
-                        SUM(CASE WHEN v.accounts_signed_by IS NOT NULL AND a.max_effective_date < ${fyStartDate}::date THEN 1 ELSE 0 END) AS accounts_approved_previous,
-                        SUM(CASE WHEN v.admin_signed_by IS NOT NULL AND a.max_effective_date >= ${fyStartDate}::date THEN 1 ELSE 0 END) AS admin_approved_current,
-                        SUM(CASE WHEN v.admin_signed_by IS NOT NULL AND a.max_effective_date < ${fyStartDate}::date THEN 1 ELSE 0 END) AS admin_approved_previous
+                        SUM(CASE WHEN v.accounts_signed_by IS NOT NULL AND TRIM(v.accounts_signed_by) <> '' AND a.max_effective_date >= ${fyStartDate}::date THEN 1 ELSE 0 END) AS accounts_approved_current,
+                        SUM(CASE WHEN v.accounts_signed_by IS NOT NULL AND TRIM(v.accounts_signed_by) <> '' AND a.max_effective_date < ${fyStartDate}::date THEN 1 ELSE 0 END) AS accounts_approved_previous,
+                        SUM(CASE WHEN v.admin_signed_by IS NOT NULL AND TRIM(v.admin_signed_by) <> '' AND a.max_effective_date >= ${fyStartDate}::date THEN 1 ELSE 0 END) AS admin_approved_current,
+                        SUM(CASE WHEN v.admin_signed_by IS NOT NULL AND TRIM(v.admin_signed_by) <> '' AND a.max_effective_date < ${fyStartDate}::date THEN 1 ELSE 0 END) AS admin_approved_previous
                     FROM voucher_amounts a
                     LEFT JOIN employee_imprest_vouchers v
                         ON v.beneficiary_name = a.user_id::text
