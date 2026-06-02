@@ -151,8 +151,7 @@ export class ProjectDashboardService {
 
     private sanitizeProjectName(name: string): string {
         return name
-            .toUpperCase()
-            .replace(/[^A-Z0-9\s-]/g, '')
+            .replace(/[^a-zA-Z0-9\s-]/g, '')
             .trim()
             .replace(/[\s-]+/g, '_');
     }
@@ -184,14 +183,7 @@ export class ProjectDashboardService {
     }
 
     async createPurchaseOrder(body: any) {
-    const project = (
-        await this.db
-        .select()
-        .from(projects)
-        .where(eq(projects.tenderId, body.tenderId))
-    )[0];
-
-    const poNumber = await this.generatePONumber(project?.projectName ?? undefined);
+    const poNumber = await this.generatePONumber(body.projectName);
 
     // Insert the purchase order
     const po = (
@@ -201,7 +193,7 @@ export class ProjectDashboardService {
             tenderId: body.tenderId,
             poNumber,
             poDate: body.poDate,
-            projectName: project?.projectName,
+            projectName: body.projectName,
             
             // Seller Info
             sellerName: body.sellerName,
@@ -241,7 +233,7 @@ export class ProjectDashboardService {
             acceptanceOfOrder: body.acceptanceOfOrder,
             documentation: body.documentation,
             poRaisedBy: body.poRaisedBy,
-            projectId: project?.id,
+            projectId: body.projectId,
         })
         .returning()
     )[0];

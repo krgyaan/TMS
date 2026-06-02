@@ -109,7 +109,7 @@ export default function RaisePoFormPage() {
   const projectId = Number(id);
 
   const { data: overview, isLoading: isProjectLoading } = useProjectOverview(projectId);
-  const { data: partiesData, isLoading: isPartiesLoading } = usePoParties();
+  const { data: partiesData } = usePoParties();
   const createPOMutation = useCreatePurchaseOrder();
   const createPartyMutation = useCreatePoParty();
 
@@ -195,7 +195,7 @@ export default function RaisePoFormPage() {
 
   const handleSubmit = async (values: PurchaseOrderFormValues) => {
     try {
-      const poData = mapFormToCreateDTO(values, overview?.tender?.id || 3613);
+      const poData = mapFormToCreateDTO(values, overview?.tender?.id || 3613, projectId, overview?.project?.projectName);
       const result = await createPOMutation.mutateAsync(poData);
       toast.success(`PO #${result.poNumber} has been created successfully.`);
       navigate(paths.operations.projectDashboard(projectId));

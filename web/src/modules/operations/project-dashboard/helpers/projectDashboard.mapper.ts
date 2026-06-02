@@ -9,9 +9,13 @@ export function formatDateForInput(date: Date | string): string {
 export function mapFormToCreateDTO(
     values: PurchaseOrderFormValues,
     tenderId: number,
+    projectId?: number,
+    projectName?: string,
 ): CreatePurchaseOrderDTO {
     return {
         tenderId,
+        projectId,
+        projectName: projectName || undefined,
         poDate: values.poDate,
         sellerId: values.sellerId ? Number(values.sellerId) : undefined,
         sellerName: values.sellerName,
