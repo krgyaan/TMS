@@ -371,7 +371,14 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
      */
     private async ensureBrowser(): Promise<void> {
         if (this.browser) {
-            return;
+            // Verify browser connection is still alive
+            try {
+                await this.browser.pages();
+                return;
+            } catch {
+                this.logger.warn('Browser connection lost, reinitializing...');
+                this.browser = null;
+            }
         }
 
         this.logger.warn('Browser not initialized, attempting to initialize with retry logic...');
@@ -450,7 +457,7 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
     /**
      * Convert HTML to PDF using Puppeteer
      */
-    private async htmlToPdf(html: string, templateType: string): Promise<Buffer> {
+    private async htmlToPdf(html: string, templateType: string, retry = true): Promise<Buffer> {
         // Ensure browser is initialized before use
         await this.ensureBrowser();
 
@@ -489,7 +496,14 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
 
             return Buffer.from(pdfBuffer);
         } catch (error) {
-            this.logger.error(`Failed to generate PDF: ${error instanceof Error ? error.message : String(error)}`);
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            // If connection dropped, kill browser reference and retry once
+            if (retry && (errorMessage.includes('Connection closed') || errorMessage.includes('Protocol error'))) {
+                this.logger.warn(`Browser connection lost during PDF generation, retrying...`);
+                this.browser = null;
+                return this.htmlToPdf(html, templateType, false);
+            }
+            this.logger.error(`Failed to generate PDF: ${errorMessage}`);
             throw error;
         } finally {
             if (page) {
