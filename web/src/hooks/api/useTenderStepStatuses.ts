@@ -11,6 +11,7 @@ import { useTenderResultByTenderId } from "@/hooks/api/useTenderResults";
 import { useTqById, useTqByTender } from "@/hooks/api/useTqManagement";
 import { useReverseAuctionByTender } from "@/hooks/api/useReverseAuctions";
 import type { StepStatus } from "@/modules/tendering/components/ShowPageLayout";
+import { useWoBasicDetailsByTender } from "./useWoBasicDetails";
 
 function deriveStatus(hasData: boolean, isLoading: boolean): StepStatus {
     if (isLoading) return "loading";
@@ -51,6 +52,7 @@ export function useTenderStepStatuses(tenderId: number | null, options: UseTende
     const { data: tenderResult, isLoading: l9 } = useTenderResultByTenderId(resolvedTenderId);
     const { data: tqByTender, isLoading: l10a } = useTqByTender(resolvedTenderId ?? 0);
     const { data: raData, isLoading: l11 } = useReverseAuctionByTender(resolvedTenderId ?? 0);
+    const { data: basicDetails, isLoading: l12 } = useWoBasicDetailsByTender(resolvedTenderId ?? 0);
 
     const steps: TenderStepStatus[] = [
         {
@@ -143,7 +145,16 @@ export function useTenderStepStatuses(tenderId: number | null, options: UseTende
             isLoading: l9,
             status: deriveStatus(!!tenderResult, l9),
         },
+        {
+            id: "basic-details",
+            label: "Basic Details",
+            shortLabel: "Basic Details",
+            stepNumber: 10,
+            hasData: !!basicDetails,
+            isLoading: l12,
+            status: deriveStatus(!!basicDetails, l12),
+        },
     ];
 
-    return { steps, tender, approval, tqData: tqByTender || tqById, raData };
+    return { steps, tender, approval, tqData: tqByTender || tqById, raData, basicDetails };
 }

@@ -14,15 +14,18 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { ShowPageLayout } from "@/components/layout/ShowPageLayout";
 import { useTenderStepStatuses } from "@/hooks/api/useTenderStepStatuses";
+import { BasicDetailsSection } from "@/modules/operations/wo-basic-details/components/BasicDetailsSection";
+import { useWoBasicDetailsByTender } from "@/hooks/api/useWoBasicDetails";
 
 export default function TenderResultShowPage() {
     const { tenderId } = useParams<{ tenderId: string }>();
     const navigate = useNavigate();
     const tenderIdNum = tenderId ? Number(tenderId) : null;
 
-    const { steps: tenderSteps } = useTenderStepStatuses(tenderIdNum);
+    const basicDetailsId = useWoBasicDetailsByTender(tenderIdNum ?? 0)?.data?.[0]?.id;
 
-    const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["result"]));
+    const { steps: tenderSteps } = useTenderStepStatuses(tenderIdNum);
+    const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(["result", "basic-details"]));
 
     const toggleSection = useCallback((id: string) => {
         setExpandedSections((prev) => {
@@ -48,6 +51,7 @@ export default function TenderResultShowPage() {
             case "bid":            return <BidSubmissionSection tenderId={tenderIdNum} />;
             case "ra-management":  return <RaSection tenderId={tenderIdNum} />;
             case "result":         return <TenderResultSection tenderId={tenderIdNum} />;
+            case "basic-details":  return basicDetailsId ? <BasicDetailsSection woBasicDetailId={basicDetailsId} /> : null;
             default: return null;
         }
     };
@@ -63,7 +67,18 @@ export default function TenderResultShowPage() {
 
     return (
         <ShowPageLayout
-            steps={tenderSteps.filter(s => ["tender-details", "physical-docs", "rfq", "emd-fees", "checklist", "costing", "bid", "ra-management", "result"].includes(s.id))}
+            steps={tenderSteps.filter(s => [
+                "tender-details", 
+                "physical-docs", 
+                "rfq", 
+                "emd-fees", 
+                "checklist", 
+                "costing", 
+                "bid", 
+                "ra-management", 
+                "result", 
+                "basic-details"
+            ].includes(s.id))}
             expandedSections={expandedSections}
             onToggleSection={toggleSection}
             onExpandAll={expandAll}

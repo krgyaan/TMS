@@ -1,15 +1,17 @@
 import { parseFileArray } from '@/lib/utils';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { FileText, ExternalLink, Download, Calendar, Hash, Building2, Users, Clock, FileCheck, TrendingUp, Calculator, CheckCircle2, XCircle, Pause, Play, Phone, Mail, User, Briefcase } from 'lucide-react';
+import { FileText, ExternalLink, Download, Calendar, Hash, Building2, Users, Clock, FileCheck, TrendingUp, Calculator, CheckCircle2, XCircle, Pause, Play, Phone, Mail, User, Briefcase, Pencil } from 'lucide-react';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import type { WoBasicDetail, WorkflowStage } from '../helpers/basiDetail.types';
 import type { WoContact } from '../../types/wo.types';
+import { paths } from '@/app/routes/paths';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 interface BasicDetailViewProps {
     data: WoBasicDetail;
@@ -104,6 +106,9 @@ export function BasicDetailView({
     isLoading = false,
     className = '',
 }: BasicDetailViewProps) {
+    const navigate = useNavigate();
+    const location = useLocation();
+
     if (isLoading) {
         return (
             <Card className={className}>
@@ -142,6 +147,12 @@ export function BasicDetailView({
                     <Building2 className="h-5 w-5" />
                     Work Order Basic Details
                 </CardTitle>
+                <CardAction>
+                    <Button variant="outline" size="sm" onClick={() => navigate(paths.operations.woBasicDetailEditPage(data.id), { state: { from: location.pathname } })}>
+                        <Pencil className="h-3 w-3" />
+                        Edit Basic Details
+                    </Button>
+                </CardAction>
             </CardHeader>
             <CardContent className="space-y-6">
                 {/* Workflow Progress */}
