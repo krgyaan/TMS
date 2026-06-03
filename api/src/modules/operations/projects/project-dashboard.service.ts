@@ -114,10 +114,14 @@ export class ProjectDashboardService {
                 .select({
                     id: purchaseOrders.id,
                     poNumber: purchaseOrders.poNumber,
-                    createdAt: purchaseOrders.createdAt,
                     sellerName: purchaseOrders.sellerName,
+                    shipToName: purchaseOrders.shipToName,
+                    poDate: purchaseOrders.poDate,
+                    poRaisedBy: users.name,
+                    createdAt: purchaseOrders.createdAt,
                 })
                 .from(purchaseOrders)
+                .innerJoin(users, eq(users.id, purchaseOrders.poRaisedBy))
                 .where(eq(purchaseOrders.projectId, projectId));
 
         return { purchaseOrders: purchaseOrdersData };
