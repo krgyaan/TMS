@@ -2,47 +2,44 @@ import React from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
 /* UI */
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 /* Icons */
 import {
-    ArrowLeft,
-    Edit,
-    Building2,
-    User,
-    Phone,
-    Mail,
-    FileText,
-    Clock,
-    Calendar,
-    IndianRupee,
-    MapPin,
-    Target,
-    UserCheck,
-    UserPlus,
-    CalendarClock,
     AlertCircle,
+    ArrowLeft,
+    Building2,
+    Calendar,
+    CalendarClock,
     CheckCircle2,
-    PauseCircle,
-    ExternalLink,
+    Clock,
     Copy,
     Download,
-    FileImage,
+    Edit,
+    ExternalLink,
     File,
-    MoreHorizontal,
-    Share2,
-    Printer,
+    FileImage,
+    FileText,
+    IndianRupee,
+    Mail,
+    MapPin,
+    PauseCircle,
+    Phone,
+    Target,
+    User,
+    UserCheck,
+    UserPlus
 } from "lucide-react";
 
 /* Data */
-import { useFollowUp } from "./follow-up.hooks";
 import { paths } from "@/app/routes/paths";
+import { useFollowUp } from "./follow-up.hooks";
 
 /* ================================
    CONSTANTS
@@ -405,6 +402,9 @@ const buildFileUrl = (value?: unknown): string => {
     // already a full URL (S3, CDN, etc.)
     if (value.startsWith("http")) return value;
 
+    // already has a directory prefix (e.g. "accounts/file.pdf" or "courier/file.docx")
+    if (value.includes('/')) return `/uploads/${value}`;
+
     return `/uploads/accounts/${value}`;
 };
 
@@ -468,7 +468,7 @@ function AttachmentCard({ url, index }: { url: unknown; index: number }) {
 
             {isImage && (
                 <div className="mt-3 rounded-lg overflow-hidden bg-muted">
-                    <img src={url} alt={fileName} className="w-full h-32 object-cover" loading="lazy" />
+                    <img src={fileUrl} alt={fileName} className="w-full h-32 object-cover" loading="lazy" />
                 </div>
             )}
         </div>

@@ -143,7 +143,20 @@ const EmdFollowUpPage = () => {
         },
     });
 
-    const [attachments, setAttachments] = useState<string[]>(DEFAULT_ATTACHMENTS);
+    const [attachments, setAttachments] = useState<{fileName: string, baseDir: string}[]>(
+        DEFAULT_ATTACHMENTS.map(f => ({ fileName: f, baseDir: 'accounts' }))
+    );
+
+    useEffect(() => {
+        const rawData = actionFormData as Record<string, any> | undefined;
+        const docs = rawData?.courierDetails?.courierDocs as string[] | undefined;
+        if (docs?.length) {
+            setAttachments(prev => [
+                ...prev,
+                ...docs.map((f: string) => ({ fileName: f, baseDir: 'courier' })),
+            ]);
+        }
+    }, [actionFormData]);
 
     const removeAttachment = (index: number) => {
         setAttachments(prev => prev.filter((_, i) => i !== index));
@@ -190,6 +203,7 @@ const EmdFollowUpPage = () => {
         }
 
         try {
+            const rawAmount = (actionFormData as Record<string, any> | undefined)?.amount ?? paymentRequests?.amountRequired;
             const payload: Record<string, unknown> = {
                 action: 'initiate-followup',
                 organisation_name: values.organization,
@@ -200,8 +214,9 @@ const EmdFollowUpPage = () => {
                 })) || [],
                 followup_start_date: values.startFrom,
                 frequency: values.frequency,
+                amount: rawAmount ?? 0,
                 emailBody,
-                attachments,
+                attachments: attachments.map(a => `${a.baseDir}/${a.fileName}`),
             };
 
             await service.updateAction(instrumentId, payload);
@@ -309,12 +324,19 @@ const EmdFollowUpPage = () => {
 
                             <div className="pt-4 border-t">
                                 <label className="text-sm font-medium mb-2 block">Attachments</label>
-                                <p className="text-xs text-muted-foreground mb-3">Files will be read from the accounts upload directory</p>
+                                <p className="text-xs text-muted-foreground mb-3">Attached files will be included with the follow-up email</p>
                                 <div className="space-y-2">
                                     {attachments.map((file, index) => (
-                                        <div key={file} className="flex items-center gap-2 text-sm">
+                                        <div key={file.fileName + file.baseDir} className="flex items-center gap-2 text-sm">
                                             <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                                            <span className="flex-1 truncate">{file}</span>
+                                            <a
+                                                href={`/uploads/${file.baseDir}/${file.fileName}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="flex-1 truncate text-blue-600 hover:underline"
+                                            >
+                                                {file.fileName}
+                                            </a>
                                             <Button
                                                 type="button"
                                                 variant="ghost"

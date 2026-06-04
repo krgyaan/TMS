@@ -476,7 +476,7 @@ export class PayOnPortalService {
                     followupFor: 'EMD Refund',
                     assignedToId: null,
                     createdById: null,
-                    amount: 0,
+                    amount: instrument.amount ? Number(instrument.amount) : 0,
                     attachments: body.attachments || [],
                     followUpHistory: []
                 };
