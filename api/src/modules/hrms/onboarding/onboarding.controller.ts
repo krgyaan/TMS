@@ -345,6 +345,13 @@ export class OnboardingController {
     const status = body.status;
     const remark = body.remark || '';
 
+    //rejecting the entry if any of the request entry is rejected
+
+    if(status == "rejected"){
+      //passing the onboarding Request Entry 
+      await this.onboardingService.rejectOnboardingRequest(id);
+    }
+
     switch (stage) {
       case 'education':
         return this.onboardingService.approveEducationRecord(id, entryId, status, adminId, remark);
