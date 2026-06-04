@@ -2040,79 +2040,84 @@ export class OnboardingService {
 
     const onboardingId = activeReqs[0].id;
 
-    // Fetch the LATEST profile record for this onboarding
-    const [currentProfile] = await this.db
-      .select({ id: onboardingProfiles.id, hrStatus: onboardingProfiles.hrStatus, status: onboardingProfiles.status })
-      .from(onboardingProfiles)
-      .where(eq(onboardingProfiles.onboardingId, onboardingId))
-      .orderBy(desc(onboardingProfiles.id))
-      .limit(1);
+    // Determine if the DTO contains profile fields (vs bank-only submission)
+    const hasProfileFields = dto.firstName !== undefined || dto.lastName !== undefined || dto.dateOfBirth !== undefined || dto.gender !== undefined || dto.phone !== undefined || dto.personalEmail !== undefined || dto.aadharNumber !== undefined || dto.panNumber !== undefined;
 
-    // If current profile was approved, block editing
-    if (currentProfile?.hrStatus === 'approved') {
-      throw new ForbiddenException('Profile has been approved and can no longer be edited.');
+    if (hasProfileFields) {
+      // Fetch the LATEST profile record for this onboarding
+      const [currentProfile] = await this.db
+        .select({ id: onboardingProfiles.id, hrStatus: onboardingProfiles.hrStatus, status: onboardingProfiles.status })
+        .from(onboardingProfiles)
+        .where(eq(onboardingProfiles.onboardingId, onboardingId))
+        .orderBy(desc(onboardingProfiles.id))
+        .limit(1);
+
+      // If current profile was approved, block editing
+      if (currentProfile?.hrStatus === 'approved') {
+        throw new ForbiddenException('Profile has been approved and can no longer be edited.');
+      }
+
+      const profileData = {
+        onboardingId,
+        firstName: dto.firstName,
+        middleName: dto.middleName,
+        lastName: dto.lastName,
+        dob: dto.dateOfBirth,
+        gender: dto.gender,
+        maritalStatus: dto.maritalStatus,
+        nationality: dto.nationality,
+        aadharNumber: dto.aadharNumber,
+        panNumber: dto.panNumber,
+        phone: dto.phone,
+        email: dto.personalEmail,
+        bloodGroup: dto.bloodGroup,
+        linkedinProfile: dto.linkedinProfile,
+        currentAddress: dto.address ? {
+          line1: dto.address.currentAddressLine1,
+          line2: dto.address.currentAddressLine2,
+          city: dto.address.currentCity,
+          state: dto.address.currentState,
+          country: dto.address.currentCountry,
+          postalCode: dto.address.currentPostalCode,
+        } : undefined,
+        permanentAddress: dto.address ? {
+          line1: dto.address.permanentAddressLine1,
+          line2: dto.address.permanentAddressLine2,
+          city: dto.address.permanentCity,
+          state: dto.address.permanentState,
+          country: dto.address.permanentCountry,
+          postalCode: dto.address.permanentPostalCode,
+        } : undefined,
+        emergencyContact: dto.emergencyContact ? {
+          name: dto.emergencyContact.name,
+          relationship: dto.emergencyContact.relationship,
+          phone: dto.emergencyContact.phone,
+          altPhone: dto.emergencyContact.altPhone,
+          email: dto.emergencyContact.email,
+        } : undefined,
+        updatedAt: new Date(),
+      };
+
+      let updated: any;
+      if (currentProfile) {
+        [updated] = await this.db.update(onboardingProfiles)
+          .set({ ...profileData, status: 'resubmitted', hrStatus: 'pending', hrRemark: null })
+          .where(eq(onboardingProfiles.id, currentProfile.id))
+          .returning();
+      } else {
+        [updated] = await this.db.insert(onboardingProfiles).values({
+          ...profileData,
+          status: 'submitted',
+          hrStatus: 'pending',
+        } as any).returning();
+      }
+
+      // Update profileStatus on the onboarding request
+      await this.db.update(onboardingRequests).set({
+        profileStatus: currentProfile ? 'resubmitted' : 'submitted',
+        updatedAt: new Date(),
+      }).where(eq(onboardingRequests.id, onboardingId));
     }
-
-    const profileData = {
-      onboardingId,
-      firstName: dto.firstName,
-      middleName: dto.middleName,
-      lastName: dto.lastName,
-      dob: dto.dateOfBirth,
-      gender: dto.gender,
-      maritalStatus: dto.maritalStatus,
-      nationality: dto.nationality,
-      aadharNumber: dto.aadharNumber,
-      panNumber: dto.panNumber,
-      phone: dto.phone,
-      email: dto.personalEmail,
-      bloodGroup: dto.bloodGroup,
-      linkedinProfile: dto.linkedinProfile,
-      currentAddress: dto.address ? {
-        line1: dto.address.currentAddressLine1,
-        line2: dto.address.currentAddressLine2,
-        city: dto.address.currentCity,
-        state: dto.address.currentState,
-        country: dto.address.currentCountry,
-        postalCode: dto.address.currentPostalCode,
-      } : undefined,
-      permanentAddress: dto.address ? {
-        line1: dto.address.permanentAddressLine1,
-        line2: dto.address.permanentAddressLine2,
-        city: dto.address.permanentCity,
-        state: dto.address.permanentState,
-        country: dto.address.permanentCountry,
-        postalCode: dto.address.permanentPostalCode,
-      } : undefined,
-      emergencyContact: dto.emergencyContact ? {
-        name: dto.emergencyContact.name,
-        relationship: dto.emergencyContact.relationship,
-        phone: dto.emergencyContact.phone,
-        altPhone: dto.emergencyContact.altPhone,
-        email: dto.emergencyContact.email,
-      } : undefined,
-      updatedAt: new Date(),
-    };
-
-    let updated: any;
-    if (currentProfile) {
-      [updated] = await this.db.update(onboardingProfiles)
-        .set({ ...profileData, status: 'resubmitted', hrStatus: 'pending', hrRemark: null })
-        .where(eq(onboardingProfiles.id, currentProfile.id))
-        .returning();
-    } else {
-      [updated] = await this.db.insert(onboardingProfiles).values({
-        ...profileData,
-        status: 'submitted',
-        hrStatus: 'pending',
-      } as any).returning();
-    }
-
-    // Update profileStatus on the onboarding request
-    await this.db.update(onboardingRequests).set({
-      profileStatus: currentProfile ? 'resubmitted' : 'submitted',
-      updatedAt: new Date(),
-    }).where(eq(onboardingRequests.id, onboardingId));
 
     // Handle Bank Accounts Sync
     if (dto.bankAccounts && Array.isArray(dto.bankAccounts)) {
@@ -2272,7 +2277,14 @@ export class OnboardingService {
         .where(eq(onboardingRequests.id, onboardingId));
     }
 
-    return { success: true, profile: updated };
+    // If any stage data was resubmitted, reset parent request status from 'rejected' to 'pending'
+    if (activeReqs[0].status === 'rejected') {
+      await this.db.update(onboardingRequests)
+        .set({ status: 'pending' })
+        .where(eq(onboardingRequests.id, onboardingId));
+    }
+
+    return { success: true };
   }
 
   async submitOnboarding(userId: number) {
@@ -2402,6 +2414,94 @@ export class OnboardingService {
     throw new BadRequestException('Education details can only be modified during onboarding.');
   }
 
+  async updateMyOnboardingBankAccounts(userId: number, body: any) {
+    const activeReqs = await this.db
+      .select({ id: onboardingRequests.id, status: onboardingRequests.status })
+      .from(onboardingRequests)
+      .where(eq(onboardingRequests.userId, userId))
+      .orderBy(desc(onboardingRequests.createdAt))
+      .limit(1);
+
+    const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
+
+    if (!isOnboarding) {
+      throw new BadRequestException('Bank details can only be modified during onboarding.');
+    }
+
+    const onboardingId = activeReqs[0].id;
+    const { bankAccounts } = body;
+
+    if (!bankAccounts || !Array.isArray(bankAccounts)) {
+      throw new BadRequestException('bankAccounts array is required');
+    }
+
+    const existing = await this.db
+      .select()
+      .from(onboardingBankDetails)
+      .where(eq(onboardingBankDetails.onboardingId, onboardingId));
+
+    // Delete records that are no longer in the submitted array (skip approved)
+    const inputIds = bankAccounts.map((b: any) => b.id).filter(Boolean) as number[];
+    const toDelete = existing.filter((b) => !inputIds.includes(b.id) && b.hrStatus !== 'approved');
+    for (const record of toDelete) {
+      await this.db.delete(onboardingBankDetails).where(eq(onboardingBankDetails.id, record.id));
+    }
+
+    for (const b of bankAccounts) {
+      // Skip approved entries — don't modify them
+      if (b.id) {
+        const dbRecord = existing.find((r) => r.id === b.id);
+        if (dbRecord && dbRecord.hrStatus === 'approved') {
+          continue;
+        }
+      }
+
+      const payload: any = {
+        bankName: b.bankName,
+        accountHolderName: b.accountHolderName,
+        accountNumber: b.accountNumber,
+        ifscCode: b.ifscCode,
+        branchName: b.branchName || null,
+        branchAddress: b.branchAddress || null,
+        upiId: b.upiId || null,
+        isPrimary: b.isPrimary === true || b.isPrimary === 'true',
+        status: b.id ? 'resubmitted' : 'submitted',
+        hrStatus: 'pending',
+        hrRemark: null,
+        updatedAt: new Date(),
+      };
+
+      if (b.id) {
+        await this.db.update(onboardingBankDetails)
+          .set(payload)
+          .where(eq(onboardingBankDetails.id, b.id));
+      } else {
+        await this.db.insert(onboardingBankDetails).values({
+          onboardingId,
+          ...payload,
+          createdAt: new Date(),
+        });
+      }
+    }
+
+    const hasExistingBank = bankAccounts.some((b: any) => b.id);
+    await this.db.update(onboardingRequests)
+      .set({
+        bankStatus: hasExistingBank ? 'resubmitted' : 'submitted',
+        updatedAt: new Date(),
+      })
+      .where(eq(onboardingRequests.id, onboardingId));
+
+    // Reset parent request status from 'rejected' to 'pending' on resubmission
+    if (activeReqs[0].status === 'rejected') {
+      await this.db.update(onboardingRequests)
+        .set({ status: 'pending' })
+        .where(eq(onboardingRequests.id, onboardingId));
+    }
+
+    return { success: true };
+  }
+
   async updateMyOnboardingEducations(userId: number, body: any) {
     const activeReqs = await this.db
       .select({ id: onboardingRequests.id, status: onboardingRequests.status })
@@ -2466,6 +2566,13 @@ export class OnboardingService {
         updatedAt: new Date(),
       })
       .where(eq(onboardingRequests.id, activeReqs[0].id));
+
+    // Reset parent request status from 'rejected' to 'pending' on resubmission
+    if (activeReqs[0].status === 'rejected') {
+      await this.db.update(onboardingRequests)
+        .set({ status: 'pending' })
+        .where(eq(onboardingRequests.id, activeReqs[0].id));
+    }
 
     return { success: true };
   }
@@ -2607,6 +2714,13 @@ export class OnboardingService {
         updatedAt: new Date(),
       })
       .where(eq(onboardingRequests.id, activeReqs[0].id));
+
+    // Reset parent request status from 'rejected' to 'pending' on resubmission
+    if (activeReqs[0].status === 'rejected') {
+      await this.db.update(onboardingRequests)
+        .set({ status: 'pending' })
+        .where(eq(onboardingRequests.id, activeReqs[0].id));
+    }
 
     return { success: true };
   }

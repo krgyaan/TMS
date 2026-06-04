@@ -460,6 +460,16 @@ export class OnboardingController {
   }
 
   /**
+   * PUT /hrms/onboarding/me/bank-accounts
+   * Bulk sync bank accounts for the current employee's onboarding.
+   */
+  @Put('me/bank-accounts')
+  @UseGuards(JwtAuthGuard)
+  async updateMyOnboardingBankAccounts(@Req() req: any, @Body() body: any) {
+    return this.onboardingService.updateMyOnboardingBankAccounts(req.user.id, body);
+  }
+
+  /**
    * POST /hrms/onboarding/bank-accounts
    */
   @Post('bank-accounts')
