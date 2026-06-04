@@ -175,7 +175,7 @@ export function OnboardingBankForm({
   const onSubmit = async (values: BankFormValues) => {
     setIsSubmitting(true);
     try {
-      await api.patch("/hrms/onboarding/me/profile", {
+      await api.put("/hrms/onboarding/me/bank-accounts", {
         bankAccounts: values.bankAccounts
       });
 
