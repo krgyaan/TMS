@@ -2567,6 +2567,13 @@ export class OnboardingService {
       })
       .where(eq(onboardingRequests.id, activeReqs[0].id));
 
+    // Reset parent request status from 'rejected' to 'pending' on resubmission
+    if (activeReqs[0].status === 'rejected') {
+      await this.db.update(onboardingRequests)
+        .set({ status: 'pending' })
+        .where(eq(onboardingRequests.id, activeReqs[0].id));
+    }
+
     return { success: true };
   }
 
@@ -2707,6 +2714,13 @@ export class OnboardingService {
         updatedAt: new Date(),
       })
       .where(eq(onboardingRequests.id, activeReqs[0].id));
+
+    // Reset parent request status from 'rejected' to 'pending' on resubmission
+    if (activeReqs[0].status === 'rejected') {
+      await this.db.update(onboardingRequests)
+        .set({ status: 'pending' })
+        .where(eq(onboardingRequests.id, activeReqs[0].id));
+    }
 
     return { success: true };
   }
