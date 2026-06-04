@@ -806,42 +806,42 @@ export class PaymentRequestsNotificationService {
                 .where(eq(instrumentChequeDetails.instrumentId, instrumentId))
                 .limit(1);
 
-            let finalPurpose = purpose || 'Payment';
-            let finalPartyName = instrument.favouring || 'Not specified';
-            let finalChequeDate = this.formatDateDDMMYYYY(instrument.issueDate) || this.formatDateDDMMYYYY(new Date().toISOString());
-            let receivingPdfUrl = '';
+    let finalPurpose = purpose || 'Payment';
+    let finalPartyName = instrument.favouring || 'Not specified';
+    let finalChequeDate = this.formatDateDDMMYYYY(instrument.issueDate) || this.formatDateDDMMYYYY(new Date().toISOString());
+    let receivingPdfUrl = '';
 
-            if (chequeDetails?.linkedDdId || chequeDetails?.linkedFdrId) {
-                const linkedType = chequeDetails?.linkedDdId ? 'DD' : 'FDR';
-                finalPurpose = linkedType;
-                finalPartyName = `Yourself for ${linkedType}`;
-                finalChequeDate = this.formatDateDDMMYYYY(new Date().toISOString());
+    const linkedType = chequeDetails?.linkedDdId ? 'DD' : chequeDetails?.linkedFdrId ? 'FDR' : null;
+    if (linkedType) {
+        finalPurpose = linkedType;
+        finalPartyName = `Yourself for ${linkedType}`;
+        finalChequeDate = this.formatDateDDMMYYYY(new Date().toISOString());
+    }
 
-                try {
-                    const pdfPaths = await this.pdfGenerator.generatePdfs(
-                        'chqCret',
-                        {
-                            cheque_date: finalChequeDate,
-                            cheque_amt: instrument.amount,
-                            cheque_favour: instrument.favouring || 'Not specified',
-                        },
-                        instrumentId,
-                        linkedType
-                    );
+    try {
+        const pdfPaths = await this.pdfGenerator.generatePdfs(
+            'chqCret',
+            {
+                cheque_date: finalChequeDate,
+                cheque_amt: instrument.amount,
+                cheque_favour: instrument.favouring || 'Not specified',
+            },
+            instrumentId,
+            linkedType || 'CHEQUE'
+        );
 
-                    if (pdfPaths.length > 0) {
-                        await this.db
-                            .update(paymentInstruments)
-                            .set({ generatedPdf: pdfPaths[0] })
-                            .where(eq(paymentInstruments.id, instrumentId));
+        if (pdfPaths.length > 0) {
+            await this.db
+                .update(paymentInstruments)
+                .set({ generatedPdf: pdfPaths[0] })
+                .where(eq(paymentInstruments.id, instrumentId));
 
-                        const apiUrl = this.configService.get<string>('app.apiUrl') || '';
-                        receivingPdfUrl = `${apiUrl}/payment-requests/instruments/${instrumentId}/pdf`;
-                    }
-                } catch (error) {
-                    this.logger.error(`Failed to generate receiving PDF for cheque ${instrumentId}:`, error);
-                }
-            }
+            const apiUrl = this.configService.get<string>('app.apiUrl') || '';
+            receivingPdfUrl = `${apiUrl}/payment-requests/instruments/${instrumentId}/pdf`;
+        }
+    } catch (error) {
+        this.logger.error(`Failed to generate receiving PDF for cheque ${instrumentId}:`, error);
+    }
 
             try {
                 const result = await this.emailService.sendPaymentEmail({

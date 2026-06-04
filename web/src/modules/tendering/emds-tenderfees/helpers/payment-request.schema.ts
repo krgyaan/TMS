@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { DELIVERY_OPTIONS } from '../constants';
+import { CHEQUE_DELIVERY_OPTIONS, DELIVERY_OPTIONS } from '../constants';
 
 const emdModeMapping: Record<string, string> = {
     BT: 'BANK_TRANSFER',
@@ -8,24 +8,25 @@ const emdModeMapping: Record<string, string> = {
 const normalizeMode = (val: unknown) =>
     typeof val === 'string' ? (emdModeMapping[val] ?? val) : val;
 
-const DELIVERY_OPTION_VALUES = DELIVERY_OPTIONS.map(option => option.value) as ['TENDER_DUE', '24', '48', '72', '96', '120'];
+const DELIVERY_OPTION_VALUES = DELIVERY_OPTIONS.map(option => option.value) as ['TENDER_DUE', '24', '48'];
+const CHEQUE_DELIVERY_OPTION_VALUES = CHEQUE_DELIVERY_OPTIONS.map(option => option.value) as ['3', '6', '12', '24'];
 
-const deliveryEnumField = () =>
+const deliveryEnumField = (values: readonly [string, ...string[]]) =>
     z.preprocess(
         (val) => {
-            // Handle empty/null/undefined
             if (val === '' || val === null || val === undefined) {
                 return undefined;
             }
-            // Convert numbers back to strings (SelectField converts "72" to 72)
             if (typeof val === 'number') {
                 return String(val);
             }
-            // Ensure string values match enum
             return val;
         },
-        z.enum(DELIVERY_OPTION_VALUES).optional()
+        z.enum(values).optional()
     );
+
+const deliveryEnumFieldForDD = () => deliveryEnumField(DELIVERY_OPTION_VALUES);
+const deliveryEnumFieldForCheque = () => deliveryEnumField(CHEQUE_DELIVERY_OPTION_VALUES);
 
 export const PaymentDetailsSchema = z.object({
     // Common amount field (used in OLD_EMD and BI_OTHER_THAN_EMD forms) and is required
@@ -39,7 +40,7 @@ export const PaymentDetailsSchema = z.object({
     // DD fields
     ddFavouring: z.string().optional(),
     ddPayableAt: z.string().optional(),
-    ddDeliverBy: deliveryEnumField(),
+    ddDeliverBy: deliveryEnumFieldForDD(),
     ddPurpose: z.string().optional(),
     ddCourierAddress: z.string().optional(),
     ddCourierName: z.string().optional(),
@@ -56,7 +57,7 @@ export const PaymentDetailsSchema = z.object({
     // FDR fields
     fdrFavouring: z.string().optional(),
     fdrExpiryDate: z.string().optional(),
-    fdrDeliverBy: deliveryEnumField(),
+    fdrDeliverBy: deliveryEnumFieldForDD(),
     fdrPurpose: z.string().optional(),
     fdrCourierAddress: z.string().optional(),
     fdrCourierName: z.string().optional(),
@@ -104,7 +105,7 @@ export const PaymentDetailsSchema = z.object({
     // Cheque fields
     chequeFavouring: z.string().optional(),
     chequeDate: z.string().optional(),
-    chequeNeededIn: deliveryEnumField(),
+    chequeNeededIn: deliveryEnumFieldForCheque(),
     chequePurpose: z.string().optional(),
     chequeAccount: z.string().optional(),
     chequeDeliveryMethod: z.string().optional(),
