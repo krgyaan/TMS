@@ -644,7 +644,7 @@ export class ChequeService {
                     assignedToId: null,
                     createdById: null,
                     amount: 0,
-                    attachments: [],
+                    attachments: body.attachments || [],
                     followUpHistory: []
                 };
                 await this.followUpService.create(followupDto, user.id || user.sub);

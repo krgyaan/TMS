@@ -541,7 +541,7 @@ export class FdrService {
                             contacts: mappedContacts,
                             frequency: body.frequency ? Number(body.frequency) : 1,
                             startFrom: body.followup_start_date || undefined,
-                            attachments: [],
+                            attachments: body.attachments || [],
                             createdById: user.id,
                             followUpHistory: [],
                         };

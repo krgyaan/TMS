@@ -117,7 +117,7 @@ export function buildEmailTemplate(instrumentType: string, data: EmailTemplateDa
     Phone no.: +91-8882591733
     </p>
     <p>In case of a courier, please reply to this mail with the Courier Docket Number and the Courier Docket Slip so that we can effectively track the envelope and ensure it is not lost in transit.</p>
-    <p>Also please find the Courier Docket Slip and POD attached, sent to <pre>${data.courierDetails}</pre></p>
+    <p>Also please find the Courier Docket Slip and POD attached, sent to <pre>${data.courierDetails ?? 'your address'}</pre></p>
     <p>Best Regards,<br />Accounts team,<br />Volks Energie Pvt. Ltd.</p>
 </div>
 </body></html>`;
