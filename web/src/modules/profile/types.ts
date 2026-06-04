@@ -1,3 +1,5 @@
+type hrStatus = "pending" | "approved" | "rejected";
+
 export type UserData = {
   id: number;
   name: string;
@@ -109,6 +111,7 @@ export type EducationData = {
   endDate: string | null;
   grade: string | null;
   status: string;
+  hrStatus : hrStatus;
 };
 
 export type ExperienceData = {
@@ -120,6 +123,7 @@ export type ExperienceData = {
   currentlyWorking: boolean;
   responsibilities: string | null;
   status: string;
+  hrStatus : hrStatus;
 };
 
 export type BankDetailData = {
@@ -133,6 +137,7 @@ export type BankDetailData = {
   upiId: string | null;
   isPrimary: boolean;
   status: string;
+  hrStatus : hrStatus;
 };
 
 export type ProfileResponse = {
@@ -142,6 +147,11 @@ export type ProfileResponse = {
   employeeProfile: EmployeeProfileData | null;
   address: AddressData | null;
   emergencyContact: EmergencyContactData | null;
+  profileStatus: String;
+  documentStatus: String;
+  inductionStatus: String;
+  bankStatus : String;
+  educationStatus: String;
   documents: DocumentData[];
   education: EducationData[];
   experience: ExperienceData[];
@@ -151,6 +161,7 @@ export type ProfileResponse = {
   complaints: ComplaintData[];
   notifications: NotificationData[];
   onboardingStatus: OnboardingStatus | null;
+  hrStatus : hrStatus;
 };
 
 

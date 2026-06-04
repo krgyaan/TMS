@@ -25,7 +25,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { useProfileContext } from "../../contexts/ProfileContext";
+import { useOnboardingContext } from "./contexts/OnboardingContext";
 import api from "@/lib/axios";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -133,7 +133,7 @@ export function OnboardingExperienceForm({
   onCancel,
   onSuccess,
 }: OnboardingExperienceFormProps) {
-  const { data, refetch } = useProfileContext();
+  const { data, refetch } = useOnboardingContext();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [collapsedCards, setCollapsedCards] = useState<Set<number>>(new Set());
 
@@ -220,7 +220,7 @@ export function OnboardingExperienceForm({
         responsibilities: exp.responsibilities || null,
       }));
 
-      await api.put("/profile/me/experiences", { experiences: payload });
+      await api.put("/hrms/onboarding/me/experiences", { experiences: payload });
 
       toast.success("Work experience saved successfully");
       refetch?.();

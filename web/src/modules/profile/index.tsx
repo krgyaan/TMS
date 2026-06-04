@@ -22,6 +22,8 @@ import { AssetsSection } from "./components/AssetsSection";
 import { ComplaintsSection } from "./components/ComplaintsSection";
 
 import { OnboardingView } from "./components/onboarding/OnboardingView";
+import { OnboardingProvider } from "./components/onboarding/contexts/OnboardingContext";
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Standard Profile View
@@ -167,7 +169,9 @@ function ProfilePageContent() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10 relative">
         {/* my very personal router */}
         {data.isOnboarding ? (
-            <OnboardingView />
+            <OnboardingProvider>
+              <OnboardingView />
+            </OnboardingProvider>
           ) : (
             <StandardProfileView />
           )}

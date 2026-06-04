@@ -12,127 +12,18 @@ import {
   Eye,
   Upload,
   Lock,
-  ExternalLink,
   CreditCard,
   Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import type { ApprovalStatus, BankAccountInfo, DocumentDetail, EducationInfo, ExperienceInfo, InductionTask, RejectionInfo, StageCardProps, StageStatus } from "./onboarding.types";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type StageStatus = "pending" | "in_progress" | "completed" | "approved" | "rejected";
-
-export type ApprovalStatus = "pending" | "approved" | "rejected" | null;
-
-export type RejectionInfo = {
-  reason: string;
-  rejectedAt?: string;
-  rejectedBy?: string;
-};
-
-export type StageDetail = {
-  label: string;
-  value: string | null;
-  status?: ApprovalStatus;
-};
-
-export type DocumentDetail = {
-  id: number;
-  name: string;
-  fileName: string | null;
-  status: "pending" | "verified" | "rejected";
-  remarks: string | null;
-  uploadedAt: string | null;
-};
-
-export type InductionTask = {
-  id: number;
-  name: string;
-  type: "BEFORE" | "AFTER";
-  status: "pending" | "completed";
-};
-
-export type EducationInfo = {
-  id: number;
-  degree: string;
-  institution: string;
-  fieldOfStudy?: string | null;
-  startDate: string;
-  endDate?: string | null;
-  grade?: string | null;
-};
-
-export type ExperienceInfo = {
-  id: number;
-  companyName: string;
-  designation: string;
-  fromDate: string;
-  toDate?: string | null;
-  currentlyWorking: boolean;
-  responsibilities?: string | null;
-};
-
-export type BankAccountInfo = {
-  id: number;
-  bankName: string;
-  accountHolderName: string;
-  accountNumber: string;
-  ifscCode: string;
-  isPrimary: boolean;
-};
-
-export type StageCardProps = {
-  /** Unique key for the stage */
-  stageKey: string;
-  /** Display label */
-  label: string;
-  /** Short description */
-  description: string;
-  /** Icon component */
-  icon: React.ElementType;
-  /** Current fill status of the stage */
-  status: StageStatus;
-  /** HR approval status (null if not yet submitted) */
-  approvalStatus?: ApprovalStatus;
-  /** Rejection details if rejected */
-  rejection?: RejectionInfo | null;
-  /** Whether this stage is read-only for the employee */
-  readOnly?: boolean;
-  /** Whether the employee has submitted for review */
-  isSubmitted?: boolean;
-  /** Animation delay index */
-  index?: number;
-  /** Whether this card is currently expanded */
-  isExpanded?: boolean;
-  /** Toggle expand callback */
-  onToggleExpand?: () => void;
-  /** Action: begin filling this stage */
-  onBeginFill?: () => void;
-  /** Action: edit/re-fill this stage */
-  onEdit?: () => void;
-  /** Action: view details read-only */
-  onView?: () => void;
-
-  // ── Expanded Content Data ──────────────────────────────────────────────
-  /** Summary details for profile stage */
-  details?: StageDetail[];
-  /** Document list for documents stage */
-  documents?: DocumentDetail[];
-  /** Induction tasks for induction stage */
-  inductionTasks?: InductionTask[];
-  /** Education info for education stage */
-  education?: EducationInfo[];
-  /** Experience info for experience stage */
-  experience?: ExperienceInfo[];
-  /** Bank accounts for bank stage */
-  bankAccounts?: BankAccountInfo[];
-  /** Custom expanded content (overrides default) */
-  children?: React.ReactNode;
-};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Status Helpers
@@ -141,6 +32,7 @@ export type StageCardProps = {
 function getStageStatusMeta(status: StageStatus) {
   switch (status) {
     case "submitted":
+    case "resubmitted":
       return {
         label: "Submitted",
         color: "text-blue-600 dark:text-blue-400",
@@ -405,7 +297,7 @@ function DocumentsContent({
   approvalStatus?: ApprovalStatus;
   rejection?: RejectionInfo | string | null;
 }) {
-  const rejectedDocs = documents.filter(d => d.status === "rejected");
+  const rejectedDocs = documents.filter(d => d.hrStatus === "rejected");
 
   return (
     <div className="space-y-3">
@@ -458,7 +350,7 @@ function DocumentsContent({
                 transition={{ delay: i * 0.04 }}
                 className={cn(
                   "rounded-xl border px-4 py-3 flex items-center justify-between gap-3",
-                  doc.status === "rejected"
+                  doc.hrStatus === "rejected"
                     ? "border-red-200/60 dark:border-red-800/40 bg-red-50/40 dark:bg-red-950/20"
                     : "border-border/30 bg-muted/10"
                 )}
@@ -482,7 +374,8 @@ function DocumentsContent({
                       </span>
                     )}
                   </div>
-                  {doc.status === "rejected" && doc.remarks && (
+
+                  {doc.hrStatus == "rejected" && (
                     <p className="text-[11px] text-red-600 dark:text-red-400 mt-1.5 leading-relaxed">
                       Reason: {doc.remarks}
                     </p>
@@ -490,7 +383,7 @@ function DocumentsContent({
                 </div>
 
                 <div className="shrink-0 flex items-center gap-2">
-                  <DocStatusBadge status={doc.status} />
+                  <DocStatusBadge status={doc.hrStatus === "approved" ? "verified" : doc.hrStatus === "rejected" ? "rejected" : "pending"} />
                 </div>
               </motion.div>
             ))}
@@ -555,6 +448,11 @@ function BankAccountsContent({
                     Primary
                   </Badge>
                 )}
+                {acc.hrStatus === 'rejected' && (
+                  <Badge>
+                    Entry Rejected
+                  </Badge>
+                )}
               </div>
               <p className="text-xs text-muted-foreground">{acc.accountHolderName}</p>
               <div className="flex items-center gap-4 mt-2">
@@ -563,6 +461,11 @@ function BankAccountsContent({
                 </p>
                 <p className="text-xs font-mono text-muted-foreground">{acc.ifscCode}</p>
               </div>
+              {acc.hrStatus === 'rejected' && (acc.remarks || acc.hrRemark) && (
+                <p className="text-[11px] text-red-600 dark:text-red-400 mt-1.5 leading-relaxed">
+                  Reason: {acc.remarks || acc.hrRemark}
+                </p>
+              )}
             </div>
             <div className="shrink-0 rounded-lg bg-muted p-2">
               <CreditCard className="h-4 w-4 text-muted-foreground" />
@@ -715,9 +618,16 @@ function EducationContent({
         >
           <div className="flex items-start justify-between">
             <div className="min-w-0">
-              <p className="text-sm font-bold text-foreground truncate">
-                {edu.degree}
-              </p>
+              <div className="flex items-center gap-2 mb-1">
+                <p className="text-sm font-bold text-foreground truncate">
+                  {edu.degree}
+                </p>
+                {edu.hrStatus === 'rejected' && (
+                  <Badge variant="destructive" className="text-[10px] h-5 rounded-full px-2">
+                    Entry Rejected
+                  </Badge>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {edu.institution}
               </p>
@@ -741,6 +651,11 @@ function EducationContent({
                   </div>
                 )}
               </div>
+              {edu.hrStatus === 'rejected' && (edu.remarks || edu.hrRemark) && (
+                <p className="text-[11px] text-red-600 dark:text-red-400 mt-1.5 leading-relaxed">
+                  Reason: {edu.remarks || edu.hrRemark}
+                </p>
+              )}
             </div>
           </div>
         </motion.div>
@@ -789,9 +704,16 @@ function ExperienceContent({
         >
           <div className="flex items-start justify-between">
             <div className="min-w-0">
-              <p className="text-sm font-bold text-foreground truncate">
-                {exp.designation}
-              </p>
+              <div className="flex items-center gap-2 mb-1">
+                <p className="text-sm font-bold text-foreground truncate">
+                  {exp.designation}
+                </p>
+                {exp.hrStatus === 'rejected' && (
+                  <Badge variant="destructive" className="text-[10px] h-5 rounded-full px-2">
+                    Entry Rejected
+                  </Badge>
+                )}
+              </div>
               <p className="text-xs text-primary font-medium mt-0.5">
                 {exp.companyName}
               </p>
@@ -810,6 +732,11 @@ function ExperienceContent({
               {exp.responsibilities && (
                 <p className="text-[11px] text-muted-foreground/70 mt-2 line-clamp-2 italic">
                   "{exp.responsibilities}"
+                </p>
+              )}
+              {exp.hrStatus === 'rejected' && (exp.remarks || exp.hrRemark) && (
+                <p className="text-[11px] text-red-600 dark:text-red-400 mt-1.5 leading-relaxed">
+                  Reason: {exp.remarks || exp.hrRemark}
                 </p>
               )}
             </div>
@@ -858,6 +785,8 @@ export function OnboardingStageCard({
 
   // ── Determine what to render in expanded section ─────────────────────
   const hasExpandedContent = Boolean(children || details || documents || inductionTasks || education || experience || bankAccounts);
+
+  console.log(documents);
 
   return (
     <motion.div
@@ -1092,7 +1021,7 @@ export function OnboardingStageCard({
                           {approvalStatus === "rejected" ? "Edit & Resubmit" : "Edit"}
                         </Button>
                       )}
-
+{/* 
                     {isSubmitted && onView && (
                       <Button
                         size="sm"
@@ -1106,7 +1035,7 @@ export function OnboardingStageCard({
                         <Eye className="h-3 w-3" />
                         View Full Details
                       </Button>
-                    )}
+                    )} */}
                   </div>
                 )}
               </div>

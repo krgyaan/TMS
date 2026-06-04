@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { useProfileContext } from "../../contexts/ProfileContext";
+import { useOnboardingContext } from "./contexts/OnboardingContext";
 import api from "@/lib/axios";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -162,7 +162,7 @@ export function OnboardingEducationForm({
   onCancel,
   onSuccess,
 }: OnboardingEducationFormProps) {
-  const { data, refetch } = useProfileContext();
+  const { data, refetch } = useOnboardingContext();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [collapsedCards, setCollapsedCards] = useState<Set<number>>(new Set());
 
@@ -249,7 +249,7 @@ export function OnboardingEducationForm({
         grade: edu.grade || null,
       }));
 
-      await api.put("/profile/me/educations", { educations: payload });
+      await api.put("/hrms/onboarding/me/educations", { educations: payload });
 
       toast.success("Education details saved successfully");
       refetch?.();

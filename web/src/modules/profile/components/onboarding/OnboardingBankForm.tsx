@@ -25,7 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { useProfileContext } from "../../contexts/ProfileContext";
+import { useOnboardingContext } from "./contexts/OnboardingContext";
 import api from "@/lib/axios";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -110,7 +110,7 @@ export function OnboardingBankForm({
   onCancel,
   onSuccess,
 }: OnboardingBankFormProps) {
-  const { data, refetch } = useProfileContext();
+  const { data, refetch } = useOnboardingContext();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [collapsedCards, setCollapsedCards] = useState<Set<number>>(new Set());
 
@@ -197,7 +197,7 @@ export function OnboardingBankForm({
   const onSubmit = async (values: BankFormValues) => {
     setIsSubmitting(true);
     try {
-      await api.patch("/profile/me", {
+      await api.patch("/hrms/onboarding/me/profile", {
         bankAccounts: values.bankAccounts
       });
 
