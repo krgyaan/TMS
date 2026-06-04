@@ -20,6 +20,7 @@ interface FollowupEmailEditorProps {
         fdrNo?: string | null;
         expiryDate?: string | null;
         transactionDate?: string | null;
+        courierDetails?: string | null;
     };
     onEmailBodyChange: (html: string) => void;
     initialEmailBody?: string;

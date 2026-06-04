@@ -553,6 +553,13 @@ export function DemandDraftActionForm({ instrumentId, action: propAction, tender
                                     ddNo: instrumentData?.ddNo,
                                     date: instrumentData?.ddDate ? new Date(instrumentData.ddDate).toISOString() : undefined,
                                     status: instrumentData?.tenderStatusName,
+                                    courierDetails: formHistory?.accountsForm
+                                        ? [
+                                            formHistory.accountsForm.courierName,
+                                            [formHistory.accountsForm.courierAddrLine1, formHistory.accountsForm.courierAddrLine2].filter(Boolean).join(', '),
+                                            [formHistory.accountsForm.courierCity, formHistory.accountsForm.courierState].filter(Boolean).join(', ') + (formHistory.accountsForm.courierPincode ? ` - ${formHistory.accountsForm.courierPincode}` : ''),
+                                        ].filter(Boolean).join('\n')
+                                        : undefined,
                                 }}
                                 onEmailBodyChange={(html) => form.setValue('emailBody', html, { shouldValidate: false })}
                                 initialEmailBody={formHistory?.initiateFollowup ? undefined : emailBody}

@@ -596,6 +596,13 @@ export function FdrActionForm({ instrumentId, action: propAction, tenderId, form
                                     date: instrumentData?.fdrDate ? new Date(instrumentData.fdrDate).toISOString() : undefined,
                                     expiryDate: instrumentData?.fdrExpiryDate ? new Date(instrumentData.fdrExpiryDate).toISOString() : undefined,
                                     status: instrumentData?.tenderStatusName,
+                                    courierDetails: formHistory?.accountsForm
+                                        ? [
+                                            formHistory.accountsForm.courierName,
+                                            [formHistory.accountsForm.courierAddrLine1, formHistory.accountsForm.courierAddrLine2].filter(Boolean).join(', '),
+                                            [formHistory.accountsForm.courierCity, formHistory.accountsForm.courierState].filter(Boolean).join(', ') + (formHistory.accountsForm.courierPincode ? ` - ${formHistory.accountsForm.courierPincode}` : ''),
+                                        ].filter(Boolean).join('\n')
+                                        : undefined,
                                 }}
                                 onEmailBodyChange={(html) => form.setValue('emailBody', html, { shouldValidate: false })}
                                 initialEmailBody={formHistory?.initiateFollowup ? undefined : emailBody}

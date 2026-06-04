@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePaymentRequest } from "@/hooks/api/usePaymentRequests";
 import { useTender } from "@/hooks/api/useTenders";
+import { useQuery } from "@tanstack/react-query";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { bankGuaranteesService } from "@/services/api/bank-guarantees.service";
 import { bankTransfersService } from "@/services/api/bank-transfers.service";
@@ -82,28 +83,55 @@ const EmdFollowUpPage = () => {
 
     const service = INSTRUMENT_SERVICE_MAP[instrumentType];
 
+    const { data: actionFormData, isLoading: isLoadingActionForm } = useQuery({
+        queryKey: ['action-form', instrumentType, instrumentId],
+        queryFn: () => service!.getActionFormData(instrumentId!),
+        enabled: !!instrumentId && !!service,
+    });
+
+    const { data: followupData, isLoading: isLoadingFollowup } = useQuery({
+        queryKey: ['followup', instrumentType, instrumentId],
+        queryFn: () => service!.getFollowupData(instrumentId!),
+        enabled: !!instrumentId && !!service,
+    });
+
     const templateData = useMemo(() => {
+        const rawData = actionFormData as Record<string, any> | undefined;
         const details = instrument?.details as Record<string, unknown> | null;
         const type = instrumentType;
+
+        const addr = rawData?.courierAddressJson as Record<string, any> | undefined;
+        const courierDetails = addr
+            ? [
+                addr.name,
+                [addr.line1, addr.line2].filter(Boolean).join(', '),
+                [addr.city, addr.state].filter(Boolean).join(', ') + (addr.pincode ? ` - ${addr.pincode}` : ''),
+            ].filter(Boolean).join('\n')
+            : rawData?.courierAddress ?? null;
+
         return {
-            tenderNo: paymentRequests?.tenderNo,
-            projectName: paymentRequests?.projectName,
-            status: tender?.statusName || '',
-            amount: paymentRequests?.amountRequired,
-            ddNo: type === 'DD' ? (details?.ddNo as string | undefined) : undefined,
-            fdrNo: type === 'FDR' ? (details?.fdrNo as string | undefined) : undefined,
-            date: type === 'DD' ? (details?.ddDate as string | undefined)
-                : type === 'FDR' ? (details?.fdrDate as string | undefined)
-                : type === 'Cheque' ? (details?.chequeDate as string | undefined)
-                : type === 'Bank Transfer' ? (details?.transactionDate as string | undefined)
-                : type === 'Portal Payment' ? (details?.transactionDate as string | undefined)
-                : type === 'BG' ? (details?.bgDate as string | undefined)
-                : undefined,
-            expiryDate: type === 'FDR' ? (details?.fdrExpiryDate as string | undefined)
-                : type === 'BG' ? (details?.validityDate as string | undefined)
-                : undefined,
+            tenderNo: rawData?.tenderNo ?? paymentRequests?.tenderNo,
+            projectName: rawData?.tenderName ?? paymentRequests?.projectName,
+            status: rawData?.tenderStatusName ?? tender?.statusName ?? '',
+            amount: rawData?.amount ?? paymentRequests?.amountRequired,
+            fdrNo: type === 'FDR' ? (rawData?.fdrNo ?? details?.fdrNo) as string | undefined : undefined,
+            ddNo: type === 'DD' ? (rawData?.ddNo ?? details?.ddNo) as string | undefined : undefined,
+            date: (rawData?.fdrDate ?? rawData?.ddDate ?? rawData?.chequeDate
+                ?? rawData?.transactionDate ?? rawData?.bgDate
+                ?? (type === 'DD' ? details?.ddDate
+                    : type === 'FDR' ? details?.fdrDate
+                    : type === 'Cheque' ? details?.chequeDate
+                    : type === 'Bank Transfer' ? details?.transactionDate
+                    : type === 'Portal Payment' ? details?.transactionDate
+                    : type === 'BG' ? details?.bgDate
+                    : undefined)) as string | undefined,
+            expiryDate: (rawData?.fdrExpiryDate ?? rawData?.validityDate
+                ?? (type === 'FDR' ? details?.fdrExpiryDate
+                    : type === 'BG' ? details?.validityDate
+                    : undefined)) as string | undefined,
+            courierDetails,
         };
-    }, [paymentRequests, instrument, instrumentType]);
+    }, [actionFormData, paymentRequests, instrument, instrumentType, tender]);
 
     const form = useForm<EmdFollowupForm>({
         resolver: zodResolver(EmdFollowupSchema) as Resolver<EmdFollowupForm>,
@@ -120,6 +148,29 @@ const EmdFollowUpPage = () => {
     const removeAttachment = (index: number) => {
         setAttachments(prev => prev.filter((_, i) => i !== index));
     };
+
+    useEffect(() => {
+        if (!followupData) return;
+        if (followupData.organisationName) {
+            form.setValue('organization', followupData.organisationName);
+        }
+        if (followupData.contacts?.length) {
+            form.setValue('contacts', followupData.contacts.map((c: any) => ({
+                name: c.name || '',
+                phone: c.phone || '',
+                email: c.email || '',
+            })));
+        }
+        if (followupData.followupStartDate) {
+            const d = new Date(followupData.followupStartDate);
+            if (!isNaN(d.getTime())) {
+                form.setValue('startFrom', d.toISOString().split('T')[0]);
+            }
+        }
+        if (followupData.frequency) {
+            form.setValue('frequency', followupData.frequency);
+        }
+    }, [followupData, form]);
 
     useEffect(() => {
         if (tender && !form.getValues('organization')) {
@@ -174,7 +225,7 @@ const EmdFollowUpPage = () => {
         );
     }
 
-    if (isLoading) {
+    if (isLoading || isLoadingActionForm || isLoadingFollowup) {
         return (
             <Card>
                 <CardHeader>
