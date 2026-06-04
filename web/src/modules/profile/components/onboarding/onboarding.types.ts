@@ -1,3 +1,5 @@
+import z from "zod";
+
 export type StageStatus = "pending" | "in_progress" | "submitted" | "resubmitted";
 export type ApprovalStatus = "pending" | "approved" | "rejected" | null;
 
@@ -120,3 +122,23 @@ export type StageCardProps = {
   /** Custom expanded content (overrides default) */
   children?: React.ReactNode;
 };
+
+export const bankEntrySchema = z.object({
+  id: z.number().optional(),
+  bankName: z.string().min(2, "Bank name is required"),
+  accountHolderName: z.string().min(2, "Account holder name is required"),
+  accountNumber: z.string().min(8, "Account number is required"),
+  ifscCode: z.string().min(4, "IFSC code is required"),
+  branchName: z.string().optional().nullable(),
+  branchAddress: z.string().optional().nullable(),
+  upiId: z.string().optional().nullable(),
+  isPrimary: z.boolean().default(false),
+  hrStatus: z.string().optional(),
+  hrRemark: z.string().optional().nullable(),
+});
+
+export const bankFormSchema = z.object({
+  bankAccounts: z.array(bankEntrySchema).min(1, "Add at least one bank account"),
+});
+
+export type BankFormValues = z.infer<typeof bankFormSchema>;

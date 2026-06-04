@@ -40,6 +40,7 @@ import {
   AlertCircle,
   Clock,
   Shield,
+  Lock,
   GraduationCap,
   Briefcase,
   FolderOpen,
@@ -761,33 +762,38 @@ const UploadedDocCard: React.FC<UploadedDocCardProps> = ({ doc, index, onView, o
               </Tooltip>
             </TooltipProvider>
             {(isOnboarding || doc.docType === "Passport Size Photo") && doc.verificationStatus === "rejected" && (
-              <Button
-                size="sm"
-                className="rounded-xl h-9 text-xs font-bold gap-1.5 shadow-md shadow-primary/20"
-                onClick={() => onReupload(doc)}
-              >
-                <Upload className="h-3 w-3" />
-                Re-upload
-              </Button>
+              <>
+                <Button
+                  size="sm"
+                  className="rounded-xl h-9 text-xs font-bold gap-1.5 shadow-md shadow-primary/20"
+                  onClick={() => onReupload(doc)}
+                >
+                  <Upload className="h-3 w-3" />
+                  Re-upload
+                </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0 rounded-xl h-9 w-9 hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => onDelete(doc)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs">Delete</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </>
             )}
-            {(isOnboarding || doc.docType === "Passport Size Photo") && doc.verificationStatus !== "verified" && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="shrink-0 rounded-xl h-9 w-9 hover:bg-destructive/10 hover:text-destructive"
-                      onClick={() => onDelete(doc)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="text-xs">Delete</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+            {doc.verificationStatus !== "rejected" && (
+              <div className="h-9 w-9 rounded-xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 bg-emerald-100/40 dark:bg-emerald-950/20 shrink-0" title="Locked">
+                <Lock className="h-3.5 w-3.5" />
+              </div>
             )}
           </div>
         </CardContent>

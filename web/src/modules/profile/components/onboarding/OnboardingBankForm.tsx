@@ -1,6 +1,4 @@
-// web/src/modules/profile/components/onboarding/OnboardingBankForm.tsx
-
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -17,8 +15,10 @@ import {
   Hash,
   MapPin,
   CheckCircle2,
+  AlertCircle,
+  XCircle,
+  Lock,
 } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,52 +27,8 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { useOnboardingContext } from "./contexts/OnboardingContext";
 import api from "@/lib/axios";
+import { bankFormSchema, type BankFormValues } from "./onboarding.types";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Validation Schema
-// ─────────────────────────────────────────────────────────────────────────────
-
-const bankEntrySchema = z.object({
-  id: z.number().optional(),
-  bankName: z.string().min(2, "Bank name is required"),
-  accountHolderName: z.string().min(2, "Account holder name is required"),
-  accountNumber: z.string().min(8, "Account number is required"),
-  ifscCode: z.string().min(4, "IFSC code is required"),
-  branchName: z.string().optional().nullable(),
-  branchAddress: z.string().optional().nullable(),
-  upiId: z.string().optional().nullable(),
-  isPrimary: z.boolean().default(false),
-});
-
-const bankFormSchema = z.object({
-  bankAccounts: z.array(bankEntrySchema).min(1, "Add at least one bank account"),
-});
-
-type BankFormValues = z.infer<typeof bankFormSchema>;
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Sub-components
-// ─────────────────────────────────────────────────────────────────────────────
-
-const SectionHeader = ({
-  icon: Icon,
-  title,
-  description,
-}: {
-  icon: any;
-  title: string;
-  description: string;
-}) => (
-  <div className="mb-6">
-    <div className="flex items-center gap-2.5 mb-1">
-      <div className="h-8 w-8 rounded-xl bg-primary/10 flex items-center justify-center">
-        <Icon className="h-4 w-4 text-primary" />
-      </div>
-      <h3 className="text-lg font-bold text-foreground">{title}</h3>
-    </div>
-    <p className="text-xs text-muted-foreground/70 ml-[34px]">{description}</p>
-  </div>
-);
 
 const EmptyState = ({ onAdd }: { onAdd: () => void }) => (
   <div className="flex flex-col items-center justify-center py-16 px-8 border-2 border-dashed border-border/20 rounded-2xl bg-muted/5">
@@ -126,6 +82,8 @@ export function OnboardingBankForm({
       branchAddress: bank.branchAddress || "",
       upiId: bank.upiId || "",
       isPrimary: bank.isPrimary || false,
+      hrStatus: bank.hrStatus || "pending",
+      hrRemark: bank.hrRemark || "",
     })) || [];
 
   const form = useForm<BankFormValues>({
@@ -140,16 +98,34 @@ export function OnboardingBankForm({
     name: "bankAccounts",
   });
 
-  // Auto-collapse all but the last card when a new one is added
+  const [hasInitializedCollapsed, setHasInitializedCollapsed] = useState(false);
+
+  // Initialize collapsed cards: expand rejected accounts by default, collapse others
   useEffect(() => {
-    if (fields.length > 1) {
-      const newCollapsed = new Set<number>();
-      for (let i = 0; i < fields.length - 1; i++) {
-        newCollapsed.add(i);
-      }
-      setCollapsedCards(newCollapsed);
+    if (existingBanks.length > 0 && !hasInitializedCollapsed) {
+      const initialCollapsed = new Set<number>();
+      existingBanks.forEach((bank: any, index: number) => {
+        if (bank.hrStatus !== "rejected") {
+          initialCollapsed.add(index);
+        }
+      });
+      setCollapsedCards(initialCollapsed);
+      setHasInitializedCollapsed(true);
     }
-  }, [fields.length]);
+  }, [existingBanks, hasInitializedCollapsed]);
+
+  // Auto-collapse all but the last card when a new one is added manually
+  useEffect(() => {
+    if (fields.length > existingBanks.length) {
+      setCollapsedCards((prev) => {
+        const next = new Set(prev);
+        for (let i = 0; i < fields.length - 1; i++) {
+          next.add(i);
+        }
+        return next;
+      });
+    }
+  }, [fields.length, existingBanks.length]);
 
   const toggleCollapse = (index: number) => {
     setCollapsedCards((prev) => {
@@ -173,6 +149,8 @@ export function OnboardingBankForm({
       branchAddress: "",
       upiId: "",
       isPrimary: fields.length === 0,
+      hrStatus: "pending",
+      hrRemark: "",
     });
   };
 
@@ -214,11 +192,6 @@ export function OnboardingBankForm({
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-      <SectionHeader
-        icon={CreditCard}
-        title="Bank Details"
-        description="Add your bank accounts for salary and reimbursements"
-      />
 
       {fields.length === 0 ? (
         <EmptyState onAdd={addNewBank} />
@@ -229,6 +202,8 @@ export function OnboardingBankForm({
             const watchBankName = form.watch(`bankAccounts.${index}.bankName`);
             const watchAccNumber = form.watch(`bankAccounts.${index}.accountNumber`);
             const watchIsPrimary = form.watch(`bankAccounts.${index}.isPrimary`);
+            const watchHrStatus = form.watch(`bankAccounts.${index}.hrStatus`);
+            const watchHrRemark = form.watch(`bankAccounts.${index}.hrRemark`);
             const errors = form.formState.errors.bankAccounts?.[index];
 
             return (
@@ -238,6 +213,10 @@ export function OnboardingBankForm({
                   "rounded-2xl border transition-all duration-300",
                   errors
                     ? "border-destructive/30 bg-destructive/[0.02]"
+                    : watchHrStatus === "rejected"
+                    ? "border-red-500/30 bg-red-500/[0.01]"
+                    : watchHrStatus === "approved"
+                    ? "border-emerald-500/20 bg-emerald-500/[0.01]"
                     : "border-border/20 bg-background",
                   !isCollapsed && "shadow-sm"
                 )}
@@ -257,7 +236,7 @@ export function OnboardingBankForm({
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h4 className="text-sm font-bold text-foreground truncate">
                         {watchBankName || `Bank Account ${index + 1}`}
                       </h4>
@@ -265,6 +244,18 @@ export function OnboardingBankForm({
                         <span className="text-[9px] font-bold uppercase tracking-wider bg-primary/10 text-primary px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1">
                           <CheckCircle2 className="h-2.5 w-2.5" />
                           Primary
+                        </span>
+                      )}
+                      {watchHrStatus === "rejected" && (
+                        <span className="text-[9px] font-bold uppercase tracking-wider bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-400 px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1 border border-red-200 dark:border-red-800/50">
+                          <XCircle className="h-2.5 w-2.5" />
+                          Rejected
+                        </span>
+                      )}
+                      {watchHrStatus === "approved" && (
+                        <span className="text-[9px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1 border border-emerald-200 dark:border-emerald-800/50">
+                          <CheckCircle2 className="h-2.5 w-2.5" />
+                          Approved
                         </span>
                       )}
                     </div>
@@ -283,7 +274,11 @@ export function OnboardingBankForm({
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="h-8 px-3 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-primary/5 hover:text-primary"
+                        disabled={watchHrStatus === "approved"}
+                        className={cn(
+                          "h-8 px-3 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-primary/5 hover:text-primary",
+                          watchHrStatus === "approved" && "opacity-40 cursor-not-allowed hover:bg-transparent text-muted-foreground"
+                        )}
                         onClick={(e) => {
                           e.stopPropagation();
                           handleSetPrimary(index);
@@ -296,7 +291,11 @@ export function OnboardingBankForm({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10"
+                      disabled={watchHrStatus === "approved"}
+                      className={cn(
+                        "h-8 w-8 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10",
+                        watchHrStatus === "approved" && "opacity-40 cursor-not-allowed hover:bg-transparent"
+                      )}
                       onClick={(e) => {
                         e.stopPropagation();
                         handleRemove(index);
@@ -304,6 +303,11 @@ export function OnboardingBankForm({
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
+                    {watchHrStatus === "approved" && (
+                      <div className="h-8 w-8 rounded-lg flex items-center justify-center text-emerald-600 dark:text-emerald-400 bg-emerald-100/40 dark:bg-emerald-950/20 shrink-0">
+                        <Lock className="h-3.5 w-3.5" />
+                      </div>
+                    )}
                     <div className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground/40">
                       {isCollapsed ? (
                         <ChevronDown className="h-4 w-4" />
@@ -317,6 +321,26 @@ export function OnboardingBankForm({
                 {/* Card Body — collapsible */}
                 {!isCollapsed && (
                   <div className="px-5 py-5 animate-in fade-in slide-in-from-top-2 duration-300">
+                    {watchHrStatus === "approved" && (
+                      <div className="mb-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-start gap-3">
+                        <CheckCircle2 className="h-5 w-5 shrink-0 mt-0.5 text-emerald-500" />
+                        <div className="space-y-1">
+                          <h5 className="text-xs font-bold uppercase tracking-wider">Verification Approved</h5>
+                          <p className="text-sm font-medium">This bank account has been approved by HR and is locked for editing.</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {watchHrStatus === "rejected" && watchHrRemark && (
+                      <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 flex items-start gap-3">
+                        <AlertCircle className="h-5 w-5 shrink-0 mt-0.5 text-red-500" />
+                        <div className="space-y-1">
+                          <h5 className="text-xs font-bold uppercase tracking-wider">Rejection Reason</h5>
+                          <p className="text-sm font-medium">{watchHrRemark}</p>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {/* Bank Name */}
                       <div className="space-y-2">
@@ -329,6 +353,7 @@ export function OnboardingBankForm({
                             {...form.register(`bankAccounts.${index}.bankName`)}
                             className="rounded-xl h-11 pl-10"
                             placeholder="e.g. HDFC Bank"
+                            disabled={watchHrStatus === "approved"}
                           />
                         </div>
                         {errors?.bankName && (
@@ -349,6 +374,7 @@ export function OnboardingBankForm({
                             {...form.register(`bankAccounts.${index}.accountHolderName`)}
                             className="rounded-xl h-11 pl-10"
                             placeholder="Full name as per bank"
+                            disabled={watchHrStatus === "approved"}
                           />
                         </div>
                         {errors?.accountHolderName && (
@@ -369,6 +395,7 @@ export function OnboardingBankForm({
                             {...form.register(`bankAccounts.${index}.accountNumber`)}
                             className="rounded-xl h-11 pl-10 font-mono"
                             placeholder="XXXXXXXXXXXX"
+                            disabled={watchHrStatus === "approved"}
                           />
                         </div>
                         {errors?.accountNumber && (
@@ -389,6 +416,7 @@ export function OnboardingBankForm({
                             {...form.register(`bankAccounts.${index}.ifscCode`)}
                             className="rounded-xl h-11 pl-10 font-mono uppercase"
                             placeholder="HDFC0001234"
+                            disabled={watchHrStatus === "approved"}
                           />
                         </div>
                         {errors?.ifscCode && (
@@ -407,6 +435,7 @@ export function OnboardingBankForm({
                           {...form.register(`bankAccounts.${index}.branchName`)}
                           className="rounded-xl h-11"
                           placeholder="Main Branch"
+                          disabled={watchHrStatus === "approved"}
                         />
                       </div>
 
@@ -419,6 +448,7 @@ export function OnboardingBankForm({
                           {...form.register(`bankAccounts.${index}.upiId`)}
                           className="rounded-xl h-11 font-mono"
                           placeholder="username@bank"
+                          disabled={watchHrStatus === "approved"}
                         />
                       </div>
 
@@ -433,6 +463,7 @@ export function OnboardingBankForm({
                             {...form.register(`bankAccounts.${index}.branchAddress`)}
                             className="rounded-xl h-11 pl-10"
                             placeholder="Full address of the branch"
+                            disabled={watchHrStatus === "approved"}
                           />
                         </div>
                       </div>
