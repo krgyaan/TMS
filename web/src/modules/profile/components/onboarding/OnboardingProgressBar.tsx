@@ -183,7 +183,7 @@ export function OnboardingProgressBar({
             Complete all stages to finalize your profile
           </p>
         </div>
-        <div className="flex items-center gap-3 bg-muted/30 px-4 py-2 rounded-2xl border border-border/50">
+        {/* <div className="flex items-center gap-3 bg-muted/30 px-4 py-2 rounded-2xl border border-border/50">
           <div className="text-right">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Overall</p>
             <p className="text-sm font-bold text-primary tabular-nums">{clampedProgress}%</p>
@@ -206,7 +206,7 @@ export function OnboardingProgressBar({
             </svg>
             <span className="text-[10px] font-bold z-10">{clampedProgress}%</span>
           </div>
-        </div>
+        </div> */}
       </div>
 
       {/* Non-Linear Status Grid */}

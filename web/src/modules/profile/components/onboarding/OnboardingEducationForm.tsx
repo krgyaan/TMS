@@ -1,5 +1,3 @@
-// web/src/modules/profile/components/onboarding/OnboardingEducationForm.tsx
-
 import React, { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -18,6 +16,9 @@ import {
   Award,
   Calendar,
   CheckCircle2,
+  AlertCircle,
+  XCircle,
+  Lock,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
@@ -33,7 +34,7 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { useProfileContext } from "../../contexts/ProfileContext";
+import { useOnboardingContext } from "./contexts/OnboardingContext";
 import api from "@/lib/axios";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -50,6 +51,8 @@ const educationEntrySchema = z.object({
   startDate: z.string().min(1, "Start date is required"),
   endDate: z.string().min(1, "End date is required"),
   grade: z.string().optional(),
+  hrStatus: z.string().optional(),
+  hrRemark: z.string().optional().nullable(),
 });
 
 const educationFormSchema = z.object({
@@ -162,7 +165,7 @@ export function OnboardingEducationForm({
   onCancel,
   onSuccess,
 }: OnboardingEducationFormProps) {
-  const { data, refetch } = useProfileContext();
+  const { data, refetch } = useOnboardingContext();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [collapsedCards, setCollapsedCards] = useState<Set<number>>(new Set());
 
@@ -176,6 +179,8 @@ export function OnboardingEducationForm({
       startDate: edu.startDate || "",
       endDate: edu.endDate || "",
       grade: edu.grade || "",
+      hrStatus: edu.hrStatus || "pending",
+      hrRemark: edu.hrRemark || "",
     })) || [];
 
   const form = useForm<EducationFormValues>({
@@ -190,16 +195,34 @@ export function OnboardingEducationForm({
     name: "educations",
   });
 
-  // Auto-collapse all but the last card when a new one is added
+  const [hasInitializedCollapsed, setHasInitializedCollapsed] = useState(false);
+
+  // Initialize collapsed cards: expand rejected educations by default, collapse others
   useEffect(() => {
-    if (fields.length > 1) {
-      const newCollapsed = new Set<number>();
-      for (let i = 0; i < fields.length - 1; i++) {
-        newCollapsed.add(i);
-      }
-      setCollapsedCards(newCollapsed);
+    if (existingEducations.length > 0 && !hasInitializedCollapsed) {
+      const initialCollapsed = new Set<number>();
+      existingEducations.forEach((edu: any, index: number) => {
+        if (edu.hrStatus !== "rejected") {
+          initialCollapsed.add(index);
+        }
+      });
+      setCollapsedCards(initialCollapsed);
+      setHasInitializedCollapsed(true);
     }
-  }, [fields.length]);
+  }, [existingEducations, hasInitializedCollapsed]);
+
+  // Auto-collapse all but the last card when a new one is added manually
+  useEffect(() => {
+    if (fields.length > existingEducations.length) {
+      setCollapsedCards((prev) => {
+        const next = new Set(prev);
+        for (let i = 0; i < fields.length - 1; i++) {
+          next.add(i);
+        }
+        return next;
+      });
+    }
+  }, [fields.length, existingEducations.length]);
 
   const toggleCollapse = (index: number) => {
     setCollapsedCards((prev) => {
@@ -221,6 +244,8 @@ export function OnboardingEducationForm({
       startDate: "",
       endDate: "",
       grade: "",
+      hrStatus: "pending",
+      hrRemark: "",
     });
   };
 
@@ -247,9 +272,11 @@ export function OnboardingEducationForm({
         startDate: edu.startDate,
         endDate: edu.endDate,
         grade: edu.grade || null,
+        hrStatus: edu.hrStatus || "pending",
+        hrRemark: edu.hrRemark || null,
       }));
 
-      await api.put("/profile/me/educations", { educations: payload });
+      await api.put("/hrms/onboarding/me/educations", { educations: payload });
 
       toast.success("Education details saved successfully");
       refetch?.();
@@ -289,10 +316,9 @@ export function OnboardingEducationForm({
             const watchField = form.watch(
               `educations.${index}.fieldOfStudy`
             );
-            const watchYear = form.watch(
-              `educations.${index}.yearOfCompletion`
-            );
             const watchGrade = form.watch(`educations.${index}.grade`);
+            const watchHrStatus = form.watch(`educations.${index}.hrStatus`);
+            const watchHrRemark = form.watch(`educations.${index}.hrRemark`);
             const errors = form.formState.errors.educations?.[index];
 
             return (
@@ -302,6 +328,10 @@ export function OnboardingEducationForm({
                   "rounded-2xl border transition-all duration-300",
                   errors
                     ? "border-destructive/30 bg-destructive/[0.02]"
+                    : watchHrStatus === "rejected"
+                    ? "border-red-500/30 bg-red-500/[0.01]"
+                    : watchHrStatus === "approved"
+                    ? "border-emerald-500/20 bg-emerald-500/[0.01]"
                     : "border-border/20 bg-background",
                   !isCollapsed && "shadow-sm"
                 )}
@@ -321,13 +351,25 @@ export function OnboardingEducationForm({
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h4 className="text-sm font-bold text-foreground truncate">
                         {watchDegree || `Education ${index + 1}`}
                       </h4>
                       {watchField && (
-                        <span className="text-[9px] font-bold uppercase tracking-wider bg-primary/5 text-primary/70 px-2 py-0.5 rounded-full shrink-0 hidden sm:inline-block">
+                        <span className="text-[9px] font-bold uppercase tracking-wider bg-primary/5 text-primary/70 px-2 py-0.5 rounded-full shrink-0">
                           {watchField}
+                        </span>
+                      )}
+                      {watchHrStatus === "rejected" && (
+                        <span className="text-[9px] font-bold uppercase tracking-wider bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-400 px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1 border border-red-200 dark:border-red-800/50">
+                          <XCircle className="h-2.5 w-2.5" />
+                          Rejected
+                        </span>
+                      )}
+                      {watchHrStatus === "approved" && (
+                        <span className="text-[9px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1 border border-emerald-200 dark:border-emerald-800/50">
+                          <CheckCircle2 className="h-2.5 w-2.5" />
+                          Approved
                         </span>
                       )}
                     </div>
@@ -361,7 +403,11 @@ export function OnboardingEducationForm({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10"
+                      disabled={watchHrStatus === "approved"}
+                      className={cn(
+                        "h-8 w-8 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10",
+                        watchHrStatus === "approved" && "opacity-40 cursor-not-allowed hover:bg-transparent"
+                      )}
                       onClick={(e) => {
                         e.stopPropagation();
                         handleRemove(index);
@@ -369,6 +415,11 @@ export function OnboardingEducationForm({
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
+                    {watchHrStatus === "approved" && (
+                      <div className="h-8 w-8 rounded-lg flex items-center justify-center text-emerald-600 dark:text-emerald-400 bg-emerald-100/40 dark:bg-emerald-950/20 shrink-0">
+                        <Lock className="h-3.5 w-3.5" />
+                      </div>
+                    )}
                     <div className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground/40">
                       {isCollapsed ? (
                         <ChevronDown className="h-4 w-4" />
@@ -382,6 +433,26 @@ export function OnboardingEducationForm({
                 {/* Card Body — collapsible */}
                 {!isCollapsed && (
                   <div className="px-5 py-5 animate-in fade-in slide-in-from-top-2 duration-300">
+                    {watchHrStatus === "approved" && (
+                      <div className="mb-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-start gap-3">
+                        <CheckCircle2 className="h-5 w-5 shrink-0 mt-0.5 text-emerald-500" />
+                        <div className="space-y-1">
+                          <h5 className="text-xs font-bold uppercase tracking-wider">Verification Approved</h5>
+                          <p className="text-sm font-medium">This education qualification has been approved by HR and is locked for editing.</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {watchHrStatus === "rejected" && watchHrRemark && (
+                      <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 flex items-start gap-3">
+                        <AlertCircle className="h-5 w-5 shrink-0 mt-0.5 text-red-500" />
+                        <div className="space-y-1">
+                          <h5 className="text-xs font-bold uppercase tracking-wider">Rejection Reason</h5>
+                          <p className="text-sm font-medium">{watchHrRemark}</p>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {/* Degree */}
                       <div className="space-y-2">
@@ -395,6 +466,7 @@ export function OnboardingEducationForm({
                             })
                           }
                           defaultValue={watchDegree}
+                          disabled={watchHrStatus === "approved"}
                         >
                           <SelectTrigger className="rounded-xl h-11 bg-background border-border/50">
                             <div className="flex items-center gap-2">
@@ -430,6 +502,7 @@ export function OnboardingEducationForm({
                             )}
                             className="rounded-xl h-11 pl-10"
                             placeholder="e.g. IIT Bombay"
+                            disabled={watchHrStatus === "approved"}
                           />
                         </div>
                         {errors?.institution && (
@@ -452,6 +525,7 @@ export function OnboardingEducationForm({
                             )}
                             className="rounded-xl h-11 pl-10"
                             placeholder="e.g. Computer Science"
+                            disabled={watchHrStatus === "approved"}
                           />
                         </div>
                       </div>
@@ -465,6 +539,7 @@ export function OnboardingEducationForm({
                           type="month"
                           {...form.register(`educations.${index}.startDate`)}
                           className="rounded-xl h-11 bg-background border-border/50"
+                          disabled={watchHrStatus === "approved"}
                         />
                         {errors?.startDate && (
                           <p className="text-[10px] text-destructive font-medium">
@@ -482,6 +557,7 @@ export function OnboardingEducationForm({
                           type="month"
                           {...form.register(`educations.${index}.endDate`)}
                           className="rounded-xl h-11 bg-background border-border/50"
+                          disabled={watchHrStatus === "approved"}
                         />
                         {errors?.endDate && (
                           <p className="text-[10px] text-destructive font-medium">
@@ -501,6 +577,7 @@ export function OnboardingEducationForm({
                             {...form.register(`educations.${index}.grade`)}
                             className="rounded-xl h-11 pl-10"
                             placeholder="e.g. 8.5 CGPA / 85% / First Class with Distinction"
+                            disabled={watchHrStatus === "approved"}
                           />
                         </div>
                         <p className="text-[10px] text-muted-foreground/50 font-medium">

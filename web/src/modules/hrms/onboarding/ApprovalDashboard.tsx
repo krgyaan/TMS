@@ -55,7 +55,7 @@ import { formatDate } from "./components/helpers";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type StageKey = "education" | "experience" | "documents" | "bankDetails";
-type EntryStatus = "pending" | "submitted" | "approved" | "rejected";
+type EntryStatus = "pending" | "submitted" | "approved" | "rejected" | "resubmitted";
 type TabValue = "active" | "rejected";
 
 interface OnboardingUser {
@@ -145,6 +145,12 @@ const STATUS_STYLES: Record<
     dot: "bg-amber-400",
     label: "Submitted",
   },
+  resubmitted: {
+    bg: "bg-amber-50 dark:bg-amber-950/20",
+    border: "border",
+    dot: "bg-amber-400",
+    label: "Resubmitted",
+  },
   approved: {
     bg: "bg-emerald-50 dark:bg-emerald-950/20",
     border: "border",
@@ -174,7 +180,7 @@ const StageBox: React.FC<StageBoxProps> = ({ stageKey, status, onClick }) => {
   const Icon = stage.icon;
   const statusCfg = STATUS_STYLES[status];
 
-  const isActionable = status === "submitted";
+  const isActionable = status === "submitted" || status === "resubmitted";
 
   return (
     <TooltipProvider delayDuration={80}>
@@ -206,7 +212,7 @@ const StageBox: React.FC<StageBoxProps> = ({ stageKey, status, onClick }) => {
                   ? "text-emerald-600 dark:text-emerald-400"
                   : status === "rejected"
                   ? "text-red-500 dark:text-red-400"
-                  : status === "submitted"
+                  : (status === "submitted" || status === "resubmitted")
                   ? stage.color.base
                   : "text-slate-400 dark:text-slate-500"
               )}
@@ -256,7 +262,7 @@ interface UserRowProps {
 
 const UserRow: React.FC<UserRowProps> = ({ user, onStageClick }) => {
   const submittedCount = Object.values(user.stages).filter(
-    (s) => s === "submitted"
+    (s) => s === "submitted" || s === "resubmitted"
   ).length;
 
   return (
@@ -456,7 +462,7 @@ const EntryCard: React.FC<EntryCardProps> = ({
         "rounded-xl border transition-all duration-300",
         displayStatus === "approved" && "bg-emerald-50/50 border-emerald-200 dark:bg-emerald-950/10 dark:border-emerald-900",
         displayStatus === "rejected" && "bg-red-50/50 border-red-200 dark:bg-red-950/10 dark:border-red-900",
-        displayStatus === "submitted" && "bg-card border-border",
+        (displayStatus === "submitted" || displayStatus === "resubmitted") && "bg-card border-border",
         displayStatus === "pending" && "bg-muted/30 border-border",
       )}
     >
@@ -471,7 +477,7 @@ const EntryCard: React.FC<EntryCardProps> = ({
               "inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full",
               displayStatus === "approved" && "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300",
               displayStatus === "rejected" && "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300",
-              displayStatus === "submitted" && "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300",
+              (displayStatus === "submitted" || displayStatus === "resubmitted") && "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300",
               displayStatus === "pending" && "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
             )}
           >
@@ -666,7 +672,10 @@ const StageReviewModal: React.FC<StageModalProps> = ({
   );
 
   const submittedCount = entries.filter(
-    (e) => (e.hrStatus ?? e.status) === "submitted"
+    (e) => {
+      const s = e.hrStatus ?? e.status;
+      return s === "submitted" || s === "resubmitted";
+    }
   ).length;
 
   return (
@@ -880,8 +889,8 @@ const ApprovalDashboard: React.FC = () => {
       )
       .sort((a, b) => {
         // Sort by most actionable first (most "submitted" stages)
-        const aSubmitted = Object.values(a.stages).filter((s) => s === "submitted").length;
-        const bSubmitted = Object.values(b.stages).filter((s) => s === "submitted").length;
+        const aSubmitted = Object.values(a.stages).filter((s) => s === "submitted" || s === "resubmitted").length;
+        const bSubmitted = Object.values(b.stages).filter((s) => s === "submitted" || s === "resubmitted").length;
         return bSubmitted - aSubmitted;
       });
   }, [users, activeTab, searchQuery]);

@@ -16,6 +16,10 @@ import {
   ChevronUp,
   GripVertical,
   Award,
+  CheckCircle2,
+  AlertCircle,
+  XCircle,
+  Lock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -25,7 +29,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { useProfileContext } from "../../contexts/ProfileContext";
+import { useOnboardingContext } from "./contexts/OnboardingContext";
 import api from "@/lib/axios";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -41,6 +45,8 @@ const experienceEntrySchema = z
     toDate: z.string().optional(),
     currentlyWorking: z.boolean().default(false),
     responsibilities: z.string().optional(),
+    hrStatus: z.string().optional(),
+    hrRemark: z.string().optional().nullable(),
   })
   .refine(
     (data) => {
@@ -133,7 +139,7 @@ export function OnboardingExperienceForm({
   onCancel,
   onSuccess,
 }: OnboardingExperienceFormProps) {
-  const { data, refetch } = useProfileContext();
+  const { data, refetch } = useOnboardingContext();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [collapsedCards, setCollapsedCards] = useState<Set<number>>(new Set());
 
@@ -147,6 +153,8 @@ export function OnboardingExperienceForm({
       toDate: exp.toDate || "",
       currentlyWorking: exp.currentlyWorking || false,
       responsibilities: exp.responsibilities || "",
+      hrStatus: exp.hrStatus || "pending",
+      hrRemark: exp.hrRemark || exp.remarks || "",
     })) || [];
 
   const form = useForm<ExperienceFormValues>({
@@ -161,16 +169,34 @@ export function OnboardingExperienceForm({
     name: "experiences",
   });
 
-  // Auto-collapse all but the last card when a new one is added
+  const [hasInitializedCollapsed, setHasInitializedCollapsed] = useState(false);
+
+  // Initialize collapsed cards: expand rejected experiences by default, collapse others
   useEffect(() => {
-    if (fields.length > 1) {
-      const newCollapsed = new Set<number>();
-      for (let i = 0; i < fields.length - 1; i++) {
-        newCollapsed.add(i);
-      }
-      setCollapsedCards(newCollapsed);
+    if (existingExperiences.length > 0 && !hasInitializedCollapsed) {
+      const initialCollapsed = new Set<number>();
+      existingExperiences.forEach((exp: any, index: number) => {
+        if (exp.hrStatus !== "rejected") {
+          initialCollapsed.add(index);
+        }
+      });
+      setCollapsedCards(initialCollapsed);
+      setHasInitializedCollapsed(true);
     }
-  }, [fields.length]);
+  }, [existingExperiences, hasInitializedCollapsed]);
+
+  // Auto-collapse all but the last card when a new one is added manually
+  useEffect(() => {
+    if (fields.length > existingExperiences.length) {
+      setCollapsedCards((prev) => {
+        const next = new Set(prev);
+        for (let i = 0; i < fields.length - 1; i++) {
+          next.add(i);
+        }
+        return next;
+      });
+    }
+  }, [fields.length, existingExperiences.length]);
 
   const toggleCollapse = (index: number) => {
     setCollapsedCards((prev) => {
@@ -192,6 +218,8 @@ export function OnboardingExperienceForm({
       toDate: "",
       currentlyWorking: false,
       responsibilities: "",
+      hrStatus: "pending",
+      hrRemark: "",
     });
   };
 
@@ -218,9 +246,11 @@ export function OnboardingExperienceForm({
         toDate: exp.currentlyWorking ? null : exp.toDate,
         currentlyWorking: exp.currentlyWorking,
         responsibilities: exp.responsibilities || null,
+        hrStatus: exp.hrStatus || "pending",
+        hrRemark: exp.hrRemark || null,
       }));
 
-      await api.put("/profile/me/experiences", { experiences: payload });
+      await api.put("/hrms/onboarding/me/experiences", { experiences: payload });
 
       toast.success("Work experience saved successfully");
       refetch?.();
@@ -273,6 +303,8 @@ export function OnboardingExperienceForm({
             const watchCurrent = form.watch(
               `experiences.${index}.currentlyWorking`
             );
+            const watchHrStatus = form.watch(`experiences.${index}.hrStatus`);
+            const watchHrRemark = form.watch(`experiences.${index}.hrRemark`);
             const errors = form.formState.errors.experiences?.[index];
 
             return (
@@ -282,6 +314,10 @@ export function OnboardingExperienceForm({
                   "rounded-2xl border transition-all duration-300",
                   errors
                     ? "border-destructive/30 bg-destructive/[0.02]"
+                    : watchHrStatus === "rejected"
+                    ? "border-red-500/30 bg-red-500/[0.01]"
+                    : watchHrStatus === "approved"
+                    ? "border-emerald-500/20 bg-emerald-500/[0.01]"
                     : "border-border/20 bg-background",
                   !isCollapsed && "shadow-sm"
                 )}
@@ -305,13 +341,25 @@ export function OnboardingExperienceForm({
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h4 className="text-sm font-bold text-foreground truncate">
                         {watchDesignation || `Experience ${index + 1}`}
                       </h4>
                       {watchCurrent && (
                         <span className="text-[9px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 px-2 py-0.5 rounded-full shrink-0">
                           Current
+                        </span>
+                      )}
+                      {watchHrStatus === "rejected" && (
+                        <span className="text-[9px] font-bold uppercase tracking-wider bg-red-50 text-red-600 dark:bg-red-950/40 dark:text-red-400 px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1 border border-red-200 dark:border-red-800/50">
+                          <XCircle className="h-2.5 w-2.5" />
+                          Rejected
+                        </span>
+                      )}
+                      {watchHrStatus === "approved" && (
+                        <span className="text-[9px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400 px-2 py-0.5 rounded-full shrink-0 flex items-center gap-1 border border-emerald-200 dark:border-emerald-800/50">
+                          <CheckCircle2 className="h-2.5 w-2.5" />
+                          Approved
                         </span>
                       )}
                     </div>
@@ -341,7 +389,11 @@ export function OnboardingExperienceForm({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10"
+                      disabled={watchHrStatus === "approved"}
+                      className={cn(
+                        "h-8 w-8 rounded-lg text-destructive/60 hover:text-destructive hover:bg-destructive/10",
+                        watchHrStatus === "approved" && "opacity-40 cursor-not-allowed hover:bg-transparent"
+                      )}
                       onClick={(e) => {
                         e.stopPropagation();
                         handleRemove(index);
@@ -349,6 +401,11 @@ export function OnboardingExperienceForm({
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
+                    {watchHrStatus === "approved" && (
+                      <div className="h-8 w-8 rounded-lg flex items-center justify-center text-emerald-600 dark:text-emerald-400 bg-emerald-100/40 dark:bg-emerald-950/20 shrink-0">
+                        <Lock className="h-3.5 w-3.5" />
+                      </div>
+                    )}
                     <div className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground/40">
                       {isCollapsed ? (
                         <ChevronDown className="h-4 w-4" />
@@ -362,6 +419,26 @@ export function OnboardingExperienceForm({
                 {/* Card Body — collapsible */}
                 {!isCollapsed && (
                   <div className="px-5 py-5 animate-in fade-in slide-in-from-top-2 duration-300">
+                    {watchHrStatus === "approved" && (
+                      <div className="mb-6 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-start gap-3">
+                        <CheckCircle2 className="h-5 w-5 shrink-0 mt-0.5 text-emerald-500" />
+                        <div className="space-y-1">
+                          <h5 className="text-xs font-bold uppercase tracking-wider">Verification Approved</h5>
+                          <p className="text-sm font-medium">This experience entry has been approved by HR and is locked for editing.</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {watchHrStatus === "rejected" && watchHrRemark && (
+                      <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 flex items-start gap-3">
+                        <AlertCircle className="h-5 w-5 shrink-0 mt-0.5 text-red-500" />
+                        <div className="space-y-1">
+                          <h5 className="text-xs font-bold uppercase tracking-wider">Rejection Reason</h5>
+                          <p className="text-sm font-medium">{watchHrRemark}</p>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {/* Company Name */}
                       <div className="space-y-2">
@@ -378,6 +455,7 @@ export function OnboardingExperienceForm({
                             )}
                             className="rounded-xl h-11 pl-10"
                             placeholder="e.g. Infosys Technologies"
+                            disabled={watchHrStatus === "approved"}
                           />
                         </div>
                         {errors?.companyName && (
@@ -402,6 +480,7 @@ export function OnboardingExperienceForm({
                             )}
                             className="rounded-xl h-11 pl-10"
                             placeholder="e.g. Senior Software Engineer"
+                            disabled={watchHrStatus === "approved"}
                           />
                         </div>
                         {errors?.designation && (
@@ -424,6 +503,7 @@ export function OnboardingExperienceForm({
                             {...form.register(`experiences.${index}.fromDate`)}
                             type="date"
                             className="rounded-xl h-11 pl-10"
+                            disabled={watchHrStatus === "approved"}
                           />
                         </div>
                         {errors?.fromDate && (
@@ -457,10 +537,10 @@ export function OnboardingExperienceForm({
                           <Input
                             {...form.register(`experiences.${index}.toDate`)}
                             type="date"
-                            disabled={watchCurrent}
+                            disabled={watchCurrent || watchHrStatus === "approved"}
                             className={cn(
                               "rounded-xl h-11 pl-10",
-                              watchCurrent && "opacity-40 cursor-not-allowed"
+                              (watchCurrent || watchHrStatus === "approved") && "opacity-40 cursor-not-allowed"
                             )}
                           />
                         </div>
@@ -471,10 +551,14 @@ export function OnboardingExperienceForm({
                         )}
 
                         {/* Currently Working Checkbox */}
-                        <div className="flex items-center gap-2 mt-2 bg-muted/30 px-3.5 py-2.5 rounded-xl border border-border/10">
+                        <div className={cn(
+                          "flex items-center gap-2 mt-2 bg-muted/30 px-3.5 py-2.5 rounded-xl border border-border/10",
+                          watchHrStatus === "approved" && "opacity-50 cursor-not-allowed"
+                        )}>
                           <Checkbox
                             id={`currentlyWorking-${index}`}
                             checked={watchCurrent}
+                            disabled={watchHrStatus === "approved"}
                             onCheckedChange={(checked) => {
                               form.setValue(
                                 `experiences.${index}.currentlyWorking`,
@@ -514,6 +598,7 @@ export function OnboardingExperienceForm({
                           )}
                           className="rounded-xl min-h-[100px] resize-none"
                           placeholder="Describe your key responsibilities, achievements, and technologies used..."
+                          disabled={watchHrStatus === "approved"}
                         />
                         <p className="text-[10px] text-muted-foreground/50 font-medium">
                           Brief summary of your role and contributions
