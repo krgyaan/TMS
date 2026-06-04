@@ -34,7 +34,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { useProfileContext } from "../../contexts/ProfileContext";
+import { useOnboardingContext } from "./contexts/OnboardingContext";
 import api from "@/lib/axios";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -109,7 +109,7 @@ interface OnboardingProfileFormProps {
 }
 
 export function OnboardingProfileForm({ onCancel, onSuccess, initialTab = "personal" }: OnboardingProfileFormProps) {
-  const { data } = useProfileContext();
+  const { data } = useOnboardingContext();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>(initialTab as any);
   const [sameAsCurrent, setSameAsCurrent] = useState(false);
@@ -211,7 +211,7 @@ export function OnboardingProfileForm({ onCancel, onSuccess, initialTab = "perso
         },
       };
 
-      const response = await api.patch("/profile/me", payload);
+      const response = await api.patch("/hrms/onboarding/me/profile", payload);
 
       toast.success("Profile details saved successfully");
       onSuccess();

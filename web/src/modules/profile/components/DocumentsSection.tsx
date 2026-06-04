@@ -40,6 +40,7 @@ import {
   AlertCircle,
   Clock,
   Shield,
+  Lock,
   GraduationCap,
   Briefcase,
   FolderOpen,
@@ -61,6 +62,7 @@ import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/axios";
 import { useProfileContext } from "../contexts/ProfileContext";
+import { useOnboardingContext } from "./onboarding/contexts/OnboardingContext";
 import { formatDate } from "../utils";
 import { getStatusConfig } from "./ui-helpers";
 import { staggerContainer, fadeInUp, tabContentVariants } from "../animations";
@@ -154,6 +156,7 @@ interface UploadDialogProps {
   isReupload?: boolean;
   existingDoc?: UploadedDocument | null;
   onSuccess: () => void;
+  isOnboarding?: boolean;
 }
 
 const UploadDialog: React.FC<UploadDialogProps> = ({
@@ -163,6 +166,7 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
   isReupload = false,
   existingDoc,
   onSuccess,
+  isOnboarding = false,
 }) => {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -203,18 +207,19 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
       if (issueDate) formData.append("issueDate", issueDate);
       if (expiryDate) formData.append("expiryDate", expiryDate);
 
+      const urlPrefix = isOnboarding ? "/hrms/onboarding" : "/profile";
       if (isReupload && existingDoc) {
-        // PATCH /profile/documents/:id
+        // PATCH /profile/documents/:id or /hrms/onboarding/documents/:id
         formData.append("docType", existingDoc.docType);
         formData.append("docCategory", existingDoc.docCategory);
-        await api.patch(`/profile/documents/${existingDoc.id}`, formData, {
+        await api.patch(`${urlPrefix}/documents/${existingDoc.id}`, formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
       } else if (documentType) {
-        // POST /profile/documents
+        // POST /profile/documents or /hrms/onboarding/documents
         formData.append("docType", documentType.docType);
         formData.append("docCategory", documentType.docCategory);
-        await api.post("/profile/documents", formData, {
+        await api.post(`${urlPrefix}/documents`, formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
       }
@@ -757,33 +762,38 @@ const UploadedDocCard: React.FC<UploadedDocCardProps> = ({ doc, index, onView, o
               </Tooltip>
             </TooltipProvider>
             {(isOnboarding || doc.docType === "Passport Size Photo") && doc.verificationStatus === "rejected" && (
-              <Button
-                size="sm"
-                className="rounded-xl h-9 text-xs font-bold gap-1.5 shadow-md shadow-primary/20"
-                onClick={() => onReupload(doc)}
-              >
-                <Upload className="h-3 w-3" />
-                Re-upload
-              </Button>
+              <>
+                <Button
+                  size="sm"
+                  className="rounded-xl h-9 text-xs font-bold gap-1.5 shadow-md shadow-primary/20"
+                  onClick={() => onReupload(doc)}
+                >
+                  <Upload className="h-3 w-3" />
+                  Re-upload
+                </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0 rounded-xl h-9 w-9 hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => onDelete(doc)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs">Delete</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </>
             )}
-            {(isOnboarding || doc.docType === "Passport Size Photo") && doc.verificationStatus !== "verified" && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="shrink-0 rounded-xl h-9 w-9 hover:bg-destructive/10 hover:text-destructive"
-                      onClick={() => onDelete(doc)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="text-xs">Delete</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+            {doc.verificationStatus !== "rejected" && (
+              <div className="h-9 w-9 rounded-xl flex items-center justify-center text-emerald-600 dark:text-emerald-400 bg-emerald-100/40 dark:bg-emerald-950/20 shrink-0" title="Locked">
+                <Lock className="h-3.5 w-3.5" />
+              </div>
             )}
           </div>
         </CardContent>
@@ -795,7 +805,30 @@ const UploadedDocCard: React.FC<UploadedDocCardProps> = ({ doc, index, onView, o
 // ─── MAIN DOCUMENTS SECTION ─────────────────────────────────────────────────
 
 export const DocumentsSection: React.FC = () => {
-  const { data, refetch } = useProfileContext();
+  // Try to use Onboarding context first, fallback to Profile context
+  let contextData: any;
+  let contextRefetch: any;
+  let isOnboarding = false;
+
+  try {
+    const onboarding = useOnboardingContext();
+    if (onboarding && onboarding.data && onboarding.data.isOnboarding) {
+      contextData = onboarding.data;
+      contextRefetch = onboarding.refetch;
+      isOnboarding = true;
+    }
+  } catch (e) {
+    // Not within OnboardingProvider
+  }
+
+  const profileContext = useProfileContext();
+  if (!isOnboarding) {
+    contextData = profileContext.data;
+    contextRefetch = profileContext.refetch;
+  }
+
+  const data = contextData;
+  const refetch = contextRefetch;
   const queryClient = useQueryClient();
 
   const [activeCategory, setActiveCategory] = useState<string>("all");
@@ -808,7 +841,8 @@ export const DocumentsSection: React.FC = () => {
   const [isReupload, setIsReupload] = useState(false);
 
   const handleUploadSuccess = () => {
-    queryClient.invalidateQueries({ queryKey: ['my-profile'] });
+    queryClient.invalidateQueries({ queryKey: [isOnboarding ? 'my-onboarding-draft' : 'my-profile'] });
+    refetch?.();
   };
 
   if (!data) return null;
@@ -873,8 +907,10 @@ export const DocumentsSection: React.FC = () => {
   const handleDelete = async (doc: UploadedDocument) => {
     if (!window.confirm(`Delete "${doc.docType}"? This cannot be undone.`)) return;
     try {
-      await api.delete(`/profile/documents/${doc.id}`);
-      queryClient.invalidateQueries({ queryKey: ['my-profile'] });
+      const urlPrefix = isOnboarding ? "/hrms/onboarding" : "/profile";
+      await api.delete(`${urlPrefix}/documents/${doc.id}`);
+      queryClient.invalidateQueries({ queryKey: [isOnboarding ? 'my-onboarding-draft' : 'my-profile'] });
+      refetch?.();
     } catch (err: any) {
       alert(err?.response?.data?.message || "Failed to delete document.");
     }
@@ -1281,6 +1317,7 @@ export const DocumentsSection: React.FC = () => {
         isReupload={isReupload}
         existingDoc={selectedUploadedDoc}
         onSuccess={handleUploadSuccess}
+        isOnboarding={isOnboarding}
       />
 
       <PreviewDialog

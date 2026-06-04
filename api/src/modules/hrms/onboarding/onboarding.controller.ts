@@ -9,14 +9,51 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Put,
   Req,
   UseGuards,
   BadRequestException,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
 import { z } from 'zod';
 import { JwtAuthGuard } from '@/modules/auth/guards/jwt-auth.guard';
 import { OnboardingService, type UpdateProfileDto } from './onboarding.service';
 import { Public } from '@/modules/auth/decorators';
+
+// ─── Multer Config ────────────────────────────────────────────────────────────
+
+const ALLOWED_EXT = ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx'];
+
+const documentStorage = diskStorage({
+  destination: './uploads/hrms/employee-documents',
+  filename: (_req, file, cb) => {
+    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+    const ext = extname(file.originalname).toLowerCase();
+    cb(null, `doc-${uniqueSuffix}${ext}`);
+  },
+});
+
+const documentMulter = {
+  storage: documentStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  fileFilter: (_req: any, file: Express.Multer.File, cb: any) => {
+    const ext = extname(file.originalname).toLowerCase();
+    if (ALLOWED_EXT.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(
+        new BadRequestException(
+          `File type not allowed. Accepted: ${ALLOWED_EXT.join(', ')}`,
+        ),
+        false,
+      );
+    }
+  },
+};
 
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
@@ -288,6 +325,12 @@ export class OnboardingController {
     @Body() body: { status: 'approved' | 'rejected'; remark: string },
     @Req() req: any,
   ) {
+    
+    if(body.status == "rejected"){
+      //passing the onboarding Request Entry 
+      await this.onboardingService.rejectOnboardingRequest(id);
+    }
+
     return this.onboardingService.approveProfileSection(id, body.status, body.remark, req.user.id);
   }
 
@@ -308,6 +351,13 @@ export class OnboardingController {
     const status = body.status;
     const remark = body.remark || '';
 
+    //rejecting the entry if any of the request entry is rejected
+
+    if(status == "rejected"){
+      //passing the onboarding Request Entry 
+      await this.onboardingService.rejectOnboardingRequest(id);
+    }
+
     switch (stage) {
       case 'education':
         return this.onboardingService.approveEducationRecord(id, entryId, status, adminId, remark);
@@ -321,5 +371,176 @@ export class OnboardingController {
       default:
         throw new BadRequestException(`Invalid stage endpoint: ${stage}`);
     }
+  }
+
+  // ─── Employee-Facing Onboarding Endpoints ──────────────────────────────────
+
+  /**
+   * GET /hrms/onboarding/me
+   * Retrieves the current employee's onboarding draft.
+   */
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  async getMyOnboardingDraft(@Req() req: any) {
+    return this.onboardingService.getMyOnboardingDraft(req.user.id);
+  }
+
+  /**
+   * PATCH /hrms/onboarding/me/profile
+   * Updates draft onboarding profile details.
+   */
+  @Patch('me/profile')
+  @UseGuards(JwtAuthGuard)
+  async updateMyOnboardingProfile(@Req() req: any, @Body() body: any) {
+    return this.onboardingService.updateMyOnboardingProfile(req.user.id, body);
+  }
+
+  /**
+   * POST /hrms/onboarding/me/submit
+   * Employee final submission of onboarding details.
+   */
+  @Post('me/submit')
+  @UseGuards(JwtAuthGuard)
+  async submitOnboarding(@Req() req: any) {
+    return this.onboardingService.submitOnboarding(req.user.id);
+  }
+
+  /**
+   * POST /hrms/onboarding/education
+   */
+  @Post('education')
+  @UseGuards(JwtAuthGuard)
+  async addOnboardingEducation(@Req() req: any, @Body() body: any) {
+    return this.onboardingService.addOnboardingEducation(req.user.id, body);
+  }
+
+  /**
+   * PATCH /hrms/onboarding/education/:id
+   */
+  @Patch('education/:id')
+  @UseGuards(JwtAuthGuard)
+  async updateOnboardingEducation(@Req() req: any, @Param('id', ParseIntPipe) eduId: number, @Body() body: any) {
+    return this.onboardingService.updateOnboardingEducation(req.user.id, eduId, body);
+  }
+
+  /**
+   * PUT /hrms/onboarding/me/educations
+   */
+  @Put('me/educations')
+  @UseGuards(JwtAuthGuard)
+  async updateMyOnboardingEducations(@Req() req: any, @Body() body: any) {
+    return this.onboardingService.updateMyOnboardingEducations(req.user.id, body);
+  }
+
+  /**
+   * POST /hrms/onboarding/experience
+   */
+  @Post('experience')
+  @UseGuards(JwtAuthGuard)
+  async addOnboardingExperience(@Req() req: any, @Body() body: any) {
+    return this.onboardingService.addOnboardingExperience(req.user.id, body);
+  }
+
+  /**
+   * PATCH /hrms/onboarding/experience/:id
+   */
+  @Patch('experience/:id')
+  @UseGuards(JwtAuthGuard)
+  async updateOnboardingExperience(@Req() req: any, @Param('id', ParseIntPipe) expId: number, @Body() body: any) {
+    return this.onboardingService.updateOnboardingExperience(req.user.id, expId, body);
+  }
+
+  /**
+   * PUT /hrms/onboarding/me/experiences
+   */
+  @Put('me/experiences')
+  @UseGuards(JwtAuthGuard)
+  async updateMyOnboardingExperiences(@Req() req: any, @Body() body: any) {
+    return this.onboardingService.updateMyOnboardingExperiences(req.user.id, body);
+  }
+
+  /**
+   * POST /hrms/onboarding/bank-accounts
+   */
+  @Post('bank-accounts')
+  @UseGuards(JwtAuthGuard)
+  async addOnboardingBankDetails(@Req() req: any, @Body() body: any) {
+    return this.onboardingService.addOnboardingBankDetails(req.user.id, body);
+  }
+
+  /**
+   * PATCH /hrms/onboarding/bank-accounts/:id
+   */
+  @Patch('bank-accounts/:id')
+  @UseGuards(JwtAuthGuard)
+  async updateOnboardingBankDetails(@Req() req: any, @Param('id', ParseIntPipe) bankId: number, @Body() body: any) {
+    return this.onboardingService.updateOnboardingBankDetails(req.user.id, bankId, body);
+  }
+
+  /**
+   * POST /hrms/onboarding/documents
+   * Upload a new draft onboarding document.
+   */
+  @Post('documents')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('file', documentMulter))
+  async uploadOnboardingDocument(
+    @Req() req: any,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: any,
+  ) {
+    if (!file) {
+      throw new BadRequestException('File is required');
+    }
+    if (!body.docType) {
+      throw new BadRequestException('docType is required');
+    }
+    if (!body.docCategory) {
+      throw new BadRequestException('docCategory is required');
+    }
+
+    return this.onboardingService.uploadOnboardingDocument(req.user.id, file, {
+      docType: body.docType,
+      docCategory: body.docCategory,
+      issueDate: body.issueDate || null,
+      expiryDate: body.expiryDate || null,
+    });
+  }
+
+  /**
+   * PATCH /hrms/onboarding/documents/:id
+   * Re-upload a rejected draft onboarding document.
+   */
+  @Patch('documents/:id')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(FileInterceptor('file', documentMulter))
+  async reuploadOnboardingDocument(
+    @Req() req: any,
+    @Param('id', ParseIntPipe) docId: number,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: any,
+  ) {
+    if (!file) {
+      throw new BadRequestException('File is required');
+    }
+
+    return this.onboardingService.reuploadOnboardingDocument(req.user.id, docId, file, {
+      issueDate: body.issueDate || null,
+      expiryDate: body.expiryDate || null,
+    });
+  }
+
+  /**
+   * DELETE /hrms/onboarding/documents/:id
+   * Delete an uploaded draft onboarding document.
+   */
+  @Delete('documents/:id')
+  @UseGuards(JwtAuthGuard)
+  async deleteOnboardingDocument(
+    @Req() req: any,
+    @Param('id', ParseIntPipe) docId: number,
+  ) {
+    await this.onboardingService.deleteOnboardingDocument(req.user.id, docId);
+    return { success: true };
   }
 }
