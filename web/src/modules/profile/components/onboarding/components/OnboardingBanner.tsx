@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import type { OnboardingStatus } from "@/modules/profile/types";
 import { motion } from "framer-motion";
 import { Shield, Sparkles, XCircle } from "lucide-react";
 
