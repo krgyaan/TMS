@@ -431,6 +431,18 @@ export class PaymentRequestsQueryService {
                         ELSE NULL
                     END
                 `,
+                paidDate: sql<Date>`
+                    CASE
+                        WHEN ${paymentInstruments.instrumentType} = 'DD' THEN ${instrumentDdDetails.ddDate}
+                        WHEN ${paymentInstruments.instrumentType} = 'FDR' THEN ${instrumentFdrDetails.fdrDate}
+                        WHEN ${paymentInstruments.instrumentType} = 'BG' THEN ${instrumentBgDetails.bgDate}
+                        WHEN ${paymentInstruments.instrumentType} = 'Cheque' THEN ${instrumentChequeDetails.chequeDate}
+                        WHEN ${paymentInstruments.instrumentType} = 'Bank Transfer' THEN ${instrumentTransferDetails.transactionDate}
+                        WHEN ${paymentInstruments.instrumentType} = 'Portal Payment' THEN ${instrumentTransferDetails.transactionDate}
+                        ELSE NULL
+                    END
+                `,
+                tenderStatus: statuses.name,
             })
             .from(paymentRequests)
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
@@ -448,6 +460,7 @@ export class PaymentRequestsQueryService {
             .leftJoin(instrumentFdrDetails, eq(instrumentFdrDetails.instrumentId, paymentInstruments.id))
             .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
             .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .where(whereClause)
             .orderBy(orderClause)
             .limit(limit)
@@ -481,6 +494,8 @@ export class PaymentRequestsQueryService {
                 displayStatus: deriveDisplayStatus(row.instrumentStatus),
                 bidSubmissionDate: row.bidSubmissionDate,
                 createdAt: row.createdAt,
+                paidDate: (row as any).paidDate,
+                tenderStatus: (row as any).tenderStatus ?? null,
             };
         });
 

@@ -387,6 +387,8 @@ export interface PaymentRequestRow {
     displayStatus: string;
     createdAt: Date | null;
     detailPurpose: string | null;
+    paidDate: Date | null;
+    tenderStatus: string | null;
 }
 
 export interface DashboardCounts {

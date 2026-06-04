@@ -174,6 +174,8 @@ export interface PaymentRequestRow {
     displayStatus: string;
     createdAt: string | null;
     detailPurpose: string | null;
+    paidDate: string | null;
+    tenderStatus: string | null;
 }
 
 export interface PaymentRequestRowWithTimer extends PaymentRequestRow {

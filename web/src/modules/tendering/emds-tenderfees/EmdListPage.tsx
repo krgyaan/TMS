@@ -580,16 +580,38 @@ const EmdsAndTenderFeesPage = () => {
                 },
                 sortable: true,
             },
-            ...(activeTab === 'paid' ? [{
-                field: 'bidSubmissionDate' as const,
-                headerName: 'Bid Submission Date',
-                width: 160,
-                cellRenderer: (params: any) => {
-                    if (!params.value) return <span className="text-gray-400">—</span>;
-                    return formatDateTime(params.value);
+            ...(activeTab === 'paid' ? [
+                {
+                    field: 'bidSubmissionDate' as const,
+                    headerName: 'Bid Submission Date',
+                    width: 160,
+                    cellRenderer: (params: any) => {
+                        if (!params.value) return <span className="text-gray-400">—</span>;
+                        return formatDateTime(params.value);
+                    },
+                    sortable: true,
                 },
-                sortable: true,
-            }] : []),
+                {
+                    field: 'paidDate' as const,
+                    headerName: 'Paid Date',
+                    width: 140,
+                    cellRenderer: (params: any) => {
+                        if (!params.value) return <span className="text-gray-400">—</span>;
+                        return formatDateTime(params.value);
+                    },
+                    sortable: true,
+                },
+                {
+                    field: 'tenderStatus' as const,
+                    headerName: 'Tender Status',
+                    width: 130,
+                    cellRenderer: (params: any) => {
+                        if (!params.value) return <span className="text-gray-400">—</span>;
+                        return <Badge variant="outline">{params.value}</Badge>;
+                    },
+                    sortable: true,
+                },
+            ] : []),
             teamMemberCol,
             timerCol,
             actionCol,
