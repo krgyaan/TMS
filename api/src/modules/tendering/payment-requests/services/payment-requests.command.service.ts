@@ -7,7 +7,7 @@ import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service'
 import { users } from '@/db/schemas/auth/users.schema';
 import { userRoles } from '@/db/schemas/auth/user-roles.schema';
 import type { CreatePaymentRequestDto, UpdatePaymentRequestDto, UpdateStatusDto, PaymentPurpose } from '../dto/payment-requests.dto';
-import { extractAmountFromDetails } from './payment-requests.shared';
+import { extractAmountFromDetails, extractPurposeFromDetails } from './payment-requests.shared';
 import { tenderInformation } from '@/db/schemas';
 import { PaymentRequestsNotificationService } from './payment-requests-notification.service';
 import { TimersService } from '@/modules/timers/timers.service';
@@ -82,7 +82,7 @@ export class PaymentRequestsCommandService {
                     const request = await this.createPaymentRequest(
                         tx,
                         tenderId,
-                        'EMD',
+                        extractPurposeFromDetails(payload.EMD.mode, payload.EMD.details, 'EMD'),
                         emdAmount,
                         tender,
                         userId,
@@ -133,7 +133,7 @@ export class PaymentRequestsCommandService {
                     const request = await this.createPaymentRequest(
                         tx,
                         tenderId,
-                        'Tender Fee',
+                        extractPurposeFromDetails(payload.TENDER_FEES.mode, payload.TENDER_FEES.details, 'Tender Fee'),
                         tfAmount,
                         tender,
                         userId,
@@ -171,7 +171,7 @@ export class PaymentRequestsCommandService {
                     const request = await this.createPaymentRequest(
                         tx,
                         tenderId,
-                        'Processing Fee',
+                        extractPurposeFromDetails(payload.PROCESSING_FEES.mode, payload.PROCESSING_FEES.details, 'Processing Fee'),
                         pfAmount,
                         tender,
                         userId,

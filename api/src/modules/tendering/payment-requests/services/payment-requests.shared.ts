@@ -4,6 +4,7 @@ import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { DD_STATUSES, FDR_STATUSES, BG_STATUSES, CHEQUE_STATUSES, BT_STATUSES, PORTAL_STATUSES } from '../constants/payment-request-statuses';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { PaymentPurpose } from './payment-requests.shared';
 
 // ============================================================================
 // Types - Re-exported from DTO
@@ -242,4 +243,36 @@ export function extractAmountFromDetails(mode: string, details: any): number {
     if (!amountKey || details[amountKey] == null) return 0;
     
     return Number(details[amountKey]) || 0;
+}
+
+const PURPOSE_VALUE_MAP: Record<string, PaymentPurpose> = {
+    'PAYABLE': 'Other Payment',
+    'SECURITY': 'Security Deposit',
+    'PERFORMANCE': 'Performance BG',
+    'COUNTER_GUARANTEE': 'Surety Bond',
+    'FINANCIAL': 'Other Payment',
+    'ADVANCE_PAYMENT': 'Other Payment',
+    'SECURITY_BOND_DEPOSIT': 'Security Deposit',
+    'BID_BOND': 'Other Payment',
+    'DD': 'DD',
+    'FDR': 'FDR',
+};
+
+export function extractPurposeFromDetails(mode: string, details: any, defaultPurpose: PaymentPurpose): PaymentPurpose {
+    if (!details) return defaultPurpose;
+
+    const purposeMap: Record<string, string> = {
+        'DD': 'ddPurpose',
+        'FDR': 'fdrPurpose',
+        'BG': 'bgPurpose',
+        'CHEQUE': 'chequePurpose',
+        'BANK_TRANSFER': 'btPurpose',
+        'PORTAL': 'portalPurpose',
+    };
+
+    const purposeKey = purposeMap[mode];
+    if (!purposeKey || !details[purposeKey]) return defaultPurpose;
+
+    const rawPurpose = String(details[purposeKey]);
+    return PURPOSE_VALUE_MAP[rawPurpose] || defaultPurpose;
 }
