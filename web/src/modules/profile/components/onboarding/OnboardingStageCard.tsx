@@ -1001,26 +1001,6 @@ export function OnboardingStageCard({
                       </Button>
                     )}
 
-                    {(status === "pending" || approvalStatus === "rejected") &&
-                      (!isSubmitted || approvalStatus === "rejected") &&
-                      onEdit && (
-                        <Button
-                          size="sm"
-                          variant={approvalStatus === "rejected" ? "default" : "outline"}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onEdit();
-                          }}
-                          className={cn(
-                            "rounded-xl text-xs gap-1.5",
-                            approvalStatus === "rejected" &&
-                              "bg-red-600 hover:bg-red-700 text-white"
-                          )}
-                        >
-                          <Pencil className="h-3 w-3" />
-                          {approvalStatus === "rejected" ? "Edit & Resubmit" : "Edit"}
-                        </Button>
-                      )}
 {/* 
                     {isSubmitted && onView && (
                       <Button
