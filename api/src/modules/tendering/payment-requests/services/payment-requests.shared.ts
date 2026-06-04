@@ -239,7 +239,7 @@ export function extractAmountFromDetails(mode: string, details: any): number {
     };
     
     const amountKey = amountMap[mode];
-    if (!amountKey || !details[amountKey]) return 0;
+    if (!amountKey || details[amountKey] == null) return 0;
     
     return Number(details[amountKey]) || 0;
 }

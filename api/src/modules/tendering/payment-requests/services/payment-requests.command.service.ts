@@ -78,7 +78,7 @@ export class PaymentRequestsCommandService {
                     ? `${payload.EMD.mode} Details`
                     : `${payload.EMD.mode} Details`;
 
-                if (emdAmount > 0) {
+                if (emdAmount >= 0) {
                     const request = await this.createPaymentRequest(
                         tx,
                         tenderId,
@@ -129,7 +129,7 @@ export class PaymentRequestsCommandService {
                     ? `${payload.TENDER_FEES.mode} Details`
                     : `${payload.TENDER_FEES.mode} Details`;
 
-                if (tfAmount > 0) {
+                if (tfAmount >= 0) {
                     const request = await this.createPaymentRequest(
                         tx,
                         tenderId,
@@ -167,7 +167,7 @@ export class PaymentRequestsCommandService {
                     ? `${payload.PROCESSING_FEES.mode} Details`
                     : `${payload.PROCESSING_FEES.mode} Details`;
 
-                if (pfAmount > 0) {
+                if (pfAmount >= 0) {
                     const request = await this.createPaymentRequest(
                         tx,
                         tenderId,
@@ -413,7 +413,6 @@ export class PaymentRequestsCommandService {
                 team: team || null,
             })
             .returning()
-            .onConflictDoNothing()
             .execute();
 
         this.logger.log(`Payment request created successfully: ${JSON.stringify(request)}`);
