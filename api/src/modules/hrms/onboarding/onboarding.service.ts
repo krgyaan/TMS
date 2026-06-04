@@ -1040,6 +1040,7 @@ export class OnboardingService {
         docType: onboardingDocuments.docType,
         docCategory: onboardingDocuments.docCategory,
         status: onboardingDocuments.status,
+        hrStatus: onboardingDocuments.hrStatus,
         createdAt: onboardingDocuments.createdAt,
         verifiedBy: users.name,
         verificationDate: onboardingDocuments.verificationDate,
@@ -1057,10 +1058,12 @@ export class OnboardingService {
       category: doc.docCategory || 'other',
       required: true,
       status: doc.status,
+      hrStatus: doc.hrStatus === 'verified' ? 'approved' : doc.hrStatus,
       uploadedAt: doc.createdAt?.toISOString(),
       verifiedBy: doc.verifiedBy,
       verifiedAt: doc.verificationDate,
       rejectedReason: doc.hrRemark,
+      hrRemark: doc.hrRemark,
       fileName: doc.fileUrl ? doc.fileUrl.split('/').pop() : 'document.pdf',
       fileSize: '2.4 MB',
       fileType: 'application/pdf',
@@ -2115,12 +2118,19 @@ export class OnboardingService {
     if (dto.bankAccounts && Array.isArray(dto.bankAccounts)) {
       const existing = await this.db.select().from(onboardingBankDetails).where(eq(onboardingBankDetails.onboardingId, onboardingId));
       const inputIds = dto.bankAccounts.map((b: any) => b.id).filter(Boolean) as number[];
-      const toDelete = existing.filter((b) => !inputIds.includes(b.id));
+      const toDelete = existing.filter((b) => !inputIds.includes(b.id) && b.hrStatus !== 'approved');
       for (const record of toDelete) {
         await this.db.delete(onboardingBankDetails).where(eq(onboardingBankDetails.id, record.id));
       }
 
       for (const b of dto.bankAccounts) {
+        if (b.id) {
+          const dbRecord = existing.find((r) => r.id === b.id);
+          if (dbRecord && dbRecord.hrStatus === 'approved') {
+            continue;
+          }
+        }
+
         const payload: any = {
           bankName: b.bankName,
           accountHolderName: b.accountHolderName,
@@ -2162,12 +2172,19 @@ export class OnboardingService {
     if (dto.education && Array.isArray(dto.education)) {
       const existing = await this.db.select().from(onboardingEducation).where(eq(onboardingEducation.onboardingId, onboardingId));
       const inputIds = dto.education.map((e: any) => e.id).filter(Boolean) as number[];
-      const toDelete = existing.filter((e) => !inputIds.includes(e.id));
+      const toDelete = existing.filter((e) => !inputIds.includes(e.id) && e.hrStatus !== 'approved');
       for (const record of toDelete) {
         await this.db.delete(onboardingEducation).where(eq(onboardingEducation.id, record.id));
       }
 
       for (const e of dto.education) {
+        if (e.id) {
+          const dbRecord = existing.find((r) => r.id === e.id);
+          if (dbRecord && dbRecord.hrStatus === 'approved') {
+            continue;
+          }
+        }
+
         const payload: any = {
           degree: e.degree,
           institution: e.institution,
@@ -2207,12 +2224,19 @@ export class OnboardingService {
     if (dto.experience && Array.isArray(dto.experience)) {
       const existing = await this.db.select().from(onboardingExperience).where(eq(onboardingExperience.onboardingId, onboardingId));
       const inputIds = dto.experience.map((e: any) => e.id).filter(Boolean) as number[];
-      const toDelete = existing.filter((e) => !inputIds.includes(e.id));
+      const toDelete = existing.filter((e) => !inputIds.includes(e.id) && e.hrStatus !== 'approved');
       for (const record of toDelete) {
         await this.db.delete(onboardingExperience).where(eq(onboardingExperience.id, record.id));
       }
 
       for (const e of dto.experience) {
+        if (e.id) {
+          const dbRecord = existing.find((r) => r.id === e.id);
+          if (dbRecord && dbRecord.hrStatus === 'approved') {
+            continue;
+          }
+        }
+
         const payload: any = {
           companyName: e.companyName,
           designation: e.designation,
@@ -2344,6 +2368,11 @@ export class OnboardingService {
       .from(onboardingRequests).where(eq(onboardingRequests.userId, userId)).orderBy(desc(onboardingRequests.createdAt)).limit(1);
 
     const isOnboarding = activeReqs.length > 0 && activeReqs[0].progress == 'pending';
+    const [entry] = await this.db.select().from(onboardingEducation).where(eq(onboardingEducation.id, eduId));
+    if (!entry) throw new NotFoundException('Education details not found');
+    if (entry.hrStatus === 'approved') {
+      throw new BadRequestException('Approved education details cannot be modified.');
+    }
 
     if (isOnboarding) {
       const [updated] = await this.db.update(onboardingEducation).set({
@@ -2476,6 +2505,12 @@ export class OnboardingService {
       .from(onboardingRequests).where(eq(onboardingRequests.userId, userId)).orderBy(desc(onboardingRequests.createdAt)).limit(1);
 
     const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
+    const [entry] = await this.db.select().from(onboardingExperience).where(eq(onboardingExperience.id, expId));
+    if (!entry) throw new NotFoundException('Experience details not found');
+    if (entry.hrStatus === 'approved') {
+      throw new BadRequestException('Approved experience details cannot be modified.');
+    }
+
     const parseDate = (d: any) => d ? new Date(d).toISOString().split('T')[0] : undefined;
 
     const payload = {
@@ -2610,8 +2645,9 @@ export class OnboardingService {
     const activeReqs = await this.db.select({ id: onboardingRequests.id, status: onboardingRequests.status })
       .from(onboardingRequests).where(eq(onboardingRequests.userId, userId)).orderBy(desc(onboardingRequests.createdAt)).limit(1);
     const isOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
-
-    if (isOnboarding) {
+    const [entry] = await this.db.select().from(onboardingBankDetails).where(eq(onboardingBankDetails.id, bankId));
+    
+    if (isOnboarding && entry.hrStatus != "approved") {
       const [updated] = await this.db.update(onboardingBankDetails).set({
         bankName: dto.bankName,
         accountHolderName: dto.accountHolderName,
@@ -2746,6 +2782,11 @@ export class OnboardingService {
       throw new NotFoundException('Document not found');
     }
 
+    if (existing.hrStatus === 'approved') {
+      try { fs.unlinkSync(file.path); } catch (_) {}
+      throw new BadRequestException('Approved documents cannot be re-uploaded.');
+    }
+
     if (existing.onboardingId !== activeReqs[0].id) {
       try { fs.unlinkSync(file.path); } catch (_) {}
       throw new ForbiddenException('You do not own this document');
@@ -2814,6 +2855,9 @@ export class OnboardingService {
       .limit(1);
 
     if (!existing) throw new NotFoundException('Document not found');
+    if (existing.hrStatus === 'approved') {
+      throw new BadRequestException('Approved documents cannot be deleted.');
+    }
     if (existing.onboardingId !== activeReqs[0].id) throw new ForbiddenException('You do not own this document');
 
     if (existing.fileUrl) {
