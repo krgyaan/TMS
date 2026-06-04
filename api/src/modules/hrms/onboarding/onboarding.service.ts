@@ -2892,4 +2892,23 @@ export class OnboardingService {
       })
       .where(eq(onboardingRequests.id, onboardingId));
   }
+
+
+  async rejectOnboardingRequest(requestId: number) {
+    const onboardingRequest = await this.db
+      .select()
+      .from(onboardingRequests)
+      .where(eq(onboardingRequests.id, requestId));
+
+    if (!onboardingRequest || onboardingRequest.length === 0) {
+      throw new NotFoundException('Onboarding Request Not Found.');
+    }
+
+    await this.db
+      .update(onboardingRequests)
+      .set({
+        status: 'rejected',
+      })
+      .where(eq(onboardingRequests.id, requestId));
+  }
 }

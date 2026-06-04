@@ -325,6 +325,12 @@ export class OnboardingController {
     @Body() body: { status: 'approved' | 'rejected'; remark: string },
     @Req() req: any,
   ) {
+    
+    if(body.status == "rejected"){
+      //passing the onboarding Request Entry 
+      await this.onboardingService.rejectOnboardingRequest(id);
+    }
+
     return this.onboardingService.approveProfileSection(id, body.status, body.remark, req.user.id);
   }
 
