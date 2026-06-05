@@ -836,6 +836,10 @@ function ConsentForPayModal({
     const [remark, setRemark] = useState('');
     const [saving, setSaving] = useState(false);
 
+    useEffect(() => {
+        setRemark('');
+    }, [open, row?.instrumentId]);
+
     const handleSubmit = async () => {
         if (!row?.instrumentId || !remark.trim()) return;
         setSaving(true);
@@ -886,6 +890,14 @@ function ConsentForPayModal({
                             rows={3}
                         />
                     </div>
+                    {row?.consentForPay && (
+                        <div>
+                            <label className="text-sm text-muted-foreground block mb-1">Previous Comments</label>
+                            <div className="text-xs text-muted-foreground bg-muted rounded p-2 whitespace-pre-wrap max-h-32 overflow-y-auto">
+                                {row.consentForPay}
+                            </div>
+                        </div>
+                    )}
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
