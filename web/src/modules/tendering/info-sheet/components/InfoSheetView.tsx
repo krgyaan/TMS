@@ -675,7 +675,7 @@ const AllFieldsTable = ({ infoSheet }: { infoSheet: TenderInfoSheet }) => {
                         {infoSheet.customerInContact && (
                             <TableRow className="hover:bg-muted/30 transition-colors">
                                 <TableCell className="text-sm font-medium text-muted-foreground">
-                                    Client in Contact
+                                    Customer in Contact
                                 </TableCell>
                                 <TableCell className="text-sm font-semibold" colSpan={3}>
                                     {formatYesNo(infoSheet.customerInContact)}
