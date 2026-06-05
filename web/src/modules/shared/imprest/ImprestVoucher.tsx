@@ -1,10 +1,11 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import DataTable from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import { Eye, ArrowLeft } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import { useImprestVoucherList } from "./imprest.hooks";
 import type { ImprestVoucherRow } from "./imprest.types";
@@ -32,6 +33,50 @@ const ImprestVoucherList: React.FC = () => {
 
     // ✅ Fetch vouchers
     const { data: rows = [], isLoading } = useImprestVoucherList(queryUserId);
+
+    const [selectedFY, setSelectedFY] = useState<string>("");
+
+    // Helper to calculate financial year (e.g. 2024-25) for a date string
+    const getFinancialYearForDate = (dateStr: string) => {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return null;
+        const year = d.getFullYear();
+        const month = d.getMonth();
+        const startYear = month >= 3 ? year : year - 1;
+        const endYear = (startYear + 1) % 100;
+        return `${startYear}-${String(endYear).padStart(2, "0")}`;
+    };
+
+    // Extract unique available financial years
+    const availableFYs = useMemo(() => {
+        const years = new Set<string>();
+        rows.forEach((r: any) => {
+            if (r.validFrom) {
+                const fy = getFinancialYearForDate(r.validFrom);
+                if (fy) {
+                    years.add(fy);
+                }
+            }
+        });
+        return Array.from(years).sort((a, b) => b.localeCompare(a));
+    }, [rows]);
+
+    // Set the latest year as default once availableFYs load
+    useEffect(() => {
+        if (availableFYs.length > 0 && selectedFY === "") {
+            setSelectedFY(availableFYs[0]);
+        }
+    }, [availableFYs, selectedFY]);
+
+    // Filter rows client-side
+    const filteredRows = useMemo(() => {
+        const activeFY = selectedFY || availableFYs[0] || "all";
+        if (activeFY === "all") return rows;
+        return rows.filter((r: any) => {
+            if (!r.validFrom) return false;
+            return getFinancialYearForDate(r.validFrom) === activeFY;
+        });
+    }, [rows, selectedFY, availableFYs]);
     // console.log(rows);
 
     const actionItems = useMemo(
@@ -143,15 +188,30 @@ const ImprestVoucherList: React.FC = () => {
             <CardHeader>
                 <div className="flex items-center justify-between">
                     <CardTitle>{queryUserId ? `Imprest Vouchers - ${userDetails?.name ?? ""}` : "Imprest Vouchers"}</CardTitle>
-                    <Button variant="outline" size="sm" onClick={() => navigate(paths.accounts.imprests)}>
-                        <ArrowLeft className="h-4 w-4" />
-                        Back
-                    </Button>
+                    <div className="flex items-center gap-3">
+                        <Select value={selectedFY || availableFYs[0] || "all"} onValueChange={setSelectedFY}>
+                            <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Filter by Year" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {availableFYs.map(fy => (
+                                    <SelectItem key={fy} value={fy}>
+                                        {fy}
+                                    </SelectItem>
+                                ))}
+                                <SelectItem value="all">All Years</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Button variant="outline" size="sm" onClick={() => navigate(paths.accounts.imprests)}>
+                            <ArrowLeft className="h-4 w-4" />
+                            Back
+                        </Button>
+                    </div>
                 </div>
             </CardHeader>
 
             <CardContent>
-                <DataTable data={rows} columnDefs={columns as any} gridOptions={{ pagination: true }} loading={isLoading} />
+                <DataTable data={filteredRows} columnDefs={columns as any} gridOptions={{ pagination: true }} loading={isLoading} />
             </CardContent>
         </Card>
     );
