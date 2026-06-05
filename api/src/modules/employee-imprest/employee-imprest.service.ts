@@ -72,6 +72,7 @@ export class EmployeeImprestService {
                         amount: data.amount,
                         remark: data.remark,
                         invoiceProof: files.map(f => f.filename),
+                        dateOfExpense: data.dateOfExpense,
                         createdAt: new Date(),
                         updatedAt: new Date(),
                     })
@@ -208,6 +209,7 @@ export class EmployeeImprestService {
                     tallyStatus: employeeImprests.tallyStatus,
                     proofStatus: employeeImprests.proofStatus,
 
+                    dateOfExpense: employeeImprests.dateOfExpense,
                     createdAt: employeeImprests.createdAt,
                 })
                 .from(employeeImprests)
@@ -354,6 +356,7 @@ export class EmployeeImprestService {
             if (data.tallyStatus !== undefined) updateData.tallyStatus = data.tallyStatus;
             if (data.status !== undefined) updateData.status = data.status;
             if (data.approvedDate !== undefined) updateData.approvedDate = data.approvedDate;
+            if (data.dateOfExpense !== undefined) updateData.dateOfExpense = data.dateOfExpense;
 
             const [updated] = await tx
                 .update(employeeImprests)

@@ -340,7 +340,7 @@ const ImprestEmployeeDashboard: React.FC = () => {
 
     const exportExcel = () => {
         const excelData = rows.map(r => ({
-            Date: new Date(r.createdAt).toLocaleDateString("en-GB"),
+            Date: new Date(r.dateOfExpense || r.createdAt).toLocaleDateString("en-GB"),
             Party: r.partyName,
             Project: r.projectName,
             Category: r.formattedCategory,

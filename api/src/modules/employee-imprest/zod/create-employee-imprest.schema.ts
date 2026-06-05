@@ -26,6 +26,8 @@ export const CreateEmployeeImprestSchema = z.object({
     tallyStatus: z.coerce.number().int().optional(),
     proofStatus: z.coerce.number().int().optional(),
     status: z.coerce.number().int().optional(),
+    
+    dateOfExpense: z.coerce.date().optional().nullable(),
 
     approvedDate: z.coerce.date().optional().nullable(),
 

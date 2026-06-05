@@ -233,6 +233,7 @@ const EmployeeImprestEditForm: React.FC = () => {
             projectName: "",
             teamId: undefined,
             amount: undefined,
+            dateOfExpense: undefined,
             remark: "",
         },
     });
@@ -260,6 +261,7 @@ const EmployeeImprestEditForm: React.FC = () => {
                 amount: imprest.amount,
                 categoryId: imprest.categoryId,
                 teamId: imprest.teamId,
+                dateOfExpense: imprest.dateOfExpense ? format(new Date(imprest.dateOfExpense), "yyyy-MM-dd") : "",
                 remark: imprest.remark || "",
             });
 
@@ -554,6 +556,20 @@ const EmployeeImprestEditForm: React.FC = () => {
                                             {errors.amount && (
                                                 <p className="text-sm text-destructive">
                                                     {errors.amount.message}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        {/* Date of Expense */}
+                                        <div className="space-y-2">
+                                            <Label>Date of Expense</Label>
+                                            <Input
+                                                type="date"
+                                                {...register("dateOfExpense")}
+                                            />
+                                            {errors.dateOfExpense && (
+                                                <p className="text-sm text-destructive">
+                                                    {errors.dateOfExpense.message}
                                                 </p>
                                             )}
                                         </div>
