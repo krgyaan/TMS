@@ -97,10 +97,8 @@ function RejectionNotice({
   rejection: RejectionInfo | string | null | undefined; 
   onEdit?: () => void;
 }) {
-  if (!rejection) return null;
-
-  const reason = typeof rejection === 'string' ? rejection : rejection.reason;
-  const rejectedAt = typeof rejection === 'string' ? null : rejection.rejectedAt;
+  const reason = typeof rejection === 'string' ? rejection : rejection?.reason;
+  const rejectedAt = typeof rejection === 'string' ? null : rejection?.rejectedAt;
 
   return (
     <motion.div
@@ -870,6 +868,12 @@ export function OnboardingStageCard({
               <p className="text-xs text-muted-foreground leading-relaxed mb-3 line-clamp-2">
                 {description}
               </p>
+
+              {approvalStatus === "rejected" && rejection && (
+                <p className="text-xs font-medium text-red-600 dark:text-red-400 mt-1 mb-3 leading-relaxed">
+                  Reason: {typeof rejection === 'string' ? rejection : rejection.reason}
+                </p>
+              )}
 
               {/* Badges row */}
               <div className="flex flex-wrap items-center gap-2">

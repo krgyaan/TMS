@@ -17,8 +17,11 @@ import {
   Loader2,
   Plus,
   Trash2,
-  Building2,
-  Hash
+  Building2, 
+  Hash,
+  AlertCircle,
+  CheckCircle2,
+  Lock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -114,10 +117,14 @@ export function OnboardingProfileForm({ onCancel, onSuccess, initialTab = "perso
   const [activeTab, setActiveTab] = useState<TabId>(initialTab as any);
   const [sameAsCurrent, setSameAsCurrent] = useState(false);
 
-  const P = data?.profile || {};
+  const P = data?.profile || {} as any;
   const ADDR = data?.address || {};
   const EC = data?.emergencyContact || {};
   const EP = data?.employeeProfile || {};
+
+  const profileHrStatus = data?.onboardingStatus?.profileHrStatus || P.hrStatus || 'pending';
+  const profileHrRemark = data?.onboardingStatus?.profileHrRemark || P.hrRemark || null;
+  const isLocked = profileHrStatus === 'approved';
 
   const tabs = [
     { id: "personal", label: "Personal", icon: User },
@@ -252,6 +259,29 @@ export function OnboardingProfileForm({ onCancel, onSuccess, initialTab = "perso
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit, onError)} className="space-y-8">
+      {/* Rejection Banner */}
+      {profileHrStatus === "rejected" && profileHrRemark && (
+        <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 flex items-start gap-3">
+          <AlertCircle className="h-5 w-5 shrink-0 mt-0.5 text-red-500" />
+          <div className="space-y-1">
+            <h5 className="text-xs font-bold uppercase tracking-wider">Profile Rejected by HR</h5>
+            <p className="text-sm font-medium">{profileHrRemark}</p>
+            <p className="text-xs text-red-500/70">Please update the details below and resubmit.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Approved Lock Banner */}
+      {isLocked && (
+        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-start gap-3">
+          <Lock className="h-5 w-5 shrink-0 mt-0.5 text-emerald-500" />
+          <div className="space-y-1">
+            <h5 className="text-xs font-bold uppercase tracking-wider">Profile Approved</h5>
+            <p className="text-sm font-medium">Your profile has been approved by HR and is locked for editing.</p>
+          </div>
+        </div>
+      )}
+
       {/* Tab Navigation */}
       <div className="flex flex-wrap gap-2 p-1 bg-muted/30 rounded-2xl border border-border/10">
         {tabs.map((tab) => (
@@ -584,7 +614,7 @@ export function OnboardingProfileForm({ onCancel, onSuccess, initialTab = "perso
               ) : (
                 <Save className="h-4 w-4" />
               )}
-              Save Profile
+              {profileHrStatus === "rejected" ? "Resubmit Profile" : "Save Profile"}
             </Button>
           )}
         </div>
