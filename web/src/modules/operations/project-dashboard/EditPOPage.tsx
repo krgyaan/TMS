@@ -108,11 +108,11 @@ const NotFound = ({ message, onBack }: { message: string; onBack: () => void }) 
 
 export default function EditPOPage() {
     const navigate = useNavigate();
-    const { id } = useParams();
-    const purchaseOrderId = Number(id);
+    const { projectId: projectIdParam, poId } = useParams<{ projectId: string; poId: string }>();
+    const purchaseOrderId = Number(poId);
 
     const { data: poData, isLoading: isPOLoading, isError: isPOError, error: poError } = usePurchaseOrderDetails(purchaseOrderId);
-    const projectId = poData?.projectId;
+    const projectId = Number(projectIdParam) || poData?.projectId;
 
     const { data: partiesData } = usePoParties();
     const updatePOMutation = useUpdatePurchaseOrder();

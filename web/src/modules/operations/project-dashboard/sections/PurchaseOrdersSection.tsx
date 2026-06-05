@@ -38,12 +38,12 @@ export const PurchaseOrdersSection: React.FC<PurchaseOrdersSectionProps> = ({
         {
             label: "View Details",
             icon: <Eye className="h-4 w-4" />,
-            onClick: (row) => navigate(paths.operations.viewPoPage(row.id)),
+            onClick: (row) => navigate(paths.operations.viewPoPage(row.id, projectId!)),
         },
         {
             label: "Edit PO",
             icon: <Edit className="h-4 w-4" />,
-            onClick: (row) => navigate(paths.operations.editPoPage(row.id)),
+            onClick: (row) => navigate(paths.operations.editPoPage(row.id, projectId!)),
         },
         {
             label: "Download PO",
