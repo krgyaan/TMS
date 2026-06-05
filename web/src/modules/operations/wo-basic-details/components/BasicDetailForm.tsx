@@ -251,7 +251,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
         const a = Number(form.watch("budgetAdmin") || 0);
         const b = Number(form.watch("budgetBuybackSale") || 0);
         const g = Number(form.watch("budgetGemCharges") || 0);
-        return s + sv + f + a + b + g;
+        return s + sv + f + a + g - b;
     }, [form.watch("budgetSupply"), form.watch("budgetService"), form.watch("budgetFreight"), form.watch("budgetAdmin"), form.watch("budgetBuybackSale"), form.watch("budgetGemCharges")]);
 
     return (
