@@ -836,10 +836,6 @@ export class TenderResultService {
             throw new NotFoundException(`Tender not found with id : ${tenderId}`);
         }
 
-        if(tender.status === status.id){
-            return { message: "Status already updated" };
-        }
-
         const prevStatus = tender.status;
 
         //we will update the status

@@ -1,14 +1,18 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useInstrumentDetails } from "@/hooks/api/usePaymentRequests";
 import { InstrumentBiView } from "./InstrumentBiView";
+import { useNavigate } from "react-router-dom";
+import { paths } from "@/app/routes/paths";
 
 interface PaymentInstrumentViewProps {
     paymentRequestId: number;
 }
 
 export const PaymentInstrumentView = ({ paymentRequestId }: PaymentInstrumentViewProps) => {
+    const navigate = useNavigate();
     const { data, isLoading, error } = useInstrumentDetails(paymentRequestId);
 
     if (isLoading) {
@@ -70,11 +74,22 @@ export const PaymentInstrumentView = ({ paymentRequestId }: PaymentInstrumentVie
                     return !details?.linkedDdId && !details?.linkedFdrId;
                 })
                 .map((instrument: any) => (
-                <InstrumentBiView
-                    key={instrument.id}
-                    instrumentId={instrument.id}
-                    instrumentType={instrument.instrumentType}
-                />
+                <div key={instrument.id} className="space-y-2">
+                    <InstrumentBiView
+                        instrumentId={instrument.id}
+                        instrumentType={instrument.instrumentType}
+                    />
+                    <div className="flex justify-end">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => navigate(paths.tendering.emdsTenderFeesFollowUp(paymentRequestId))}
+                        >
+                            Initiate Followup
+                        </Button>
+                    </div>
+                </div>
             ))}
 
             {(!instruments || instruments.length === 0) && (

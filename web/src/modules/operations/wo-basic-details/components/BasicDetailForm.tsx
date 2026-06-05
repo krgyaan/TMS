@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { type SubmitHandler, useForm, type Resolver } from "react-hook-form";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Form } from "@/components/ui/form";
@@ -36,8 +36,10 @@ const teamArray = [
 
 export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
     const navigate = useNavigate();
+    const location = useLocation();
     const [searchParams] = useSearchParams();
     const urlTenderId = searchParams.get("tenderId");
+    const returnTo = (location.state as { from?: string } | null)?.from;
     const createMutation = useCreateWoBasicDetail();
     const updateMutation = useUpdateWoBasicDetail();
 
@@ -236,7 +238,7 @@ export function BasicDetailForm({ mode, existingData }: BasicDetailFormProps) {
                     });
                 }
             }
-            navigate(paths.operations.woBasicDetailListPage);
+            navigate(returnTo || paths.operations.woBasicDetailListPage);
         } catch (error: any) {
             toast.error(error?.message || "Failed to save basic detail");
         }

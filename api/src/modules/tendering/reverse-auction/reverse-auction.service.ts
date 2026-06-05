@@ -1031,7 +1031,7 @@ export class ReverseAuctionService {
             updatePayload.technicallyQualified = raRecord.technicallyQualified;
             updatePayload.disqualificationReason = raRecord.disqualificationReason;
             updatePayload.raStatus= raStatus ? raStatus : 'pending';
-            updatePayload.status = newStatus;
+            updatePayload.status = status;
         }
 
         // Check if tender_result exists

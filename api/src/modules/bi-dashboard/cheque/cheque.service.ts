@@ -643,8 +643,8 @@ export class ChequeService {
                     followupFor: 'Cheque Followup',
                     assignedToId: null,
                     createdById: null,
-                    amount: 0,
-                    attachments: [],
+                    amount: instrument.amount ? Number(instrument.amount) : 0,
+                    attachments: body.attachments || [],
                     followUpHistory: []
                 };
                 await this.followUpService.create(followupDto, user.id || user.sub);

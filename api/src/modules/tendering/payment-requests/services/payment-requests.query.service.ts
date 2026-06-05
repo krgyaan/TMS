@@ -1,9 +1,11 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, StreamableFile } from '@nestjs/common';
 import { Inject } from '@nestjs/common';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { eq, and, or, inArray, gt, sql, desc, asc, not } from 'drizzle-orm';
 import { paymentRequests, paymentInstruments, instrumentDdDetails, instrumentFdrDetails, instrumentBgDetails, instrumentChequeDetails, instrumentTransferDetails } from '@db/schemas/tendering/payment-requests.schema';
+import { createReadStream, existsSync } from 'fs';
+import * as path from 'path';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { tenderInformation } from '@/db/schemas/tendering/tender-info-sheet.schema';
 import { bidSubmissions } from '@db/schemas/tendering/bid-submissions.schema';
@@ -389,6 +391,10 @@ export class PaymentRequestsQueryService {
                 eq(paymentInstruments.isActive, true)
             ))
             .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(instrumentDdDetails, eq(instrumentDdDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(instrumentFdrDetails, eq(instrumentFdrDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id))
             .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
             .where(whereClause);
 
@@ -416,6 +422,27 @@ export class PaymentRequestsQueryService {
                 favouring: paymentInstruments.favouring,
                 bidSubmissionDate: bidSubmissions.submissionDatetime,
                 createdAt: paymentRequests.createdAt,
+                detailPurpose: sql<string>`
+                    CASE
+                        WHEN ${paymentInstruments.instrumentType} = 'DD' THEN ${instrumentDdDetails.ddPurpose}
+                        WHEN ${paymentInstruments.instrumentType} = 'FDR' THEN ${instrumentFdrDetails.fdrPurpose}
+                        WHEN ${paymentInstruments.instrumentType} = 'BG' THEN ${instrumentBgDetails.bgPurpose}
+                        WHEN ${paymentInstruments.instrumentType} = 'Cheque' THEN ${instrumentChequeDetails.chequeReason}
+                        ELSE NULL
+                    END
+                `,
+                paidDate: sql<Date>`
+                    CASE
+                        WHEN ${paymentInstruments.instrumentType} = 'DD' THEN ${instrumentDdDetails.ddDate}
+                        WHEN ${paymentInstruments.instrumentType} = 'FDR' THEN ${instrumentFdrDetails.fdrDate}
+                        WHEN ${paymentInstruments.instrumentType} = 'BG' THEN ${instrumentBgDetails.bgDate}
+                        WHEN ${paymentInstruments.instrumentType} = 'Cheque' THEN ${instrumentChequeDetails.chequeDate}
+                        WHEN ${paymentInstruments.instrumentType} = 'Bank Transfer' THEN ${instrumentTransferDetails.transactionDate}
+                        WHEN ${paymentInstruments.instrumentType} = 'Portal Payment' THEN ${instrumentTransferDetails.transactionDate}
+                        ELSE NULL
+                    END
+                `,
+                tenderStatus: statuses.name,
             })
             .from(paymentRequests)
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
@@ -429,6 +456,11 @@ export class PaymentRequestsQueryService {
                 eq(paymentInstruments.isActive, true)
             ))
             .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(instrumentDdDetails, eq(instrumentDdDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(instrumentFdrDetails, eq(instrumentFdrDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .where(whereClause)
             .orderBy(orderClause)
             .limit(limit)
@@ -458,9 +490,12 @@ export class PaymentRequestsQueryService {
                 instrumentType: row.instrumentType as any,
                 instrumentStatus: row.instrumentStatus,
                 favouring: row.favouring,
+                detailPurpose: (row as any).detailPurpose,
                 displayStatus: deriveDisplayStatus(row.instrumentStatus),
                 bidSubmissionDate: row.bidSubmissionDate,
                 createdAt: row.createdAt,
+                paidDate: (row as any).paidDate,
+                tenderStatus: (row as any).tenderStatus ?? null,
             };
         });
 
@@ -650,6 +685,7 @@ export class PaymentRequestsQueryService {
                 courierDeadline: paymentInstruments.courierDeadline,
                 status: paymentInstruments.status,
                 isActive: paymentInstruments.isActive,
+                reqNo: paymentInstruments.reqNo,
             })
             .from(paymentInstruments)
             .where(and(
@@ -657,10 +693,29 @@ export class PaymentRequestsQueryService {
                 eq(paymentInstruments.isActive, true)
             ));
 
+        const instrumentsWithDetails = await Promise.all(prInstruments.map(async (instrument) => {
+            const base = this.mapInstrumentBase(instrument);
+            let details: any = null;
+            if (instrument.instrumentType === 'DD') {
+                [details] = await this.db.select({
+                    reqNo: instrumentDdDetails.reqNo,
+                }).from(instrumentDdDetails).where(eq(instrumentDdDetails.instrumentId, instrument.id)).limit(1);
+            } else if (instrument.instrumentType === 'BG') {
+                [details] = await this.db.select({
+                    courierNo: instrumentBgDetails.courierNo,
+                }).from(instrumentBgDetails).where(eq(instrumentBgDetails.instrumentId, instrument.id)).limit(1);
+            }
+            return {
+                ...base,
+                reqNo: base.reqNo || details?.reqNo || null,
+                courierNo: details?.courierNo || null,
+            };
+        }));
+
         return {
             requests: requests.map(req => ({
                 ...this.mapPaymentRequest(req),
-                instruments: prInstruments.filter(i => i.requestId === req.id).map(i => this.mapInstrumentBase(i)),
+                instruments: instrumentsWithDetails.filter(i => i.requestId === req.id),
             })),
         };
     }
@@ -727,6 +782,7 @@ export class PaymentRequestsQueryService {
                 courierDeadline: paymentInstruments.courierDeadline,
                 status: paymentInstruments.status,
                 isActive: paymentInstruments.isActive,
+                reqNo: paymentInstruments.reqNo,
             })
             .from(paymentInstruments)
             .where(and(
@@ -780,6 +836,7 @@ export class PaymentRequestsQueryService {
                 courierDeadline: paymentInstruments.courierDeadline,
                 status: paymentInstruments.status,
                 isActive: paymentInstruments.isActive,
+                reqNo: paymentInstruments.reqNo,
             })
             .from(paymentInstruments)
             .where(and(
@@ -1152,6 +1209,8 @@ export class PaymentRequestsQueryService {
             courierDeadline: instrument.courierDeadline != null ? Number(instrument.courierDeadline) : null,
             status: instrument.status,
             isActive: instrument.isActive,
+            reqNo: instrument.reqNo,
+            details: null, // to be filled in mapInstrumentResponse
         };
     }
 
@@ -1396,5 +1455,29 @@ export class PaymentRequestsQueryService {
             chequePurpose: details?.chequeReason || '',
             chequeAccount: details?.bankName || instrument?.bankName || '',
         };
+    }
+
+    async serveGeneratedPdf(instrumentId: number): Promise<StreamableFile> {
+        const [instrument] = await this.db
+            .select({ generatedPdf: paymentInstruments.generatedPdf })
+            .from(paymentInstruments)
+            .where(eq(paymentInstruments.id, instrumentId))
+            .limit(1);
+
+        if (!instrument?.generatedPdf) {
+            throw new NotFoundException('No generated PDF found for this instrument');
+        }
+
+        const absolutePath = path.join(process.cwd(), 'uploads', 'tendering', instrument.generatedPdf);
+
+        if (!existsSync(absolutePath)) {
+            throw new NotFoundException('PDF file not found on disk');
+        }
+
+        const fileStream = createReadStream(absolutePath);
+        return new StreamableFile(fileStream, {
+            type: 'application/pdf',
+            disposition: `inline; filename="${path.basename(absolutePath)}"`,
+        });
     }
 }

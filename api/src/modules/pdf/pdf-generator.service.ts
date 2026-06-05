@@ -21,6 +21,7 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
     }
 
     async onModuleInit() {
+        this.registerHandlebarsHelpers();
         try {
             this.browser = await puppeteer.launch(PDF_CONFIG.browserOptions);
             this.logger.log('Puppeteer browser launched successfully');
@@ -278,21 +279,24 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
      * Register Handlebars helpers for PDF templates
      */
     private registerHandlebarsHelpers() {
-        // Format date helper
+        // Increment helper (for 1-based index)
+        Handlebars.registerHelper('inc', (value: number) => value + 1);
+
+        // Format date helper (dd-mm-yyyy)
         Handlebars.registerHelper('formatDate', (date: Date | string | null | undefined) => {
             if (!date) return 'N/A';
-            return new Date(date).toLocaleDateString('en-IN', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-            });
+            const d = new Date(date);
+            const day = String(d.getDate()).padStart(2, '0');
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const year = d.getFullYear();
+            return `${day}-${month}-${year}`;
         });
 
-        // Format currency helper
+        // Format currency helper (INR with commas, no symbol)
         Handlebars.registerHelper('formatCurrency', (amount: number | string | null | undefined) => {
-            if (amount == null) return '₹0.00';
+            if (amount == null) return '0.00';
             const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
-            return `₹${numAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            return numAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         });
 
         // Format date time helper
@@ -324,12 +328,57 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
     }
 
     /**
+     * Convert number to words in Indian numbering system (lakhs, crores)
+     */
+    public grandTotalInWords(num: number): string {
+        if (num === 0) return 'Zero Only';
+
+        const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+            'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+        const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+        const convertBelow1000 = (n: number): string => {
+            if (n === 0) return '';
+            if (n < 20) return ones[n];
+            if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 ? ' ' + ones[n % 10] : '');
+            return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 ? ' ' + convertBelow1000(n % 100) : '');
+        };
+
+        const wholePart = Math.floor(num);
+        const decimalPart = Math.round((num - wholePart) * 100);
+
+        const crore = Math.floor(wholePart / 10000000);
+        const lakh = Math.floor((wholePart % 10000000) / 100000);
+        const thousand = Math.floor((wholePart % 100000) / 1000);
+        const remainder = wholePart % 1000;
+
+        let result = '';
+        if (crore) result += convertBelow1000(crore) + ' Crore ';
+        if (lakh) result += convertBelow1000(lakh) + ' Lakh ';
+        if (thousand) result += convertBelow1000(thousand) + ' Thousand ';
+        if (remainder) result += convertBelow1000(remainder);
+
+        if (decimalPart > 0) {
+            result += ' and ' + convertBelow1000(decimalPart) + ' Paise';
+        }
+
+        return result.trim() + ' Only';
+    }
+
+    /**
      * Ensure browser is initialized, with retry logic and lazy initialization
      * Attempts to initialize the browser if it's null, with exponential backoff retries
      */
     private async ensureBrowser(): Promise<void> {
         if (this.browser) {
-            return;
+            // Verify browser connection is still alive
+            try {
+                await this.browser.pages();
+                return;
+            } catch {
+                this.logger.warn('Browser connection lost, reinitializing...');
+                this.browser = null;
+            }
         }
 
         this.logger.warn('Browser not initialized, attempting to initialize with retry logic...');
@@ -408,7 +457,7 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
     /**
      * Convert HTML to PDF using Puppeteer
      */
-    private async htmlToPdf(html: string, templateType: string): Promise<Buffer> {
+    private async htmlToPdf(html: string, templateType: string, retry = true): Promise<Buffer> {
         // Ensure browser is initialized before use
         await this.ensureBrowser();
 
@@ -447,7 +496,14 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
 
             return Buffer.from(pdfBuffer);
         } catch (error) {
-            this.logger.error(`Failed to generate PDF: ${error instanceof Error ? error.message : String(error)}`);
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            // If connection dropped, kill browser reference and retry once
+            if (retry && (errorMessage.includes('Connection closed') || errorMessage.includes('Protocol error'))) {
+                this.logger.warn(`Browser connection lost during PDF generation, retrying...`);
+                this.browser = null;
+                return this.htmlToPdf(html, templateType, false);
+            }
+            this.logger.error(`Failed to generate PDF: ${errorMessage}`);
             throw error;
         } finally {
             if (page) {

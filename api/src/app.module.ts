@@ -80,7 +80,7 @@ import { TimersModule } from "@/modules/timers/timers.module";
 import { BusinessPerformanceModule } from "./modules/performance/business-performance/business-performance.module";
 import { WoBasicDetailsModule } from "@/modules/operations/wo-basic-details/wo-basic-details.module";
 import { KickOffMeetingModule } from "./modules/operations/kick-off-meeting/kick-off-meeting.module";
-import { ProjectsModule } from "./modules/operations/projects/projects.module";
+import { ProjectDashboardModule } from "./modules/operations/projects/project-dashboard.module";
 import { FollowupSchedulerModule } from "@/modules/follow-up/follow-up-scheduler.module";
 import { PqrModule } from "@/modules/shared/pqr/pqr.module";
 import { FinanceDocumentsModule } from "@/modules/shared/finance-documents/finance-documents.module";
@@ -200,7 +200,7 @@ import { ProfileModule } from './modules/profile/profile.module';
         WoDocumentsModule,
         WoQueriesModule,
         KickOffMeetingModule,
-        ProjectsModule,
+        ProjectDashboardModule,
         FollowupSchedulerModule,
         PqrModule,
         FinanceDocumentsModule,

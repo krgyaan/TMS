@@ -1,4 +1,5 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query, Logger } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Query, Logger, Res, StreamableFile } from '@nestjs/common';
+import type { Response } from 'express';
 import { PaymentRequestsQueryService } from './services/payment-requests.query.service';
 import { PaymentRequestsCommandService } from './services/payment-requests.command.service';
 import { CreatePaymentRequestSchema, UpdatePaymentRequestSchema, UpdateStatusSchema, DashboardQuerySchema, type DashboardResponse, type DashboardCounts, type DashboardTab } from './dto/payment-requests.dto';
@@ -127,5 +128,13 @@ export class PaymentRequestsController {
     @Get(':id/instruments')
     async findInstrumentsByPaymentRequestId(@Param('id', ParseIntPipe) id: number) {
         return this.queryService.findInstrumentsByPaymentRequestId(id);
+    }
+
+    @Get('instruments/:id/pdf')
+    async serveInstrumentPdf(
+        @Param('id', ParseIntPipe) id: number,
+        @Res({ passthrough: true }) res: Response,
+    ): Promise<StreamableFile> {
+        return this.queryService.serveGeneratedPdf(id);
     }
 }

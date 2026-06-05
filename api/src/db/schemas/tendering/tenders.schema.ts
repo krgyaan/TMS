@@ -20,10 +20,10 @@ export const tenderInfos = pgTable("tender_infos", {
     deleteStatus: integer("delete_status").default(0).notNull(),
     documents: text("documents"),
     // Tender approval fields
-    tlRemarks: varchar("tl_remarks", { length: 200 }),
-    tlApprovalRemarks: varchar("tl_approval_remarks", { length: 200 }),
+    tlRemarks: text("tl_remarks"),
+    tlApprovalRemarks: text("tl_approval_remarks"),
     tlApprovalTimestamp: timestamp("tl_approval_timestamp", {withTimezone : true}),
-    rfqTo: varchar("rfq_to", { length: 15 }),
+    rfqTo: varchar("rfq_to", { length: 200 }),
     tlStatus: integer("tl_status").default(0).notNull(),
     processingFeeMode: varchar("processing_fee_mode", { length: 100 }),
     tenderFeeMode: varchar("tender_fee_mode", { length: 100 }),

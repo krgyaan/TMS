@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type StageProgressStatus = "pending" | "in_progress" | "submitted" | "completed";
+export type StageProgressStatus = "pending" | "in_progress" | "submitted" | "completed" | "resubmitted";
 
 export type ProgressStage = {
   key: string;
@@ -60,112 +60,6 @@ function getStepStyles(status: StageProgressStatus, isLast: boolean) {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Sub-components
-// ─────────────────────────────────────────────────────────────────────────────
-
-function StepIndicator({
-  stage,
-  stepNumber,
-  isLast,
-  totalSteps,
-  index,
-}: {
-  stage: ProgressStage;
-  stepNumber: number;
-  isLast: boolean;
-  totalSteps: number;
-  index: number;
-}) {
-  const styles = getStepStyles(stage.status, isLast);
-  const StepIcon = stage.icon || styles.icon;
-
-  return (
-    <div className="flex flex-col items-center relative" style={{ flex: 1 }}>
-      {/* Connector line (before this step) */}
-      {index > 0 && (
-        <div
-          className="absolute top-4 right-1/2 h-0.5 z-0"
-          style={{ width: "100%" }}
-        >
-          <motion.div
-            className={cn("h-full rounded-full", styles.connector)}
-            initial={{ scaleX: 0 }}
-            animate={{ scaleX: stage.status !== "pending" ? 1 : 0.3 }}
-            transition={{ duration: 0.5, delay: index * 0.15 }}
-            style={{ transformOrigin: "left" }}
-          />
-          {/* Background track */}
-          <div className="absolute inset-0 h-full rounded-full bg-muted/40 -z-10" />
-        </div>
-      )}
-
-      {/* Step dot */}
-      <motion.div
-        initial={{ scale: 0 }}
-        animate={{ scale: 1 }}
-        transition={{
-          type: "spring",
-          stiffness: 300,
-          damping: 20,
-          delay: index * 0.12,
-        }}
-        className="relative z-10"
-      >
-        <div
-          className={cn(
-            "h-8 w-8 rounded-full border-2 flex items-center justify-center transition-all duration-300",
-            "ring-4",
-            styles.dot,
-            styles.ring
-          )}
-        >
-          {stage.status === "completed" ? (
-            <motion.div
-              initial={{ scale: 0, rotate: -90 }}
-              animate={{ scale: 1, rotate: 0 }}
-              transition={{ type: "spring", stiffness: 400, damping: 15, delay: index * 0.12 + 0.1 }}
-            >
-              <CheckCircle2 className="h-4 w-4" />
-            </motion.div>
-          ) : stage.status === "in_progress" ? (
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-            >
-              <Clock className="h-3.5 w-3.5" />
-            </motion.div>
-          ) : (
-            <span className="text-[10px] font-bold">{stepNumber}</span>
-          )}
-        </div>
-
-        {/* Active pulse ring */}
-        {stage.status === "in_progress" && (
-          <span className="absolute inset-0 rounded-full animate-ping bg-primary/20" />
-        )}
-      </motion.div>
-
-      {/* Label */}
-      <motion.span
-        initial={{ opacity: 0, y: 5 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: index * 0.12 + 0.15 }}
-        className={cn(
-          "mt-2.5 text-[10px] sm:text-[11px] text-center leading-tight max-w-[80px] sm:max-w-[100px]",
-          styles.label
-        )}
-      >
-        {stage.label}
-      </motion.span>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Main Component
-// ─────────────────────────────────────────────────────────────────────────────
-
 export function OnboardingProgressBar({
   progress,
   stages,
@@ -183,7 +77,7 @@ export function OnboardingProgressBar({
             Complete all stages to finalize your profile
           </p>
         </div>
-        <div className="flex items-center gap-3 bg-muted/30 px-4 py-2 rounded-2xl border border-border/50">
+        {/* <div className="flex items-center gap-3 bg-muted/30 px-4 py-2 rounded-2xl border border-border/50">
           <div className="text-right">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Overall</p>
             <p className="text-sm font-bold text-primary tabular-nums">{clampedProgress}%</p>
@@ -206,13 +100,13 @@ export function OnboardingProgressBar({
             </svg>
             <span className="text-[10px] font-bold z-10">{clampedProgress}%</span>
           </div>
-        </div>
+        </div> */}
       </div>
 
       {/* Non-Linear Status Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         {stages.map((stage, idx) => {
-          const isCompleted = stage.status === "completed" || stage.status === "submitted";
+          const isCompleted = ["completed", "submitted" , "resubmitted"].includes(stage.status);
           const Icon = stage.icon || Clock;
 
           return (

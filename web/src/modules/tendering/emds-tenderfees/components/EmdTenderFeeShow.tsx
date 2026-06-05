@@ -1,7 +1,10 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { AlertCircle, FileText } from "lucide-react";
 import { InstrumentBiView } from "./InstrumentBiView";
+import { useNavigate } from "react-router-dom";
+import { paths } from "@/app/routes/paths";
 
 interface PaymentRequest {
     id: number;
@@ -42,11 +45,31 @@ interface EmdTenderFeeShowProps {
 }
 
 export const EmdTenderFeeShow = ({ paymentRequests, text }: EmdTenderFeeShowProps) => {
+    const navigate = useNavigate();
+
     if (!paymentRequests || !Array.isArray(paymentRequests)) return null;
 
     const emdRequests = paymentRequests.filter(r => r.purpose === "EMD");
     const tenderFeeRequests = paymentRequests.filter(r => r.purpose === "Tender Fee");
     const processingFeeRequests = paymentRequests.filter(r => r.purpose === "Processing Fee");
+
+    const renderInstruments = (requests: PaymentRequest[]) =>
+        requests.flatMap(r => (r.instruments ?? []).map(inst => ({ requestId: r.id, instrument: inst })))
+            .map(({ requestId, instrument: inst }) => (
+                <div key={inst.id} className="space-y-2">
+                    <InstrumentBiView instrumentId={inst.id} instrumentType={inst.instrumentType} />
+                    <div className="flex justify-end">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => navigate(paths.tendering.emdsTenderFeesFollowUp(requestId))}
+                        >
+                            Initiate Followup
+                        </Button>
+                    </div>
+                </div>
+            ));
 
     return (
         <div className="space-y-4">
@@ -57,15 +80,9 @@ export const EmdTenderFeeShow = ({ paymentRequests, text }: EmdTenderFeeShowProp
                 </Alert>
             )}
 
-            {emdRequests.flatMap(r => r.instruments ?? []).map(inst => (
-                <InstrumentBiView key={inst.id} instrumentId={inst.id} instrumentType={inst.instrumentType} />
-            ))}
-            {tenderFeeRequests.flatMap(r => r.instruments ?? []).map(inst => (
-                <InstrumentBiView key={inst.id} instrumentId={inst.id} instrumentType={inst.instrumentType} />
-            ))}
-            {processingFeeRequests.flatMap(r => r.instruments ?? []).map(inst => (
-                <InstrumentBiView key={inst.id} instrumentId={inst.id} instrumentType={inst.instrumentType} />
-            ))}
+            {renderInstruments(emdRequests)}
+            {renderInstruments(tenderFeeRequests)}
+            {renderInstruments(processingFeeRequests)}
         </div>
     );
 };

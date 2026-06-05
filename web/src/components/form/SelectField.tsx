@@ -125,6 +125,7 @@ export function Combobox({
                     {filtered.length === 0 && <div className="text-muted-foreground px-2 py-2 text-sm">No results</div>}
                     {filtered.map(o => {
                         const isSelected = value === o.id;
+                        const isCreateNew = o.id === "__create_new__";
                         return (
                             <DropdownMenuItem
                                 key={`${o.id}-${o.name}`}
@@ -134,7 +135,7 @@ export function Combobox({
                                     setOpen(false);
                                     setQuery("");
                                 }}
-                                className="flex items-center gap-2"
+                                className={cn("flex items-center gap-2", isCreateNew && "text-primary font-semibold")}
                             >
                                 <svg
                                     xmlns="http://www.w3.org/2000/svg"

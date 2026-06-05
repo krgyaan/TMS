@@ -50,7 +50,9 @@ export class MailerService {
 
         const attachments = files.map(file => {
             const safeName = normalize(file).replace(/^(\.\.(\/|\\|$))+/, "");
-            const relativePath = input.baseDir ? join(input.baseDir, safeName) : safeName;
+            const relativePath = safeName.includes('/') || safeName.includes('\\')
+                ? safeName
+                : input.baseDir ? join(input.baseDir, safeName) : safeName;
             const absolutePath = join(uploadsRoot, relativePath);
 
             if (!existsSync(absolutePath)) {

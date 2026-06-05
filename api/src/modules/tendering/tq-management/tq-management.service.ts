@@ -501,10 +501,20 @@ export class TqManagementService {
     }) {
         // Get current tender status before update
         const currentTender = await this.tenderInfosService.findById(data.tenderId);
+
+        if(!currentTender){
+            throw new BadRequestException("Tender Not Found");
+        }
+
         const prevStatus = currentTender?.status ?? null;
+        let newStatus = prevStatus;
+
+        const changeStatus = await this.checkForStatusChange(prevStatus);
 
         // AUTO STATUS CHANGE: Update tender status to 19 (TQ Received) and track it
-        const newStatus = 19; // Status ID for "TQ Received"
+        if(changeStatus){
+            newStatus = 19; // Status ID for "TQ Received"
+        }
 
         const result = await this.db.transaction(async (tx) => {
             // Create TQ record
@@ -533,10 +543,12 @@ export class TqManagementService {
             }
 
             // Update tender status
-            await tx
-                .update(tenderInfos)
-                .set({ status: newStatus, updatedAt: new Date() })
-                .where(eq(tenderInfos.id, data.tenderId));
+            if (newStatus !== prevStatus) {
+                await tx
+                    .update(tenderInfos)
+                    .set({ status: newStatus, updatedAt: new Date() })
+                    .where(eq(tenderInfos.id, data.tenderId));
+            }
 
             // Track status change
             await this.tenderStatusHistoryService.trackStatusChange(
@@ -571,11 +583,21 @@ export class TqManagementService {
 
         // Get current tender status before update
         const currentTender = await this.tenderInfosService.findById(tqRecord.tenderId);
-        const prevStatus = currentTender?.status ?? null;
+        
+        if(!currentTender){
+            throw new BadRequestException("Tender Not Found");
+        }
+
+        const prevStatus = currentTender.status;
+        let newStatus = prevStatus;
 
         // AUTO STATUS CHANGE: Update tender status to 20 (TQ replied) and track it
         // Note: Status 40 (TQ replied, Qualified) would require additional qualification check
-        const newStatus = 20; // Status ID for "TQ replied"
+        const changeStatus = await this.checkForStatusChange(prevStatus);
+
+        if(changeStatus){
+            newStatus = 20; // Status ID for "TQ replied"
+        }
 
         const result = await this.db.transaction(async (tx) => {
             const updated = await tx
@@ -593,10 +615,12 @@ export class TqManagementService {
                 .returning();
 
             // Update tender status
-            await tx
-                .update(tenderInfos)
-                .set({ status: newStatus, updatedAt: new Date() })
-                .where(eq(tenderInfos.id, tqRecord.tenderId));
+            if (newStatus !== prevStatus) {
+                await tx
+                    .update(tenderInfos)
+                    .set({ status: newStatus, updatedAt: new Date() })
+                    .where(eq(tenderInfos.id, tqRecord.tenderId));
+            }
 
             // Track status change
             await this.tenderStatusHistoryService.trackStatusChange(
@@ -631,10 +655,21 @@ export class TqManagementService {
 
         // Get current tender status before update
         const currentTender = await this.tenderInfosService.findById(tqRecord.tenderId);
-        const prevStatus = currentTender?.status ?? null;
+
+        if(!currentTender){
+            throw new BadRequestException("Tender Not Found");
+        }
+
+        const prevStatus = currentTender?.status;
+        let newStatus = prevStatus;
 
         // AUTO STATUS CHANGE: Update tender status to 39 (Disqualified, TQ missed) and track it
-        const newStatus = 39; // Status ID for "Disqualified, TQ missed"
+
+        const changeStatus = await this.checkForStatusChange(prevStatus);
+
+        if(changeStatus){
+            newStatus = 39; // Status ID for "Disqualified, TQ missed"
+        }
 
         const result = await this.db.transaction(async (tx) => {
             const updated = await tx
@@ -650,10 +685,12 @@ export class TqManagementService {
                 .returning();
 
             // Update tender status
-            await tx
-                .update(tenderInfos)
-                .set({ status: newStatus, updatedAt: new Date() })
-                .where(eq(tenderInfos.id, tqRecord.tenderId));
+            if (newStatus !== prevStatus) {
+                await tx
+                    .update(tenderInfos)
+                    .set({ status: newStatus, updatedAt: new Date() })
+                    .where(eq(tenderInfos.id, tqRecord.tenderId));
+            }
 
 
             //we also need to update the result status if the tender is qualified or disqualified
@@ -693,18 +730,27 @@ export class TqManagementService {
     async markAsNoTq(tenderId: number, userId: number, qualified: boolean = true, disqualificationReason?: string) {
         // Get current tender status before update
         const currentTender = await this.tenderInfosService.findById(tenderId);
-        const prevStatus = currentTender?.status ?? null;
+
+        if(!currentTender){
+            throw new BadRequestException("Tender Not Found");
+        }
+
+        const prevStatus = currentTender.status;
+        let newStatus = prevStatus;
 
         //finding the tq_status for Result Entry 
         let tqStatus = qualified ? 'Qualified, No TQ Recieved' : 'Disqualified, No TQ Recieved';
 
         // AUTO STATUS CHANGE: Update tender status based on qualification
         // Status 37 (Qualified, No TQ received) or Status 38 (Disqualified, No TQ received)
-        const newStatus = qualified ? 37 : 38;
+        const changeStatus = await this.checkForStatusChange(prevStatus);
+
+        if(changeStatus){
+            newStatus = qualified ? 37 : 38;
+        }
 
         const result = await this.db.transaction(async (tx) => {
             // Create a TQ record with "No TQ" status based on qualification
-            const tqStatus = qualified ? 'Qualified, No TQ received' : 'Disqualified, No TQ received';
             const [tqRecord] = await tx
                 .insert(tenderQueries)
                 .values({
@@ -718,10 +764,12 @@ export class TqManagementService {
                 .returning();
 
             // Update tender status
-            await tx
-                .update(tenderInfos)
-                .set({ status: newStatus, updatedAt: new Date() })
-                .where(eq(tenderInfos.id, tenderId));
+            if (newStatus !== prevStatus) {
+                await tx
+                    .update(tenderInfos)
+                    .set({ status: newStatus, updatedAt: new Date() })
+                    .where(eq(tenderInfos.id, tenderId));
+            }
 
             //we also need to update the result status if the tender is qualified or disqualified
             const {id : resultId} = await this.tenderResulService.getOrCreateForTender(tenderId);
@@ -731,7 +779,7 @@ export class TqManagementService {
                 .update(tenderResults)
                 .set({
                     technicallyQualified: qualified ? "Yes" : "No",
-                    status : qualified ? "Under Evaluation" : "Disqualified",
+                    status: qualified ? sql`CASE WHEN ${tenderResults.status} IS NULL OR ${tenderResults.status} = '' THEN 'Under Evaluation' ELSE ${tenderResults.status} END` : "Disqualified",
                     disqualificationReason: qualified ? null : (disqualificationReason || null),
                     tqStatus : tqStatus
                 })
@@ -760,11 +808,22 @@ export class TqManagementService {
 
         // Get current tender status before update
         const currentTender = await this.tenderInfosService.findById(tenderId);
-        const prevStatus = currentTender?.status ?? null;
+
+        if(!currentTender){
+            throw new BadRequestException("Tender Not Found");
+        }
+
+
+        const prevStatus = currentTender.status;
+        let newStatus = prevStatus;
 
         // AUTO STATUS CHANGE: Update tender status based on qualification
         // Status 40 (TQ replied, Qualified) or Status 39 (Disqualified, TQ missed)
-        const newStatus = qualified ? 40 : 39;
+        const changeStatus = await this.checkForStatusChange(prevStatus);
+        
+        if(changeStatus){
+            newStatus = qualified ? 40 : 39;
+        }
         
         //finding the tq_status for Result Entry 
         let tqStatus = qualified ? 'Qualified, TQ Replied' : 'Disqualified, TQ Missed';
@@ -782,10 +841,12 @@ export class TqManagementService {
                 .returning();
 
             // Update tender status
-            await tx
-                .update(tenderInfos)
-                .set({ status: newStatus, updatedAt: new Date() })
-                .where(eq(tenderInfos.id, tenderId));
+            if (newStatus !== prevStatus) {
+                await tx
+                    .update(tenderInfos)
+                    .set({ status: newStatus, updatedAt: new Date() })
+                    .where(eq(tenderInfos.id, tenderId));
+            }
             
             //we also need to update the result status if the tender is qualified or disqualified
             const {id : resultId} = await this.tenderResulService.getOrCreateForTender(tqRecord.tenderId);
@@ -821,6 +882,15 @@ export class TqManagementService {
         }
 
         return result;
+    }
+
+    async checkForStatusChange(status) {
+        const statusList = await this.db.select().from(statuses).where(inArray(statuses.tenderCategory,['lost', 'won']));
+        const resultStatus = statusList.map((val) => Number(val.id));
+
+        const changeStatus = status && !resultStatus.includes(Number(status));
+
+        return changeStatus;
     }
 
     async updateTqReceived(

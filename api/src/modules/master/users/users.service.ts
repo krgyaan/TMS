@@ -558,7 +558,13 @@ export class UsersService {
     }
 
     async getTeamMembers(teamId: number): Promise<User[]> {
-        const result = (await this.db
+        const conditions = [isNull(users.deletedAt)];
+
+        if (teamId !== 0) {
+            conditions.push(eq(users.team, teamId));
+        }
+
+        const result = await this.db
             .select({
                 id: users.id,
                 name: users.name,
@@ -568,7 +574,8 @@ export class UsersService {
                 isActive: users.isActive,
             })
             .from(users)
-            .where(and(eq(users.team, teamId), isNull(users.deletedAt)))) as User[];
+            .where(and(...conditions)) as User[];
+
         return result;
     }
 

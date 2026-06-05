@@ -10,6 +10,8 @@ export const paymentPurposeEnum = pgEnum('payment_purpose', [
     'Performance BG',    // Corresponds to MySQL emds.purpose = 'Performance BG'
     'Surety Bond',       // Corresponds to MySQL emds.purpose = 'Surety Bond'
     'Other Payment',     // Corresponds to MySQL emds.purpose = 'Other Payment'
+    'DD',
+    'FDR',
 ]);
 
 export const instrumentTypeEnum = pgEnum('instrument_type', [

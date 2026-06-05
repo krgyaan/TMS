@@ -208,6 +208,17 @@ export function ChequeView({
                                 </TableCell>
                                 <TableCell colSpan={2} />
                             </TableRow>
+                            {data.generatedPdf && (
+                                <TableRow className="hover:bg-muted/30 transition-colors">
+                                    <TableCell className="text-sm font-medium text-muted-foreground">
+                                        Receiving PDF
+                                    </TableCell>
+                                    <TableCell className="text-sm">
+                                        <FileLink file={data.generatedPdf} />
+                                    </TableCell>
+                                    <TableCell colSpan={2} />
+                                </TableRow>
+                            )}
 
                             {/* Handover/Confirmation Details */}
                             {(data.handover || data.confirmation || data.reference) && (

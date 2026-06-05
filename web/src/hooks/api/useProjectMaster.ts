@@ -106,3 +106,12 @@ export const useDeleteProjectMaster = () => {
         },
     });
 };
+
+export const useProjectMasterOptions = () => {
+    const { data } = useProjectMasters({ page: 1, limit: 500 });
+
+    return data?.data.map(project => ({
+        id: String(project.id),
+        name: `${project.tenderId ? "✅" : ""} ${project.projectName}`,
+    })) || [];
+}

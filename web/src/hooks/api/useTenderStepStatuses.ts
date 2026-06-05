@@ -1,5 +1,6 @@
 import { useTender } from "@/hooks/api/useTenders";
 import { useTenderApproval } from "@/hooks/api/useTenderApprovals";
+import { useInfoSheet } from "@/hooks/api/useInfoSheets";
 import { usePhysicalDocByTenderId } from "@/hooks/api/usePhysicalDocs";
 import { useRfqByTenderId } from "@/hooks/api/useRfqs";
 import { usePaymentRequestsByTender } from "@/hooks/api/usePaymentRequests";
@@ -10,6 +11,7 @@ import { useTenderResultByTenderId } from "@/hooks/api/useTenderResults";
 import { useTqById, useTqByTender } from "@/hooks/api/useTqManagement";
 import { useReverseAuctionByTender } from "@/hooks/api/useReverseAuctions";
 import type { StepStatus } from "@/modules/tendering/components/ShowPageLayout";
+import { useWoBasicDetailsByTender } from "./useWoBasicDetails";
 
 function deriveStatus(hasData: boolean, isLoading: boolean): StepStatus {
     if (isLoading) return "loading";
@@ -40,6 +42,7 @@ export function useTenderStepStatuses(tenderId: number | null, options: UseTende
 
     const { data: tender, isLoading: l1 } = useTender(resolvedTenderId);
     const { data: approval, isLoading: l2 } = useTenderApproval(resolvedTenderId);
+    const { data: infoSheet, isLoading: lInfo } = useInfoSheet(resolvedTenderId);
     const { data: physicalDoc, isLoading: l3 } = usePhysicalDocByTenderId(resolvedTenderId);
     const { data: rfq, isLoading: l4 } = useRfqByTenderId(resolvedTenderId);
     const { data: paymentReqs, isLoading: l5 } = usePaymentRequestsByTender(resolvedTenderId);
@@ -49,6 +52,7 @@ export function useTenderStepStatuses(tenderId: number | null, options: UseTende
     const { data: tenderResult, isLoading: l9 } = useTenderResultByTenderId(resolvedTenderId);
     const { data: tqByTender, isLoading: l10a } = useTqByTender(resolvedTenderId ?? 0);
     const { data: raData, isLoading: l11 } = useReverseAuctionByTender(resolvedTenderId ?? 0);
+    const { data: basicDetails, isLoading: l12 } = useWoBasicDetailsByTender(resolvedTenderId ?? 0);
 
     const steps: TenderStepStatus[] = [
         {
@@ -65,9 +69,9 @@ export function useTenderStepStatuses(tenderId: number | null, options: UseTende
             label: "Physical Documents",
             shortLabel: "Physical Docs",
             stepNumber: 2,
-            hasData: !!physicalDoc,
-            isLoading: l3,
-            status: deriveStatus(!!physicalDoc, l3),
+            hasData: !!physicalDoc || infoSheet?.physicalDocType === 'ONLY_EMD',
+            isLoading: l3 || lInfo,
+            status: infoSheet?.physicalDocType === 'ONLY_EMD' ? 'completed' : deriveStatus(!!physicalDoc, l3),
         },
         {
             id: "rfq",
@@ -141,7 +145,16 @@ export function useTenderStepStatuses(tenderId: number | null, options: UseTende
             isLoading: l9,
             status: deriveStatus(!!tenderResult, l9),
         },
+        {
+            id: "basic-details",
+            label: "Basic Details",
+            shortLabel: "Basic Details",
+            stepNumber: 10,
+            hasData: !!basicDetails,
+            isLoading: l12,
+            status: deriveStatus(!!basicDetails, l12),
+        },
     ];
 
-    return { steps, tender, approval, tqData: tqByTender || tqById, raData };
+    return { steps, tender, approval, tqData: tqByTender || tqById, raData, basicDetails };
 }

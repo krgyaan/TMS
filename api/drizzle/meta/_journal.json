@@ -253,6 +253,13 @@
       "when": 1767869778000,
       "tag": "0063_drop_budget_from_wo_details",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1748900000000,
+      "tag": "0067_fix_payment_instrument_default_status",
+      "breakpoints": true
     }
   ]
 }

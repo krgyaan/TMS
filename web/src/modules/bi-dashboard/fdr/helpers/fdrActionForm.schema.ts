@@ -65,11 +65,15 @@ export const FdrActionFormSchema = BaseActionFormSchema.extend({
 ).refine(
     (data) => {
         if (data.action === 'accounts-form' && data.fdr_req === 'Accepted') {
-            return !!data.fdr_date && !!data.fdr_no && !!data.courierOrg;
+            return !!data.fdr_date && !!data.fdr_no &&
+                !!data.courierOrg && !!data.courierName && !!data.courierPhone &&
+                !!data.courierAddrLine1 && !!data.courierPincode &&
+                /^\d{6}$/.test(data.courierPincode || '') &&
+                !!data.empFrom && !!data.delDate && !!data.urgency;
         }
         return true;
     },
-    { message: 'FDR date, FDR number, and courier organization are required when accepted', path: ['fdr_date'] }
+    { message: 'FDR date, FDR number, and courier dispatch details are required when accepted', path: ['fdr_date'] }
 ).refine(
     (data) => {
         if (data.action === 'initiate-followup') {
