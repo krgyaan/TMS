@@ -504,10 +504,10 @@ const EmdsAndTenderFeesPage = () => {
 
         return [
             tenderDetailsCol,
-            {
+            ...((activeTab === 'others' || activeTab === 'fees') ? [{
                 field: 'purpose',
                 headerName: 'Purpose',
-                width: 130,
+                width: 150,
                 cellRenderer: (params: any) => {
                     const displayValue = activeTab === 'others'
                         ? (params.data?.detailPurpose || params.value)
@@ -518,7 +518,7 @@ const EmdsAndTenderFeesPage = () => {
                         </Badge>
                     );
                 },
-            },
+            }] : []),
             currencyCol<any>('amountRequired', {
                 field: "amountRequired",
                 colId: "amountRequired",
