@@ -397,7 +397,7 @@ export function OnboardingView() {
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
             <OnboardingHeader />
 
-            {onboardingStatus && <OnboardingBanner onboardingStatus={onboardingStatus} onFillProfile={() => setEditingStage("profile")} />}
+            {onboardingStatus && <OnboardingBanner onboardingStatus={onboardingStatus} />}
 
             {/* Progress Section */}
             <motion.div

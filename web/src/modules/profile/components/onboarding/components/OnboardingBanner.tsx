@@ -61,10 +61,9 @@ function getBannerConfig(onboardingStatus: OnboardingStatus) {
 }
 
 
-function OnboardingBanner({ onboardingStatus, onFillProfile }: { onboardingStatus: OnboardingStatus; onFillProfile?: () => void }) {
+function OnboardingBanner({ onboardingStatus }: { onboardingStatus: OnboardingStatus }) {
     const config = getBannerConfig(onboardingStatus);
     const BannerIcon = config.icon;
-    const isProfileIncomplete = onboardingStatus.profileStatus === "pending";
 
     return (
         <motion.div
@@ -89,16 +88,6 @@ function OnboardingBanner({ onboardingStatus, onFillProfile }: { onboardingStatu
                         <p className={cn("text-xs sm:text-sm mt-0.5 leading-relaxed", config.subtextColor)}>{config.description}</p>
                     </div>
                 </div>
-
-                {onFillProfile && isProfileIncomplete && (
-                    <Button
-                        size="sm"
-                        onClick={onFillProfile}
-                        className="rounded-xl px-6 h-9 sm:h-10 text-xs sm:text-sm font-bold shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all shrink-0"
-                    >
-                        {onboardingStatus.profileStatus === "rejected" ? "Re-fill Profile Details" : "Fill Profile Details"}
-                    </Button>
-                )}
             </div>
         </motion.div>
     );
