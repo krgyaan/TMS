@@ -11,6 +11,11 @@ export interface ImprestStats {
     };
 }
 
+export interface PreviousFYStats extends ImprestStats {
+    financialYear: string;
+    fyStartYear: number;
+}
+
 export interface EmployeeImprestSummary {
     userId: number;
     userName: string;
@@ -29,7 +34,7 @@ export interface EmployeeImprestSummary {
 
     // Segregated
     current: ImprestStats;
-    previous: ImprestStats;
+    previous: PreviousFYStats[];
 }
 
 export interface CreateImprestCreditPayload {

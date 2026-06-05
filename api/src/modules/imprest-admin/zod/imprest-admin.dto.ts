@@ -11,6 +11,11 @@ export interface ImprestStatsDto {
     };
 }
 
+export interface PreviousFYStatsDto extends ImprestStatsDto {
+    financialYear: string;
+    fyStartYear: number;
+}
+
 export interface EmployeeImprestSummaryDto {
     userId: number;
     userName: string;
@@ -29,5 +34,5 @@ export interface EmployeeImprestSummaryDto {
 
     // Segregated for summary cards
     current: ImprestStatsDto;
-    previous: ImprestStatsDto;
+    previous: PreviousFYStatsDto[];
 }
