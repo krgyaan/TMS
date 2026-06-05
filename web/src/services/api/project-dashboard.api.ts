@@ -1,8 +1,10 @@
 import { BaseApiService } from './base.service';
+import axiosInstance from '@/lib/axios';
 import type {
     CreatePurchaseOrderDTO,
     UpdatePurchaseOrderDTO,
     CreatePartyDTO,
+    PurchaseOrderRow,
 } from '@/modules/operations/project-dashboard/helpers/projectDashboard.types';
 
 class ProjectDashboardApiService extends BaseApiService {
@@ -20,7 +22,7 @@ class ProjectDashboardApiService extends BaseApiService {
         return this.get(`/${id}/work-orders`);
     }
 
-    async getProjectPurchaseOrders(id: number): Promise<{ purchaseOrders: any[] }> {
+    async getProjectPurchaseOrders(id: number): Promise<{ purchaseOrders: PurchaseOrderRow[] }> {
         return this.get(`/${id}/purchase-orders`);
     }
 
@@ -46,6 +48,11 @@ class ProjectDashboardApiService extends BaseApiService {
 
     async getPurchaseOrder(id: number): Promise<any> {
         return this.get(`/purchase-orders/${id}`);
+    }
+
+    getPurchaseOrderPdfUrl(id: number): string {
+        const baseUrl = axiosInstance.defaults.baseURL || '';
+        return `${baseUrl}/projects/purchase-orders/${id}/pdf`;
     }
 
     async updatePurchaseOrder(id: number, data: UpdatePurchaseOrderDTO): Promise<any> {

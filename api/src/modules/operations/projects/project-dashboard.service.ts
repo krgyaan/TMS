@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { eq, like, desc } from "drizzle-orm";
+import { eq, like, desc, sql } from "drizzle-orm";
 
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
@@ -115,10 +115,23 @@ export class ProjectDashboardService {
                     id: purchaseOrders.id,
                     poNumber: purchaseOrders.poNumber,
                     sellerName: purchaseOrders.sellerName,
+                    sellerEmail: purchaseOrders.sellerEmail,
+                    sellerAddress: purchaseOrders.sellerAddress,
+                    sellerGstNo: purchaseOrders.sellerGstNo,
+                    sellerPanNo: purchaseOrders.sellerPanNo,
+                    sellerMsmeNo: purchaseOrders.sellerMsmeNo,
+                    sellerCinNo: purchaseOrders.sellerCinNo,
                     shipToName: purchaseOrders.shipToName,
+                    shippingAddress: purchaseOrders.shippingAddress,
+                    shipToGst: purchaseOrders.shipToGst,
+                    shipToPan: purchaseOrders.shipToPan,
                     poDate: purchaseOrders.poDate,
                     poRaisedBy: users.name,
                     createdAt: purchaseOrders.createdAt,
+                    poPdf: purchaseOrders.generatedPdf,
+                    totalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                    totalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                    grandTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                 })
                 .from(purchaseOrders)
                 .innerJoin(users, eq(users.id, purchaseOrders.poRaisedBy))
