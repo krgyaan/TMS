@@ -11,6 +11,7 @@ import { extractAmountFromDetails, extractPurposeFromDetails } from './payment-r
 import { tenderInformation } from '@/db/schemas';
 import { PaymentRequestsNotificationService } from './payment-requests-notification.service';
 import { TimersService } from '@/modules/timers/timers.service';
+import { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 
 @Injectable()
 export class PaymentRequestsCommandService {
