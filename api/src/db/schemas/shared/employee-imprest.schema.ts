@@ -28,6 +28,8 @@ export const employeeImprests = pgTable("employee_imprests", {
     proofStatus: integer("proof_status").notNull().default(0),
     status: integer("status").notNull().default(1),
 
+    dateOfExpense: timestamp("date_of_expense", {withTimezone : true}),
+
     accRemark : text('acc_remark'),
 
     // timestamps

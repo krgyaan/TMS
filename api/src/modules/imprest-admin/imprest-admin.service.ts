@@ -104,7 +104,7 @@ export class ImprestAdminService {
                 voucher_amounts AS (
                     SELECT
                         user_id,
-                        EXTRACT(YEAR FROM effective_date)::int AS year,
+                        EXTRACT(ISOYEAR FROM effective_date)::int AS year,
                         EXTRACT(WEEK FROM effective_date)::int AS week,
                         MIN(effective_date) AS start_date,
                         (
@@ -373,7 +373,7 @@ export class ImprestAdminService {
                         SELECT
                             user_id,
 
-                            EXTRACT(YEAR FROM effective_date)::int AS year,
+                            EXTRACT(ISOYEAR FROM effective_date)::int AS year,
                             EXTRACT(WEEK FROM effective_date)::int AS week,
 
                             MIN(effective_date) AS start_date,
@@ -397,7 +397,7 @@ export class ImprestAdminService {
                 proofs AS (
                     SELECT
                         user_id,
-                        EXTRACT(YEAR FROM effective_date)::int AS year,
+                        EXTRACT(ISOYEAR FROM effective_date)::int AS year,
                         EXTRACT(WEEK FROM effective_date)::int AS week,
                         array_agg(DISTINCT proof)
                             FILTER (WHERE proof IS NOT NULL) AS all_invoice_proofs
@@ -503,7 +503,7 @@ export class ImprestAdminService {
         SELECT invoice_proof
         FROM employee_imprests
         WHERE user_id = ${userId}
-          AND EXTRACT(YEAR FROM COALESCE(approved_date, created_at)) = ${year}
+          AND EXTRACT(ISOYEAR FROM COALESCE(approved_date, created_at)) = ${year}
           AND EXTRACT(WEEK FROM COALESCE(approved_date, created_at)) = ${week}
     `);
 

@@ -29,6 +29,7 @@ export const UpdateEmployeeImprestSchema = z.object({
 
     // dates
     approvedDate: z.coerce.date().optional().nullable(),
+    dateOfExpense: z.coerce.date().optional().nullable(),
 });
 
 export type UpdateEmployeeImprestDto = z.infer<typeof UpdateEmployeeImprestSchema>;
