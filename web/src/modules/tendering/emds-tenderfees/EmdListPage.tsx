@@ -4,7 +4,7 @@ import type { ColDef } from "ag-grid-community";
 import DataTable from "@/components/ui/data-table";
 import { formatDateTime } from "@/hooks/useFormatedDate";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
-import { EyeIcon, Pencil, Plus, RefreshCw, Search, Send, Download, XCircle } from "lucide-react";
+import { CheckCircle, EyeIcon, Pencil, Plus, RefreshCw, Search, Send, Download, XCircle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsTrigger, TabsList } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +14,8 @@ import { paths } from "@/app/routes/paths";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import type { PendingTenderRowWithTimer, PaymentRequestRowWithTimer } from "./helpers/payment-request.types";
 import { currencyCol, tenderNameCol } from "@/components/data-grid";
@@ -89,6 +91,10 @@ const EmdsAndTenderFeesPage = () => {
     const { hasTenderingPermission } = useTenderingPermissions();
     const [exporting, setExporting] = useState(false);
     const { isAdmin, isSuperUser } = useAuth();
+    const [consentModal, setConsentModal] = useState<{
+        open: boolean;
+        row: PaymentRequestRowWithTimer | null;
+    }>({ open: false, row: null });
 
     const EXPORT_TAB_OPTIONS = [
         { value: 'pending', label: 'Request Pending' },
@@ -441,12 +447,10 @@ const EmdsAndTenderFeesPage = () => {
                 },
                 {
                     field: 'statusName',
-                    headerName: 'Status',
+                    headerName: 'Tender Status',
                     width: 150,
                     cellRenderer: (params: any) => (
-                        <Badge variant="outline" className={STATUS_COLORS[params.value] || ''}>
-                            {params.value}
-                        </Badge>
+                        params.value
                     ),
                 },
                 timerCol,
@@ -482,10 +486,23 @@ const EmdsAndTenderFeesPage = () => {
                     },
                 ];
 
-                if (activeTab === 'sent' || activeTab === 'rejected') {
+                if (activeTab === 'sent') {
                     actions.unshift({
-                        label: activeTab === 'rejected' ? 'Resubmit' : 'Edit Request',
-                        icon: activeTab === 'rejected' ? <RefreshCw className="w-4 h-4" /> : <Pencil className="w-4 h-4" />,
+                        label: 'Consent for EMD Payment/Pay',
+                        icon: <CheckCircle className="w-4 h-4" />,
+                        onClick: (r) => setConsentModal({ open: true, row: r }),
+                        visible: () => hasTenderingPermission,
+                    });
+                    actions.unshift({
+                        label: 'Edit Request',
+                        icon: <Pencil className="w-4 h-4" />,
+                        onClick: (r) => navigate(paths.tendering.emdsTenderFeesEdit(r.id)),
+                    });
+                }
+                if (activeTab === 'rejected') {
+                    actions.unshift({
+                        label: 'Resubmit',
+                        icon: <RefreshCw className="w-4 h-4" />,
                         onClick: (r) => navigate(paths.tendering.emdsTenderFeesEdit(r.id)),
                     });
                 }
@@ -504,6 +521,7 @@ const EmdsAndTenderFeesPage = () => {
 
         return [
             tenderDetailsCol,
+            teamMemberCol,
             ...((activeTab === 'others' || activeTab === 'fees') ? [{
                 field: 'purpose',
                 headerName: 'Purpose',
@@ -554,16 +572,6 @@ const EmdsAndTenderFeesPage = () => {
                 ),
             },
             {
-                field: 'bidValid',
-                headerName: 'Bid Valid Till',
-                width: 150,
-                cellRenderer: (params: any) => {
-                    if (!params.value) return <span className="text-gray-400">—</span>;
-                    return formatDateTime(params.value);
-                },
-                hide: activeTab === 'others',
-            },
-            {
                 field: 'dueDate',
                 headerName: 'Due Date',
                 width: 140,
@@ -580,15 +588,22 @@ const EmdsAndTenderFeesPage = () => {
                 },
                 sortable: true,
             },
+            {
+                field: 'bidValid',
+                headerName: 'Bid Valid Till',
+                width: 150,
+                cellRenderer: (params: any) => {
+                    if (!params.value) return <span className="text-gray-400">—</span>;
+                    return formatDateTime(params.value);
+                },
+                hide: activeTab === 'others',
+            },
             ...(activeTab === 'paid' ? [
                 {
-                    field: 'bidSubmissionDate' as const,
-                    headerName: 'Bid Submission Date',
-                    width: 160,
-                    cellRenderer: (params: any) => {
-                        if (!params.value) return <span className="text-gray-400">—</span>;
-                        return formatDateTime(params.value);
-                    },
+                    field: 'tenderStatus' as const,
+                    headerName: 'Tender Status',
+                    width: 130,
+                    cellRenderer: (params: any) => (params.value),
                     sortable: true,
                 },
                 {
@@ -602,17 +617,16 @@ const EmdsAndTenderFeesPage = () => {
                     sortable: true,
                 },
                 {
-                    field: 'tenderStatus' as const,
-                    headerName: 'Tender Status',
-                    width: 130,
+                    field: 'bidSubmissionDate' as const,
+                    headerName: 'Bid Submission Date',
+                    width: 160,
                     cellRenderer: (params: any) => {
                         if (!params.value) return <span className="text-gray-400">—</span>;
-                        return <Badge variant="outline">{params.value}</Badge>;
+                        return formatDateTime(params.value);
                     },
                     sortable: true,
                 },
             ] : []),
-            teamMemberCol,
             timerCol,
             actionCol,
         ];
@@ -794,8 +808,108 @@ const EmdsAndTenderFeesPage = () => {
                     setChangeStatusModal({ open: false, tenderId: null });
                 }}
             />
+
+            <ConsentForPayModal
+                open={consentModal.open}
+                onOpenChange={(open) => setConsentModal({ ...consentModal, open })}
+                row={consentModal.row}
+                onSuccess={() => {
+                    setConsentModal({ open: false, row: null });
+                    refetch();
+                }}
+            />
         </Card>
     );
 };
+
+function ConsentForPayModal({
+    open,
+    onOpenChange,
+    row,
+    onSuccess,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    row: PaymentRequestRowWithTimer | null;
+    onSuccess: () => void;
+}) {
+    const [remark, setRemark] = useState('');
+    const [saving, setSaving] = useState(false);
+
+    useEffect(() => {
+        setRemark('');
+    }, [open, row?.instrumentId]);
+
+    const handleSubmit = async () => {
+        if (!row?.instrumentId || !remark.trim()) return;
+        setSaving(true);
+        try {
+            await paymentRequestsService.updateConsentForPay(row.instrumentId, remark.trim());
+            onSuccess();
+        } catch (error) {
+            console.error('Failed to update consent:', error);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Consent for EMD Payment/Pay</DialogTitle>
+                    <DialogDescription>
+                        Review the details below and provide your consent remark.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-2">
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                            <span className="text-muted-foreground">Project Name:</span>
+                            <p className="font-medium">{row?.tenderName || '—'}</p>
+                        </div>
+                        <div>
+                            <span className="text-muted-foreground">Tender No:</span>
+                            <p className="font-medium">{row?.tenderNo || '—'}</p>
+                        </div>
+                        <div>
+                            <span className="text-muted-foreground">Amount:</span>
+                            <p className="font-medium">{row?.amountRequired ? formatINR(Number(row.amountRequired)) : '—'}</p>
+                        </div>
+                        <div>
+                            <span className="text-muted-foreground">Mode:</span>
+                            <p className="font-medium">{row?.instrumentType ? (INSTRUMENT_LABELS as any)[row.instrumentType] || row.instrumentType : '—'}</p>
+                        </div>
+                    </div>
+                    <div>
+                        <label className="text-sm text-muted-foreground block mb-1">Consent Remark</label>
+                        <Textarea
+                            placeholder="Enter your consent remark..."
+                            value={remark}
+                            onChange={(e) => setRemark(e.target.value)}
+                            rows={3}
+                        />
+                    </div>
+                    {row?.consentForPay && (
+                        <div>
+                            <label className="text-sm text-muted-foreground block mb-1">Previous Comments</label>
+                            <div className="text-xs text-muted-foreground bg-muted rounded p-2 whitespace-pre-wrap max-h-32 overflow-y-auto">
+                                {row.consentForPay}
+                            </div>
+                        </div>
+                    )}
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+                        Cancel
+                    </Button>
+                    <Button onClick={handleSubmit} disabled={!remark.trim() || saving}>
+                        {saving ? 'Saving...' : 'Consent & Pay'}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
 
 export default EmdsAndTenderFeesPage;
