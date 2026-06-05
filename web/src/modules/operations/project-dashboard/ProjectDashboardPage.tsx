@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import SelectField from "@/components/form/SelectField";
 import { useAuth } from "@/contexts/AuthContext";
 import { FormProvider, useForm } from "react-hook-form";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 import { paths } from "@/app/routes/paths";
 
 import { EmployeeImprestsSection } from "./sections/EmployeeImprestsSection";
@@ -14,18 +15,24 @@ import { WorkOrdersSection } from "./sections/WorkOrdersSection";
 import { useProjectMasterOptions } from "@/hooks/api/useProjectMaster";
 
 export default function ProjectDashboardPage() {
-    const [searchParams] = useSearchParams();
+    const { projectId: projectIdParam } = useParams<{ projectId: string }>();
+    const navigate = useNavigate();
     const { isTeamLeader, isAdmin, isSuperUser, teamId } = useAuth();
     const isOpsTeamLeader = isTeamLeader && Number(teamId) == 3;
-    const id = searchParams.get("id");
+
     const form = useForm<{ projectId: string | null }>({
-        defaultValues: { projectId: id },
+        defaultValues: { projectId: projectIdParam || null },
     });
-    const projectId = form.watch("projectId");
+    const selectedProjectId = form.watch("projectId");
+    const projectId = projectIdParam || selectedProjectId;
 
     const projects = useProjectMasterOptions();
-    console.log("Projects for dropdown:", projects);
-    const navigate = useNavigate();
+
+    useEffect(() => {
+        if (selectedProjectId && selectedProjectId !== projectIdParam) {
+            navigate(paths.operations.projectDashboard(Number(selectedProjectId)), { replace: true });
+        }
+    }, [selectedProjectId, projectIdParam, navigate]);
 
     return (
         <div className="space-y-6">

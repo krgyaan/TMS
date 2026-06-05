@@ -59,10 +59,11 @@ export default function OperationsRoutes() {
             <Route path="work-order/contract-agreement/:id" element={<RouteWrapper><Operations_ContractAgreementShow /></RouteWrapper>} />
 
             <Route path="project-dashboard" element={<RouteWrapper><Operations_ProjectDashboard /></RouteWrapper>} />
+            <Route path="project-dashboard/:projectId" element={<RouteWrapper><Operations_ProjectDashboard /></RouteWrapper>} />
             <Route path="project-dashboard/show/:id" element={<RouteWrapper><Operations_ProjectShowPage /></RouteWrapper>} />
-            <Route path="project-dashboard/purchase-order/create/:id" element={<RouteWrapper><Operations_RaisePoFormPage /></RouteWrapper>} />
-            <Route path="project-dashboard/purchase-order/:id" element={<RouteWrapper><Operations_ViewPoPage /></RouteWrapper>} />
-            <Route path="project-dashboard/purchase-order/:id/edit" element={<RouteWrapper><Operations_EditPOPage /></RouteWrapper>}></Route>
+            <Route path="project-dashboard/:projectId/purchase-order/create" element={<RouteWrapper><Operations_RaisePoFormPage /></RouteWrapper>} />
+            <Route path="project-dashboard/:projectId/purchase-order/:poId" element={<RouteWrapper><Operations_ViewPoPage /></RouteWrapper>} />
+            <Route path="project-dashboard/:projectId/purchase-order/:poId/edit" element={<RouteWrapper><Operations_EditPOPage /></RouteWrapper>}></Route>
         </Routes>
     );
 }

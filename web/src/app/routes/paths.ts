@@ -123,11 +123,11 @@ export const paths = {
         contractAgreementListPage: "/operations/work-order/contract-agreement",
         contractAgreementShowPage: (id: number) => `/operations/work-order/contract-agreement/${id}`,
 
-        projectDashboard: (id?: number) => id ? `/operations/project-dashboard?id=${id}` : "/operations/project-dashboard",
+        projectDashboard: (id?: number) => id ? `/operations/project-dashboard/${id}` : "/operations/project-dashboard",
         projectShowPage: (id: number) => `/operations/project-dashboard/show/${id}`,
-        raisePoForm:(id: number) => `/operations/project-dashboard/purchase-order/create/${id}`,
-        viewPoPage: (id: number) => `/operations/project-dashboard/purchase-order/${id}`,
-        editPoPage: (id: number) => `/operations/project-dashboard/purchase-order/${id}/edit`,
+        raisePoForm: (projectId: number) => `/operations/project-dashboard/${projectId}/purchase-order/create`,
+        viewPoPage: (poId: number, projectId: number) => `/operations/project-dashboard/${projectId}/purchase-order/${poId}`,
+        editPoPage: (poId: number, projectId: number) => `/operations/project-dashboard/${projectId}/purchase-order/${poId}/edit`,
     },
 
     // ==================== SERVICES ====================

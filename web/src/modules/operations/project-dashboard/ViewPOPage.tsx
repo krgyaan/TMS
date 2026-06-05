@@ -1,6 +1,10 @@
+import { useParams } from "react-router-dom";
+
 const ViewPOPage = () => {
+  const { projectId, poId } = useParams<{ projectId: string; poId: string }>();
+
   return (
-    <div>ViewPOPage</div>
+    <div>ViewPOPage (project: {projectId}, po: {poId})</div>
   )
 }
 

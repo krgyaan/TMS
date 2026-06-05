@@ -383,8 +383,8 @@ export function BasicDetailView({
                                     (parseFloat(String(data.budgetService || '0'))) +
                                     (parseFloat(String(data.budgetFreight || '0'))) +
                                     (parseFloat(String(data.budgetAdmin || '0'))) +
-                                    (parseFloat(String(data.budgetBuybackSale || '0'))) +
-                                    (parseFloat(String(data.budgetGemCharges || '0')))
+                                    (parseFloat(String(data.budgetGemCharges || '0'))) -
+                                    (parseFloat(String(data.budgetBuybackSale || '0')))
                                 )}
                             </TableCell>
                             <TableCell colSpan={2} />

@@ -56,6 +56,29 @@ export interface CreatePartyDTO {
     type?: string;
 }
 
+export interface PurchaseOrderRow {
+    id: number;
+    poNumber: string;
+    sellerName: string;
+    sellerEmail?: string;
+    sellerAddress?: string;
+    sellerGstNo?: string;
+    sellerPanNo?: string;
+    sellerMsmeNo?: string;
+    sellerCinNo?: string;
+    shipToName: string;
+    shippingAddress: string;
+    shipToGst?: string;
+    shipToPan?: string;
+    poDate: string;
+    poRaisedBy: string;
+    createdAt: string;
+    totalAmount: number;
+    totalGstAmt: number;
+    grandTotal: number;
+    poPdf?: string;
+}
+
 export interface UpdatePurchaseOrderDTO {
     poDate: string;
     sellerId?: number;

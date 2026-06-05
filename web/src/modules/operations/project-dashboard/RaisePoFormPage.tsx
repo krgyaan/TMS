@@ -93,8 +93,8 @@ const FormSkeleton = () => (
 
 export default function RaisePoFormPage() {
   const navigate = useNavigate();
-  const { id } = useParams();
-  const projectId = Number(id);
+  const { projectId: projectIdParam } = useParams<{ projectId: string }>();
+  const projectId = Number(projectIdParam);
 
   const { data: overview, isLoading: isProjectLoading } = useProjectOverview(projectId);
   const { data: partiesData } = usePoParties();
