@@ -24,6 +24,7 @@ export interface ImprestRow {
     projectName: string | null;
     remark: string | null;
     ip?: string | null;
+    dateOfExpense?: string | null;
 
     // numeric
     amount: number;

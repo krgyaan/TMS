@@ -50,6 +50,7 @@ const EmployeeImprestForm: React.FC = () => {
             amount: undefined,
             categoryId: null,
             teamId: undefined,
+            dateOfExpense: undefined,
             remark: "",
         },
     });
@@ -188,6 +189,12 @@ const EmployeeImprestForm: React.FC = () => {
                                     <Label>Amount</Label>
                                     <Input type="number" placeholder="Amount" {...register("amount")} />
                                     {errors.amount && <p className="text-sm text-red-600">{errors.amount.message}</p>}
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label>Date of Expense</Label>
+                                    <Input type="date" {...register("dateOfExpense")} />
+                                    {errors.dateOfExpense && <p>{errors.dateOfExpense.message}</p>}
                                 </div>
 
                                 {/* File upload — always shown */}
