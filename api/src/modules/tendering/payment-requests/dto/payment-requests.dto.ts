@@ -389,6 +389,7 @@ export interface PaymentRequestRow {
     detailPurpose: string | null;
     paidDate: Date | null;
     tenderStatus: string | null;
+    consentForPay: string;
 }
 
 export interface DashboardCounts {

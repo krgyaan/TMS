@@ -130,6 +130,15 @@ export class PaymentRequestsController {
         return this.queryService.findInstrumentsByPaymentRequestId(id);
     }
 
+    @Patch('instruments/:instrumentId/consent')
+    async updateConsentForPay(
+        @Param('instrumentId', ParseIntPipe) instrumentId: number,
+        @Body() body: { consentRemark: string },
+        @CurrentUser() user: ValidatedUser,
+    ) {
+        return this.commandService.updateConsentForPay(instrumentId, body.consentRemark, user);
+    }
+
     @Get('instruments/:id/pdf')
     async serveInstrumentPdf(
         @Param('id', ParseIntPipe) id: number,

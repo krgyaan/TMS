@@ -443,6 +443,7 @@ export class PaymentRequestsQueryService {
                     END
                 `,
                 tenderStatus: statuses.name,
+                consentForPay: paymentInstruments.consentForPay,
             })
             .from(paymentRequests)
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
@@ -496,6 +497,7 @@ export class PaymentRequestsQueryService {
                 createdAt: row.createdAt,
                 paidDate: (row as any).paidDate,
                 tenderStatus: (row as any).tenderStatus ?? null,
+                consentForPay: row.consentForPay ?? '',
             };
         });
 

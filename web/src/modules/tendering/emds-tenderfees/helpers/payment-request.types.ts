@@ -176,6 +176,7 @@ export interface PaymentRequestRow {
     detailPurpose: string | null;
     paidDate: string | null;
     tenderStatus: string | null;
+    consentForPay: string;
 }
 
 export interface PaymentRequestRowWithTimer extends PaymentRequestRow {

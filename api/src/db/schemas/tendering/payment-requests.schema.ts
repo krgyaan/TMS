@@ -129,6 +129,9 @@ export const paymentInstruments = pgTable('payment_instruments', {
     // Rejection reason for portal payments
     rejectionReason: text('rejection_reason'),
 
+    // Consent for EMD Payment/Pay
+    consentForPay: varchar('consent_for_pay', { length: 255 }).default(''),
+
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 }, (table) => {

@@ -68,6 +68,12 @@ class PaymentRequestsService extends BaseApiService {
     async updateStatus(id: number, data: UpdateStatusDto) {
         return this.patch<any, UpdateStatusDto>(`/${id}/status`, data);
     }
+
+    async updateConsentForPay(instrumentId: number, consentRemark: string) {
+        return this.patch<{ consentForPay: string }, { consentRemark: string }>(
+            `/instruments/${instrumentId}/consent`, { consentRemark }
+        );
+    }
 }
 
 export const paymentRequestsService = new PaymentRequestsService();

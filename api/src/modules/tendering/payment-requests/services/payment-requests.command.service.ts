@@ -372,6 +372,36 @@ export class PaymentRequestsCommandService {
         return this.findById(requestId);
     }
 
+    async updateConsentForPay(instrumentId: number, consentRemark: string, user: ValidatedUser) {
+        const now = new Date();
+        const formattedDate = now.toLocaleString('en-GB', {
+            day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
+        const newEntry = `${consentRemark} - on ${formattedDate} by ${user.name}`;
+
+        const [instrument] = await this.db
+            .select({ consentForPay: paymentInstruments.consentForPay })
+            .from(paymentInstruments)
+            .where(eq(paymentInstruments.id, instrumentId))
+            .limit(1);
+
+        if (!instrument) {
+            throw new NotFoundException(`Instrument ${instrumentId} not found`);
+        }
+
+        const updatedConsent = instrument.consentForPay
+            ? `${newEntry}\n---\n${instrument.consentForPay}`
+            : newEntry;
+
+        await this.db
+            .update(paymentInstruments)
+            .set({ consentForPay: updatedConsent })
+            .where(eq(paymentInstruments.id, instrumentId));
+
+        this.logger.log(`Consent for pay updated for instrument ${instrumentId}`);
+        return { consentForPay: updatedConsent };
+    }
+
     // ============================================================================
     // Private Helpers - Payment Request
     // ============================================================================
