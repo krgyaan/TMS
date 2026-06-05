@@ -11,6 +11,7 @@ export interface CreatePurchaseOrderDTO {
     projectName?: string;
     poDate: string;
     sellerId?: number;
+    shipToPartyId?: number;
     sellerName: string;
     sellerEmail?: string;
     sellerAddress?: string;
@@ -82,6 +83,7 @@ export interface PurchaseOrderRow {
 export interface UpdatePurchaseOrderDTO {
     poDate: string;
     sellerId?: number;
+    shipToPartyId?: number;
     sellerName: string;
     sellerEmail?: string;
     sellerAddress?: string;

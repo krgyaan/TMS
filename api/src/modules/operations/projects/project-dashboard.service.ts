@@ -250,6 +250,9 @@ export class ProjectDashboardService {
         .returning()
     )[0];
 
+        // Sync edited party details back to project_parties
+        await this.syncPartyFromPO(body);
+
     // Insert products
     if (body.products && body.products.length > 0) {
         for (const product of body.products) {
@@ -469,6 +472,9 @@ export class ProjectDashboardService {
                 .returning()
         )[0];
 
+        // Sync edited party details back to project_parties
+        await this.syncPartyFromPO(body);
+
         // Delete existing products and insert new ones
         await this.db
             .delete(purchaseOrderProducts)
@@ -500,6 +506,34 @@ export class ProjectDashboardService {
 
         this.logger.info(`Purchase Order updated: ${updatedPO.poNumber}`);
         return updatedPO;
+    }
+
+    private async syncPartyFromPO(body: any) {
+        if (body.sellerId) {
+            await this.db
+                .update(projectParties)
+                .set({
+                    name: body.sellerName,
+                    email: body.sellerEmail || null,
+                    address: body.sellerAddress || null,
+                    gstNo: body.sellerGstNo || null,
+                    pan: body.sellerPanNo || null,
+                    msme: body.sellerMsmeNo || null,
+                })
+                .where(eq(projectParties.id, body.sellerId));
+        }
+        if (body.shipToPartyId) {
+            await this.db
+                .update(projectParties)
+                .set({
+                    name: body.shipToName,
+                    email: null,
+                    address: body.shippingAddress || null,
+                    gstNo: body.shipToGst || null,
+                    pan: body.shipToPan || null,
+                })
+                .where(eq(projectParties.id, body.shipToPartyId));
+        }
     }
 
     async listParties(type?: string) {

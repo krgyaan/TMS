@@ -18,6 +18,7 @@ export function mapFormToCreateDTO(
         projectName: projectName || undefined,
         poDate: values.poDate,
         sellerId: values.sellerId ? Number(values.sellerId) : undefined,
+        shipToPartyId: values.partyId ? Number(values.partyId) : undefined,
         sellerName: values.sellerName,
         sellerEmail: values.sellerEmail || undefined,
         sellerAddress: values.sellerAddress || undefined,
@@ -57,6 +58,7 @@ export function mapFormToUpdateDTO(
     return {
         poDate: values.poDate,
         sellerId: values.sellerId ? Number(values.sellerId) : undefined,
+        shipToPartyId: values.partyId ? Number(values.partyId) : undefined,
         sellerName: values.sellerName,
         sellerEmail: values.sellerEmail || undefined,
         sellerAddress: values.sellerAddress || undefined,
