@@ -56,33 +56,43 @@ export class ImprestAdminService {
         return weekNo;
     }
 
+    private formatFinancialYear(startYear: number): string {
+        const endYear = (startYear + 1) % 100;
+        const formattedEndYear = String(endYear).padStart(2, "0");
+        return `${startYear}-${formattedEndYear}`;
+    }
+
     async getEmployeeSummary(): Promise<EmployeeImprestSummaryDto[]> {
         this.logger.info("Fetching employee imprest summary");
 
         const now = new Date();
         const currentMonth = now.getMonth(); // 0 = Jan, 2 = Mar, 3 = Apr
-        const fyStartYear = currentMonth >= 3 ? now.getFullYear() : now.getFullYear() - 1;
-        const fyStartDate = `${fyStartYear}-04-01`;
+        const currentFyStartYear = currentMonth >= 3 ? now.getFullYear() : now.getFullYear() - 1;
 
         try {
             const rawQuery = sql`
                 WITH imprest_agg AS (
                     SELECT
                         user_id,
-                        COALESCE(SUM(CASE WHEN COALESCE(approved_date, created_at) >= ${fyStartDate}::date THEN amount ELSE 0 END), 0) AS amount_spent_current,
-                        COALESCE(SUM(CASE WHEN COALESCE(approved_date, created_at) < ${fyStartDate}::date THEN amount ELSE 0 END), 0) AS amount_spent_previous,
-                        COALESCE(SUM(CASE WHEN approval_status = 1 AND COALESCE(approved_date, created_at) >= ${fyStartDate}::date THEN amount ELSE 0 END), 0) AS amount_approved_current,
-                        COALESCE(SUM(CASE WHEN approval_status = 1 AND COALESCE(approved_date, created_at) < ${fyStartDate}::date THEN amount ELSE 0 END), 0) AS amount_approved_previous
+                        CASE WHEN EXTRACT(MONTH FROM COALESCE(approved_date, created_at)) >= 4 
+                             THEN EXTRACT(YEAR FROM COALESCE(approved_date, created_at)) 
+                             ELSE EXTRACT(YEAR FROM COALESCE(approved_date, created_at)) - 1 
+                        END::int AS fy_start_year,
+                        COALESCE(SUM(amount), 0) AS amount_spent,
+                        COALESCE(SUM(CASE WHEN approval_status = 1 THEN amount ELSE 0 END), 0) AS amount_approved
                     FROM employee_imprests
-                    GROUP BY user_id
+                    GROUP BY user_id, fy_start_year
                 ),
                 txn_agg AS (
                     SELECT
                         user_id,
-                        COALESCE(SUM(CASE WHEN txn_date >= ${fyStartDate}::date THEN amount ELSE 0 END), 0) AS amount_received_current,
-                        COALESCE(SUM(CASE WHEN txn_date < ${fyStartDate}::date THEN amount ELSE 0 END), 0) AS amount_received_previous
+                        CASE WHEN EXTRACT(MONTH FROM txn_date) >= 4 
+                             THEN EXTRACT(YEAR FROM txn_date) 
+                             ELSE EXTRACT(YEAR FROM txn_date) - 1 
+                        END::int AS fy_start_year,
+                        COALESCE(SUM(amount), 0) AS amount_received
                     FROM employee_imprest_transactions
-                    GROUP BY user_id
+                    GROUP BY user_id, fy_start_year
                 ),
                 voucher_base AS (
                     SELECT
@@ -111,45 +121,43 @@ export class ImprestAdminService {
                 voucher_agg AS (
                     SELECT
                         a.user_id,
-                        COUNT(CASE WHEN a.max_effective_date >= ${fyStartDate}::date THEN a.year END) AS total_vouchers_current,
-                        COUNT(CASE WHEN a.max_effective_date < ${fyStartDate}::date THEN a.year END) AS total_vouchers_previous,
-                        SUM(CASE WHEN v.accounts_signed_by IS NOT NULL AND a.max_effective_date >= ${fyStartDate}::date THEN 1 ELSE 0 END) AS accounts_approved_current,
-                        SUM(CASE WHEN v.accounts_signed_by IS NOT NULL AND a.max_effective_date < ${fyStartDate}::date THEN 1 ELSE 0 END) AS accounts_approved_previous,
-                        SUM(CASE WHEN v.admin_signed_by IS NOT NULL AND a.max_effective_date >= ${fyStartDate}::date THEN 1 ELSE 0 END) AS admin_approved_current,
-                        SUM(CASE WHEN v.admin_signed_by IS NOT NULL AND a.max_effective_date < ${fyStartDate}::date THEN 1 ELSE 0 END) AS admin_approved_previous
+                        CASE WHEN EXTRACT(MONTH FROM a.max_effective_date) >= 4 
+                             THEN EXTRACT(YEAR FROM a.max_effective_date) 
+                             ELSE EXTRACT(YEAR FROM a.max_effective_date) - 1 
+                        END::int AS fy_start_year,
+                        COUNT(a.year) AS total_vouchers,
+                        SUM(CASE WHEN v.accounts_signed_by IS NOT NULL AND TRIM(v.accounts_signed_by) <> '' THEN 1 ELSE 0 END) AS accounts_approved,
+                        SUM(CASE WHEN v.admin_signed_by IS NOT NULL AND TRIM(v.admin_signed_by) <> '' THEN 1 ELSE 0 END) AS admin_approved
                     FROM voucher_amounts a
                     LEFT JOIN employee_imprest_vouchers v
                         ON v.beneficiary_name = a.user_id::text
                         AND v.valid_from::date = a.start_date
                         AND v.valid_to::date   = a.end_date
-                    GROUP BY a.user_id
+                    GROUP BY a.user_id, fy_start_year
+                ),
+                all_user_fy AS (
+                    SELECT user_id, fy_start_year FROM imprest_agg
+                    UNION
+                    SELECT user_id, fy_start_year FROM txn_agg
+                    UNION
+                    SELECT user_id, fy_start_year FROM voucher_agg
                 )
                 SELECT
                     u.id AS "userId",
                     u.name AS "userName",
-                    
-                    COALESCE(i.amount_spent_current, 0) AS "amountSpentCurrent",
-                    COALESCE(i.amount_spent_previous, 0) AS "amountSpentPrevious",
-                    
-                    COALESCE(i.amount_approved_current, 0) AS "amountApprovedCurrent",
-                    COALESCE(i.amount_approved_previous, 0) AS "amountApprovedPrevious",
-                    
-                    COALESCE(t.amount_received_current, 0) AS "amountReceivedCurrent",
-                    COALESCE(t.amount_received_previous, 0) AS "amountReceivedPrevious",
-                    
-                    COALESCE(v.total_vouchers_current, 0) AS "totalVouchersCurrent",
-                    COALESCE(v.total_vouchers_previous, 0) AS "totalVouchersPrevious",
-                    
-                    COALESCE(v.accounts_approved_current, 0) AS "accountsApprovedCurrent",
-                    COALESCE(v.accounts_approved_previous, 0) AS "accountsApprovedPrevious",
-                    
-                    COALESCE(v.admin_approved_current, 0) AS "adminApprovedCurrent",
-                    COALESCE(v.admin_approved_previous, 0) AS "adminApprovedPrevious"
+                    f.fy_start_year AS "fyStartYear",
+                    COALESCE(i.amount_spent, 0) AS "amountSpent",
+                    COALESCE(i.amount_approved, 0) AS "amountApproved",
+                    COALESCE(t.amount_received, 0) AS "amountReceived",
+                    COALESCE(v.total_vouchers, 0) AS "totalVouchers",
+                    COALESCE(v.accounts_approved, 0) AS "accountsApproved",
+                    COALESCE(v.admin_approved, 0) AS "adminApproved"
                 FROM users u
-                INNER JOIN imprest_agg i ON i.user_id = u.id
-                LEFT JOIN txn_agg t ON t.user_id = u.id
-                LEFT JOIN voucher_agg v ON v.user_id = u.id
-                ORDER BY u.name
+                INNER JOIN all_user_fy f ON f.user_id = u.id
+                LEFT JOIN imprest_agg i ON i.user_id = f.user_id AND i.fy_start_year = f.fy_start_year
+                LEFT JOIN txn_agg t ON t.user_id = f.user_id AND t.fy_start_year = f.fy_start_year
+                LEFT JOIN voucher_agg v ON v.user_id = f.user_id AND v.fy_start_year = f.fy_start_year
+                ORDER BY u.name, f.fy_start_year DESC
             `;
 
             this.logger.debug("Executing final employee summary query");
@@ -163,53 +171,110 @@ export class ImprestAdminService {
             // ==============================
             // 5️⃣ Map Result
             // ==============================
-            const result = rows.map((row: any) => {
-                const currentApproved = Number(row.amountApprovedCurrent);
-                const currentReceived = Number(row.amountReceivedCurrent);
-                const previousApproved = Number(row.amountApprovedPrevious);
-                const previousReceived = Number(row.amountReceivedPrevious);
+            // Group rows by user
+            const userGroups = new Map<number, {
+                userId: number;
+                userName: string;
+                years: Array<{
+                    fyStartYear: number;
+                    amountSpent: number;
+                    amountApproved: number;
+                    amountReceived: number;
+                    totalVouchers: number;
+                    accountsApproved: number;
+                    adminApproved: number;
+                }>;
+            }>();
 
-                return {
-                    userId: row.userId!,
-                    userName: row.userName,
+            for (const row of rows as any[]) {
+                const userId = Number(row.userId);
+                if (!userGroups.has(userId)) {
+                    userGroups.set(userId, {
+                        userId,
+                        userName: row.userName,
+                        years: []
+                    });
+                }
+                userGroups.get(userId)!.years.push({
+                    fyStartYear: Number(row.fyStartYear),
+                    amountSpent: Number(row.amountSpent),
+                    amountApproved: Number(row.amountApproved),
+                    amountReceived: Number(row.amountReceived),
+                    totalVouchers: Number(row.totalVouchers),
+                    accountsApproved: Number(row.accountsApproved),
+                    adminApproved: Number(row.adminApproved),
+                });
+            }
 
-                    // Total for table
-                    amountSpent: Number(row.amountSpentCurrent) + Number(row.amountSpentPrevious),
-                    amountApproved: currentApproved + previousApproved,
-                    amountReceived: currentReceived + previousReceived,
-                    amountLeft: (currentApproved + previousApproved) - (currentReceived + previousReceived),
+            const result: EmployeeImprestSummaryDto[] = [];
+
+            for (const group of userGroups.values()) {
+                const currentYearData = group.years.find(y => y.fyStartYear === currentFyStartYear) || {
+                    fyStartYear: currentFyStartYear,
+                    amountSpent: 0,
+                    amountApproved: 0,
+                    amountReceived: 0,
+                    totalVouchers: 0,
+                    accountsApproved: 0,
+                    adminApproved: 0
+                };
+
+                const previousYearsData = group.years
+                    .filter(y => y.fyStartYear < currentFyStartYear)
+                    .sort((a, b) => b.fyStartYear - a.fyStartYear);
+
+                const totalSpent = group.years.reduce((sum, y) => sum + y.amountSpent, 0);
+                const totalApproved = group.years.reduce((sum, y) => sum + y.amountApproved, 0);
+                const totalReceived = group.years.reduce((sum, y) => sum + y.amountReceived, 0);
+                
+                const totalVouchers = group.years.reduce((sum, y) => sum + y.totalVouchers, 0);
+                const accountsApproved = group.years.reduce((sum, y) => sum + y.accountsApproved, 0);
+                const adminApproved = group.years.reduce((sum, y) => sum + y.adminApproved, 0);
+
+                result.push({
+                    userId: group.userId,
+                    userName: group.userName,
+
+                    amountSpent: totalSpent,
+                    amountApproved: totalApproved,
+                    amountReceived: totalReceived,
+                    amountLeft: totalApproved - totalReceived,
 
                     voucherInfo: {
-                        totalVouchers: Number(row.totalVouchersCurrent) + Number(row.totalVouchersPrevious),
-                        accountsApproved: Number(row.accountsApprovedCurrent) + Number(row.accountsApprovedPrevious),
-                        adminApproved: Number(row.adminApprovedCurrent) + Number(row.adminApprovedPrevious),
+                        totalVouchers,
+                        accountsApproved,
+                        adminApproved,
                     },
-                    
-                    // Segregated for summary cards
+
                     current: {
-                        amountSpent: Number(row.amountSpentCurrent),
-                        amountApproved: currentApproved,
-                        amountReceived: currentReceived,
-                        amountLeft: currentApproved - currentReceived,
+                        amountSpent: currentYearData.amountSpent,
+                        amountApproved: currentYearData.amountApproved,
+                        amountReceived: currentYearData.amountReceived,
+                        amountLeft: currentYearData.amountApproved - currentYearData.amountReceived,
                         voucherInfo: {
-                            totalVouchers: Number(row.totalVouchersCurrent),
-                            accountsApproved: Number(row.accountsApprovedCurrent),
-                            adminApproved: Number(row.adminApprovedCurrent),
+                            totalVouchers: currentYearData.totalVouchers,
+                            accountsApproved: currentYearData.accountsApproved,
+                            adminApproved: currentYearData.adminApproved
                         }
                     },
-                    previous: {
-                        amountSpent: Number(row.amountSpentPrevious),
-                        amountApproved: previousApproved,
-                        amountReceived: previousReceived,
-                        amountLeft: previousApproved - previousReceived,
+
+                    previous: previousYearsData.map(y => ({
+                        financialYear: this.formatFinancialYear(y.fyStartYear),
+                        fyStartYear: y.fyStartYear,
+                        amountSpent: y.amountSpent,
+                        amountApproved: y.amountApproved,
+                        amountReceived: y.amountReceived,
+                        amountLeft: y.amountApproved - y.amountReceived,
                         voucherInfo: {
-                            totalVouchers: Number(row.totalVouchersPrevious),
-                            accountsApproved: Number(row.accountsApprovedPrevious),
-                            adminApproved: Number(row.adminApprovedPrevious),
+                            totalVouchers: y.totalVouchers,
+                            accountsApproved: y.accountsApproved,
+                            adminApproved: y.adminApproved
                         }
-                    }
-                };
-            });
+                    }))
+                });
+            }
+
+            result.sort((a, b) => a.userName.localeCompare(b.userName));
 
             this.logger.debug("Employee summary mapped successfully");
 

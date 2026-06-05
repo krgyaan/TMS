@@ -1,22 +1,21 @@
 // imprest-admin.index.tsx
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import DataTable from "@/components/ui/data-table";
-import { Loader2, ExternalLink, Receipt, LayoutDashboard, FileText, IndianRupee, Plus } from "lucide-react";
+import { ExternalLink, FileText, IndianRupee, LayoutDashboard, Loader2, Plus, Receipt } from "lucide-react";
 
 import { paths } from "@/app/routes/paths";
-import { useEmployeeImprestSummary } from "./imprest-admin.hooks";
-import type { EmployeeImprestSummary } from "./imprest-admin.types";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { useAuth } from "@/contexts/AuthContext";
+import { useEmployeeImprestSummary } from "./imprest-admin.hooks";
+import type { EmployeeImprestSummary } from "./imprest-admin.types";
 
-import type { GridApi } from "ag-grid-community";
 import { Input } from "@/components/ui/input";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import type { GridApi } from "ag-grid-community";
 import { PayImprestDialog } from "./components/PayImprestDialog";
 /** INR formatter */
 const formatINR = (num: number) =>
@@ -41,6 +40,13 @@ const ImprestAdminIndex: React.FC = () => {
     const loggedInUser = useAuth().user;
     const isAuthorized = isAdmin || isSuperUser;
     const navigate = useNavigate();
+    const currentFinancialYear = useMemo(() => {
+        const now = new Date();
+        const month = now.getMonth();
+        const startYear = month >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+        const endYear = (startYear + 1) % 100;
+        return `${startYear}-${String(endYear).padStart(2, "0")}`;
+    }, []);
     const { data = [], isLoading, error } = useEmployeeImprestSummary();
     console.log("Fetched employee imprest summary data:", data);
 
@@ -81,41 +87,68 @@ const ImprestAdminIndex: React.FC = () => {
 
     /* -------------------- GLOBAL SUMMARY -------------------- */
     const totals = useMemo(() => {
-        return data.reduce(
-            (acc, e) => {
-                acc.received.current += e.current.amountReceived;
-                acc.received.previous += e.previous.amountReceived;
-                
-                acc.spent.current += e.current.amountSpent;
-                acc.spent.previous += e.previous.amountSpent;
-                
-                acc.approved.current += e.current.amountApproved;
-                acc.approved.previous += e.previous.amountApproved;
-                
-                acc.left.current += e.current.amountLeft;
-                acc.left.previous += e.previous.amountLeft;
+        const current = {
+            received: 0,
+            spent: 0,
+            approved: 0,
+            left: 0,
+            totalVouchers: 0,
+            accountsApproved: 0,
+            adminApproved: 0,
+        };
 
-                acc.totalVouchers.current += e.current.voucherInfo?.totalVouchers || 0;
-                acc.totalVouchers.previous += e.previous.voucherInfo?.totalVouchers || 0;
-                
-                acc.accountsApproved.current += e.current.voucherInfo?.accountsApproved || 0;
-                acc.accountsApproved.previous += e.previous.voucherInfo?.accountsApproved || 0;
-                
-                acc.adminApproved.current += e.current.voucherInfo?.adminApproved || 0;
-                acc.adminApproved.previous += e.previous.voucherInfo?.adminApproved || 0;
+        const previousMap: Record<number, {
+            financialYear: string;
+            fyStartYear: number;
+            received: number;
+            spent: number;
+            approved: number;
+            left: number;
+            totalVouchers: number;
+            accountsApproved: number;
+            adminApproved: number;
+        }> = {};
 
-                return acc;
-            },
-            {
-                received: { current: 0, previous: 0 },
-                spent: { current: 0, previous: 0 },
-                approved: { current: 0, previous: 0 },
-                left: { current: 0, previous: 0 },
-                totalVouchers: { current: 0, previous: 0 },
-                accountsApproved: { current: 0, previous: 0 },
-                adminApproved: { current: 0, previous: 0 },
-            }
-        );
+        data.forEach(e => {
+            current.received += e.current.amountReceived;
+            current.spent += e.current.amountSpent;
+            current.approved += e.current.amountApproved;
+            current.left += e.current.amountLeft;
+            current.totalVouchers += e.current.voucherInfo?.totalVouchers || 0;
+            current.accountsApproved += e.current.voucherInfo?.accountsApproved || 0;
+            current.adminApproved += e.current.voucherInfo?.adminApproved || 0;
+
+            e.previous?.forEach(prev => {
+                if (!previousMap[prev.fyStartYear]) {
+                    previousMap[prev.fyStartYear] = {
+                        financialYear: prev.financialYear,
+                        fyStartYear: prev.fyStartYear,
+                        received: 0,
+                        spent: 0,
+                        approved: 0,
+                        left: 0,
+                        totalVouchers: 0,
+                        accountsApproved: 0,
+                        adminApproved: 0,
+                    };
+                }
+                const entry = previousMap[prev.fyStartYear];
+                entry.received += prev.amountReceived;
+                entry.spent += prev.amountSpent;
+                entry.approved += prev.amountApproved;
+                entry.left += prev.amountLeft;
+                entry.totalVouchers += prev.voucherInfo?.totalVouchers || 0;
+                entry.accountsApproved += prev.voucherInfo?.accountsApproved || 0;
+                entry.adminApproved += prev.voucherInfo?.adminApproved || 0;
+            });
+        });
+
+        const previousList = Object.values(previousMap).sort((a, b) => b.fyStartYear - a.fyStartYear);
+
+        return {
+            current,
+            previous: previousList,
+        };
     }, [data]);
 
     /* -------------------- TABLE COLUMNS -------------------- */
@@ -227,17 +260,19 @@ const ImprestAdminIndex: React.FC = () => {
                                 <div className="p-2 bg-chart-3/10 rounded-lg text-chart-3 ring-1 ring-inset ring-chart-3/20">
                                     <IndianRupee className="h-4 w-4" />
                                 </div>
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full border border-border/50">Current FY</span>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full border border-border/50">{currentFinancialYear}</span>
                             </div>
                             <div>
                                 <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Amount Received</p>
-                                <h3 className="text-2xl font-bold text-foreground tracking-tight">{formatINR(totals.received.current)}</h3>
+                                <h3 className="text-2xl font-bold text-foreground tracking-tight">{formatINR(totals.current.received)}</h3>
                             </div>
                         </div>
-                        <div className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
-                            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Previous FY</span>
-                            <span className="text-[11px] font-bold text-foreground">{formatINR(totals.received.previous)}</span>
-                        </div>
+                        {totals.previous.map(prev => (
+                            <div key={prev.fyStartYear} className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
+                                <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">{prev.financialYear}</span>
+                                <span className="text-[11px] font-bold text-foreground">{formatINR(prev.received)}</span>
+                            </div>
+                        ))}
                     </CardContent>
                 </Card>
 
@@ -248,17 +283,19 @@ const ImprestAdminIndex: React.FC = () => {
                                 <div className="p-2 bg-primary/10 rounded-lg text-primary ring-1 ring-inset ring-primary/20">
                                     <Receipt className="h-4 w-4" />
                                 </div>
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full border border-border/50">Current FY</span>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full border border-border/50">{currentFinancialYear}</span>
                             </div>
                             <div>
                                 <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Amount Spent</p>
-                                <h3 className="text-2xl font-bold text-foreground tracking-tight">{formatINR(totals.spent.current)}</h3>
+                                <h3 className="text-2xl font-bold text-foreground tracking-tight">{formatINR(totals.current.spent)}</h3>
                             </div>
                         </div>
-                        <div className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
-                            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Previous FY</span>
-                            <span className="text-[11px] font-bold text-foreground">{formatINR(totals.spent.previous)}</span>
-                        </div>
+                        {totals.previous.map(prev => (
+                            <div key={prev.fyStartYear} className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
+                                <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">{prev.financialYear}</span>
+                                <span className="text-[11px] font-bold text-foreground">{formatINR(prev.spent)}</span>
+                            </div>
+                        ))}
                     </CardContent>
                 </Card>
 
@@ -269,17 +306,19 @@ const ImprestAdminIndex: React.FC = () => {
                                 <div className="p-2 bg-chart-2/10 rounded-lg text-chart-2 ring-1 ring-inset ring-chart-2/20">
                                     <FileText className="h-4 w-4" />
                                 </div>
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full border border-border/50">Current FY</span>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full border border-border/50">{currentFinancialYear}</span>
                             </div>
                             <div>
                                 <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Amount Approved</p>
-                                <h3 className="text-2xl font-bold text-foreground tracking-tight">{formatINR(totals.approved.current)}</h3>
+                                <h3 className="text-2xl font-bold text-foreground tracking-tight">{formatINR(totals.current.approved)}</h3>
                             </div>
                         </div>
-                        <div className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
-                            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Previous FY</span>
-                            <span className="text-[11px] font-bold text-foreground">{formatINR(totals.approved.previous)}</span>
-                        </div>
+                        {totals.previous.map(prev => (
+                            <div key={prev.fyStartYear} className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
+                                <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">{prev.financialYear}</span>
+                                <span className="text-[11px] font-bold text-foreground">{formatINR(prev.approved)}</span>
+                            </div>
+                        ))}
                     </CardContent>
                 </Card>
 
@@ -290,17 +329,19 @@ const ImprestAdminIndex: React.FC = () => {
                                 <div className="p-2 bg-chart-5/10 rounded-lg text-chart-5 ring-1 ring-inset ring-chart-5/20">
                                     <LayoutDashboard className="h-4 w-4" />
                                 </div>
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full border border-border/50">Current FY</span>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full border border-border/50">{currentFinancialYear}</span>
                             </div>
                             <div>
                                 <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Amount Left</p>
-                                <h3 className="text-2xl font-bold text-foreground tracking-tight">{formatINR(totals.left.current)}</h3>
+                                <h3 className="text-2xl font-bold text-foreground tracking-tight">{formatINR(totals.current.left)}</h3>
                             </div>
                         </div>
-                        <div className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
-                            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Previous FY</span>
-                            <span className="text-[11px] font-bold text-foreground">{formatINR(totals.left.previous)}</span>
-                        </div>
+                        {totals.previous.map(prev => (
+                            <div key={prev.fyStartYear} className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
+                                <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">{prev.financialYear}</span>
+                                <span className="text-[11px] font-bold text-foreground">{formatINR(prev.left)}</span>
+                            </div>
+                        ))}
                     </CardContent>
                 </Card>
             </div>
@@ -316,15 +357,17 @@ const ImprestAdminIndex: React.FC = () => {
                                 </div>
                                 <div>
                                     <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Total Vouchers</p>
-                                    <p className="text-2xl font-bold text-foreground tracking-tight leading-none mt-1">{totals.totalVouchers.current}</p>
+                                    <p className="text-2xl font-bold text-foreground tracking-tight leading-none mt-1">{totals.current.totalVouchers}</p>
                                 </div>
                             </div>
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/40 px-2 py-0.5 rounded-full">Current FY</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/40 px-2 py-0.5 rounded-full">{currentFinancialYear}</span>
                         </div>
-                        <div className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
-                            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Previous FY</span>
-                            <span className="text-[11px] font-bold text-foreground">{totals.totalVouchers.previous}</span>
-                        </div>
+                        {totals.previous.map(prev => (
+                            <div key={prev.fyStartYear} className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
+                                <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">{prev.financialYear}</span>
+                                <span className="text-[11px] font-bold text-foreground">{prev.totalVouchers}</span>
+                            </div>
+                        ))}
                     </CardContent>
                 </Card>
 
@@ -337,15 +380,17 @@ const ImprestAdminIndex: React.FC = () => {
                                 </div>
                                 <div>
                                     <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Accounts Approved</p>
-                                    <p className="text-2xl font-bold text-foreground tracking-tight leading-none mt-1">{totals.accountsApproved.current}</p>
+                                    <p className="text-2xl font-bold text-foreground tracking-tight leading-none mt-1">{totals.current.accountsApproved}</p>
                                 </div>
                             </div>
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/40 px-2 py-0.5 rounded-full">Current FY</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/40 px-2 py-0.5 rounded-full">{currentFinancialYear}</span>
                         </div>
-                        <div className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
-                            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Previous FY</span>
-                            <span className="text-[11px] font-bold text-foreground">{totals.accountsApproved.previous}</span>
-                        </div>
+                        {totals.previous.map(prev => (
+                            <div key={prev.fyStartYear} className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
+                                <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">{prev.financialYear}</span>
+                                <span className="text-[11px] font-bold text-foreground">{prev.accountsApproved}</span>
+                            </div>
+                        ))}
                     </CardContent>
                 </Card>
 
@@ -358,15 +403,17 @@ const ImprestAdminIndex: React.FC = () => {
                                 </div>
                                 <div>
                                     <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Admin Approved</p>
-                                    <p className="text-2xl font-bold text-foreground tracking-tight leading-none mt-1">{totals.adminApproved.current}</p>
+                                    <p className="text-2xl font-bold text-foreground tracking-tight leading-none mt-1">{totals.current.adminApproved}</p>
                                 </div>
                             </div>
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/40 px-2 py-0.5 rounded-full">Current FY</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted/40 px-2 py-0.5 rounded-full">{currentFinancialYear}</span>
                         </div>
-                        <div className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
-                            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">Previous FY</span>
-                            <span className="text-[11px] font-bold text-foreground">{totals.adminApproved.previous}</span>
-                        </div>
+                        {totals.previous.map(prev => (
+                            <div key={prev.fyStartYear} className="bg-muted/30 border-t px-3 py-1.5 flex justify-between items-center">
+                                <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">{prev.financialYear}</span>
+                                <span className="text-[11px] font-bold text-foreground">{prev.adminApproved}</span>
+                            </div>
+                        ))}
                     </CardContent>
                 </Card>
             </div>
