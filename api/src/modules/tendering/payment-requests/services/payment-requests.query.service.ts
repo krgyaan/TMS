@@ -843,7 +843,7 @@ export class PaymentRequestsQueryService {
             })
             .from(paymentInstruments)
             .where(and(
-                inArray(paymentInstruments.requestId, requests.map(r => r.id)),
+                inArray(paymentInstruments.requestId, [request.id]),
                 eq(paymentInstruments.isActive, true)
             ));
 
