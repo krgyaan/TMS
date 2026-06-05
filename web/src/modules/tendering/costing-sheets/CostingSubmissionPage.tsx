@@ -11,7 +11,7 @@ import { useDocumentChecklistByTender } from '@/hooks/api/useDocumentChecklists'
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { AlertCircle, ArrowLeft } from 'lucide-react';
 import { SubmissionChecklist, type Checkpoint } from '@/components/tendering/SubmissionChecklist';
 
 export default function CostingSheetSubmitPage() {
@@ -73,10 +73,21 @@ export default function CostingSheetSubmitPage() {
     ];
 
     const isChecklistFulfilled = checkpoints.every(cp => cp.status === 'fulfilled' || cp.status === 'na');
+    const emdConsented = !emdNA && Array.isArray(paymentRequests) &&
+        paymentRequests.some(r => r.instruments?.some((i: any) => i.consentForPay));
 
     return (
         <div className="space-y-6">
             <SubmissionChecklist checkpoints={checkpoints} />
+
+            {!emdNA && !emdConsented && (
+                <Alert variant="warning">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                        EMD Consent for Payment is pending. Please ensure consent has been given in the EMD Dashboard before proceeding.
+                    </AlertDescription>
+                </Alert>
+            )}
 
             <CostingSheetSubmitForm
                 tenderId={id}

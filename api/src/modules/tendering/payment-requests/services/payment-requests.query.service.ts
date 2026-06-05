@@ -839,10 +839,11 @@ export class PaymentRequestsQueryService {
                 status: paymentInstruments.status,
                 isActive: paymentInstruments.isActive,
                 reqNo: paymentInstruments.reqNo,
+                consentForPay: paymentInstruments.consentForPay,
             })
             .from(paymentInstruments)
             .where(and(
-                eq(paymentInstruments.requestId, request.id),
+                inArray(paymentInstruments.requestId, requests.map(r => r.id)),
                 eq(paymentInstruments.isActive, true)
             ));
 

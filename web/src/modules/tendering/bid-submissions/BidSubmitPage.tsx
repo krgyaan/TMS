@@ -68,10 +68,21 @@ export default function BidSubmitPage() {
     ];
 
     const isChecklistFulfilled = checkpoints.every(cp => cp.status === 'fulfilled' || cp.status === 'na');
+    const emdConsented = !emdNA && Array.isArray(paymentRequests) &&
+        paymentRequests.some(r => r.instruments?.some((i: any) => i.consentForPay));
 
     return (
         <div className="space-y-6">
             <SubmissionChecklist checkpoints={checkpoints} title="Bid Submission Checklist" />
+
+            {!emdNA && !emdConsented && (
+                <Alert variant="warning">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                        EMD Consent for Payment is pending. Please ensure consent has been given in the EMD Dashboard before proceeding.
+                    </AlertDescription>
+                </Alert>
+            )}
 
             <SubmitBidForm
                 tenderId={id}
