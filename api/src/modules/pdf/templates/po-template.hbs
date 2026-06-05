@@ -25,8 +25,6 @@
                 <strong>Volks Energie Pvt. Ltd.</strong><br>
                 B-1/D8, 2nd floor, Mohan Cooperative Industrial Estate,<br>
                 New Delhi - 110044<br>
-                Mob: +91 9650393636<br>
-                email: goyal@volksenergie.in<br>
                 PAN No.: AADCV9396C<br>
                 GST No.: 07AADCV9396C1Z
             </td>
@@ -48,15 +46,19 @@
                 {{seller_address}}<br>
                 PAN No.: {{seller_pan}}<br>
                 GST No.: {{seller_gst}}<br>
-                MSME No.: {{seller_msme}}
+                MSME No.: {{#if seller_msme}}{{seller_msme}}{{else}}Non MSME Vendor{{/if}}
             </td>
 
             <td style="width: 50%; vertical-align: top; border: 1px solid #000; padding: 8px;">
                 <strong>Shipping Details:</strong><br>
                 {{shipping_to_name}}<br>
                 {{shipping_to_address}}<br>
+                {{#if shipping_to_pan}}
                 PAN No.: {{shipping_to_pan}}<br>
+                {{/if}}
+                {{#if shipping_to_gst}}
                 GST No.: {{shipping_to_gst}}
+                {{/if}}
             </td>
         </tr>
       </tbody>
@@ -65,7 +67,7 @@
     <!-- Intro -->
     <p>
         This is in reference to your offer and subsequent discussion with you. 
-        We are pleased to place this PO to your company {{shipping_to_name}}
+        We are pleased to place this PO to your company {{seller_name}}
     </p>
 
     <!-- Items Table -->
@@ -86,13 +88,13 @@
         <tr>
             <td style="border: 1px solid #000; padding: 5px;">{{inc @index}}</td>
             <td style="border: 1px solid #000; padding: 5px;">{{description}}</td>
-            <td style="border: 1px solid #000; padding: 5px;">{{hsn}}</td>
-            <td style="border: 1px solid #000; padding: 5px;">{{quantity}}</td>
-            <td style="border: 1px solid #000; padding: 5px;">{{formatCurrency rate}}</td>
-            <td style="border: 1px solid #000; padding: 5px;">{{formatCurrency amount}}</td>
-            <td style="border: 1px solid #000; padding: 5px;">{{gst_rate}}</td>
-            <td style="border: 1px solid #000; padding: 5px;">{{formatCurrency gst_amount}}</td>
-            <td style="border: 1px solid #000; padding: 5px;">{{formatCurrency total}}</td>
+            <td style="border: 1px solid #000; padding: 5px; text-align: right;">{{hsn}}</td>
+            <td style="border: 1px solid #000; padding: 5px; text-align: right;">{{quantity}}</td>
+            <td style="border: 1px solid #000; padding: 5px; text-align: right;">{{formatCurrency rate}}</td>
+            <td style="border: 1px solid #000; padding: 5px; text-align: right;">{{formatCurrency amount}}</td>
+            <td style="border: 1px solid #000; padding: 5px; text-align: right;">{{gst_rate}}%</td>
+            <td style="border: 1px solid #000; padding: 5px; text-align: right;">{{formatCurrency gst_amount}}</td>
+            <td style="border: 1px solid #000; padding: 5px; text-align: right;">{{formatCurrency total}}</td>
         </tr>
         {{/each}}
 
@@ -101,10 +103,10 @@
             <td colspan="5" style="border: 1px solid #000; padding: 5px; text-align: right;">
                 <strong>Total Amount</strong>
             </td>
-            <td style="border: 1px solid #000; padding: 5px;">{{formatCurrency total_amount}}</td>
+            <td style="border: 1px solid #000; padding: 5px; text-align: right;">{{formatCurrency total_amount}}</td>
             <td></td>
-            <td style="border: 1px solid #000; padding: 5px;">{{formatCurrency total_gst_amt}}</td>
-            <td style="border: 1px solid #000; padding: 5px;">{{formatCurrency grand_total}}</td>
+            <td style="border: 1px solid #000; padding: 5px; text-align: right;">{{formatCurrency total_gst_amt}}</td>
+            <td style="border: 1px solid #000; padding: 5px; text-align: right;">{{formatCurrency grand_total}}</td>
         </tr>
     </table>
 
