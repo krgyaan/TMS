@@ -441,12 +441,10 @@ const EmdsAndTenderFeesPage = () => {
                 },
                 {
                     field: 'statusName',
-                    headerName: 'Status',
+                    headerName: 'Tender Status',
                     width: 150,
                     cellRenderer: (params: any) => (
-                        <Badge variant="outline" className={STATUS_COLORS[params.value] || ''}>
-                            {params.value}
-                        </Badge>
+                        params.value
                     ),
                 },
                 timerCol,
@@ -504,6 +502,7 @@ const EmdsAndTenderFeesPage = () => {
 
         return [
             tenderDetailsCol,
+            teamMemberCol,
             ...((activeTab === 'others' || activeTab === 'fees') ? [{
                 field: 'purpose',
                 headerName: 'Purpose',
@@ -554,16 +553,6 @@ const EmdsAndTenderFeesPage = () => {
                 ),
             },
             {
-                field: 'bidValid',
-                headerName: 'Bid Valid Till',
-                width: 150,
-                cellRenderer: (params: any) => {
-                    if (!params.value) return <span className="text-gray-400">—</span>;
-                    return formatDateTime(params.value);
-                },
-                hide: activeTab === 'others',
-            },
-            {
                 field: 'dueDate',
                 headerName: 'Due Date',
                 width: 140,
@@ -580,15 +569,22 @@ const EmdsAndTenderFeesPage = () => {
                 },
                 sortable: true,
             },
+            {
+                field: 'bidValid',
+                headerName: 'Bid Valid Till',
+                width: 150,
+                cellRenderer: (params: any) => {
+                    if (!params.value) return <span className="text-gray-400">—</span>;
+                    return formatDateTime(params.value);
+                },
+                hide: activeTab === 'others',
+            },
             ...(activeTab === 'paid' ? [
                 {
-                    field: 'bidSubmissionDate' as const,
-                    headerName: 'Bid Submission Date',
-                    width: 160,
-                    cellRenderer: (params: any) => {
-                        if (!params.value) return <span className="text-gray-400">—</span>;
-                        return formatDateTime(params.value);
-                    },
+                    field: 'tenderStatus' as const,
+                    headerName: 'Tender Status',
+                    width: 130,
+                    cellRenderer: (params: any) => (params.value),
                     sortable: true,
                 },
                 {
@@ -602,17 +598,16 @@ const EmdsAndTenderFeesPage = () => {
                     sortable: true,
                 },
                 {
-                    field: 'tenderStatus' as const,
-                    headerName: 'Tender Status',
-                    width: 130,
+                    field: 'bidSubmissionDate' as const,
+                    headerName: 'Bid Submission Date',
+                    width: 160,
                     cellRenderer: (params: any) => {
                         if (!params.value) return <span className="text-gray-400">—</span>;
-                        return <Badge variant="outline">{params.value}</Badge>;
+                        return formatDateTime(params.value);
                     },
                     sortable: true,
                 },
             ] : []),
-            teamMemberCol,
             timerCol,
             actionCol,
         ];
