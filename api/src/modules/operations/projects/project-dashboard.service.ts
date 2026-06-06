@@ -600,6 +600,11 @@ export class ProjectDashboardService {
             }
         }
 
+        // Generate PDF asynchronously (don't block response)
+        this.generatePdfForPO(updatedPO, body.products).catch((err) => {
+            this.logger.error(`Failed to generate PO PDF after update: ${err.message}`);
+        });
+
         this.logger.info(`Purchase Order updated: ${updatedPO.poNumber}`);
         return updatedPO;
     }
