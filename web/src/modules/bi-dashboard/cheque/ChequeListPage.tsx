@@ -146,6 +146,37 @@ const ChequeListPage = () => {
     const colDefs = useMemo<ColDef<ChequeDashboardRow>[]>(
         () => [
             {
+                field: 'tenderNo',
+                colId: 'tenderNo',
+                headerName: 'Tender Details',
+                width: 200,
+                sortable: true,
+                filter: true,
+                cellRenderer: (params: any) => {
+                    const data = params.data;
+                    if (!data) return null;
+                    if (data.tenderNo) {
+                        return (
+                            <div className="flex flex-col gap-0.5">
+                                <p className="text-xs">{data.tenderName}</p>
+                                <p className="text-xs text-[10px] text-muted-foreground truncate">{data.tenderNo}</p>
+                            </div>
+                        );
+                    }
+                    return <Badge variant="outline">{data.requestType || '—'}</Badge>;
+                },
+            },
+            {
+                field: 'tenderStatus',
+                headerName: 'Tender Status',
+                width: 140,
+                maxWidth: 130,
+                colId: 'tenderStatus',
+                valueGetter: (params) => params.data?.tenderStatus || '—',
+                sortable: true,
+                filter: true,
+            },
+            {
                 field: 'cheque',
                 headerName: 'Cheque Date',
                 width: 130,
@@ -242,15 +273,6 @@ const ChequeListPage = () => {
                     if (!dateB) return -1;
                     return new Date(dateA).getTime() - new Date(dateB).getTime();
                 },
-            },
-            {
-                field: 'requestedBy',
-                headerName: 'Member',
-                width: 180,
-                maxWidth: 180,
-                colId: 'requestedBy',
-                sortable: true,
-                filter: true,
             },
             {
                 field: 'expiry',
