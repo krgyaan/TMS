@@ -1,5 +1,6 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { eq, like, desc, sql } from "drizzle-orm";
+import { createHash } from "node:crypto";
 
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
@@ -129,6 +130,7 @@ export class ProjectDashboardService {
                     poRaisedBy: users.name,
                     createdAt: purchaseOrders.createdAt,
                     poPdf: purchaseOrders.generatedPdf,
+                    poPdfVersions: purchaseOrders.generatedPdfVersions,
                     totalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                     totalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                     grandTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
@@ -288,7 +290,57 @@ export class ProjectDashboardService {
         return this.getPurchaseOrder(po.id);
     }
 
+    private computePOHash(po: any, products: any[]): string {
+        const fields = {
+            poDate: po.poDate,
+            poNumber: po.poNumber,
+            projectName: po.projectName,
+            sellerName: po.sellerName,
+            sellerAddress: po.sellerAddress,
+            sellerGstNo: po.sellerGstNo,
+            sellerPanNo: po.sellerPanNo,
+            sellerMsmeNo: po.sellerMsmeNo,
+            sellerCinNo: po.sellerCinNo,
+            shipToName: po.shipToName,
+            shippingAddress: po.shippingAddress,
+            shipToGst: po.shipToGst,
+            shipToPan: po.shipToPan,
+            contactPersonName: po.contactPersonName,
+            contactPersonPhone: po.contactPersonPhone,
+            contactPersonEmail: po.contactPersonEmail,
+            quotationNo: po.quotationNo,
+            quotationDate: po.quotationDate,
+            termsAndConditions: po.termsAndConditions,
+            certRecipient: po.certRecipient,
+            remarks: po.remarks,
+            products: (products || []).map((p: any) => ({
+                description: p.description,
+                hsnSac: p.hsnSac,
+                qty: p.qty,
+                rate: p.rate,
+                gstRate: p.gstRate,
+            })),
+        };
+        return createHash("sha256").update(JSON.stringify(fields)).digest("hex");
+    }
+
     private async generatePdfForPO(po: any, products: any[]) {
+        const contentHash = this.computePOHash(po, products);
+
+        // Check if we already have a version with the same hash (no changes)
+        const versions = (po.generatedPdfVersions ?? {}) as Record<string, { path: string; hash: string }>;
+        const existingVersion = Object.values(versions).find((v) => v.hash === contentHash);
+        if (existingVersion) {
+            this.logger.info(`PO ${po.id}: no changes detected, reusing existing PDF`);
+            if (po.generatedPdf !== existingVersion.path) {
+                await this.db
+                    .update(purchaseOrders)
+                    .set({ generatedPdf: existingVersion.path })
+                    .where(eq(purchaseOrders.id, po.id));
+            }
+            return;
+        }
+
         const items = (products || []).map((p: any, i: number) => {
             const qty = Number(p.qty);
             const rate = Number(p.rate);
@@ -342,9 +394,17 @@ export class ProjectDashboardService {
         try {
             const pdfPaths = await this.pdfGenerator.generatePdfs('po', data, po.id, 'PO');
             if (pdfPaths.length > 0) {
+                const now = new Date();
+                const label = `v-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}-${String(now.getSeconds()).padStart(2, "0")}`;
+
+                const updatedVersions = { ...versions, [label]: { path: pdfPaths[0], hash: contentHash } };
+
                 await this.db
                     .update(purchaseOrders)
-                    .set({ generatedPdf: pdfPaths[0] })
+                    .set({
+                        generatedPdf: pdfPaths[0],
+                        generatedPdfVersions: updatedVersions,
+                    })
                     .where(eq(purchaseOrders.id, po.id));
             }
         } catch (error) {
@@ -376,14 +436,56 @@ export class ProjectDashboardService {
         return { ...po, products: enrichedProducts, total };
     }
 
-    async getPurchaseOrderPdf(id: number): Promise<{ path: string; filename: string }> {
+    async getPurchaseOrderPdf(id: number, version?: string): Promise<{ path: string; filename: string }> {
         const po = (await this.db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id)))[0];
         if (!po) throw new NotFoundException("Purchase Order not found");
+
+        if (version) {
+            const versions = (po.generatedPdfVersions ?? {}) as Record<string, { path: string; hash: string }>;
+            const entry = versions[version];
+            if (!entry) throw new NotFoundException(`PDF version "${version}" not found`);
+            return {
+                path: entry.path,
+                filename: `PO_${po.poNumber?.replace(/\//g, "_") || id}_${version}.pdf`,
+            };
+        }
+
         if (!po.generatedPdf) throw new NotFoundException("PDF not yet generated for this Purchase Order");
         return {
             path: po.generatedPdf,
             filename: `PO_${po.poNumber?.replace(/\//g, "_") || id}.pdf`,
         };
+    }
+
+    async getPurchaseOrderPdfVersions(id: number): Promise<Record<string, { path: string; hash: string }>> {
+        const po = (await this.db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id)))[0];
+        if (!po) throw new NotFoundException("Purchase Order not found");
+        return (po.generatedPdfVersions ?? {}) as Record<string, { path: string; hash: string }>;
+    }
+
+    async deletePdfVersion(id: number, version: string): Promise<void> {
+        const po = (await this.db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id)))[0];
+        if (!po) throw new NotFoundException("Purchase Order not found");
+
+        const versions = (po.generatedPdfVersions ?? {}) as Record<string, { path: string; hash: string }>;
+        if (!versions[version]) throw new NotFoundException(`PDF version "${version}" not found`);
+
+        delete versions[version];
+
+        // If we deleted the latest, point generatedPdf to another version or null
+        let latestPdf: string | null = null;
+        const remaining = Object.values(versions);
+        if (remaining.length > 0) {
+            latestPdf = remaining[remaining.length - 1].path;
+        }
+
+        await this.db
+            .update(purchaseOrders)
+            .set({
+                generatedPdf: latestPdf,
+                generatedPdfVersions: versions,
+            })
+            .where(eq(purchaseOrders.id, id));
     }
 
     private getTotalProductValues(products: any[]) {
@@ -503,6 +605,11 @@ export class ProjectDashboardService {
                 });
             }
         }
+
+        // Generate PDF asynchronously (don't block response)
+        this.generatePdfForPO(updatedPO, body.products).catch((err) => {
+            this.logger.error(`Failed to generate PO PDF after update: ${err.message}`);
+        });
 
         this.logger.info(`Purchase Order updated: ${updatedPO.poNumber}`);
         return updatedPO;

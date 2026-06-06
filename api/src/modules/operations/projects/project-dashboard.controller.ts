@@ -9,6 +9,7 @@ import {
   HttpCode,
   HttpStatus,
   Put,
+  Delete,
   Res,
 } from "@nestjs/common";
 import { createReadStream } from "fs";
@@ -71,10 +72,30 @@ export class ProjectDashboardController {
     return this.service.generatePONumber(projectName);
   }
 
-  // Serve PO PDF
+  // List PDF versions
+  @Get("purchase-orders/:id/pdf/versions")
+  getPurchaseOrderPdfVersions(@Param("id", ParseIntPipe) id: number) {
+    return this.service.getPurchaseOrderPdfVersions(id);
+  }
+
+  // Delete a PDF version
+  @Delete("purchase-orders/:id/pdf/versions/:version")
+  @HttpCode(HttpStatus.OK)
+  deletePdfVersion(
+    @Param("id", ParseIntPipe) id: number,
+    @Param("version") version: string,
+  ) {
+    return this.service.deletePdfVersion(id, version);
+  }
+
+  // Serve PO PDF (optional version query param)
   @Get("purchase-orders/:id/pdf")
-  async getPurchaseOrderPdf(@Param("id", ParseIntPipe) id: number, @Res() res: Response) {
-    const { path: relPath, filename } = await this.service.getPurchaseOrderPdf(id);
+  async getPurchaseOrderPdf(
+    @Param("id", ParseIntPipe) id: number,
+    @Query("version") version: string | undefined,
+    @Res() res: Response,
+  ) {
+    const { path: relPath, filename } = await this.service.getPurchaseOrderPdf(id, version);
     const absolutePath = join(process.cwd(), "uploads", "tendering", relPath);
     const fileStream = createReadStream(absolutePath);
     res.set({

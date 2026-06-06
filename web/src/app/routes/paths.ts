@@ -128,6 +128,7 @@ export const paths = {
         raisePoForm: (projectId: number) => `/operations/project-dashboard/${projectId}/purchase-order/create`,
         viewPoPage: (poId: number, projectId: number) => `/operations/project-dashboard/${projectId}/purchase-order/${poId}`,
         editPoPage: (poId: number, projectId: number) => `/operations/project-dashboard/${projectId}/purchase-order/${poId}/edit`,
+        poPdfVersions: (poId: number, projectId: number) => `/operations/project-dashboard/${projectId}/purchase-order/${poId}/pdf-versions`,
     },
 
     // ==================== SERVICES ====================

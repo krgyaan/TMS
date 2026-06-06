@@ -50,9 +50,19 @@ class ProjectDashboardApiService extends BaseApiService {
         return this.get(`/purchase-orders/${id}`);
     }
 
-    getPurchaseOrderPdfUrl(id: number): string {
+    getPurchaseOrderPdfUrl(id: number, version?: string): string {
         const baseUrl = axiosInstance.defaults.baseURL || '';
-        return `${baseUrl}/projects/purchase-orders/${id}/pdf`;
+        let url = `${baseUrl}/projects/purchase-orders/${id}/pdf`;
+        if (version) url += `?version=${encodeURIComponent(version)}`;
+        return url;
+    }
+
+    async getPurchaseOrderPdfVersions(id: number): Promise<Record<string, { path: string; hash: string }>> {
+        return this.get(`/purchase-orders/${id}/pdf/versions`);
+    }
+
+    async deletePdfVersion(id: number, version: string): Promise<void> {
+        return this.delete(`/purchase-orders/${id}/pdf/versions/${encodeURIComponent(version)}`);
     }
 
     async updatePurchaseOrder(id: number, data: UpdatePurchaseOrderDTO): Promise<any> {
