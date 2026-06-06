@@ -77,6 +77,7 @@ export interface PurchaseOrderRow {
     totalGstAmt: number;
     grandTotal: number;
     poPdf?: string;
+    poPdfVersions?: Record<string, { path: string; hash: string }>;
 }
 
 export interface UpdatePurchaseOrderDTO {

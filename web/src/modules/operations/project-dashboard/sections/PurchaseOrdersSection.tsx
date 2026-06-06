@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Download, Edit, Eye, Plus } from "lucide-react";
+import { Edit, Eye, History, Plus } from "lucide-react";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import DataTable from "@/components/ui/data-table";
@@ -13,7 +13,6 @@ import { paths } from "@/app/routes/paths";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { useProjectPurchaseOrders } from "@/hooks/api/useProjectDashboard";
-import { projectDashboardApi } from "@/services/api/project-dashboard.api";
 import { Button } from "@/components/ui/button";
 import type { PurchaseOrderRow } from "../helpers/projectDashboard.types";
 
@@ -46,11 +45,11 @@ export const PurchaseOrdersSection: React.FC<PurchaseOrdersSectionProps> = ({
             onClick: (row) => navigate(paths.operations.editPoPage(row.id, projectId!)),
         },
         {
-            label: "Download PO",
-            icon: <Download className="h-4 w-4" />,
-            onClick: (row) => window.open(projectDashboardApi.getPurchaseOrderPdfUrl(row.id), '_blank'),
+            label: "PDF Versions",
+            icon: <History className="h-4 w-4" />,
+            onClick: (row) => navigate(paths.operations.poPdfVersions(row.id, projectId!)),
         },
-    ], [navigate]);
+    ], [navigate, projectId]);
 
     const poColumns = useMemo<ColDef<PurchaseOrderRow>[]>(() => [
         {

@@ -31,6 +31,7 @@ const Operations_ProjectShowPage = lazy(() => import("@/modules/operations/proje
 const Operations_RaisePoFormPage = lazy(() => import("@/modules/operations/project-dashboard/RaisePoFormPage"));
 const Operations_ViewPoPage = lazy(() => import("@/modules/operations/project-dashboard/ViewPOPage"));
 const Operations_EditPOPage = lazy(() => import("@/modules/operations/project-dashboard/EditPOPage"));
+const Operations_PoPdfVersions = lazy(() => import("@/modules/operations/project-dashboard/PoPdfVersionsPage"));
 
 export default function OperationsRoutes() {
     return (
@@ -64,6 +65,7 @@ export default function OperationsRoutes() {
             <Route path="project-dashboard/:projectId/purchase-order/create" element={<RouteWrapper><Operations_RaisePoFormPage /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/purchase-order/:poId" element={<RouteWrapper><Operations_ViewPoPage /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/purchase-order/:poId/edit" element={<RouteWrapper><Operations_EditPOPage /></RouteWrapper>}></Route>
+            <Route path="project-dashboard/:projectId/purchase-order/:poId/pdf-versions" element={<RouteWrapper><Operations_PoPdfVersions /></RouteWrapper>} />
         </Routes>
     );
 }
