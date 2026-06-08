@@ -675,7 +675,7 @@ export class BidSubmissionsService {
 
             } else {
                 // Send DNB email
-                await this.sendDNBEmail(data.tenderId, {reasonForMissing : result.reasonForMissing, fromStatus: prevStatus?.name || 'Unknown'}, data.submittedBy);
+                await this.sendDNBEmail(data.tenderId, {reasonForMissing : result.reasonForMissing, fromStatus: prevStatus?.name || 'Unknown', prevention : result.preventionMeasures}, data.submittedBy);
             }
 
             //stopping all the timers running for this tender
@@ -1077,7 +1077,7 @@ export class BidSubmissionsService {
      */
     private async sendDNBEmail(
         tenderId: number,
-        bidSubmission: { reasonForMissing: string, fromStatus : string },
+        bidSubmission: { reasonForMissing: string, fromStatus : string , prevention: string},
         submittedBy: number
     ) {
         const tender = await this.tenderInfosService.findById(tenderId);
@@ -1115,6 +1115,7 @@ export class BidSubmissionsService {
             tender_name: tender.tenderName,
             due_date_time: dueDateTime,
             reason: bidSubmission.reasonForMissing || 'Not specified',
+            prevention: bidSubmission.prevention,
             from_status_name : bidSubmission.fromStatus,
             te_name: teName,
         };
