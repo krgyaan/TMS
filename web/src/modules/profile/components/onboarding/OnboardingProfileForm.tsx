@@ -218,7 +218,7 @@ export function OnboardingProfileForm({ onCancel, onSuccess, initialTab = "perso
         },
       };
 
-      const response = await api.patch("/hrms/onboarding/me/profile", payload);
+      const response = await api.patch("/hrms/employee-onboarding/me/profile", payload);
 
       toast.success("Profile details saved successfully");
       onSuccess();

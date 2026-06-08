@@ -45,7 +45,7 @@ export interface SignupResponse {
 class OnboardingApiService extends BaseApiService {
     constructor() {
         // Base route for onboarding
-        super("/hrms/onboarding");
+        super("/hrms/employee-onboarding");
     }
 
     // ─── Write Operations ─────────────────────────────────────────────────────

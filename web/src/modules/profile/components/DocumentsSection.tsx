@@ -207,7 +207,7 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
       if (issueDate) formData.append("issueDate", issueDate);
       if (expiryDate) formData.append("expiryDate", expiryDate);
 
-      const urlPrefix = isOnboarding ? "/hrms/onboarding" : "/profile";
+      const urlPrefix = isOnboarding ? "/hrms/employee-onboarding" : "/profile";
       if (isReupload && existingDoc) {
         // PATCH /profile/documents/:id or /hrms/onboarding/documents/:id
         formData.append("docType", existingDoc.docType);
@@ -907,7 +907,7 @@ export const DocumentsSection: React.FC = () => {
   const handleDelete = async (doc: UploadedDocument) => {
     if (!window.confirm(`Delete "${doc.docType}"? This cannot be undone.`)) return;
     try {
-      const urlPrefix = isOnboarding ? "/hrms/onboarding" : "/profile";
+      const urlPrefix = isOnboarding ? "/hrms/employee-onboarding" : "/profile";
       await api.delete(`${urlPrefix}/documents/${doc.id}`);
       queryClient.invalidateQueries({ queryKey: [isOnboarding ? 'my-onboarding-draft' : 'my-profile'] });
       refetch?.();
