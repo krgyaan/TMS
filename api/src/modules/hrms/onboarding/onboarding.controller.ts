@@ -273,8 +273,7 @@ export class OnboardingController {
       case 'bank-details':
         return this.onboardingService.approveBankRecord(id, entryId, status, remark, adminId);
       case 'documents':
-        const docStatus = status === 'approved' ? 'verified' : 'rejected';
-        return this.onboardingService.verifyDocument(id, entryId, docStatus, remark, adminId);
+        return this.onboardingService.verifyDocument(id, entryId, status, remark, adminId);
       default:
         throw new BadRequestException(`Invalid stage endpoint: ${stage}`);
     }

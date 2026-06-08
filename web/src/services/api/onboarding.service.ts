@@ -163,7 +163,7 @@ export const onboardingService = {
   },
 
   verifyDocument: async (id: number, docId: number, status: string, reason?: string): Promise<void> => {
-    await axiosInstance.patch(`/hrms/onboarding/${id}/documents/${docId}/verify`, { status, reason });
+    await axiosInstance.patch(`/hrms/onboarding/${id}/documents/${docId}/approve`, { status, remark: reason || "" });
   },
 
   // Induction

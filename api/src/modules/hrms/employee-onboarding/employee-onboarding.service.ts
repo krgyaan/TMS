@@ -384,7 +384,7 @@ export class EmployeeOnboardingService {
       fileName: d.fileUrl ? d.fileUrl.split('/').pop() : null,
       issueDate: d.issueDate || null,
       expiryDate: d.expiryDate || null,
-      verificationStatus: d.hrStatus === 'approved' ? 'verified' : d.hrStatus === 'rejected' ? 'rejected' : 'pending',
+      verificationStatus: d.hrStatus === 'approved' ? 'approved' : d.hrStatus === 'rejected' ? 'rejected' : 'pending',
       hrStatus: d.hrStatus,
       verifiedBy: d.verifiedBy ? String(d.verifiedBy) : null,
       verificationDate: d.verificationDate || null,
