@@ -186,6 +186,13 @@ export class OnboardingService {
     if (eduApproved) progress += 20;
     if (expApproved) progress += 20;
     if (bankApproved) progress += 20;
+
+    let hrStatus = 'pending';
+    if (profileRejected || docsRejected || eduRejected || expRejected || bankRejected) {
+      hrStatus = 'rejected';
+    } else if (profileCompleted && docsApproved && eduApproved && expApproved && bankApproved) {
+      hrStatus = 'approved';
+    }
     
     await tx
       .update(onboardingRequests)
@@ -196,6 +203,7 @@ export class OnboardingService {
         experienceStatus: newExperienceStatus,
         bankStatus: newBankStatus,
         inductionStatus: newInductionStatus,
+        hrStatus,
         progress: Math.floor(progress),
         updatedAt: new Date(),
       })
@@ -599,6 +607,7 @@ export class OnboardingService {
           email: onboardingRequests.email,
           phone: onboardingRequests.phone,
           status: onboardingRequests.status,
+          hrStatus: onboardingRequests.hrStatus,
           profileStatus: onboardingRequests.profileStatus,
           documentStatus: onboardingRequests.documentStatus,
           educationStatus: onboardingRequests.educationStatus,
@@ -757,6 +766,7 @@ export class OnboardingService {
         email: onboardingRequests.email,
         phone: onboardingRequests.phone,
         profileStatus: onboardingRequests.profileStatus,
+        hrStatus: onboardingRequests.hrStatus,
         progress: onboardingRequests.progress,
         approvedAt: onboardingRequests.approvedAt,
         updatedAt: onboardingRequests.updatedAt,
@@ -812,6 +822,7 @@ export class OnboardingService {
         email: onboardingRequests.email,
         phone: onboardingRequests.phone,
         status: onboardingRequests.status,
+        hrStatus: onboardingRequests.hrStatus,
         profileStatus: onboardingRequests.profileStatus,
         documentStatus: onboardingRequests.documentStatus,
         educationStatus: onboardingRequests.educationStatus,
@@ -911,6 +922,7 @@ export class OnboardingService {
         name: onboardingRequests.name,
         email: onboardingRequests.email,
         documentStatus: onboardingRequests.documentStatus,
+        hrStatus: onboardingRequests.hrStatus,
         progress: onboardingRequests.progress,
         firstName: onboardingProfiles.firstName,
         lastName: onboardingProfiles.lastName,
@@ -1007,6 +1019,7 @@ export class OnboardingService {
         id: onboardingRequests.id,
         email: onboardingRequests.email,
         inductionStatus: onboardingRequests.inductionStatus,
+        hrStatus: onboardingRequests.hrStatus,
         progress: onboardingRequests.progress,
         approvedAt: onboardingRequests.approvedAt,
         firstName: onboardingProfiles.firstName,

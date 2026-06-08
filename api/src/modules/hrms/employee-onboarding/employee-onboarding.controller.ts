@@ -1,5 +1,3 @@
-// src/modules/hrms/employee-onboarding/employee-onboarding.controller.ts
-
 import {
   Body,
   Controller,

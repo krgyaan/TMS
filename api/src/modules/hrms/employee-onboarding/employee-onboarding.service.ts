@@ -1,5 +1,3 @@
-// src/modules/hrms/employee-onboarding/employee-onboarding.service.ts
-
 import {
   Injectable,
   Inject,
@@ -274,6 +272,7 @@ export class EmployeeOnboardingService {
       .select({
         id: onboardingRequests.id,
         status: onboardingRequests.status,
+        hrStatus: onboardingRequests.hrStatus,
         requestType: onboardingRequests.requestType,
         profileStatus: onboardingRequests.profileStatus,
         documentStatus: onboardingRequests.documentStatus,
@@ -494,12 +493,12 @@ export class EmployeeOnboardingService {
         ? 'approved'
         : 'pending';
 
-    const uploadedTypes = obDocsRows.map(d => d.docType);
-    const missingDocs = REQUIRED_DOC_TYPES.filter(type => !uploadedTypes.includes(type));
-    const allDocsUploaded = missingDocs.length === 0;
-
-    const hasResubmittedDoc = obDocsRows.some(d => d.status === 'resubmitted');
-    const documentStatus = allDocsUploaded ? (hasResubmittedDoc ? 'resubmitted' : 'submitted') : 'pending';
+    const allRequiredSubmitted = REQUIRED_DOC_TYPES.every((type) =>
+      obDocsRows.some((d: any) => d.docType === type && (d.status === 'submitted' || d.status === 'resubmitted'))
+    );
+    const documentStatus = allRequiredSubmitted
+      ? (obDocsRows.some(d => d.status === 'resubmitted') ? 'resubmitted' : 'submitted')
+      : 'pending';
     const documentHrStatus = documents.some((d: any) => d.hrStatus === 'rejected')
       ? 'rejected'
       : (documents.length > 0 && documents.every((d: any) => d.hrStatus === 'approved'))
@@ -533,6 +532,7 @@ export class EmployeeOnboardingService {
       id: obReq.id,
       requestType: obReq.requestType,
       status: obReq.status,
+      hrStatus: obReq.hrStatus,
       profileStatus,
       documentStatus,
       bankStatus,
@@ -659,11 +659,6 @@ export class EmployeeOnboardingService {
         } as any);
       }
 
-      // Update profileStatus on the onboarding request
-      await this.db.update(onboardingRequests).set({
-        profileStatus: currentProfile ? 'resubmitted' : 'submitted',
-        updatedAt: new Date(),
-      }).where(eq(onboardingRequests.id, onboardingId));
     }
 
     // Handle Bank Accounts Sync
@@ -710,14 +705,6 @@ export class EmployeeOnboardingService {
           });
         }
       }
-
-      const hasExistingBank = dto.bankAccounts.some((b: any) => b.id);
-      await this.db.update(onboardingRequests)
-        .set({
-          bankStatus: hasExistingBank ? 'resubmitted' : 'submitted',
-          updatedAt: new Date(),
-        })
-        .where(eq(onboardingRequests.id, onboardingId));
     }
 
     // Handle Education Sync
@@ -762,14 +749,6 @@ export class EmployeeOnboardingService {
           });
         }
       }
-
-      const hasExistingEdu = dto.education.some((e: any) => e.id);
-      await this.db.update(onboardingRequests)
-        .set({
-          educationStatus: hasExistingEdu ? 'resubmitted' : 'submitted',
-          updatedAt: new Date(),
-        })
-        .where(eq(onboardingRequests.id, onboardingId));
     }
 
     // Handle Experience Sync
@@ -814,15 +793,9 @@ export class EmployeeOnboardingService {
           });
         }
       }
-
-      const hasExistingExp = dto.experience.some((e: any) => e.id);
-      await this.db.update(onboardingRequests)
-        .set({
-          experienceStatus: hasExistingExp ? 'resubmitted' : 'submitted',
-          updatedAt: new Date(),
-        })
-        .where(eq(onboardingRequests.id, onboardingId));
     }
+
+    await this.recalculateSubmissionStatuses(this.db, onboardingId);
 
     // If any stage data was resubmitted, reset parent request status from 'rejected' to 'pending'
     if (activeReqs[0].status === 'rejected') {
@@ -872,11 +845,7 @@ export class EmployeeOnboardingService {
       } as any).where(eq(onboardingProfiles.id, obProfile.id));
     }
 
-    // Update the profileStatus on the onboarding request
-    await this.db.update(onboardingRequests).set({
-      profileStatus: 'submitted',
-      updatedAt: new Date(),
-    }).where(eq(onboardingRequests.id, onboardingId));
+    await this.recalculateSubmissionStatuses(this.db, onboardingId);
 
     // Log the activity
     await this.db.insert(onboardingActivityLogs).values({
@@ -912,9 +881,7 @@ export class EmployeeOnboardingService {
         hrStatus: 'pending',
       }).returning();
 
-      await this.db.update(onboardingRequests)
-        .set({ educationStatus: 'submitted', updatedAt: new Date() })
-        .where(eq(onboardingRequests.id, activeReqs[0].id));
+      await this.recalculateSubmissionStatuses(this.db, activeReqs[0].id);
 
       return inserted;
     }
@@ -947,13 +914,7 @@ export class EmployeeOnboardingService {
         updatedAt: new Date(),
       }).where(eq(onboardingEducation.id, eduId)).returning();
 
-      // Update the request stage status
-      await this.db.update(onboardingRequests)
-        .set({
-          educationStatus: 'resubmitted',
-          updatedAt: new Date(),
-        })
-        .where(eq(onboardingRequests.id, activeReqs[0].id));
+      await this.recalculateSubmissionStatuses(this.db, activeReqs[0].id);
 
       return updated;
     }
@@ -1031,13 +992,7 @@ export class EmployeeOnboardingService {
       }
     }
 
-    const hasExistingBank = bankAccounts.some((b: any) => b.id);
-    await this.db.update(onboardingRequests)
-      .set({
-        bankStatus: hasExistingBank ? 'resubmitted' : 'submitted',
-        updatedAt: new Date(),
-      })
-      .where(eq(onboardingRequests.id, onboardingId));
+    await this.recalculateSubmissionStatuses(this.db, onboardingId);
 
     // Reset parent request status from 'rejected' to 'pending' on resubmission
     if (activeReqs[0].status === 'rejected') {
@@ -1106,13 +1061,7 @@ export class EmployeeOnboardingService {
       }
     }
 
-    const hasExistingEdu = educations.some((e: any) => e.id);
-    await this.db.update(onboardingRequests)
-      .set({
-        educationStatus: hasExistingEdu ? 'resubmitted' : 'submitted',
-        updatedAt: new Date(),
-      })
-      .where(eq(onboardingRequests.id, activeReqs[0].id));
+    await this.recalculateSubmissionStatuses(this.db, activeReqs[0].id);
 
     // Reset parent request status from 'rejected' to 'pending' on resubmission
     if (activeReqs[0].status === 'rejected') {
@@ -1144,9 +1093,7 @@ export class EmployeeOnboardingService {
         hrStatus: 'pending',
       }).returning();
 
-      await this.db.update(onboardingRequests)
-        .set({ experienceStatus: 'submitted', updatedAt: new Date() })
-        .where(eq(onboardingRequests.id, activeReqs[0].id));
+      await this.recalculateSubmissionStatuses(this.db, activeReqs[0].id);
 
       return inserted;
     }
@@ -1184,12 +1131,7 @@ export class EmployeeOnboardingService {
       const [updated] = await this.db.update(onboardingExperience).set(payload)
         .where(eq(onboardingExperience.id, expId)).returning();
 
-      await this.db.update(onboardingRequests)
-        .set({
-          experienceStatus: 'resubmitted',
-          updatedAt: new Date(),
-        })
-        .where(eq(onboardingRequests.id, activeReqs[0].id));
+      await this.recalculateSubmissionStatuses(this.db, activeReqs[0].id);
 
       return updated;
     }
@@ -1254,13 +1196,7 @@ export class EmployeeOnboardingService {
       }
     }
 
-    const hasExistingExp = experiences.some((e: any) => e.id);
-    await this.db.update(onboardingRequests)
-      .set({
-        experienceStatus: hasExistingExp ? 'resubmitted' : 'submitted',
-        updatedAt: new Date(),
-      })
-      .where(eq(onboardingRequests.id, activeReqs[0].id));
+    await this.recalculateSubmissionStatuses(this.db, activeReqs[0].id);
 
     // Reset parent request status from 'rejected' to 'pending' on resubmission
     if (activeReqs[0].status === 'rejected') {
@@ -1292,9 +1228,7 @@ export class EmployeeOnboardingService {
         hrStatus: 'pending',
       }).returning();
 
-      await this.db.update(onboardingRequests)
-        .set({ bankStatus: 'submitted', updatedAt: new Date() })
-        .where(eq(onboardingRequests.id, activeReqs[0].id));
+      await this.recalculateSubmissionStatuses(this.db, activeReqs[0].id);
 
       return inserted;
     }
@@ -1324,12 +1258,7 @@ export class EmployeeOnboardingService {
         updatedAt: new Date(),
       }).where(eq(onboardingBankDetails.id, bankId)).returning();
 
-      await this.db.update(onboardingRequests)
-        .set({
-          bankStatus: 'resubmitted',
-          updatedAt: new Date(),
-        })
-        .where(eq(onboardingRequests.id, activeReqs[0].id));
+      await this.recalculateSubmissionStatuses(this.db, activeReqs[0].id);
 
       return updated;
     }
@@ -1393,7 +1322,7 @@ export class EmployeeOnboardingService {
       } as any)
       .returning();
 
-    await this.checkAndUpdateDocumentStatus(onboardingId!);
+    await this.recalculateSubmissionStatuses(this.db, onboardingId!);
 
     return {
       id: inserted.id,
@@ -1479,7 +1408,7 @@ export class EmployeeOnboardingService {
       .where(eq(onboardingDocuments.id, docId))
       .returning();
 
-    await this.checkAndUpdateDocumentStatus(activeReqs[0].id);
+    await this.recalculateSubmissionStatuses(this.db, activeReqs[0].id);
 
     return {
       id: updated.id,
@@ -1530,25 +1459,78 @@ export class EmployeeOnboardingService {
     }
 
     await this.db.delete(onboardingDocuments).where(eq(onboardingDocuments.id, docId));
-    await this.checkAndUpdateDocumentStatus(activeReqs[0].id);
+    await this.recalculateSubmissionStatuses(this.db, activeReqs[0].id);
   }
 
-  private async checkAndUpdateDocumentStatus(onboardingId: number) {
-    const currentDocs = await this.db
+  private async recalculateSubmissionStatuses(txOrDb: any, onboardingId: number): Promise<void> {
+    // 1. Profile
+    const [profile] = await txOrDb
+      .select({ status: onboardingProfiles.status })
+      .from(onboardingProfiles)
+      .where(eq(onboardingProfiles.onboardingId, onboardingId))
+      .orderBy(desc(onboardingProfiles.id))
+      .limit(1);
+
+    const profileStatus = (profile?.status === 'submitted' || profile?.status === 'resubmitted') 
+      ? profile.status 
+      : 'pending';
+
+    // 2. Education
+    const educations = await txOrDb
+      .select({ status: onboardingEducation.status })
+      .from(onboardingEducation)
+      .where(eq(onboardingEducation.onboardingId, onboardingId));
+
+    let educationStatus = 'pending';
+    if (educations.length > 0) {
+      educationStatus = educations.some((e: any) => e.status === 'resubmitted') ? 'resubmitted' : 'submitted';
+    }
+
+    // 3. Experience
+    const experiences = await txOrDb
+      .select({ status: onboardingExperience.status })
+      .from(onboardingExperience)
+      .where(eq(onboardingExperience.onboardingId, onboardingId));
+
+    let experienceStatus = 'pending';
+    if (experiences.length > 0) {
+      experienceStatus = experiences.some((e: any) => e.status === 'resubmitted') ? 'resubmitted' : 'submitted';
+    }
+
+    // 4. Bank Details
+    const banks = await txOrDb
+      .select({ status: onboardingBankDetails.status })
+      .from(onboardingBankDetails)
+      .where(eq(onboardingBankDetails.onboardingId, onboardingId));
+
+    let bankStatus = 'pending';
+    if (banks.length > 0) {
+      bankStatus = banks.some((b: any) => b.status === 'resubmitted') ? 'resubmitted' : 'submitted';
+    }
+
+    // 5. Documents
+    const currentDocs = await txOrDb
       .select({ docType: onboardingDocuments.docType, status: onboardingDocuments.status })
       .from(onboardingDocuments)
       .where(eq(onboardingDocuments.onboardingId, onboardingId));
 
-    const uploadedTypes = currentDocs.map((d) => d.docType);
-    const allUploaded = REQUIRED_DOC_TYPES.every((type) => uploadedTypes.includes(type));
+    const allRequiredSubmitted = REQUIRED_DOC_TYPES.every((type) =>
+      currentDocs.some((d: any) => d.docType === type && (d.status === 'submitted' || d.status === 'resubmitted'))
+    );
+    let documentStatus = 'pending';
+    if (allRequiredSubmitted) {
+      const hasResubmitted = currentDocs.some((d: any) => d.status === 'resubmitted');
+      documentStatus = hasResubmitted ? 'resubmitted' : 'submitted';
+    }
 
-    const hasResubmitted = currentDocs.some((d) => d.status === 'resubmitted');
-    const newStatus = allUploaded ? (hasResubmitted ? 'resubmitted' : 'submitted') : 'pending';
-
-    await this.db
+    await txOrDb
       .update(onboardingRequests)
       .set({
-        documentStatus: newStatus,
+        profileStatus,
+        educationStatus,
+        experienceStatus,
+        bankStatus,
+        documentStatus,
         updatedAt: new Date(),
       })
       .where(eq(onboardingRequests.id, onboardingId));
