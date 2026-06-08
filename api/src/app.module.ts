@@ -104,6 +104,7 @@ import { AssetsModule } from "@/modules/hrms/assets/assets.module";
 import { AccountChecklistModule } from './modules/accounts/account-checklist/account-checklist.module';
 import { AccountChecklistSchedulerModule } from "./modules/accounts/account-checklist/account-checklist-scheduler.module";
 import { OnboardingModule } from './modules/hrms/onboarding/onboarding.module';
+import { EmployeeOnboardingModule } from './modules/hrms/employee-onboarding/employee-onboarding.module';
 import { ProfileModule } from './modules/profile/profile.module';
 @Module({
     imports: [
@@ -218,6 +219,7 @@ import { ProfileModule } from './modules/profile/profile.module';
         AccountChecklistModule,
         AccountChecklistSchedulerModule,
         OnboardingModule,
+        EmployeeOnboardingModule,
         ProfileModule,
     ],
     controllers: [AppController,],
