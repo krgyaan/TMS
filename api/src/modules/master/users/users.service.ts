@@ -14,6 +14,7 @@ import { permissions } from "@db/schemas/auth/permissions.schema";
 import { designations } from "@db/schemas/master/designations.schema";
 import { teams } from "@db/schemas/master/teams.schema";
 import { RoleName, DataScope, getDataScope, canSwitchTeams } from "@/common/constants/roles.constant";
+import { PermissionService } from "@/modules/auth/services/permission.service";
 
 export type SafeUser = Pick<User, "id" | "name" | "email" | "username" | "mobile" | "team" | "isActive" | "createdAt" | "updatedAt">;
 
@@ -50,7 +51,7 @@ export type UserRoleInfo = {
 };
 
 // UPDATED: Include role in UserWithRelations
-export type UserWithRelations = SafeUser & {
+export type UserWithRelations = Omit<SafeUser, "team"> & {
     profile: UserProfileSummary | null;
     team: { id: number; name: string | null } | null;
     designation: { id: number; name: string | null } | null;
@@ -72,7 +73,10 @@ export type UserAuthInfo = {
 
 @Injectable()
 export class UsersService {
-    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
+    constructor(
+        @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly permissionService: PermissionService,
+    ) {}
 
     // UPDATED: Include role in base query
     private baseUserQuery() {
@@ -97,7 +101,6 @@ export class UsersService {
                 profileGender: userProfiles.gender,
                 profileEmployeeCode: userProfiles.employeeCode,
                 profileDesignationId: userProfiles.designationId,
-                profilePrimaryTeamId: userProfiles.primaryTeamId,
                 profileAltEmail: userProfiles.altEmail,
                 profileEmergencyContactName: userProfiles.emergencyContactName,
                 profileEmergencyContactPhone: userProfiles.emergencyContactPhone,
@@ -112,6 +115,7 @@ export class UsersService {
                 // Team fields
                 teamId: teams.id,
                 teamName: teams.name,
+                primaryTeamId: users.primaryTeamId,
                 // Designation fields
                 designationId: designations.id,
                 designationName: designations.name,
@@ -122,7 +126,7 @@ export class UsersService {
             .from(users)
             .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
             .leftJoin(designations, eq(userProfiles.designationId, designations.id))
-            .leftJoin(teams, eq(userProfiles.primaryTeamId, teams.id))
+            .leftJoin(teams, eq(users.primaryTeamId, teams.id))
             .leftJoin(userRoles, eq(userRoles.userId, users.id)) // NEW
             .leftJoin(roles, eq(roles.id, userRoles.roleId)); // NEW
     }
@@ -139,7 +143,6 @@ export class UsersService {
                   gender: row.profileGender,
                   employeeCode: row.profileEmployeeCode,
                   designationId: row.profileDesignationId,
-                  primaryTeamId: row.profilePrimaryTeamId,
                   oldTeamId: row.team,
                   altEmail: row.profileAltEmail,
                   emergencyContactName: row.profileEmergencyContactName,
@@ -192,7 +195,7 @@ export class UsersService {
             createdAt: row.createdAt,
             updatedAt: row.updatedAt,
             profile,
-            team: row.primaryTeamId !== null ? row.primaryTeamId : row.oldTeamId,
+            team: row.teamId != null ? { id: row.teamId, name: row.teamName } : null,
             designation,
             role, // NEW
         };
@@ -206,7 +209,7 @@ export class UsersService {
                 email: users.email,
                 roleName: roles.name,
                 roleId: roles.id,
-                primaryTeamId: userProfiles.primaryTeamId,
+                primaryTeamId: users.primaryTeamId,
                 oldTeamId: users.team,
                 permissionModule: permissions.module,
                 permissionAction : permissions.action,
@@ -312,17 +315,21 @@ export class UsersService {
             throw new NotFoundException("One or more permissions not found");
         }
 
-        // Delete existing user permissions for these permission IDs
-        await this.db.delete(userPermissions).where(and(eq(userPermissions.userId, userId), inArray(userPermissions.permissionId, permissionIds)));
+        await this.db.transaction(async (tx) => {
+            // Delete existing user permissions for these permission IDs
+            await tx.delete(userPermissions).where(and(eq(userPermissions.userId, userId), inArray(userPermissions.permissionId, permissionIds)));
 
-        // Insert new permissions
-        const values = permissionIds.map((permissionId, index) => ({
-            userId,
-            permissionId,
-            granted: granted[index],
-        }));
+            // Insert new permissions
+            const values = permissionIds.map((permissionId, index) => ({
+                userId,
+                permissionId,
+                granted: granted[index],
+            }));
 
-        await this.db.insert(userPermissions).values(values);
+            await tx.insert(userPermissions).values(values);
+        });
+
+        await this.permissionService.refreshUserOverrides(userId);
     }
 
     // NEW: Get user's permissions with granted/denied status
@@ -362,6 +369,8 @@ export class UsersService {
         if (result.length === 0) {
             throw new NotFoundException(`User permission override not found for user ${userId} and permission ${permissionId}`);
         }
+
+        await this.permissionService.refreshUserOverrides(userId);
     }
 
     // NEW: Get role by name
@@ -551,6 +560,13 @@ export class UsersService {
         } catch {
             return false;
         }
+    }
+
+    async updateLastLogin(userId: number): Promise<void> {
+        await this.db
+            .update(users)
+            .set({ lastLoginAt: new Date(), updatedAt: new Date() })
+            .where(and(eq(users.id, userId), isNull(users.deletedAt)));
     }
 
     private async hashPassword(plain: string) {

@@ -174,6 +174,9 @@ export class AuthService {
         // Get all permissions (role + user overrides)
         const permissions = await this.permissionService.getUserPermissions(userId, authInfo?.roleId ?? null);
 
+        // Update last login timestamp (fire-and-forget)
+        await this.usersService.updateLastLogin(userId);
+
         const payload: JwtPayload = {
             id: userId,
             sub: userId,

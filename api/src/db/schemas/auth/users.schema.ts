@@ -1,6 +1,7 @@
 import {
     pgTable,
     bigserial,
+    bigint,
     varchar,
     timestamp,
     boolean,
@@ -19,10 +20,10 @@ export const users = pgTable(
         mobile: varchar('mobile', { length: 20 }),
         password: varchar('password', { length: 255 }).notNull(),
         team: integer('team').references(() => teams.id),
+        primaryTeamId: bigint('primary_team_id', { mode: 'number' }),
         emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
         lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
         isActive: boolean('is_active').notNull().default(true),
-        rememberToken: varchar('remember_token', { length: 255 }),
         createdAt: timestamp('created_at', { withTimezone: true })
             .notNull()
             .defaultNow(),
