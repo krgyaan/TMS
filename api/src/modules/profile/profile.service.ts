@@ -125,8 +125,9 @@ export class ProfileService {
           departmentName: teams.name,
         })
       .from(userProfiles)
+      .leftJoin(users, eq(users.id, userProfiles.userId))
       .leftJoin(designations, eq(userProfiles.designationId, designations.id))
-      .leftJoin(teams, eq(userProfiles.primaryTeamId, teams.id))
+      .leftJoin(teams, eq(users.primaryTeamId, teams.id))
       .where(eq(userProfiles.userId, userId))
       .limit(1);
 

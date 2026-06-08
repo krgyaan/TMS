@@ -378,7 +378,7 @@ export class OnboardingService {
         employeeType: employeeProfile?.employeeType || null,
         workLocation: employeeProfile?.workLocation || null,
         designationId: userProfile?.designationId || null,
-        departmentId: userProfile?.primaryTeamId || null,
+        departmentId: user.primaryTeamId || null,
         reportingTl: employeeProfile?.reportingTl || null,
         probationMonths: employeeProfile?.probationMonths || null,
         probationEndDate: employeeProfile?.probationEndDate || null,
