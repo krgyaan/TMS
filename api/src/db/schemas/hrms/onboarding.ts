@@ -28,6 +28,7 @@ export const onboardingRequests = pgTable('hrms_onboarding_requests', {
   phone: varchar('phone', { length: 20 }),
 
   status: varchar('status', { length: 50 }).notNull().default('pending'),
+  hrStatus: varchar('hr_status', { length: 50 }).notNull().default('pending'),
 
   // Aggregate stage statuses (computed from individual entity statuses)
   // Values: 'pending' | 'in_progress' | 'submitted' | 'approved' | 'rejected'
