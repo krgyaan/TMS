@@ -1465,72 +1465,145 @@ export class EmployeeOnboardingService {
   private async recalculateSubmissionStatuses(txOrDb: any, onboardingId: number): Promise<void> {
     // 1. Profile
     const [profile] = await txOrDb
-      .select({ status: onboardingProfiles.status })
+      .select({ 
+        status: onboardingProfiles.status,
+        hrStatus: onboardingProfiles.hrStatus,
+        firstName: onboardingProfiles.firstName
+      })
       .from(onboardingProfiles)
       .where(eq(onboardingProfiles.onboardingId, onboardingId))
       .orderBy(desc(onboardingProfiles.id))
       .limit(1);
 
-    const profileStatus = (profile?.status === 'submitted' || profile?.status === 'resubmitted') 
-      ? profile.status 
-      : 'pending';
+    const profileCompleted = (profile?.status === 'submitted' || profile?.status === 'resubmitted') && profile?.hrStatus === 'approved';
+    const profileRejected = profile?.hrStatus === 'rejected';
+
+    let newProfileStatus: string;
+    if (profile?.hrStatus === 'approved') newProfileStatus = 'approved';
+    else if (profile?.hrStatus === 'rejected') newProfileStatus = 'rejected';
+    else if (profile?.status === 'resubmitted') newProfileStatus = 'resubmitted';
+    else if (profile?.status === 'submitted') newProfileStatus = 'submitted';
+    else if (profile?.firstName) newProfileStatus = 'in_progress';
+    else newProfileStatus = 'pending';
 
     // 2. Education
     const educations = await txOrDb
-      .select({ status: onboardingEducation.status })
+      .select({ status: onboardingEducation.status, hrStatus: onboardingEducation.hrStatus })
       .from(onboardingEducation)
       .where(eq(onboardingEducation.onboardingId, onboardingId));
 
-    let educationStatus = 'pending';
-    if (educations.length > 0) {
-      educationStatus = educations.some((e: any) => e.status === 'resubmitted') ? 'resubmitted' : 'submitted';
-    }
+    const eduApproved = educations.length > 0 && educations.every((e: any) => e.hrStatus === 'approved');
+    const eduRejected = educations.some((e: any) => e.hrStatus === 'rejected');
+    const eduResubmitted = educations.some((e: any) => e.status === 'resubmitted');
+
+    let newEducationStatus: string;
+    if (eduApproved) newEducationStatus = 'approved';
+    else if (eduRejected) newEducationStatus = 'rejected';
+    else if (eduResubmitted) newEducationStatus = 'resubmitted';
+    else if (educations.length > 0) newEducationStatus = 'submitted';
+    else newEducationStatus = 'pending';
 
     // 3. Experience
     const experiences = await txOrDb
-      .select({ status: onboardingExperience.status })
+      .select({ status: onboardingExperience.status, hrStatus: onboardingExperience.hrStatus })
       .from(onboardingExperience)
       .where(eq(onboardingExperience.onboardingId, onboardingId));
 
-    let experienceStatus = 'pending';
-    if (experiences.length > 0) {
-      experienceStatus = experiences.some((e: any) => e.status === 'resubmitted') ? 'resubmitted' : 'submitted';
-    }
+    const expApproved = experiences.length > 0 && experiences.every((e: any) => e.hrStatus === 'approved');
+    const expRejected = experiences.some((e: any) => e.hrStatus === 'rejected');
+    const expResubmitted = experiences.some((e: any) => e.status === 'resubmitted');
+
+    let newExperienceStatus: string;
+    if (expApproved) newExperienceStatus = 'approved';
+    else if (expRejected) newExperienceStatus = 'rejected';
+    else if (expResubmitted) newExperienceStatus = 'resubmitted';
+    else if (experiences.length > 0) newExperienceStatus = 'submitted';
+    else newExperienceStatus = 'pending';
 
     // 4. Bank Details
     const banks = await txOrDb
-      .select({ status: onboardingBankDetails.status })
+      .select({ status: onboardingBankDetails.status, hrStatus: onboardingBankDetails.hrStatus })
       .from(onboardingBankDetails)
       .where(eq(onboardingBankDetails.onboardingId, onboardingId));
 
-    let bankStatus = 'pending';
-    if (banks.length > 0) {
-      bankStatus = banks.some((b: any) => b.status === 'resubmitted') ? 'resubmitted' : 'submitted';
-    }
+    const bankApproved = banks.length > 0 && banks.every((b: any) => b.hrStatus === 'approved');
+    const bankRejected = banks.some((b: any) => b.hrStatus === 'rejected');
+    const bankResubmitted = banks.some((b: any) => b.status === 'resubmitted');
+
+    let newBankStatus: string;
+    if (bankApproved) newBankStatus = 'approved';
+    else if (bankRejected) newBankStatus = 'rejected';
+    else if (bankResubmitted) newBankStatus = 'resubmitted';
+    else if (banks.length > 0) newBankStatus = 'submitted';
+    else newBankStatus = 'pending';
 
     // 5. Documents
     const currentDocs = await txOrDb
-      .select({ docType: onboardingDocuments.docType, status: onboardingDocuments.status })
+      .select({ docType: onboardingDocuments.docType, status: onboardingDocuments.status, hrStatus: onboardingDocuments.hrStatus })
       .from(onboardingDocuments)
       .where(eq(onboardingDocuments.onboardingId, onboardingId));
 
     const allRequiredSubmitted = REQUIRED_DOC_TYPES.every((type) =>
       currentDocs.some((d: any) => d.docType === type && (d.status === 'submitted' || d.status === 'resubmitted'))
     );
-    let documentStatus = 'pending';
-    if (allRequiredSubmitted) {
-      const hasResubmitted = currentDocs.some((d: any) => d.status === 'resubmitted');
-      documentStatus = hasResubmitted ? 'resubmitted' : 'submitted';
+    const docsApproved = currentDocs.length > 0 && currentDocs.every((d: any) => d.hrStatus === 'approved');
+    const docsRejected = currentDocs.some((d: any) => d.hrStatus === 'rejected');
+    const docsResubmitted = currentDocs.some((d: any) => d.status === 'resubmitted');
+
+    let newDocumentStatus: string;
+    if (docsApproved) newDocumentStatus = 'approved';
+    else if (docsRejected) newDocumentStatus = 'rejected';
+    else if (docsResubmitted) newDocumentStatus = 'resubmitted';
+    else if (allRequiredSubmitted) newDocumentStatus = 'submitted';
+    else newDocumentStatus = 'pending';
+
+    // 6. Induction
+    const tasks = await txOrDb
+      .select({ status: onboardingInduction.status })
+      .from(onboardingInduction)
+      .where(eq(onboardingInduction.onboardingId, onboardingId));
+
+    const inductionCompleted = tasks.length > 0 && tasks.every((t: any) => t.status === 'completed');
+    const newInductionStatus = inductionCompleted ? 'completed' : (tasks.length > 0 ? 'in_progress' : 'pending');
+
+    // 7. Progress %
+    let progress = 0;
+    if (profileCompleted) progress += 20;
+    if (docsApproved) progress += 20;
+    if (eduApproved) progress += 20;
+    if (expApproved) progress += 20;
+    if (bankApproved) progress += 20;
+
+    let hrStatus = 'pending';
+    if (profileRejected || docsRejected || eduRejected || expRejected || bankRejected) {
+      hrStatus = 'rejected';
+    } else if (profileCompleted && docsApproved && eduApproved && expApproved && bankApproved) {
+      hrStatus = 'approved';
+    }
+
+    const [request] = await txOrDb
+      .select({ status: onboardingRequests.status })
+      .from(onboardingRequests)
+      .where(eq(onboardingRequests.id, onboardingId))
+      .limit(1);
+
+    let newStatus = request?.status || 'pending';
+    if (newStatus === 'rejected' && hrStatus === 'pending') {
+      newStatus = 'pending';
     }
 
     await txOrDb
       .update(onboardingRequests)
       .set({
-        profileStatus,
-        educationStatus,
-        experienceStatus,
-        bankStatus,
-        documentStatus,
+        profileStatus: newProfileStatus,
+        documentStatus: newDocumentStatus,
+        educationStatus: newEducationStatus,
+        experienceStatus: newExperienceStatus,
+        bankStatus: newBankStatus,
+        inductionStatus: newInductionStatus,
+        hrStatus,
+        status: newStatus,
+        progress: Math.floor(progress),
         updatedAt: new Date(),
       })
       .where(eq(onboardingRequests.id, onboardingId));
