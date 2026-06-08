@@ -598,10 +598,12 @@ export class BidSubmissionsService {
 
 
             // checking for various actions to be performed
-            if (EMDActionStatuses.includes(data.rejectionStatus)) {
+            // if (EMDActionStatuses.includes(data.rejectionStatus)) {
                 // applicable stage, we will perform EMD actions
-                await this.rejectEMD(tender.id, data.submittedBy, data.rejectionStatus);
-            }
+
+                // -> new change the emd will be rejected for all the bids missed 
+            await this.rejectEMD(tender.id, data.submittedBy, data.rejectionStatus);
+            // }
             
 
             //checking bid submissionis
@@ -706,6 +708,8 @@ export class BidSubmissionsService {
         //reject the emd once these statuses are implemented
         //need the rejection reason for rejecting the payment request
 
+        //we need to reject both payment request and payment instrument
+
         const pendingEmds = await this.db.
                 select({
                     paymentRequests: paymentRequests,
@@ -737,7 +741,7 @@ export class BidSubmissionsService {
             // Updating each instrument and request in the table
             if (emd.paymentInstruments?.id) {
                 // Stripping 'PENDING' from the end and replacing with 'REJECTED'
-                const newStatus = emd.paymentInstruments.status.replace(/PENDING$/i, 'REJECTED');
+                const newStatus = emd.paymentInstruments.status.replace(/PENDING$/i, 'ACCOUNT_FORM_REJECTED');
 
                 await this.db.update(paymentInstruments)
                     .set({ 
