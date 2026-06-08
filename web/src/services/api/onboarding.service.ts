@@ -8,6 +8,7 @@ export interface OnboardingRequest {
   email: string;
   phone: string;
   status: "pending" | "approved" | "rejected";
+  hrStatus: "pending" | "approved" | "rejected";
   profileStatus: string;
   documentStatus: string;
   educationStatus: string;
@@ -37,6 +38,7 @@ export interface ProfileListItem {
   firstName: string | null;
   lastName: string | null;
   profileStatus: string;
+  hrStatus: "pending" | "approved" | "rejected";
   progress: number;
   approvedAt: string | null;
   updatedAt: string;
@@ -63,6 +65,7 @@ export interface FullProfile {
   email: string;
   phone: string;
   status: string;
+  hrStatus: string;
   profileStatus: string;
   progress: number;
   approvedAt: string | null;

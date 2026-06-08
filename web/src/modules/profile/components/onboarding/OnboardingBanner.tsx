@@ -59,7 +59,7 @@ function deriveBannerConfig(onboardingStatus: OnboardingStatus): BannerConfig {
   const { status, employeeCompleted, hrCompleted, progress } = onboardingStatus;
 
   // ── Rejected: Action Required ────────────────────────────────────────
-  if (status === "rejected") {
+  if (onboardingStatus.hrStatus === "rejected") {
     return {
       variant: "rejected",
       icon: XCircle,
@@ -79,7 +79,7 @@ function deriveBannerConfig(onboardingStatus: OnboardingStatus): BannerConfig {
   }
 
   // ── Almost Done: HR is finishing up ──────────────────────────────────
-  if (employeeCompleted && hrCompleted && status !== "fully_completed") {
+  if (onboardingStatus.hrStatus === "approved" && status !== "fully_completed") {
     return {
       variant: "almost_done",
       icon: CheckCircle2,
