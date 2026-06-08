@@ -164,7 +164,8 @@ function getActionLabel(
 // ─────────────────────────────────────────────────────────────────────────────
 
 function DocStatusBadge({ status }: { status: "pending" | "approved" | "rejected" }) {
-  const config = {
+  const normalizedStatus = (status || "pending").toLowerCase() as "pending" | "approved" | "rejected";
+  const statusMap = {
     pending: {
       label: "Pending Review",
       className: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800/50",
@@ -180,8 +181,9 @@ function DocStatusBadge({ status }: { status: "pending" | "approved" | "rejected
       className: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-800/50",
       icon: XCircle,
     },
-  }[status];
+  };
 
+  const config = statusMap[normalizedStatus] || statusMap.pending;
   const Icon = config.icon;
 
   return (
@@ -783,8 +785,6 @@ export function OnboardingStageCard({
 
   // ── Determine what to render in expanded section ─────────────────────
   const hasExpandedContent = Boolean(children || details || documents || inductionTasks || education || experience || bankAccounts);
-
-  console.log(documents);
 
   return (
     <motion.div
