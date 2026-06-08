@@ -432,7 +432,6 @@ export class ProjectDashboardService {
             }
         })
 
-        this.logger.debug("po details ", po);
         return { ...po, products: enrichedProducts, total };
     }
 
