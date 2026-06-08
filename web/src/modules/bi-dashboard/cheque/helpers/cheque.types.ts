@@ -14,6 +14,10 @@ export interface ChequeDashboardRow {
     id: number;
     requestId: number;
     purpose: string | null;
+    requestType: string | null;
+    tenderNo: string | null;
+    tenderName: string | null;
+    tenderStatus: string | null;
     requestedBy: string | null;
     date: Date | null;
     chequeNo: string | null;

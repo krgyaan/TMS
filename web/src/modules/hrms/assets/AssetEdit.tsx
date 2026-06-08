@@ -35,7 +35,7 @@ import { useCurrentUser } from '@/hooks/api/useAuth';
 import { paths } from '@/app/routes/paths';
 
 const assetSchema = z.object({
-  userId: z.string().optional(),
+  userId: z.union([z.string(), z.number()]).optional(),
   assetCode: z.string().min(1, 'Asset Code is required'),
   assetType: z.string().min(1, 'Asset Type is required'),
   assetCategory: z.string().min(1, 'Asset Category is required'),

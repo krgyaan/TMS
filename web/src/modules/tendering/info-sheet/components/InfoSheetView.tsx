@@ -672,6 +672,16 @@ const AllFieldsTable = ({ infoSheet }: { infoSheet: TenderInfoSheet }) => {
                                 Client Contacts
                             </TableCell>
                         </TableRow>
+                        {infoSheet.customerInContact && (
+                            <TableRow className="hover:bg-muted/30 transition-colors">
+                                <TableCell className="text-sm font-medium text-muted-foreground">
+                                    Customer in Contact
+                                </TableCell>
+                                <TableCell className="text-sm font-semibold" colSpan={3}>
+                                    {formatYesNo(infoSheet.customerInContact)}
+                                </TableCell>
+                            </TableRow>
+                        )}
                         {infoSheet.clients.map((client, idx) => (
                             <React.Fragment
                                 key={`${client.clientName}-${idx}`}

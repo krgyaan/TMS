@@ -305,6 +305,7 @@ export class FollowUpService {
                 conditions.push(inArray(followUps.stopReason, [1, 3, 4]));
             } else if (tab === "future") {
                 conditions.push(gt(followUps.startFrom, today));
+                conditions.push(ne(followUps.frequency, 6));
             }
 
             const orderDirection = sortOrder === "asc" ? asc : desc;
