@@ -139,7 +139,7 @@ export const WorkOrdersSection: React.FC<WorkOrdersSectionProps> = ({
                             Work Orders
                         </CardTitle>
                         <CardAction>
-                            <Button size="sm" variant="default" onClick={() => navigate(paths.operations.raisePoForm(projectId))}>
+                            <Button size="sm" variant="default" onClick={() => navigate(paths.operations.raiseVendorWoForm(projectId))}>
                                 <Plus className="mr-1.5 h-4 w-4" />
                                 Raise Work Order
                             </Button>
