@@ -130,6 +130,11 @@ export const paths = {
         editPoPage: (poId: number, projectId: number) => `/operations/project-dashboard/${projectId}/purchase-order/${poId}/edit`,
         poPdfVersions: (poId: number, projectId: number) => `/operations/project-dashboard/${projectId}/purchase-order/${poId}/pdf-versions`,
         purchaseOrders: "/operations/purchase-orders",
+
+        vendorWorkOrders: "/operations/vendor-work-orders",
+        raiseVendorWoForm: (projectId: number) => `/operations/project-dashboard/${projectId}/vendor-work-order/create`,
+        editVendorWoPage: (woId: number, projectId: number) => `/operations/project-dashboard/${projectId}/vendor-work-order/${woId}`,
+        vendorWoPdfVersions: (woId: number, projectId: number) => `/operations/project-dashboard/${projectId}/vendor-work-order/${woId}/pdf-versions`,
     },
 
     // ==================== SERVICES ====================
