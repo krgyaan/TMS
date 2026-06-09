@@ -140,7 +140,7 @@ function mapVwoDataToFormValues(data: any): VendorWorkOrderFormValues {
 
 export default function EditVendorWorkOrderPage() {
   const navigate = useNavigate();
-  const { projectId: projectIdParam, id: vwoIdParam } = useParams<{ projectId: string; id: string }>();
+  const { projectId: projectIdParam, woId: vwoIdParam } = useParams<{ projectId: string; woId: string }>();
   const projectId = Number(projectIdParam);
   const vwoId = Number(vwoIdParam);
 
@@ -394,8 +394,7 @@ export default function EditVendorWorkOrderPage() {
                     placeholder="Choose a vendor..."
                   />
                 </div>
-                {selectedSellerId && selectedSellerId !== "" && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <FieldWrapper control={form.control} name="sellerName" label={<>Vendor Name <span className="text-destructive">*</span></>}>
                       {(field) => <Input {...field} placeholder="Enter vendor name" />}
                     </FieldWrapper>
@@ -448,7 +447,6 @@ export default function EditVendorWorkOrderPage() {
                       )}
                     </FieldWrapper>
                   </div>
-                )}
               </div>
               {/* ── Ship To Details ── */}
               <div className="border rounded-lg border-sidebar-primary-foreground border-dashed p-2 my-3 w-full md:w-1/2">
@@ -483,8 +481,7 @@ export default function EditVendorWorkOrderPage() {
                     placeholder="Choose shipping destination..."
                   />
                 </div>
-                {selectedPartyId && selectedPartyId !== "" && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <FieldWrapper control={form.control} name="shipToName" label={<>Ship To Name <span className="text-destructive">*</span></>}>
                       {(field) => <Input {...field} placeholder="Enter recipient name" />}
                     </FieldWrapper>
@@ -514,7 +511,6 @@ export default function EditVendorWorkOrderPage() {
                       )}
                     </FieldWrapper>
                   </div>
-                )}
               </div>
             </div>
 
