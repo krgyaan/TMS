@@ -37,6 +37,7 @@ const Operations_PurchaseOrderList = lazy(() => import("@/modules/shared/purchas
 const Operations_RaiseVendorWoFormPage = lazy(() => import("@/modules/operations/vendor-work-orders/CreateVendorWorkOrderPage"));
 const Operations_EditVendorWoPage = lazy(() => import("@/modules/operations/vendor-work-orders/EditVendorWorkOrderPage"));
 const Operations_VendorWorkOrderList = lazy(() => import("@/modules/operations/vendor-work-orders/VendorWorkOrderListPage"));
+const Operations_VendorWoPdfVersions = lazy(() => import("@/modules/operations/vendor-work-orders/VendorWoPdfVersionsPage"));
 
 export default function OperationsRoutes() {
     return (
@@ -75,6 +76,7 @@ export default function OperationsRoutes() {
             <Route path="vendor-work-orders" element={<RouteWrapper><Operations_VendorWorkOrderList /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/vendor-work-order/create" element={<RouteWrapper><Operations_RaiseVendorWoFormPage /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/vendor-work-order/:woId" element={<RouteWrapper><Operations_EditVendorWoPage /></RouteWrapper>} />
+            <Route path="project-dashboard/:projectId/vendor-work-order/:woId/pdf-versions" element={<RouteWrapper><Operations_VendorWoPdfVersions /></RouteWrapper>} />
         </Routes>
     );
 }
