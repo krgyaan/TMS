@@ -16,6 +16,7 @@ export interface OnboardingRequest {
   bankStatus: string;
   inductionStatus: string;
   progress: number;
+  employeeProgress: number;
   approvedAt: string | null;
   createdAt: string;
   updatedAt: string;
