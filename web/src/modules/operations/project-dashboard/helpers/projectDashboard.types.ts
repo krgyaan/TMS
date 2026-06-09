@@ -59,6 +59,7 @@ export interface CreatePartyDTO {
 
 export interface PurchaseOrderRow {
     id: number;
+    projectId: number;
     poNumber: string;
     sellerName: string;
     sellerEmail?: string;

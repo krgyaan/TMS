@@ -62,6 +62,7 @@ const navMain: NavGroup[] = [
             { title: "Kick Off", url: paths.operations.woKickOffListPage, permission: "ops.kick-off" },
             { title: "Contract Agreement", url: paths.operations.contractAgreementListPage, permission: "ops.contract-agreement" },
             { title: "Project Dashboard", url: paths.operations.projectDashboard(), permission: "ops.dashboard" },
+            { title: "Purchase Orders", url: paths.operations.purchaseOrders, permission: "ops.purchase-orders" },
         ],
     },
     {
@@ -98,6 +99,7 @@ const navMain: NavGroup[] = [
             { title: "GST Checklists", url: paths.accounts.gstChecklists, permission: "accounts.gst-checklists" },
             { title: "Fixed Expenses", url: paths.accounts.fixedExpenses, permission: "accounts.fixed-expenses" },
             { title: "Delegation Dashboard", url: paths.accounts.delegation, permission: "accounts.delegation" },
+            { title: "Purchase Orders", url: paths.accounts.purchaseOrders, permission: "accounts.purchase-orders" },
         ],
     },
     {

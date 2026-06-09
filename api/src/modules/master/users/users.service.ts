@@ -605,7 +605,7 @@ export class UsersService {
             .from(users)
             .innerJoin(userRoles, eq(userRoles.userId, users.id))
             .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
-            .leftJoin(teams, eq(teams.id, userProfiles.primaryTeamId))
+            .leftJoin(teams, eq(teams.id, users.primaryTeamId))
             .where(and(eq(userRoles.roleId, roleId), isNull(users.deletedAt), eq(users.isActive, true)))
             .orderBy(asc(users.name));
     }
@@ -618,9 +618,9 @@ export class UsersService {
             eq(users.isActive, true),
         ];
 
-        // If a specific team is provided, also filter by userProfiles.primaryTeamId
+        // If a specific team is provided, also filter by users.primaryTeamId
         if (teamId !== undefined) {
-            conditions.push(eq(userProfiles.primaryTeamId, teamId));
+            conditions.push(eq(users.primaryTeamId, teamId));
         }
 
         return this.db
@@ -632,7 +632,7 @@ export class UsersService {
             })
             .from(users)
             .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
-            .leftJoin(teams, eq(teams.id, userProfiles.primaryTeamId))
+            .leftJoin(teams, eq(teams.id, users.primaryTeamId))
             .where(and(...conditions))
             .orderBy(asc(users.name));
     }

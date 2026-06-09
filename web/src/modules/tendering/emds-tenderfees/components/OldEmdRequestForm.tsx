@@ -46,7 +46,7 @@ export function OldEmdRequestForm({ tenderId, requestIds, initialData, mode = 'c
     const isEditMode = mode === 'edit';
     const { data: currentUser } = useCurrentUser();
     const teamOptions = useTeamOptions([1,2]);
-    const defaultTeamId = currentUser?.profile?.primaryTeamId;
+    const defaultTeamId = currentUser?.team?.id;
 
     const form = useForm<FormValues>({
         resolver: zodResolver(OldEntryPaymentRequestSchema) as Resolver<FormValues>,

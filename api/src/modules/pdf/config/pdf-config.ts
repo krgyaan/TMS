@@ -117,6 +117,17 @@ export const PDF_CONFIG = {
                 left: '7.5mm',
             },
         },
+        vwo: {
+            directory: '.',
+            templates: ['vendor-wo-template'],
+            storagePath: 'vwo',
+            margin: {
+                top: '10mm',
+                right: '7.5mm',
+                bottom: '10mm',
+                left: '7.5mm',
+            },
+        },
     },
 
     /**

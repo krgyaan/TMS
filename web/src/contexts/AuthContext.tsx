@@ -89,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const permissions = user?.permissions ?? [];
 
         // Extract team info
-        const teamId = user?.team?.id ?? user?.profile?.primaryTeamId ?? null;
+        const teamId = user?.team?.id ?? null;
 
         // Calculate effective team ID
         const effectiveTeamId = canSwitchTeams ? activeTeamId : teamId;

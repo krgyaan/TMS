@@ -8,7 +8,6 @@ export const projectsDashboardKeys = {
     poParties: () => [...projectsDashboardKeys.all, "po-parties"] as const,
     purchaseOrder: (id: number) => [...projectsDashboardKeys.all, "purchase-order", id] as const,
     overview: (id: number) => [...projectsDashboardKeys.all, "overview", id] as const,
-    workOrders: (id: number) => [...projectsDashboardKeys.all, "work-orders", id] as const,
     projectPurchaseOrders: (id: number) => [...projectsDashboardKeys.all, "purchase-orders", id] as const,
     imprests: (id: number) => [...projectsDashboardKeys.all, "imprests", id] as const,
 };
@@ -19,14 +18,6 @@ export const useProjectOverview = (id: number) => {
     return useQuery({
         queryKey: projectsDashboardKeys.overview(id),
         queryFn: () => projectDashboardApi.getOverview(id),
-        enabled: !!id,
-    });
-};
-
-export const useProjectWorkOrders = (id: number) => {
-    return useQuery({
-        queryKey: projectsDashboardKeys.workOrders(id),
-        queryFn: () => projectDashboardApi.getWorkOrders(id),
         enabled: !!id,
     });
 };
@@ -63,6 +54,13 @@ export const useNextPONumber = (projectName: string | undefined) => {
         queryFn: () => projectDashboardApi.getNextPONumber(projectName!),
         enabled: !!projectName,
         staleTime: 5 * 60 * 1000,
+    });
+};
+
+export const useAllPurchaseOrders = () => {
+    return useQuery({
+        queryKey: [...projectsDashboardKeys.all, "all-purchase-orders"],
+        queryFn: () => projectDashboardApi.getAllPurchaseOrders(),
     });
 };
 

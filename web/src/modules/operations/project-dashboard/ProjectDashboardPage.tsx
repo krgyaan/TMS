@@ -11,7 +11,7 @@ import { paths } from "@/app/routes/paths";
 import { EmployeeImprestsSection } from "./sections/EmployeeImprestsSection";
 import { ProjectOverviewSection } from "./sections/ProjectOverviewSection";
 import { PurchaseOrdersSection } from "./sections/PurchaseOrdersSection";
-import { WorkOrdersSection } from "./sections/WorkOrdersSection";
+import { VendorWorkOrdersSection } from "./sections/VendorWorkOrdersSection";
 import { useProjectMasterOptions } from "@/hooks/api/useProjectMaster";
 
 export default function ProjectDashboardPage() {
@@ -93,7 +93,7 @@ export default function ProjectDashboardPage() {
             {/* Sections — each fetches its own data in parallel */}
             <ProjectOverviewSection projectId={Number(projectId)} />
             <PurchaseOrdersSection projectId={Number(projectId)} />
-            <WorkOrdersSection projectId={Number(projectId)} />
+            <VendorWorkOrdersSection projectId={Number(projectId)} />
             <EmployeeImprestsSection projectId={Number(projectId)} />
         </div>
     );

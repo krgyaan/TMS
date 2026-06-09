@@ -27,6 +27,8 @@ const AddTask = lazy(() => import("@/modules/accounts/delegation/AddTask"));
 const TaskDetail = lazy(() => import("@/modules/accounts/delegation/TaskDetail"));
 const TaskStatusUpdate = lazy(() => import("@/modules/accounts/delegation/TaskStatusUpdate"));
 
+const Accounts_PurchaseOrderList = lazy(() => import("@/modules/shared/purchase-orders/PurchaseOrderListPage"));
+
 export default function AccountsRoutes() {
     return (
         <Routes>
@@ -53,6 +55,7 @@ export default function AccountsRoutes() {
             <Route path="task-checklists/:id/report" element={<RouteWrapper><TaskChecklistReport /></RouteWrapper>} />
 
             <Route path="delegation" element={<RouteWrapper><TaskDashboard /></RouteWrapper>} />
+            <Route path="purchase-orders" element={<RouteWrapper><Accounts_PurchaseOrderList /></RouteWrapper>} />
             <Route path="delegation/add" element={<RouteWrapper><AddTask /></RouteWrapper>} />
             <Route path="delegation/:id" element={<RouteWrapper><TaskDetail /></RouteWrapper>} />
             <Route path="delegation/:id/update" element={<RouteWrapper><TaskStatusUpdate /></RouteWrapper>} />

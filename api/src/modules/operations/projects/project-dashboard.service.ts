@@ -114,6 +114,7 @@ export class ProjectDashboardService {
         const purchaseOrdersData = await this.db
                 .select({
                     id: purchaseOrders.id,
+                    projectId: purchaseOrders.projectId,
                     poNumber: purchaseOrders.poNumber,
                     sellerName: purchaseOrders.sellerName,
                     sellerEmail: purchaseOrders.sellerEmail,
@@ -138,6 +139,39 @@ export class ProjectDashboardService {
                 .from(purchaseOrders)
                 .innerJoin(users, eq(users.id, purchaseOrders.poRaisedBy))
                 .where(eq(purchaseOrders.projectId, projectId));
+
+        return { purchaseOrders: purchaseOrdersData };
+    }
+
+    async getAllPurchaseOrders() {
+        const purchaseOrdersData = await this.db
+                .select({
+                    id: purchaseOrders.id,
+                    projectId: purchaseOrders.projectId,
+                    poNumber: purchaseOrders.poNumber,
+                    sellerName: purchaseOrders.sellerName,
+                    sellerEmail: purchaseOrders.sellerEmail,
+                    sellerAddress: purchaseOrders.sellerAddress,
+                    sellerGstNo: purchaseOrders.sellerGstNo,
+                    sellerPanNo: purchaseOrders.sellerPanNo,
+                    sellerMsmeNo: purchaseOrders.sellerMsmeNo,
+                    sellerCinNo: purchaseOrders.sellerCinNo,
+                    shipToName: purchaseOrders.shipToName,
+                    shippingAddress: purchaseOrders.shippingAddress,
+                    shipToGst: purchaseOrders.shipToGst,
+                    shipToPan: purchaseOrders.shipToPan,
+                    poDate: purchaseOrders.poDate,
+                    poRaisedBy: users.name,
+                    createdAt: purchaseOrders.createdAt,
+                    poPdf: purchaseOrders.generatedPdf,
+                    poPdfVersions: purchaseOrders.generatedPdfVersions,
+                    totalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                    totalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                    grandTotal: sql<number>`COALESCE((SELECT SUM(total_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
+                })
+                .from(purchaseOrders)
+                .innerJoin(users, eq(users.id, purchaseOrders.poRaisedBy))
+                .orderBy(desc(purchaseOrders.createdAt));
 
         return { purchaseOrders: purchaseOrdersData };
     }

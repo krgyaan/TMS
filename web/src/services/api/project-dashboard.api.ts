@@ -57,6 +57,10 @@ class ProjectDashboardApiService extends BaseApiService {
         return url;
     }
 
+    async getAllPurchaseOrders(): Promise<{ purchaseOrders: PurchaseOrderRow[] }> {
+        return this.get('/purchase-orders');
+    }
+
     async getPurchaseOrderPdfVersions(id: number): Promise<Record<string, { path: string; hash: string }>> {
         return this.get(`/purchase-orders/${id}/pdf/versions`);
     }

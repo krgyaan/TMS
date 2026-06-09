@@ -129,6 +129,12 @@ export const paths = {
         viewPoPage: (poId: number, projectId: number) => `/operations/project-dashboard/${projectId}/purchase-order/${poId}`,
         editPoPage: (poId: number, projectId: number) => `/operations/project-dashboard/${projectId}/purchase-order/${poId}/edit`,
         poPdfVersions: (poId: number, projectId: number) => `/operations/project-dashboard/${projectId}/purchase-order/${poId}/pdf-versions`,
+        purchaseOrders: "/operations/purchase-orders",
+
+        vendorWorkOrders: "/operations/vendor-work-orders",
+        raiseVendorWoForm: (projectId: number) => `/operations/project-dashboard/${projectId}/vendor-work-order/create`,
+        editVendorWoPage: (woId: number, projectId: number) => `/operations/project-dashboard/${projectId}/vendor-work-order/${woId}/edit`,
+        vendorWoPdfVersions: (woId: number, projectId: number) => `/operations/project-dashboard/${projectId}/vendor-work-order/${woId}/pdf-versions`,
     },
 
     // ==================== SERVICES ====================
@@ -191,6 +197,7 @@ export const paths = {
         delegationAdd: "/accounts/delegation/add",
         delegationView: (id: string) => `/accounts/delegation/${id}`,
         delegationUpdate: (id: string) => `/accounts/delegation/${id}/update`,
+        purchaseOrders: "/accounts/purchase-orders",
     },
 
     // ==================== CRM ====================
