@@ -12,6 +12,7 @@ import { EmailService } from '@/modules/email/email.service';
 import { RecipientResolver } from '@/modules/email/recipient.resolver';
 import type { RecipientSource } from '@/modules/email/dto/send-email.dto';
 import { Logger } from '@nestjs/common';
+import { ClientDirectorySyncService } from '@/modules/shared/client-directory/client-directory-sync.service';
 import { organizations } from '@db/schemas/master/organizations.schema';
 import { websites } from '@db/schemas/master/websites.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
@@ -50,6 +51,7 @@ export class TenderInfoSheetsService {
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
         private readonly timersService: TimersService,
+        private readonly clientDirectorySyncService: ClientDirectorySyncService,
     ) { }
 
     async findByTenderId(tenderId: number): Promise<TenderInfoSheetWithRelations | null> {
@@ -591,6 +593,16 @@ export class TenderInfoSheetsService {
                             clientEmail: client.clientEmail ?? null,
                         }))
                     );
+
+                    // Sync to client directory
+                    await this.clientDirectorySyncService.syncToClientDirectory(
+                        clients.map((c) => ({
+                            name: c.clientName ?? '',
+                            email: c.clientEmail,
+                            phone: c.clientMobile,
+                            org: null,
+                        })),
+                    );
                 }
 
                 // Technical & financial documents only relevant when recommending
@@ -1031,6 +1043,16 @@ export class TenderInfoSheetsService {
                                 clientMobile: client.clientMobile ?? null,
                                 clientEmail: client.clientEmail ?? null,
                             }))
+                        );
+
+                        // Sync to client directory
+                        await this.clientDirectorySyncService.syncToClientDirectory(
+                            clients.map((c) => ({
+                                name: c.clientName ?? '',
+                                email: c.clientEmail,
+                                phone: c.clientMobile,
+                                org: null,
+                            })),
                         );
                     }
 

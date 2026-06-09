@@ -13,6 +13,7 @@ import type { PaginatedResult } from "@/modules/tendering/types/shared.types";
 import { items } from "@db/schemas/master/items.schema";
 import { TenderStatusHistoryService } from "@/modules/tendering/tender-status-history/tender-status-history.service";
 import { EmailService } from "@/modules/email/email.service";
+import { ClientDirectorySyncService } from "@/modules/shared/client-directory/client-directory-sync.service";
 import { RecipientResolver } from "@/modules/email/recipient.resolver";
 import type { RecipientSource } from "@/modules/email/dto/send-email.dto";
 import { Logger } from "@nestjs/common";
@@ -83,7 +84,8 @@ export class PhysicalDocsService {
         private readonly tenderStatusHistoryService: TenderStatusHistoryService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
-        private readonly timersService: TimersService
+        private readonly timersService: TimersService,
+        private readonly clientDirectorySyncService: ClientDirectorySyncService,
     ) {}
 
     /**
@@ -556,6 +558,16 @@ export class PhysicalDocsService {
                         email: p.email,
                         phone: p.phone,
                     }));
+
+                    // Sync to client directory
+                    await this.clientDirectorySyncService.syncToClientDirectory(
+                        data.physicalDocsPersons.map((p) => ({
+                            name: p.name,
+                            email: p.email,
+                            phone: p.phone,
+                            org: null,
+                        })),
+                    );
                 }
 
                 // Update tender status only if there are no existing bid submissions
@@ -685,6 +697,16 @@ export class PhysicalDocsService {
                     email: p.email,
                     phone: p.phone,
                 }));
+
+                // Sync to client directory
+                await this.clientDirectorySyncService.syncToClientDirectory(
+                    data.physicalDocsPersons.map((p) => ({
+                        name: p.name,
+                        email: p.email,
+                        phone: p.phone,
+                        org: null,
+                    })),
+                );
             } else {
                 // If persons not provided, fetch existing ones
                 const existingPersons = await tx.select().from(physicalDocsPersons).where(eq(physicalDocsPersons.physicalDocId, id));
