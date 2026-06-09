@@ -619,8 +619,8 @@ export class VendorWorkOrderService {
 
     private sanitizeProjectName(name: string): string {
         return name
-            .toUpperCase()
-            .replace(/[^A-Z0-9]/g, "")
-            .slice(0, 4);
+            .replace(/[^a-zA-Z0-9\s-]/g, '')
+            .trim()
+            .replace(/[\s-]+/g, '_');
     }
 }
