@@ -88,6 +88,7 @@ import { ProjectsMasterrModule } from "@/modules/shared/projects-master/projects
 import { AllExceptionsFilter } from "./logger/all-exception.filter";
 import { LoggerModule } from "@/logger/logger.module";
 import { ProjectsMasterModule } from "./modules/master/projects-master/projects-master.module";
+import { ClientDirectoryModule } from "@/modules/shared/client-directory/client-directory.module";
 import { RequestExtensionsModule } from "./modules/tendering/request_extensions/request-extension.module";
 import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-queries.module";
 import { LoanAdvanceModule } from "./modules/accounts/loan-advance/loan-advance.module";
@@ -223,6 +224,7 @@ import { ProfileModule } from './modules/profile/profile.module';
         OnboardingModule,
         EmployeeOnboardingModule,
         ProfileModule,
+        ClientDirectoryModule,
     ],
     controllers: [AppController,],
     providers: [
