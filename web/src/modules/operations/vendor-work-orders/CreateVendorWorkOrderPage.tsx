@@ -15,19 +15,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCreatePoParty, usePoParties, useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { useGetTeamMembers } from "@/hooks/api/useUsers";
+import { useNextVWONumber, useCreateVendorWorkOrder } from "@/hooks/api/useVendorWorkOrders";
 import { VWOProductsField } from "./components/VWOProductsField";
 import { VWOTermsField } from "./components/VWOTermsField";
 import { DEFAULT_VWO_TERMS_ROWS } from "./helpers/vwoForm.constants";
 import { VWOFormPreview } from "./components/VWOFormPreview";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
 import { ArrowLeft, Building2, Calendar, Eye, Hash, Info, Loader2, Mail, MapPin, Phone, UserCheck, UserPlus } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { formatDateForInput, mapVwoFormToCreateDTO } from "./helpers/vwoForm.mapper";
-import type { CreateVendorWorkOrderDTO } from "./helpers/vwoForm.types";
 import { vendorWorkOrderFormSchema, type VendorWorkOrderFormValues } from "./helpers/vwoForm.schema";
 
 interface NewPartyForm {
@@ -102,8 +101,8 @@ export default function CreateVendorWorkOrderPage() {
 
   const parties = partiesData || [];
 
-  const [nextWONumber, setNextWONumber] = useState<string>("");
-  const [isLoadingWONumber, setIsLoadingWONumber] = useState(true);
+  const projectName = overview?.project?.projectName;
+  const { data: nextWONumber, isLoading: isLoadingWONumber } = useNextVWONumber(projectName);
 
   const [showPreview, setShowPreview] = useState(false);
   const [isAddPartyOpen, setIsAddPartyOpen] = useState(false);
@@ -136,27 +135,6 @@ export default function CreateVendorWorkOrderPage() {
       .filter((p: any) => p.type === "ship_to")
       .map((p: any) => ({ id: String(p.id), name: p.name })),
   ], [parties]);
-
-  useEffect(() => {
-    const fetchWONumber = async () => {
-      try {
-        setIsLoadingWONumber(true);
-        const projectName = overview?.project?.projectName;
-        const params = projectName ? `?projectName=${encodeURIComponent(projectName)}` : "";
-        const response = await fetch(`/vendor-work-orders/next-number${params}`);
-        if (!response.ok) throw new Error("Failed to fetch next WO number");
-        const data = await response.text();
-        setNextWONumber(data);
-      } catch {
-        setNextWONumber("VWO-001");
-      } finally {
-        setIsLoadingWONumber(false);
-      }
-    };
-    if (overview?.project?.projectName) {
-      fetchWONumber();
-    }
-  }, [overview?.project?.projectName]);
 
   useEffect(() => {
     if (!selectedSellerId || selectedSellerId === "__create_new__") return;
@@ -214,27 +192,7 @@ export default function CreateVendorWorkOrderPage() {
     }
   };
 
-  const createVWOMutation = useMutation({
-    mutationFn: (data: CreateVendorWorkOrderDTO) =>
-      fetch("/vendor-work-orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      }).then(async (res) => {
-        if (!res.ok) {
-          const errBody = await res.json().catch(() => null);
-          throw new Error(errBody?.message || "Failed to create vendor work order");
-        }
-        return res.json();
-      }),
-    onSuccess: (result) => {
-      toast.success(`WO #${result.woNumber} has been created successfully.`);
-      navigate(paths.operations.projectDashboard(projectId));
-    },
-    onError: (error: any) => {
-      toast.error(error?.message || "Failed to create vendor work order. Please try again.");
-    },
-  });
+  const createVWOMutation = useCreateVendorWorkOrder();
 
   const handlePreview = async () => {
     const isValid = await form.trigger();
@@ -246,9 +204,11 @@ export default function CreateVendorWorkOrderPage() {
   const handleSubmit = async (values: VendorWorkOrderFormValues) => {
     try {
       const vwoData = mapVwoFormToCreateDTO(values, overview?.tender?.id || 3613, projectId, overview?.project?.projectName);
-      await createVWOMutation.mutateAsync(vwoData);
+      const result = await createVWOMutation.mutateAsync(vwoData);
+      toast.success(`WO #${result.woNumber} has been created successfully.`);
+      navigate(paths.operations.projectDashboard(projectId));
     } catch {
-      // Error handled in mutation onError
+      toast.error("Failed to create vendor work order. Please try again.");
     }
   };
 

@@ -15,19 +15,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCreatePoParty, usePoParties, useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { useGetTeamMembers } from "@/hooks/api/useUsers";
+import { useVendorWorkOrderDetails, useUpdateVendorWorkOrder } from "@/hooks/api/useVendorWorkOrders";
 import { VWOProductsField } from "./components/VWOProductsField";
 import { VWOTermsField } from "./components/VWOTermsField";
 import { DEFAULT_VWO_TERMS_ROWS } from "./helpers/vwoForm.constants";
 import { VWOFormPreview } from "./components/VWOFormPreview";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Building2, Calendar, Eye, Hash, Info, Loader2, Mail, MapPin, Phone, UserCheck, UserPlus } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { formatDateForInput, mapVwoFormToUpdateDTO } from "./helpers/vwoForm.mapper";
-import type { UpdateVendorWorkOrderDTO } from "./helpers/vwoForm.types";
 import { vendorWorkOrderFormSchema, type VendorWorkOrderFormValues } from "./helpers/vwoForm.schema";
 
 interface NewPartyForm {
@@ -158,15 +157,7 @@ export default function EditVendorWorkOrderPage() {
   const [newParty, setNewParty] = useState<NewPartyForm>({ name: "", email: "", address: "", gstNo: "", pan: "", msme: "" });
   const [vwoNumber, setVwoNumber] = useState<string>("");
 
-  const { data: vwoData, isLoading: isVwoLoading } = useQuery({
-    queryKey: ["vendor-work-order", vwoId],
-    queryFn: async () => {
-      const response = await fetch(`/vendor-work-orders/${vwoId}`);
-      if (!response.ok) throw new Error("Failed to fetch vendor work order");
-      return response.json();
-    },
-    enabled: !!vwoId,
-  });
+  const { data: vwoData, isLoading: isVwoLoading } = useVendorWorkOrderDetails(vwoId);
 
   const form = useForm<VendorWorkOrderFormValues>({
     resolver: zodResolver(vendorWorkOrderFormSchema) as any,
@@ -259,27 +250,7 @@ export default function EditVendorWorkOrderPage() {
     }
   };
 
-  const updateVWOMutation = useMutation({
-    mutationFn: (data: UpdateVendorWorkOrderDTO) =>
-      fetch(`/vendor-work-orders/${vwoId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      }).then(async (res) => {
-        if (!res.ok) {
-          const errBody = await res.json().catch(() => null);
-          throw new Error(errBody?.message || "Failed to update vendor work order");
-        }
-        return res.json();
-      }),
-    onSuccess: (result) => {
-      toast.success(`WO #${result.woNumber} has been updated successfully.`);
-      navigate(paths.operations.projectDashboard(projectId));
-    },
-    onError: (error: any) => {
-      toast.error(error?.message || "Failed to update vendor work order. Please try again.");
-    },
-  });
+  const updateVWOMutation = useUpdateVendorWorkOrder();
 
   const handlePreview = async () => {
     const isValid = await form.trigger();
@@ -291,9 +262,11 @@ export default function EditVendorWorkOrderPage() {
   const handleSubmit = async (values: VendorWorkOrderFormValues) => {
     try {
       const vwoData = mapVwoFormToUpdateDTO(values);
-      await updateVWOMutation.mutateAsync(vwoData);
+      await updateVWOMutation.mutateAsync({ id: vwoId, data: vwoData });
+      toast.success(`WO has been updated successfully.`);
+      navigate(paths.operations.projectDashboard(projectId));
     } catch {
-      // Error handled in mutation onError
+      toast.error("Failed to update vendor work order. Please try again.");
     }
   };
 
