@@ -2,9 +2,10 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '@db/database.module';
 import { LoanAdvanceController } from './loan-advance.controller';
 import { LoanAdvanceService } from './loan-advance.service';
+import { ClientDirectoryModule } from '@/modules/shared/client-directory/client-directory.module';
 
 @Module({
-    imports: [DatabaseModule],
+    imports: [DatabaseModule, ClientDirectoryModule],
     controllers: [LoanAdvanceController],
     providers: [LoanAdvanceService],
     exports: [LoanAdvanceService],
