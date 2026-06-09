@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import { PdfGeneratorService } from "@/modules/pdf/pdf-generator.service";
+import { ClientDirectorySyncService } from "@/modules/shared/client-directory/client-directory-sync.service";
 
 import { vendorWorkOrders } from "@/db/schemas/operations/vendor-work-orders.schema";
 import { vendorWorkOrderItems } from "@/db/schemas/operations/vendor-work-order-items.schema";
@@ -19,6 +20,7 @@ export class VendorWorkOrderService {
         @Inject(DRIZZLE) private readonly db: DbInstance,
         @Inject(WINSTON_MODULE_PROVIDER) private readonly logger: Logger,
         private readonly pdfGenerator: PdfGeneratorService,
+        private readonly clientDirectorySyncService: ClientDirectorySyncService,
     ) {}
 
     async generateWONumber(projectName?: string) {
@@ -164,6 +166,18 @@ export class VendorWorkOrderService {
                 .where(eq(vendorWorkOrders.id, id))
                 .returning()
         )[0];
+
+        await this.clientDirectorySyncService.syncToClientDirectory([{
+            name: body.contactPersonName,
+            email: body.contactPersonEmail,
+            phone: body.contactPersonPhone,
+            org: body.sellerName,
+        }, {
+            name: body.sellerName,
+            email: body.sellerEmail,
+            phone: null,
+            org: null,
+        }].filter((c) => c.name));
 
         await this.syncParty(body);
 
