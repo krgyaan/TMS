@@ -2,13 +2,17 @@
 import { eq } from "drizzle-orm";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
+import { ClientDirectorySyncService } from "@/modules/shared/client-directory/client-directory-sync.service";
 import { vendors, type Vendor, type NewVendor } from "@db/schemas/vendors/vendors.schema";
 import { vendorOrganizations } from "@db/schemas/vendors/vendor-organizations.schema";
 import { vendorFiles } from "@db/schemas/vendors/vendor-files.schema";
 
 @Injectable()
 export class VendorsService {
-    constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
+    constructor(
+        @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly clientDirectorySyncService: ClientDirectorySyncService,
+    ) {}
 
     /**
      * Select fields with organization
@@ -86,7 +90,14 @@ export class VendorsService {
 
     async create(data: NewVendor): Promise<Vendor> {
         const rows = await this.db.insert(vendors).values(data).returning();
-        return rows[0];
+        const vendor = rows[0];
+        await this.clientDirectorySyncService.syncToClientDirectory([{
+            name: vendor.name,
+            email: vendor.email,
+            phone: vendor.mobile,
+            org: null,
+        }]);
+        return vendor;
     }
 
     async update(id: number, data: Partial<NewVendor>): Promise<Vendor> {
@@ -99,7 +110,16 @@ export class VendorsService {
         if (!rows[0]) {
             throw new NotFoundException(`Vendor with ID ${id} not found`);
         }
-        return rows[0];
+        const vendor = rows[0];
+        if (data.name || data.email || data.mobile) {
+            await this.clientDirectorySyncService.syncToClientDirectory([{
+                name: vendor.name,
+                email: vendor.email,
+                phone: vendor.mobile,
+                org: null,
+            }]);
+        }
+        return vendor;
     }
 
     async delete(id: number): Promise<void> {
