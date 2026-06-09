@@ -99,6 +99,7 @@ import { WoQueriesModule } from "./modules/operations/wo-queries/wo-queries.modu
 import { CustomerPerformanceModule } from "./modules/performance/customer-performance/customer-performance.module";
 import { LocationPerformanceModule } from "./modules/performance/location-performance/location-performance.module";
 import { ContractAgreementModule } from "./modules/operations/contract-agreement/contract-agreement.module";
+import { VendorWorkOrderModule } from "./modules/operations/vendor-work-orders/vendor-work-order.module";
 import { EmployeeProfilesModule } from "@/modules/hrms/employee-profiles/employee-profiles.module";
 import { AssetsModule } from "@/modules/hrms/assets/assets.module";
 import { AccountChecklistModule } from './modules/accounts/account-checklist/account-checklist.module';
@@ -214,6 +215,7 @@ import { ProfileModule } from './modules/profile/profile.module';
         CustomerPerformanceModule,
         LocationPerformanceModule,
         ContractAgreementModule,
+        VendorWorkOrderModule,
         EmployeeProfilesModule,
         AssetsModule,
         AccountChecklistModule,
