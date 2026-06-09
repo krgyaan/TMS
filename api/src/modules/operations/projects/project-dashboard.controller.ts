@@ -72,6 +72,12 @@ export class ProjectDashboardController {
     return this.service.generatePONumber(projectName);
   }
 
+  // List all POs (cross-project)
+  @Get("purchase-orders")
+  getAllPurchaseOrders() {
+    return this.service.getAllPurchaseOrders();
+  }
+
   // List PDF versions
   @Get("purchase-orders/:id/pdf/versions")
   getPurchaseOrderPdfVersions(@Param("id", ParseIntPipe) id: number) {

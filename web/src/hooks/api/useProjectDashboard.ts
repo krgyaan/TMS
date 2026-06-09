@@ -66,6 +66,13 @@ export const useNextPONumber = (projectName: string | undefined) => {
     });
 };
 
+export const useAllPurchaseOrders = () => {
+    return useQuery({
+        queryKey: [...projectsDashboardKeys.all, "all-purchase-orders"],
+        queryFn: () => projectDashboardApi.getAllPurchaseOrders(),
+    });
+};
+
 export const usePurchaseOrderDetails = (id: number) => {
     return useQuery({
         queryKey: projectsDashboardKeys.purchaseOrder(id),
