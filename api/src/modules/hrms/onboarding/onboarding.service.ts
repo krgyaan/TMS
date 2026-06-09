@@ -29,7 +29,7 @@ import { employeeEducation } from '@/db/schemas/hrms/employee-education.schema';
 import { employeeExperience } from '@/db/schemas/hrms/employee-experience.schema';
 import { employeeDocuments } from '@/db/schemas/hrms/employee-documents.schema';
 import { employeeBankDetails } from '@/db/schemas/hrms/employee-bank-details.schema';
-import { eq, desc, aliasedTable, inArray, and } from 'drizzle-orm';
+import { eq, desc, aliasedTable, inArray, and, ne, or } from 'drizzle-orm';
 import { designations } from '@/db/schemas/master/designations.schema';
 import { teams } from '@/db/schemas/master/teams.schema';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
@@ -766,7 +766,7 @@ export class OnboardingService {
         email: onboardingRequests.email,
         phone: onboardingRequests.phone,
         profileStatus: onboardingRequests.profileStatus,
-        hrStatus: onboardingRequests.hrStatus,
+        hrStatus: onboardingProfiles.hrStatus,
         progress: onboardingRequests.progress,
         approvedAt: onboardingRequests.approvedAt,
         updatedAt: onboardingRequests.updatedAt,
@@ -781,13 +781,19 @@ export class OnboardingService {
         // Employee personal fields
         firstName: onboardingProfiles.firstName,
         lastName: onboardingProfiles.lastName,
+        hrRemark: onboardingProfiles.hrRemark,
         // Reviewer name (who approved)
         reviewedBy: users.name,
       })
       .from(onboardingRequests)
       .innerJoin(onboardingProfiles, eq(onboardingProfiles.onboardingId, onboardingRequests.id))
       .leftJoin(users, eq(onboardingRequests.approvedBy, users.id))
-      .where(eq(onboardingRequests.status, 'approved'))
+      .where(
+        and(
+          // eq(onboardingProfiles.hrStatus, "approved"),
+          inArray(onboardingRequests.profileStatus, ['submitted', 'resubmitted']),
+        ),
+      )
       .orderBy(desc(onboardingRequests.approvedAt));
 
     return rows;
@@ -1017,6 +1023,7 @@ export class OnboardingService {
     const rows = await this.db
       .select({
         id: onboardingRequests.id,
+        userId: onboardingRequests.userId,
         email: onboardingRequests.email,
         inductionStatus: onboardingRequests.inductionStatus,
         hrStatus: onboardingRequests.hrStatus,
@@ -1033,6 +1040,17 @@ export class OnboardingService {
       .leftJoin(onboardingProfiles, eq(onboardingProfiles.onboardingId, onboardingRequests.id))
       .where(eq(onboardingRequests.status, 'approved'))
       .orderBy(desc(onboardingRequests.approvedAt));
+
+    const requestIds = rows.map((r) => r.id);
+    const userIds = rows.map((r) => r.userId).filter(Boolean) as number[];
+
+    const documents = requestIds.length > 0
+      ? await this.db.select().from(onboardingDocuments).where(inArray(onboardingDocuments.onboardingId, requestIds))
+      : [];
+
+    const oauthAccs = userIds.length > 0
+      ? await this.db.select().from(oauthAccounts).where(inArray(oauthAccounts.userId, userIds))
+      : [];
 
     const taskRows = await this.db
       .select()
@@ -1054,12 +1072,20 @@ export class OnboardingService {
       return acc;
     }, {} as Record<number, any[]>);
 
-    return rows.map((r) => ({
-      ...r,
-      employeeId: `EMP-${r.id.toString().padStart(4, '0')}`,
-      tasks: tasksByEmpId[r.id] || [],
-      inductionCoordinator: 'System Admin',
-    }));
+    return rows.map((r) => {
+      const rowDocs = documents.filter((d) => d.onboardingId === r.id);
+      const oauthPhoto = oauthAccs.find((o) => o.userId === r.userId)?.avatar;
+      const docProfilePhoto = rowDocs.find((d) => d.docType === 'Passport Size Photo')?.fileUrl;
+      const profilePhoto = docProfilePhoto || oauthPhoto || null;
+
+      return {
+        ...r,
+        employeeId: `EMP-${r.id.toString().padStart(4, '0')}`,
+        tasks: tasksByEmpId[r.id] || [],
+        inductionCoordinator: 'System Admin',
+        profilePhoto,
+      };
+    });
   }
 
   /**

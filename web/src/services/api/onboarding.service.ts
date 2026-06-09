@@ -16,6 +16,7 @@ export interface OnboardingRequest {
   bankStatus: string;
   inductionStatus: string;
   progress: number;
+  employeeProgress: number;
   approvedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -54,6 +55,7 @@ export interface ProfileListItem {
   ifscCode: string | null;
   hrCompleted: boolean;
   employeeCompleted: boolean;
+  hrRemark?: string | null;
 }
 
 /** Shape returned by GET /hrms/onboarding/:id/profile (full profile) */

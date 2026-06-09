@@ -1547,16 +1547,18 @@ const OnboardingDashboard: React.FC = () => {
   );
 
   const filtered = useMemo(() => {
-    return joinees.filter((j) => {
-      const matchesTab = activeTab === "all" || j.status === activeTab;
-      const q = deferredSearch.toLowerCase();
-      const matchesSearch =
-        !q ||
-        j.name.toLowerCase().includes(q) ||
-        j.email.toLowerCase().includes(q) ||
-        j.phone?.toLowerCase().includes(q);
-      return matchesTab && matchesSearch;
-    });
+    return joinees
+      .filter((j) => {
+        const matchesTab = activeTab === "all" || j.status === activeTab;
+        const q = deferredSearch.toLowerCase();
+        const matchesSearch =
+          !q ||
+          j.name.toLowerCase().includes(q) ||
+          j.email.toLowerCase().includes(q) ||
+          j.phone?.toLowerCase().includes(q);
+        return matchesTab && matchesSearch;
+      })
+      .sort((a, b) => (b.employeeProgress ?? 0) - (a.employeeProgress ?? 0));
   }, [joinees, activeTab, deferredSearch]);
 
   const openView = (j: OnboardingRequest) => {
