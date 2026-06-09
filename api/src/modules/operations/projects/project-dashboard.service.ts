@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import { PdfGeneratorService } from "@/modules/pdf/pdf-generator.service";
+import { ClientDirectorySyncService } from "@/modules/shared/client-directory/client-directory-sync.service";
 
 import { projects } from "@/db/schemas/operations/projects.schema";
 import { tenderInfos } from "@/db/schemas/tendering/tenders.schema";
@@ -27,6 +28,7 @@ export class ProjectDashboardService {
         private readonly logger: Logger,
 
         private readonly pdfGenerator: PdfGeneratorService,
+        private readonly clientDirectorySyncService: ClientDirectorySyncService,
     ) {}
 
     async getOverview(projectId: number) {
@@ -313,6 +315,18 @@ export class ProjectDashboardService {
         }
     }
 
+        await this.clientDirectorySyncService.syncToClientDirectory([{
+            name: body.contactPersonName,
+            email: body.contactPersonEmail,
+            phone: body.contactPersonPhone,
+            org: body.sellerName,
+        }, {
+            name: body.sellerName,
+            email: body.sellerEmail,
+            phone: null,
+            org: null,
+        }].filter((c) => c.name));
+
         this.logger.info(`Purchase Order created: ${poNumber}`);
 
         // Generate PDF asynchronously (don't block response)
@@ -556,6 +570,15 @@ export class ProjectDashboardService {
             .returning()
         )[0];
 
+        if (party.name) {
+            await this.clientDirectorySyncService.syncToClientDirectory([{
+                name: party.name,
+                email: party.email,
+                phone: null,
+                org: null,
+            }]);
+        }
+
         this.logger.info(`Party created: ${party.name} (ID: ${party.id}, type: ${party.type})`);
         return party;
     }
@@ -643,6 +666,13 @@ export class ProjectDashboardService {
         this.generatePdfForPO(updatedPO, body.products).catch((err) => {
             this.logger.error(`Failed to generate PO PDF after update: ${err.message}`);
         });
+
+        await this.clientDirectorySyncService.syncToClientDirectory([{
+            name: body.contactPersonName,
+            email: body.contactPersonEmail,
+            phone: body.contactPersonPhone,
+            org: body.sellerName,
+        }].filter((c) => c.name));
 
         this.logger.info(`Purchase Order updated: ${updatedPO.poNumber}`);
         return updatedPO;
