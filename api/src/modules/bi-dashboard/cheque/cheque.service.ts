@@ -106,7 +106,7 @@ export class ChequeService {
         } else if (tab === 'cheque-for-security') {
             conditions.push(
                 ne(paymentInstruments.action, 6), // not cancelled
-                eq(instrumentChequeDetails.chequeReason, 'Security'),
+                inArray(instrumentChequeDetails.chequeReason, ['Security', 'SECURITY']),
                 eq(paymentInstruments.status, CHEQUE_STATUSES.ACCOUNTS_FORM_ACCEPTED),
                 this.getNotExpiredCondition(),
             );
