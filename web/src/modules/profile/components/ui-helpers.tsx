@@ -11,9 +11,9 @@ import {
 
 export const getStatusConfig = (status: string) => {
   switch (status) {
-    case "verified":
+    case "approved":
       return {
-        label: "Verified",
+        label: "Approved",
         icon: FileCheck,
         className:
           "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",

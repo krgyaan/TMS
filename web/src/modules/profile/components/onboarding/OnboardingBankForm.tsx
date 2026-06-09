@@ -175,7 +175,7 @@ export function OnboardingBankForm({
   const onSubmit = async (values: BankFormValues) => {
     setIsSubmitting(true);
     try {
-      await api.put("/hrms/onboarding/me/bank-accounts", {
+      await api.put("/hrms/employee-onboarding/me/bank-accounts", {
         bankAccounts: values.bankAccounts
       });
 

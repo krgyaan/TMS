@@ -276,7 +276,7 @@ export function OnboardingEducationForm({
         hrRemark: edu.hrRemark || null,
       }));
 
-      await api.put("/hrms/onboarding/me/educations", { educations: payload });
+      await api.put("/hrms/employee-onboarding/me/educations", { educations: payload });
 
       toast.success("Education details saved successfully");
       refetch?.();

@@ -250,7 +250,7 @@ export function OnboardingExperienceForm({
         hrRemark: exp.hrRemark || null,
       }));
 
-      await api.put("/hrms/onboarding/me/experiences", { experiences: payload });
+      await api.put("/hrms/employee-onboarding/me/experiences", { experiences: payload });
 
       toast.success("Work experience saved successfully");
       refetch?.();

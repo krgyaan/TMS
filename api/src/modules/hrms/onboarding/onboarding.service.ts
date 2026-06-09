@@ -994,7 +994,7 @@ export class OnboardingService {
       category: doc.docCategory || 'other',
       required: true,
       status: doc.status,
-      hrStatus: doc.hrStatus === 'verified' ? 'approved' : doc.hrStatus,
+      hrStatus: doc.hrStatus,
       uploadedAt: doc.createdAt?.toISOString(),
       verifiedBy: doc.verifiedBy,
       verifiedAt: doc.verificationDate,
@@ -1358,7 +1358,7 @@ export class OnboardingService {
   async verifyDocument(id: number, docId: number, status: string, reason: string | undefined, adminId: number) {
     return this.db.transaction(async (tx) => {
       await tx.update(onboardingDocuments).set({
-        status: status === 'verified' ? 'submitted' : 'pending', // map internal status
+        status: status === 'approved' ? 'submitted' : 'pending', // map internal status
         hrStatus: status,
         hrRemark: reason || null,
         verifiedBy: adminId,

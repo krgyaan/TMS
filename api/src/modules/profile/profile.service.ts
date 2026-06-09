@@ -89,10 +89,44 @@ export class ProfileService {
     const isComplete = userProfileRow?.profileCompleted === true;
 
     if (!isComplete) {
+      // Fetch active onboarding request status
+      const activeReqs = await this.db
+        .select({
+          id: onboardingRequests.id,
+          status: onboardingRequests.status,
+          hrStatus: onboardingRequests.hrStatus,
+          progress: onboardingRequests.progress,
+        })
+        .from(onboardingRequests)
+        .where(eq(onboardingRequests.userId, userId))
+        .orderBy(desc(onboardingRequests.createdAt))
+        .limit(1);
+
+      let onboardingStatus: any = null;
+      if (activeReqs.length > 0) {
+        const obReq = activeReqs[0];
+        
+        // Also fetch onboardingProfile to see if employeeCompleted is true
+        const [obProfile] = await this.db
+          .select({ employeeCompleted: onboardingProfiles.employeeCompleted })
+          .from(onboardingProfiles)
+          .where(eq(onboardingProfiles.onboardingId, obReq.id))
+          .orderBy(desc(onboardingProfiles.id))
+          .limit(1);
+
+        onboardingStatus = {
+          id: obReq.id,
+          status: obReq.status,
+          hrStatus: obReq.hrStatus,
+          progress: obReq.progress || 0,
+          employeeCompleted: obProfile?.employeeCompleted || false,
+        };
+      }
+
       return {
         currentUser,
         isOnboarding: true,
-        onboardingStatus: null,
+        onboardingStatus,
         profile: null,
         employeeProfile: null,
         address: null,

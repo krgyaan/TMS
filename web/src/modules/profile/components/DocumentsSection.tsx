@@ -87,7 +87,7 @@ interface UploadedDocument {
   fileName?: string;
   fileSize?: string;
   fileUrl?: string;
-  verificationStatus: "pending" | "verified" | "rejected";
+  verificationStatus: "pending" | "approved" | "rejected";
   remarks?: string;
   uploadedAt?: string;
   verifiedBy?: string;
@@ -207,7 +207,7 @@ const UploadDialog: React.FC<UploadDialogProps> = ({
       if (issueDate) formData.append("issueDate", issueDate);
       if (expiryDate) formData.append("expiryDate", expiryDate);
 
-      const urlPrefix = isOnboarding ? "/hrms/onboarding" : "/profile";
+      const urlPrefix = isOnboarding ? "/hrms/employee-onboarding" : "/profile";
       if (isReupload && existingDoc) {
         // PATCH /profile/documents/:id or /hrms/onboarding/documents/:id
         formData.append("docType", existingDoc.docType);
@@ -722,12 +722,12 @@ const UploadedDocCard: React.FC<UploadedDocCardProps> = ({ doc, index, onView, o
             </div>
           )}
 
-          {doc.verificationStatus === "verified" && doc.verifiedBy && (
+          {doc.verificationStatus === "approved" && doc.verifiedBy && (
             <div className="mt-3 p-2.5 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
               <div className="flex items-start gap-2">
                 <CheckCircle2 className="h-3 w-3 text-emerald-600 mt-0.5 shrink-0" />
                 <p className="text-[10px] text-emerald-600/80 leading-relaxed">
-                  Verified by {doc.verifiedBy}
+                  Approved by {doc.verifiedBy}
                   {doc.verificationDate && <> on {formatDate(doc.verificationDate)}</>}
                 </p>
               </div>
@@ -873,7 +873,7 @@ export const DocumentsSection: React.FC = () => {
   });
 
   // Stats
-  const verifiedCount = DOCUMENTS.filter((d) => d.verificationStatus === "verified").length;
+  const approvedCount = DOCUMENTS.filter((d) => d.verificationStatus === "approved").length;
   const pendingVerificationCount = DOCUMENTS.filter((d) => d.verificationStatus === "pending").length;
   const rejectedCount = DOCUMENTS.filter((d) => d.verificationStatus === "rejected").length;
 
@@ -907,7 +907,7 @@ export const DocumentsSection: React.FC = () => {
   const handleDelete = async (doc: UploadedDocument) => {
     if (!window.confirm(`Delete "${doc.docType}"? This cannot be undone.`)) return;
     try {
-      const urlPrefix = isOnboarding ? "/hrms/onboarding" : "/profile";
+      const urlPrefix = isOnboarding ? "/hrms/employee-onboarding" : "/profile";
       await api.delete(`${urlPrefix}/documents/${doc.id}`);
       queryClient.invalidateQueries({ queryKey: [isOnboarding ? 'my-onboarding-draft' : 'my-profile'] });
       refetch?.();
@@ -996,8 +996,8 @@ export const DocumentsSection: React.FC = () => {
               borderColor: "border-primary/10",
             },
             {
-              label: "Verified",
-              value: verifiedCount,
+              label: "Approved",
+              value: approvedCount,
               icon: FileCheck,
               color: "text-emerald-600",
               bg: "bg-emerald-500/10",
@@ -1262,7 +1262,7 @@ export const DocumentsSection: React.FC = () => {
                     const CIcon = config.icon;
                     const catDocs = DOCUMENTS.filter((d) => d.docCategory === category);
                     const catTotal = REQUIRED_DOCUMENTS.filter((d) => d.docCategory === category).length;
-                    const catVerified = catDocs.filter((d) => d.verificationStatus === "verified").length;
+                    const catApproved = catDocs.filter((d) => d.verificationStatus === "approved").length;
 
                     return (
                       <div
@@ -1295,7 +1295,7 @@ export const DocumentsSection: React.FC = () => {
                           <div className="h-1.5 rounded-full bg-muted/50 mt-2 overflow-hidden">
                             <div
                               className={cn("h-full rounded-full transition-all duration-500", config.bg.replace("/10", ""))}
-                              style={{ width: `${(catVerified / catDocs.length) * 100}%` }}
+                              style={{ width: `${(catApproved / catDocs.length) * 100}%` }}
                             />
                           </div>
                         )}
