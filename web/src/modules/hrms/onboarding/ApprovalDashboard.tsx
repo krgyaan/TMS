@@ -827,23 +827,35 @@ const ApprovalDashboard: React.FC = () => {
 
   const users: OnboardingUser[] = useMemo(
     () =>
-      rawUsers.map((u: any) => ({
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        profilePhoto: u.profilePhoto,
-        stages: {
-          education: (u.educationStatus as EntryStatus) || "pending",
-          experience: (u.experienceStatus as EntryStatus) || "pending",
-          documents: (u.documentStatus as EntryStatus) || "pending",
-          bankDetails: (u.bankStatus as EntryStatus) || "pending",
-        },
-        hasRejection:
-          u.educationStatus === "rejected" ||
-          u.experienceStatus === "rejected" ||
-          u.documentStatus === "rejected" ||
-          u.bankStatus === "rejected",
-      })),
+      rawUsers
+        .filter((u: any) => {
+          const statuses = [
+            u.profileStatus,
+            u.documentStatus,
+            u.inductionStatus,
+            u.bankStatus,
+            u.educationStatus,
+            u.experienceStatus,
+          ];
+          return statuses.some((status) => status === "submitted" || status === "resubmitted");
+        })
+        .map((u: any) => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          profilePhoto: u.profilePhoto,
+          stages: {
+            education: (u.educationStatus as EntryStatus) || "pending",
+            experience: (u.experienceStatus as EntryStatus) || "pending",
+            documents: (u.documentStatus as EntryStatus) || "pending",
+            bankDetails: (u.bankStatus as EntryStatus) || "pending",
+          },
+          hasRejection:
+            u.educationStatus === "rejected" ||
+            u.experienceStatus === "rejected" ||
+            u.documentStatus === "rejected" ||
+            u.bankStatus === "rejected",
+        })),
     [rawUsers]
   );
 

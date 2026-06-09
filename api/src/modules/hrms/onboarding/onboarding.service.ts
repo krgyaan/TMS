@@ -29,7 +29,7 @@ import { employeeEducation } from '@/db/schemas/hrms/employee-education.schema';
 import { employeeExperience } from '@/db/schemas/hrms/employee-experience.schema';
 import { employeeDocuments } from '@/db/schemas/hrms/employee-documents.schema';
 import { employeeBankDetails } from '@/db/schemas/hrms/employee-bank-details.schema';
-import { eq, desc, aliasedTable, inArray, and, ne } from 'drizzle-orm';
+import { eq, desc, aliasedTable, inArray, and, ne, or } from 'drizzle-orm';
 import { designations } from '@/db/schemas/master/designations.schema';
 import { teams } from '@/db/schemas/master/teams.schema';
 import { WINSTON_MODULE_PROVIDER } from 'nest-winston';
