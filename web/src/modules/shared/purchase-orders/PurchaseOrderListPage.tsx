@@ -1,11 +1,13 @@
-import React, { useMemo } from "react";
-import { Eye, History } from "lucide-react";
+import React, { useMemo, useState, useCallback, useEffect } from "react";
+import { Eye, History, Search } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import DataTable from "@/components/ui/data-table";
+import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import type { ColDef, ValueFormatterParams } from "ag-grid-community";
+import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
 import { useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
@@ -17,8 +19,19 @@ import type { PurchaseOrderRow } from "@/modules/operations/project-dashboard/he
 const PurchaseOrderListPage: React.FC = () => {
     const navigate = useNavigate();
     const { data } = useAllPurchaseOrders();
+    const [gridApi, setGridApi] = useState<GridApi | null>(null);
+    const [search, setSearch] = useState("");
+    const debouncedSearch = useDebouncedSearch(search, 300);
 
     const purchaseOrders = data?.purchaseOrders ?? [];
+
+    const onGridReady = useCallback((event: GridReadyEvent<PurchaseOrderRow>) => {
+        setGridApi(event.api);
+    }, []);
+
+    useEffect(() => {
+        gridApi?.setGridOption("quickFilterText", debouncedSearch || undefined);
+    }, [debouncedSearch, gridApi]);
 
     const poActions: ActionItem<PurchaseOrderRow>[] = useMemo(() => [
         {
@@ -39,7 +52,7 @@ const PurchaseOrderListPage: React.FC = () => {
             headerName: "PO Number",
             sortable: true,
             filter: true,
-            width: 250,
+            width: 300,
             flex: 1,
             cellRenderer: (p: CustomCellRendererProps<PurchaseOrderRow>) => (
                 <TooltipProvider>
@@ -66,6 +79,10 @@ const PurchaseOrderListPage: React.FC = () => {
             filter: true,
             flex: 1,
             minWidth: 150,
+            getQuickFilterText: (params) => {
+                const d = params.data;
+                return `${d.sellerName} ${d.sellerEmail || ""} ${d.sellerAddress || ""} ${d.sellerGstNo || ""} ${d.sellerPanNo || ""} ${d.sellerMsmeNo || ""} ${d.sellerCinNo || ""}`;
+            },
             cellRenderer: (p: CustomCellRendererProps<PurchaseOrderRow>) => (
                 <TooltipProvider>
                     <Tooltip>
@@ -91,6 +108,10 @@ const PurchaseOrderListPage: React.FC = () => {
             headerName: "Shipping",
             sortable: true,
             filter: true,
+            getQuickFilterText: (params) => {
+                const d = params.data;
+                return `${d.shipToName} ${d.shippingAddress || ""} ${d.shipToGst || ""} ${d.shipToPan || ""}`;
+            },
             cellRenderer: (p: CustomCellRendererProps<PurchaseOrderRow>) => (
                 <TooltipProvider>
                     <Tooltip>
@@ -113,6 +134,10 @@ const PurchaseOrderListPage: React.FC = () => {
             headerName: "Amount",
             sortable: true,
             valueFormatter: (p: ValueFormatterParams<PurchaseOrderRow>) => formatINR(p.value),
+            getQuickFilterText: (params) => {
+                const d = params.data;
+                return `${d.grandTotal} ${d.totalAmount} ${d.totalGstAmt}`;
+            },
             cellRenderer: (p: CustomCellRendererProps<PurchaseOrderRow>) => (
                 <TooltipProvider>
                     <Tooltip>
@@ -147,31 +172,42 @@ const PurchaseOrderListPage: React.FC = () => {
     ], [navigate]);
 
     return (
-        <div className="mx-auto max-w-7xl p-6">
-            <Card>
-                <CardHeader className="pb-4">
-                    <div className="flex justify-between items-center gap-2">
-                        <CardTitle className="text-base font-semibold">
-                            Purchase Orders
-                        </CardTitle>
+        <Card>
+            <CardHeader className="pb-4">
+                <div className="flex justify-between items-center gap-2">
+                    <CardTitle className="text-base font-semibold">
+                        Purchase Orders
+                    </CardTitle>
+                </div>
+                <CardDescription>
+                    {purchaseOrders.length} order{purchaseOrders.length !== 1 ? "s" : ""} found
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0">
+                <div className="flex justify-end">
+                    <div className="relative mb-4">
+                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            type="text"
+                            placeholder="Search ..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="pl-8"
+                        />
                     </div>
-                    <CardDescription>
-                        {purchaseOrders.length} order{purchaseOrders.length !== 1 ? "s" : ""} found
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-0">
-                    <DataTable
-                        data={purchaseOrders}
-                        columnDefs={poColumns}
-                        gridOptions={{
-                            pagination: true,
-                            paginationPageSize: 10,
-                            domLayout: "autoHeight",
-                        }}
-                    />
-                </CardContent>
-            </Card>
-        </div>
+                </div>
+                <DataTable
+                    data={purchaseOrders}
+                    columnDefs={poColumns}
+                    onGridReady={onGridReady}
+                    gridOptions={{
+                        pagination: true,
+                        paginationPageSize: 10,
+                        domLayout: "autoHeight",
+                    }}
+                />
+            </CardContent>
+        </Card>
     );
 };
 
