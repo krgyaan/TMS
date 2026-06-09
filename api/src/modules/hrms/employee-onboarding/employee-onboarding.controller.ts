@@ -101,7 +101,7 @@ const SignupSchema = z.object({
 
 // ─── Controller ───────────────────────────────────────────────────────────────
 
-@Controller('hrms/onboarding')
+@Controller('hrms/employee-onboarding')
 export class EmployeeOnboardingController {
   constructor(private readonly employeeOnboardingService: EmployeeOnboardingService) {}
 

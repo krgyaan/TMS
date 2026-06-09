@@ -16,7 +16,7 @@ export const OnboardingProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const { data, isLoading, error, refetch } = useQuery<ProfileResponse>({
     queryKey: ['my-onboarding-draft'],
     queryFn: async () => {
-      const response = await api.get('/hrms/onboarding/me');
+      const response = await api.get('/hrms/employee-onboarding/me');
       return response.data;
     },
   });
