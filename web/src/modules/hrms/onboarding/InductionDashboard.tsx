@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -123,6 +123,7 @@ interface EmployeeInduction {
   approvedAt: string;
   tasks: InductionTask[];
   inductionCoordinator?: string;
+  profilePhoto?: string;
 }
 
 // ─── Animation Hook ──────────────────────────────────────────────────────────
@@ -319,6 +320,7 @@ const mapApiEmployee = (raw: any): EmployeeInduction => {
     approvedAt: raw.approvedAt ?? new Date().toISOString(),
     tasks: Array.isArray(raw.tasks) ? raw.tasks.map(mapApiTask) : [],
     inductionCoordinator: raw.inductionCoordinator ?? undefined,
+    profilePhoto: raw.profilePhoto ?? undefined,
   };
 };
 
@@ -326,6 +328,25 @@ const mapApiEmployee = (raw: any): EmployeeInduction => {
 
 const getInitials = (first: string, last: string) =>
   `${first?.[0] ?? "?"}${last?.[0] ?? "?"}`.toUpperCase();
+
+const avatarColors = [
+  "bg-blue-500/15 text-blue-700 dark:text-blue-400",
+  "bg-violet-500/15 text-violet-700 dark:text-violet-400",
+  "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+  "bg-orange-500/15 text-orange-700 dark:text-orange-400",
+  "bg-rose-500/15 text-rose-700 dark:text-rose-400",
+  "bg-cyan-500/15 text-cyan-700 dark:text-cyan-400",
+  "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  "bg-indigo-500/15 text-indigo-700 dark:text-indigo-400",
+];
+
+const getAvatarColor = (name: string) => {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return avatarColors[Math.abs(hash) % avatarColors.length];
+};
 
 const formatDate = (d: string) =>
   new Date(d).toLocaleDateString("en-GB", {
@@ -698,8 +719,16 @@ const EmployeeRow: React.FC<{
       {/* Avatar + Info */}
       <div className="flex items-center gap-3.5 flex-1 min-w-0">
         <div className="relative flex-shrink-0">
-          <Avatar className="h-10 w-10 ring-2 ring-background shadow-sm">
-            <AvatarFallback className="text-xs font-bold bg-primary/10 text-primary">
+          <Avatar className="h-10 w-10 rounded-xl flex-shrink-0 ring-2 ring-background shadow-sm">
+            {employee.profilePhoto && (
+              <AvatarImage src={employee.profilePhoto} alt={`${employee.firstName} ${employee.lastName}`} className="object-cover" />
+            )}
+            <AvatarFallback
+              className={cn(
+                "rounded-xl text-xs font-bold",
+                getAvatarColor(`${employee.firstName} ${employee.lastName}`)
+              )}
+            >
               {getInitials(employee.firstName, employee.lastName)}
             </AvatarFallback>
           </Avatar>
@@ -1124,8 +1153,16 @@ const EmployeeInductionModal: React.FC<{
           {/* Header */}
           <DialogHeader className="px-6 py-5 border-b bg-muted/10 flex-shrink-0">
             <div className="flex items-center gap-4">
-              <Avatar className="h-12 w-12 flex-shrink-0 ring-2 ring-background shadow-md">
-                <AvatarFallback className="text-sm font-bold bg-primary/10 text-primary">
+              <Avatar className="h-12 w-12 rounded-xl flex-shrink-0 ring-2 ring-background shadow-md">
+                {employee.profilePhoto && (
+                  <AvatarImage src={employee.profilePhoto} alt={`${employee.firstName} ${employee.lastName}`} className="object-cover" />
+                )}
+                <AvatarFallback
+                  className={cn(
+                    "rounded-xl text-sm font-bold",
+                    getAvatarColor(`${employee.firstName} ${employee.lastName}`)
+                  )}
+                >
                   {getInitials(employee.firstName, employee.lastName)}
                 </AvatarFallback>
               </Avatar>
