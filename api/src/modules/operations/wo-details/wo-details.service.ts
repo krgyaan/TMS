@@ -1,6 +1,7 @@
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import type { DbInstance } from '@db';
 import { DRIZZLE } from '@db/database.module';
+import { ClientDirectorySyncService } from '@/modules/shared/client-directory/client-directory-sync.service';
 import { woAcceptance, woAmendments, woBasicDetails, woBillingAddresses, woBillingBoq, woBuybackBoq, woContacts, woDetails, woDocuments, woKickoffMeetings, woQueries, woShippingAddresses } from '@db/schemas/operations';
 import { rfqs, rfqResponseDocuments, rfqResponses, tenderCostingSheets, tenderInfos } from '@db/schemas/tendering';
 import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
@@ -55,7 +56,10 @@ type PageData =
 @Injectable()
 export class WoDetailsService {
   private readonly logger = new Logger(WoDetailsService.name);
-  constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: DbInstance,
+    private readonly clientDirectorySyncService: ClientDirectorySyncService,
+  ) {}
 
   private mapRowToResponse(row: WoDetailRow) {
     return {
@@ -1508,6 +1512,15 @@ export class WoDetailsService {
       if (contactRows.length > 0) {
         await this.db.insert(woContacts).values(contactRows);
       }
+
+      await this.clientDirectorySyncService.syncToClientDirectory(
+        contactRows.map((c) => ({
+          name: c.name ?? '',
+          email: c.email,
+          phone: c.phone,
+          org: c.organization,
+        })),
+      );
     }
   }
 
