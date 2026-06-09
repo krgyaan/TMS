@@ -352,6 +352,7 @@ export const paths = {
         projectsCreate: "/document-dashboard/projects/create",
         projectsEdit: (id: number | string) => `/document-dashboard/projects/${id}/edit`,
         projectsView: (id: number | string) => `/document-dashboard/projects/${id}`,
+        clientDirectory: "/document-dashboard/client-directory",
     },
 
     // ==================== HRMS ====================

@@ -15,6 +15,7 @@ const DocumentDashboard_Projects = lazy(() => import('@/modules/shared/master-pr
 const DocumentDashboard_Projects_Create = lazy(() => import('@/modules/shared/master-project/ProjectsCreatePage'));
 const DocumentDashboard_Projects_Edit = lazy(() => import('@/modules/shared/master-project/ProjectsEditPage'));
 const DocumentDashboard_Projects_Show = lazy(() => import('@/modules/shared/master-project/ProjectsShowPage'));
+const DocumentDashboard_ClientDirectory = lazy(() => import('@/modules/shared/client-directory/ClientDirectoryListPage'));
 
 export default function DocumentDashboardRoutes() {
     return (
@@ -31,6 +32,7 @@ export default function DocumentDashboardRoutes() {
             <Route path="projects/create" element={<RouteWrapper><DocumentDashboard_Projects_Create /></RouteWrapper>} />
             <Route path="projects/:id/edit" element={<RouteWrapper><DocumentDashboard_Projects_Edit /></RouteWrapper>} />
             <Route path="projects/:id" element={<RouteWrapper><DocumentDashboard_Projects_Show /></RouteWrapper>} />
+            <Route path="client-directory" element={<RouteWrapper><DocumentDashboard_ClientDirectory /></RouteWrapper>} />
         </Routes>
     );
 }
