@@ -55,6 +55,7 @@ export interface ProfileListItem {
   ifscCode: string | null;
   hrCompleted: boolean;
   employeeCompleted: boolean;
+  hrRemark?: string | null;
 }
 
 /** Shape returned by GET /hrms/onboarding/:id/profile (full profile) */
