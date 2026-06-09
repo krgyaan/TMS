@@ -62,5 +62,5 @@ export function getEffectiveTeamId(user: AuthUser | null, overrideTeamId?: numbe
     }
 
     // Otherwise use user's primary team
-    return user.team?.id ?? user.profile?.primaryTeamId ?? null;
+    return user.team?.id ?? null;
 }

@@ -378,7 +378,7 @@ export class PermissionService implements OnModuleInit {
         }
     }
 
-    private async refreshRolePermissions(roleId: number) {
+    async refreshRolePermissions(roleId: number) {
         const rows = await this.db
             .select({
                 module: permissions.module,
@@ -418,7 +418,7 @@ export class PermissionService implements OnModuleInit {
         }
     }
 
-    private async refreshUserOverrides(userId: number) {
+    async refreshUserOverrides(userId: number) {
         const rows = await this.db
             .select({
                 module: permissions.module,

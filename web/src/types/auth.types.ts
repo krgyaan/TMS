@@ -33,7 +33,6 @@ export interface UserProfile {
     gender: string | null;
     employeeCode: string | null;
     designationId: number | null;
-    primaryTeamId: number | null;
     altEmail: string | null;
     emergencyContactName: string | null;
     emergencyContactPhone: string | null;
