@@ -2,6 +2,7 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { eq, desc, asc, sql, and, or, ilike, SQL } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
+import { ClientDirectorySyncService } from '@/modules/shared/client-directory/client-directory-sync.service';
 import { CreateRequestExtensionDto, UpdateRequestExtensionDto } from './dto/request-extension.dto';
 import { requestExtension, type Client } from '@/db/schemas/tendering/request-extension.schema';
 import { tenderInfos, userProfiles, users, companies } from '@/db/schemas';
@@ -35,6 +36,7 @@ export class RequestExtensionsService {
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
+        private readonly clientDirectorySyncService: ClientDirectorySyncService,
     ) { }
 
     private mapCreateToDb(data: CreateRequestExtensionDto) {
@@ -200,6 +202,18 @@ export class RequestExtensionsService {
 
         const result = await this.findById(inserted.id);
 
+        // Sync to client directory
+        if (data.clients?.length) {
+            await this.clientDirectorySyncService.syncToClientDirectory(
+                data.clients.map((c) => ({
+                    name: c.name,
+                    email: c.email,
+                    phone: c.phone,
+                    org: c.org,
+                })),
+            );
+        }
+
         // Fetch tender to get teamMember
         const [tender] = await this.db
             .select({ teamMember: tenderInfos.teamMember })
@@ -222,6 +236,18 @@ export class RequestExtensionsService {
             .where(eq(requestExtension.id, id));
 
         const result = await this.findById(id);
+
+        // Sync to client directory
+        if (data.clients?.length) {
+            await this.clientDirectorySyncService.syncToClientDirectory(
+                data.clients.map((c) => ({
+                    name: c.name,
+                    email: c.email,
+                    phone: c.phone,
+                    org: c.org,
+                })),
+            );
+        }
 
         // Fetch tender to get teamMember
         const [tender] = await this.db
