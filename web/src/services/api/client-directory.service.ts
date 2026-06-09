@@ -33,6 +33,10 @@ class ClientDirectoryService extends BaseApiService {
     async remove(id: number): Promise<void> {
         await this.delete<void>(`/${id}`);
     }
+
+    async syncAll(): Promise<{ synced: number }> {
+        return this.post<{ synced: number }>('/sync-all');
+    }
 }
 
 export const clientDirectoryService = new ClientDirectoryService();

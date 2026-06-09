@@ -82,6 +82,21 @@ export const useUpdateClientDirectory = () => {
     });
 };
 
+export const useSyncAllClientDirectory = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: () => clientDirectoryService.syncAll(),
+        onSuccess: (result) => {
+            queryClient.invalidateQueries({ queryKey: clientDirectoryKey.lists() });
+            toast.success(`Synced ${result.synced} contacts to directory`);
+        },
+        onError: (error) => {
+            toast.error(handleQueryError(error));
+        },
+    });
+};
+
 export const useDeleteClientDirectory = () => {
     const queryClient = useQueryClient();
 

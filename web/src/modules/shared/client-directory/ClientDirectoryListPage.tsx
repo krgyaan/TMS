@@ -6,9 +6,10 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Eye, Edit, FileX2, Search } from 'lucide-react';
+import { AlertCircle, Eye, Edit, FileX2, Search, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useClientDirectories } from '@/hooks/api/useClientDirectory';
+import { useClientDirectories, useSyncAllClientDirectory } from '@/hooks/api/useClientDirectory';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import type { ClientDirectoryRow } from '@/modules/shared/client-directory/helpers/client-directory.types';
 import { ClientDirectoryModal } from './components/ClientDirectoryModal';
@@ -22,6 +23,8 @@ const ClientDirectoryListPage = () => {
     const [modalOpen, setModalOpen] = useState(false);
     const [modalRecordId, setModalRecordId] = useState<number | null>(null);
     const [modalMode, setModalMode] = useState<'view' | 'edit'>('view');
+
+    const syncMutation = useSyncAllClientDirectory();
 
     useEffect(() => {
         setPagination((p) => ({ ...p, pageIndex: 0 }));
@@ -181,7 +184,15 @@ const ClientDirectoryListPage = () => {
             </CardHeader>
             <CardContent className="px-0">
                 <div className="flex justify-between items-center gap-4 px-6 pb-4">
-                    <div></div>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => syncMutation.mutate()}
+                        disabled={syncMutation.isPending}
+                    >
+                        <RefreshCw className={`mr-2 h-4 w-4 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+                        {syncMutation.isPending ? 'Syncing...' : 'Sync All Contacts'}
+                    </Button>
                     <div className="relative flex-1 max-w-sm">
                         <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input

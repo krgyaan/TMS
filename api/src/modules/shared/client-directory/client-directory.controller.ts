@@ -55,6 +55,12 @@ export class ClientDirectoryController {
         return this.clientDirectoryService.update(id, parsed);
     }
 
+    @Post('sync-all')
+    @HttpCode(HttpStatus.OK)
+    async syncAll() {
+        return this.clientDirectoryService.syncAll();
+    }
+
     @Delete(':id')
     @HttpCode(HttpStatus.NO_CONTENT)
     async delete(@Param('id', ParseIntPipe) id: number) {
