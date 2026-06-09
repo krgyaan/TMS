@@ -1,5 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { useFieldArray, useWatch, useMemo, type Control } from "react-hook-form";
+import { useFieldArray, useWatch, type Control } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Copy, Trash2, AlertCircle, Calculator } from "lucide-react";
 import { calculateTotals, formatCurrency } from "@/modules/operations/project-dashboard/helpers/projectDashboard.mapper";
 import type { VendorWorkOrderFormValues } from "../helpers/vwoForm.schema";
+import { useMemo } from "react";
 
 interface VWOProductsFieldProps {
     control: Control<VendorWorkOrderFormValues>;
