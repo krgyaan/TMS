@@ -13,8 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { useCreatePurchaseInvoice, useNextPINumber } from "@/hooks/api/usePurchaseInvoices";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Calendar, Hash, Info, Loader2 } from "lucide-react";
-import React from "react";
+import { ArrowLeft, Calendar, Hash, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -128,17 +127,17 @@ export default function CreatePurchaseInvoicePage() {
                             <SelectField
                                 control={form.control}
                                 name="category"
-                                label={<><Info className="h-3.5 w-3.5 inline mr-1 text-muted-foreground" />Category - Budget Breakdown <span className="text-destructive">*</span></>}
+                                label="Category"
                                 options={BUDGET_CATEGORIES}
                                 placeholder="Select category..."
                             />
                         </div>
 
-                        <FieldWrapper control={form.control} name="partyName" label={<>Party Name <span className="text-destructive">*</span></>}>
-                            {(field) => <Input {...field} placeholder="Enter party name" />}
-                        </FieldWrapper>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <FieldWrapper control={form.control} name="partyName" label={<>Party Name <span className="text-destructive">*</span></>}>
+                                {(field) => <Input {...field} placeholder="Enter party name" />}
+                            </FieldWrapper>
                             <FieldWrapper control={form.control} name="valuePreGst" label={<>Value (Pre GST) <span className="text-destructive">*</span></>}>
                                 {(field) => (
                                     <Input

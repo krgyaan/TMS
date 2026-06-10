@@ -7,16 +7,15 @@ import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { useCreatePaymentRequest, useNextPRNumber } from "@/hooks/api/usePaymentRequests";
+import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { purchaseInvoiceApi } from "@/services/api/purchase-invoice.api";
-import { PaymentAgainstField } from "./components/PaymentAgainstField";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Building2, Hash, Landmark, Loader2 } from "lucide-react";
-import React from "react";
+import { ArrowLeft, Building2, Hash, Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
+import { PaymentAgainstField } from "./components/PaymentAgainstField";
 import { mapPaymentRequestFormToCreateDTO } from "./helpers/paymentRequest.mapper";
 import { paymentRequestFormSchema, type PaymentRequestFormValues } from "./helpers/paymentRequest.schema";
 
@@ -138,16 +137,12 @@ export default function CreatePaymentRequestPage() {
                             </div>
                         </div>
 
-                        <FieldWrapper control={form.control} name="partyName" label={<>Party Name <span className="text-destructive">*</span></>}>
-                            {(field) => <Input {...field} placeholder="Enter party name" />}
-                        </FieldWrapper>
 
                         <div className="border rounded-lg border-dashed p-4 space-y-4">
-                            <h3 className="text-lg font-semibold flex items-center gap-2">
-                                <Landmark className="h-5 w-5" />
-                                Bank Details
-                            </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <FieldWrapper control={form.control} name="partyName" label={<>Party Name <span className="text-destructive">*</span></>}>
+                                    {(field) => <Input {...field} placeholder="Enter party name" />}
+                                </FieldWrapper>
                                 <FieldWrapper control={form.control} name="accountNumber" label={<>Account Number <span className="text-destructive">*</span></>}>
                                     {(field) => <Input {...field} placeholder="Enter account number" />}
                                 </FieldWrapper>
@@ -179,7 +174,6 @@ export default function CreatePaymentRequestPage() {
                         </div>
 
                         <div className="border rounded-lg border-dashed p-4 space-y-4">
-                            <h3 className="text-lg font-semibold">Payment Details</h3>
                             <PaymentAgainstField control={form.control} />
                         </div>
 
