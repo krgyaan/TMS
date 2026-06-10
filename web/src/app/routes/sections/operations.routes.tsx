@@ -39,6 +39,11 @@ const Operations_EditVendorWoPage = lazy(() => import("@/modules/operations/vend
 const Operations_VendorWorkOrderList = lazy(() => import("@/modules/operations/vendor-work-orders/VendorWorkOrderListPage"));
 const Operations_VendorWoPdfVersions = lazy(() => import("@/modules/operations/vendor-work-orders/VendorWoPdfVersionsPage"));
 
+const Operations_CreatePurchaseInvoice = lazy(() => import("@/modules/operations/purchase-invoices/CreatePurchaseInvoicePage"));
+const Operations_EditPurchaseInvoice = lazy(() => import("@/modules/operations/purchase-invoices/EditPurchaseInvoicePage"));
+const Operations_CreatePaymentRequest = lazy(() => import("@/modules/operations/payment-requests/CreatePaymentRequestPage"));
+const Operations_EditPaymentRequest = lazy(() => import("@/modules/operations/payment-requests/EditPaymentRequestPage"));
+
 export default function OperationsRoutes() {
     return (
         <Routes>
@@ -78,6 +83,10 @@ export default function OperationsRoutes() {
             <Route path="project-dashboard/:projectId/vendor-work-order/:woId" element={<RouteWrapper><Operations_EditVendorWoPage /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/vendor-work-order/:woId/edit" element={<RouteWrapper><Operations_EditVendorWoPage /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/vendor-work-order/:woId/pdf-versions" element={<RouteWrapper><Operations_VendorWoPdfVersions /></RouteWrapper>} />
+            <Route path="project-dashboard/:projectId/purchase-invoice/create" element={<RouteWrapper><Operations_CreatePurchaseInvoice /></RouteWrapper>} />
+            <Route path="project-dashboard/:projectId/purchase-invoice/:piId/edit" element={<RouteWrapper><Operations_EditPurchaseInvoice /></RouteWrapper>} />
+            <Route path="project-dashboard/:projectId/payment-request/create" element={<RouteWrapper><Operations_CreatePaymentRequest /></RouteWrapper>} />
+            <Route path="project-dashboard/:projectId/payment-request/:prId/edit" element={<RouteWrapper><Operations_EditPaymentRequest /></RouteWrapper>} />
         </Routes>
     );
 }

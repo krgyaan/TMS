@@ -135,6 +135,11 @@ export const paths = {
         raiseVendorWoForm: (projectId: number) => `/operations/project-dashboard/${projectId}/vendor-work-order/create`,
         editVendorWoPage: (woId: number, projectId: number) => `/operations/project-dashboard/${projectId}/vendor-work-order/${woId}/edit`,
         vendorWoPdfVersions: (woId: number, projectId: number) => `/operations/project-dashboard/${projectId}/vendor-work-order/${woId}/pdf-versions`,
+
+        raisePurchaseInvoiceForm: (projectId: number) => `/operations/project-dashboard/${projectId}/purchase-invoice/create`,
+        editPurchaseInvoicePage: (piId: number, projectId: number) => `/operations/project-dashboard/${projectId}/purchase-invoice/${piId}/edit`,
+        raisePaymentRequestForm: (projectId: number) => `/operations/project-dashboard/${projectId}/payment-request/create`,
+        editPaymentRequestPage: (prId: number, projectId: number) => `/operations/project-dashboard/${projectId}/payment-request/${prId}/edit`,
     },
 
     // ==================== SERVICES ====================
