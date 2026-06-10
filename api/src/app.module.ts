@@ -101,6 +101,8 @@ import { CustomerPerformanceModule } from "./modules/performance/customer-perfor
 import { LocationPerformanceModule } from "./modules/performance/location-performance/location-performance.module";
 import { ContractAgreementModule } from "./modules/operations/contract-agreement/contract-agreement.module";
 import { VendorWorkOrderModule } from "./modules/operations/vendor-work-orders/vendor-work-order.module";
+import { PurchaseInvoiceModule } from "./modules/operations/purchase-invoices/purchase-invoice.module";
+import { PaymentRequestModule } from "./modules/operations/payment-requests/payment-request.module";
 import { EmployeeProfilesModule } from "@/modules/hrms/employee-profiles/employee-profiles.module";
 import { AssetsModule } from "@/modules/hrms/assets/assets.module";
 import { AccountChecklistModule } from './modules/accounts/account-checklist/account-checklist.module';
@@ -217,6 +219,8 @@ import { ProfileModule } from './modules/profile/profile.module';
         LocationPerformanceModule,
         ContractAgreementModule,
         VendorWorkOrderModule,
+        PurchaseInvoiceModule,
+        PaymentRequestModule,
         EmployeeProfilesModule,
         AssetsModule,
         AccountChecklistModule,
