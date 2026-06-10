@@ -455,6 +455,7 @@ export class OnboardingService {
         maritalStatus: obProfile.maritalStatus,
         nationality: obProfile.nationality,
         phone: obProfile.phone,
+        altEmail: obProfile.email,
         aadharNumber: obProfile.aadharNumber,
         panNumber: obProfile.panNumber,
         bloodGroup: obProfile.bloodGroup,
@@ -764,6 +765,7 @@ export class OnboardingService {
         id: onboardingRequests.id,
         name: onboardingRequests.name,
         email: onboardingRequests.email,
+        personalEmail: onboardingProfiles.email,
         phone: onboardingRequests.phone,
         profileStatus: onboardingRequests.profileStatus,
         hrStatus: onboardingProfiles.hrStatus,
@@ -871,6 +873,7 @@ export class OnboardingService {
     return {
       ...profileRow.profile,
       ...request,
+      personalEmail: profileRow.profile.email,
       designation: profileRow.designationName,
       department: profileRow.departmentName,
       reportingTl: profileRow.reportingTlName,
@@ -1342,8 +1345,6 @@ export class OnboardingService {
 
       const [req] = await tx.select({ userId: onboardingRequests.userId }).from(onboardingRequests).where(eq(onboardingRequests.id, id)).limit(1);
 
-      await this.updateOnboardingRequestStatus(id, hrStatus, tx);
-
       if (hrStatus === 'approved') {
         if (req?.userId) {
           await this.syncExperienceToEmployee(tx, req.userId, exp);
@@ -1365,8 +1366,6 @@ export class OnboardingService {
         hrRemark,
         updatedAt: new Date(),
       }).where(eq(onboardingBankDetails.id, bankId));
-
-      await this.updateOnboardingRequestStatus(id, hrStatus, tx);
 
       if (hrStatus === 'approved') {
         const [req] = await tx.select({ userId: onboardingRequests.userId }).from(onboardingRequests).where(eq(onboardingRequests.id, id)).limit(1);
@@ -1392,20 +1391,9 @@ export class OnboardingService {
         updatedAt: new Date(),
       }).where(eq(onboardingDocuments.id, docId));
 
-      await this.updateOnboardingRequestStatus(id, status, tx);
-
       await this.recalculateProgress(tx, id);
       return { success: true };
     });
-  }
-
-  private async updateOnboardingRequestStatus(requestId : number, status: string, tx: typeof this.db){
-          //updating the request status
-      await tx.update(onboardingRequests)
-            .set({
-              status: status
-            })
-            .where(eq(onboardingRequests.id, requestId));
   }
 
   // ─── Data Sync Helpers (Onboarding -> Employee) ──────────────────────────────
@@ -1425,6 +1413,7 @@ export class OnboardingService {
       aadharNumber: onProf.aadharNumber,
       panNumber: onProf.panNumber,
       phone: onProf.phone,
+      altEmail: onProf.email,
       bloodGroup: onProf.bloodGroup,
       linkedinProfile: onProf.linkedinProfile,
       currentAddress: onProf.currentAddress,
@@ -1551,6 +1540,7 @@ export class OnboardingService {
       .update(onboardingRequests)
       .set({
         status: 'rejected',
+        hrStatus: 'rejected',
       })
       .where(eq(onboardingRequests.id, requestId));
   }

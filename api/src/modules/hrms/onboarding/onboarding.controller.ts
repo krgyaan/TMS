@@ -232,12 +232,6 @@ export class OnboardingController {
     @Body() body: { status: 'approved' | 'rejected'; remark: string },
     @Req() req: any,
   ) {
-    
-    if(body.status == "rejected"){
-      //passing the onboarding Request Entry 
-      await this.onboardingService.rejectOnboardingRequest(id);
-    }
-
     return this.onboardingService.approveProfileSection(id, body.status, body.remark, req.user.id);
   }
 
@@ -257,13 +251,6 @@ export class OnboardingController {
     const adminId = req.user.id;
     const status = body.status;
     const remark = body.remark || '';
-
-    //rejecting the entry if any of the request entry is rejected
-
-    if(status == "rejected"){
-      //passing the onboarding Request Entry 
-      await this.onboardingService.rejectOnboardingRequest(id);
-    }
 
     switch (stage) {
       case 'education':
