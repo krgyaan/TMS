@@ -416,7 +416,8 @@ const EntryCard: React.FC<EntryCardProps> = ({
                 <Mail className="h-3.5 w-3.5 text-muted-foreground" /> Contact Details
               </h4>
               <div className="grid grid-cols-2 gap-x-6 gap-y-3">
-                <DetailField icon={Mail} label="Email" value={entry.email} />
+                <DetailField icon={Mail} label="Work Email" value={entry.email} />
+                <DetailField icon={Mail} label="Personal Email" value={entry.personalEmail} />
                 <DetailField icon={Phone} label="Phone" value={entry.phone} />
                 <div className="col-span-2">
                   <DetailField icon={ExternalLink} label="LinkedIn" value={entry.linkedinProfile} />

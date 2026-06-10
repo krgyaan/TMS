@@ -320,7 +320,8 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ profileId, open, onClose }) =
 
               {/* Contact */}
               <DetailSection icon={Phone} title="Contact Details">
-                <Field label="Email" value={profile.email} />
+                <Field label="Work Email" value={profile.email} />
+                <Field label="Personal Email" value={profile.personalEmail} />
                 <Field label="Phone" value={profile.phone} />
                 <Field label="LinkedIn" value={profile.linkedinProfile} full />
               </DetailSection>
