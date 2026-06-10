@@ -1235,6 +1235,18 @@ export class OnboardingService {
               
             newUserId = newUser.id;
 
+            // Create a default user profile
+            await tx.insert(userProfiles).values({
+              userId: newUser.id,
+              firstName: onProf.firstName,
+              middleName: onProf.middleName,
+              lastName: onProf.lastName,
+              phone: onProf.phone,
+              altEmail: onProf.email,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+
             // Seed default induction tasks
             await this.seedInductionTasks(tx, id);
           }
@@ -1303,6 +1315,21 @@ export class OnboardingService {
         }
       }
 
+      await tx.insert(onboardingActivityLogs).values({
+        onboardingId: id,
+        action: hrStatus === 'approved' ? 'PROFILE_APPROVED' : 'PROFILE_REJECTED',
+        performedBy: adminId,
+        metadata: {
+          data: {
+            firstName: latestProfile.firstName,
+            lastName: latestProfile.lastName,
+            email: latestProfile.email,
+          },
+          action: hrStatus,
+          comment: hrRemark || null,
+        },
+      });
+
       await this.recalculateProgress(tx, id);
       return { success: true };
     });
@@ -1326,6 +1353,21 @@ export class OnboardingService {
           await this.syncEducationToEmployee(tx, req.userId, edu);
         }
       }
+
+      await tx.insert(onboardingActivityLogs).values({
+        onboardingId: id,
+        action: hrStatus === 'approved' ? 'EDUCATION_APPROVED' : 'EDUCATION_REJECTED',
+        performedBy: adminId,
+        metadata: {
+          data: {
+            id: edu.id,
+            degree: edu.degree,
+            institution: edu.institution,
+          },
+          action: hrStatus,
+          comment: hrRemark || null,
+        },
+      });
 
       await this.recalculateProgress(tx, id);
       return { success: true };
@@ -1351,6 +1393,21 @@ export class OnboardingService {
         }
       }
 
+      await tx.insert(onboardingActivityLogs).values({
+        onboardingId: id,
+        action: hrStatus === 'approved' ? 'EXPERIENCE_APPROVED' : 'EXPERIENCE_REJECTED',
+        performedBy: adminId,
+        metadata: {
+          data: {
+            id: exp.id,
+            companyName: exp.companyName,
+            designation: exp.designation,
+          },
+          action: hrStatus,
+          comment: hrRemark || null,
+        },
+      });
+
       await this.recalculateProgress(tx, id);
       return { success: true };
     });
@@ -1374,6 +1431,22 @@ export class OnboardingService {
         }
       }
 
+      await tx.insert(onboardingActivityLogs).values({
+        onboardingId: id,
+        action: hrStatus === 'approved' ? 'BANK_APPROVED' : 'BANK_REJECTED',
+        performedBy: adminId,
+        metadata: {
+          data: {
+            id: bank.id,
+            bankName: bank.bankName,
+            accountHolderName: bank.accountHolderName,
+            accountNumber: bank.accountNumber,
+          },
+          action: hrStatus,
+          comment: hrRemark || null,
+        },
+      });
+
       await this.recalculateProgress(tx, id);
       return { success: true };
     });
@@ -1382,6 +1455,41 @@ export class OnboardingService {
 
   async verifyDocument(id: number, docId: number, status: string, reason: string | undefined, adminId: number) {
     return this.db.transaction(async (tx) => {
+      const [doc] = await tx.select().from(onboardingDocuments).where(eq(onboardingDocuments.id, docId)).limit(1);
+      if (!doc) throw new NotFoundException('Document record not found');
+
+      // Sync profile photo to userProfiles when a Passport Size Photo is approved
+      if (status === 'approved' && doc.docType == 'Passport Size Photo') {
+        const [onboardingRequest] = await tx
+          .select({ userId: onboardingRequests.userId })
+          .from(onboardingRequests)
+          .where(eq(onboardingRequests.id, id))
+          .limit(1);
+
+
+        if (onboardingRequest?.userId) {
+          const [existingProfile] = await tx
+            .select()
+            .from(userProfiles)
+            .where(eq(userProfiles.userId, onboardingRequest.userId))
+            .limit(1);
+
+          if (existingProfile) {
+            await tx.update(userProfiles).set({
+              image: doc.fileUrl,
+              updatedAt: new Date(),
+            }).where(eq(userProfiles.userId, onboardingRequest.userId));
+          } else {
+            await tx.insert(userProfiles).values({
+              userId: onboardingRequest.userId,
+              image: doc.fileUrl,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            } as any);
+          }
+        }
+      }
+
       await tx.update(onboardingDocuments).set({
         status: status === 'approved' ? 'submitted' : 'pending', // map internal status
         hrStatus: status,
@@ -1390,6 +1498,22 @@ export class OnboardingService {
         verificationDate: new Date().toISOString().split('T')[0],
         updatedAt: new Date(),
       }).where(eq(onboardingDocuments.id, docId));
+
+      await tx.insert(onboardingActivityLogs).values({
+        onboardingId: id,
+        action: status === 'approved' ? 'DOCUMENT_APPROVED' : 'DOCUMENT_REJECTED',
+        performedBy: adminId,
+        metadata: {
+          data: {
+            id: doc.id,
+            docCategory: doc.docCategory,
+            docType: doc.docType,
+            fileUrl: doc.fileUrl,
+          },
+          action: status,
+          comment: reason || null,
+        },
+      });
 
       await this.recalculateProgress(tx, id);
       return { success: true };
@@ -1401,12 +1525,18 @@ export class OnboardingService {
   private async syncProfileToEmployee(tx: any, userId: number, onProf: any) {
     const fullName = [onProf.firstName, onProf.middleName, onProf.lastName].filter(Boolean).join(' ');
     
-    // 1. Update userProfiles
-    await tx.update(userProfiles).set({
+    // 1. Upsert userProfiles
+    const [existingProfile] = await tx
+      .select()
+      .from(userProfiles)
+      .where(eq(userProfiles.userId, userId))
+      .limit(1);
+
+    const profileData = {
       firstName: onProf.firstName,
       middleName: onProf.middleName,
       lastName: onProf.lastName,
-      dob: onProf.dob,
+      dateOfBirth: onProf.dob,
       gender: onProf.gender,
       maritalStatus: onProf.maritalStatus,
       nationality: onProf.nationality,
@@ -1421,7 +1551,13 @@ export class OnboardingService {
       emergencyContact: onProf.emergencyContact,
       profileCompleted: true,
       updatedAt: new Date(),
-    }).where(eq(userProfiles.userId, userId));
+    };
+
+    if (existingProfile) {
+      await tx.update(userProfiles).set(profileData).where(eq(userProfiles.userId, userId));
+    } else {
+      await tx.insert(userProfiles).values({ userId, ...profileData, createdAt: new Date() } as any);
+    }
 
     // 2. Upsert employeeProfiles
     const [existingEmp] = await tx.select().from(employeeProfiles).where(eq(employeeProfiles.userId, userId)).limit(1);

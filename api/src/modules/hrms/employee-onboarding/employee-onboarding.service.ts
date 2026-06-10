@@ -651,12 +651,40 @@ export class EmployeeOnboardingService {
         await this.db.update(onboardingProfiles)
           .set({ ...profileData, status: 'resubmitted', hrStatus: 'pending', hrRemark: null })
           .where(eq(onboardingProfiles.id, currentProfile.id));
+
+        await this.db.insert(onboardingActivityLogs).values({
+          onboardingId,
+          action: 'PROFILE_RESUBMITTED',
+          performedBy: userId,
+          metadata: {
+            data: {
+              firstName: dto.firstName,
+              lastName: dto.lastName,
+              email: dto.personalEmail,
+            },
+            action: 'resubmitted',
+          },
+        });
       } else {
         await this.db.insert(onboardingProfiles).values({
           ...profileData,
           status: 'submitted',
           hrStatus: 'pending',
         } as any);
+
+        await this.db.insert(onboardingActivityLogs).values({
+          onboardingId,
+          action: 'PROFILE_SUBMITTED',
+          performedBy: userId,
+          metadata: {
+            data: {
+              firstName: dto.firstName,
+              lastName: dto.lastName,
+              email: dto.personalEmail,
+            },
+            action: 'submitted',
+          },
+        });
       }
 
     }
@@ -705,6 +733,17 @@ export class EmployeeOnboardingService {
           });
         }
       }
+
+      const isResubmit = existing.length > 0;
+      await this.db.insert(onboardingActivityLogs).values({
+        onboardingId,
+        action: isResubmit ? 'BANK_BULK_RESUBMITTED' : 'BANK_BULK_SAVED',
+        performedBy: userId,
+        metadata: {
+          bankAccounts: dto.bankAccounts.map((b: any) => ({ bankName: b.bankName, accountNumber: b.accountNumber })),
+          action: isResubmit ? 'resubmitted' : 'submitted',
+        },
+      });
     }
 
     // Handle Education Sync
@@ -749,6 +788,17 @@ export class EmployeeOnboardingService {
           });
         }
       }
+
+      const isResubmit = existing.length > 0;
+      await this.db.insert(onboardingActivityLogs).values({
+        onboardingId,
+        action: isResubmit ? 'EDUCATION_BULK_RESUBMITTED' : 'EDUCATION_BULK_SAVED',
+        performedBy: userId,
+        metadata: {
+          education: dto.education.map((e: any) => ({ degree: e.degree, institution: e.institution })),
+          action: isResubmit ? 'resubmitted' : 'submitted',
+        },
+      });
     }
 
     // Handle Experience Sync
@@ -793,6 +843,17 @@ export class EmployeeOnboardingService {
           });
         }
       }
+
+      const isResubmit = existing.length > 0;
+      await this.db.insert(onboardingActivityLogs).values({
+        onboardingId,
+        action: isResubmit ? 'EXPERIENCE_BULK_RESUBMITTED' : 'EXPERIENCE_BULK_SAVED',
+        performedBy: userId,
+        metadata: {
+          experience: dto.experience.map((e: any) => ({ companyName: e.companyName, designation: e.designation })),
+          action: isResubmit ? 'resubmitted' : 'submitted',
+        },
+      });
     }
 
     await this.recalculateSubmissionStatuses(this.db, onboardingId);
@@ -883,6 +944,19 @@ export class EmployeeOnboardingService {
 
       await this.recalculateSubmissionStatuses(this.db, activeReqs[0].id);
 
+      await this.db.insert(onboardingActivityLogs).values({
+        onboardingId: activeReqs[0].id,
+        action: 'EDUCATION_ADDED',
+        performedBy: userId,
+        metadata: {
+          data: {
+            degree: dto.degree,
+            institution: dto.institution,
+          },
+          action: 'submitted',
+        },
+      });
+
       return inserted;
     }
 
@@ -915,6 +989,20 @@ export class EmployeeOnboardingService {
       }).where(eq(onboardingEducation.id, eduId)).returning();
 
       await this.recalculateSubmissionStatuses(this.db, activeReqs[0].id);
+
+      await this.db.insert(onboardingActivityLogs).values({
+        onboardingId: activeReqs[0].id,
+        action: 'EDUCATION_UPDATED',
+        performedBy: userId,
+        metadata: {
+          data: {
+            id: eduId,
+            degree: dto.degree,
+            institution: dto.institution,
+          },
+          action: 'resubmitted',
+        },
+      });
 
       return updated;
     }
@@ -994,6 +1082,17 @@ export class EmployeeOnboardingService {
 
     await this.recalculateSubmissionStatuses(this.db, onboardingId);
 
+    const isResubmit = existing.length > 0;
+    await this.db.insert(onboardingActivityLogs).values({
+      onboardingId,
+      action: isResubmit ? 'BANK_BULK_RESUBMITTED' : 'BANK_BULK_SAVED',
+      performedBy: userId,
+      metadata: {
+        bankAccounts: bankAccounts.map((b: any) => ({ bankName: b.bankName, accountNumber: b.accountNumber })),
+        action: isResubmit ? 'resubmitted' : 'submitted',
+      },
+    });
+
     // Reset parent request status from 'rejected' to 'pending' on resubmission
     if (activeReqs[0].status === 'rejected') {
       await this.db.update(onboardingRequests)
@@ -1063,6 +1162,17 @@ export class EmployeeOnboardingService {
 
     await this.recalculateSubmissionStatuses(this.db, activeReqs[0].id);
 
+    const isResubmit = existing.length > 0;
+    await this.db.insert(onboardingActivityLogs).values({
+      onboardingId: activeReqs[0].id,
+      action: isResubmit ? 'EDUCATION_BULK_RESUBMITTED' : 'EDUCATION_BULK_SAVED',
+      performedBy: userId,
+      metadata: {
+        education: educations.map((e: any) => ({ degree: e.degree, institution: e.institution })),
+        action: isResubmit ? 'resubmitted' : 'submitted',
+      },
+    });
+
     // Reset parent request status from 'rejected' to 'pending' on resubmission
     if (activeReqs[0].status === 'rejected') {
       await this.db.update(onboardingRequests)
@@ -1094,6 +1204,19 @@ export class EmployeeOnboardingService {
       }).returning();
 
       await this.recalculateSubmissionStatuses(this.db, activeReqs[0].id);
+
+      await this.db.insert(onboardingActivityLogs).values({
+        onboardingId: activeReqs[0].id,
+        action: 'EXPERIENCE_ADDED',
+        performedBy: userId,
+        metadata: {
+          data: {
+            companyName: dto.companyName,
+            designation: dto.designation,
+          },
+          action: 'submitted',
+        },
+      });
 
       return inserted;
     }
@@ -1132,6 +1255,20 @@ export class EmployeeOnboardingService {
         .where(eq(onboardingExperience.id, expId)).returning();
 
       await this.recalculateSubmissionStatuses(this.db, activeReqs[0].id);
+
+      await this.db.insert(onboardingActivityLogs).values({
+        onboardingId: activeReqs[0].id,
+        action: 'EXPERIENCE_UPDATED',
+        performedBy: userId,
+        metadata: {
+          data: {
+            id: expId,
+            companyName: dto.companyName,
+            designation: dto.designation,
+          },
+          action: 'resubmitted',
+        },
+      });
 
       return updated;
     }
@@ -1198,6 +1335,17 @@ export class EmployeeOnboardingService {
 
     await this.recalculateSubmissionStatuses(this.db, activeReqs[0].id);
 
+    const isResubmit = existing.length > 0;
+    await this.db.insert(onboardingActivityLogs).values({
+      onboardingId: activeReqs[0].id,
+      action: isResubmit ? 'EXPERIENCE_BULK_RESUBMITTED' : 'EXPERIENCE_BULK_SAVED',
+      performedBy: userId,
+      metadata: {
+        experience: experiences.map((e: any) => ({ companyName: e.companyName, designation: e.designation })),
+        action: isResubmit ? 'resubmitted' : 'submitted',
+      },
+    });
+
     // Reset parent request status from 'rejected' to 'pending' on resubmission
     if (activeReqs[0].status === 'rejected') {
       await this.db.update(onboardingRequests)
@@ -1230,6 +1378,19 @@ export class EmployeeOnboardingService {
 
       await this.recalculateSubmissionStatuses(this.db, activeReqs[0].id);
 
+      await this.db.insert(onboardingActivityLogs).values({
+        onboardingId: activeReqs[0].id,
+        action: 'BANK_ADDED',
+        performedBy: userId,
+        metadata: {
+          data: {
+            bankName: dto.bankName,
+            accountNumber: dto.accountNumber,
+          },
+          action: 'submitted',
+        },
+      });
+
       return inserted;
     }
 
@@ -1259,6 +1420,20 @@ export class EmployeeOnboardingService {
       }).where(eq(onboardingBankDetails.id, bankId)).returning();
 
       await this.recalculateSubmissionStatuses(this.db, activeReqs[0].id);
+
+      await this.db.insert(onboardingActivityLogs).values({
+        onboardingId: activeReqs[0].id,
+        action: 'BANK_UPDATED',
+        performedBy: userId,
+        metadata: {
+          data: {
+            id: bankId,
+            bankName: dto.bankName,
+            accountNumber: dto.accountNumber,
+          },
+          action: 'resubmitted',
+        },
+      });
 
       return updated;
     }
@@ -1323,6 +1498,21 @@ export class EmployeeOnboardingService {
       .returning();
 
     await this.recalculateSubmissionStatuses(this.db, onboardingId!);
+
+    await this.db.insert(onboardingActivityLogs).values({
+      onboardingId: onboardingId!,
+      action: 'DOCUMENT_UPLOADED',
+      performedBy: userId,
+      metadata: {
+        data: {
+          id: inserted.id,
+          docType: dto.docType,
+          docCategory: dto.docCategory,
+          fileUrl,
+        },
+        action: 'submitted',
+      },
+    });
 
     return {
       id: inserted.id,
@@ -1410,6 +1600,20 @@ export class EmployeeOnboardingService {
 
     await this.recalculateSubmissionStatuses(this.db, activeReqs[0].id);
 
+    await this.db.insert(onboardingActivityLogs).values({
+      onboardingId: activeReqs[0].id,
+      action: 'DOCUMENT_REUPLOADED',
+      performedBy: userId,
+      metadata: {
+        data: {
+          id: docId,
+          docType: existing.docType,
+          fileUrl: newFileUrl,
+        },
+        action: 'resubmitted',
+      },
+    });
+
     return {
       id: updated.id,
       docType: updated.docType,
@@ -1460,6 +1664,19 @@ export class EmployeeOnboardingService {
 
     await this.db.delete(onboardingDocuments).where(eq(onboardingDocuments.id, docId));
     await this.recalculateSubmissionStatuses(this.db, activeReqs[0].id);
+
+    await this.db.insert(onboardingActivityLogs).values({
+      onboardingId: activeReqs[0].id,
+      action: 'DOCUMENT_DELETED',
+      performedBy: userId,
+      metadata: {
+        data: {
+          id: docId,
+          docType: existing.docType,
+        },
+        action: 'deleted',
+      },
+    });
   }
 
   private async recalculateSubmissionStatuses(txOrDb: any, onboardingId: number): Promise<void> {
