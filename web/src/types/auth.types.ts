@@ -51,6 +51,8 @@ export interface UserProfile {
     currentAddress: any;
     permanentAddress: any;
     emergencyContact: any;
+    profilePhoto: string | null;
+    googlePhoto : string | null;
     createdAt: string | null;
     updatedAt: string | null;
 }

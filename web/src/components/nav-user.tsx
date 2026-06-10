@@ -70,7 +70,7 @@ export function NavUser({ user, onLogout }: NavUserProps) {
     }, [onLogout]);
 
     const initials = getInitials(user?.name) || getInitials(user?.email);
-    const avatarUrl = user?.profile?.image || user?.image || undefined;
+    const avatarUrl = user?.profile?.profilePhoto || user?.profile?.googlePhoto || null;
 
     return (
         <SidebarMenu>

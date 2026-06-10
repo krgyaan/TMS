@@ -572,10 +572,10 @@ const PendingUploadCard: React.FC<PendingUploadCardProps> = ({ doc, index, onUpl
       <Card
         className={cn(
           "border-dashed border-2 shadow-none hover:shadow-lg hover:shadow-primary/[0.04] transition-all duration-400 group bg-muted/10 backdrop-blur-sm overflow-hidden",
-          (isOnboarding || doc.docType === "Passport Size Photo") ? "hover:bg-muted/20 cursor-pointer" : "cursor-default",
+          isOnboarding ? "hover:bg-muted/20 cursor-pointer" : "cursor-default",
           catConfig.borderColor
         )}
-        onClick={() => (isOnboarding || doc.docType === "Passport Size Photo") && onUpload(doc)}
+        onClick={() => isOnboarding && onUpload(doc)}
       >
         <CardContent className="p-5">
           <div className="flex items-start justify-between mb-4">
@@ -607,7 +607,7 @@ const PendingUploadCard: React.FC<PendingUploadCardProps> = ({ doc, index, onUpl
             {doc.docCategory}
           </p>
 
-          {(isOnboarding || doc.docType === "Passport Size Photo") && (
+          {isOnboarding && (
             <div className="mt-5 pt-4 border-t border-dashed border-border/30">
               <Button
                 size="sm"
@@ -761,7 +761,7 @@ const UploadedDocCard: React.FC<UploadedDocCardProps> = ({ doc, index, onView, o
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            {(isOnboarding || doc.docType === "Passport Size Photo") && doc.verificationStatus === "rejected" && (
+            {isOnboarding && doc.verificationStatus === "rejected" && (
               <>
                 <Button
                   size="sm"
