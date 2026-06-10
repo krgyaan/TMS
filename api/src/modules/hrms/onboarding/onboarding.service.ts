@@ -1303,6 +1303,21 @@ export class OnboardingService {
         }
       }
 
+      await tx.insert(onboardingActivityLogs).values({
+        onboardingId: id,
+        action: hrStatus === 'approved' ? 'PROFILE_APPROVED' : 'PROFILE_REJECTED',
+        performedBy: adminId,
+        metadata: {
+          data: {
+            firstName: latestProfile.firstName,
+            lastName: latestProfile.lastName,
+            email: latestProfile.email,
+          },
+          action: hrStatus,
+          comment: hrRemark || null,
+        },
+      });
+
       await this.recalculateProgress(tx, id);
       return { success: true };
     });
@@ -1326,6 +1341,21 @@ export class OnboardingService {
           await this.syncEducationToEmployee(tx, req.userId, edu);
         }
       }
+
+      await tx.insert(onboardingActivityLogs).values({
+        onboardingId: id,
+        action: hrStatus === 'approved' ? 'EDUCATION_APPROVED' : 'EDUCATION_REJECTED',
+        performedBy: adminId,
+        metadata: {
+          data: {
+            id: edu.id,
+            degree: edu.degree,
+            institution: edu.institution,
+          },
+          action: hrStatus,
+          comment: hrRemark || null,
+        },
+      });
 
       await this.recalculateProgress(tx, id);
       return { success: true };
@@ -1351,6 +1381,21 @@ export class OnboardingService {
         }
       }
 
+      await tx.insert(onboardingActivityLogs).values({
+        onboardingId: id,
+        action: hrStatus === 'approved' ? 'EXPERIENCE_APPROVED' : 'EXPERIENCE_REJECTED',
+        performedBy: adminId,
+        metadata: {
+          data: {
+            id: exp.id,
+            companyName: exp.companyName,
+            designation: exp.designation,
+          },
+          action: hrStatus,
+          comment: hrRemark || null,
+        },
+      });
+
       await this.recalculateProgress(tx, id);
       return { success: true };
     });
@@ -1374,6 +1419,22 @@ export class OnboardingService {
         }
       }
 
+      await tx.insert(onboardingActivityLogs).values({
+        onboardingId: id,
+        action: hrStatus === 'approved' ? 'BANK_APPROVED' : 'BANK_REJECTED',
+        performedBy: adminId,
+        metadata: {
+          data: {
+            id: bank.id,
+            bankName: bank.bankName,
+            accountHolderName: bank.accountHolderName,
+            accountNumber: bank.accountNumber,
+          },
+          action: hrStatus,
+          comment: hrRemark || null,
+        },
+      });
+
       await this.recalculateProgress(tx, id);
       return { success: true };
     });
@@ -1382,6 +1443,9 @@ export class OnboardingService {
 
   async verifyDocument(id: number, docId: number, status: string, reason: string | undefined, adminId: number) {
     return this.db.transaction(async (tx) => {
+      const [doc] = await tx.select().from(onboardingDocuments).where(eq(onboardingDocuments.id, docId)).limit(1);
+      if (!doc) throw new NotFoundException('Document record not found');
+
       await tx.update(onboardingDocuments).set({
         status: status === 'approved' ? 'submitted' : 'pending', // map internal status
         hrStatus: status,
@@ -1390,6 +1454,22 @@ export class OnboardingService {
         verificationDate: new Date().toISOString().split('T')[0],
         updatedAt: new Date(),
       }).where(eq(onboardingDocuments.id, docId));
+
+      await tx.insert(onboardingActivityLogs).values({
+        onboardingId: id,
+        action: status === 'approved' ? 'DOCUMENT_APPROVED' : 'DOCUMENT_REJECTED',
+        performedBy: adminId,
+        metadata: {
+          data: {
+            id: doc.id,
+            docCategory: doc.docCategory,
+            docType: doc.docType,
+            fileUrl: doc.fileUrl,
+          },
+          action: status,
+          comment: reason || null,
+        },
+      });
 
       await this.recalculateProgress(tx, id);
       return { success: true };
