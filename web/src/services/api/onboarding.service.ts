@@ -153,6 +153,11 @@ export const onboardingService = {
     return data;
   },
 
+  approveProfile: async (id: number, status: 'approved' | 'rejected', remark?: string): Promise<any> => {
+    const { data } = await axiosInstance.patch(`/hrms/onboarding/${id}/approve-profile`, { status, remark: remark || "" });
+    return data;
+  },
+
   // Documents
   getDocumentTrackerList: async (): Promise<any[]> => {
     const { data } = await axiosInstance.get("/hrms/onboarding/documents-tracker");
