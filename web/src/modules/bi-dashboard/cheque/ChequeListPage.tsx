@@ -8,20 +8,19 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import DataTable from '@/components/ui/data-table';
 import { Input } from '@/components/ui/input';
 import { QuickFilter } from '@/components/ui/quick-filter';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useChequeDashboard, useChequeDashboardCounts } from '@/hooks/api/useCheques';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { useBiExport } from '@/hooks/useBiExport';
 import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { chequesService } from '@/services/api/cheques.service';
+import { ExportExcelDropdown } from '@/components/bi-dashboard/ExportExcelDropdown';
 import type { ColDef } from 'ag-grid-community';
-import { saveAs } from 'file-saver';
-import { AlertCircle, Calendar, CheckCircle, Clock, Download, Edit, Eye, FileX2, Link, Plus, Search, Shield, XCircle } from 'lucide-react';
+import { AlertCircle, Calendar, CheckCircle, Clock, Edit, Eye, FileX2, Link, Plus, Search, Shield, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import * as XLSX from 'xlsx';
 import type { ChequeDashboardRow, ChequeDashboardTab } from './helpers/cheque.types';
 
 const TABS_CONFIG: Array<{ key: ChequeDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
@@ -75,18 +74,6 @@ const TABS_CONFIG: Array<{ key: ChequeDashboardTab; name: string; icon: React.Re
     }
 ];
 
-const EXPORT_TAB_OPTIONS = [
-    { value: 'cheque-pending', label: 'Pending' },
-    { value: 'cheque-payable', label: 'Payable' },
-    { value: 'cheque-paid-stop', label: 'Paid/stop' },
-    { value: 'cheque-for-security', label: 'For Security' },
-    { value: 'cheque-for-dd-fdr', label: 'For DD/FDR' },
-    { value: 'rejected', label: 'Rejected' },
-    { value: 'cancelled', label: 'Cancelled' },
-    { value: 'expired', label: 'Expired' },
-    { value: 'all', label: 'All' },
-];
-
 const getStatusVariant = (status: string | null): string => {
     if (!status) return 'secondary';
     const statusLower = status.toLowerCase();
@@ -109,9 +96,6 @@ const ChequeListPage = () => {
     const [teamFilter, setTeamFilter] = useState<string>('All');
     const teamId = teamFilter === 'All' ? undefined : teamFilter === 'AC' ? 1 : 2;
 
-    const [exportTab, setExportTab] = useState<string>('');
-    const [exporting, setExporting] = useState(false);
-
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, [activeTab, debouncedSearch, teamFilter]);
@@ -131,37 +115,6 @@ const ChequeListPage = () => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, []);
 
-    const fetchAllRows = async (tab: string): Promise<any[]> => {
-        if (tab === 'all') {
-            const allRows: any[] = [];
-            for (const t of TABS_CONFIG) {
-                let page = 1;
-                const limit = 100;
-                let total = 0;
-                const tabRows: any[] = [];
-                do {
-                    const data = await chequesService.getAll({ tab: t.key, page, limit });
-                    tabRows.push(...(data.data || []));
-                    total = data.meta?.total || data.data?.length || 0;
-                    page++;
-                } while (tabRows.length < total);
-                allRows.push(...tabRows.map(r => ({ ...r, _tab: t.name })));
-            }
-            return allRows;
-        }
-        const allRows: any[] = [];
-        let page = 1;
-        const limit = 100;
-        let total = 0;
-        do {
-            const data = await chequesService.getAll({ tab: tab as any, page, limit });
-            allRows.push(...(data.data || []));
-            total = data.meta?.total || data.data?.length || 0;
-            page++;
-        } while (allRows.length < total);
-        return allRows;
-    };
-
     const flattenFormData = (data: Record<string, any>): Record<string, any> => {
         const out: Record<string, any> = {};
         if (data.chequeNo) out['Cheque No'] = data.chequeNo;
@@ -176,82 +129,45 @@ const ChequeListPage = () => {
         return out;
     };
 
-    const handleExport = async () => {
-        if (!exportTab) return;
-        setExporting(true);
-        try {
-            const rows = await fetchAllRows(exportTab);
-            if (rows.length === 0) return;
-
-            const isPendingTab = exportTab === 'cheque-pending';
-            const isAllTab = exportTab === 'all';
-
-            let exportRows: Record<string, any>[];
-
-            if (isPendingTab) {
-                exportRows = rows.map((r: any) => ({
-                    'Cheque Date': r.cheque ? new Date(r.cheque).toLocaleDateString('en-GB') : '',
-                    'Cheque No': r.chequeNo || '',
-                    'Payee name': r.payeeName || '',
-                    'Requested By': r.requestedBy || '',
-                    'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
-                    'Amount': r.amount || '',
-                    'Type': r.type || '',
-                    'Due Date': r.dueDate ? new Date(r.dueDate).toLocaleDateString('en-GB') : '',
-                    'Member': r.requestedBy || '',
-                    'Expiry': r.expiry || '',
-                    'Cheque Status': r.chequeStatus || '',
-                }));
-            } else {
-                exportRows = rows.map((r: any) => {
-                    const base: Record<string, any> = {
-                        'Cheque Date': r.cheque ? new Date(r.cheque).toLocaleDateString('en-GB') : '',
-                        'Cheque No': r.chequeNo || '',
-                        'Payee name': r.payeeName || '',
-                        'Requested By': r.requestedBy || '',
-                        'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
-                        'Amount': r.amount || '',
-                        'Type': r.type || '',
-                        'Due Date': r.dueDate ? new Date(r.dueDate).toLocaleDateString('en-GB') : '',
-                        'Member': r.requestedBy || '',
-                        'Expiry': r.expiry || '',
-                        'Cheque Status': r.chequeStatus || '',
-                    };
-                    if (isAllTab) {
-                        base['Tab'] = r._tab || '';
-                    }
-                    return base;
-                });
-
-                const tabsWithForm = ['cheque-payable', 'cheque-paid-stop', 'cheque-for-security', 'cheque-for-dd-fdr', 'rejected', 'cancelled', 'expired'];
-                if (isAllTab || tabsWithForm.includes(exportTab)) {
-                    for (let i = 0; i < rows.length; i++) {
-                        const row = rows[i];
-                        try {
-                            const formData = await chequesService.getActionFormData(row.id);
-                            if (formData && Object.keys(formData).length > 0) {
-                                const flat = flattenFormData(formData);
-                                Object.assign(exportRows[i], flat);
-                            }
-                        } catch {
-                            // skip
-                        }
-                    }
-                }
-            }
-
-            const ws = XLSX.utils.json_to_sheet(exportRows);
-            const wb = XLSX.utils.book_new();
-            const sheetName = isAllTab ? 'All Data' : exportTab;
-            XLSX.utils.book_append_sheet(wb, ws, sheetName);
-            const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-            saveAs(new Blob([buf]), `cheques_${exportTab}_${new Date().toISOString().slice(0, 10)}.xlsx`);
-        } catch (err) {
-            console.error('Export failed:', err);
-        } finally {
-            setExporting(false);
-        }
-    };
+    const { exportTab, setExportTab, exporting, handleExport, exportOptions } = useBiExport({
+        getAllFn: (params) => chequesService.getAll(params),
+        getActionFormDataFn: (id) => chequesService.getActionFormData(id),
+        tabsConfig: TABS_CONFIG,
+        pendingTabKey: 'cheque-pending',
+        tabsWithForm: ['cheque-payable', 'cheque-paid-stop', 'cheque-for-security', 'cheque-for-dd-fdr', 'rejected', 'cancelled', 'expired'],
+        filenamePrefix: 'cheques',
+        flattenFormData,
+        mapPendingRow: (r: any) => ({
+            'Cheque Date': r.cheque ? new Date(r.cheque).toLocaleDateString('en-GB') : '',
+            'Cheque No': r.chequeNo || '',
+            'Payee name': r.payeeName || '',
+            'Requested By': r.requestedBy || '',
+            'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
+            'Amount': r.amount || '',
+            'Type': r.type || '',
+            'Due Date': r.dueDate ? new Date(r.dueDate).toLocaleDateString('en-GB') : '',
+            'Member': r.requestedBy || '',
+            'Expiry': r.expiry || '',
+            'Cheque Status': r.chequeStatus || '',
+        }),
+        mapRow: (r: any, isAllTab: boolean) => {
+            const base: Record<string, any> = {
+                'Cheque Date': r.cheque ? new Date(r.cheque).toLocaleDateString('en-GB') : '',
+                'Cheque No': r.chequeNo || '',
+                'Payee name': r.payeeName || '',
+                'Requested By': r.requestedBy || '',
+                'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
+                'Amount': r.amount || '',
+                'Type': r.type || '',
+                'Due Date': r.dueDate ? new Date(r.dueDate).toLocaleDateString('en-GB') : '',
+                'Member': r.requestedBy || '',
+                'Expiry': r.expiry || '',
+                'Cheque Status': r.chequeStatus || '',
+            };
+            if (isAllTab) base['Tab'] = r._tab || '';
+            return base;
+        },
+    });
 
     const { data: apiResponse, isLoading, error } = useChequeDashboard({
         tab: activeTab,
@@ -500,25 +416,13 @@ const ChequeListPage = () => {
                         </div>
                         <CardAction>
                             <div className="flex items-center gap-2">
-                                <Select value={exportTab} onValueChange={setExportTab}>
-                                    <SelectTrigger className="w-44">
-                                        <SelectValue placeholder="Choose tab to export" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {EXPORT_TAB_OPTIONS.map(opt => (
-                                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleExport}
-                                    disabled={!exportTab || exporting}
-                                >
-                                    <Download className="mr-2 h-4 w-4" />
-                                    {exporting ? 'Exporting...' : 'Download Excel'}
-                                </Button>
+                                <ExportExcelDropdown
+                                    exportOptions={exportOptions}
+                                    exportTab={exportTab}
+                                    setExportTab={setExportTab}
+                                    exporting={exporting}
+                                    handleExport={handleExport}
+                                />
                                 <Button variant="outline" onClick={() => navigate(paths.tendering.oldEmdsForCHEQUE())}>
                                     <Plus className="w-4 h-4" />
                                     Add Old Entry

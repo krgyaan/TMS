@@ -8,20 +8,19 @@ import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import DataTable from '@/components/ui/data-table';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useBankGuaranteeCardStats, useBankGuaranteeDashboard, useBankGuaranteeDashboardCounts } from '@/hooks/api/useBankGuarantees';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { useBiExport } from '@/hooks/useBiExport';
 import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { bankGuaranteesService } from '@/services/api/bank-guarantees.service';
+import { ExportExcelDropdown } from '@/components/bi-dashboard/ExportExcelDropdown';
 import type { ColDef } from 'ag-grid-community';
-import { saveAs } from 'file-saver';
-import { AlertCircle, Download, Edit, Eye, FileText, FileX2, Plus, Search, Shield, XCircle } from 'lucide-react';
+import { AlertCircle, Edit, Eye, FileText, FileX2, Plus, Search, Shield, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import * as XLSX from 'xlsx';
 import BankStatsCards from './components/BankStatsCards';
 import type { BankGuaranteeCardStats, BankGuaranteeDashboardRow, BankGuaranteeDashboardTab } from './helpers/bankGuarantee.types';
 
@@ -64,16 +63,6 @@ const TABS_CONFIG: Array<{ key: BankGuaranteeDashboardTab; name: string; icon: R
     }
 ];
 
-const EXPORT_TAB_OPTIONS = [
-    { value: 'new-requests', label: 'New Requests' },
-    { value: 'live-yes', label: 'Live YES' },
-    { value: 'live-pnb', label: 'Live PNB' },
-    { value: 'live-bg-limit', label: 'Live BG Limit' },
-    { value: 'cancelled', label: 'Cancelled' },
-    { value: 'rejected', label: 'Rejected' },
-    { value: 'all', label: 'All' },
-];
-
 const getStatusVariant = (status: string | null): string => {
     if (!status) return 'secondary';
     const statusLower = status.toLowerCase();
@@ -94,9 +83,6 @@ const BankGuaranteeListPage = () => {
     const [search, setSearch] = useState<string>('');
     const debouncedSearch = useDebouncedSearch(search, 300);
 
-    const [exportTab, setExportTab] = useState<string>('');
-    const [exporting, setExporting] = useState(false);
-
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, [activeTab, debouncedSearch]);
@@ -116,37 +102,6 @@ const BankGuaranteeListPage = () => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, []);
 
-    const fetchAllRows = async (tab: string): Promise<any[]> => {
-        if (tab === 'all') {
-            const allRows: any[] = [];
-            for (const t of TABS_CONFIG) {
-                let page = 1;
-                const limit = 100;
-                let total = 0;
-                const tabRows: any[] = [];
-                do {
-                    const data = await bankGuaranteesService.getAll({ tab: t.key, page, limit });
-                    tabRows.push(...(data.data || []));
-                    total = data.meta?.total || data.data?.length || 0;
-                    page++;
-                } while (tabRows.length < total);
-                allRows.push(...tabRows.map(r => ({ ...r, _tab: t.name })));
-            }
-            return allRows;
-        }
-        const allRows: any[] = [];
-        let page = 1;
-        const limit = 100;
-        let total = 0;
-        do {
-            const data = await bankGuaranteesService.getAll({ tab: tab as any, page, limit });
-            allRows.push(...(data.data || []));
-            total = data.meta?.total || data.data?.length || 0;
-            page++;
-        } while (allRows.length < total);
-        return allRows;
-    };
-
     const flattenFormData = (data: Record<string, any>): Record<string, any> => {
         const out: Record<string, any> = {};
         if (data.bgNo) out['BG No'] = data.bgNo;
@@ -162,90 +117,53 @@ const BankGuaranteeListPage = () => {
         return out;
     };
 
-    const handleExport = async () => {
-        if (!exportTab) return;
-        setExporting(true);
-        try {
-            const rows = await fetchAllRows(exportTab);
-            if (rows.length === 0) return;
-
-            const isNewRequestsTab = exportTab === 'new-requests';
-            const isAllTab = exportTab === 'all';
-
-            let exportRows: Record<string, any>[];
-
-            if (isNewRequestsTab) {
-                exportRows = rows.map((r: any) => ({
-                    'BG Date': r.bgDate ? new Date(r.bgDate).toLocaleDateString('en-GB') : '',
-                    'BG No': r.bgNo || '',
-                    'Beneficiary name': r.beneficiaryName || '',
-                    'Tender Details': r.tenderNo || '',
-                    'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
-                    'Amount': r.amount || '',
-                    'Expiry Date': r.bgExpiryDate ? new Date(r.bgExpiryDate).toLocaleDateString('en-GB') : '',
-                    'BG Claim Period': r.bgClaimPeriod ? `${r.bgClaimPeriod} days` : '',
-                    'BG Charges paid': r.bgChargesPaid || '',
-                    'BG Charges Calculated': r.bgChargesCalculated || '',
-                    'FDR No': r.fdrNo || '',
-                    'FDR Value': r.fdrValue || '',
-                    'Tender Status': r.tenderStatus || '',
-                    'Expiry': r.expiryStatus || '',
-                    'BG Status': r.bgStatus || '',
-                }));
-            } else {
-                exportRows = rows.map((r: any) => {
-                    const base: Record<string, any> = {
-                        'BG Date': r.bgDate ? new Date(r.bgDate).toLocaleDateString('en-GB') : '',
-                        'BG No': r.bgNo || '',
-                        'Beneficiary name': r.beneficiaryName || '',
-                        'Tender Details': r.tenderNo || '',
-                        'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
-                        'Amount': r.amount || '',
-                        'Expiry Date': r.bgExpiryDate ? new Date(r.bgExpiryDate).toLocaleDateString('en-GB') : '',
-                        'BG Claim Period': r.bgClaimPeriod ? `${r.bgClaimPeriod} days` : '',
-                        'BG Charges paid': r.bgChargesPaid || '',
-                        'BG Charges Calculated': r.bgChargesCalculated || '',
-                        'FDR No': r.fdrNo || '',
-                        'FDR Value': r.fdrValue || '',
-                        'Tender Status': r.tenderStatus || '',
-                        'Expiry': r.expiryStatus || '',
-                        'BG Status': r.bgStatus || '',
-                    };
-                    if (isAllTab) {
-                        base['Tab'] = r._tab || '';
-                    }
-                    return base;
-                });
-
-                const tabsWithForm = ['live-yes', 'live-pnb', 'live-bg-limit', 'cancelled', 'rejected'];
-                if (isAllTab || tabsWithForm.includes(exportTab)) {
-                    for (let i = 0; i < rows.length; i++) {
-                        const row = rows[i];
-                        try {
-                            const formData = await bankGuaranteesService.getActionFormData(row.id);
-                            if (formData && Object.keys(formData).length > 0) {
-                                const flat = flattenFormData(formData);
-                                Object.assign(exportRows[i], flat);
-                            }
-                        } catch {
-                            // skip
-                        }
-                    }
-                }
-            }
-
-            const ws = XLSX.utils.json_to_sheet(exportRows);
-            const wb = XLSX.utils.book_new();
-            const sheetName = isAllTab ? 'All Data' : exportTab;
-            XLSX.utils.book_append_sheet(wb, ws, sheetName);
-            const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-            saveAs(new Blob([buf]), `bank-guarantees_${exportTab}_${new Date().toISOString().slice(0, 10)}.xlsx`);
-        } catch (err) {
-            console.error('Export failed:', err);
-        } finally {
-            setExporting(false);
-        }
-    };
+    const { exportTab, setExportTab, exporting, handleExport, exportOptions } = useBiExport({
+        getAllFn: (params) => bankGuaranteesService.getAll(params),
+        getActionFormDataFn: (id) => bankGuaranteesService.getActionFormData(id),
+        tabsConfig: TABS_CONFIG,
+        pendingTabKey: 'new-requests',
+        tabsWithForm: ['live-yes', 'live-pnb', 'live-bg-limit', 'cancelled', 'rejected'],
+        filenamePrefix: 'bank-guarantees',
+        flattenFormData,
+        mapPendingRow: (r: any) => ({
+            'BG Date': r.bgDate ? new Date(r.bgDate).toLocaleDateString('en-GB') : '',
+            'BG No': r.bgNo || '',
+            'Beneficiary name': r.beneficiaryName || '',
+            'Tender Details': r.tenderNo || '',
+            'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
+            'Amount': r.amount || '',
+            'Expiry Date': r.bgExpiryDate ? new Date(r.bgExpiryDate).toLocaleDateString('en-GB') : '',
+            'BG Claim Period': r.bgClaimPeriod ? `${r.bgClaimPeriod} days` : '',
+            'BG Charges paid': r.bgChargesPaid || '',
+            'BG Charges Calculated': r.bgChargesCalculated || '',
+            'FDR No': r.fdrNo || '',
+            'FDR Value': r.fdrValue || '',
+            'Tender Status': r.tenderStatus || '',
+            'Expiry': r.expiryStatus || '',
+            'BG Status': r.bgStatus || '',
+        }),
+        mapRow: (r: any, isAllTab: boolean) => {
+            const base: Record<string, any> = {
+                'BG Date': r.bgDate ? new Date(r.bgDate).toLocaleDateString('en-GB') : '',
+                'BG No': r.bgNo || '',
+                'Beneficiary name': r.beneficiaryName || '',
+                'Tender Details': r.tenderNo || '',
+                'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
+                'Amount': r.amount || '',
+                'Expiry Date': r.bgExpiryDate ? new Date(r.bgExpiryDate).toLocaleDateString('en-GB') : '',
+                'BG Claim Period': r.bgClaimPeriod ? `${r.bgClaimPeriod} days` : '',
+                'BG Charges paid': r.bgChargesPaid || '',
+                'BG Charges Calculated': r.bgChargesCalculated || '',
+                'FDR No': r.fdrNo || '',
+                'FDR Value': r.fdrValue || '',
+                'Tender Status': r.tenderStatus || '',
+                'Expiry': r.expiryStatus || '',
+                'BG Status': r.bgStatus || '',
+            };
+            if (isAllTab) base['Tab'] = r._tab || '';
+            return base;
+        },
+    });
 
     const { data: apiResponse, isLoading, error } = useBankGuaranteeDashboard({
         tab: activeTab,
@@ -526,25 +444,13 @@ const BankGuaranteeListPage = () => {
                         </div>
                         <CardAction>
                             <div className="flex items-center gap-2">
-                                <Select value={exportTab} onValueChange={setExportTab}>
-                                    <SelectTrigger className="w-44">
-                                        <SelectValue placeholder="Choose tab to export" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {EXPORT_TAB_OPTIONS.map(opt => (
-                                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleExport}
-                                    disabled={!exportTab || exporting}
-                                >
-                                    <Download className="mr-2 h-4 w-4" />
-                                    {exporting ? 'Exporting...' : 'Download Excel'}
-                                </Button>
+                                <ExportExcelDropdown
+                                    exportOptions={exportOptions}
+                                    exportTab={exportTab}
+                                    setExportTab={setExportTab}
+                                    exporting={exporting}
+                                    handleExport={handleExport}
+                                />
                                 <Button variant="outline" onClick={() => navigate(paths.tendering.oldEmdsForBG())}>
                                     <Plus className="w-4 h-4" />
                                     Add Old Entry

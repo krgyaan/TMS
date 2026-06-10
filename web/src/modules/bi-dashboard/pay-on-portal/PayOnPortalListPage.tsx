@@ -9,20 +9,19 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import DataTable from '@/components/ui/data-table';
 import { Input } from '@/components/ui/input';
 import { QuickFilter } from '@/components/ui/quick-filter';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { usePayOnPortalDashboard, usePayOnPortalDashboardCounts } from '@/hooks/api/usePayOnPortals';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { useBiExport } from '@/hooks/useBiExport';
 import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { payOnPortalsService } from '@/services/api/pay-on-portals.service';
+import { ExportExcelDropdown } from '@/components/bi-dashboard/ExportExcelDropdown';
 import type { ColDef } from 'ag-grid-community';
-import { saveAs } from 'file-saver';
-import { AlertCircle, CheckCircle, Clock, Download, Edit, Eye, FileX2, RotateCcw, Search, Wallet, XCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle, Clock, Edit, Eye, FileX2, RotateCcw, Search, Wallet, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import * as XLSX from 'xlsx';
 import type { PayOnPortalDashboardRow, PayOnPortalDashboardTab } from './helpers/payOnPortal.types';
 
 const TABS_CONFIG: Array<{ key: PayOnPortalDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
@@ -58,15 +57,6 @@ const TABS_CONFIG: Array<{ key: PayOnPortalDashboardTab; name: string; icon: Rea
     }
 ];
 
-const EXPORT_TAB_OPTIONS = [
-    { value: 'pending', label: 'Pending' },
-    { value: 'accepted', label: 'Accepted' },
-    { value: 'rejected', label: 'Rejected' },
-    { value: 'returned', label: 'Returned' },
-    { value: 'settled', label: 'Settled' },
-    { value: 'all', label: 'All' },
-];
-
 const getStatusVariant = (status: string | null): string => {
     if (!status) return 'secondary';
     const statusLower = status.toLowerCase();
@@ -91,9 +81,6 @@ const PayOnPortalListPage = () => {
     const [teamFilter, setTeamFilter] = useState<string>('All');
     const teamId = teamFilter === 'All' ? undefined : teamFilter === 'AC' ? 1 : 2;
 
-    const [exportTab, setExportTab] = useState<string>('');
-    const [exporting, setExporting] = useState(false);
-
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, [activeTab, debouncedSearch, teamFilter]);
@@ -113,37 +100,6 @@ const PayOnPortalListPage = () => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, []);
 
-    const fetchAllRows = async (tab: string): Promise<any[]> => {
-        if (tab === 'all') {
-            const allRows: any[] = [];
-            for (const t of TABS_CONFIG) {
-                let page = 1;
-                const limit = 100;
-                let total = 0;
-                const tabRows: any[] = [];
-                do {
-                    const data = await payOnPortalsService.getAll({ tab: t.key, page, limit });
-                    tabRows.push(...(data.data || []));
-                    total = data.meta?.total || data.data?.length || 0;
-                    page++;
-                } while (tabRows.length < total);
-                allRows.push(...tabRows.map(r => ({ ...r, _tab: t.name })));
-            }
-            return allRows;
-        }
-        const allRows: any[] = [];
-        let page = 1;
-        const limit = 100;
-        let total = 0;
-        do {
-            const data = await payOnPortalsService.getAll({ tab: tab as any, page, limit });
-            allRows.push(...(data.data || []));
-            total = data.meta?.total || data.data?.length || 0;
-            page++;
-        } while (allRows.length < total);
-        return allRows;
-    };
-
     const flattenFormData = (data: Record<string, any>): Record<string, any> => {
         const out: Record<string, any> = {};
         if (data.portalName) out['Portal Name'] = data.portalName;
@@ -158,78 +114,41 @@ const PayOnPortalListPage = () => {
         return out;
     };
 
-    const handleExport = async () => {
-        if (!exportTab) return;
-        setExporting(true);
-        try {
-            const rows = await fetchAllRows(exportTab);
-            if (rows.length === 0) return;
-
-            const isPendingTab = exportTab === 'pending';
-            const isAllTab = exportTab === 'all';
-
-            let exportRows: Record<string, any>[];
-
-            if (isPendingTab) {
-                exportRows = rows.map((r: any) => ({
-                    'Date': r.date ? new Date(r.date).toLocaleDateString('en-GB') : '',
-                    'Tender Name': r.tenderNo || '',
-                    'Team Member': r.teamMember || '',
-                    'Tender Status': r.tenderStatus || '',
-                    'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
-                    'Purpose': r.purpose || '',
-                    'Amount': r.amount || '',
-                    'POP Status': r.popStatus || '',
-                }));
-            } else {
-                exportRows = rows.map((r: any) => {
-                    const base: Record<string, any> = {
-                        'Date': r.date ? new Date(r.date).toLocaleDateString('en-GB') : '',
-                        'Tender Name': r.tenderNo || '',
-                        'Team Member': r.teamMember || '',
-                        'Tender Status': r.tenderStatus || '',
-                        'UTR No': r.utrNo || '',
-                        'Portal Name': r.portalName || '',
-                        'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
-                        'Purpose': r.purpose || '',
-                        'Amount': r.amount || '',
-                        'POP Status': r.popStatus || '',
-                    };
-                    if (isAllTab) {
-                        base['Tab'] = r._tab || '';
-                    }
-                    return base;
-                });
-
-                const tabsWithForm = ['accepted', 'rejected', 'returned', 'settled'];
-                if (isAllTab || tabsWithForm.includes(exportTab)) {
-                    for (let i = 0; i < rows.length; i++) {
-                        const row = rows[i];
-                        try {
-                            const formData = await payOnPortalsService.getActionFormData(row.id);
-                            if (formData && Object.keys(formData).length > 0) {
-                                const flat = flattenFormData(formData);
-                                Object.assign(exportRows[i], flat);
-                            }
-                        } catch {
-                            // skip
-                        }
-                    }
-                }
-            }
-
-            const ws = XLSX.utils.json_to_sheet(exportRows);
-            const wb = XLSX.utils.book_new();
-            const sheetName = isAllTab ? 'All Data' : exportTab;
-            XLSX.utils.book_append_sheet(wb, ws, sheetName);
-            const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-            saveAs(new Blob([buf]), `pay-on-portals_${exportTab}_${new Date().toISOString().slice(0, 10)}.xlsx`);
-        } catch (err) {
-            console.error('Export failed:', err);
-        } finally {
-            setExporting(false);
-        }
-    };
+    const { exportTab, setExportTab, exporting, handleExport, exportOptions } = useBiExport({
+        getAllFn: (params) => payOnPortalsService.getAll(params),
+        getActionFormDataFn: (id) => payOnPortalsService.getActionFormData(id),
+        tabsConfig: TABS_CONFIG,
+        pendingTabKey: 'pending',
+        tabsWithForm: ['accepted', 'rejected', 'returned', 'settled'],
+        filenamePrefix: 'pay-on-portals',
+        flattenFormData,
+        mapPendingRow: (r: any) => ({
+            'Date': r.date ? new Date(r.date).toLocaleDateString('en-GB') : '',
+            'Tender Name': r.tenderNo || '',
+            'Team Member': r.teamMember || '',
+            'Tender Status': r.tenderStatus || '',
+            'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
+            'Purpose': r.purpose || '',
+            'Amount': r.amount || '',
+            'POP Status': r.popStatus || '',
+        }),
+        mapRow: (r: any, isAllTab: boolean) => {
+            const base: Record<string, any> = {
+                'Date': r.date ? new Date(r.date).toLocaleDateString('en-GB') : '',
+                'Tender Name': r.tenderNo || '',
+                'Team Member': r.teamMember || '',
+                'Tender Status': r.tenderStatus || '',
+                'UTR No': r.utrNo || '',
+                'Portal Name': r.portalName || '',
+                'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
+                'Purpose': r.purpose || '',
+                'Amount': r.amount || '',
+                'POP Status': r.popStatus || '',
+            };
+            if (isAllTab) base['Tab'] = r._tab || '';
+            return base;
+        },
+    });
 
     const { data: apiResponse, isLoading, error } = usePayOnPortalDashboard({
         tab: activeTab,
@@ -460,25 +379,13 @@ const PayOnPortalListPage = () => {
                         </div>
                         <CardAction>
                             <div className="flex items-center gap-2">
-                                <Select value={exportTab} onValueChange={setExportTab}>
-                                    <SelectTrigger className="w-44">
-                                        <SelectValue placeholder="Choose tab to export" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {EXPORT_TAB_OPTIONS.map(opt => (
-                                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleExport}
-                                    disabled={!exportTab || exporting}
-                                >
-                                    <Download className="mr-2 h-4 w-4" />
-                                    {exporting ? 'Exporting...' : 'Download Excel'}
-                                </Button>
+                                <ExportExcelDropdown
+                                    exportOptions={exportOptions}
+                                    exportTab={exportTab}
+                                    setExportTab={setExportTab}
+                                    exporting={exporting}
+                                    handleExport={handleExport}
+                                />
                             </div>
                         </CardAction>
                     </div>

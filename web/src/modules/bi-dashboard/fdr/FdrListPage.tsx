@@ -9,20 +9,19 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import DataTable from '@/components/ui/data-table';
 import { Input } from '@/components/ui/input';
 import { QuickFilter } from '@/components/ui/quick-filter';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFdrDashboard, useFdrDashboardCounts } from '@/hooks/api/useFdrs';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { useBiExport } from '@/hooks/useBiExport';
 import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { fdrsService } from '@/services/api/fdrs.service';
+import { ExportExcelDropdown } from '@/components/bi-dashboard/ExportExcelDropdown';
 import type { ColDef } from 'ag-grid-community';
-import { saveAs } from 'file-saver';
-import { AlertCircle, Clock, Download, Edit, Eye, FileX2, Link, Plus, RotateCcw, Search, Shield, XCircle } from 'lucide-react';
+import { AlertCircle, Clock, Edit, Eye, FileX2, Link, Plus, RotateCcw, Search, Shield, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import * as XLSX from 'xlsx';
 import type { DashboardTab, FdrDashboardRow } from './helpers/fdr.types';
 
 const TABS_CONFIG: Array<{ key: DashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
@@ -76,18 +75,6 @@ const TABS_CONFIG: Array<{ key: DashboardTab; name: string; icon: React.ReactNod
     }
 ];
 
-const EXPORT_TAB_OPTIONS = [
-    { value: 'pending', label: 'Pending' },
-    { value: 'pnb-bg-linked', label: 'PNB BG linked' },
-    { value: 'ybl-bg-linked', label: 'YBL BG linked' },
-    { value: 'security-deposit', label: 'Security Deposit (SD)' },
-    { value: 'bond-linked', label: 'Bond linked' },
-    { value: 'rejected', label: 'Rejected' },
-    { value: 'returned', label: 'Returned' },
-    { value: 'cancelled', label: 'Cancelled' },
-    { value: 'all', label: 'All' },
-];
-
 const getStatusVariant = (status: string | null): string => {
     if (!status) return 'secondary';
     const statusLower = status.toLowerCase();
@@ -110,13 +97,9 @@ const FdrListPage = () => {
     const [teamFilter, setTeamFilter] = useState<string>('All');
     const teamId = teamFilter === 'All' ? undefined : teamFilter === 'AC' ? 1 : 2;
 
-    const [exportTab, setExportTab] = useState<string>('');
-    const [exporting, setExporting] = useState(false);
-
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, [teamFilter]);
-
 
     const handlePageSizeChange = useCallback((newPageSize: number) => {
         setPagination({ pageIndex: 0, pageSize: newPageSize });
@@ -132,37 +115,6 @@ const FdrListPage = () => {
         setSortModel(sortModel);
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, []);
-
-    const fetchAllRows = async (tab: string): Promise<any[]> => {
-        if (tab === 'all') {
-            const allRows: any[] = [];
-            for (const t of TABS_CONFIG) {
-                let page = 1;
-                const limit = 100;
-                let total = 0;
-                const tabRows: any[] = [];
-                do {
-                    const data = await fdrsService.getAll({ tab: t.key, page, limit });
-                    tabRows.push(...(data.data || []));
-                    total = data.meta?.total || data.data?.length || 0;
-                    page++;
-                } while (tabRows.length < total);
-                allRows.push(...tabRows.map(r => ({ ...r, _tab: t.name })));
-            }
-            return allRows;
-        }
-        const allRows: any[] = [];
-        let page = 1;
-        const limit = 100;
-        let total = 0;
-        do {
-            const data = await fdrsService.getAll({ tab: tab as any, page, limit });
-            allRows.push(...(data.data || []));
-            total = data.meta?.total || data.data?.length || 0;
-            page++;
-        } while (allRows.length < total);
-        return allRows;
-    };
 
     const flattenFormData = (data: Record<string, any>): Record<string, any> => {
         const out: Record<string, any> = {};
@@ -183,78 +135,41 @@ const FdrListPage = () => {
         return out;
     };
 
-    const handleExport = async () => {
-        if (!exportTab) return;
-        setExporting(true);
-        try {
-            const rows = await fetchAllRows(exportTab);
-            if (rows.length === 0) return;
-
-            const isPendingTab = exportTab === 'pending';
-            const isAllTab = exportTab === 'all';
-
-            let exportRows: Record<string, any>[];
-
-            if (isPendingTab) {
-                exportRows = rows.map((r: any) => ({
-                    'FDR Date': r.fdrCreationDate ? new Date(r.fdrCreationDate).toLocaleDateString('en-GB') : '',
-                    'FDR No': r.fdrNo || '',
-                    'Beneficiary name': r.beneficiaryName || '',
-                    'FDR Amount': r.fdrAmount || '',
-                    'Tender Name': r.tenderNo || '',
-                    'Tender Status': r.tenderStatus || '',
-                    'Member': r.member || '',
-                    'Expiry': r.expiry || '',
-                    'FDR Status': r.fdrStatus || '',
-                }));
-            } else {
-                exportRows = rows.map((r: any) => {
-                    const base: Record<string, any> = {
-                        'FDR Date': r.fdrCreationDate ? new Date(r.fdrCreationDate).toLocaleDateString('en-GB') : '',
-                        'FDR No': r.fdrNo || '',
-                        'Beneficiary name': r.beneficiaryName || '',
-                        'FDR Amount': r.fdrAmount || '',
-                        'Tender Name': r.tenderNo || '',
-                        'Tender Status': r.tenderStatus || '',
-                        'Member': r.member || '',
-                        'Expiry': r.expiry || '',
-                        'FDR Status': r.fdrStatus || '',
-                    };
-                    if (isAllTab) {
-                        base['Tab'] = r._tab || '';
-                    }
-                    return base;
-                });
-
-                const tabsWithForm = ['pnb-bg-linked', 'ybl-bg-linked', 'security-deposit', 'bond-linked', 'rejected', 'returned', 'cancelled'];
-                if (isAllTab || tabsWithForm.includes(exportTab)) {
-                    for (let i = 0; i < rows.length; i++) {
-                        const row = rows[i];
-                        try {
-                            const formData = await fdrsService.getActionFormData(row.id);
-                            if (formData && Object.keys(formData).length > 0) {
-                                const flat = flattenFormData(formData);
-                                Object.assign(exportRows[i], flat);
-                            }
-                        } catch {
-                            // skip
-                        }
-                    }
-                }
-            }
-
-            const ws = XLSX.utils.json_to_sheet(exportRows);
-            const wb = XLSX.utils.book_new();
-            const sheetName = isAllTab ? 'All Data' : exportTab;
-            XLSX.utils.book_append_sheet(wb, ws, sheetName);
-            const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-            saveAs(new Blob([buf]), `fdrs_${exportTab}_${new Date().toISOString().slice(0, 10)}.xlsx`);
-        } catch (err) {
-            console.error('Export failed:', err);
-        } finally {
-            setExporting(false);
-        }
-    };
+    const { exportTab, setExportTab, exporting, handleExport, exportOptions } = useBiExport({
+        getAllFn: (params) => fdrsService.getAll(params),
+        getActionFormDataFn: (id) => fdrsService.getActionFormData(id),
+        tabsConfig: TABS_CONFIG,
+        pendingTabKey: 'pending',
+        tabsWithForm: ['pnb-bg-linked', 'ybl-bg-linked', 'security-deposit', 'bond-linked', 'rejected', 'returned', 'cancelled'],
+        filenamePrefix: 'fdrs',
+        flattenFormData,
+        mapPendingRow: (r: any) => ({
+            'FDR Date': r.fdrCreationDate ? new Date(r.fdrCreationDate).toLocaleDateString('en-GB') : '',
+            'FDR No': r.fdrNo || '',
+            'Beneficiary name': r.beneficiaryName || '',
+            'FDR Amount': r.fdrAmount || '',
+            'Tender Name': r.tenderNo || '',
+            'Tender Status': r.tenderStatus || '',
+            'Member': r.member || '',
+            'Expiry': r.expiry || '',
+            'FDR Status': r.fdrStatus || '',
+        }),
+        mapRow: (r: any, isAllTab: boolean) => {
+            const base: Record<string, any> = {
+                'FDR Date': r.fdrCreationDate ? new Date(r.fdrCreationDate).toLocaleDateString('en-GB') : '',
+                'FDR No': r.fdrNo || '',
+                'Beneficiary name': r.beneficiaryName || '',
+                'FDR Amount': r.fdrAmount || '',
+                'Tender Name': r.tenderNo || '',
+                'Tender Status': r.tenderStatus || '',
+                'Member': r.member || '',
+                'Expiry': r.expiry || '',
+                'FDR Status': r.fdrStatus || '',
+            };
+            if (isAllTab) base['Tab'] = r._tab || '';
+            return base;
+        },
+    });
 
     const { data: apiResponse, isLoading, error } = useFdrDashboard({
         tab: activeTab,
@@ -459,25 +374,13 @@ const FdrListPage = () => {
                         </div>
                         <CardAction>
                             <div className="flex items-center gap-2">
-                                <Select value={exportTab} onValueChange={setExportTab}>
-                                    <SelectTrigger className="w-44">
-                                        <SelectValue placeholder="Choose tab to export" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {EXPORT_TAB_OPTIONS.map(opt => (
-                                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleExport}
-                                    disabled={!exportTab || exporting}
-                                >
-                                    <Download className="mr-2 h-4 w-4" />
-                                    {exporting ? 'Exporting...' : 'Download Excel'}
-                                </Button>
+                                <ExportExcelDropdown
+                                    exportOptions={exportOptions}
+                                    exportTab={exportTab}
+                                    setExportTab={setExportTab}
+                                    exporting={exporting}
+                                    handleExport={handleExport}
+                                />
                                 <Button variant="outline" onClick={() => navigate(paths.tendering.oldEmdsForFDR())}>
                                     <Plus className="w-4 h-4" />
                                     Add Old Entry
