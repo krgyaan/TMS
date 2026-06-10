@@ -83,10 +83,10 @@ export default function OperationsRoutes() {
             <Route path="project-dashboard/:projectId/vendor-work-order/:woId" element={<RouteWrapper><Operations_EditVendorWoPage /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/vendor-work-order/:woId/edit" element={<RouteWrapper><Operations_EditVendorWoPage /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/vendor-work-order/:woId/pdf-versions" element={<RouteWrapper><Operations_VendorWoPdfVersions /></RouteWrapper>} />
-            <Route path="project-dashboard/:projectId/purchase-invoice/create" element={<RouteWrapper><Operations_CreatePurchaseInvoice /></RouteWrapper>} />
-            <Route path="project-dashboard/:projectId/purchase-invoice/:piId/edit" element={<RouteWrapper><Operations_EditPurchaseInvoice /></RouteWrapper>} />
-            <Route path="project-dashboard/:projectId/payment-request/create" element={<RouteWrapper><Operations_CreatePaymentRequest /></RouteWrapper>} />
-            <Route path="project-dashboard/:projectId/payment-request/:prId/edit" element={<RouteWrapper><Operations_EditPaymentRequest /></RouteWrapper>} />
+            <Route path="project-dashboard/:projectId/project-purchase-invoice/create" element={<RouteWrapper><Operations_CreatePurchaseInvoice /></RouteWrapper>} />
+            <Route path="project-dashboard/:projectId/project-purchase-invoice/:piId/edit" element={<RouteWrapper><Operations_EditPurchaseInvoice /></RouteWrapper>} />
+            <Route path="project-dashboard/:projectId/project-payment-request/create" element={<RouteWrapper><Operations_CreatePaymentRequest /></RouteWrapper>} />
+            <Route path="project-dashboard/:projectId/project-payment-request/:prId/edit" element={<RouteWrapper><Operations_EditPaymentRequest /></RouteWrapper>} />
         </Routes>
     );
 }

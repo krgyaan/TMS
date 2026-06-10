@@ -3,7 +3,7 @@ import { PurchaseInvoiceService } from "./purchase-invoice.service";
 import { CurrentUser } from "@/modules/auth/decorators/current-user.decorator";
 import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
 
-@Controller("purchase-invoices")
+@Controller("project-purchase-invoices")
 export class PurchaseInvoiceController {
     constructor(private readonly service: PurchaseInvoiceService) {}
 
@@ -22,6 +22,16 @@ export class PurchaseInvoiceController {
         return this.service.update(id, body);
     }
 
+    @Get("next-number")
+    getNextNumber(@Query("projectName") projectName: string) {
+        return this.service.generateNumber(projectName);
+    }
+
+    @Get("project/:projectId")
+    getByProject(@Param("projectId", ParseIntPipe) projectId: number) {
+        return this.service.getByProject(projectId);
+    }
+
     @Get()
     getAll() {
         return this.service.getAll();
@@ -30,15 +40,5 @@ export class PurchaseInvoiceController {
     @Get(":id")
     getById(@Param("id", ParseIntPipe) id: number) {
         return this.service.getById(id);
-    }
-
-    @Get("project/:projectId")
-    getByProject(@Param("projectId", ParseIntPipe) projectId: number) {
-        return this.service.getByProject(projectId);
-    }
-
-    @Get("next-number")
-    getNextNumber(@Query("projectName") projectName: string) {
-        return this.service.generateNumber(projectName);
     }
 }

@@ -38,7 +38,7 @@ export const PaymentRequestsSection: React.FC<PaymentRequestsSectionProps> = ({
         {
             label: "Edit Request",
             icon: <Edit className="h-4 w-4" />,
-            onClick: (row) => navigate(paths.operations.editPaymentRequestPage(row.id, projectId!)),
+            onClick: (row) => navigate(paths.operations.editProjectPaymentRequestPage(row.id, projectId!)),
         },
     ], [navigate, projectId]);
 
@@ -132,7 +132,7 @@ export const PaymentRequestsSection: React.FC<PaymentRequestsSectionProps> = ({
                             Payment Requests
                         </CardTitle>
                         <CardAction>
-                            <Button size="sm" variant="default" onClick={() => navigate(paths.operations.raisePaymentRequestForm(projectId))}>
+                            <Button size="sm" variant="default" onClick={() => navigate(paths.operations.raiseProjectPaymentRequestForm(projectId))}>
                                 <Plus className="mr-1.5 h-4 w-4" />
                                 Request for Payment
                             </Button>

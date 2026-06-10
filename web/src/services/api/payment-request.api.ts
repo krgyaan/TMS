@@ -2,7 +2,7 @@ import { BaseApiService } from "./base.service";
 
 class PaymentRequestApiService extends BaseApiService {
     constructor() {
-        super("/payment-requests");
+        super("/project-payment-requests");
     }
 
     async getAll() {

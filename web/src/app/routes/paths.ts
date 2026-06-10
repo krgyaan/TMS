@@ -136,10 +136,10 @@ export const paths = {
         editVendorWoPage: (woId: number, projectId: number) => `/operations/project-dashboard/${projectId}/vendor-work-order/${woId}/edit`,
         vendorWoPdfVersions: (woId: number, projectId: number) => `/operations/project-dashboard/${projectId}/vendor-work-order/${woId}/pdf-versions`,
 
-        raisePurchaseInvoiceForm: (projectId: number) => `/operations/project-dashboard/${projectId}/purchase-invoice/create`,
-        editPurchaseInvoicePage: (piId: number, projectId: number) => `/operations/project-dashboard/${projectId}/purchase-invoice/${piId}/edit`,
-        raisePaymentRequestForm: (projectId: number) => `/operations/project-dashboard/${projectId}/payment-request/create`,
-        editPaymentRequestPage: (prId: number, projectId: number) => `/operations/project-dashboard/${projectId}/payment-request/${prId}/edit`,
+        raiseProjectPurchaseInvoiceForm: (projectId: number) => `/operations/project-dashboard/${projectId}/project-purchase-invoice/create`,
+        editProjectPurchaseInvoicePage: (piId: number, projectId: number) => `/operations/project-dashboard/${projectId}/project-purchase-invoice/${piId}/edit`,
+        raiseProjectPaymentRequestForm: (projectId: number) => `/operations/project-dashboard/${projectId}/project-payment-request/create`,
+        editProjectPaymentRequestPage: (prId: number, projectId: number) => `/operations/project-dashboard/${projectId}/project-payment-request/${prId}/edit`,
     },
 
     // ==================== SERVICES ====================

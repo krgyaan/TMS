@@ -32,7 +32,7 @@ export const PurchaseInvoicesSection: React.FC<PurchaseInvoicesSectionProps> = (
         {
             label: "Edit Invoice",
             icon: <Edit className="h-4 w-4" />,
-            onClick: (row) => navigate(paths.operations.editPurchaseInvoicePage(row.id, projectId!)),
+            onClick: (row) => navigate(paths.operations.editProjectPurchaseInvoicePage(row.id, projectId!)),
         },
     ], [navigate, projectId]);
 
@@ -117,7 +117,7 @@ export const PurchaseInvoicesSection: React.FC<PurchaseInvoicesSectionProps> = (
                             Purchase Invoices
                         </CardTitle>
                         <CardAction>
-                            <Button size="sm" variant="default" onClick={() => navigate(paths.operations.raisePurchaseInvoiceForm(projectId))}>
+                            <Button size="sm" variant="default" onClick={() => navigate(paths.operations.raiseProjectPurchaseInvoiceForm(projectId))}>
                                 <Plus className="mr-1.5 h-4 w-4" />
                                 New PI
                             </Button>
