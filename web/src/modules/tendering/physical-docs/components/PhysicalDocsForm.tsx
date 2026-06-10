@@ -101,6 +101,8 @@ export function PhysicalDocsForm({ tenderId, mode, existingData }: PhysicalDocsF
     };
 
     const handleSubmit: SubmitHandler<PhysicalDocsFormValues> = async (values) => {
+        console.log("Form Values: ", values);
+        
         if (hasSubmittedRef.current) return;
         hasSubmittedRef.current = true;
 
@@ -108,28 +110,30 @@ export function PhysicalDocsForm({ tenderId, mode, existingData }: PhysicalDocsF
             let courierId = values.courierNo;
 
             // Step 1: Create Courier Request if needed
-            if (values.isCourierRequested === 'no') {
-                const courierData = {
-                    toOrg: values.toOrg!,
-                    toName: values.toName!,
-                    toAddr: values.toAddr!,
-                    toPin: values.toPin!,
-                    toMobile: values.toMobile!,
-                    empFrom: values.empFrom!,
-                    delDate: values.delDate!,
-                    urgency: values.urgency!,
-                };
-                const createdCourier = await createCourierMutation.mutateAsync({ data: courierData, files });
-                courierId = createdCourier.id;
-            }
+            const courierData = {
+                toOrg: values.toOrg!,
+                toName: values.toName!,
+                toAddr: values.toAddr!,
+                toPin: values.toPin!,
+                toMobile: values.toMobile!,
+                empFrom: values.empFrom!,
+                delDate: values.delDate!,
+                urgency: values.urgency!,
+            };
+            const createdCourier = await createCourierMutation.mutateAsync({ data: courierData, files });
+            courierId = createdCourier.id;
+
 
             // Step 2: Create/Update Physical Docs
             const finalValues = { ...values, courierNo: courierId };
             if (mode === 'create') {
                 const payload = mapFormToCreatePayload(finalValues);
+                console.log("Create Payload: ", payload);
+                
                 await createMutation.mutateAsync(payload);
             } else if (existingData?.id) {
                 const payload = mapFormToUpdatePayload(existingData.id, finalValues);
+                console.log("Update Payload: ", payload);
                 await updateMutation.mutateAsync(payload);
             }
             toast.success('Physical documents submitted successfully');
@@ -390,10 +394,7 @@ export function PhysicalDocsForm({ tenderId, mode, existingData }: PhysicalDocsF
                             >
                                 Reset
                             </Button>
-                            <Button
-                                type="submit"
-                                disabled={isSubmitting || fields.length === 0}
-                            >
+                            <Button type="submit">
                                 {isSubmitting && <span className="animate-spin mr-2">⏳</span>}
                                 <Save className="mr-2 h-4 w-4" />
                                 {mode === 'create' ? 'Submit' : 'Update'} Physical Docs
