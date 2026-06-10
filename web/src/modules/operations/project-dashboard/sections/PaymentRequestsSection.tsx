@@ -1,20 +1,18 @@
-import React, { useMemo, useState } from "react";
-import { Edit, Eye, Plus } from "lucide-react";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import DataTable from "@/components/ui/data-table";
+import { paths } from "@/app/routes/paths";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import DataTable from "@/components/ui/data-table";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useProjectPaymentRequests } from "@/hooks/api/usePaymentRequests";
+import { formatINR } from "@/hooks/useINRFormatter";
+import type { PaymentRequestRow } from "@/modules/operations/payment-requests/helpers/paymentRequest.types";
 import type { ColDef, GridApi, ValueFormatterParams } from "ag-grid-community";
 import type { CustomCellRendererProps } from "ag-grid-react";
+import { Edit, Plus } from "lucide-react";
+import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { paths } from "@/app/routes/paths";
-import { formatDate } from "@/hooks/useFormatedDate";
-import { formatINR } from "@/hooks/useINRFormatter";
-import { useProjectPaymentRequests } from "@/hooks/api/usePaymentRequests";
-import { Button } from "@/components/ui/button";
-import type { PaymentRequestRow } from "@/modules/operations/payment-requests/helpers/paymentRequest.types";
 
 const PAYMENT_AGAINST_LABELS: Record<string, string> = {
     upload_invoice: "Upload Invoice",
@@ -136,7 +134,7 @@ export const PaymentRequestsSection: React.FC<PaymentRequestsSectionProps> = ({
                         <CardAction>
                             <Button size="sm" variant="default" onClick={() => navigate(paths.operations.raisePaymentRequestForm(projectId))}>
                                 <Plus className="mr-1.5 h-4 w-4" />
-                                Raise Payment Request
+                                Request for Payment
                             </Button>
                         </CardAction>
                     </div>

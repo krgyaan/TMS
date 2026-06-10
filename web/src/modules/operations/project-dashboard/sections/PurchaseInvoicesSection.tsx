@@ -1,20 +1,19 @@
-import React, { useMemo, useState } from "react";
-import { Edit, Eye, Plus } from "lucide-react";
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import DataTable from "@/components/ui/data-table";
+import { paths } from "@/app/routes/paths";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import type { ColDef, GridApi, ValueFormatterParams } from "ag-grid-community";
-import type { CustomCellRendererProps } from "ag-grid-react";
-import { useNavigate } from "react-router-dom";
-import { paths } from "@/app/routes/paths";
+import { Button } from "@/components/ui/button";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import DataTable from "@/components/ui/data-table";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useProjectPurchaseInvoices } from "@/hooks/api/usePurchaseInvoices";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
-import { useProjectPurchaseInvoices } from "@/hooks/api/usePurchaseInvoices";
-import { Button } from "@/components/ui/button";
 import type { PurchaseInvoiceRow } from "@/modules/operations/purchase-invoices/helpers/purchaseInvoice.types";
+import type { ColDef, GridApi, ValueFormatterParams } from "ag-grid-community";
+import type { CustomCellRendererProps } from "ag-grid-react";
+import { Edit, Plus } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 interface PurchaseInvoicesSectionProps {
     projectId: number | null;
@@ -120,7 +119,7 @@ export const PurchaseInvoicesSection: React.FC<PurchaseInvoicesSectionProps> = (
                         <CardAction>
                             <Button size="sm" variant="default" onClick={() => navigate(paths.operations.raisePurchaseInvoiceForm(projectId))}>
                                 <Plus className="mr-1.5 h-4 w-4" />
-                                Raise Invoice
+                                New PI
                             </Button>
                         </CardAction>
                     </div>
