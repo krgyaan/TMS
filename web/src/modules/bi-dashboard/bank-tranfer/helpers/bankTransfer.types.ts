@@ -1,4 +1,5 @@
 export type BankTransferDashboardTab = 'pending' | 'accepted' | 'rejected' | 'returned' | 'settled';
+export type BankTransferExportTab = BankTransferDashboardTab | 'all';
 
 export type BankTransferDashboardFilters = {
     tab?: BankTransferDashboardTab;

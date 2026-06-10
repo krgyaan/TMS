@@ -1,25 +1,29 @@
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import DataTable from '@/components/ui/data-table';
-import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { paths } from '@/app/routes/paths';
+import { tenderNameCol } from '@/components/data-grid/columns';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, FileX2, Search, Eye, Clock, CheckCircle, XCircle, RotateCcw, Edit, Plus } from 'lucide-react';
-import { QuickFilter } from '@/components/ui/quick-filter';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import DataTable from '@/components/ui/data-table';
+import { Input } from '@/components/ui/input';
+import { QuickFilter } from '@/components/ui/quick-filter';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useDemandDraftDashboard, useDemandDraftDashboardCounts } from '@/hooks/api/useDemandDrafts';
-import type { DemandDraftDashboardRow, DashboardTab } from './helpers/demandDraft.types';
-import { tenderNameCol } from '@/components/data-grid/columns';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
-import { paths } from '@/app/routes/paths';
-import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { demandDraftsService } from '@/services/api/demand-drafts.service';
+import type { ColDef } from 'ag-grid-community';
+import { saveAs } from 'file-saver';
+import { AlertCircle, CheckCircle, Clock, Download, Edit, Eye, FileX2, Plus, RotateCcw, Search, XCircle } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import * as XLSX from 'xlsx';
+import type { DashboardTab, DemandDraftDashboardRow } from './helpers/demandDraft.types';
 
 const TABS_CONFIG: Array<{ key: DashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -54,6 +58,15 @@ const TABS_CONFIG: Array<{ key: DashboardTab; name: string; icon: React.ReactNod
     }
 ];
 
+const EXPORT_TAB_OPTIONS = [
+    { value: 'pending', label: 'Pending' },
+    { value: 'created', label: 'Created' },
+    { value: 'rejected', label: 'Rejected' },
+    { value: 'returned', label: 'Returned' },
+    { value: 'cancelled', label: 'Cancelled' },
+    { value: 'all', label: 'All' },
+];
+
 const getStatusVariant = (status: string | null): string => {
     if (!status) return 'secondary';
     const statusLower = status.toLowerCase();
@@ -76,6 +89,9 @@ const DemandDraftListPage = () => {
     const [teamFilter, setTeamFilter] = useState<string>('All');
     const teamId = teamFilter === 'All' ? undefined : teamFilter === 'AC' ? 1 : 2;
 
+    const [exportTab, setExportTab] = useState<string>('');
+    const [exporting, setExporting] = useState(false);
+
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, [teamFilter]);
@@ -95,6 +111,130 @@ const DemandDraftListPage = () => {
         setSortModel(sortModel);
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, []);
+
+    const fetchAllRows = async (tab: string): Promise<any[]> => {
+        if (tab === 'all') {
+            const allRows: any[] = [];
+            for (const t of TABS_CONFIG) {
+                let page = 1;
+                const limit = 100;
+                let total = 0;
+                const tabRows: any[] = [];
+                do {
+                    const data = await demandDraftsService.getAll({ tab: t.key, page, limit });
+                    tabRows.push(...(data.data || []));
+                    total = data.meta?.total || data.data?.length || 0;
+                    page++;
+                } while (tabRows.length < total);
+                allRows.push(...tabRows.map(r => ({ ...r, _tab: t.name })));
+            }
+            return allRows;
+        }
+        const allRows: any[] = [];
+        let page = 1;
+        const limit = 100;
+        let total = 0;
+        do {
+            const data = await demandDraftsService.getAll({ tab: tab as any, page, limit });
+            allRows.push(...(data.data || []));
+            total = data.meta?.total || data.data?.length || 0;
+            page++;
+        } while (allRows.length < total);
+        return allRows;
+    };
+
+    const flattenFormData = (data: Record<string, any>): Record<string, any> => {
+        const out: Record<string, any> = {};
+        if (data.ddNo) out['DD No'] = data.ddNo;
+        if (data.ddDate) out['DD Date'] = new Date(data.ddDate).toLocaleDateString('en-GB');
+        if (data.reqNo) out['Courier Req No'] = data.reqNo;
+        if (data.ddNeeds) out['Deliver By'] = data.ddNeeds;
+        if (data.ddPurpose) out['Purpose Detail'] = data.ddPurpose;
+        if (data.ddRemarks) out['Remarks'] = data.ddRemarks;
+        if (data.utr) out['UTR'] = data.utr;
+        if (data.issueDate) out['Issue Date'] = new Date(data.issueDate).toLocaleDateString('en-GB');
+        if (data.expiryDate) out['Expiry Date'] = new Date(data.expiryDate).toLocaleDateString('en-GB');
+        if (data.payableAt) out['Payable At'] = data.payableAt;
+        if (data.docketNo) out['Docket No'] = data.docketNo;
+        return out;
+    };
+
+    const handleExport = async () => {
+        if (!exportTab) return;
+        setExporting(true);
+        try {
+            const rows = await fetchAllRows(exportTab);
+            if (rows.length === 0) return;
+
+            const isPendingTab = exportTab === 'pending';
+            const isAllTab = exportTab === 'all';
+
+            let exportRows: Record<string, any>[];
+
+            if (isPendingTab) {
+                exportRows = rows.map((r: any) => ({
+                    'DD Date': r.ddCreationDate ? new Date(r.ddCreationDate).toLocaleDateString('en-GB') : '',
+                    'DD No': r.ddNo || '',
+                    'Tender Details': r.tenderNo || '',
+                    'Tender Status': r.tenderStatus || '',
+                    'Beneficiary name': r.beneficiaryName || '',
+                    'Purpose': r.purpose || '',
+                    'DD Amount': r.ddAmount || '',
+                    'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
+                    'Member': r.teamMember || '',
+                    'Expiry': r.expiry || '',
+                    'DD Status': r.ddStatus || '',
+                }));
+            } else {
+                exportRows = rows.map((r: any) => {
+                    const base: Record<string, any> = {
+                        'Tender Details': r.tenderNo || '',
+                        'Tender Status': r.tenderStatus || '',
+                        'Beneficiary name': r.beneficiaryName || '',
+                        'Purpose': r.purpose || '',
+                        'DD Amount': r.ddAmount || '',
+                        'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
+                        'Member': r.teamMember || '',
+                        'Expiry': r.expiry || '',
+                        'DD Status': r.ddStatus || '',
+                    };
+                    if (isAllTab) {
+                        base['Tab'] = r._tab || '';
+                    }
+                    if (r.ddCreationDate) base['DD Date'] = new Date(r.ddCreationDate).toLocaleDateString('en-GB');
+                    if (r.ddNo) base['DD No'] = r.ddNo;
+                    return base;
+                });
+
+                const tabsWithForm = ['created', 'rejected', 'returned', 'cancelled'];
+                if (isAllTab || tabsWithForm.includes(exportTab)) {
+                    for (let i = 0; i < rows.length; i++) {
+                        const row = rows[i];
+                        try {
+                            const formData = await demandDraftsService.getActionFormData(row.id);
+                            if (formData && Object.keys(formData).length > 0) {
+                                const flat = flattenFormData(formData);
+                                Object.assign(exportRows[i], flat);
+                            }
+                        } catch {
+                            // skip instruments without form data
+                        }
+                    }
+                }
+            }
+
+            const ws = XLSX.utils.json_to_sheet(exportRows);
+            const wb = XLSX.utils.book_new();
+            const sheetName = isAllTab ? 'All Data' : exportTab;
+            XLSX.utils.book_append_sheet(wb, ws, sheetName);
+            const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            saveAs(new Blob([buf]), `demand-drafts_${exportTab}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        } catch (err) {
+            console.error('Export failed:', err);
+        } finally {
+            setExporting(false);
+        }
+    };
 
     const { data: apiResponse, isLoading, error } = useDemandDraftDashboard({
         tab: activeTab,
@@ -330,10 +470,31 @@ const DemandDraftListPage = () => {
                             </CardDescription>
                         </div>
                         <CardAction>
-                            <Button variant="outline" onClick={() => navigate(paths.tendering.oldEmdsForDD())}>
-                                <Plus className="w-4 h-4" />
-                                Add Old Entry
-                            </Button>
+                            <div className="flex items-center gap-2">
+                                <Select value={exportTab} onValueChange={setExportTab}>
+                                    <SelectTrigger className="w-44">
+                                        <SelectValue placeholder="Choose tab to export" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {EXPORT_TAB_OPTIONS.map(opt => (
+                                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleExport}
+                                    disabled={!exportTab || exporting}
+                                >
+                                    <Download className="mr-2 h-4 w-4" />
+                                    {exporting ? 'Exporting...' : 'Download Excel'}
+                                </Button>
+                                <Button variant="outline" onClick={() => navigate(paths.tendering.oldEmdsForDD())}>
+                                    <Plus className="w-4 h-4" />
+                                    Add Old Entry
+                                </Button>
+                            </div>
                         </CardAction>
                     </div>
                 </CardHeader>
