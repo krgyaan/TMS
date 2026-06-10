@@ -188,9 +188,9 @@ export const useBankDetails = (onboardingId: number | null) =>
 
 // ─── Approve / Reject mutations ───────────────────────────────────────────────
 
-type StageKey = "education" | "experience" | "documents" | "bankDetails";
+type StageKey = "profile" | "education" | "experience" | "documents" | "bankDetails";
 
-const STAGE_ENDPOINTS: Record<StageKey, string> = {
+const STAGE_ENDPOINTS: Record<Exclude<StageKey, "profile">, string> = {
   education: "education",
   experience: "experience",
   documents: "documents",
@@ -206,19 +206,24 @@ export const useUpdateEntryStatus = (stageKey: StageKey) => {
       status,
       reason,
     }: {
-      entryId: number;
+      entryId?: number;
       onboardingId: number;
       status: 'approved' | 'rejected';
       reason?: string;
     }) => {
+      if (stageKey === "profile") {
+        return onboardingService.approveProfile(onboardingId, status, reason);
+      }
       const endpoint = STAGE_ENDPOINTS[stageKey];
-      return onboardingService.updateStageEntryStatus(onboardingId, endpoint, entryId, status, reason);
+      return onboardingService.updateStageEntryStatus(onboardingId, endpoint, entryId!, status, reason);
     },
     onSuccess: (_, { onboardingId, status }) => {
       qc.invalidateQueries({
         queryKey: ["onboarding", stageKey, onboardingId],
       });
       qc.invalidateQueries({ queryKey: ["onboarding", "list"] });
+      qc.invalidateQueries({ queryKey: ["onboarding", "profiles"] });
+      qc.invalidateQueries({ queryKey: ["onboarding", "profile", onboardingId] });
       toast.success(`Entry ${status} successfully`);
     },
     onError: (error: any) => {

@@ -1342,8 +1342,6 @@ export class OnboardingService {
 
       const [req] = await tx.select({ userId: onboardingRequests.userId }).from(onboardingRequests).where(eq(onboardingRequests.id, id)).limit(1);
 
-      await this.updateOnboardingRequestStatus(id, hrStatus, tx);
-
       if (hrStatus === 'approved') {
         if (req?.userId) {
           await this.syncExperienceToEmployee(tx, req.userId, exp);
@@ -1365,8 +1363,6 @@ export class OnboardingService {
         hrRemark,
         updatedAt: new Date(),
       }).where(eq(onboardingBankDetails.id, bankId));
-
-      await this.updateOnboardingRequestStatus(id, hrStatus, tx);
 
       if (hrStatus === 'approved') {
         const [req] = await tx.select({ userId: onboardingRequests.userId }).from(onboardingRequests).where(eq(onboardingRequests.id, id)).limit(1);
@@ -1392,20 +1388,9 @@ export class OnboardingService {
         updatedAt: new Date(),
       }).where(eq(onboardingDocuments.id, docId));
 
-      await this.updateOnboardingRequestStatus(id, status, tx);
-
       await this.recalculateProgress(tx, id);
       return { success: true };
     });
-  }
-
-  private async updateOnboardingRequestStatus(requestId : number, status: string, tx: typeof this.db){
-          //updating the request status
-      await tx.update(onboardingRequests)
-            .set({
-              status: status
-            })
-            .where(eq(onboardingRequests.id, requestId));
   }
 
   // ─── Data Sync Helpers (Onboarding -> Employee) ──────────────────────────────
@@ -1551,6 +1536,7 @@ export class OnboardingService {
       .update(onboardingRequests)
       .set({
         status: 'rejected',
+        hrStatus: 'rejected',
       })
       .where(eq(onboardingRequests.id, requestId));
   }
