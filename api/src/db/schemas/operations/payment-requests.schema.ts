@@ -1,7 +1,7 @@
 import { pgTable, bigserial, bigint, varchar, text, numeric, date, timestamp, index } from "drizzle-orm/pg-core";
 
 export const paymentRequests = pgTable(
-    "payment_requests",
+    "project_payment_requests",
     {
         id: bigserial("id", { mode: "number" }).primaryKey(),
         projectId: bigint("project_id", { mode: "number" }).notNull(),
