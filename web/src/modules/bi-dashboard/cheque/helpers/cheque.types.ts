@@ -1,4 +1,5 @@
 export type ChequeDashboardTab = 'cheque-pending' | 'cheque-payable' | 'cheque-paid-stop' | 'cheque-for-security' | 'cheque-for-dd-fdr' | 'rejected' | 'cancelled' | 'expired';
+export type ChequeExportTab = ChequeDashboardTab | 'all';
 
 export type ChequeDashboardFilters = {
     tab?: ChequeDashboardTab;

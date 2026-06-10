@@ -1,4 +1,5 @@
 export type BankGuaranteeDashboardTab = 'new-requests' | 'live-yes' | 'live-pnb' | 'live-bg-limit' | 'cancelled' | 'rejected';
+export type BankGuaranteeExportTab = BankGuaranteeDashboardTab | 'all';
 
 export type BankGuaranteeDashboardFilters = {
     tab?: BankGuaranteeDashboardTab;

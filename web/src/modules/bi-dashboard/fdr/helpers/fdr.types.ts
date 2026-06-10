@@ -1,4 +1,5 @@
 export type DashboardTab = 'pending' | 'rejected' | 'returned' | 'cancelled' | 'pnb-bg-linked' | 'ybl-bg-linked' | 'security-deposit' | 'bond-linked';
+export type ExportTab = DashboardTab | 'all';
 
 export interface DashboardFilters {
     tab?: DashboardTab;

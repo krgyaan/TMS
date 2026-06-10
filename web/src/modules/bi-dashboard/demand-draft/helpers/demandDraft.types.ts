@@ -1,4 +1,5 @@
 export type DashboardTab = 'pending' | 'created' | 'rejected' | 'returned' | 'cancelled';
+export type ExportTab = DashboardTab | 'all';
 
 export interface DashboardFilters {
     tab?: DashboardTab;

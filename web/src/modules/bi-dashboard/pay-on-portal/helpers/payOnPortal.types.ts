@@ -1,4 +1,5 @@
 export type PayOnPortalDashboardTab = 'pending' | 'accepted' | 'rejected' | 'returned' | 'settled';
+export type PayOnPortalExportTab = PayOnPortalDashboardTab | 'all';
 
 export type PayOnPortalDashboardFilters = {
     tab?: PayOnPortalDashboardTab;
