@@ -1,6 +1,5 @@
 import { paths } from "@/app/routes/paths";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
-import { SelectField } from "@/components/form/SelectField";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,13 +12,12 @@ import { usePaymentRequestDetails, useUpdatePaymentRequest } from "@/hooks/api/u
 import { PaymentAgainstField } from "./components/PaymentAgainstField";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Building2, Landmark, Loader2 } from "lucide-react";
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { mapPaymentRequestFormToUpdateDTO } from "./helpers/paymentRequest.mapper";
 import { paymentRequestFormSchema, type PaymentRequestFormValues } from "./helpers/paymentRequest.schema";
-import { usePoParties } from "@/hooks/api/useProjectDashboard";
 
 export default function EditPaymentRequestPage() {
     const navigate = useNavigate();
@@ -29,16 +27,7 @@ export default function EditPaymentRequestPage() {
 
     const { data: overview } = useProjectOverview(projectId);
     const { data: paymentRequest, isLoading } = usePaymentRequestDetails(prId);
-    const { data: partiesData } = usePoParties();
     const updateMutation = useUpdatePaymentRequest();
-    const parties = partiesData || [];
-
-    const partyOptions = useMemo(() =>
-        (parties || [])
-            .filter((p: any) => !p.type || p.type === "seller")
-            .map((p: any) => ({ id: p.name, name: p.name })),
-        [parties]
-    );
 
     const form = useForm<PaymentRequestFormValues>({
         resolver: zodResolver(paymentRequestFormSchema) as any,
@@ -49,10 +38,15 @@ export default function EditPaymentRequestPage() {
             ifsc: "",
             amount: null,
             paymentAgainst: "",
-            purchaseInvoiceId: "",
             uploadedInvoiceFile: [],
             poFile: [],
             remark: "",
+            pi_category: "",
+            pi_partyName: "",
+            pi_valuePreGst: null,
+            pi_gstAmount: null,
+            pi_invoiceDate: "",
+            pi_invoiceFile: [],
         },
     });
 
@@ -65,10 +59,15 @@ export default function EditPaymentRequestPage() {
                 ifsc: paymentRequest.ifsc || "",
                 amount: Number(paymentRequest.amount) || null,
                 paymentAgainst: paymentRequest.paymentAgainst || "",
-                purchaseInvoiceId: paymentRequest.purchaseInvoiceId ? String(paymentRequest.purchaseInvoiceId) : "",
                 uploadedInvoiceFile: paymentRequest.uploadedInvoiceFile ? [paymentRequest.uploadedInvoiceFile] : [],
                 poFile: paymentRequest.poFile ? [paymentRequest.poFile] : [],
                 remark: paymentRequest.remark || "",
+                pi_category: "",
+                pi_partyName: "",
+                pi_valuePreGst: null,
+                pi_gstAmount: null,
+                pi_invoiceDate: "",
+                pi_invoiceFile: [],
             });
         }
     }, [paymentRequest, form]);
@@ -126,16 +125,9 @@ export default function EditPaymentRequestPage() {
                             </div>
                         </div>
 
-                        <div className="max-w-md">
-                            <SelectField
-                                control={form.control}
-                                name="partyName"
-                                label="Party Name"
-                                options={partyOptions}
-                                placeholder="Select or type party name..."
-                                allowCustom
-                            />
-                        </div>
+                        <FieldWrapper control={form.control} name="partyName" label={<>Party Name <span className="text-destructive">*</span></>}>
+                            {(field) => <Input {...field} placeholder="Enter party name" />}
+                        </FieldWrapper>
 
                         <div className="border rounded-lg border-dashed p-4 space-y-4">
                             <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -143,13 +135,13 @@ export default function EditPaymentRequestPage() {
                                 Bank Details
                             </h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <FieldWrapper control={form.control} name="accountNumber" label="Account Number <span className='text-destructive'>*</span>">
+                                <FieldWrapper control={form.control} name="accountNumber" label={<>Account Number <span className="text-destructive">*</span></>}>
                                     {(field) => <Input {...field} placeholder="Enter account number" />}
                                 </FieldWrapper>
-                                <FieldWrapper control={form.control} name="accountName" label="Account Name <span className='text-destructive'>*</span>">
+                                <FieldWrapper control={form.control} name="accountName" label={<>Account Name <span className="text-destructive">*</span></>}>
                                     {(field) => <Input {...field} placeholder="Enter account name" />}
                                 </FieldWrapper>
-                                <FieldWrapper control={form.control} name="ifsc" label="IFSC <span className='text-destructive'>*</span>">
+                                <FieldWrapper control={form.control} name="ifsc" label={<>IFSC <span className="text-destructive">*</span></>}>
                                     {(field) => (
                                         <Input
                                             {...field}
@@ -159,7 +151,7 @@ export default function EditPaymentRequestPage() {
                                         />
                                     )}
                                 </FieldWrapper>
-                                <FieldWrapper control={form.control} name="amount" label="Amount <span className='text-destructive'>*</span>">
+                                <FieldWrapper control={form.control} name="amount" label={<>Amount <span className="text-destructive">*</span></>}>
                                     {(field) => (
                                         <Input
                                             type="number"

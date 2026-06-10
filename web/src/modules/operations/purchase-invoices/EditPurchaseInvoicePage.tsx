@@ -14,13 +14,12 @@ import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { usePurchaseInvoiceDetails, useUpdatePurchaseInvoice } from "@/hooks/api/usePurchaseInvoices";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Calendar, Info, Loader2 } from "lucide-react";
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { mapPurchaseInvoiceFormToUpdateDTO } from "./helpers/purchaseInvoice.mapper";
 import { purchaseInvoiceFormSchema, type PurchaseInvoiceFormValues } from "./helpers/purchaseInvoice.schema";
-import { usePoParties } from "@/hooks/api/useProjectDashboard";
 
 const BUDGET_CATEGORIES = [
     { id: "Supply", name: "Supply" },
@@ -39,16 +38,7 @@ export default function EditPurchaseInvoicePage() {
 
     const { data: overview } = useProjectOverview(projectId);
     const { data: invoice, isLoading } = usePurchaseInvoiceDetails(piId);
-    const { data: partiesData } = usePoParties();
     const updateMutation = useUpdatePurchaseInvoice();
-    const parties = partiesData || [];
-
-    const partyOptions = useMemo(() =>
-        (parties || [])
-            .filter((p: any) => !p.type || p.type === "seller")
-            .map((p: any) => ({ id: p.name, name: p.name })),
-        [parties]
-    );
 
     const form = useForm<PurchaseInvoiceFormValues>({
         resolver: zodResolver(purchaseInvoiceFormSchema) as any,
@@ -131,19 +121,12 @@ export default function EditPurchaseInvoicePage() {
                             />
                         </div>
 
-                        <div className="max-w-md">
-                            <SelectField
-                                control={form.control}
-                                name="partyName"
-                                label="Party Name"
-                                options={partyOptions}
-                                placeholder="Select or type party name..."
-                                allowCustom
-                            />
-                        </div>
+                        <FieldWrapper control={form.control} name="partyName" label={<>Party Name <span className="text-destructive">*</span></>}>
+                            {(field) => <Input {...field} placeholder="Enter party name" />}
+                        </FieldWrapper>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <FieldWrapper control={form.control} name="valuePreGst" label="Value (Pre GST) <span className='text-destructive'>*</span>">
+                            <FieldWrapper control={form.control} name="valuePreGst" label={<>Value (Pre GST) <span className="text-destructive">*</span></>}>
                                 {(field) => (
                                     <Input
                                         type="number"
@@ -154,7 +137,7 @@ export default function EditPurchaseInvoicePage() {
                                     />
                                 )}
                             </FieldWrapper>
-                            <FieldWrapper control={form.control} name="gstAmount" label="GST Amount <span className='text-destructive'>*</span>">
+                            <FieldWrapper control={form.control} name="gstAmount" label={<>GST Amount <span className="text-destructive">*</span></>}>
                                 {(field) => (
                                     <Input
                                         type="number"

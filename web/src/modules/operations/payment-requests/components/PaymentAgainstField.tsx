@@ -1,12 +1,23 @@
 import React from "react";
 import type { Control } from "react-hook-form";
 import { useFormContext } from "react-hook-form";
+import { DateInput } from "@/components/form/DateInput";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { TenderFileUploader } from "@/components/tender-file-upload";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { paymentAgainstOptions } from "../helpers/paymentRequest.schema";
+
+const BUDGET_CATEGORIES = [
+    { id: "Supply", name: "Supply" },
+    { id: "Service", name: "Service" },
+    { id: "Freight", name: "Freight" },
+    { id: "Admin/Misc.", name: "Admin/Misc." },
+    { id: "Buyback/Sale", name: "Buyback/Sale" },
+    { id: "GEM Charges", name: "GEM Charges" },
+];
 
 const PAYMENT_AGAINST_OPTIONS = paymentAgainstOptions.map(o => ({ id: o.value, name: o.label }));
 
@@ -32,7 +43,6 @@ export const PaymentAgainstField: React.FC<PaymentAgainstFieldProps> = ({ contro
 
             {paymentAgainst === "upload_invoice" && (
                 <div className="border rounded-lg border-dashed p-4 space-y-2">
-                    <Label>Upload Purchase Invoice</Label>
                     <TenderFileUploader
                         label="Upload Invoice Document"
                         context="tender-documents"
@@ -43,28 +53,58 @@ export const PaymentAgainstField: React.FC<PaymentAgainstFieldProps> = ({ contro
             )}
 
             {paymentAgainst === "new_pi" && (
-                <div className="border rounded-lg border-dashed p-4 space-y-2">
-                    <Label>Purchase Invoice Reference</Label>
-                    <p className="text-sm text-muted-foreground">
-                        Create a purchase invoice first via the Purchase Invoice form.
-                        After creation, enter the Purchase Invoice ID here:
-                    </p>
-                    <FieldWrapper control={control} name="purchaseInvoiceId" label="Purchase Invoice ID">
-                        {(field) => (
-                            <input
-                                {...field}
-                                type="number"
-                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                placeholder="Enter Purchase Invoice ID"
-                            />
-                        )}
+                <div className="border rounded-lg border-dashed p-4 space-y-6">
+                    <h4 className="text-md font-semibold">Purchase Invoice Details</h4>
+                    <div className="max-w-md">
+                        <SelectField
+                            control={control}
+                            name="pi_category"
+                            label="Category - Budget Breakdown"
+                            options={BUDGET_CATEGORIES}
+                            placeholder="Select category..."
+                        />
+                    </div>
+                    <FieldWrapper control={control} name="pi_partyName" label="Party Name">
+                        {(field) => <Input {...field} placeholder="Enter party name" />}
                     </FieldWrapper>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <FieldWrapper control={control} name="pi_valuePreGst" label="Value (Pre GST)">
+                            {(field) => (
+                                <Input
+                                    type="number"
+                                    step="0.01"
+                                    placeholder="0.00"
+                                    value={field.value ?? ""}
+                                    onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                                />
+                            )}
+                        </FieldWrapper>
+                        <FieldWrapper control={control} name="pi_gstAmount" label="GST Amount">
+                            {(field) => (
+                                <Input
+                                    type="number"
+                                    step="0.01"
+                                    placeholder="0.00"
+                                    value={field.value ?? ""}
+                                    onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : null)}
+                                />
+                            )}
+                        </FieldWrapper>
+                    </div>
+                    <FieldWrapper control={control} name="pi_invoiceDate" label="Invoice Date">
+                        {(field) => <DateInput value={field.value} onChange={field.onChange} />}
+                    </FieldWrapper>
+                    <TenderFileUploader
+                        label="Upload Invoice"
+                        context="tender-documents"
+                        value={watch("pi_invoiceFile")}
+                        onChange={(paths) => setValue("pi_invoiceFile", paths)}
+                    />
                 </div>
             )}
 
             {paymentAgainst === "po" && (
                 <div className="border rounded-lg border-dashed p-4 space-y-2">
-                    <Label>Upload PO Document</Label>
                     <TenderFileUploader
                         label="Upload PO Document"
                         context="tender-documents"

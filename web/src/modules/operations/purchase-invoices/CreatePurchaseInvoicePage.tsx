@@ -6,16 +6,15 @@ import { TenderFileUploader } from "@/components/tender-file-upload";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useProjectOverview, usePoParties, useCreatePoParty } from "@/hooks/api/useProjectDashboard";
+import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { useCreatePurchaseInvoice, useNextPINumber } from "@/hooks/api/usePurchaseInvoices";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Calendar, Hash, Info, Loader2, UserPlus } from "lucide-react";
-import React, { useMemo, useState } from "react";
+import { ArrowLeft, Calendar, Hash, Info, Loader2 } from "lucide-react";
+import React from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -46,26 +45,13 @@ export default function CreatePurchaseInvoicePage() {
     const projectId = Number(projectIdParam);
 
     const { data: overview, isLoading: isProjectLoading } = useProjectOverview(projectId);
-    const { data: partiesData } = usePoParties();
-    const createPartyMutation = useCreatePoParty();
-    const parties = partiesData || [];
     const projectName = overview?.project?.projectName;
     const { data: nextPINumber, isLoading: isLoadingPINumber } = useNextPINumber(projectName);
-
-    const [isAddPartyOpen, setIsAddPartyOpen] = useState(false);
-    const [newPartyName, setNewPartyName] = useState("");
 
     const form = useForm<PurchaseInvoiceFormValues>({
         resolver: zodResolver(purchaseInvoiceFormSchema) as any,
         defaultValues: defaultFormValues,
     });
-
-    const partyOptions = useMemo(() =>
-        (parties || [])
-            .filter((p: any) => !p.type || p.type === "seller")
-            .map((p: any) => ({ id: p.name, name: p.name })),
-        [parties]
-    );
 
     const createPIMutation = useCreatePurchaseInvoice();
 
@@ -77,22 +63,6 @@ export default function CreatePurchaseInvoicePage() {
             navigate(paths.operations.projectDashboard(projectId));
         } catch {
             toast.error("Failed to create purchase invoice. Please try again.");
-        }
-    };
-
-    const handleAddNewParty = async () => {
-        if (!newPartyName.trim()) {
-            toast.error("Party name is required");
-            return;
-        }
-        try {
-            await createPartyMutation.mutateAsync({ name: newPartyName, type: "seller" });
-            toast.success(`Party "${newPartyName}" added successfully.`);
-            form.setValue("partyName", newPartyName);
-            setNewPartyName("");
-            setIsAddPartyOpen(false);
-        } catch (error: any) {
-            toast.error(error?.message || "Failed to add party.");
         }
     };
 
@@ -164,50 +134,9 @@ export default function CreatePurchaseInvoicePage() {
                             />
                         </div>
 
-                        <div className="max-w-md">
-                            <div className="flex items-end gap-2">
-                                <div className="flex-1">
-                                    <SelectField
-                                        control={form.control}
-                                        name="partyName"
-                                        label="Party Name"
-                                        options={partyOptions}
-                                        placeholder="Select existing party..."
-                                    />
-                                </div>
-                                <Dialog open={isAddPartyOpen} onOpenChange={setIsAddPartyOpen}>
-                                    <DialogTrigger asChild>
-                                        <Button variant="outline" size="sm" type="button">
-                                            <UserPlus className="mr-2 h-4 w-4" />
-                                            Add New
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent className="sm:max-w-[500px]">
-                                        <DialogHeader>
-                                            <DialogTitle>Add New Party</DialogTitle>
-                                            <DialogDescription>Add a new party for the invoice.</DialogDescription>
-                                        </DialogHeader>
-                                        <div className="space-y-4 py-4">
-                                            <div className="space-y-2">
-                                                <Label>Party Name <span className="text-destructive">*</span></Label>
-                                                <Input
-                                                    value={newPartyName}
-                                                    onChange={(e) => setNewPartyName(e.target.value)}
-                                                    placeholder="Enter party name"
-                                                />
-                                            </div>
-                                        </div>
-                                        <DialogFooter className="gap-2">
-                                            <Button variant="outline" onClick={() => { setIsAddPartyOpen(false); setNewPartyName(""); }}>Cancel</Button>
-                                            <Button onClick={handleAddNewParty} disabled={!newPartyName.trim() || createPartyMutation.isPending}>
-                                                {createPartyMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
-                                                Add Party
-                                            </Button>
-                                        </DialogFooter>
-                                    </DialogContent>
-                                </Dialog>
-                            </div>
-                        </div>
+                        <FieldWrapper control={form.control} name="partyName" label={<>Party Name <span className="text-destructive">*</span></>}>
+                            {(field) => <Input {...field} placeholder="Enter party name" />}
+                        </FieldWrapper>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <FieldWrapper control={form.control} name="valuePreGst" label={<>Value (Pre GST) <span className="text-destructive">*</span></>}>

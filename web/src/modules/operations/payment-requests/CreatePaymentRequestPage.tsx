@@ -1,6 +1,5 @@
 import { paths } from "@/app/routes/paths";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
-import { SelectField } from "@/components/form/SelectField";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,16 +9,16 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { useCreatePaymentRequest, useNextPRNumber } from "@/hooks/api/usePaymentRequests";
+import { purchaseInvoiceApi } from "@/services/api/purchase-invoice.api";
 import { PaymentAgainstField } from "./components/PaymentAgainstField";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Building2, Hash, Landmark, Loader2 } from "lucide-react";
-import React, { useMemo } from "react";
+import React from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { mapPaymentRequestFormToCreateDTO } from "./helpers/paymentRequest.mapper";
 import { paymentRequestFormSchema, type PaymentRequestFormValues } from "./helpers/paymentRequest.schema";
-import { usePoParties, useCreatePoParty } from "@/hooks/api/useProjectDashboard";
 
 const defaultFormValues: PaymentRequestFormValues = {
     partyName: "",
@@ -28,10 +27,15 @@ const defaultFormValues: PaymentRequestFormValues = {
     ifsc: "",
     amount: null,
     paymentAgainst: "",
-    purchaseInvoiceId: "",
     uploadedInvoiceFile: [],
     poFile: [],
     remark: "",
+    pi_category: "",
+    pi_partyName: "",
+    pi_valuePreGst: null,
+    pi_gstAmount: null,
+    pi_invoiceDate: "",
+    pi_invoiceFile: [],
 };
 
 export default function CreatePaymentRequestPage() {
@@ -40,8 +44,6 @@ export default function CreatePaymentRequestPage() {
     const projectId = Number(projectIdParam);
 
     const { data: overview, isLoading: isProjectLoading } = useProjectOverview(projectId);
-    const { data: partiesData } = usePoParties();
-    const parties = partiesData || [];
     const projectName = overview?.project?.projectName;
     const { data: nextPRNumber, isLoading: isLoadingPRNumber } = useNextPRNumber(projectName);
 
@@ -50,18 +52,26 @@ export default function CreatePaymentRequestPage() {
         defaultValues: defaultFormValues,
     });
 
-    const partyOptions = useMemo(() =>
-        (parties || [])
-            .filter((p: any) => !p.type || p.type === "seller")
-            .map((p: any) => ({ id: p.name, name: p.name })),
-        [parties]
-    );
-
     const createPRMutation = useCreatePaymentRequest();
 
     const handleSubmit = async (values: PaymentRequestFormValues) => {
         try {
             const prData = mapPaymentRequestFormToCreateDTO(values, projectId, projectName);
+
+            if (values.paymentAgainst === "new_pi") {
+                const pi = await purchaseInvoiceApi.create({
+                    projectId,
+                    projectName: projectName || undefined,
+                    category: values.pi_category,
+                    partyName: values.pi_partyName,
+                    valuePreGst: values.pi_valuePreGst!,
+                    gstAmount: values.pi_gstAmount!,
+                    invoiceDate: values.pi_invoiceDate,
+                    invoiceFile: values.pi_invoiceFile?.[0],
+                });
+                prData.purchaseInvoiceId = pi.id;
+            }
+
             const result = await createPRMutation.mutateAsync(prData);
             toast.success(`Payment Request #${result.requestNo} created successfully.`);
             navigate(paths.operations.projectDashboard(projectId));
@@ -110,7 +120,6 @@ export default function CreatePaymentRequestPage() {
             <CardContent>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-                        {/* Request Number Preview */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div className="space-y-2">
                                 <Label className="flex items-center gap-2">
@@ -129,32 +138,23 @@ export default function CreatePaymentRequestPage() {
                             </div>
                         </div>
 
-                        {/* Party Name */}
-                        <div className="max-w-md">
-                            <SelectField
-                                control={form.control}
-                                name="partyName"
-                                label="Party Name"
-                                options={partyOptions}
-                                placeholder="Select or type party name..."
-                                allowCustom
-                            />
-                        </div>
+                        <FieldWrapper control={form.control} name="partyName" label={<>Party Name <span className="text-destructive">*</span></>}>
+                            {(field) => <Input {...field} placeholder="Enter party name" />}
+                        </FieldWrapper>
 
-                        {/* Bank Details */}
                         <div className="border rounded-lg border-dashed p-4 space-y-4">
                             <h3 className="text-lg font-semibold flex items-center gap-2">
                                 <Landmark className="h-5 w-5" />
                                 Bank Details
                             </h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <FieldWrapper control={form.control} name="accountNumber" label="Account Number <span className='text-destructive'>*</span>">
+                                <FieldWrapper control={form.control} name="accountNumber" label={<>Account Number <span className="text-destructive">*</span></>}>
                                     {(field) => <Input {...field} placeholder="Enter account number" />}
                                 </FieldWrapper>
-                                <FieldWrapper control={form.control} name="accountName" label="Account Name <span className='text-destructive'>*</span>">
+                                <FieldWrapper control={form.control} name="accountName" label={<>Account Name <span className="text-destructive">*</span></>}>
                                     {(field) => <Input {...field} placeholder="Enter account name" />}
                                 </FieldWrapper>
-                                <FieldWrapper control={form.control} name="ifsc" label="IFSC <span className='text-destructive'>*</span>">
+                                <FieldWrapper control={form.control} name="ifsc" label={<>IFSC <span className="text-destructive">*</span></>}>
                                     {(field) => (
                                         <Input
                                             {...field}
@@ -164,7 +164,7 @@ export default function CreatePaymentRequestPage() {
                                         />
                                     )}
                                 </FieldWrapper>
-                                <FieldWrapper control={form.control} name="amount" label="Amount <span className='text-destructive'>*</span>">
+                                <FieldWrapper control={form.control} name="amount" label={<>Amount <span className="text-destructive">*</span></>}>
                                     {(field) => (
                                         <Input
                                             type="number"
@@ -178,13 +178,11 @@ export default function CreatePaymentRequestPage() {
                             </div>
                         </div>
 
-                        {/* Payment Against */}
                         <div className="border rounded-lg border-dashed p-4 space-y-4">
                             <h3 className="text-lg font-semibold">Payment Details</h3>
                             <PaymentAgainstField control={form.control} />
                         </div>
 
-                        {/* Footer */}
                         <div className="flex items-end justify-end">
                             <div className="flex items-center gap-4">
                                 <Button type="button" variant="outline" onClick={() => navigate(-1)}>
