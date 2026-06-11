@@ -1,3 +1,4 @@
+import { paths } from '@/app/routes/paths';
 import { tenderNameCol } from '@/components/data-grid/columns';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
@@ -137,12 +138,12 @@ const TenderFeeListPage = () => {
             {
                 label: 'View Details',
                 icon: <Eye className="h-4 w-4" />,
-                onClick: (row: any) => navigate(`/bi-dashboard/demand-draft/details/${row.requestId}`),
+                onClick: (row: any) => navigate(paths.bi.tenderFeeView('dd', row.requestId)),
             },
             {
                 label: 'Action Form',
                 icon: <Edit className="h-4 w-4" />,
-                onClick: (row: any) => navigate(`/bi-dashboard/demand-draft/action/${row.id}`),
+                onClick: (row: any) => navigate(paths.bi.tenderFeeAction('dd', row.id)),
             },
         ],
         [navigate],
@@ -220,12 +221,12 @@ const TenderFeeListPage = () => {
             {
                 label: 'View Details',
                 icon: <Eye className="h-4 w-4" />,
-                onClick: (row: any) => navigate(`/bi-dashboard/pay-on-portal/details/${row.requestId}`),
+                onClick: (row: any) => navigate(paths.bi.tenderFeeView('portal', row.requestId)),
             },
             {
                 label: 'Action Form',
                 icon: <Edit className="h-4 w-4" />,
-                onClick: (row: any) => navigate(`/bi-dashboard/pay-on-portal/action/${row.id}`),
+                onClick: (row: any) => navigate(paths.bi.tenderFeeAction('portal', row.id)),
             },
         ],
         [navigate],
@@ -291,12 +292,12 @@ const TenderFeeListPage = () => {
             {
                 label: 'View Details',
                 icon: <Eye className="h-4 w-4" />,
-                onClick: (row: any) => navigate(`/bi-dashboard/bank-transfer/details/${row.requestId}`),
+                onClick: (row: any) => navigate(paths.bi.tenderFeeView('transfer', row.requestId)),
             },
             {
                 label: 'Action Form',
                 icon: <Edit className="h-4 w-4" />,
-                onClick: (row: any) => navigate(`/bi-dashboard/bank-transfer/action/${row.id}`),
+                onClick: (row: any) => navigate(paths.bi.tenderFeeAction('transfer', row.id)),
             },
         ],
         [navigate],
