@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
-import { usePaymentRequestDetails, useUpdatePaymentRequest } from "@/hooks/api/usePaymentRequests";
+import { usePaymentRequestDetails, useUpdatePaymentRequest } from "@/hooks/api/useProjectPaymentRequests";
 import { PaymentAgainstField } from "./components/PaymentAgainstField";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ArrowLeft, Building2, Landmark, Loader2 } from "lucide-react";

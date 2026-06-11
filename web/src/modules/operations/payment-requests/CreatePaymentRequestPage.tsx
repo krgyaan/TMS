@@ -7,7 +7,7 @@ import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useCreatePaymentRequest, useNextPRNumber } from "@/hooks/api/usePaymentRequests";
+import { useCreatePaymentRequest, useNextPRNumber } from "@/hooks/api/useProjectPaymentRequests";
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
 import { purchaseInvoiceApi } from "@/services/api/purchase-invoice.api";
 import { zodResolver } from "@hookform/resolvers/zod";

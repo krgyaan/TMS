@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import DataTable from "@/components/ui/data-table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useProjectPaymentRequests } from "@/hooks/api/usePaymentRequests";
+import { useProjectPaymentRequests } from "@/hooks/api/useProjectPaymentRequests";
 import { formatINR } from "@/hooks/useINRFormatter";
 import type { PaymentRequestRow } from "@/modules/operations/payment-requests/helpers/paymentRequest.types";
 import type { ColDef, GridApi, ValueFormatterParams } from "ag-grid-community";
