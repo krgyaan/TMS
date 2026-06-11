@@ -78,7 +78,6 @@ export interface PurchaseOrderRow {
     totalAmount: number;
     totalGstAmt: number;
     grandTotal: number;
-    poPdf?: string;
     poPdfVersions?: Record<string, { path: string; hash: string }>;
 }
 

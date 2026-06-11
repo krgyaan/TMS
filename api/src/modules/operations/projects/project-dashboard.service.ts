@@ -132,7 +132,6 @@ export class ProjectDashboardService {
                     poDate: purchaseOrders.poDate,
                     poRaisedBy: users.name,
                     createdAt: purchaseOrders.createdAt,
-                    poPdf: purchaseOrders.generatedPdf,
                     poPdfVersions: purchaseOrders.generatedPdfVersions,
                     totalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                     totalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
@@ -165,7 +164,6 @@ export class ProjectDashboardService {
                     poDate: purchaseOrders.poDate,
                     poRaisedBy: users.name,
                     createdAt: purchaseOrders.createdAt,
-                    poPdf: purchaseOrders.generatedPdf,
                     poPdfVersions: purchaseOrders.generatedPdfVersions,
                     totalAmount: sql<number>`COALESCE((SELECT SUM(taxable_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
                     totalGstAmt: sql<number>`COALESCE((SELECT SUM(gst_amount::numeric) FROM purchase_order_products WHERE purchase_order_id = ${purchaseOrders.id}), 0)`,
@@ -380,12 +378,6 @@ export class ProjectDashboardService {
         const existingVersion = Object.values(versions).find((v) => v.hash === contentHash);
         if (existingVersion) {
             this.logger.info(`PO ${po.id}: no changes detected, reusing existing PDF`);
-            if (po.generatedPdf !== existingVersion.path) {
-                await this.db
-                    .update(purchaseOrders)
-                    .set({ generatedPdf: existingVersion.path })
-                    .where(eq(purchaseOrders.id, po.id));
-            }
             return;
         }
 
@@ -450,7 +442,6 @@ export class ProjectDashboardService {
                 await this.db
                     .update(purchaseOrders)
                     .set({
-                        generatedPdf: pdfPaths[0],
                         generatedPdfVersions: updatedVersions,
                     })
                     .where(eq(purchaseOrders.id, po.id));
@@ -484,24 +475,45 @@ export class ProjectDashboardService {
     }
 
     async getPurchaseOrderPdf(id: number, version?: string): Promise<{ path: string; filename: string }> {
-        const po = (await this.db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id)))[0];
-        if (!po) throw new NotFoundException("Purchase Order not found");
+        try {
+            const po = (await this.db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id)))[0];
+            if (!po) throw new NotFoundException("Purchase Order not found");
 
-        if (version) {
             const versions = (po.generatedPdfVersions ?? {}) as Record<string, { path: string; hash: string }>;
-            const entry = versions[version];
-            if (!entry) throw new NotFoundException(`PDF version "${version}" not found`);
-            return {
-                path: entry.path,
-                filename: `PO_${po.poNumber?.replace(/\//g, "_") || id}_${version}.pdf`,
-            };
-        }
 
-        if (!po.generatedPdf) throw new NotFoundException("PDF not yet generated for this Purchase Order");
-        return {
-            path: po.generatedPdf,
-            filename: `PO_${po.poNumber?.replace(/\//g, "_") || id}.pdf`,
-        };
+            if (version) {
+                const entry = versions[version];
+                if (!entry) throw new NotFoundException(`PDF version "${version}" not found`);
+                return {
+                    path: entry.path,
+                    filename: `PO_${po.poNumber?.replace(/\//g, "_") || id}_${version}.pdf`,
+                };
+            }
+
+            // No version specified → return the latest
+            const sorted = Object.entries(versions).sort((a, b) =>
+                this.parseLabelDate(b[0]).getTime() - this.parseLabelDate(a[0]).getTime()
+            );
+            if (sorted.length === 0) throw new NotFoundException("No PDF versions found for this Purchase Order");
+            const [latestLabel, latestEntry] = sorted[0];
+            return {
+                path: latestEntry.path,
+                filename: `PO_${po.poNumber?.replace(/\//g, "_") || id}_${latestLabel}.pdf`,
+            };
+        } catch (error) {
+            this.logger.error(`Failed to get PO PDF: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
+    }
+
+    private parseLabelDate(label: string): Date {
+        if (label === "v-original") return new Date(0);
+        const match = label.match(/^v-(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})$/);
+        if (match) {
+            const [, y, m, d, h, min, s] = match.map(Number);
+            return new Date(y, m - 1, d, h, min, s);
+        }
+        return new Date(0);
     }
 
     async getPurchaseOrderPdfVersions(id: number): Promise<Record<string, { path: string; hash: string }>> {
@@ -511,28 +523,23 @@ export class ProjectDashboardService {
     }
 
     async deletePdfVersion(id: number, version: string): Promise<void> {
-        const po = (await this.db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id)))[0];
-        if (!po) throw new NotFoundException("Purchase Order not found");
+        try {
+            const po = (await this.db.select().from(purchaseOrders).where(eq(purchaseOrders.id, id)))[0];
+            if (!po) throw new NotFoundException("Purchase Order not found");
 
-        const versions = (po.generatedPdfVersions ?? {}) as Record<string, { path: string; hash: string }>;
-        if (!versions[version]) throw new NotFoundException(`PDF version "${version}" not found`);
+            const versions = (po.generatedPdfVersions ?? {}) as Record<string, { path: string; hash: string }>;
+            if (!versions[version]) throw new NotFoundException(`PDF version "${version}" not found`);
 
-        delete versions[version];
+            delete versions[version];
 
-        // If we deleted the latest, point generatedPdf to another version or null
-        let latestPdf: string | null = null;
-        const remaining = Object.values(versions);
-        if (remaining.length > 0) {
-            latestPdf = remaining[remaining.length - 1].path;
+            await this.db
+                .update(purchaseOrders)
+                .set({ generatedPdfVersions: versions })
+                .where(eq(purchaseOrders.id, id));
+        } catch (error) {
+            this.logger.error(`Failed to delete PDF version: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
         }
-
-        await this.db
-            .update(purchaseOrders)
-            .set({
-                generatedPdf: latestPdf,
-                generatedPdfVersions: versions,
-            })
-            .where(eq(purchaseOrders.id, id));
     }
 
     private getTotalProductValues(products: any[]) {
