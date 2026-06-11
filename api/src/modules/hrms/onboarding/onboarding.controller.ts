@@ -91,6 +91,22 @@ export class OnboardingController {
     return this.onboardingService.getProfileList();
   }
 
+  @Get('incomplete')
+  @UseGuards(JwtAuthGuard)
+  async getIncomplete() {
+    return this.onboardingService.findIncompleteOnboarding();
+  }
+
+  /**
+   * GET /hrms/onboarding/my-status
+   * Checks the logged-in user's onboarding status.
+   */
+  @Get('my-status')
+  @UseGuards(JwtAuthGuard)
+  async getMyStatus(@Req() req: any) {
+    return this.onboardingService.findUserOnboardingStatus(req.user.id);
+  }
+
   /**
    * GET /hrms/onboarding/:id/profile  — Protected: HR only
    * Returns a single employee's full profile.

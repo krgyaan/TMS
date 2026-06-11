@@ -755,6 +755,143 @@ export class OnboardingService {
   }
 
   /**
+   * Get list of employees who have not submitted their complete onboarding.
+   * Checks profileStatus, documentStatus, bankStatus, educationStatus, and experienceStatus.
+   */
+  async findIncompleteOnboarding(): Promise<any[]> {
+    try {
+      const rows = await this.db
+        .select({
+          id: onboardingRequests.id,
+          userId: onboardingRequests.userId,
+          name: onboardingRequests.name,
+          email: onboardingRequests.email,
+          phone: onboardingRequests.phone,
+          status: onboardingRequests.status,
+          hrStatus: onboardingRequests.hrStatus,
+          profileStatus: onboardingRequests.profileStatus,
+          documentStatus: onboardingRequests.documentStatus,
+          educationStatus: onboardingRequests.educationStatus,
+          experienceStatus: onboardingRequests.experienceStatus,
+          bankStatus: onboardingRequests.bankStatus,
+          progress: onboardingRequests.progress,
+          createdAt: onboardingRequests.createdAt,
+          updatedAt: onboardingRequests.updatedAt,
+          avatar: userProfiles.image,
+        })
+        .from(onboardingRequests)
+        .leftJoin(userProfiles, eq(onboardingRequests.userId, userProfiles.userId))
+        .orderBy(desc(onboardingRequests.createdAt));
+
+      return rows.filter((row) => {
+        const statuses = [
+          row.profileStatus,
+          row.documentStatus,
+          row.educationStatus,
+          row.experienceStatus,
+          row.bankStatus,
+        ];
+        // At least one status is NOT 'submitted' and NOT 'resubmitted'
+        return statuses.some((status) => status !== 'submitted' && status !== 'resubmitted');
+      });
+    } catch (err) {
+      this.logger.error('OnboardingService.findIncompleteOnboarding failed', { err });
+      throw err;
+    }
+  }
+
+  /**
+   * Check onboarding status of a specific user.
+   */
+  async findUserOnboardingStatus(userId: number): Promise<any> {
+    try {
+      const [request] = await this.db
+        .select({
+          id: onboardingRequests.id,
+          profileStatus: onboardingRequests.profileStatus,
+          documentStatus: onboardingRequests.documentStatus,
+          educationStatus: onboardingRequests.educationStatus,
+          experienceStatus: onboardingRequests.experienceStatus,
+          bankStatus: onboardingRequests.bankStatus,
+          hrStatus: onboardingRequests.hrStatus,
+        })
+        .from(onboardingRequests)
+        .where(eq(onboardingRequests.userId, userId))
+        .orderBy(desc(onboardingRequests.createdAt))
+        .limit(1);
+
+      if (!request) {
+        return { isComplete: true, hasRequest: false };
+      }
+
+      // Query child table entry hrStatuses for individual rejection/approval checks
+      const [profile] = await this.db
+        .select({ hrStatus: onboardingProfiles.hrStatus })
+        .from(onboardingProfiles)
+        .where(eq(onboardingProfiles.onboardingId, request.id))
+        .orderBy(desc(onboardingProfiles.id))
+        .limit(1);
+
+      const docs = await this.db
+        .select({ hrStatus: onboardingDocuments.hrStatus })
+        .from(onboardingDocuments)
+        .where(eq(onboardingDocuments.onboardingId, request.id));
+
+      const edu = await this.db
+        .select({ hrStatus: onboardingEducation.hrStatus })
+        .from(onboardingEducation)
+        .where(eq(onboardingEducation.onboardingId, request.id));
+
+      const exp = await this.db
+        .select({ hrStatus: onboardingExperience.hrStatus })
+        .from(onboardingExperience)
+        .where(eq(onboardingExperience.onboardingId, request.id));
+
+      const bank = await this.db
+        .select({ hrStatus: onboardingBankDetails.hrStatus })
+        .from(onboardingBankDetails)
+        .where(eq(onboardingBankDetails.onboardingId, request.id));
+
+      const profileHrStatus = profile?.hrStatus || 'pending';
+      const documentHrStatus = docs.some(d => d.hrStatus === 'rejected') ? 'rejected' : (docs.length > 0 && docs.every(d => d.hrStatus === 'approved') ? 'approved' : 'pending');
+      const educationHrStatus = edu.some(e => e.hrStatus === 'rejected') ? 'rejected' : (edu.length > 0 && edu.every(e => e.hrStatus === 'approved') ? 'approved' : 'pending');
+      const experienceHrStatus = exp.some(e => e.hrStatus === 'rejected') ? 'rejected' : (exp.length > 0 && exp.every(e => e.hrStatus === 'approved') ? 'approved' : 'pending');
+      const bankHrStatus = bank.some(b => b.hrStatus === 'rejected') ? 'rejected' : (bank.length > 0 && bank.every(b => b.hrStatus === 'approved') ? 'approved' : 'pending');
+
+      const statuses = [
+        request.profileStatus,
+        request.documentStatus,
+        request.educationStatus,
+        request.experienceStatus,
+        request.bankStatus,
+      ];
+
+      // Onboarding is incomplete if at least one status is NOT 'submitted' and NOT 'resubmitted'
+      const isIncomplete = statuses.some((status) => status !== 'submitted' && status !== 'resubmitted');
+
+      return {
+        isComplete: !isIncomplete,
+        hasRequest: true,
+        requestId: request.id,
+        profileStatus: request.profileStatus,
+        documentStatus: request.documentStatus,
+        educationStatus: request.educationStatus,
+        experienceStatus: request.experienceStatus,
+        bankStatus: request.bankStatus,
+        hrStatus: request.hrStatus, // overall marker
+        profileHrStatus,
+        documentHrStatus,
+        educationHrStatus,
+        experienceHrStatus,
+        bankHrStatus,
+      };
+    } catch (err) {
+      this.logger.error('OnboardingService.findUserOnboardingStatus failed', { err, userId });
+      throw err;
+    }
+  }
+
+  /**
    * GET /hrms/onboarding/profiles
    * All approved onboarding requests joined with their profile data.
    * Used by the Profile Details tracker dashboard.

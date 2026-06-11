@@ -6,9 +6,28 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
-import { ChevronRight, FileText, Landmark, Send, Truck, Wallet } from "lucide-react";
+import { 
+    ChevronRight, 
+    FileText, 
+    Landmark, 
+    Send, 
+    Truck, 
+    Wallet, 
+    Search, 
+    Loader2, 
+    AlertCircle, 
+    Check, 
+    Clock, 
+    AlertTriangle,
+    XCircle
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useIncompleteOnboarding, useMyOnboardingStatus } from "@/modules/hrms/onboarding/useOnboarding";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 // Types
 interface TenderInfo {
@@ -100,6 +119,212 @@ const QuickActionCard = ({ icon: Icon, title, subtitle, color, bgColor, onClick 
     </button>
 );
 
+const OnboardingTrackerWidget = () => {
+    const { data: incompleteList, isLoading, error } = useIncompleteOnboarding();
+    const [searchQuery, setSearchQuery] = useState("");
+    const navigate = useNavigate();
+
+    const filteredList = useMemo(() => {
+        if (!incompleteList) return [];
+        return incompleteList.filter(user => 
+            (user.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (user.email || "").toLowerCase().includes(searchQuery.toLowerCase())
+        );
+    }, [incompleteList, searchQuery]);
+
+    const getStatusIndicator = (status: string | null | undefined, label: string) => {
+        const isCompleted = status === "submitted" || status === "resubmitted";
+        const isRejected = status === "rejected";
+        const isApproved = status === "approved";
+
+        let bgColor = "bg-muted text-muted-foreground border-muted-foreground/20";
+        let icon = <Clock className="h-3 w-3" />;
+        let text = "Pending";
+
+        if (isCompleted) {
+            bgColor = "bg-emerald-500/10 text-emerald-600 border-emerald-500/20 dark:bg-emerald-500/20 dark:text-emerald-400";
+            icon = <Check className="h-3 w-3" />;
+            text = status === "resubmitted" ? "Resubmitted" : "Submitted";
+        } else if (isApproved) {
+            bgColor = "bg-green-500/10 text-green-600 border-green-500/20 dark:bg-green-500/20 dark:text-green-400";
+            icon = <Check className="h-3 w-3" />;
+            text = "Approved";
+        } else if (isRejected) {
+            bgColor = "bg-rose-500/10 text-rose-600 border-rose-500/20 dark:bg-rose-500/20 dark:text-rose-400";
+            icon = <AlertTriangle className="h-3 w-3" />;
+            text = "Rejected";
+        } else if (status === "in_progress") {
+            bgColor = "bg-amber-500/10 text-amber-600 border-amber-500/20 dark:bg-amber-500/20 dark:text-amber-400";
+            text = "In Progress";
+        }
+
+        return (
+            <div className="flex flex-col items-center gap-1 flex-1 min-w-[70px]">
+                <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</span>
+                <span className={cn(
+                    "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium w-full justify-center transition-all duration-300",
+                    bgColor
+                )}>
+                    {icon}
+                    <span className="truncate">{text}</span>
+                </span>
+            </div>
+        );
+    };
+
+    if (isLoading) {
+        return (
+            <Card className="border border-border/50 shadow-lg bg-card/60 backdrop-blur-xl rounded-2xl p-6">
+                <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <p className="text-sm text-muted-foreground animate-pulse">Loading onboarding submissions...</p>
+                </div>
+            </Card>
+        );
+    }
+
+    if (error) {
+        return (
+            <Card className="border border-border/50 shadow-lg bg-card/60 backdrop-blur-xl rounded-2xl p-6">
+                <div className="flex items-center space-x-3 text-red-500 justify-center py-6">
+                    <AlertCircle className="h-5 w-5" />
+                    <span className="text-sm font-semibold">Failed to load onboarding submissions</span>
+                </div>
+            </Card>
+        );
+    }
+
+    const totalIncomplete = incompleteList?.length || 0;
+
+    return (
+        <Card className="border border-border/50 shadow-xl bg-card/60 backdrop-blur-xl rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:shadow-primary/5">
+            <CardHeader className="pb-4 border-b border-border/40">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                        <div className="flex items-center gap-2.5">
+                            <CardTitle className="text-lg font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
+                                Onboarding Status Tracker
+                            </CardTitle>
+                            <Badge variant="destructive" className="animate-pulse font-mono font-bold text-xs px-2 py-0.5 rounded-full">
+                                {totalIncomplete} Pending
+                            </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            Employees who have not submitted all onboarding documents and details
+                        </p>
+                    </div>
+                    <div className="relative w-full md:w-72">
+                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search employee name/email..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-9 h-9 bg-background/50 border-border/50 rounded-xl text-xs focus:ring-primary/20 focus:border-primary"
+                        />
+                    </div>
+                </div>
+            </CardHeader>
+            <CardContent className="p-0">
+                {filteredList.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 text-center px-4">
+                        <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center mb-4 border border-emerald-500/20">
+                            <Check className="h-6 w-6" />
+                        </div>
+                        <h3 className="text-sm font-bold text-foreground">
+                            {searchQuery ? "No matching employees found" : "All Caught Up!"}
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-1 max-w-xs leading-normal">
+                            {searchQuery 
+                                ? "No employees match your search query. Try another name or email."
+                                : "Every employee has successfully submitted their complete onboarding!"}
+                        </p>
+                    </div>
+                ) : (
+                    <div className="divide-y divide-border/40 max-h-[420px] overflow-y-auto custom-scrollbar">
+                        {filteredList.map((user) => {
+                            const statuses = [
+                                user.profileStatus,
+                                user.documentStatus,
+                                user.educationStatus,
+                                user.experienceStatus,
+                                user.bankStatus,
+                            ];
+                            const submittedCount = statuses.filter(s => s === "submitted" || s === "resubmitted" || s === "approved").length;
+                            const progressPercent = Math.round((submittedCount / 5) * 100);
+
+                            const initials = (user.name || "")
+                                .split(" ")
+                                .map((n: string) => n[0])
+                                .slice(0, 2)
+                                .join("")
+                                .toUpperCase() || "??";
+
+                            let hash = 0;
+                            const nameForHash = user.name || "Unknown";
+                            for (let i = 0; i < nameForHash.length; i++) {
+                                hash = nameForHash.charCodeAt(i) + ((hash << 5) - hash);
+                            }
+                            const avatarColor = `hsl(${Math.abs(hash) % 360}, 65%, 45%)`;
+
+                            return (
+                                <div 
+                                    key={user.id}
+                                    className="p-5 flex flex-col xl:flex-row xl:items-center justify-between gap-5 hover:bg-muted/30 transition-all duration-300 group"
+                                >
+                                    <div className="flex items-center gap-4 min-w-[240px]">
+                                        <Avatar className="h-10 w-10 rounded-xl ring-1 ring-border/50 flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
+                                            {user.avatar && <AvatarImage src={user.avatar} className="object-cover" />}
+                                            <AvatarFallback className="rounded-xl text-white font-bold text-xs" style={{ backgroundColor: avatarColor }}>
+                                                {initials}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                        <div className="min-w-0">
+                                            <h4 className="text-xs font-bold text-foreground truncate group-hover:text-primary transition-colors">
+                                                {user.name}
+                                            </h4>
+                                            <p className="text-[10px] text-muted-foreground truncate">{user.email}</p>
+                                            <div className="flex items-center gap-2 mt-1.5">
+                                                <div className="h-1.5 w-24 rounded-full bg-muted overflow-hidden">
+                                                    <div 
+                                                        className={cn(
+                                                            "h-full rounded-full transition-all duration-500",
+                                                            progressPercent >= 80 ? "bg-emerald-500" :
+                                                            progressPercent >= 40 ? "bg-amber-500" : "bg-orange-500"
+                                                        )}
+                                                        style={{ width: `${progressPercent}%` }}
+                                                    />
+                                                </div>
+                                                <span className="text-[9px] font-bold text-muted-foreground">{progressPercent}% Submitted</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 flex-1 justify-start xl:justify-center">
+                                        {getStatusIndicator(user.profileStatus, "Profile")}
+                                        {getStatusIndicator(user.documentStatus, "Documents")}
+                                        {getStatusIndicator(user.educationStatus, "Education")}
+                                        {getStatusIndicator(user.experienceStatus, "Experience")}
+                                        {getStatusIndicator(user.bankStatus, "Bank")}
+                                    </div>
+
+                                    <div className="flex items-center justify-end flex-shrink-0 pl-4">
+                                        <button
+                                            onClick={() => navigate(`/hrms/onboarding/dashboard`)}
+                                            className="inline-flex items-center justify-center p-2 rounded-xl text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300"
+                                        >
+                                            <ChevronRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    );
+};
+
 const Dashboard = () => {
     const navigate = useNavigate();
     const [dashboardData, setDashboardData] = useState<DashboardData>(mockDashboardData);
@@ -108,6 +333,86 @@ const Dashboard = () => {
     const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
 
     const {teamId, isSuperUser, isAdmin} = useAuth();
+
+    const { data: myStatus } = useMyOnboardingStatus();
+    const [showOnboardingModal, setShowOnboardingModal] = useState(false);
+
+    useEffect(() => {
+        // beautiful example of using session storage to show modal
+        if (myStatus && myStatus.hasRequest && !myStatus.isComplete) {
+            const isDismissed = sessionStorage.getItem("dismissed_onboarding_modal");
+            if (!isDismissed) {
+                setShowOnboardingModal(true);
+            }
+        }
+    }, [myStatus]);
+
+    const handleDismissModal = () => {
+        sessionStorage.setItem("dismissed_onboarding_modal", "true");
+        setShowOnboardingModal(false);
+    };
+
+    const getModalStepIndicator = (
+        status: string | null | undefined,
+        hrStatus: string | null | undefined,
+        label: string
+    ) => {
+        const isApproved = hrStatus === "approved";
+        const isResubmitted = status === "resubmitted";
+        const isSubmitted = status === "submitted";
+        const isRejected = hrStatus === "rejected";
+        
+        const isCompleted = isApproved || isResubmitted || isSubmitted;
+        
+        return (
+            <div className={cn(
+                "flex items-center gap-3 p-3 rounded-xl border transition-all duration-300",
+                isRejected 
+                    ? "bg-rose-500/10 border-rose-500/20 hover:border-rose-500/30" 
+                    : isCompleted
+                        ? "bg-emerald-500/5 border-emerald-500/15 hover:border-emerald-500/30"
+                        : "bg-muted/40 border-border/40 hover:border-primary/20"
+            )}>
+                <div className={cn(
+                    "h-6 w-6 rounded-full flex items-center justify-center border-2",
+                    isCompleted
+                        ? "bg-emerald-500/10 border-emerald-500 text-emerald-600" 
+                        : isRejected
+                            ? "bg-rose-500/10 border-rose-500 text-rose-600"
+                            : "bg-amber-500/10 border-amber-500 text-amber-600"
+                )}>
+                    {isCompleted ? (
+                        <Check className="h-3.5 w-3.5" />
+                    ) : isRejected ? (
+                        <XCircle className="h-3.5 w-3.5" />
+                    ) : (
+                        <Clock className="h-3.5 w-3.5" />
+                    )}
+                </div>
+                <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-foreground">{label}</p>
+                    <p className={cn(
+                        "text-[10px] leading-tight truncate",
+                        isRejected 
+                            ? "text-rose-600 font-semibold" 
+                            : isCompleted 
+                                ? "text-emerald-600 font-semibold" 
+                                : "text-muted-foreground"
+                    )}>
+                        {isApproved 
+                            ? "Approved" 
+                            : isResubmitted 
+                                ? "Resubmitted" 
+                                : isSubmitted 
+                                    ? "Submitted" 
+                                    : isRejected 
+                                        ? "Rejected" 
+                                        : "Pending"}
+                    </p>
+                </div>
+            </div>
+        );
+    };
 
     const isTenderingTeam = teamId == 1 || teamId == 2 || isSuperUser || isAdmin;
 
@@ -252,6 +557,15 @@ const Dashboard = () => {
     return (
         <div className="space-y-6 p-8">
             {/* Quick Actions */}
+
+            {/* Onboarding Status Tracker Widget */}
+            {(teamId == 8 || isSuperUser) && (
+                <div className="hidden md:block">
+                    <OnboardingTrackerWidget />
+                </div>
+            )}
+            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {quickActions
                     .filter(action => action.title !== "New Tender" || isTenderingTeam)
@@ -320,6 +634,8 @@ const Dashboard = () => {
                     </CardContent>
                 </Card>
             </div> */}
+
+
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                 {/* Calendar Section */}
@@ -462,6 +778,69 @@ const Dashboard = () => {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Onboarding Status / Correction Modal */}
+            <Dialog open={showOnboardingModal} onOpenChange={setShowOnboardingModal}>
+                <DialogContent className="sm:max-w-[480px] p-0 overflow-hidden rounded-2xl border border-border/50 shadow-2xl bg-card/90 backdrop-blur-xl">
+                    <div className="p-8 space-y-6">
+                        <DialogHeader className="space-y-3 text-center">
+                            {myStatus?.hrStatus === "rejected" ? (
+                                <div className="mx-auto w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-600 flex items-center justify-center border border-rose-500/20">
+                                    <XCircle className="h-6 w-6 animate-pulse" />
+                                </div>
+                            ) : (
+                                <div className="mx-auto w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center border border-amber-500/20">
+                                    <AlertCircle className="h-6 w-6 animate-pulse" />
+                                </div>
+                            )}
+                            <DialogTitle className="text-xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
+                                {myStatus?.hrStatus === "rejected" ? "Correction Required" : "Onboarding Pending"}
+                            </DialogTitle>
+                            <DialogDescription className="text-xs text-muted-foreground leading-normal max-w-sm mx-auto">
+                                {myStatus?.hrStatus === "rejected"
+                                    ? "One or more of your onboarding sections have been rejected by HR. Please review and update the rejected sections below to resubmit."
+                                    : "You have not completed your onboarding submission yet. Please complete the pending sections below to ensure your profile is fully set up."}
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {myStatus && (
+                                <>
+                                    {getModalStepIndicator(myStatus.profileStatus, myStatus.profileHrStatus, "Profile Details")}
+                                    {getModalStepIndicator(myStatus.documentStatus, myStatus.documentHrStatus, "Documents")}
+                                    {getModalStepIndicator(myStatus.educationStatus, myStatus.educationHrStatus, "Education")}
+                                    {getModalStepIndicator(myStatus.experienceStatus, myStatus.experienceHrStatus, "Experience")}
+                                    {getModalStepIndicator(myStatus.bankStatus, myStatus.bankHrStatus, "Bank Details")}
+                                </>
+                            )}
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                            <Button 
+                                variant="ghost" 
+                                onClick={handleDismissModal}
+                                className="flex-1 rounded-xl h-10 text-xs border border-border/40 hover:bg-muted"
+                            >
+                                Remind Me Later
+                            </Button>
+                            <Button 
+                                onClick={() => {
+                                    handleDismissModal();
+                                    navigate("/profile");
+                                }}
+                                className={cn(
+                                    "flex-1 rounded-xl h-10 text-xs text-white shadow-lg hover:shadow-xl transition-all duration-300",
+                                    myStatus?.hrStatus === "rejected"
+                                        ? "bg-gradient-to-r from-rose-600 to-red-500 hover:from-rose-500 hover:to-red-400 focus:ring-rose-500/20 shadow-rose-500/10"
+                                        : "bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-600/90 shadow-primary/10"
+                                )}
+                            >
+                                {myStatus?.hrStatus === "rejected" ? "Refill & Fix Details" : "Complete Onboarding"}
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };
