@@ -1,6 +1,8 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { eq, like, desc, sql } from "drizzle-orm";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { join } from "node:path";
+import { rename } from "node:fs/promises";
 
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
@@ -434,10 +436,23 @@ export class ProjectDashboardService {
         try {
             const pdfPaths = await this.pdfGenerator.generatePdfs('po', data, po.id, 'PO');
             if (pdfPaths.length > 0) {
+                // Rename PDF to use PO sequence number instead of timestamp (avoids Date.now() race)
+                const poSeq = po.poNumber?.split('/').pop() || `PO${po.id}`;
+                const rand = randomUUID().split('-')[0];
+                const newFileName = `${poSeq}-${rand}.pdf`;
+                const storageDir = 'payment-pdfs/po';
+
+                const oldPath = join(process.cwd(), 'uploads', 'tendering', pdfPaths[0]);
+                const newPath = join(process.cwd(), 'uploads', 'tendering', storageDir, newFileName);
+
+                await rename(oldPath, newPath);
+
+                const finalPath = `${storageDir}/${newFileName}`;
+
                 const now = new Date();
                 const label = `v-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}-${String(now.getSeconds()).padStart(2, "0")}`;
 
-                const updatedVersions = { ...versions, [label]: { path: pdfPaths[0], hash: contentHash } };
+                const updatedVersions = { ...versions, [label]: { path: finalPath, hash: contentHash } };
 
                 await this.db
                     .update(purchaseOrders)
