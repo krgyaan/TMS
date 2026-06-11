@@ -92,6 +92,16 @@ export class OnboardingController {
   }
 
   /**
+   * GET /hrms/onboarding/incomplete
+   * Returns list of employees who have not submitted their complete onboarding.
+   */
+  @Get('incomplete')
+  @UseGuards(JwtAuthGuard)
+  async getIncomplete() {
+    return this.onboardingService.findIncompleteOnboarding();
+  }
+
+  /**
    * GET /hrms/onboarding/:id/profile  — Protected: HR only
    * Returns a single employee's full profile.
    */

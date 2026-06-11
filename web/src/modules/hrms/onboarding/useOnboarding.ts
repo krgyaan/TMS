@@ -12,6 +12,13 @@ export const useOnboardingDashboard = () => {
   });
 };
 
+export const useIncompleteOnboarding = () => {
+  return useQuery({
+    queryKey: ["onboarding", "incomplete"],
+    queryFn: onboardingService.getIncompleteOnboarding,
+  });
+};
+
 export const useUpdateOnboardingStatus = () => {
   const queryClient = useQueryClient();
 

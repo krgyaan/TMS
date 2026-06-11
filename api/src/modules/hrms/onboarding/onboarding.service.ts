@@ -755,6 +755,52 @@ export class OnboardingService {
   }
 
   /**
+   * Get list of employees who have not submitted their complete onboarding.
+   * Checks profileStatus, documentStatus, bankStatus, educationStatus, and experienceStatus.
+   */
+  async findIncompleteOnboarding(): Promise<any[]> {
+    try {
+      const rows = await this.db
+        .select({
+          id: onboardingRequests.id,
+          userId: onboardingRequests.userId,
+          name: onboardingRequests.name,
+          email: onboardingRequests.email,
+          phone: onboardingRequests.phone,
+          status: onboardingRequests.status,
+          hrStatus: onboardingRequests.hrStatus,
+          profileStatus: onboardingRequests.profileStatus,
+          documentStatus: onboardingRequests.documentStatus,
+          educationStatus: onboardingRequests.educationStatus,
+          experienceStatus: onboardingRequests.experienceStatus,
+          bankStatus: onboardingRequests.bankStatus,
+          progress: onboardingRequests.progress,
+          createdAt: onboardingRequests.createdAt,
+          updatedAt: onboardingRequests.updatedAt,
+          avatar: userProfiles.image,
+        })
+        .from(onboardingRequests)
+        .leftJoin(userProfiles, eq(onboardingRequests.userId, userProfiles.userId))
+        .orderBy(desc(onboardingRequests.createdAt));
+
+      return rows.filter((row) => {
+        const statuses = [
+          row.profileStatus,
+          row.documentStatus,
+          row.educationStatus,
+          row.experienceStatus,
+          row.bankStatus,
+        ];
+        // At least one status is NOT 'submitted' and NOT 'resubmitted'
+        return statuses.some((status) => status !== 'submitted' && status !== 'resubmitted');
+      });
+    } catch (err) {
+      this.logger.error('OnboardingService.findIncompleteOnboarding failed', { err });
+      throw err;
+    }
+  }
+
+  /**
    * GET /hrms/onboarding/profiles
    * All approved onboarding requests joined with their profile data.
    * Used by the Profile Details tracker dashboard.
