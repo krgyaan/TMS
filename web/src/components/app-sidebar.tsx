@@ -85,6 +85,7 @@ const navMain: NavGroup[] = [
             { title: "Pay on Portal", url: paths.bi.payOnPortal, permission: "bi.pay-on-portal" },
             { title: "Cheque", url: paths.bi.cheque, permission: "bi.cheque" },
             { title: "FDR", url: paths.bi.fdr, permission: "bi.fdr" },
+            { title: "Tender Fee", url: paths.bi.tenderFee, permission: "bi.tender-fee" },
         ],
     },
     {

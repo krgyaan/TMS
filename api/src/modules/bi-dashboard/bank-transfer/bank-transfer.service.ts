@@ -40,6 +40,7 @@ export class BankTransferService {
         const conditions: any[] = [
             eq(paymentInstruments.instrumentType, 'Bank Transfer'),
             eq(paymentInstruments.isActive, true),
+            sql`${paymentRequests.purpose} NOT IN ('Tender Fee', 'Processing Fee')`,
         ];
 
         if (tab === 'pending') {

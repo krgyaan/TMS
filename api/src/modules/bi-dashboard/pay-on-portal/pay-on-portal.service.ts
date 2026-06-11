@@ -41,6 +41,7 @@ export class PayOnPortalService {
         const conditions: any[] = [
             eq(paymentInstruments.instrumentType, 'Portal Payment'),
             eq(paymentInstruments.isActive, true),
+            sql`${paymentRequests.purpose} NOT IN ('Tender Fee', 'Processing Fee')`,
         ];
 
         if (tab === 'pending') {
