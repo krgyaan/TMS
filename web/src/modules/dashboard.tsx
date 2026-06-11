@@ -476,8 +476,10 @@ const Dashboard = () => {
             {/* Quick Actions */}
 
             {/* Onboarding Status Tracker Widget */}
-            {(teamId == 8 ) && (
-                <OnboardingTrackerWidget />
+            {(teamId == 8 || isSuperUser) && (
+                <div className="hidden md:block">
+                    <OnboardingTrackerWidget />
+                </div>
             )}
             
 
