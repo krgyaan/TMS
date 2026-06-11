@@ -172,12 +172,8 @@ export const paths = {
         payOnPortalView: (requestId: number) => `/bi-dashboard/pay-on-portal/details/${requestId}`,
         payOnPortalAction: (id: number) => `/bi-dashboard/pay-on-portal/action/${id}`,
         tenderFee: "/bi-dashboard/tender-fee",
-        tenderFeeView: (id: number) => `/bi-dashboard/tender-fee/details/${id}`,
-        tenderFeeAction: (type: string, id: number) => {
-            if (type === 'dd') return `/bi-dashboard/demand-draft/action/${id}`;
-            if (type === 'portal') return `/bi-dashboard/pay-on-portal/action/${id}`;
-            return `/bi-dashboard/bank-transfer/action/${id}`;
-        },
+        tenderFeeView: (type: string, id: number) => `/bi-dashboard/tender-fee/details/${type}/${id}`,
+        tenderFeeAction: (type: string, id: number) => `/bi-dashboard/tender-fee/action/${type}/${id}`,
     },
 
     // ==================== ACCOUNTS ====================
