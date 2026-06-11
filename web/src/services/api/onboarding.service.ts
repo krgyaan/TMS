@@ -128,6 +128,31 @@ export const onboardingService = {
     return data;
   },
 
+  getIncompleteOnboarding: async (): Promise<OnboardingRequest[]> => {
+    const { data } = await axiosInstance.get("/hrms/onboarding/incomplete");
+    return data;
+  },
+
+  getMyOnboardingStatus: async (): Promise<{
+    isComplete: boolean;
+    hasRequest: boolean;
+    requestId?: number;
+    profileStatus?: string;
+    documentStatus?: string;
+    educationStatus?: string;
+    experienceStatus?: string;
+    bankStatus?: string;
+    hrStatus?: string;
+    profileHrStatus?: string;
+    documentHrStatus?: string;
+    educationHrStatus?: string;
+    experienceHrStatus?: string;
+    bankHrStatus?: string;
+  }> => {
+    const { data } = await axiosInstance.get("/hrms/onboarding/my-status");
+    return data;
+  },
+
   updateStatus: async (id: number, dto: UpdateStatusDto): Promise<OnboardingRequest> => {
     const { data } = await axiosInstance.patch(`/hrms/onboarding/${id}/status`, dto);
     return data;
