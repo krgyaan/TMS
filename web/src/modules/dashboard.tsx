@@ -18,13 +18,16 @@ import {
     AlertCircle, 
     Check, 
     Clock, 
-    AlertTriangle 
+    AlertTriangle,
+    XCircle
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useIncompleteOnboarding } from "@/modules/hrms/onboarding/useOnboarding";
+import { useIncompleteOnboarding, useMyOnboardingStatus } from "@/modules/hrms/onboarding/useOnboarding";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 // Types
 interface TenderInfo {
@@ -330,6 +333,86 @@ const Dashboard = () => {
     const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
 
     const {teamId, isSuperUser, isAdmin} = useAuth();
+
+    const { data: myStatus } = useMyOnboardingStatus();
+    const [showOnboardingModal, setShowOnboardingModal] = useState(false);
+
+    useEffect(() => {
+        // beautiful example of using session storage to show modal
+        if (myStatus && myStatus.hasRequest && !myStatus.isComplete) {
+            const isDismissed = sessionStorage.getItem("dismissed_onboarding_modal");
+            if (!isDismissed) {
+                setShowOnboardingModal(true);
+            }
+        }
+    }, [myStatus]);
+
+    const handleDismissModal = () => {
+        sessionStorage.setItem("dismissed_onboarding_modal", "true");
+        setShowOnboardingModal(false);
+    };
+
+    const getModalStepIndicator = (
+        status: string | null | undefined,
+        hrStatus: string | null | undefined,
+        label: string
+    ) => {
+        const isApproved = hrStatus === "approved";
+        const isResubmitted = status === "resubmitted";
+        const isSubmitted = status === "submitted";
+        const isRejected = hrStatus === "rejected";
+        
+        const isCompleted = isApproved || isResubmitted || isSubmitted;
+        
+        return (
+            <div className={cn(
+                "flex items-center gap-3 p-3 rounded-xl border transition-all duration-300",
+                isRejected 
+                    ? "bg-rose-500/10 border-rose-500/20 hover:border-rose-500/30" 
+                    : isCompleted
+                        ? "bg-emerald-500/5 border-emerald-500/15 hover:border-emerald-500/30"
+                        : "bg-muted/40 border-border/40 hover:border-primary/20"
+            )}>
+                <div className={cn(
+                    "h-6 w-6 rounded-full flex items-center justify-center border-2",
+                    isCompleted
+                        ? "bg-emerald-500/10 border-emerald-500 text-emerald-600" 
+                        : isRejected
+                            ? "bg-rose-500/10 border-rose-500 text-rose-600"
+                            : "bg-amber-500/10 border-amber-500 text-amber-600"
+                )}>
+                    {isCompleted ? (
+                        <Check className="h-3.5 w-3.5" />
+                    ) : isRejected ? (
+                        <XCircle className="h-3.5 w-3.5" />
+                    ) : (
+                        <Clock className="h-3.5 w-3.5" />
+                    )}
+                </div>
+                <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-foreground">{label}</p>
+                    <p className={cn(
+                        "text-[10px] leading-tight truncate",
+                        isRejected 
+                            ? "text-rose-600 font-semibold" 
+                            : isCompleted 
+                                ? "text-emerald-600 font-semibold" 
+                                : "text-muted-foreground"
+                    )}>
+                        {isApproved 
+                            ? "Approved" 
+                            : isResubmitted 
+                                ? "Resubmitted" 
+                                : isSubmitted 
+                                    ? "Submitted" 
+                                    : isRejected 
+                                        ? "Rejected" 
+                                        : "Pending"}
+                    </p>
+                </div>
+            </div>
+        );
+    };
 
     const isTenderingTeam = teamId == 1 || teamId == 2 || isSuperUser || isAdmin;
 
@@ -695,6 +778,69 @@ const Dashboard = () => {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Onboarding Status / Correction Modal */}
+            <Dialog open={showOnboardingModal} onOpenChange={setShowOnboardingModal}>
+                <DialogContent className="sm:max-w-[480px] p-0 overflow-hidden rounded-2xl border border-border/50 shadow-2xl bg-card/90 backdrop-blur-xl">
+                    <div className="p-8 space-y-6">
+                        <DialogHeader className="space-y-3 text-center">
+                            {myStatus?.hrStatus === "rejected" ? (
+                                <div className="mx-auto w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-600 flex items-center justify-center border border-rose-500/20">
+                                    <XCircle className="h-6 w-6 animate-pulse" />
+                                </div>
+                            ) : (
+                                <div className="mx-auto w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center border border-amber-500/20">
+                                    <AlertCircle className="h-6 w-6 animate-pulse" />
+                                </div>
+                            )}
+                            <DialogTitle className="text-xl font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
+                                {myStatus?.hrStatus === "rejected" ? "Correction Required" : "Onboarding Pending"}
+                            </DialogTitle>
+                            <DialogDescription className="text-xs text-muted-foreground leading-normal max-w-sm mx-auto">
+                                {myStatus?.hrStatus === "rejected"
+                                    ? "One or more of your onboarding sections have been rejected by HR. Please review and update the rejected sections below to resubmit."
+                                    : "You have not completed your onboarding submission yet. Please complete the pending sections below to ensure your profile is fully set up."}
+                            </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {myStatus && (
+                                <>
+                                    {getModalStepIndicator(myStatus.profileStatus, myStatus.profileHrStatus, "Profile Details")}
+                                    {getModalStepIndicator(myStatus.documentStatus, myStatus.documentHrStatus, "Documents")}
+                                    {getModalStepIndicator(myStatus.educationStatus, myStatus.educationHrStatus, "Education")}
+                                    {getModalStepIndicator(myStatus.experienceStatus, myStatus.experienceHrStatus, "Experience")}
+                                    {getModalStepIndicator(myStatus.bankStatus, myStatus.bankHrStatus, "Bank Details")}
+                                </>
+                            )}
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                            <Button 
+                                variant="ghost" 
+                                onClick={handleDismissModal}
+                                className="flex-1 rounded-xl h-10 text-xs border border-border/40 hover:bg-muted"
+                            >
+                                Remind Me Later
+                            </Button>
+                            <Button 
+                                onClick={() => {
+                                    handleDismissModal();
+                                    navigate("/profile");
+                                }}
+                                className={cn(
+                                    "flex-1 rounded-xl h-10 text-xs text-white shadow-lg hover:shadow-xl transition-all duration-300",
+                                    myStatus?.hrStatus === "rejected"
+                                        ? "bg-gradient-to-r from-rose-600 to-red-500 hover:from-rose-500 hover:to-red-400 focus:ring-rose-500/20 shadow-rose-500/10"
+                                        : "bg-gradient-to-r from-primary to-blue-600 hover:from-primary/90 hover:to-blue-600/90 shadow-primary/10"
+                                )}
+                            >
+                                {myStatus?.hrStatus === "rejected" ? "Refill & Fix Details" : "Complete Onboarding"}
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };
