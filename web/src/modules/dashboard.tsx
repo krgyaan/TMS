@@ -8,6 +8,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { 
     ChevronRight, 
+    ChevronDown,
+    ChevronUp,
     FileText, 
     Landmark, 
     Send, 
@@ -122,6 +124,7 @@ const QuickActionCard = ({ icon: Icon, title, subtitle, color, bgColor, onClick 
 const OnboardingTrackerWidget = () => {
     const { data: incompleteList, isLoading, error } = useIncompleteOnboarding();
     const [searchQuery, setSearchQuery] = useState("");
+    const [isExpanded, setIsExpanded] = useState(true);
     const navigate = useNavigate();
 
     const filteredList = useMemo(() => {
@@ -198,8 +201,14 @@ const OnboardingTrackerWidget = () => {
 
     return (
         <Card className="border border-border/50 shadow-xl bg-card/60 backdrop-blur-xl rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:shadow-primary/5">
-            <CardHeader className="pb-4 border-b border-border/40">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <CardHeader 
+                className={cn(
+                    "pb-4 cursor-pointer hover:bg-muted/10 transition-colors select-none",
+                    isExpanded && "border-b border-border/40"
+                )}
+                onClick={() => setIsExpanded(!isExpanded)}
+            >
+                <div className="flex items-center justify-between">
                     <div className="space-y-1">
                         <div className="flex items-center gap-2.5">
                             <CardTitle className="text-lg font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
@@ -209,11 +218,37 @@ const OnboardingTrackerWidget = () => {
                                 {totalIncomplete} Pending
                             </Badge>
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                            Employees who have not submitted all onboarding documents and details
-                        </p>
+                        {isExpanded && (
+                            <p className="text-xs text-muted-foreground">
+                                Employees who have not submitted all onboarding documents and details
+                            </p>
+                        )}
                     </div>
-                    <div className="relative w-full md:w-72">
+                    <div className="flex items-center gap-4" onClick={(e) => e.stopPropagation()}>
+                        {isExpanded && (
+                            <div className="relative w-72 hidden sm:block">
+                                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search employee name/email..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="pl-9 h-9 bg-background/50 border-border/50 rounded-xl text-xs focus:ring-primary/20 focus:border-primary"
+                                />
+                            </div>
+                        )}
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setIsExpanded(!isExpanded)}
+                            className="h-8 w-8 rounded-lg"
+                        >
+                            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </Button>
+                    </div>
+                </div>
+                {/* Mobile search input */}
+                {isExpanded && (
+                    <div className="relative w-full mt-3 sm:hidden" onClick={(e) => e.stopPropagation()}>
                         <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
                             placeholder="Search employee name/email..."
@@ -222,105 +257,107 @@ const OnboardingTrackerWidget = () => {
                             className="pl-9 h-9 bg-background/50 border-border/50 rounded-xl text-xs focus:ring-primary/20 focus:border-primary"
                         />
                     </div>
-                </div>
+                )}
             </CardHeader>
-            <CardContent className="p-0">
-                {filteredList.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-16 text-center px-4">
-                        <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center mb-4 border border-emerald-500/20">
-                            <Check className="h-6 w-6" />
+            {isExpanded && (
+                <CardContent className="p-0">
+                    {filteredList.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-16 text-center px-4">
+                            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center mb-4 border border-emerald-500/20">
+                                <Check className="h-6 w-6" />
+                            </div>
+                            <h3 className="text-sm font-bold text-foreground">
+                                {searchQuery ? "No matching employees found" : "All Caught Up!"}
+                            </h3>
+                            <p className="text-xs text-muted-foreground mt-1 max-w-xs leading-normal">
+                                {searchQuery 
+                                    ? "No employees match your search query. Try another name or email."
+                                    : "Every employee has successfully submitted their complete onboarding!"}
+                            </p>
                         </div>
-                        <h3 className="text-sm font-bold text-foreground">
-                            {searchQuery ? "No matching employees found" : "All Caught Up!"}
-                        </h3>
-                        <p className="text-xs text-muted-foreground mt-1 max-w-xs leading-normal">
-                            {searchQuery 
-                                ? "No employees match your search query. Try another name or email."
-                                : "Every employee has successfully submitted their complete onboarding!"}
-                        </p>
-                    </div>
-                ) : (
-                    <div className="divide-y divide-border/40 max-h-[420px] overflow-y-auto custom-scrollbar">
-                        {filteredList.map((user) => {
-                            const statuses = [
-                                user.profileStatus,
-                                user.documentStatus,
-                                user.educationStatus,
-                                user.experienceStatus,
-                                user.bankStatus,
-                            ];
-                            const submittedCount = statuses.filter(s => s === "submitted" || s === "resubmitted" || s === "approved").length;
-                            const progressPercent = Math.round((submittedCount / 5) * 100);
+                    ) : (
+                        <div className="divide-y divide-border/40 max-h-[420px] overflow-y-auto custom-scrollbar">
+                            {filteredList.map((user) => {
+                                const statuses = [
+                                    user.profileStatus,
+                                    user.documentStatus,
+                                    user.educationStatus,
+                                    user.experienceStatus,
+                                    user.bankStatus,
+                                ];
+                                const submittedCount = statuses.filter(s => s === "submitted" || s === "resubmitted" || s === "approved").length;
+                                const progressPercent = Math.round((submittedCount / 5) * 100);
 
-                            const initials = (user.name || "")
-                                .split(" ")
-                                .map((n: string) => n[0])
-                                .slice(0, 2)
-                                .join("")
-                                .toUpperCase() || "??";
+                                const initials = (user.name || "")
+                                    .split(" ")
+                                    .map((n: string) => n[0])
+                                    .slice(0, 2)
+                                    .join("")
+                                    .toUpperCase() || "??";
 
-                            let hash = 0;
-                            const nameForHash = user.name || "Unknown";
-                            for (let i = 0; i < nameForHash.length; i++) {
-                                hash = nameForHash.charCodeAt(i) + ((hash << 5) - hash);
-                            }
-                            const avatarColor = `hsl(${Math.abs(hash) % 360}, 65%, 45%)`;
+                                let hash = 0;
+                                const nameForHash = user.name || "Unknown";
+                                for (let i = 0; i < nameForHash.length; i++) {
+                                    hash = nameForHash.charCodeAt(i) + ((hash << 5) - hash);
+                                }
+                                const avatarColor = `hsl(${Math.abs(hash) % 360}, 65%, 45%)`;
 
-                            return (
-                                <div 
-                                    key={user.id}
-                                    className="p-5 flex flex-col xl:flex-row xl:items-center justify-between gap-5 hover:bg-muted/30 transition-all duration-300 group"
-                                >
-                                    <div className="flex items-center gap-4 min-w-[240px]">
-                                        <Avatar className="h-10 w-10 rounded-xl ring-1 ring-border/50 flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
-                                            {user.avatar && <AvatarImage src={user.avatar} className="object-cover" />}
-                                            <AvatarFallback className="rounded-xl text-white font-bold text-xs" style={{ backgroundColor: avatarColor }}>
-                                                {initials}
-                                            </AvatarFallback>
-                                        </Avatar>
-                                        <div className="min-w-0">
-                                            <h4 className="text-xs font-bold text-foreground truncate group-hover:text-primary transition-colors">
-                                                {user.name}
-                                            </h4>
-                                            <p className="text-[10px] text-muted-foreground truncate">{user.email}</p>
-                                            <div className="flex items-center gap-2 mt-1.5">
-                                                <div className="h-1.5 w-24 rounded-full bg-muted overflow-hidden">
-                                                    <div 
-                                                        className={cn(
-                                                            "h-full rounded-full transition-all duration-500",
-                                                            progressPercent >= 80 ? "bg-emerald-500" :
-                                                            progressPercent >= 40 ? "bg-amber-500" : "bg-orange-500"
-                                                        )}
-                                                        style={{ width: `${progressPercent}%` }}
-                                                    />
+                                return (
+                                    <div 
+                                        key={user.id}
+                                        className="p-5 flex flex-col xl:flex-row xl:items-center justify-between gap-5 hover:bg-muted/30 transition-all duration-300 group"
+                                    >
+                                        <div className="flex items-center gap-4 min-w-[240px]">
+                                            <Avatar className="h-10 w-10 rounded-xl ring-1 ring-border/50 flex-shrink-0 group-hover:scale-105 transition-transform duration-300">
+                                                {user.avatar && <AvatarImage src={user.avatar} className="object-cover" />}
+                                                <AvatarFallback className="rounded-xl text-white font-bold text-xs" style={{ backgroundColor: avatarColor }}>
+                                                    {initials}
+                                                </AvatarFallback>
+                                            </Avatar>
+                                            <div className="min-w-0">
+                                                <h4 className="text-xs font-bold text-foreground truncate group-hover:text-primary transition-colors">
+                                                    {user.name}
+                                                </h4>
+                                                <p className="text-[10px] text-muted-foreground truncate">{user.email}</p>
+                                                <div className="flex items-center gap-2 mt-1.5">
+                                                    <div className="h-1.5 w-24 rounded-full bg-muted overflow-hidden">
+                                                        <div 
+                                                            className={cn(
+                                                                "h-full rounded-full transition-all duration-500",
+                                                                progressPercent >= 80 ? "bg-emerald-500" :
+                                                                progressPercent >= 40 ? "bg-amber-500" : "bg-orange-500"
+                                                            )}
+                                                            style={{ width: `${progressPercent}%` }}
+                                                        />
+                                                    </div>
+                                                    <span className="text-[9px] font-bold text-muted-foreground">{progressPercent}% Submitted</span>
                                                 </div>
-                                                <span className="text-[9px] font-bold text-muted-foreground">{progressPercent}% Submitted</span>
                                             </div>
                                         </div>
-                                    </div>
 
-                                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 flex-1 justify-start xl:justify-center">
-                                        {getStatusIndicator(user.profileStatus, "Profile")}
-                                        {getStatusIndicator(user.documentStatus, "Documents")}
-                                        {getStatusIndicator(user.educationStatus, "Education")}
-                                        {getStatusIndicator(user.experienceStatus, "Experience")}
-                                        {getStatusIndicator(user.bankStatus, "Bank")}
-                                    </div>
+                                        <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 flex-1 justify-start xl:justify-center">
+                                            {getStatusIndicator(user.profileStatus, "Profile")}
+                                            {getStatusIndicator(user.documentStatus, "Documents")}
+                                            {getStatusIndicator(user.educationStatus, "Education")}
+                                            {getStatusIndicator(user.experienceStatus, "Experience")}
+                                            {getStatusIndicator(user.bankStatus, "Bank")}
+                                        </div>
 
-                                    <div className="flex items-center justify-end flex-shrink-0 pl-4">
-                                        <button
-                                            onClick={() => navigate(`/hrms/onboarding/dashboard`)}
-                                            className="inline-flex items-center justify-center p-2 rounded-xl text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300"
-                                        >
-                                            <ChevronRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                                        </button>
+                                        <div className="flex items-center justify-end flex-shrink-0 pl-4">
+                                            <button
+                                                onClick={() => navigate(`/hrms/onboarding/dashboard`)}
+                                                className="inline-flex items-center justify-center p-2 rounded-xl text-muted-foreground hover:text-primary hover:bg-primary/5 transition-all duration-300"
+                                            >
+                                                <ChevronRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
-            </CardContent>
+                                );
+                            })}
+                        </div>
+                    )}
+                </CardContent>
+            )}
         </Card>
     );
 };
@@ -332,7 +369,7 @@ const Dashboard = () => {
     const [currentTime, setCurrentTime] = useState<string>("");
     const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
 
-    const {teamId, isSuperUser, isAdmin} = useAuth();
+    const {teamName, teamId, isSuperUser, isAdmin} = useAuth();
 
     const { data: myStatus } = useMyOnboardingStatus();
     const [showOnboardingModal, setShowOnboardingModal] = useState(false);
@@ -557,15 +594,7 @@ const Dashboard = () => {
     return (
         <div className="space-y-6 p-8">
             {/* Quick Actions */}
-
-            {/* Onboarding Status Tracker Widget */}
-            {(teamId == 8 || isSuperUser) && (
-                <div className="hidden md:block">
-                    <OnboardingTrackerWidget />
-                </div>
-            )}
             
-
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {quickActions
                     .filter(action => action.title !== "New Tender" || isTenderingTeam)
@@ -577,6 +606,14 @@ const Dashboard = () => {
                     />
                 ))}
             </div>
+
+
+            {/* Onboarding Status Tracker Widget */}
+            {(teamName == "HR" || isSuperUser) && (
+                <div className="hidden md:block">
+                    <OnboardingTrackerWidget />
+                </div>
+            )}
 
             {/* Statistics Cards */}
             {/* <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
