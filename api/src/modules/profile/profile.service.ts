@@ -10,8 +10,8 @@ const EMPLOYEE_DOCS_UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'hrms', 'em
 //final list of requires docs every employee needs to upload
 const REQUIRED_DOC_TYPES = [
   'Aadhar Card',
+  'PAN Card',
   'Graduation Certificate',
-  'Resume / CV',
   'Passport Size Photo',
   'Bank Passbook / Cancelled Cheque',
 ]; 
@@ -180,6 +180,7 @@ export class ProfileService {
       alternatePhone: null,
       aadharNumber: upr.aadharNumber || null,
       panNumber: upr.panNumber || null,
+      pfNumber: upr.pfNumber || null,
       bloodGroup: (upr as any).bloodGroup || null,
       linkedinProfile: (upr as any).linkedinProfile || null,
       employeeCode: upr.employeeCode || null,

@@ -73,6 +73,7 @@ const SignupSchema = z.object({
   alternatePhone: z.string().optional(),
   aadharNumber: z.string().optional(),
   panNumber: z.string().optional(),
+  pfNumber: z.string().optional(),
 
   // Current Address
   currentAddressLine1: z.string().min(1, 'Address line 1 is required'),
