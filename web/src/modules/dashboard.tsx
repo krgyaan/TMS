@@ -124,7 +124,7 @@ const QuickActionCard = ({ icon: Icon, title, subtitle, color, bgColor, onClick 
 const OnboardingTrackerWidget = () => {
     const { data: incompleteList, isLoading, error } = useIncompleteOnboarding();
     const [searchQuery, setSearchQuery] = useState("");
-    const [isExpanded, setIsExpanded] = useState(true);
+    const [isExpanded, setIsExpanded] = useState(false);
     const navigate = useNavigate();
 
     const filteredList = useMemo(() => {
