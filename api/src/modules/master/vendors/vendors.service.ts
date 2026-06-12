@@ -1,4 +1,4 @@
-﻿import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
@@ -89,7 +89,14 @@ export class VendorsService {
     }
 
     async create(data: NewVendor): Promise<Vendor> {
-        const rows = await this.db.insert(vendors).values(data).returning();
+        const trimmedData = {
+            ...data,
+            name: data.name?.trim(),
+            email: data.email?.trim(),
+            mobile: data.mobile?.trim(),
+            address: data.address?.trim(),
+        };
+        const rows = await this.db.insert(vendors).values(trimmedData).returning();
         const vendor = rows[0];
         await this.clientDirectorySyncService.syncToClientDirectory([{
             name: vendor.name,
@@ -101,9 +108,16 @@ export class VendorsService {
     }
 
     async update(id: number, data: Partial<NewVendor>): Promise<Vendor> {
+        const trimmedData = {
+            ...data,
+            name: data.name?.trim(),
+            email: data.email?.trim(),
+            mobile: data.mobile?.trim(),
+            address: data.address?.trim(),
+        };
         const rows = await this.db
             .update(vendors)
-            .set({ ...data, updatedAt: new Date() })
+            .set({ ...trimmedData, updatedAt: new Date() })
             .where(eq(vendors.id, id))
             .returning();
 

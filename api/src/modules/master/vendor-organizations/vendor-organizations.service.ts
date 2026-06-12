@@ -186,10 +186,17 @@ export class VendorOrganizationsService {
         if (data.persons && data.persons.length > 0) {
             for (const personData of data.persons) {
                 const { files, ...personFields } = personData;
+                const trimmedPersonFields = {
+                    ...personFields,
+                    name: personFields.name?.trim(),
+                    email: personFields.email?.trim(),
+                    mobile: personFields.mobile?.trim(),
+                    address: personFields.address?.trim(),
+                };
                 const person = await this.db
                     .insert(vendors)
                     .values({
-                        ...personFields,
+                        ...trimmedPersonFields,
                         orgId: organization.id,
                     })
                     .returning();
@@ -298,10 +305,17 @@ export class VendorOrganizationsService {
             if (data.persons.create && data.persons.create.length > 0) {
                 for (const personData of data.persons.create) {
                     const { files, ...personFields } = personData;
+                    const trimmedPersonFields = {
+                        ...personFields,
+                        name: personFields.name?.trim(),
+                        email: personFields.email?.trim(),
+                        mobile: personFields.mobile?.trim(),
+                        address: personFields.address?.trim(),
+                    };
                     const person = await this.db
                         .insert(vendors)
                         .values({
-                            ...personFields,
+                            ...trimmedPersonFields,
                             orgId: id,
                         })
                         .returning();
@@ -318,9 +332,16 @@ export class VendorOrganizationsService {
             }
             if (data.persons.update) {
                 for (const { id: personId, data: personData } of data.persons.update) {
+                    const trimmedPersonData = {
+                        ...personData,
+                        name: personData.name?.trim(),
+                        email: personData.email?.trim(),
+                        mobile: personData.mobile?.trim(),
+                        address: personData.address?.trim(),
+                    };
                     await this.db
                         .update(vendors)
-                        .set({ ...personData, updatedAt: new Date() })
+                        .set({ ...trimmedPersonData, updatedAt: new Date() })
                         .where(eq(vendors.id, personId));
                 }
             }

@@ -1,13 +1,13 @@
-﻿import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, HttpCode, HttpStatus, Delete } from "@nestjs/common";
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, HttpCode, HttpStatus, Delete } from "@nestjs/common";
 import { z } from "zod";
 import { VendorsService } from "@/modules/master/vendors/vendors.service";
 
 const CreateVendorSchema = z.object({
     orgId: z.number().optional(),
-    name: z.string().min(1).max(255),
-    email: z.string().email(),
-    mobile: z.string().min(1).max(22),
-    address: z.string().optional(),
+    name: z.string().trim().min(1).max(255),
+    email: z.string().trim().email(),
+    mobile: z.string().trim().min(1).max(22),
+    address: z.string().trim().optional(),
 });
 
 const UpdateVendorSchema = CreateVendorSchema.partial();
