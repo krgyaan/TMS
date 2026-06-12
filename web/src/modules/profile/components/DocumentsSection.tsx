@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -99,7 +99,7 @@ interface UploadedDocument {
 const REQUIRED_DOCUMENTS: DocumentType[] = [
   // Identity Documents
   { id: "aadhar", docType: "Aadhar Card", docCategory: "Identity Documents", required: true, uploaded: false },
-  { id: "pan", docType: "PAN Card", docCategory: "Identity Documents", required: false, uploaded: false },
+  { id: "pan", docType: "PAN Card", docCategory: "Identity Documents", required: true, uploaded: false },
   { id: "passport", docType: "Passport", docCategory: "Identity Documents", required: false, uploaded: false },
   { id: "driving-license", docType: "Driving License", docCategory: "Identity Documents", required: false, uploaded: false },
   { id: "voter-id", docType: "Voter ID", docCategory: "Identity Documents", required: false, uploaded: false },
@@ -116,7 +116,7 @@ const REQUIRED_DOCUMENTS: DocumentType[] = [
   { id: "experience-cert", docType: "Experience Certificates", docCategory: "Employment Documents", required: false, uploaded: false },
   { id: "salary-slips", docType: "Salary Slips (Last 3 months)", docCategory: "Employment Documents", required: false, uploaded: false },
   // Other Documents
-  { id: "resume", docType: "Resume / CV", docCategory: "Other Documents", required: true, uploaded: false },
+  { id: "resume", docType: "Resume / CV", docCategory: "Other Documents", required: false, uploaded: false },
   { id: "photo", docType: "Passport Size Photo", docCategory: "Other Documents", required: true, uploaded: false },
   { id: "bank-proof", docType: "Bank Passbook / Cancelled Cheque", docCategory: "Other Documents", required: true, uploaded: false },
   { id: "nda", docType: "NDA (signed)", docCategory: "Other Documents", required: false, uploaded: false },
@@ -832,7 +832,7 @@ export const DocumentsSection: React.FC = () => {
   const queryClient = useQueryClient();
 
   const [activeCategory, setActiveCategory] = useState<string>("all");
-  const [activeView, setActiveView] = useState<"uploaded" | "pending">("uploaded");
+  const [activeView, setActiveView] = useState<"uploaded" | "pending">(isOnboarding ? "pending" : "uploaded");
   const [searchQuery, setSearchQuery] = useState("");
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [previewDialogOpen, setPreviewDialogOpen] = useState(false);

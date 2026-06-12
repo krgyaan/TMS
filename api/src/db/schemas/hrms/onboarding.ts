@@ -78,6 +78,7 @@ export const onboardingProfiles = pgTable('hrms_onboarding_profiles', {
   panNumber: varchar('pan_number', { length: 20 }),
   bloodGroup: varchar('blood_group', { length: 10 }),
   linkedinProfile: varchar('linkedin_profile', { length: 255 }),
+  pfNumber: varchar('pf_number', { length: 50 }),
 
   currentAddress: jsonb('current_address').default({}),
   permanentAddress: jsonb('permanent_address').default({}),

@@ -301,6 +301,7 @@ export class OnboardingService {
         phone: userProfile?.phone || user.mobile || null,
         aadharNumber: userProfile?.aadharNumber || null,
         panNumber: userProfile?.panNumber || null,
+        pfNumber: userProfile?.pfNumber || null,
         bloodGroup: userProfile?.bloodGroup || null,
         linkedinProfile: userProfile?.linkedinProfile || null,
         currentAddress,
@@ -458,6 +459,7 @@ export class OnboardingService {
         altEmail: obProfile.email,
         aadharNumber: obProfile.aadharNumber,
         panNumber: obProfile.panNumber,
+        pfNumber: obProfile.pfNumber,
         bloodGroup: obProfile.bloodGroup,
         linkedinProfile: obProfile.linkedinProfile,
         currentAddress: obProfile.currentAddress,
@@ -482,6 +484,7 @@ export class OnboardingService {
         probationEndDate: obProfile.probationEndDate,
         salaryType: obProfile.salaryType,
         basicSalary: obProfile.basicSalary,
+        pfNumber: obProfile.pfNumber,
       };
 
       if (existingEmp) {
@@ -1679,6 +1682,7 @@ export class OnboardingService {
       nationality: onProf.nationality,
       aadharNumber: onProf.aadharNumber,
       panNumber: onProf.panNumber,
+      pfNumber: onProf.pfNumber,
       phone: onProf.phone,
       altEmail: onProf.email,
       bloodGroup: onProf.bloodGroup,
@@ -1711,6 +1715,7 @@ export class OnboardingService {
       probationEndDate: onProf.probationEndDate,
       salaryType: onProf.salaryType,
       basicSalary: onProf.basicSalary,
+      pfNumber: onProf.pfNumber,
       hra: onProf.hra,
       allowances: onProf.allowances,
       bonus: onProf.bonus,

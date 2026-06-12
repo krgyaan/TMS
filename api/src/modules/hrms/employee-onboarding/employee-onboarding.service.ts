@@ -33,8 +33,8 @@ const EMPLOYEE_DOCS_UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'hrms', 'em
 
 const REQUIRED_DOC_TYPES = [
   'Aadhar Card',
+  'PAN Card',
   'Graduation Certificate',
-  'Resume / CV',
   'Passport Size Photo',
   'Bank Passbook / Cancelled Cheque',
 ];
@@ -55,6 +55,7 @@ export interface SubmitSignupDto {
   alternatePhone?: string;
   aadharNumber?: string;
   panNumber?: string;
+  pfNumber?: string;
 
   // Current Address
   currentAddressLine1: string;
@@ -198,6 +199,7 @@ export class EmployeeOnboardingService {
         phone: dto.phone,
         aadharNumber: dto.aadharNumber ?? null,
         panNumber: dto.panNumber ?? null,
+        pfNumber: dto.pfNumber ?? null,
 
         // Address (stored as JSONB)
         currentAddress,
@@ -335,6 +337,7 @@ export class EmployeeOnboardingService {
         alternatePhone: null,
         aadharNumber: obProfile.aadharNumber || null,
         panNumber: obProfile.panNumber || null,
+        pfNumber: obProfile.pfNumber || null,
         bloodGroup: obProfile.bloodGroup || null,
         linkedinProfile: obProfile.linkedinProfile || null,
         status: obProfile.status ? obProfile.status : 'pending',
@@ -590,7 +593,7 @@ export class EmployeeOnboardingService {
     const onboardingId = activeReqs[0].id;
 
     // Determine if the DTO contains profile fields (vs bank-only submission)
-    const hasProfileFields = dto.firstName !== undefined || dto.lastName !== undefined || dto.dateOfBirth !== undefined || dto.gender !== undefined || dto.phone !== undefined || dto.personalEmail !== undefined || dto.aadharNumber !== undefined || dto.panNumber !== undefined;
+    const hasProfileFields = dto.firstName !== undefined || dto.lastName !== undefined || dto.dateOfBirth !== undefined || dto.gender !== undefined || dto.phone !== undefined || dto.personalEmail !== undefined || dto.aadharNumber !== undefined || dto.panNumber !== undefined || dto.pfNumber !== undefined;
 
     if (hasProfileFields) {
       // Fetch the LATEST profile record for this onboarding
@@ -617,6 +620,7 @@ export class EmployeeOnboardingService {
         nationality: dto.nationality,
         aadharNumber: dto.aadharNumber,
         panNumber: dto.panNumber,
+        pfNumber: dto.pfNumber,
         phone: dto.phone,
         email: dto.personalEmail,
         bloodGroup: dto.bloodGroup,

@@ -92,6 +92,7 @@ function buildProfileDetails(data: any): StageDetail[] {
         { label: "Personal Email", value: p.personalEmail || null },
         { label: "Aadhar Number", value: p.aadharNumber || null },
         { label: "PAN Number", value: p.panNumber || null },
+        { label: "PF Number", value: p.pfNumber || null },
         { label: "Blood Group", value: p.bloodGroup || null },
         { label: "Marital Status", value: p.maritalStatus || null },
         { label: "Nationality", value: p.nationality || null },
