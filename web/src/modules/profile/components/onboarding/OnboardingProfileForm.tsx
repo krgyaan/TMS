@@ -24,6 +24,7 @@ import {
   ShieldCheck,
   Home,
   UserCheck,
+  Hash,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -61,6 +62,7 @@ const profileSchema = z.object({
   alternatePhone: z.string().optional(),
   aadharNumber: z.string().optional(),
   panNumber: z.string().optional(),
+  pfNumber: z.string().optional(),
   linkedinProfile: z.string().optional(),
 
   // Address
@@ -129,6 +131,7 @@ const TAB_FIELDS: Record<TabId, (keyof ProfileFormValues)[]> = {
     "alternatePhone",
     "aadharNumber",
     "panNumber",
+    "pfNumber",
     "linkedinProfile",
   ],
   address: [
@@ -362,6 +365,7 @@ export function OnboardingProfileForm({
       alternatePhone: P.alternatePhone || "",
       aadharNumber: P.aadharNumber || "",
       panNumber: P.panNumber || "",
+      pfNumber: P.pfNumber || "",
       linkedinProfile: P.linkedinProfile || "",
 
       currentAddressLine1: ADDR.currentAddressLine1 || "",
@@ -911,7 +915,7 @@ export function OnboardingProfileForm({
 
             {/* Identity */}
             <Separator className="bg-border/10" />
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-5 gap-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4">
               <FormField
                 label="Nationality"
                 required
@@ -949,6 +953,20 @@ export function OnboardingProfileForm({
                   {...register("panNumber")}
                   placeholder="ABCDE1234F"
                   hasError={!!errors.panNumber}
+                  disabled={isLocked}
+                  className="font-mono uppercase"
+                />
+              </FormField>
+              <FormField
+                label="PF Number"
+                error={errors.pfNumber?.message}
+                icon={Hash}
+                hint="Provident Fund Number"
+              >
+                <FormInput
+                  {...register("pfNumber")}
+                  placeholder="XX/XXX/XXXXXXX/XXX/XXXXXXX"
+                  hasError={!!errors.pfNumber}
                   disabled={isLocked}
                   className="font-mono uppercase"
                 />

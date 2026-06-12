@@ -1,5 +1,5 @@
 import { Injectable, Inject, NotFoundException, ConflictException, ForbiddenException, BadRequestException } from '@nestjs/common';
-import { eq, desc, aliasedTable, and } from 'drizzle-orm';
+import { eq, desc, aliasedTable, and, sql } from 'drizzle-orm';
 import { DRIZZLE } from '@/db/database.module';
 import type { DbInstance } from '@/db';
 import * as fs from 'fs';
@@ -10,8 +10,8 @@ const EMPLOYEE_DOCS_UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'hrms', 'em
 //final list of requires docs every employee needs to upload
 const REQUIRED_DOC_TYPES = [
   'Aadhar Card',
+  'PAN Card',
   'Graduation Certificate',
-  'Resume / CV',
   'Passport Size Photo',
   'Bank Passbook / Cancelled Cheque',
 ]; 
@@ -161,7 +161,7 @@ export class ProfileService {
       .from(userProfiles)
       .leftJoin(users, eq(users.id, userProfiles.userId))
       .leftJoin(designations, eq(userProfiles.designationId, designations.id))
-      .leftJoin(teams, eq(users.primaryTeamId, teams.id))
+      .leftJoin(teams, eq(teams.id, sql<number>`COALESCE(${users.primaryTeamId}, ${users.team})`))
       .where(eq(userProfiles.userId, userId))
       .limit(1);
 
@@ -180,6 +180,7 @@ export class ProfileService {
       alternatePhone: null,
       aadharNumber: upr.aadharNumber || null,
       panNumber: upr.panNumber || null,
+      pfNumber: upr.pfNumber || null,
       bloodGroup: (upr as any).bloodGroup || null,
       linkedinProfile: (upr as any).linkedinProfile || null,
       employeeCode: upr.employeeCode || null,
