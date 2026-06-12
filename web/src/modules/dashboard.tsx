@@ -369,7 +369,7 @@ const Dashboard = () => {
     const [currentTime, setCurrentTime] = useState<string>("");
     const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
 
-    const {teamId, isSuperUser, isAdmin} = useAuth();
+    const {teamName, teamId, isSuperUser, isAdmin} = useAuth();
 
     const { data: myStatus } = useMyOnboardingStatus();
     const [showOnboardingModal, setShowOnboardingModal] = useState(false);
@@ -609,7 +609,7 @@ const Dashboard = () => {
 
 
             {/* Onboarding Status Tracker Widget */}
-            {(teamId == 8 || isSuperUser) && (
+            {(teamName == "HR" || isSuperUser) && (
                 <div className="hidden md:block">
                     <OnboardingTrackerWidget />
                 </div>
