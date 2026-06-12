@@ -20,7 +20,7 @@ export default function ProjectDashboardPage() {
     const { projectId: projectIdParam } = useParams<{ projectId: string }>();
     const navigate = useNavigate();
     const { isTeamLeader, isAdmin, isSuperUser, teamId } = useAuth();
-    const isOpsTeamLeader = isTeamLeader && Number(teamId) == 3;
+    const isOpsTeamLeader = isTeamLeader;
 
     const form = useForm<{ projectId: string | null }>({
         defaultValues: { projectId: projectIdParam || null },
