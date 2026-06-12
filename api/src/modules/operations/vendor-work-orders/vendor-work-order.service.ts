@@ -2,7 +2,7 @@ import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { eq, like, desc, sql } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { join } from "node:path";
-import { rename } from "node:fs/promises";
+import { rename, readFile } from "node:fs/promises";
 
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
@@ -12,6 +12,7 @@ import { ClientDirectorySyncService } from "@/modules/shared/client-directory/cl
 import { vendorWorkOrders } from "@/db/schemas/operations/vendor-work-orders.schema";
 import { vendorWorkOrderItems } from "@/db/schemas/operations/vendor-work-order-items.schema";
 import { projectParties } from "@/db/schemas/operations/project-parties.schema";
+import { woBasicDetails } from "@/db/schemas/operations/work-order.schema";
 import { users } from "@/db/schemas";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
@@ -558,7 +559,22 @@ export class VendorWorkOrderService {
         const totalGstAmt = items.reduce((s: number, i: any) => s + i.gst_amount, 0);
         const grandTotal = totalAmount + totalGstAmt;
 
+        // Determine signature image based on team
+        const [woBasic] = await this.db
+            .select({ team: woBasicDetails.team })
+            .from(woBasicDetails)
+            .where(eq(woBasicDetails.tenderId, wo.tenderId))
+            .limit(1);
+        const team = woBasic?.team;
+        const isProd = process.env.NODE_ENV === 'production';
+        const rootDir = isProd ? 'dist' : 'src';
+        const assetsPath = join(process.cwd(), rootDir, 'modules', 'pdf', 'assets');
+        const signFile = team === 1 ? 'arju-boi.png' : 'sign-po.jpg';
+        const signBuffer = await readFile(join(assetsPath, signFile));
+        const img_sign_po_base64 = signBuffer.toString('base64');
+
         const data = {
+            img_sign_po_base64,
             wo_date: wo.woDate || "",
             wo_number: wo.woNumber || "",
             project_name: wo.projectName || "",
