@@ -32,7 +32,6 @@ export const purchaseOrders = pgTable(
         tenderId: bigint("tender_id", { mode: "number" }).notNull(),
         projectId: bigint("project_id", { mode: "number" }).notNull(),
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-        generatedPdf: varchar("generated_pdf", { length: 500 }),
         generatedPdfVersions: jsonb("generated_pdf_versions").notNull().default({}),
         updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     },

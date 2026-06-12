@@ -24,8 +24,6 @@ export interface VendorWorkOrderRow {
     totalAmount: number;
     totalGstAmt: number;
     grandTotal: number;
-    woPdf?: string;
-    generatedPdf?: string;
     generatedPdfVersions?: Record<string, { path: string; hash: string }>;
 }
 

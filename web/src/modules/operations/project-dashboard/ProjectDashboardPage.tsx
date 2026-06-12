@@ -12,6 +12,8 @@ import { EmployeeImprestsSection } from "./sections/EmployeeImprestsSection";
 import { ProjectOverviewSection } from "./sections/ProjectOverviewSection";
 import { PurchaseOrdersSection } from "./sections/PurchaseOrdersSection";
 import { VendorWorkOrdersSection } from "./sections/VendorWorkOrdersSection";
+import { PurchaseInvoicesSection } from "./sections/PurchaseInvoicesSection";
+import { PaymentRequestsSection } from "./sections/PaymentRequestsSection";
 import { useProjectMasterOptions } from "@/hooks/api/useProjectMaster";
 
 export default function ProjectDashboardPage() {
@@ -94,6 +96,8 @@ export default function ProjectDashboardPage() {
             <ProjectOverviewSection projectId={Number(projectId)} />
             <PurchaseOrdersSection projectId={Number(projectId)} />
             <VendorWorkOrdersSection projectId={Number(projectId)} />
+            <PurchaseInvoicesSection projectId={Number(projectId)} />
+            <PaymentRequestsSection projectId={Number(projectId)} />
             <EmployeeImprestsSection projectId={Number(projectId)} />
         </div>
     );

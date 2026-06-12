@@ -1,6 +1,8 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { eq, like, desc, sql } from "drizzle-orm";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { join } from "node:path";
+import { rename } from "node:fs/promises";
 
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
@@ -277,7 +279,6 @@ export class VendorWorkOrderService {
                 totalAmount: sql<number>`COALESCE((SELECT SUM(CAST(taxable_amount AS numeric)) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
                 totalGstAmt: sql<number>`COALESCE((SELECT SUM(CAST(gst_amount AS numeric)) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
                 grandTotal: sql<number>`COALESCE((SELECT SUM(CAST(total_amount AS numeric)) FROM vendor_work_order_items WHERE vendor_work_order_id = ${vendorWorkOrders.id}), 0)`,
-                generatedPdf: vendorWorkOrders.generatedPdf,
                 generatedPdfVersions: vendorWorkOrders.generatedPdfVersions,
             })
             .from(vendorWorkOrders)
@@ -355,28 +356,49 @@ export class VendorWorkOrderService {
     }
 
     async getPdf(id: number, version?: string) {
-        const wo = await this.db
-            .select({
-                generatedPdf: vendorWorkOrders.generatedPdf,
-                generatedPdfVersions: vendorWorkOrders.generatedPdfVersions,
-                woNumber: vendorWorkOrders.woNumber,
-            })
-            .from(vendorWorkOrders)
-            .where(eq(vendorWorkOrders.id, id))
-            .then(rows => rows[0]);
-        if (!wo) throw new NotFoundException("Vendor Work Order not found");
+        try {
+            const wo = await this.db
+                .select({
+                    generatedPdfVersions: vendorWorkOrders.generatedPdfVersions,
+                    woNumber: vendorWorkOrders.woNumber,
+                })
+                .from(vendorWorkOrders)
+                .where(eq(vendorWorkOrders.id, id))
+                .then(rows => rows[0]);
+            if (!wo) throw new NotFoundException("Vendor Work Order not found");
 
-        if (version && wo.generatedPdfVersions) {
-            const versions = wo.generatedPdfVersions as Record<string, { path: string; hash: string }>;
-            const v = versions[version];
-            if (!v) throw new NotFoundException(`PDF version ${version} not found`);
-            return { path: v.path, filename: `${wo.woNumber}_${version}.pdf` };
+            const versions = (wo.generatedPdfVersions ?? {}) as Record<string, { path: string; hash: string }>;
+
+            if (version) {
+                const v = versions[version];
+                if (!v) throw new NotFoundException(`PDF version ${version} not found`);
+                return { path: v.path, filename: `${wo.woNumber}_${version}.pdf` };
+            }
+
+            // No version specified → return latest
+            const sorted = Object.entries(versions).sort((a, b) =>
+                this.parseLabelDate(b[0]).getTime() - this.parseLabelDate(a[0]).getTime()
+            );
+            if (sorted.length === 0) throw new NotFoundException("No PDF versions found for this Vendor Work Order");
+            const [latestLabel, latestEntry] = sorted[0];
+            return {
+                path: latestEntry.path,
+                filename: `${wo.woNumber}_${latestLabel}.pdf`,
+            };
+        } catch (error) {
+            this.logger.error(`Failed to get VWO PDF: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
         }
+    }
 
-        return {
-            path: wo.generatedPdf || "",
-            filename: `${wo.woNumber}.pdf`,
-        };
+    private parseLabelDate(label: string): Date {
+        if (label === "v-original") return new Date(0);
+        const match = label.match(/^v-(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})$/);
+        if (match) {
+            const [, y, m, d, h, min, s] = match.map(Number);
+            return new Date(y, m - 1, d, h, min, s);
+        }
+        return new Date(0);
     }
 
     async getPdfVersions(id: number) {
@@ -389,25 +411,26 @@ export class VendorWorkOrderService {
     }
 
     async deletePdfVersion(id: number, version: string) {
-        const wo = await this.db
-            .select({ generatedPdfVersions: vendorWorkOrders.generatedPdfVersions, generatedPdf: vendorWorkOrders.generatedPdf })
-            .from(vendorWorkOrders)
-            .where(eq(vendorWorkOrders.id, id))
-            .then(rows => rows[0]);
-        if (!wo) throw new NotFoundException("Vendor Work Order not found");
+        try {
+            const wo = await this.db
+                .select({ generatedPdfVersions: vendorWorkOrders.generatedPdfVersions })
+                .from(vendorWorkOrders)
+                .where(eq(vendorWorkOrders.id, id))
+                .then(rows => rows[0]);
+            if (!wo) throw new NotFoundException("Vendor Work Order not found");
 
-        const versions = { ...(wo.generatedPdfVersions as Record<string, { path: string; hash: string }>) };
-        delete versions[version];
+            const versions = { ...(wo.generatedPdfVersions as Record<string, { path: string; hash: string }>) };
+            if (!versions[version]) throw new NotFoundException(`PDF version "${version}" not found`);
+            delete versions[version];
 
-        const latestVersion = Object.values(versions).sort((a, b) => (a.hash > b.hash ? -1 : 1))[0];
-
-        await this.db
-            .update(vendorWorkOrders)
-            .set({
-                generatedPdfVersions: versions,
-                generatedPdf: latestVersion?.path || null,
-            })
-            .where(eq(vendorWorkOrders.id, id));
+            await this.db
+                .update(vendorWorkOrders)
+                .set({ generatedPdfVersions: versions })
+                .where(eq(vendorWorkOrders.id, id));
+        } catch (error) {
+            this.logger.error(`Failed to delete VWO PDF version: ${error instanceof Error ? error.message : String(error)}`);
+            throw error;
+        }
     }
 
     private async syncParty(body: any) {
@@ -509,12 +532,6 @@ export class VendorWorkOrderService {
         const existingVersion = Object.values(versions).find((v) => v.hash === contentHash);
         if (existingVersion) {
             this.logger.info(`VWO ${wo.id}: no changes detected, reusing existing PDF`);
-            if (wo.generatedPdf !== existingVersion.path) {
-                await this.db
-                    .update(vendorWorkOrders)
-                    .set({ generatedPdf: existingVersion.path })
-                    .where(eq(vendorWorkOrders.id, wo.id));
-            }
             return;
         }
 
@@ -571,15 +588,27 @@ export class VendorWorkOrderService {
         try {
             const pdfPaths = await this.pdfGenerator.generatePdfs('vwo', data, wo.id, 'VWO');
             if (pdfPaths.length > 0) {
+                // Rename PDF to use WO sequence number instead of timestamp (avoids Date.now() race)
+                const woSeq = wo.woNumber?.split('/').pop() || `WO${wo.id}`;
+                const rand = randomUUID().split('-')[0];
+                const newFileName = `${woSeq}-${rand}.pdf`;
+                const storageDir = 'payment-pdfs/vwo';
+
+                const oldPath = join(process.cwd(), 'uploads', 'tendering', pdfPaths[0]);
+                const newPath = join(process.cwd(), 'uploads', 'tendering', storageDir, newFileName);
+
+                await rename(oldPath, newPath);
+
+                const finalPath = `${storageDir}/${newFileName}`;
+
                 const now = new Date();
                 const label = `v-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}-${String(now.getMinutes()).padStart(2, "0")}-${String(now.getSeconds()).padStart(2, "0")}`;
 
-                const updatedVersions = { ...versions, [label]: { path: pdfPaths[0], hash: contentHash } };
+                const updatedVersions = { ...versions, [label]: { path: finalPath, hash: contentHash } };
 
                 await this.db
                     .update(vendorWorkOrders)
                     .set({
-                        generatedPdf: pdfPaths[0],
                         generatedPdfVersions: updatedVersions,
                     })
                     .where(eq(vendorWorkOrders.id, wo.id));

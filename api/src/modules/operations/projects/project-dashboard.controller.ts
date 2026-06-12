@@ -1,18 +1,5 @@
-import {
-  Controller,
-  Get,
-  Post,
-  Param,
-  Body,
-  Query,
-  ParseIntPipe,
-  HttpCode,
-  HttpStatus,
-  Put,
-  Delete,
-  Res,
-} from "@nestjs/common";
-import { createReadStream } from "fs";
+import { Controller, Get, Post, Param, Body, Query, ParseIntPipe, HttpCode, HttpStatus, Put, Delete, Res, NotFoundException } from "@nestjs/common";
+import { createReadStream, existsSync } from "fs";
 import { join } from "path";
 import type { Response } from "express";
 
@@ -103,7 +90,18 @@ export class ProjectDashboardController {
   ) {
     const { path: relPath, filename } = await this.service.getPurchaseOrderPdf(id, version);
     const absolutePath = join(process.cwd(), "uploads", "tendering", relPath);
+
+    if (!existsSync(absolutePath)) {
+      throw new NotFoundException("PDF file not found on disk");
+    }
+
     const fileStream = createReadStream(absolutePath);
+    fileStream.on("error", (err) => {
+      if (!res.headersSent) {
+        res.status(HttpStatus.INTERNAL_SERVER_ERROR).send("Error streaming PDF");
+      }
+    });
+
     res.set({
       "Content-Type": "application/pdf",
       "Content-Disposition": `inline; filename="${filename}"`,
