@@ -1,5 +1,5 @@
 import { Injectable, Inject, NotFoundException, ConflictException, ForbiddenException, BadRequestException } from '@nestjs/common';
-import { eq, desc, aliasedTable, and } from 'drizzle-orm';
+import { eq, desc, aliasedTable, and, sql } from 'drizzle-orm';
 import { DRIZZLE } from '@/db/database.module';
 import type { DbInstance } from '@/db';
 import * as fs from 'fs';
@@ -161,7 +161,7 @@ export class ProfileService {
       .from(userProfiles)
       .leftJoin(users, eq(users.id, userProfiles.userId))
       .leftJoin(designations, eq(userProfiles.designationId, designations.id))
-      .leftJoin(teams, eq(users.primaryTeamId, teams.id))
+      .leftJoin(teams, eq(teams.id, sql<number>`COALESCE(${users.primaryTeamId}, ${users.team})`))
       .where(eq(userProfiles.userId, userId))
       .limit(1);
 
