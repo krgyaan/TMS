@@ -7,7 +7,10 @@ const BI_FDR = lazy(() => import('@/modules/bi-dashboard/fdr/FdrListPage'));
 const BI_Cheque = lazy(() => import('@/modules/bi-dashboard/cheque/ChequeListPage'));
 const BI_BankGuarantee = lazy(() => import('@/modules/bi-dashboard/bank-guarantee/BankGuaranteeListPage'));
 const BI_BankTransfer = lazy(() => import('@/modules/bi-dashboard/bank-tranfer/BankTransferListPage'));
+const BI_BankTransferMeetingRemarks = lazy(() => import('@/modules/bi-dashboard/bank-tranfer/BankTransferMeetingRemarksPage'));
+
 const BI_PayOnPortal = lazy(() => import('@/modules/bi-dashboard/pay-on-portal/PayOnPortalListPage'));
+
 const BI_TenderFee = lazy(() => import('@/modules/bi-dashboard/tender-fee/TenderFeeListPage'));
 const BI_TenderFeeAction = lazy(() => import('@/modules/bi-dashboard/tender-fee/TenderFeeActionPage'));
 const BI_TenderFeeDetails = lazy(() => import('@/modules/bi-dashboard/tender-fee/TenderFeeDetailsPage'));
@@ -46,6 +49,7 @@ export default function BIDashboardRoutes() {
             <Route path="cheque/action/:id" element={<RouteWrapper><BI_ChequeAction /></RouteWrapper>} />
             <Route path="pay-on-portal/action/:id" element={<RouteWrapper><BI_PayOnPortalAction /></RouteWrapper>} />
             <Route path="bank-transfer/action/:id" element={<RouteWrapper><BI_BankTransferAction /></RouteWrapper>} />
+            <Route path="bank-transfer/meeting-remarks/:id" element={<RouteWrapper><BI_BankTransferMeetingRemarks /></RouteWrapper>} />
             <Route path="demand-draft/details/:id" element={<RouteWrapper><BI_DemandDraftDetails /></RouteWrapper>} />
             <Route path="fdr/details/:id" element={<RouteWrapper><BI_FDRDetails /></RouteWrapper>} />
             <Route path="cheque/details/:id" element={<RouteWrapper><BI_ChequeDetails /></RouteWrapper>} />

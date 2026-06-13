@@ -18,7 +18,7 @@ import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { bankTransfersService } from '@/services/api/bank-transfers.service';
 import type { ColDef } from 'ag-grid-community';
-import { AlertCircle, CheckCircle, Clock, Edit, Eye, FileX2, RotateCcw, Search, Wallet, XCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle, Clock, Edit, Eye, FileX2, MessageSquare, RotateCcw, Search, Wallet, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { BankTransferDashboardRow, BankTransferDashboardTab } from './helpers/bankTransfer.types';
@@ -180,6 +180,11 @@ const BankTransferListPage = () => {
                 icon: <Edit className="h-4 w-4" />,
                 onClick: (row: BankTransferDashboardRow) => navigate(paths.bi.bankTransferAction(row.id)),
             },
+            {
+                label: 'Meeting Remarks',
+                icon: <MessageSquare className="h-4 w-4" />,
+                onClick: (row: BankTransferDashboardRow) => navigate(paths.bi.bankTransferMeetingRemarks(row.id)),
+            }
         ],
         [navigate]
     );

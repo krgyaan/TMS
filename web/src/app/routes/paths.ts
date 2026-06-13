@@ -168,6 +168,7 @@ export const paths = {
         bankTransfer: "/bi-dashboard/bank-transfer",
         bankTransferView: (requestId: number) => `/bi-dashboard/bank-transfer/details/${requestId}`,
         bankTransferAction: (id: number) => `/bi-dashboard/bank-transfer/action/${id}`,
+        bankTransferMeetingRemarks: (id: number) => `/bi-dashboard/bank-transfer/meeting-remarks/${id}`,
         payOnPortal: "/bi-dashboard/pay-on-portal",
         payOnPortalView: (requestId: number) => `/bi-dashboard/pay-on-portal/details/${requestId}`,
         payOnPortalAction: (id: number) => `/bi-dashboard/pay-on-portal/action/${id}`,
