@@ -1,10 +1,12 @@
 export interface PayOnPortalDashboardRow {
     id: number;
     requestId: number;
+    type: string | null;
     purpose: string | null;
     date: Date | null;
     teamMember: string | null;
     utrNo: string | null;
+    utr: string | null;
     portalName: string | null;
     tenderName: string | null;
     tenderNo: string | null;

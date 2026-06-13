@@ -1,10 +1,10 @@
 import { paths } from '@/app/routes/paths';
+import { ExportExcelDropdown } from '@/components/bi-dashboard/ExportExcelDropdown';
 import { tenderNameCol } from '@/components/data-grid/columns';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import DataTable from '@/components/ui/data-table';
 import { Input } from '@/components/ui/input';
@@ -12,12 +12,11 @@ import { QuickFilter } from '@/components/ui/quick-filter';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { usePayOnPortalDashboard, usePayOnPortalDashboardCounts } from '@/hooks/api/usePayOnPortals';
-import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { useBiExport } from '@/hooks/useBiExport';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { payOnPortalsService } from '@/services/api/pay-on-portals.service';
-import { ExportExcelDropdown } from '@/components/bi-dashboard/ExportExcelDropdown';
 import type { ColDef } from 'ag-grid-community';
 import { AlertCircle, CheckCircle, Clock, Edit, Eye, FileX2, RotateCcw, Search, Wallet, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -222,7 +221,7 @@ const PayOnPortalListPage = () => {
                 width: 140,
                 maxWidth: 140,
                 colId: 'tenderStatus',
-                valueGetter: (params) => params.data?.tenderStatus || '—',
+                valueGetter: (params) => params.data?.tenderStatus || params.data?.type || '—',
                 sortable: true,
                 filter: true,
             },
@@ -232,7 +231,7 @@ const PayOnPortalListPage = () => {
                 width: 150,
                 maxWidth: 150,
                 colId: 'utrNo',
-                valueGetter: (params) => params.data?.utrNo || '—',
+                valueGetter: (params) => params.data?.utrNo || params.data?.utr || '—',
                 sortable: true,
                 filter: true,
                 hide: activeTab === 'pending' || activeTab === 'rejected',
