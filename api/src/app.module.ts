@@ -76,6 +76,7 @@ import { DemandDraftModule } from "@/modules/bi-dashboard/demand-draft/demand-dr
 import { FdrModule } from "@/modules/bi-dashboard/fdr/fdr.module";
 import { BankTransferModule } from "@/modules/bi-dashboard/bank-transfer/bank-transfer.module";
 import { ChequeModule } from "@/modules/bi-dashboard/cheque/cheque.module";
+import { TenderFeeModule } from "@/modules/bi-dashboard/tender-fee/tender-fee.module";
 import { TimersModule } from "@/modules/timers/timers.module";
 import { BusinessPerformanceModule } from "./modules/performance/business-performance/business-performance.module";
 import { WoBasicDetailsModule } from "@/modules/operations/wo-basic-details/wo-basic-details.module";
@@ -197,6 +198,7 @@ import { ProfileModule } from './modules/profile/profile.module';
         FdrModule,
         BankTransferModule,
         ChequeModule,
+        TenderFeeModule,
         TimersModule,
         WoBasicDetailsModule,
         WoDetailsModule,

@@ -6,6 +6,7 @@ export interface BankTransferDashboardRow {
     teamMember: string | null;
     member: string | null;
     utrNo: string | null;
+    utr: string | null;
     accountName: string | null;
     tenderName: string | null;
     tenderNo: string | null;

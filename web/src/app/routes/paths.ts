@@ -171,6 +171,9 @@ export const paths = {
         payOnPortal: "/bi-dashboard/pay-on-portal",
         payOnPortalView: (requestId: number) => `/bi-dashboard/pay-on-portal/details/${requestId}`,
         payOnPortalAction: (id: number) => `/bi-dashboard/pay-on-portal/action/${id}`,
+        tenderFee: "/bi-dashboard/tender-fee",
+        tenderFeeView: (type: string, id: number) => `/bi-dashboard/tender-fee/details/${type}/${id}`,
+        tenderFeeAction: (type: string, id: number) => `/bi-dashboard/tender-fee/action/${type}/${id}`,
     },
 
     // ==================== ACCOUNTS ====================
