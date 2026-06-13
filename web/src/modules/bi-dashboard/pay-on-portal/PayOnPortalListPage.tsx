@@ -279,16 +279,6 @@ const PayOnPortalListPage = () => {
                 },
             },
             {
-                field: 'teamMember',
-                headerName: 'Member',
-                width: 140,
-                maxWidth: 140,
-                colId: 'teamMember',
-                valueGetter: (params) => params.data?.teamMember || '—',
-                sortable: true,
-                filter: true,
-            },
-            {
                 field: 'popStatus',
                 headerName: 'POP Status',
                 width: 110,
