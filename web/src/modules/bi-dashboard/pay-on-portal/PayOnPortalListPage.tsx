@@ -18,7 +18,7 @@ import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { payOnPortalsService } from '@/services/api/pay-on-portals.service';
 import type { ColDef } from 'ag-grid-community';
-import { AlertCircle, CheckCircle, Clock, Edit, Eye, FileX2, RotateCcw, Search, Wallet, XCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle, Clock, Edit, Eye, FileX2, MessageSquare, RotateCcw, Search, Wallet, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { PayOnPortalDashboardRow, PayOnPortalDashboardTab } from './helpers/payOnPortal.types';
@@ -177,6 +177,11 @@ const PayOnPortalListPage = () => {
                 icon: <Edit className="h-4 w-4" />,
                 onClick: (row: PayOnPortalDashboardRow) => navigate(paths.bi.payOnPortalAction(row.id)),
             },
+            {
+                label: 'Meeting Remarks',
+                icon: <MessageSquare className="h-4 w-4" />,
+                onClick: (row: PayOnPortalDashboardRow) => navigate(paths.bi.payOnPortalMeetingRemarks(row.id)),
+            }
         ],
         [navigate]
     );
