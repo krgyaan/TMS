@@ -1,4 +1,5 @@
 import { paths } from '@/app/routes/paths';
+import { ExportExcelDropdown } from '@/components/bi-dashboard/ExportExcelDropdown';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -11,14 +12,13 @@ import { QuickFilter } from '@/components/ui/quick-filter';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useChequeDashboard, useChequeDashboardCounts } from '@/hooks/api/useCheques';
-import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { useBiExport } from '@/hooks/useBiExport';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { chequesService } from '@/services/api/cheques.service';
-import { ExportExcelDropdown } from '@/components/bi-dashboard/ExportExcelDropdown';
 import type { ColDef } from 'ag-grid-community';
-import { AlertCircle, Calendar, CheckCircle, Clock, Edit, Eye, FileX2, Link, Plus, Search, Shield, XCircle } from 'lucide-react';
+import { AlertCircle, Calendar, CheckCircle, Clock, Edit, Eye, FileX2, Link, MessageSquare, Plus, Search, Shield, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { ChequeDashboardRow, ChequeDashboardTab } from './helpers/cheque.types';
@@ -196,6 +196,11 @@ const ChequeListPage = () => {
                 icon: <Edit className="h-4 w-4" />,
                 onClick: (row: ChequeDashboardRow) => navigate(paths.bi.chequeAction(row.id)),
             },
+            {
+                label: 'Meeting Remarks',
+                icon: <MessageSquare className="h-4 w-4" />,
+                onClick: (row: ChequeDashboardRow) => navigate(paths.bi.chequeMeetingRemarks(row.id)),
+            }
         ],
         [navigate]
     );
