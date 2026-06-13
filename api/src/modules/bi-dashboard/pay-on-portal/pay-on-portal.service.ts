@@ -162,7 +162,7 @@ export class PayOnPortalService {
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id))
-            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
             .leftJoin(this.requesterUser, eq(this.requesterUser.id, paymentRequests.requestedBy))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .where(whereClause)
@@ -179,7 +179,7 @@ export class PayOnPortalService {
             .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id));
         if (searchTerm || teamId) {
             countQueryBuilder = countQueryBuilder
-                .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+                .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
                 .leftJoin(this.requesterUser, eq(this.requesterUser.id, paymentRequests.requestedBy))
                 .leftJoin(statuses, eq(statuses.id, tenderInfos.status));
         }
