@@ -1,5 +1,5 @@
 import { lazy } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
 import { RouteWrapper } from '../components/RouteWrapper';
 
 const BI_DemandDraft = lazy(() => import('@/modules/bi-dashboard/demand-draft/DemandDraftListPage'));
@@ -7,29 +7,30 @@ const BI_FDR = lazy(() => import('@/modules/bi-dashboard/fdr/FdrListPage'));
 const BI_Cheque = lazy(() => import('@/modules/bi-dashboard/cheque/ChequeListPage'));
 const BI_BankGuarantee = lazy(() => import('@/modules/bi-dashboard/bank-guarantee/BankGuaranteeListPage'));
 const BI_BankTransfer = lazy(() => import('@/modules/bi-dashboard/bank-tranfer/BankTransferListPage'));
-const BI_BankTransferMeetingRemarks = lazy(() => import('@/modules/bi-dashboard/bank-tranfer/BankTransferMeetingRemarksPage'));
-
 const BI_PayOnPortal = lazy(() => import('@/modules/bi-dashboard/pay-on-portal/PayOnPortalListPage'));
-
-const BI_TenderFee = lazy(() => import('@/modules/bi-dashboard/tender-fee/TenderFeeListPage'));
 const BI_TenderFeeAction = lazy(() => import('@/modules/bi-dashboard/tender-fee/TenderFeeActionPage'));
 const BI_TenderFeeDetails = lazy(() => import('@/modules/bi-dashboard/tender-fee/TenderFeeDetailsPage'));
-
+const BI_TenderFee = lazy(() => import('@/modules/bi-dashboard/tender-fee/TenderFeeListPage'));
 const BI_BankGuaranteeAction = lazy(() => import('@/modules/bi-dashboard/bank-guarantee/BankGuaranteeActionPage'));
 const BI_FdrAction = lazy(() => import('@/modules/bi-dashboard/fdr/FdrActionPage'));
 const BI_DemandDraftAction = lazy(() => import('@/modules/bi-dashboard/demand-draft/DemandDraftActionPage'));
 const BI_ChequeAction = lazy(() => import('@/modules/bi-dashboard/cheque/ChequeActionPage'));
 const BI_PayOnPortalAction = lazy(() => import('@/modules/bi-dashboard/pay-on-portal/PayOnPortalActionPage'));
 const BI_BankTransferAction = lazy(() => import('@/modules/bi-dashboard/bank-tranfer/BankTransferActionPage'));
-
 const BI_DemandDraftDetails = lazy(() => import('@/modules/bi-dashboard/demand-draft/DemandDraftDetailsPage'));
 const BI_FDRDetails = lazy(() => import('@/modules/bi-dashboard/fdr/FdrDetailsPage'));
 const BI_ChequeDetails = lazy(() => import('@/modules/bi-dashboard/cheque/ChequeDetailsPage'));
 const BI_BankGuaranteeDetails = lazy(() => import('@/modules/bi-dashboard/bank-guarantee/BankGuaranteeDetailsPage'));
 const BI_BankTransferDetails = lazy(() => import('@/modules/bi-dashboard/bank-tranfer/BankTransferDetailsPage'));
 const BI_PayOnPortalDetails = lazy(() => import('@/modules/bi-dashboard/pay-on-portal/PayOnPortalDetailsPage'));
-
 const BI_BankGuaranteeEdit = lazy(() => import('@/modules/bi-dashboard/bank-guarantee/BankGuaranteeEditPage'));
+const BI_BankTransferMeetingRemarks = lazy(() => import('@/modules/bi-dashboard/bank-tranfer/BankTransferMeetingRemarksPage'));
+const BI_PayOnPortalMeetingRemarks = lazy(() => import('@/modules/bi-dashboard/pay-on-portal/PayOnPortalMeetingRemarksPage'));
+const BI_DDMeetingRemarks = lazy(() => import('@/modules/bi-dashboard/demand-draft/DemandDraftMeetingRemarksPage'));
+const BI_FDRMeetingRemarks = lazy(() => import('@/modules/bi-dashboard/fdr/FdrMeetingRemarksPage'));
+const BI_ChequeMeetingRemarks = lazy(() => import('@/modules/bi-dashboard/cheque/ChequeMeetingRemarksPage'));
+const BI_TenderFeeMeetingRemarks = lazy(() => import('@/modules/bi-dashboard/tender-fee/TenderFeeMeetingRemarksPage'));
+const BI_BankGuaranteeMeetingRemarks = lazy(() => import('@/modules/bi-dashboard/bank-guarantee/BankGuaranteeMeetingRemarksPage')); 
 
 export default function BIDashboardRoutes() {
     return (
@@ -50,7 +51,13 @@ export default function BIDashboardRoutes() {
             <Route path="pay-on-portal/action/:id" element={<RouteWrapper><BI_PayOnPortalAction /></RouteWrapper>} />
             <Route path="bank-transfer/action/:id" element={<RouteWrapper><BI_BankTransferAction /></RouteWrapper>} />
             <Route path="bank-transfer/meeting-remarks/:id" element={<RouteWrapper><BI_BankTransferMeetingRemarks /></RouteWrapper>} />
+            <Route path="pay-on-portal/meeting-remarks/:id" element={<RouteWrapper><BI_PayOnPortalMeetingRemarks /></RouteWrapper>} />
             <Route path="demand-draft/details/:id" element={<RouteWrapper><BI_DemandDraftDetails /></RouteWrapper>} />
+            <Route path="demand-draft/meeting-remarks/:id" element={<RouteWrapper><BI_DDMeetingRemarks /></RouteWrapper>} />
+             <Route path="fdr/meeting-remarks/:id" element={<RouteWrapper><BI_FDRMeetingRemarks /></RouteWrapper>} />
+             <Route path="cheque/meeting-remarks/:id" element={<RouteWrapper><BI_ChequeMeetingRemarks /></RouteWrapper>} />
+             <Route path="tender-fee/meeting-remarks/:id" element={<RouteWrapper><BI_TenderFeeMeetingRemarks /></RouteWrapper>} />
+             <Route path="bank-guarantee/meeting-remarks/:id" element={<RouteWrapper><BI_BankGuaranteeMeetingRemarks /></RouteWrapper>} />
             <Route path="fdr/details/:id" element={<RouteWrapper><BI_FDRDetails /></RouteWrapper>} />
             <Route path="cheque/details/:id" element={<RouteWrapper><BI_ChequeDetails /></RouteWrapper>} />
             <Route path="bank-guarantee/details/:id" element={<RouteWrapper><BI_BankGuaranteeDetails /></RouteWrapper>} />
