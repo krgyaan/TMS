@@ -1,4 +1,5 @@
 import { paths } from '@/app/routes/paths';
+import { ExportExcelDropdown } from '@/components/bi-dashboard/ExportExcelDropdown';
 import { tenderNameCol } from '@/components/data-grid/columns';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
@@ -11,14 +12,13 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useBankGuaranteeCardStats, useBankGuaranteeDashboard, useBankGuaranteeDashboardCounts } from '@/hooks/api/useBankGuarantees';
-import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { useBiExport } from '@/hooks/useBiExport';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { bankGuaranteesService } from '@/services/api/bank-guarantees.service';
-import { ExportExcelDropdown } from '@/components/bi-dashboard/ExportExcelDropdown';
 import type { ColDef } from 'ag-grid-community';
-import { AlertCircle, Edit, Eye, FileText, FileX2, Plus, Search, Shield, XCircle } from 'lucide-react';
+import { AlertCircle, Edit, Eye, FileText, FileX2, MessageSquare, Plus, Search, Shield, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BankStatsCards from './components/BankStatsCards';
@@ -197,6 +197,11 @@ const BankGuaranteeListPage = () => {
                 icon: <Edit className="h-4 w-4" />,
                 onClick: (row: BankGuaranteeDashboardRow) => navigate(paths.bi.bankGuaranteeEdit(row.requestId)),
             },
+            {
+                label: 'Meeting Remarks',
+                icon: <MessageSquare className="h-4 w-4" />,
+                onClick: (row: BankGuaranteeDashboardRow) => navigate(paths.bi.bankGuaranteeMeetingRemarks(row.id)),
+            }
         ],
         [navigate]
     );

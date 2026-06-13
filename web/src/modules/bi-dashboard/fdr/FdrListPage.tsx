@@ -1,4 +1,5 @@
 import { paths } from '@/app/routes/paths';
+import { ExportExcelDropdown } from '@/components/bi-dashboard/ExportExcelDropdown';
 import { tenderNameCol } from '@/components/data-grid/columns';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
@@ -12,14 +13,13 @@ import { QuickFilter } from '@/components/ui/quick-filter';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFdrDashboard, useFdrDashboardCounts } from '@/hooks/api/useFdrs';
-import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { useBiExport } from '@/hooks/useBiExport';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { fdrsService } from '@/services/api/fdrs.service';
-import { ExportExcelDropdown } from '@/components/bi-dashboard/ExportExcelDropdown';
 import type { ColDef } from 'ag-grid-community';
-import { AlertCircle, Clock, Edit, Eye, FileX2, Link, Plus, RotateCcw, Search, Shield, XCircle } from 'lucide-react';
+import { AlertCircle, Clock, Edit, Eye, FileX2, Link, MessageSquare, Plus, RotateCcw, Search, Shield, XCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { DashboardTab, FdrDashboardRow } from './helpers/fdr.types';
@@ -198,6 +198,11 @@ const FdrListPage = () => {
                 icon: <Edit className="h-4 w-4" />,
                 onClick: (row: FdrDashboardRow) => navigate(paths.bi.fdrAction(row.id)),
             },
+            {
+                label: 'Meeting Remarks',
+                icon: <MessageSquare className="h-4 w-4" />,
+                onClick: (row: FdrDashboardRow) => navigate(paths.bi.FdrMeetingRemarksPage(row.id)),
+            }
         ],
         [navigate]
     );
