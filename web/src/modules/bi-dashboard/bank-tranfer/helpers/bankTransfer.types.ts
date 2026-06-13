@@ -17,6 +17,7 @@ export interface BankTransferDashboardRow {
     purpose: string | null;
     date: Date | null;
     teamMember: string | null;
+    utr: string | null;
     utrNo: string | null;
     accountName: string | null;
     tenderName: string | null;
