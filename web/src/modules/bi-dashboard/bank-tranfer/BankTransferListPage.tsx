@@ -267,7 +267,7 @@ const BankTransferListPage = () => {
                 width: 130,
                 maxWidth: 130,
                 colId: 'tenderStatus',
-                valueGetter: (params) => params.data?.tenderStatus || '—',
+                valueGetter: (params) => params.data?.tenderStatus || params.data?.type || '—',
                 sortable: true,
                 filter: true,
             },
