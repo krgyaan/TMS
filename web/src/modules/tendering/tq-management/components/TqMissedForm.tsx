@@ -23,20 +23,10 @@ type FormValues = z.infer<typeof TqMissedFormSchema>;
 
 interface TqMissedFormProps {
     tqData: TenderQuery;
-    tenderDetails: {
-        tenderNo: string;
-        tenderName: string;
-        dueDate: Date | null;
-        teamMemberName: string | null;
-    };
     mode: 'missed' | 'edit';
 }
 
-export default function TqMissedForm({
-    tqData,
-    tenderDetails,
-    mode
-}: TqMissedFormProps) {
+export default function TqMissedForm({ tqData, mode }: TqMissedFormProps) {
     const navigate = useNavigate();
     const updateMutation = useUpdateTqMissed();
 
@@ -101,27 +91,6 @@ export default function TqMissedForm({
             <CardContent>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-                        {/* Tender Information */}
-                        <div className="space-y-4">
-                            <h4 className="font-semibold text-base text-primary border-b pb-2">
-                                Tender Information
-                            </h4>
-                            <div className="grid gap-4 md:grid-cols-2 bg-muted/30 p-4 rounded-lg">
-                                <div>
-                                    <p className="text-sm font-medium text-muted-foreground">Tender No</p>
-                                    <p className="text-base font-semibold">{tenderDetails.tenderNo}</p>
-                                </div>
-                                <div>
-                                    <p className="text-sm font-medium text-muted-foreground">Team Member</p>
-                                    <p className="text-base font-semibold">{tenderDetails.teamMemberName || '—'}</p>
-                                </div>
-                                <div className="md:col-span-2">
-                                    <p className="text-sm font-medium text-muted-foreground">Tender Name</p>
-                                    <p className="text-base font-semibold">{tenderDetails.tenderName}</p>
-                                </div>
-                            </div>
-                        </div>
-
                         {/* Missed TQ Analysis */}
                         <div className="space-y-4">
                             <h4 className="font-semibold text-base text-destructive border-b pb-2">
