@@ -16,7 +16,7 @@ import { TenderFileUploader } from '@/components/tender-file-upload';
 
 const TqRepliedFormSchema = z.object({
     repliedDatetime: z.string().min(1, 'TQ reply date and time is required'),
-    repliedDocument: z.array(z.string()).default([]),
+    repliedDocument: z.array(z.string()).min(1, 'TQ Replied Document is required'),
     proofOfSubmission: z.array(z.string()).min(1, 'Proof of submission is required'),
 });
 
@@ -24,20 +24,10 @@ type FormValues = z.infer<typeof TqRepliedFormSchema>;
 
 interface TqRepliedFormProps {
     tqData: TenderQuery;
-    tenderDetails: {
-        tenderNo: string;
-        tenderName: string;
-        dueDate: Date | null;
-        teamMemberName: string | null;
-    };
     mode: 'replied' | 'edit';
 }
 
-export default function TqRepliedForm({
-    tqData,
-    tenderDetails,
-    mode
-}: TqRepliedFormProps) {
+export default function TqRepliedForm({ tqData, mode }: TqRepliedFormProps) {
     const navigate = useNavigate();
     const updateMutation = useUpdateTqReplied();
 
@@ -109,62 +99,41 @@ export default function TqRepliedForm({
             <CardContent>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-                        {/* Tender Information */}
-                        <div className="space-y-4">
-                            <h4 className="font-semibold text-base text-primary border-b pb-2">
-                                Tender Information
-                            </h4>
-                            <div className="grid gap-4 md:grid-cols-2 bg-muted/30 p-4 rounded-lg">
-                                <div>
-                                    <p className="text-sm font-medium text-muted-foreground">Tender No</p>
-                                    <p className="text-base font-semibold">{tenderDetails.tenderNo}</p>
-                                </div>
-                                <div>
-                                    <p className="text-sm font-medium text-muted-foreground">Team Member</p>
-                                    <p className="text-base font-semibold">{tenderDetails.teamMemberName || '—'}</p>
-                                </div>
-                                <div className="md:col-span-2">
-                                    <p className="text-sm font-medium text-muted-foreground">Tender Name</p>
-                                    <p className="text-base font-semibold">{tenderDetails.tenderName}</p>
-                                </div>
-                            </div>
-                        </div>
-
                         {/* TQ Reply Details */}
                         <div className="space-y-4">
                             <h4 className="font-semibold text-base text-primary border-b pb-2">
                                 TQ Reply Details
                             </h4>
 
-                            <FieldWrapper
-                                control={form.control}
-                                name="repliedDatetime"
-                                label="TQ Reply Date & Time"
-                            >
-                                {(field) => (
-                                    <Input
-                                        {...field}
-                                        type="datetime-local"
-                                        placeholder="Select date and time"
-                                    />
-                                )}
-                            </FieldWrapper>
-
-                            <TenderFileUploader
-                                context="tq-management"
-                                value={repliedDocument}
-                                onChange={(paths) => form.setValue('repliedDocument', paths)}
-                                label="Submitted TQ Documents (Optional)"
-                                disabled={isSubmitting}
-                            />
-
-                            <TenderFileUploader
-                                context="tq-management"
-                                value={proofOfSubmission}
-                                onChange={(paths) => form.setValue('proofOfSubmission', paths)}
-                                label="Proof of Submission"
-                                disabled={isSubmitting}
-                            />
+                            <div className='grid gap-4 md:grid-cols-3 items-start'>
+                                <FieldWrapper
+                                    control={form.control}
+                                    name="repliedDatetime"
+                                    label="TQ Reply Date & Time"
+                                >
+                                    {(field) => (
+                                        <Input
+                                            {...field}
+                                            type="datetime-local"
+                                            placeholder="Select date and time"
+                                        />
+                                    )}
+                                </FieldWrapper>
+                                <TenderFileUploader
+                                    context="tq-management"
+                                    value={repliedDocument}
+                                    onChange={(paths) => form.setValue('repliedDocument', paths)}
+                                    label="Submitted TQ Documents"
+                                    disabled={isSubmitting}
+                                />
+                                <TenderFileUploader
+                                    context="tq-management"
+                                    value={proofOfSubmission}
+                                    onChange={(paths) => form.setValue('proofOfSubmission', paths)}
+                                    label="Proof of Submission"
+                                    disabled={isSubmitting}
+                                />
+                            </div>
                         </div>
 
                         {/* Form Actions */}

@@ -1,26 +1,26 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import DataTable from '@/components/ui/data-table';
-import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState } from 'react';
-import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
-import type { ActionItem } from '@/components/ui/ActionMenu';
-import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Send, XCircle, Eye, Edit, FileX2, CheckCircle, FileCheck, Search } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { useTqManagement, useMarkAsNoTq, useTqManagementDashboardCounts, useTqQualified } from '@/hooks/api/useTqManagement';
 import { dateCol, tenderNameCol } from '@/components/data-grid/columns';
+import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
+import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
+import type { ActionItem } from '@/components/ui/ActionMenu';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import DataTable from '@/components/ui/data-table';
+import { Input } from '@/components/ui/input';
+import { QuickFilter } from '@/components/ui/quick-filter';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useMarkAsNoTq, useTqManagement, useTqManagementDashboardCounts, useTqQualified } from '@/hooks/api/useTqManagement';
+import { usePersistentTableState } from '@/hooks/usePersistentTableState';
+import type { ColDef } from 'ag-grid-community';
+import { AlertCircle, CheckCircle, Edit, Eye, FileCheck, FileX2, Search, Send, XCircle } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useTenderingPermissions } from '../hooks/useTenderingPermissions';
+import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
 import QualificationDialog from './components/QualificationDialog';
 import type { TabKey, TqManagementDashboardRowWithTimer } from './helpers/tqManagement.types';
-import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
-import { usePersistentTableState } from '@/hooks/usePersistentTableState';
-import { QuickFilter } from '@/components/ui/quick-filter';
-import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
-import { useTenderingPermissions } from '../hooks/useTenderingPermissions';
 
 
 const TqManagementListPage = () => {
@@ -135,7 +135,7 @@ const TqManagementListPage = () => {
             visible: (row) => row.tqStatus === 'TQ awaited',
         },
         {
-            label: 'Submit TQ',
+            label: 'Reply TQ',
             onClick: (row: TqManagementDashboardRowWithTimer) => {
                 navigate(paths.tendering.tqReplied(row.tqId!));
             },

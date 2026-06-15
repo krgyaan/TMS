@@ -1,18 +1,16 @@
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useTqById } from '@/hooks/api/useTqManagement';
+import { AlertCircle } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import TqRepliedForm from './components/TqRepliedForm';
-import { useTender } from '@/hooks/api/useTenders';
-import { useTqById } from '@/hooks/api/useTqManagement';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle } from 'lucide-react';
 
 export default function TqRepliedPage() {
     const { id } = useParams<{ id: string }>();
     const { data: tqData, isLoading: tqLoading } = useTqById(Number(id));
-    const { data: tenderDetails, isLoading: tenderLoading } = useTender(Number(tqData?.tenderId));
 
-    if (tqLoading || tenderLoading) return <Skeleton className="h-[800px]" />;
-    if (!tqData || !tenderDetails) return <div>TQ not found</div>;
+    if (tqLoading) return <Skeleton />;
+    if (!tqData) return <Alert>TQ not found</Alert>;
 
     if (tqData.status !== 'TQ received') {
         return (
@@ -28,12 +26,6 @@ export default function TqRepliedPage() {
     return (
         <TqRepliedForm
             tqData={tqData}
-            tenderDetails={{
-                tenderNo: tenderDetails.tenderNo,
-                tenderName: tenderDetails.tenderName,
-                dueDate: tenderDetails.dueDate as Date,
-                teamMemberName: tenderDetails.teamMemberName as string,
-            }}
             mode="replied"
         />
     );
