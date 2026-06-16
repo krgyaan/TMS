@@ -38,6 +38,9 @@ export interface DataTableProps<T = any> {
     showLengthChange?: boolean;
     pageSizeOptions?: number[];
     onPageSizeChange?: (pageSize: number) => void;
+    columnState?: any[];
+    onColumnResized?: (event: any) => void;
+    onColumnMoved?: (event: any) => void;
 }
 
 const DataTable = <T extends Record<string, any>>({
@@ -66,6 +69,9 @@ const DataTable = <T extends Record<string, any>>({
     showLengthChange = true,
     pageSizeOptions = [5, 10, 25, 50, 100],
     onPageSizeChange,
+    columnState,
+    onColumnResized,
+    onColumnMoved,
 }: DataTableProps<T>) => {
 
     // 1. Calculate Pagination Logic
@@ -159,6 +165,13 @@ const DataTable = <T extends Record<string, any>>({
     }), [enablePagination, activePageSize, enableSorting, enableFiltering, enableColumnResizing, enableRowSelection, selectionType, manualPagination]);
 
     const handleGridReady = useCallback((event: GridReadyEvent<T>) => {
+        // Restore persisted column widths before auto-size
+        if (columnState && event.api) {
+            event.api.applyColumnState({
+                state: columnState,
+                applyOrder: true,
+            });
+        }
         // Auto-size columns if enabled
         if (autoSizeColumns) {
             if (Array.isArray(autoSizeColumns)) {
@@ -173,13 +186,22 @@ const DataTable = <T extends Record<string, any>>({
             }
         }
         if (onGridReady) onGridReady(event);
-    }, [onGridReady, autoSizeColumns]);
+    }, [onGridReady, autoSizeColumns, columnState]);
 
     const handleSelectionChanged = useCallback((event: any) => {
         if (onSelectionChanged && enableRowSelection) {
             onSelectionChanged(event.api.getSelectedRows());
         }
     }, [onSelectionChanged, enableRowSelection]);
+
+    const handleColumnResized = useCallback((event: any) => {
+        if (!event.finished) return;
+        if (onColumnResized) onColumnResized(event);
+    }, [onColumnResized]);
+
+    const handleColumnMoved = useCallback((event: any) => {
+        if (onColumnMoved) onColumnMoved(event);
+    }, [onColumnMoved]);
 
     return (
         <div className={`flex flex-col w-full h-full ${className}`}>
@@ -204,6 +226,8 @@ const DataTable = <T extends Record<string, any>>({
                         suppressPaginationPanel={manualPagination}
                         onGridReady={handleGridReady}
                         onSelectionChanged={handleSelectionChanged}
+                        onColumnResized={handleColumnResized}
+                        onColumnMoved={handleColumnMoved}
                         theme={themeOverride ?? myAgTheme}
                     />
                 </div>

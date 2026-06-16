@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ColDef } from "ag-grid-community";
 import DataTable from "@/components/ui/data-table";
@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsTrigger, TabsList } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { usePaymentDashboard, usePaymentDashboardCounts } from "@/hooks/api/usePaymentRequests";
-import { useNavigate, useSearchParams} from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +20,7 @@ import type { ActionItem } from "@/components/ui/ActionMenu";
 import type { PendingTenderRowWithTimer, PaymentRequestRowWithTimer } from "./helpers/payment-request.types";
 import { currencyCol, tenderNameCol } from "@/components/data-grid";
 import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
-import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
+import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { ChangeStatusModal } from "../tenders/components/ChangeStatusModal";
 import { useTenderingPermissions } from "../hooks/useTenderingPermissions";
 import { formatINR } from "@/hooks/useINRFormatter";
@@ -77,13 +77,25 @@ const INSTRUMENT_LABELS: Record<string, string> = {
 
 const EmdsAndTenderFeesPage = () => {
     const navigate = useNavigate();
-    const [searchParams] = useSearchParams();
-    const initialTab = (searchParams.get('tab') as TabValue) || 'pending';
-    const [activeTab, setActiveTab] = useState<TabValue>(initialTab);
-    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
-    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
-    const [search, setSearch] = useState<string>('');
-    const debouncedSearch = useDebouncedSearch(search, 300);
+
+    const {
+        activeTab,
+        setActiveTab,
+        search,
+        setSearch,
+        debouncedSearch,
+        pagination,
+        setPagination,
+        sortModel,
+        handleSortChanged,
+        handlePageSizeChange,
+        saveColumnState,
+        restoreColumnState,
+    } = usePersistentTableState({
+        storageKey: 'emd-tenderfees',
+        defaultTab: 'pending' as TabValue,
+    });
+
     const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({
         open: false,
         tenderId: null
@@ -265,25 +277,6 @@ const EmdsAndTenderFeesPage = () => {
 
         return out;
     };
-
-    useEffect(() => {
-        setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, debouncedSearch]);
-
-    const handleSortChanged = useCallback((event: any) => {
-        const sortModel = event.api.getColumnState()
-            .filter((col: any) => col.sort)
-            .map((col: any) => ({
-                colId: col.colId,
-                sort: col.sort as 'asc' | 'desc'
-            }));
-        setSortModel(sortModel);
-        setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, []);
-
-    const handlePageSizeChange = useCallback((newPageSize: number) => {
-        setPagination({ pageIndex: 0, pageSize: newPageSize });
-    }, []);
 
     // Fetch dashboard data
     const { data: dashboardData, isLoading, error, refetch } = usePaymentDashboard(
@@ -785,6 +778,9 @@ const EmdsAndTenderFeesPage = () => {
                             onPageSizeChange={handlePageSizeChange}
                             showTotalCount={true}
                             showLengthChange={true}
+                            onColumnResized={saveColumnState}
+                            onColumnMoved={saveColumnState}
+                            onGridReady={restoreColumnState}
                             gridOptions={{
                                 defaultColDef: {
                                     filter: true,

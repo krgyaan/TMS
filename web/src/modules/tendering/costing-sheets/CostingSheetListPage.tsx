@@ -2,10 +2,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DataTable from "@/components/ui/data-table";
 import type { ColDef } from "ag-grid-community";
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useMemo, useState } from "react";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -20,21 +20,33 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import axiosInstance from "@/lib/axios";
-import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
+import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { QuickFilter } from "@/components/ui/quick-filter";
 import { ChangeStatusModal } from "../tenders/components/ChangeStatusModal";
 import { useTenderingPermissions } from "../hooks/useTenderingPermissions";
 
 const CostingSheets = () => {
-    const [searchParams] = useSearchParams();
-    const initialTab = (searchParams.get('tab') as CostingSheetTab) || 'pending';
-    const [activeTab, setActiveTab] = useState<CostingSheetTab>(initialTab);
-    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
-    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
-    const [search, setSearch] = useState<string>('');
-    const { hasTenderingPermission } = useTenderingPermissions();
-    const debouncedSearch = useDebouncedSearch(search, 300);
     const navigate = useNavigate();
+
+    const {
+        activeTab,
+        setActiveTab,
+        search,
+        setSearch,
+        debouncedSearch,
+        pagination,
+        setPagination,
+        handleSortChanged,
+        handlePageSizeChange,
+        saveColumnState,
+        sortModel,
+        restoreColumnState,
+    } = usePersistentTableState({
+        storageKey: 'costing-sheets',
+        defaultTab: 'pending' as CostingSheetTab,
+    });
+
+    const { hasTenderingPermission } = useTenderingPermissions();
 
     const [connectDriveOpen, setConnectDriveOpen] = useState(false);
     const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
@@ -53,25 +65,6 @@ const CostingSheets = () => {
     const { data: driveScopes } = useCheckDriveScopes();
     const createSheetMutation = useCreateCostingSheet();
     const createSheetWithNameMutation = useCreateCostingSheetWithName();
-
-    useEffect(() => {
-        setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, debouncedSearch]);
-
-    const handleSortChanged = useCallback((event: any) => {
-        const sortModel = event.api.getColumnState()
-            .filter((col: any) => col.sort)
-            .map((col: any) => ({
-                colId: col.colId,
-                sort: col.sort as 'asc' | 'desc'
-            }));
-        setSortModel(sortModel);
-        setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, []);
-
-    const handlePageSizeChange = useCallback((newPageSize: number) => {
-        setPagination({ pageIndex: 0, pageSize: newPageSize });
-    }, []);
 
     const { data: apiResponse, isLoading: loading, error } = useCostingSheets(
         activeTab,
@@ -488,6 +481,9 @@ const CostingSheets = () => {
                                             onPageSizeChange={handlePageSizeChange}
                                             showTotalCount={true}
                                             showLengthChange={true}
+                                            onColumnResized={saveColumnState}
+                                            onColumnMoved={saveColumnState}
+                                            onGridReady={restoreColumnState}
                                             gridOptions={{
                                                 defaultColDef: {
                                                     editable: false,
