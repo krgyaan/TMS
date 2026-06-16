@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -73,6 +73,10 @@ import {
   Milestone,
   FileText,
   Info,
+  Sparkles,
+  TrendingUp,
+  Activity,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -119,12 +123,61 @@ interface EmployeeInduction {
   approvedAt: string;
   tasks: InductionTask[];
   inductionCoordinator?: string;
+  profilePhoto?: string;
 }
 
+// ─── Animation Hook ──────────────────────────────────────────────────────────
+
+const useStaggeredEntrance = (itemCount: number, baseDelay = 30) => {
+  const [visibleItems, setVisibleItems] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    const timers: NodeJS.Timeout[] = [];
+    for (let i = 0; i < itemCount; i++) {
+      timers.push(
+        setTimeout(() => {
+          setVisibleItems((prev) => new Set([...prev, i]));
+        }, i * baseDelay)
+      );
+    }
+    return () => timers.forEach(clearTimeout);
+  }, [itemCount, baseDelay]);
+
+  return visibleItems;
+};
+
+// ─── Animated Number ─────────────────────────────────────────────────────────
+
+const AnimatedNumber: React.FC<{ value: number; duration?: number }> = ({
+  value,
+  duration = 600,
+}) => {
+  const [display, setDisplay] = useState(0);
+  const ref = useRef<number>(0);
+
+  useEffect(() => {
+    const start = ref.current;
+    const diff = value - start;
+    if (diff === 0) return;
+    const startTime = performance.now();
+
+    const animate = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = Math.round(start + diff * eased);
+      setDisplay(current);
+      if (progress < 1) requestAnimationFrame(animate);
+      else ref.current = value;
+    };
+
+    requestAnimationFrame(animate);
+  }, [value, duration]);
+
+  return <>{display}</>;
+};
+
 // ─── Default task definitions ─────────────────────────────────────────────────
-// These are the canonical induction tasks every employee should have.
-// They are used as a fallback when the DB has no rows yet for an employee,
-// so the UI always shows a meaningful checklist rather than an empty state.
 
 const DEFAULT_BEFORE_TASKS: Array<{
   name: string;
@@ -133,55 +186,13 @@ const DEFAULT_BEFORE_TASKS: Array<{
   required: boolean;
   icon: React.ElementType;
 }> = [
-  {
-    name: "Documents collection form completed",
-    phase: "before_joining",
-    assignedTo: "HR",
-    required: true,
-    icon: FileSignature,
-  },
-  {
-    name: "DISC form completed",
-    phase: "before_joining",
-    assignedTo: "HR",
-    required: false,
-    icon: FileText,
-  },
-  {
-    name: "Workstation identified",
-    phase: "before_joining",
-    assignedTo: "Admin",
-    required: true,
-    icon: MonitorCheck,
-  },
-  {
-    name: "Email ID created",
-    phase: "before_joining",
-    assignedTo: "IT",
-    required: false,
-    icon: Mail,
-  },
-  {
-    name: "Employee added to systems",
-    phase: "before_joining",
-    assignedTo: "IT",
-    required: true,
-    icon: Database,
-  },
-  {
-    name: "Visiting card ordered",
-    phase: "before_joining",
-    assignedTo: "Admin",
-    required: true,
-    icon: IdCard,
-  },
-  {
-    name: "ID card ordered",
-    phase: "before_joining",
-    assignedTo: "Admin",
-    required: false,
-    icon: BadgeCheck,
-  },
+  { name: "Documents collection form completed", phase: "before_joining", assignedTo: "HR", required: true, icon: FileSignature },
+  { name: "DISC form completed", phase: "before_joining", assignedTo: "HR", required: false, icon: FileText },
+  { name: "Workstation identified", phase: "before_joining", assignedTo: "Admin", required: true, icon: MonitorCheck },
+  { name: "Email ID created", phase: "before_joining", assignedTo: "IT", required: false, icon: Mail },
+  { name: "Employee added to systems", phase: "before_joining", assignedTo: "IT", required: true, icon: Database },
+  { name: "Visiting card ordered", phase: "before_joining", assignedTo: "Admin", required: true, icon: IdCard },
+  { name: "ID card ordered", phase: "before_joining", assignedTo: "Admin", required: false, icon: BadgeCheck },
 ];
 
 const DEFAULT_AFTER_TASKS: Array<{
@@ -191,114 +202,23 @@ const DEFAULT_AFTER_TASKS: Array<{
   required: boolean;
   icon: React.ElementType;
 }> = [
-  {
-    name: "HR policy training completed",
-    phase: "after_joining",
-    assignedTo: "HR",
-    required: false,
-    icon: ShieldCheck,
-  },
-  {
-    name: "Leave policy training completed",
-    phase: "after_joining",
-    assignedTo: "HR",
-    required: false,
-    icon: BookOpen,
-  },
-  {
-    name: "Attendance training completed",
-    phase: "after_joining",
-    assignedTo: "HR",
-    required: false,
-    icon: Clock,
-  },
-  {
-    name: "Laptop allotted",
-    phase: "after_joining",
-    assignedTo: "IT",
-    required: false,
-    icon: Laptop,
-  },
-  {
-    name: "Office tour completed",
-    phase: "after_joining",
-    assignedTo: "Admin",
-    required: false,
-    icon: Building2,
-  },
-  {
-    name: "Reporting manager introduction",
-    phase: "after_joining",
-    assignedTo: "Manager",
-    required: false,
-    icon: UserCog,
-  },
-  {
-    name: "PF initiation (if applicable)",
-    phase: "after_joining",
-    assignedTo: "HR",
-    required: false,
-    icon: CreditCard,
-  },
-  {
-    name: "Candidate profile shared",
-    phase: "after_joining",
-    assignedTo: "HR",
-    required: false,
-    icon: Users2,
-  },
-  {
-    name: "Buddy assigned",
-    phase: "after_joining",
-    assignedTo: "HR",
-    required: true,
-    icon: UserPlus,
-  },
-  {
-    name: "Training needs identified",
-    phase: "after_joining",
-    assignedTo: "Manager",
-    required: true,
-    icon: Presentation,
-  },
-  {
-    name: "Welcome session completed",
-    phase: "after_joining",
-    assignedTo: "HR",
-    required: false,
-    icon: PartyPopper,
-  },
-  {
-    name: "Employee database updated",
-    phase: "after_joining",
-    assignedTo: "HR",
-    required: false,
-    icon: Database,
-  },
-  {
-    name: "PF office updated",
-    phase: "after_joining",
-    assignedTo: "HR",
-    required: false,
-    icon: PhoneCall,
-  },
-  {
-    name: "ID / Visiting card provided",
-    phase: "after_joining",
-    assignedTo: "Admin",
-    required: false,
-    icon: IdCard,
-  },
-  {
-    name: "Welcome kit arranged",
-    phase: "after_joining",
-    assignedTo: "Admin",
-    required: false,
-    icon: Package,
-  },
+  { name: "HR policy training completed", phase: "after_joining", assignedTo: "HR", required: false, icon: ShieldCheck },
+  { name: "Leave policy training completed", phase: "after_joining", assignedTo: "HR", required: false, icon: BookOpen },
+  { name: "Attendance training completed", phase: "after_joining", assignedTo: "HR", required: false, icon: Clock },
+  { name: "Laptop allotted", phase: "after_joining", assignedTo: "IT", required: false, icon: Laptop },
+  { name: "Office tour completed", phase: "after_joining", assignedTo: "Admin", required: false, icon: Building2 },
+  { name: "Reporting manager introduction", phase: "after_joining", assignedTo: "Manager", required: false, icon: UserCog },
+  { name: "PF initiation (if applicable)", phase: "after_joining", assignedTo: "HR", required: false, icon: CreditCard },
+  { name: "Candidate profile shared", phase: "after_joining", assignedTo: "HR", required: false, icon: Users2 },
+  { name: "Buddy assigned", phase: "after_joining", assignedTo: "HR", required: true, icon: UserPlus },
+  { name: "Training needs identified", phase: "after_joining", assignedTo: "Manager", required: true, icon: Presentation },
+  { name: "Welcome session completed", phase: "after_joining", assignedTo: "HR", required: false, icon: PartyPopper },
+  { name: "Employee database updated", phase: "after_joining", assignedTo: "HR", required: false, icon: Database },
+  { name: "PF office updated", phase: "after_joining", assignedTo: "HR", required: false, icon: PhoneCall },
+  { name: "ID / Visiting card provided", phase: "after_joining", assignedTo: "Admin", required: false, icon: IdCard },
+  { name: "Welcome kit arranged", phase: "after_joining", assignedTo: "Admin", required: false, icon: Package },
 ];
 
-/** All 22 default tasks with synthetic ids prefixed "default-" */
 const DEFAULT_TASKS: InductionTask[] = [
   ...DEFAULT_BEFORE_TASKS,
   ...DEFAULT_AFTER_TASKS,
@@ -308,12 +228,9 @@ const DEFAULT_TASKS: InductionTask[] = [
   status: "pending" as TaskStatus,
 }));
 
-// ─── Icon resolution (for API tasks whose names we may not know upfront) ──────
+// ─── Icon resolution ──────────────────────────────────────────────────────────
 
-const TASK_ICON_MAP: Array<{
-  keywords: string[];
-  icon: React.ElementType;
-}> = [
+const TASK_ICON_MAP: Array<{ keywords: string[]; icon: React.ElementType }> = [
   { keywords: ["document", "form", "disc"], icon: FileSignature },
   { keywords: ["workstation", "monitor", "desktop"], icon: MonitorCheck },
   { keywords: ["email", "mail"], icon: Mail },
@@ -345,28 +262,21 @@ const resolveTaskIcon = (taskName: string): React.ElementType => {
 
 // ─── Normalizers ──────────────────────────────────────────────────────────────
 
-const normalizeTaskStatus = (
-  status: string | null | undefined
-): TaskStatus => {
+const normalizeTaskStatus = (status: string | null | undefined): TaskStatus => {
   if (!status) return "pending";
   const s = status.toLowerCase();
-  if (s === "completed" || s === "done" || s === "verified")
-    return "completed";
+  if (s === "completed" || s === "done" || s === "verified") return "completed";
   return "pending";
 };
 
-const normalizePhase = (
-  phase: string | null | undefined
-): TaskPhase => {
+const normalizePhase = (phase: string | null | undefined): TaskPhase => {
   if (!phase) return "before_joining";
   const p = phase.toLowerCase();
   if (p === "after_joining" || p === "after") return "after_joining";
   return "before_joining";
 };
 
-const normalizeAssignedTo = (
-  assignedTo: string | null | undefined
-): AssignedTo => {
+const normalizeAssignedTo = (assignedTo: string | null | undefined): AssignedTo => {
   if (!assignedTo) return "HR";
   const a = assignedTo.toUpperCase();
   if (a === "IT") return "IT";
@@ -375,15 +285,8 @@ const normalizeAssignedTo = (
   return "HR";
 };
 
-/**
- * Map a raw API task row → typed InductionTask.
- * Merges with the matching default task definition (by name) so that
- * required / icon / phase are always correct even if the DB row is sparse.
- */
 const mapApiTask = (raw: any): InductionTask => {
   const name: string = raw.name ?? raw.taskName ?? "Unknown Task";
-
-  // Try to find the matching default task so we inherit its metadata
   const defaultMatch = DEFAULT_TASKS.find(
     (d) => d.name.toLowerCase() === name.toLowerCase()
   );
@@ -391,50 +294,33 @@ const mapApiTask = (raw: any): InductionTask => {
   return {
     id: String(raw.id),
     name,
-    phase: normalizePhase(
-      raw.phase ?? raw.taskType ?? defaultMatch?.phase
-    ),
-    assignedTo: normalizeAssignedTo(
-      raw.assignedTo ?? defaultMatch?.assignedTo
-    ),
+    phase: normalizePhase(raw.phase ?? raw.taskType ?? defaultMatch?.phase),
+    assignedTo: normalizeAssignedTo(raw.assignedTo ?? defaultMatch?.assignedTo),
     required: raw.required ?? defaultMatch?.required ?? false,
     status: normalizeTaskStatus(raw.status),
     completedAt: raw.completedAt ?? undefined,
     completedBy: raw.completedBy ?? undefined,
     remarks: raw.remarks ?? undefined,
-    // Prefer the matched default icon, fall back to keyword resolution
     icon: defaultMatch?.icon ?? resolveTaskIcon(name),
   };
 };
 
-/**
- * Map a raw API tracker row → typed EmployeeInduction.
- * The tracker tasks array may be empty (no DB rows seeded yet) —
- * that is handled in the modal, not here.
- */
 const mapApiEmployee = (raw: any): EmployeeInduction => {
   const nameParts = (raw.name ?? "").split(" ");
   return {
     id: raw.id,
-    employeeId:
-      raw.employeeId ?? `EMP-${String(raw.id).padStart(4, "0")}`,
-    firstName:
-      raw.firstName ?? (nameParts.length > 0 ? nameParts[0] : "—"),
-    lastName:
-      raw.lastName ??
-      (nameParts.length > 1 ? nameParts[nameParts.length - 1] : ""),
+    employeeId: raw.employeeId ?? `EMP-${String(raw.id).padStart(4, "0")}`,
+    firstName: raw.firstName ?? (nameParts.length > 0 ? nameParts[0] : "—"),
+    lastName: raw.lastName ?? (nameParts.length > 1 ? nameParts[nameParts.length - 1] : ""),
     middleName: raw.middleName ?? undefined,
     email: raw.email ?? "",
     designation: raw.designation ?? raw.employeeType ?? "—",
     department: raw.department ?? raw.departmentId ?? "—",
-    dateOfJoining:
-      raw.dateOfJoining ?? raw.approvedAt ?? new Date().toISOString(),
+    dateOfJoining: raw.dateOfJoining ?? raw.approvedAt ?? new Date().toISOString(),
     approvedAt: raw.approvedAt ?? new Date().toISOString(),
-    // Map whatever tasks the tracker returned (may be [])
-    tasks: Array.isArray(raw.tasks)
-      ? raw.tasks.map(mapApiTask)
-      : [],
+    tasks: Array.isArray(raw.tasks) ? raw.tasks.map(mapApiTask) : [],
     inductionCoordinator: raw.inductionCoordinator ?? undefined,
+    profilePhoto: raw.profilePhoto ?? undefined,
   };
 };
 
@@ -442,6 +328,25 @@ const mapApiEmployee = (raw: any): EmployeeInduction => {
 
 const getInitials = (first: string, last: string) =>
   `${first?.[0] ?? "?"}${last?.[0] ?? "?"}`.toUpperCase();
+
+const avatarColors = [
+  "bg-blue-500/15 text-blue-700 dark:text-blue-400",
+  "bg-violet-500/15 text-violet-700 dark:text-violet-400",
+  "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+  "bg-orange-500/15 text-orange-700 dark:text-orange-400",
+  "bg-rose-500/15 text-rose-700 dark:text-rose-400",
+  "bg-cyan-500/15 text-cyan-700 dark:text-cyan-400",
+  "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+  "bg-indigo-500/15 text-indigo-700 dark:text-indigo-400",
+];
+
+const getAvatarColor = (name: string) => {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return avatarColors[Math.abs(hash) % avatarColors.length];
+};
 
 const formatDate = (d: string) =>
   new Date(d).toLocaleDateString("en-GB", {
@@ -467,24 +372,14 @@ const computeInductionStats = (tasks: InductionTask[]) => {
 
   const beforeTasks = tasks.filter((t) => t.phase === "before_joining");
   const afterTasks = tasks.filter((t) => t.phase === "after_joining");
-  const beforeCompleted = beforeTasks.filter(
-    (t) => t.status === "completed"
-  ).length;
-  const afterCompleted = afterTasks.filter(
-    (t) => t.status === "completed"
-  ).length;
+  const beforeCompleted = beforeTasks.filter((t) => t.status === "completed").length;
+  const afterCompleted = afterTasks.filter((t) => t.status === "completed").length;
 
   const requiredTotal = tasks.filter((t) => t.required).length;
-  const requiredCompleted = tasks.filter(
-    (t) => t.required && t.status === "completed"
-  ).length;
-  const allRequiredDone =
-    requiredTotal === 0 || requiredCompleted === requiredTotal;
+  const requiredCompleted = tasks.filter((t) => t.required && t.status === "completed").length;
+  const allRequiredDone = requiredTotal === 0 || requiredCompleted === requiredTotal;
 
-  const byAssignee: Record<
-    AssignedTo,
-    { total: number; completed: number }
-  > = {
+  const byAssignee: Record<AssignedTo, { total: number; completed: number }> = {
     HR: { total: 0, completed: 0 },
     IT: { total: 0, completed: 0 },
     Admin: { total: 0, completed: 0 },
@@ -511,80 +406,161 @@ const computeInductionStats = (tasks: InductionTask[]) => {
   };
 };
 
-const getInductionStatus = (
-  emp: EmployeeInduction
-): EmployeeInductionTab => {
-  // Use default tasks length as reference when DB has no tasks yet
-  const tasks =
-    emp.tasks.length > 0 ? emp.tasks : DEFAULT_TASKS;
+const getInductionStatus = (emp: EmployeeInduction): EmployeeInductionTab => {
+  const tasks = emp.tasks.length > 0 ? emp.tasks : DEFAULT_TASKS;
   const { pct, completed } = computeInductionStats(tasks);
   if (completed === 0) return "not_started";
   if (pct === 100) return "completed";
   return "in_progress";
 };
 
-// ─── Assignee Config ──────────────────────────────────────────────────────────
 
-const ASSIGNEE_CONFIG: Record<
-  AssignedTo,
-  { color: string; bg: string }
-> = {
-  HR: {
-    color: "text-blue-700 dark:text-blue-400",
-    bg: "bg-blue-100 dark:bg-blue-900/40",
-  },
-  IT: {
-    color: "text-purple-700 dark:text-purple-400",
-    bg: "bg-purple-100 dark:bg-purple-900/40",
-  },
-  Admin: {
-    color: "text-orange-700 dark:text-orange-400",
-    bg: "bg-orange-100 dark:bg-orange-900/40",
-  },
-  Manager: {
-    color: "text-teal-700 dark:text-teal-400",
-    bg: "bg-teal-100 dark:bg-teal-900/40",
-  },
-};
+
+// ─── CSS Keyframes (injected once) ────────────────────────────────────────────
+
+const StyleInjector: React.FC = () => (
+  <style>{`
+    @keyframes ind-fade-up {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes ind-fade-in {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes ind-scale-in {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    @keyframes ind-slide-down {
+      from { opacity: 0; max-height: 0; }
+      to { opacity: 1; max-height: 2000px; }
+    }
+    @keyframes ind-shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+    @keyframes ind-pulse-soft {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+    @keyframes ind-check-pop {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+      100% { transform: scale(1); }
+    }
+    .ind-fade-up {
+      animation: ind-fade-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .ind-fade-in {
+      animation: ind-fade-in 0.3s ease forwards;
+    }
+    .ind-scale-in {
+      animation: ind-scale-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .ind-slide-down {
+      animation: ind-slide-down 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      overflow: hidden;
+    }
+    .ind-check-pop {
+      animation: ind-check-pop 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .ind-progress-bar {
+      transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .ind-glass {
+      backdrop-filter: blur(12px) saturate(1.5);
+      -webkit-backdrop-filter: blur(12px) saturate(1.5);
+    }
+  `}</style>
+);
 
 // ─── Skeleton Loaders ─────────────────────────────────────────────────────────
 
 const EmployeeRowSkeleton: React.FC = () => (
-  <div className="flex items-center gap-3 px-4 py-3.5 rounded-xl border bg-card">
-    <Skeleton className="h-9 w-9 rounded-full flex-shrink-0" />
-    <div className="flex-1 space-y-2">
-      <Skeleton className="h-3.5 w-40" />
-      <Skeleton className="h-3 w-56" />
+  <div className="flex items-center gap-3 px-5 py-4 rounded-2xl border border-border/50 bg-card/50">
+    <Skeleton className="h-10 w-10 rounded-xl flex-shrink-0" />
+    <div className="flex-1 space-y-2.5">
+      <Skeleton className="h-3.5 w-44" />
+      <Skeleton className="h-3 w-60" />
     </div>
     <Skeleton className="h-3 w-28 hidden lg:block" />
-    <Skeleton className="h-3 w-36 hidden xl:block" />
-    <Skeleton className="h-4 w-28" />
     <Skeleton className="h-6 w-20 hidden md:block" />
-    <Skeleton className="h-4 w-16 hidden lg:block" />
   </div>
 );
 
 const StatCardSkeleton: React.FC = () => (
-  <div className="rounded-xl border p-4 flex items-center gap-3 bg-card">
-    <Skeleton className="w-10 h-10 rounded-lg flex-shrink-0" />
-    <div className="space-y-2">
-      <Skeleton className="h-6 w-10" />
-      <Skeleton className="h-3 w-24" />
+  <div className="rounded-2xl border border-border/50 p-5 flex items-center gap-4 bg-card/50">
+    <Skeleton className="w-12 h-12 rounded-xl flex-shrink-0" />
+    <div className="space-y-2.5">
+      <Skeleton className="h-7 w-12" />
+      <Skeleton className="h-3 w-28" />
     </div>
   </div>
 );
 
 const TaskRowSkeleton: React.FC = () => (
-  <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg border bg-card">
+  <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border/50 bg-card/50">
     <Skeleton className="h-4 w-4 rounded flex-shrink-0" />
-    <Skeleton className="w-7 h-7 rounded-lg flex-shrink-0" />
-    <div className="flex-1 space-y-1.5">
-      <Skeleton className="h-3 w-48" />
-      <Skeleton className="h-2.5 w-32" />
+    <Skeleton className="w-8 h-8 rounded-xl flex-shrink-0" />
+    <div className="flex-1 space-y-2">
+      <Skeleton className="h-3 w-52" />
+      <Skeleton className="h-2.5 w-36" />
     </div>
-    <Skeleton className="h-5 w-12 rounded" />
+    <Skeleton className="h-5 w-14 rounded-lg" />
   </div>
 );
+
+// ─── Circular Progress ────────────────────────────────────────────────────────
+
+const CircularProgress: React.FC<{
+  value: number;
+  size?: number;
+  strokeWidth?: number;
+  className?: string;
+}> = ({ value, size = 40, strokeWidth = 3, className }) => {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (value / 100) * circumference;
+
+  return (
+    <div className={cn("relative inline-flex items-center justify-center", className)}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={strokeWidth}
+          className="text-muted/40"
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={strokeWidth}
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          className={cn(
+            "transition-all duration-700 ease-out",
+            value === 100
+              ? "text-emerald-500"
+              : value > 50
+              ? "text-primary"
+              : value > 0
+              ? "text-amber-500"
+              : "text-muted-foreground/30"
+          )}
+        />
+      </svg>
+      <span className="absolute text-[9px] font-bold">{value}%</span>
+    </div>
+  );
+};
 
 // ─── Stat Card ────────────────────────────────────────────────────────────────
 
@@ -595,67 +571,48 @@ const StatCard: React.FC<{
   icon: React.ElementType;
   highlight?: boolean;
   success?: boolean;
-}> = ({ label, value, sub, icon: Icon, highlight, success }) => (
+  delay?: number;
+}> = ({ label, value, sub, icon: Icon, highlight, success, delay = 0 }) => (
   <div
     className={cn(
-      "rounded-xl border p-4 flex items-center gap-3 transition-shadow hover:shadow-sm",
-      highlight && "bg-primary/5 border-primary/20",
-      success &&
-        "bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800",
-      !highlight && !success && "bg-card"
+      "group relative rounded-2xl border p-5 flex items-center gap-4 transition-all duration-300",
+      "hover:shadow-lg hover:-translate-y-0.5 ind-fade-up",
+      highlight && "bg-primary/[0.03] border-primary/20 hover:border-primary/30 hover:shadow-primary/5",
+      success && "bg-emerald-50/50 dark:bg-emerald-950/10 border-emerald-200/50 dark:border-emerald-800/30 hover:border-emerald-300 hover:shadow-emerald-500/5",
+      !highlight && !success && "bg-card border-border/50 hover:border-border"
     )}
+    style={{ animationDelay: `${delay}ms` }}
   >
     <div
       className={cn(
-        "w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0",
+        "w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform duration-300 group-hover:scale-105",
         highlight && "bg-primary/10",
-        success && "bg-green-100 dark:bg-green-900/40",
-        !highlight && !success && "bg-muted"
+        success && "bg-emerald-100 dark:bg-emerald-900/30",
+        !highlight && !success && "bg-muted/70"
       )}
     >
       <Icon
         className={cn(
-          "h-5 w-5",
+          "h-5.5 w-5.5",
           highlight && "text-primary",
-          success && "text-green-600 dark:text-green-400",
+          success && "text-emerald-600 dark:text-emerald-400",
           !highlight && !success && "text-muted-foreground"
         )}
       />
     </div>
     <div className="min-w-0">
       <p className="text-2xl font-bold tracking-tight leading-none">
-        {value}
+        <AnimatedNumber value={value} />
       </p>
-      <p className="text-xs font-medium text-muted-foreground mt-0.5">
-        {label}
-      </p>
-      {sub && (
-        <p className="text-[10px] text-muted-foreground/70">{sub}</p>
-      )}
+      <p className="text-xs font-medium text-muted-foreground mt-1">{label}</p>
+      {sub && <p className="text-[10px] text-muted-foreground/60 mt-0.5">{sub}</p>}
     </div>
   </div>
 );
 
-// ─── Assignee Badge ───────────────────────────────────────────────────────────
 
-const AssigneeBadge: React.FC<{ assignee: AssignedTo }> = ({
-  assignee,
-}) => {
-  const cfg = ASSIGNEE_CONFIG[assignee];
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold",
-        cfg.color,
-        cfg.bg
-      )}
-    >
-      {assignee}
-    </span>
-  );
-};
 
-// ─── Phase mini progress bar ──────────────────────────────────────────────────
+// ─── Phase Mini Progress ──────────────────────────────────────────────────────
 
 const PhaseMiniBar: React.FC<{
   label: string;
@@ -663,250 +620,226 @@ const PhaseMiniBar: React.FC<{
   total: number;
   icon: React.ElementType;
 }> = ({ label, completed, total, icon: Icon }) => {
-  const pct =
-    total === 0 ? 0 : Math.round((completed / total) * 100);
+  const pct = total === 0 ? 0 : Math.round((completed / total) * 100);
   return (
     <TooltipProvider delayDuration={100}>
       <Tooltip>
         <TooltipTrigger asChild>
-          <div className="flex items-center gap-1.5 cursor-default min-w-0">
+          <div className="flex items-center gap-2 cursor-default min-w-0">
             <Icon className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-            <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden flex-shrink-0">
+            <div className="w-16 h-1.5 rounded-full bg-muted/60 overflow-hidden flex-shrink-0">
               <div
                 className={cn(
-                  "h-full rounded-full transition-all",
+                  "h-full rounded-full ind-progress-bar",
                   pct === 100
-                    ? "bg-green-500"
+                    ? "bg-emerald-500"
                     : pct > 0
                     ? "bg-primary"
-                    : "bg-muted-foreground/20"
+                    : "bg-muted-foreground/15"
                 )}
                 style={{ width: `${pct}%` }}
               />
             </div>
-            <span className="text-[10px] text-muted-foreground w-7 text-right flex-shrink-0">
+            <span className="text-[10px] tabular-nums text-muted-foreground w-7 text-right flex-shrink-0">
               {pct}%
             </span>
           </div>
         </TooltipTrigger>
         <TooltipContent side="top" className="text-xs">
           <p className="font-medium">{label}</p>
-          <p className="text-muted-foreground">
-            {completed}/{total} tasks done
-          </p>
+          <p className="text-muted-foreground">{completed}/{total} tasks</p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
   );
 };
 
-// ─── Assignee Progress Pills ──────────────────────────────────────────────────
 
-const AssigneeProgress: React.FC<{
-  byAssignee: Record<AssignedTo, { total: number; completed: number }>;
-}> = ({ byAssignee }) => (
-  <div className="flex items-center gap-2 flex-wrap">
-    {(
-      Object.entries(byAssignee) as [
-        AssignedTo,
-        { total: number; completed: number }
-      ][]
-    ).map(([assignee, { total, completed }]) => {
-      if (total === 0) return null;
-      const pct = Math.round((completed / total) * 100);
-      const cfg = ASSIGNEE_CONFIG[assignee];
-      return (
-        <TooltipProvider key={assignee} delayDuration={100}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div
-                className={cn(
-                  "flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold cursor-default",
-                  cfg.color,
-                  cfg.bg
-                )}
-              >
-                {assignee}
-                <span className="font-normal opacity-70">
-                  {completed}/{total}
-                </span>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent className="text-xs">
-              <p className="font-medium">{assignee}</p>
-              <p className="text-muted-foreground">
-                {completed}/{total} tasks · {pct}%
-              </p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      );
-    })}
-  </div>
-);
+
+// ─── Status Badge ─────────────────────────────────────────────────────────────
+
+const StatusBadge: React.FC<{ status: EmployeeInductionTab }> = ({ status }) => {
+  const config = {
+    not_started: {
+      label: "Not Started",
+      icon: CircleDashed,
+      cls: "text-muted-foreground bg-muted/60 border-border/50",
+    },
+    in_progress: {
+      label: "In Progress",
+      icon: Activity,
+      cls: "text-primary bg-primary/5 border-primary/20",
+    },
+    completed: {
+      label: "Completed",
+      icon: CheckCircle2,
+      cls: "text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200/60 dark:border-emerald-800/40",
+    },
+    all: { label: "", icon: Users, cls: "" },
+  };
+
+  const c = config[status];
+  if (status === "all") return null;
+
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold border",
+        c.cls
+      )}
+    >
+      <c.icon className="h-3 w-3" />
+      {c.label}
+    </span>
+  );
+};
 
 // ─── Employee Row ─────────────────────────────────────────────────────────────
 
 const EmployeeRow: React.FC<{
   employee: EmployeeInduction;
   onView: (e: EmployeeInduction) => void;
-}> = ({ employee, onView }) => {
-  // For display purposes on the list row, use tracker tasks if available,
-  // otherwise fall back to default tasks so progress bars aren't all zeros.
-  const displayTasks =
-    employee.tasks.length > 0 ? employee.tasks : DEFAULT_TASKS;
+  index: number;
+  isVisible: boolean;
+}> = ({ employee, onView, index, isVisible }) => {
+  const displayTasks = employee.tasks.length > 0 ? employee.tasks : DEFAULT_TASKS;
   const stats = computeInductionStats(displayTasks);
   const status = getInductionStatus(employee);
 
   return (
     <div
-      className="group flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3.5 rounded-xl border bg-card hover:bg-muted/30 transition-all cursor-pointer"
+      className={cn(
+        "group relative flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-4 rounded-2xl border border-border/40 bg-card/80 transition-all duration-300 cursor-pointer",
+        "hover:bg-muted/40 hover:border-border/80 hover:shadow-md hover:shadow-black/[0.03] dark:hover:shadow-white/[0.02]",
+        isVisible ? "ind-fade-up" : "opacity-0"
+      )}
+      style={{ animationDelay: `${index * 40}ms` }}
       onClick={() => onView(employee)}
     >
       {/* Avatar + Info */}
-      <div className="flex items-center gap-3 flex-1 min-w-0">
+      <div className="flex items-center gap-3.5 flex-1 min-w-0">
         <div className="relative flex-shrink-0">
-          <Avatar className="h-9 w-9">
-            <AvatarFallback className="text-xs font-bold bg-primary/10 text-primary">
+          <Avatar className="h-10 w-10 rounded-xl flex-shrink-0 ring-2 ring-background shadow-sm">
+            {employee.profilePhoto && (
+              <AvatarImage src={employee.profilePhoto} alt={`${employee.firstName} ${employee.lastName}`} className="object-cover" />
+            )}
+            <AvatarFallback
+              className={cn(
+                "rounded-xl text-xs font-bold",
+                getAvatarColor(`${employee.firstName} ${employee.lastName}`)
+              )}
+            >
               {getInitials(employee.firstName, employee.lastName)}
             </AvatarFallback>
           </Avatar>
           <div
             className={cn(
-              "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-background",
+              "absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-background transition-colors",
               status === "completed"
-                ? "bg-green-500"
+                ? "bg-emerald-500"
                 : status === "in_progress"
                 ? "bg-primary"
-                : "bg-muted-foreground/40"
+                : "bg-muted-foreground/30"
             )}
           />
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-sm font-semibold leading-none">
+            <p className="text-sm font-semibold leading-none tracking-tight">
               {employee.firstName}{" "}
               {employee.middleName ? `${employee.middleName} ` : ""}
               {employee.lastName}
             </p>
-            <span className="text-[10px] font-mono bg-muted text-muted-foreground px-1.5 py-0.5 rounded hidden sm:inline">
+            <span className="text-[10px] font-mono bg-muted/70 text-muted-foreground px-1.5 py-0.5 rounded-md hidden sm:inline border border-border/40">
               {employee.employeeId}
             </span>
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5 truncate">
+          {/* <p className="text-xs text-muted-foreground mt-1 truncate">
             {employee.designation} · {employee.department}
-          </p>
+          </p> */}
         </div>
       </div>
 
       {/* Phase Bars */}
-      <div className="hidden lg:flex flex-col gap-1.5 w-44">
-        <PhaseMiniBar
-          label="Before Joining"
-          completed={stats.beforeCompleted}
-          total={stats.beforeTasks}
-          icon={Milestone}
-        />
-        <PhaseMiniBar
-          label="After Joining"
-          completed={stats.afterCompleted}
-          total={stats.afterTasks}
-          icon={CheckCheck}
-        />
+      <div className="hidden lg:flex flex-col gap-2 w-44">
+        <PhaseMiniBar label="Before Joining" completed={stats.beforeCompleted} total={stats.beforeTasks} icon={Milestone} />
+        <PhaseMiniBar label="After Joining" completed={stats.afterCompleted} total={stats.afterTasks} icon={CheckCheck} />
       </div>
 
-      {/* Assignee Progress */}
-      <div className="hidden xl:block w-48">
-        <AssigneeProgress byAssignee={stats.byAssignee} />
-      </div>
 
-      {/* Overall */}
-      <div className="flex items-center gap-3 flex-shrink-0 w-36">
-        <div className="flex-1">
-          <div className="flex justify-between items-center mb-1">
-            <span className="text-[10px] text-muted-foreground">
-              {stats.completed}/{stats.total} tasks
-            </span>
-            <span className="text-[10px] font-bold">{stats.pct}%</span>
-          </div>
-          <Progress value={stats.pct} className="h-1.5" />
+
+      {/* Circular Progress */}
+      <div className="flex items-center gap-3 flex-shrink-0">
+        <CircularProgress value={stats.pct} size={42} strokeWidth={3} />
+        <div className="text-right">
+          <p className="text-xs font-semibold tabular-nums">{stats.completed}/{stats.total}</p>
+          <p className="text-[10px] text-muted-foreground">tasks</p>
         </div>
       </div>
 
       {/* Required */}
-      <div className="flex-shrink-0 w-28 hidden md:block">
+      <div className="flex-shrink-0 w-24 hidden md:block">
         <div
           className={cn(
-            "text-center text-[10px] font-medium px-2 py-1 rounded-lg border",
+            "text-center text-[10px] font-medium px-2 py-1.5 rounded-xl border transition-colors",
             stats.allRequiredDone
-              ? "bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800 dark:text-green-400"
-              : "bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-400"
+              ? "bg-emerald-50/80 border-emerald-200/50 text-emerald-700 dark:bg-emerald-950/20 dark:border-emerald-800/30 dark:text-emerald-400"
+              : "bg-amber-50/80 border-amber-200/50 text-amber-700 dark:bg-amber-950/20 dark:border-amber-800/30 dark:text-amber-400"
           )}
         >
-          {stats.requiredCompleted}/{stats.requiredTotal} required
+          {stats.requiredCompleted}/{stats.requiredTotal} req
         </div>
       </div>
 
       {/* DOJ */}
       <div className="hidden lg:flex items-center gap-1.5 text-xs text-muted-foreground flex-shrink-0 w-24">
         <CalendarDays className="h-3.5 w-3.5 flex-shrink-0" />
-        <span>
-          {employee.dateOfJoining
-            ? formatDate(employee.dateOfJoining)
-            : "—"}
-        </span>
+        <span className="tabular-nums">{employee.dateOfJoining ? formatDate(employee.dateOfJoining) : "—"}</span>
       </div>
 
-      {/* View Button */}
-      <div
-        className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <TooltipProvider delayDuration={100}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onView(employee);
-                }}
-                className="h-7 w-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-              >
-                <Eye className="h-4 w-4" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent className="text-xs">View tasks</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+      {/* View indicator */}
+      <div className="flex items-center flex-shrink-0">
+        <div className="h-8 w-8 rounded-xl flex items-center justify-center text-muted-foreground/40 group-hover:text-primary group-hover:bg-primary/5 transition-all duration-200">
+          <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+        </div>
       </div>
     </div>
   );
 };
 
-// ─── Task Row (inside modal) ──────────────────────────────────────────────────
+// ─── Task Row (Modal) ─────────────────────────────────────────────────────────
 
 const TaskRow: React.FC<{
   task: InductionTask;
   onToggle: (task: InductionTask) => void;
   onRemark: (task: InductionTask) => void;
   isToggling?: boolean;
-  /** True when the task is a default placeholder (not yet in DB) */
   isDefault?: boolean;
-}> = ({ task, onToggle, onRemark, isToggling, isDefault }) => {
+  index?: number;
+}> = ({ task, onToggle, onRemark, isToggling, isDefault, index = 0 }) => {
   const TaskIcon = task.icon;
   const isCompleted = task.status === "completed";
 
   return (
     <div
       className={cn(
-        "flex items-start gap-3 px-3 py-2.5 rounded-lg border transition-colors",
+        "group flex items-start gap-3 px-4 py-3 rounded-xl border transition-all duration-200 ind-fade-up",
         isCompleted
-          ? "bg-green-50/50 dark:bg-green-900/10 border-green-200 dark:border-green-900 border-l-2 border-l-green-500"
-          : "bg-card border-border hover:bg-muted/30 border-l-2 border-l-border",
-        isDefault && "opacity-60"
+          ? "bg-emerald-50/40 dark:bg-emerald-950/10 border-emerald-200/40 dark:border-emerald-900/30"
+          : "bg-card border-border/40 hover:bg-muted/30 hover:border-border/60",
+        isDefault && "opacity-50"
       )}
+      style={{ animationDelay: `${index * 25}ms` }}
     >
-      {/* Checkbox — disabled for defaults since they have no real DB id */}
+      {/* Completion indicator line */}
+      <div
+        className={cn(
+          "absolute left-0 top-2 bottom-2 w-0.5 rounded-full transition-colors duration-300",
+          isCompleted ? "bg-emerald-500" : "bg-transparent"
+        )}
+      />
+
+      {/* Checkbox */}
       <div className="flex-shrink-0 mt-0.5">
         {isToggling ? (
           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
@@ -916,8 +849,9 @@ const TaskRow: React.FC<{
             onCheckedChange={() => !isDefault && onToggle(task)}
             disabled={isDefault}
             className={cn(
+              "transition-all",
               isCompleted &&
-                "border-green-500 data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600"
+                "border-emerald-500 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 ind-check-pop"
             )}
           />
         )}
@@ -926,84 +860,81 @@ const TaskRow: React.FC<{
       {/* Icon */}
       <div
         className={cn(
-          "w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0",
-          isCompleted
-            ? "bg-green-100 dark:bg-green-900/40"
-            : "bg-muted"
+          "w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors duration-200",
+          isCompleted ? "bg-emerald-100 dark:bg-emerald-900/30" : "bg-muted/60"
         )}
       >
         <TaskIcon
           className={cn(
-            "h-3.5 w-3.5",
-            isCompleted
-              ? "text-green-600 dark:text-green-400"
-              : "text-muted-foreground"
+            "h-4 w-4 transition-colors",
+            isCompleted ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
           )}
         />
       </div>
 
-      {/* Name + Meta */}
+      {/* Content */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           <p
             className={cn(
-              "text-xs font-medium",
-              isCompleted && "line-through text-muted-foreground"
+              "text-xs font-medium transition-colors",
+              isCompleted && "line-through text-muted-foreground/70"
             )}
           >
             {task.name}
           </p>
           {task.required && (
-            <span className="text-[9px] font-bold text-destructive border border-destructive/30 px-1 py-0.5 rounded leading-none">
-              REQ
+            <span className="text-[8px] font-bold text-destructive/80 border border-destructive/20 bg-destructive/5 px-1.5 py-0.5 rounded-md leading-none uppercase tracking-wider">
+              Required
             </span>
           )}
           {isDefault && (
-            <span className="text-[9px] font-medium text-muted-foreground border border-border px-1 py-0.5 rounded leading-none">
-              NOT STARTED
+            <span className="text-[8px] font-medium text-muted-foreground border border-border/60 px-1.5 py-0.5 rounded-md leading-none">
+              Template
             </span>
           )}
         </div>
 
-        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-          <AssigneeBadge assignee={task.assignedTo} />
+        <div className="flex items-center gap-2 mt-1 flex-wrap">
           {isCompleted && task.completedAt && (
-            <span className="text-[10px] text-muted-foreground">
-              Done {formatDate(task.completedAt)}
+            <span className="text-[10px] text-muted-foreground/70 flex items-center gap-1">
+              <CheckCircle2 className="h-2.5 w-2.5 text-emerald-500" />
+              {formatDate(task.completedAt)}
               {task.completedBy && ` · ${task.completedBy}`}
             </span>
           )}
           {task.remarks && (
-            <span className="text-[10px] text-muted-foreground italic truncate max-w-40">
-              "{task.remarks}"
+            <span className="text-[10px] text-muted-foreground/60 italic truncate max-w-40 flex items-center gap-0.5">
+              <MessageSquare className="h-2.5 w-2.5" />
+              {task.remarks}
             </span>
           )}
         </div>
       </div>
 
-      {/* Remark Button — only for real DB tasks */}
+      {/* Actions */}
       {!isDefault && (
-        <TooltipProvider delayDuration={100}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={() => onRemark(task)}
-                className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors flex-shrink-0"
-              >
-                <MessageSquare className="h-3.5 w-3.5" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent className="text-xs">
-              Add / view remark
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <TooltipProvider delayDuration={100}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => onRemark(task)}
+                  className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                >
+                  <MessageSquare className="h-3.5 w-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent className="text-xs">Remark</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
       )}
     </div>
   );
 };
 
-// ─── Phase Section (inside modal) ────────────────────────────────────────────
+// ─── Phase Section (Modal) ───────────────────────────────────────────────────
 
 const PhaseSection: React.FC<{
   phase: TaskPhase;
@@ -1013,65 +944,70 @@ const PhaseSection: React.FC<{
   togglingTaskId: string | null;
   defaultTaskIds: Set<string>;
   defaultOpen?: boolean;
-}> = ({
-  phase,
-  tasks,
-  onToggle,
-  onRemark,
-  togglingTaskId,
-  defaultTaskIds,
-  defaultOpen = true,
-}) => {
+}> = ({ phase, tasks, onToggle, onRemark, togglingTaskId, defaultTaskIds, defaultOpen = true }) => {
   const [open, setOpen] = useState(defaultOpen);
   const completed = tasks.filter((t) => t.status === "completed").length;
-  const pct =
-    tasks.length === 0 ? 0 : Math.round((completed / tasks.length) * 100);
+  const pct = tasks.length === 0 ? 0 : Math.round((completed / tasks.length) * 100);
   const isBefore = phase === "before_joining";
 
   return (
-    <div className="border rounded-xl overflow-hidden">
+    <div className="border border-border/40 rounded-2xl overflow-hidden ind-scale-in">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center gap-3 px-4 py-3 bg-muted/40 hover:bg-muted/60 transition-colors"
+        className="w-full flex items-center gap-3 px-5 py-3.5 bg-muted/20 hover:bg-muted/40 transition-colors duration-200"
       >
-        <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 border bg-background">
+        <div
+          className={cn(
+            "w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 border transition-colors",
+            pct === 100
+              ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200/50 dark:border-emerald-800/30"
+              : "bg-background border-border/50"
+          )}
+        >
           {isBefore ? (
-            <Milestone className="h-3.5 w-3.5 text-primary" />
+            <Milestone className={cn("h-4 w-4", pct === 100 ? "text-emerald-600" : "text-primary")} />
           ) : (
-            <CheckCheck className="h-3.5 w-3.5 text-primary" />
+            <CheckCheck className={cn("h-4 w-4", pct === 100 ? "text-emerald-600" : "text-primary")} />
           )}
         </div>
         <div className="flex-1 text-left">
-          <p className="text-sm font-semibold">
+          <p className="text-sm font-semibold tracking-tight">
             {isBefore ? "Before Joining" : "After Joining"}
           </p>
           <p className="text-[10px] text-muted-foreground mt-0.5">
-            {completed}/{tasks.length} tasks completed
+            {completed}/{tasks.length} completed
           </p>
         </div>
         <div className="flex items-center gap-3 mr-2">
-          <Progress value={pct} className="w-20 h-1.5" />
+          <div className="w-24 h-1.5 rounded-full bg-muted/60 overflow-hidden">
+            <div
+              className={cn(
+                "h-full rounded-full ind-progress-bar",
+                pct === 100 ? "bg-emerald-500" : pct > 0 ? "bg-primary" : "bg-muted-foreground/15"
+              )}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
           <span
             className={cn(
-              "text-xs font-bold",
-              pct === 100
-                ? "text-green-600 dark:text-green-400"
-                : "text-foreground"
+              "text-xs font-bold tabular-nums w-8 text-right",
+              pct === 100 ? "text-emerald-600 dark:text-emerald-400" : ""
             )}
           >
             {pct}%
           </span>
         </div>
-        {open ? (
-          <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-        ) : (
-          <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-        )}
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 text-muted-foreground flex-shrink-0 transition-transform duration-200",
+            !open && "-rotate-90"
+          )}
+        />
       </button>
 
       {open && (
-        <div className="p-3 space-y-2 bg-card">
-          {tasks.map((task) => (
+        <div className="p-3 space-y-1.5 bg-card/50 ind-slide-down">
+          {tasks.map((task, i) => (
             <TaskRow
               key={task.id}
               task={task}
@@ -1079,6 +1015,7 @@ const PhaseSection: React.FC<{
               onRemark={onRemark}
               isToggling={togglingTaskId === task.id}
               isDefault={defaultTaskIds.has(task.id)}
+              index={i}
             />
           ))}
         </div>
@@ -1104,10 +1041,10 @@ const RemarkModal: React.FC<{
 
   return (
     <Dialog open={open} onOpenChange={() => onClose()}>
-      <DialogContent className="sm:max-w-sm p-0 gap-0 overflow-hidden">
-        <DialogHeader className="px-6 py-4 border-b bg-muted/30">
+      <DialogContent className="sm:max-w-sm p-0 gap-0 overflow-hidden rounded-2xl">
+        <DialogHeader className="px-6 py-5 border-b bg-muted/20">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
               <MessageSquare className="h-5 w-5 text-primary" />
             </div>
             <div>
@@ -1119,8 +1056,8 @@ const RemarkModal: React.FC<{
           </div>
         </DialogHeader>
 
-        <div className="px-6 py-5 space-y-3">
-          <div className="space-y-1.5">
+        <div className="px-6 py-5 space-y-4">
+          <div className="space-y-2">
             <label className="text-xs font-medium flex items-center gap-1.5">
               <MessageSquare className="h-3.5 w-3.5 text-muted-foreground" />
               Remarks / Notes
@@ -1130,35 +1067,24 @@ const RemarkModal: React.FC<{
               onChange={(e) => setRemark(e.target.value)}
               placeholder="Add any notes or remarks for this task…"
               rows={3}
-              className="resize-none text-sm"
+              className="resize-none text-sm rounded-xl"
             />
           </div>
           {task?.completedAt && (
             <p className="text-[10px] text-muted-foreground flex items-center gap-1.5">
-              <CheckCircle2 className="h-3 w-3 text-green-600" />
+              <CheckCircle2 className="h-3 w-3 text-emerald-600" />
               Completed {formatDateTime(task.completedAt)}
               {task.completedBy && ` by ${task.completedBy}`}
             </p>
           )}
         </div>
 
-        <DialogFooter className="px-6 py-4 border-t bg-muted/30">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onClose}
-            disabled={isLoading}
-          >
+        <DialogFooter className="px-6 py-4 border-t bg-muted/20">
+          <Button variant="outline" size="sm" onClick={onClose} disabled={isLoading} className="rounded-xl">
             Cancel
           </Button>
-          <Button
-            size="sm"
-            onClick={() => onSave(remark)}
-            disabled={isLoading}
-          >
-            {isLoading && (
-              <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-            )}
+          <Button size="sm" onClick={() => onSave(remark)} disabled={isLoading} className="rounded-xl">
+            {isLoading && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
             Save Remark
           </Button>
         </DialogFooter>
@@ -1190,40 +1116,22 @@ const EmployeeInductionModal: React.FC<{
   onSaveRemark,
   isRemarkLoading,
 }) => {
-  const [filterAssignee, setFilterAssignee] = useState<
-    AssignedTo | "all"
-  >("all");
-  const [filterStatus, setFilterStatus] = useState<
-    TaskStatus | "all"
-  >("all");
-  const [remarkTask, setRemarkTask] = useState<InductionTask | null>(
-    null
-  );
+  const [filterStatus, setFilterStatus] = useState<TaskStatus | "all">("all");
+  const [remarkTask, setRemarkTask] = useState<InductionTask | null>(null);
   const [remarkOpen, setRemarkOpen] = useState(false);
 
   if (!employee) return null;
 
-  // ── Resolve which tasks to display ───────────────────────────────────────
-  // Priority: liveTasks (fresh from API) > DEFAULT_TASKS (placeholder)
-  // We never fall back to employee.tasks from the tracker because the
-  // tracker often returns [] for employees who have no DB rows yet.
-  //
-  // defaultTaskIds tracks which ids came from DEFAULT_TASKS so TaskRow
-  // can render them as read-only placeholders.
   let resolvedTasks: InductionTask[];
   let defaultTaskIds: Set<string>;
 
   if (isLoadingTasks) {
-    // Still fetching — show nothing yet (skeleton rendered below)
     resolvedTasks = [];
     defaultTaskIds = new Set();
   } else if (liveTasks && liveTasks.length > 0) {
-    // Real tasks exist in DB — show them, fully interactive
     resolvedTasks = liveTasks;
-    defaultTaskIds = new Set(); // no defaults mixed in
+    defaultTaskIds = new Set();
   } else {
-    // No DB rows yet — show the canonical default checklist as read-only
-    // placeholders so HR sees what needs to be done
     resolvedTasks = DEFAULT_TASKS;
     defaultTaskIds = new Set(DEFAULT_TASKS.map((t) => t.id));
   }
@@ -1231,140 +1139,87 @@ const EmployeeInductionModal: React.FC<{
   const stats = computeInductionStats(resolvedTasks);
 
   const filteredTasks = resolvedTasks.filter((t) => {
-    const aOk =
-      filterAssignee === "all" || t.assignedTo === filterAssignee;
-    const sOk = filterStatus === "all" || t.status === filterStatus;
-    return aOk && sOk;
+    return filterStatus === "all" || t.status === filterStatus;
   });
 
-  const beforeTasks = filteredTasks.filter(
-    (t) => t.phase === "before_joining"
-  );
-  const afterTasks = filteredTasks.filter(
-    (t) => t.phase === "after_joining"
-  );
-
+  const beforeTasks = filteredTasks.filter((t) => t.phase === "before_joining");
+  const afterTasks = filteredTasks.filter((t) => t.phase === "after_joining");
   const isShowingDefaults = defaultTaskIds.size > 0;
 
   return (
     <>
       <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-2xl p-0 gap-0 overflow-hidden max-h-[92vh] flex flex-col">
+        <DialogContent className="sm:max-w-2xl p-0 gap-0 overflow-hidden max-h-[92vh] flex flex-col rounded-2xl">
           {/* Header */}
-          <DialogHeader className="px-6 py-4 border-b bg-muted/30 flex-shrink-0">
+          <DialogHeader className="px-6 py-5 border-b bg-muted/10 flex-shrink-0">
             <div className="flex items-center gap-4">
-              <Avatar className="h-11 w-11 flex-shrink-0">
-                <AvatarFallback className="text-sm font-bold bg-primary/10 text-primary">
+              <Avatar className="h-12 w-12 rounded-xl flex-shrink-0 ring-2 ring-background shadow-md">
+                {employee.profilePhoto && (
+                  <AvatarImage src={employee.profilePhoto} alt={`${employee.firstName} ${employee.lastName}`} className="object-cover" />
+                )}
+                <AvatarFallback
+                  className={cn(
+                    "rounded-xl text-sm font-bold",
+                    getAvatarColor(`${employee.firstName} ${employee.lastName}`)
+                  )}
+                >
                   {getInitials(employee.firstName, employee.lastName)}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <DialogTitle className="text-base">
+                  <DialogTitle className="text-base tracking-tight">
                     {employee.firstName}{" "}
-                    {employee.middleName
-                      ? `${employee.middleName} `
-                      : ""}
+                    {employee.middleName ? `${employee.middleName} ` : ""}
                     {employee.lastName}
                   </DialogTitle>
-                  <span className="text-[10px] font-mono bg-muted text-muted-foreground px-1.5 py-0.5 rounded">
+                  <span className="text-[10px] font-mono bg-muted/70 text-muted-foreground px-1.5 py-0.5 rounded-md border border-border/40">
                     {employee.employeeId}
                   </span>
                 </div>
-                <DialogDescription className="text-xs mt-0.5">
-                  {employee.designation} · {employee.department} · DOJ{" "}
-                  {employee.dateOfJoining
-                    ? formatDate(employee.dateOfJoining)
-                    : "—"}
+                <DialogDescription className="text-xs mt-1">DOJ{" "}
+                  {employee.dateOfJoining ? formatDate(employee.dateOfJoining) : "—"}
                 </DialogDescription>
                 {employee.inductionCoordinator && (
-                  <p className="text-[10px] text-muted-foreground mt-0.5 flex items-center gap-1">
+                  <p className="text-[10px] text-muted-foreground mt-1 flex items-center gap-1">
                     <UserCog className="h-3 w-3" />
                     Coordinator: {employee.inductionCoordinator}
                   </p>
                 )}
               </div>
+              <CircularProgress value={isLoadingTasks ? 0 : stats.pct} size={56} strokeWidth={3.5} />
             </div>
 
-            {/* Stat Strip */}
-            <div className="flex items-center gap-5 mt-3 pt-3 border-t flex-wrap">
+            {/* Stats row */}
+            <div className="grid grid-cols-4 gap-2 mt-4 pt-4 border-t border-border/30">
               {[
-                {
-                  label: "Total",
-                  value: stats.total,
-                  cls: "text-foreground",
-                },
-                {
-                  label: "Completed",
-                  value: stats.completed,
-                  cls: "text-green-700 dark:text-green-400",
-                },
-                {
-                  label: "Pending",
-                  value: stats.pending,
-                  cls: "text-amber-700 dark:text-amber-400",
-                },
-                {
-                  label: "Required",
-                  value: `${stats.requiredCompleted}/${stats.requiredTotal}`,
-                  cls: "text-foreground",
-                },
-              ].map(({ label, value, cls }) => (
-                <div key={label} className="flex items-center gap-1.5">
-                  <span
-                    className={cn("text-lg font-bold leading-none", cls)}
-                  >
-                    {isLoadingTasks ? "—" : value}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground">
-                    {label}
-                  </span>
+                { label: "Total", value: stats.total, icon: ListChecks, cls: "" },
+                { label: "Done", value: stats.completed, icon: CheckCircle2, cls: "text-emerald-700 dark:text-emerald-400" },
+                { label: "Pending", value: stats.pending, icon: Clock, cls: "text-amber-700 dark:text-amber-400" },
+                { label: "Required", value: stats.requiredCompleted, icon: Zap, cls: "" },
+              ].map(({ label, value, icon: SIcon, cls }) => (
+                <div key={label} className="flex items-center gap-2 px-2.5 py-2 rounded-xl bg-muted/30">
+                  <SIcon className={cn("h-3.5 w-3.5 text-muted-foreground", cls)} />
+                  <div>
+                    <span className={cn("text-base font-bold leading-none tabular-nums", cls)}>
+                      {isLoadingTasks ? "—" : value}
+                    </span>
+                    {label === "Required" && !isLoadingTasks && (
+                      <span className="text-muted-foreground font-normal text-[10px]">/{stats.requiredTotal}</span>
+                    )}
+                    <p className="text-[9px] text-muted-foreground mt-0.5">{label}</p>
+                  </div>
                 </div>
               ))}
-              <div className="ml-auto flex items-center gap-2">
-                <Progress
-                  value={isLoadingTasks ? 0 : stats.pct}
-                  className="w-24 h-1.5"
-                />
-                <span className="text-xs font-bold">
-                  {isLoadingTasks ? "—" : `${stats.pct}%`}
-                </span>
-              </div>
             </div>
 
-            {/* Assignee breakdown */}
-            {!isLoadingTasks && (
-              <div className="mt-2">
-                <AssigneeProgress byAssignee={stats.byAssignee} />
-              </div>
-            )}
+
           </DialogHeader>
 
           {/* Filters */}
-          <div className="px-5 py-2.5 border-b bg-muted/10 flex items-center gap-2 flex-wrap flex-shrink-0">
-            <Select
-              value={filterAssignee}
-              onValueChange={(v) => setFilterAssignee(v as any)}
-            >
-              <SelectTrigger className="h-8 w-32 text-xs">
-                <SelectValue placeholder="All Teams" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Teams</SelectItem>
-                {(["HR", "IT", "Admin", "Manager"] as AssignedTo[]).map(
-                  (a) => (
-                    <SelectItem key={a} value={a}>
-                      {a}
-                    </SelectItem>
-                  )
-                )}
-              </SelectContent>
-            </Select>
-            <Select
-              value={filterStatus}
-              onValueChange={(v) => setFilterStatus(v as any)}
-            >
-              <SelectTrigger className="h-8 w-32 text-xs">
+          <div className="px-5 py-3 border-b border-border/30 bg-muted/5 flex items-center gap-2 flex-wrap flex-shrink-0">
+            <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as any)}>
+              <SelectTrigger className="h-8 w-32 text-xs rounded-xl">
                 <SelectValue placeholder="All Tasks" />
               </SelectTrigger>
               <SelectContent>
@@ -1374,21 +1229,21 @@ const EmployeeInductionModal: React.FC<{
               </SelectContent>
             </Select>
             <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground ml-auto">
-              <span className="text-destructive font-bold border border-destructive/30 px-1 rounded text-[9px]">
-                REQ
+              <span className="text-destructive/70 font-bold border border-destructive/20 bg-destructive/5 px-1.5 rounded-md text-[8px] uppercase tracking-wider">
+                Required
               </span>
-              <span>= Required task</span>
+              <span>= Mandatory task</span>
             </div>
           </div>
 
-          {/* Info banner when showing defaults */}
+          {/* Info banner */}
           {isShowingDefaults && !isLoadingTasks && (
-            <div className="px-5 py-2.5 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 flex items-center gap-2 flex-shrink-0">
-              <Info className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+            <div className="px-5 py-3 bg-amber-50/60 dark:bg-amber-950/10 border-b border-amber-200/40 dark:border-amber-800/20 flex items-center gap-2.5 flex-shrink-0">
+              <div className="w-6 h-6 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center flex-shrink-0">
+                <Info className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+              </div>
               <p className="text-[11px] text-amber-800 dark:text-amber-300">
-                Induction tasks have not been initialised for this
-                employee yet. Tasks shown are the standard checklist.
-                Contact your system administrator to seed tasks.
+                Tasks shown are from the standard template. They haven't been initialised in the database yet.
               </p>
             </div>
           )}
@@ -1408,10 +1263,7 @@ const EmployeeInductionModal: React.FC<{
                     phase="before_joining"
                     tasks={beforeTasks}
                     onToggle={onToggleTask}
-                    onRemark={(task) => {
-                      setRemarkTask(task);
-                      setRemarkOpen(true);
-                    }}
+                    onRemark={(task) => { setRemarkTask(task); setRemarkOpen(true); }}
                     togglingTaskId={togglingTaskId}
                     defaultTaskIds={defaultTaskIds}
                     defaultOpen={true}
@@ -1422,21 +1274,19 @@ const EmployeeInductionModal: React.FC<{
                     phase="after_joining"
                     tasks={afterTasks}
                     onToggle={onToggleTask}
-                    onRemark={(task) => {
-                      setRemarkTask(task);
-                      setRemarkOpen(true);
-                    }}
+                    onRemark={(task) => { setRemarkTask(task); setRemarkOpen(true); }}
                     togglingTaskId={togglingTaskId}
                     defaultTaskIds={defaultTaskIds}
                     defaultOpen={true}
                   />
                 )}
                 {filteredTasks.length === 0 && (
-                  <div className="flex flex-col items-center justify-center py-10 text-center">
-                    <ListChecks className="h-10 w-10 text-muted-foreground/40 mb-3" />
-                    <p className="text-sm font-medium">
-                      No tasks match filters
-                    </p>
+                  <div className="flex flex-col items-center justify-center py-14 text-center ind-fade-in">
+                    <div className="w-14 h-14 rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
+                      <ListChecks className="h-7 w-7 text-muted-foreground/40" />
+                    </div>
+                    <p className="text-sm font-medium">No tasks match your filters</p>
+                    <p className="text-xs text-muted-foreground mt-1">Try adjusting the status filter</p>
                   </div>
                 )}
               </>
@@ -1444,13 +1294,13 @@ const EmployeeInductionModal: React.FC<{
           </div>
 
           {/* Footer */}
-          <DialogFooter className="px-6 py-3.5 border-t bg-muted/30 flex-shrink-0">
+          <DialogFooter className="px-6 py-4 border-t border-border/30 bg-muted/10 flex-shrink-0">
             <div className="flex items-center justify-between w-full gap-3">
               <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                 {!isLoadingTasks && stats.allRequiredDone ? (
                   <>
-                    <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
-                    <span className="text-green-700 dark:text-green-400 font-medium">
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                    <span className="text-emerald-700 dark:text-emerald-400 font-medium">
                       All required tasks completed
                     </span>
                   </>
@@ -1465,7 +1315,7 @@ const EmployeeInductionModal: React.FC<{
                   </>
                 )}
               </p>
-              <Button variant="outline" size="sm" onClick={onClose}>
+              <Button variant="outline" size="sm" onClick={onClose} className="rounded-xl">
                 Close
               </Button>
             </div>
@@ -1473,14 +1323,10 @@ const EmployeeInductionModal: React.FC<{
         </DialogContent>
       </Dialog>
 
-      {/* Nested Remark Modal */}
       <RemarkModal
         task={remarkTask}
         open={remarkOpen}
-        onClose={() => {
-          setRemarkOpen(false);
-          setRemarkTask(null);
-        }}
+        onClose={() => { setRemarkOpen(false); setRemarkTask(null); }}
         onSave={(remark) => {
           if (remarkTask) {
             onSaveRemark(remarkTask.id, remark);
@@ -1496,22 +1342,15 @@ const EmployeeInductionModal: React.FC<{
 
 // ─── Empty State ──────────────────────────────────────────────────────────────
 
-const EmptyState: React.FC<{
-  search: string;
-  tab: EmployeeInductionTab;
-}> = ({ search, tab }) => (
-  <div className="flex flex-col items-center justify-center py-16 text-center">
-    <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mb-4">
-      <ListChecks className="h-7 w-7 text-muted-foreground/50" />
+const EmptyState: React.FC<{ search: string; tab: EmployeeInductionTab }> = ({ search, tab }) => (
+  <div className="flex flex-col items-center justify-center py-20 text-center ind-fade-in">
+    <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-5">
+      <ListChecks className="h-8 w-8 text-muted-foreground/40" />
     </div>
-    <p className="text-sm font-medium">
-      {search
-        ? "No matching employees"
-        : `No ${
-            tab === "all" ? "" : tab.replace(/_/g, " ")
-          } inductions`}
+    <p className="text-sm font-semibold">
+      {search ? "No matching employees" : `No ${tab === "all" ? "" : tab.replace(/_/g, " ")} inductions`}
     </p>
-    <p className="text-xs text-muted-foreground mt-1">
+    <p className="text-xs text-muted-foreground mt-1.5 max-w-xs">
       {search
         ? `Try adjusting your search — "${search}"`
         : "Approved employees will appear here for induction tracking."}
@@ -1522,15 +1361,15 @@ const EmptyState: React.FC<{
 // ─── Error State ──────────────────────────────────────────────────────────────
 
 const ErrorState: React.FC<{ onRetry: () => void }> = ({ onRetry }) => (
-  <div className="flex flex-col items-center justify-center py-16 text-center">
-    <div className="w-14 h-14 rounded-full bg-destructive/10 flex items-center justify-center mb-4">
-      <AlertTriangle className="h-7 w-7 text-destructive/60" />
+  <div className="flex flex-col items-center justify-center py-20 text-center ind-fade-in">
+    <div className="w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mb-5">
+      <AlertTriangle className="h-8 w-8 text-destructive/50" />
     </div>
-    <p className="text-sm font-medium">Failed to load induction data</p>
-    <p className="text-xs text-muted-foreground mt-1 mb-4">
-      There was an error fetching induction tasks from the server.
+    <p className="text-sm font-semibold">Failed to load induction data</p>
+    <p className="text-xs text-muted-foreground mt-1.5 mb-5">
+      There was an error fetching data from the server.
     </p>
-    <Button variant="outline" size="sm" onClick={onRetry}>
+    <Button variant="outline" size="sm" onClick={onRetry} className="rounded-xl">
       Try Again
     </Button>
   </div>
@@ -1539,27 +1378,14 @@ const ErrorState: React.FC<{ onRetry: () => void }> = ({ onRetry }) => (
 // ─── Legend ───────────────────────────────────────────────────────────────────
 
 const Legend: React.FC = () => (
-  <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
-    {(["HR", "IT", "Admin", "Manager"] as AssignedTo[]).map((a) => (
-      <div key={a} className="flex items-center gap-1.5">
-        <span
-          className={cn(
-            "inline-flex px-1.5 py-0.5 rounded text-[10px] font-semibold",
-            ASSIGNEE_CONFIG[a].color,
-            ASSIGNEE_CONFIG[a].bg
-          )}
-        >
-          {a}
-        </span>
-      </div>
-    ))}
-    <div className="flex items-center gap-1.5">
-      <Milestone className="h-3.5 w-3.5 text-muted-foreground" />
-      <span>Before Joining</span>
+  <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+    <div className="flex items-center gap-1">
+      <Milestone className="h-3 w-3" />
+      <span className="text-[10px]">Before</span>
     </div>
-    <div className="flex items-center gap-1.5">
-      <CheckCheck className="h-3.5 w-3.5 text-muted-foreground" />
-      <span>After Joining</span>
+    <div className="flex items-center gap-1">
+      <CheckCheck className="h-3 w-3" />
+      <span className="text-[10px]">After</span>
     </div>
   </div>
 );
@@ -1567,22 +1393,13 @@ const Legend: React.FC = () => (
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
 const InductionDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] =
-    useState<EmployeeInductionTab>("all");
+  const [activeTab, setActiveTab] = useState<EmployeeInductionTab>("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<
-    "name" | "progress" | "joined" | "pending"
-  >("pending");
-
-  const [viewEmployee, setViewEmployee] =
-    useState<EmployeeInduction | null>(null);
+  const [sortBy, setSortBy] = useState<"name" | "progress" | "joined" | "pending">("pending");
+  const [viewEmployee, setViewEmployee] = useState<EmployeeInduction | null>(null);
   const [viewOpen, setViewOpen] = useState(false);
-  const [togglingTaskId, setTogglingTaskId] = useState<string | null>(
-    null
-  );
-  const [remarkSavingTaskId, setRemarkSavingTaskId] = useState<
-    string | null
-  >(null);
+  const [togglingTaskId, setTogglingTaskId] = useState<string | null>(null);
+  const [remarkSavingTaskId, setRemarkSavingTaskId] = useState<string | null>(null);
 
   // ── API ───────────────────────────────────────────────────────────────────
   const {
@@ -1592,15 +1409,12 @@ const InductionDashboard: React.FC = () => {
     refetch: refetchTracker,
   } = useInductionTrackerList();
 
-  // Only fires when the modal is open and we have an employee selected
-  const { data: rawEmployeeTasks, isLoading: isLoadingTasks } =
-    useEmployeeInduction(
-      viewOpen && viewEmployee ? viewEmployee.id : null
-    );
+  const { data: rawEmployeeTasks, isLoading: isLoadingTasks } = useEmployeeInduction(
+    viewOpen && viewEmployee ? viewEmployee.id : null
+  );
 
   const activeOnboardingId = viewEmployee?.id ?? 0;
-  const { mutate: updateTask } =
-    useUpdateInductionTask(activeOnboardingId);
+  const { mutate: updateTask } = useUpdateInductionTask(activeOnboardingId);
 
   // ── Derived data ──────────────────────────────────────────────────────────
   const employees: EmployeeInduction[] = useMemo(() => {
@@ -1608,32 +1422,24 @@ const InductionDashboard: React.FC = () => {
     return (rawTracker as any[]).map(mapApiEmployee);
   }, [rawTracker]);
 
-  // Map raw API tasks → typed tasks (with icons resolved)
   const liveTasks: InductionTask[] | undefined = useMemo(() => {
     if (!rawEmployeeTasks) return undefined;
     return (rawEmployeeTasks as any[]).map(mapApiTask);
   }, [rawEmployeeTasks]);
 
   // ── Global stats ──────────────────────────────────────────────────────────
-  // Use DEFAULT_TASKS.length as the per-employee total when the tracker
-  // returns no tasks, so numbers are meaningful rather than 0.
   const globalStats = useMemo(() => {
     const perEmpTotal = DEFAULT_TASKS.length;
     const totalTasks = employees.length * perEmpTotal;
-
-    const completedTasks = employees.reduce((acc, e) => {
-      // If tracker has real task data, count from it; otherwise 0
-      return (
-        acc + e.tasks.filter((t) => t.status === "completed").length
-      );
-    }, 0);
-
+    const completedTasks = employees.reduce(
+      (acc, e) => acc + e.tasks.filter((t) => t.status === "completed").length,
+      0
+    );
     const pendingTasks = totalTasks - completedTasks;
     const fullyDone = employees.filter((e) => {
       if (e.tasks.length === 0) return false;
       return computeInductionStats(e.tasks).pct === 100;
     }).length;
-
     return { totalTasks, completedTasks, pendingTasks, fullyDone };
   }, [employees]);
 
@@ -1641,15 +1447,9 @@ const InductionDashboard: React.FC = () => {
   const tabCounts = useMemo(
     () => ({
       all: employees.length,
-      not_started: employees.filter(
-        (e) => getInductionStatus(e) === "not_started"
-      ).length,
-      in_progress: employees.filter(
-        (e) => getInductionStatus(e) === "in_progress"
-      ).length,
-      completed: employees.filter(
-        (e) => getInductionStatus(e) === "completed"
-      ).length,
+      not_started: employees.filter((e) => getInductionStatus(e) === "not_started").length,
+      in_progress: employees.filter((e) => getInductionStatus(e) === "in_progress").length,
+      completed: employees.filter((e) => getInductionStatus(e) === "completed").length,
     }),
     [employees]
   );
@@ -1657,8 +1457,7 @@ const InductionDashboard: React.FC = () => {
   // ── Filtered & sorted list ─────────────────────────────────────────────────
   const filtered = useMemo(() => {
     let list = employees.filter((e) => {
-      const matchTab =
-        activeTab === "all" || getInductionStatus(e) === activeTab;
+      const matchTab = activeTab === "all" || getInductionStatus(e) === activeTab;
       const q = searchQuery.toLowerCase();
       const matchSearch =
         !q ||
@@ -1672,32 +1471,17 @@ const InductionDashboard: React.FC = () => {
 
     list = [...list].sort((a, b) => {
       if (sortBy === "name")
-        return `${a.firstName} ${a.lastName}`.localeCompare(
-          `${b.firstName} ${b.lastName}`
-        );
+        return `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`);
       if (sortBy === "progress") {
-        const statsA = computeInductionStats(
-          a.tasks.length > 0 ? a.tasks : DEFAULT_TASKS
-        );
-        const statsB = computeInductionStats(
-          b.tasks.length > 0 ? b.tasks : DEFAULT_TASKS
-        );
+        const statsA = computeInductionStats(a.tasks.length > 0 ? a.tasks : DEFAULT_TASKS);
+        const statsB = computeInductionStats(b.tasks.length > 0 ? b.tasks : DEFAULT_TASKS);
         return statsB.pct - statsA.pct;
       }
       if (sortBy === "joined")
-        return (
-          new Date(a.dateOfJoining).getTime() -
-          new Date(b.dateOfJoining).getTime()
-        );
+        return new Date(a.dateOfJoining).getTime() - new Date(b.dateOfJoining).getTime();
       if (sortBy === "pending") {
-        const pendA =
-          a.tasks.length > 0
-            ? computeInductionStats(a.tasks).pending
-            : DEFAULT_TASKS.length;
-        const pendB =
-          b.tasks.length > 0
-            ? computeInductionStats(b.tasks).pending
-            : DEFAULT_TASKS.length;
+        const pendA = a.tasks.length > 0 ? computeInductionStats(a.tasks).pending : DEFAULT_TASKS.length;
+        const pendB = b.tasks.length > 0 ? computeInductionStats(b.tasks).pending : DEFAULT_TASKS.length;
         return pendB - pendA;
       }
       return 0;
@@ -1706,60 +1490,66 @@ const InductionDashboard: React.FC = () => {
     return list;
   }, [employees, activeTab, searchQuery, sortBy]);
 
+  const visibleItems = useStaggeredEntrance(filtered.length, 40);
+
   // ── Handlers ───────────────────────────────────────────────────────────────
 
-  const handleToggleTask = (task: InductionTask) => {
-    if (!viewEmployee) return;
-    const newStatus =
-      task.status === "completed" ? "pending" : "completed";
-    setTogglingTaskId(task.id);
-    updateTask(
-      { taskId: Number(task.id), updates: { status: newStatus } },
-      { onSettled: () => setTogglingTaskId(null) }
-    );
-  };
+  const handleToggleTask = useCallback(
+    (task: InductionTask) => {
+      if (!viewEmployee) return;
+      const newStatus = task.status === "completed" ? "pending" : "completed";
+      setTogglingTaskId(task.id);
+      updateTask(
+        { taskId: Number(task.id), updates: { status: newStatus } },
+        { onSettled: () => setTogglingTaskId(null) }
+      );
+    },
+    [viewEmployee, updateTask]
+  );
 
-  const handleSaveRemark = (taskId: string, remark: string) => {
-    if (!viewEmployee) return;
-    setRemarkSavingTaskId(taskId);
-    updateTask(
-      { taskId: Number(taskId), updates: { remarks: remark } },
-      { onSettled: () => setRemarkSavingTaskId(null) }
-    );
-  };
+  const handleSaveRemark = useCallback(
+    (taskId: string, remark: string) => {
+      if (!viewEmployee) return;
+      setRemarkSavingTaskId(taskId);
+      updateTask(
+        { taskId: Number(taskId), updates: { remarks: remark } },
+        { onSettled: () => setRemarkSavingTaskId(null) }
+      );
+    },
+    [viewEmployee, updateTask]
+  );
 
-  const tabs: {
-    value: EmployeeInductionTab;
-    label: string;
-    icon: React.ElementType;
-  }[] = [
+  const tabs: { value: EmployeeInductionTab; label: string; icon: React.ElementType }[] = [
     { value: "all", label: "All", icon: Users },
     { value: "not_started", label: "Not Started", icon: CircleDashed },
-    { value: "in_progress", label: "In Progress", icon: Clock },
+    { value: "in_progress", label: "In Progress", icon: Activity },
     { value: "completed", label: "Completed", icon: CheckCircle2 },
   ];
 
   return (
     <TooltipProvider>
-      <Card className="flex flex-col h-full min-h-0">
+      <StyleInjector />
+      <Card className="flex flex-col h-full min-h-0 rounded-2xl border-border/50 shadow-sm">
         {/* ── Header ── */}
-        <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0 pb-4 flex-wrap">
-          <div className="space-y-1">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <ClipboardList className="h-5 w-5 text-primary" />
+        <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0 pb-5 flex-wrap">
+          <div className="space-y-1.5">
+            <CardTitle className="flex items-center gap-2.5 text-lg tracking-tight">
+              <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
+                <ClipboardList className="h-4.5 w-4.5 text-primary" />
+              </div>
               Induction Tracker
             </CardTitle>
-            <CardDescription>
-              Manage and track onboarding induction tasks for all new
-              joiners
+            <CardDescription className="text-sm">
+              Track onboarding induction tasks for new joiners
             </CardDescription>
           </div>
           {!isLoadingTracker && globalStats.pendingTasks > 0 && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-xs">
-              <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+            <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/15 border border-amber-200/50 dark:border-amber-800/25 text-xs ind-fade-in">
+              <div className="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                <Clock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+              </div>
               <span className="text-amber-800 dark:text-amber-300 font-medium">
-                {globalStats.pendingTasks} task
-                {globalStats.pendingTasks > 1 ? "s" : ""} pending
+                {globalStats.pendingTasks} task{globalStats.pendingTasks > 1 ? "s" : ""} pending
               </span>
             </div>
           )}
@@ -1780,24 +1570,28 @@ const InductionDashboard: React.FC = () => {
                 value={globalStats.totalTasks}
                 icon={ListChecks}
                 sub={`across ${employees.length} employees`}
+                delay={0}
               />
               <StatCard
                 label="Pending Tasks"
                 value={globalStats.pendingTasks}
                 icon={Clock}
                 highlight={globalStats.pendingTasks > 0}
+                delay={60}
               />
               <StatCard
                 label="Completed Tasks"
                 value={globalStats.completedTasks}
                 icon={CheckCheck}
+                delay={120}
               />
               <StatCard
                 label="Fully Inducted"
                 value={globalStats.fullyDone}
-                icon={PartyPopper}
+                icon={Sparkles}
                 success={globalStats.fullyDone > 0}
                 sub={`of ${employees.length} employees`}
+                delay={180}
               />
             </div>
           )}
@@ -1807,27 +1601,23 @@ const InductionDashboard: React.FC = () => {
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
               <Tabs
                 value={activeTab}
-                onValueChange={(v) =>
-                  setActiveTab(v as EmployeeInductionTab)
-                }
+                onValueChange={(v) => setActiveTab(v as EmployeeInductionTab)}
               >
-                <TabsList className="h-9">
+                <TabsList className="h-10 p-1 rounded-xl bg-muted/50">
                   {tabs.map((tab) => (
                     <TabsTrigger
                       key={tab.value}
                       value={tab.value}
-                      className="gap-1.5 text-xs px-3"
+                      className="gap-1.5 text-xs px-3.5 rounded-lg data-[state=active]:shadow-sm transition-all"
                     >
                       <tab.icon className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">
-                        {tab.label}
-                      </span>
+                      <span className="hidden sm:inline">{tab.label}</span>
                       <span
                         className={cn(
-                          "ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium",
+                          "ml-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold tabular-nums transition-colors",
                           activeTab === tab.value
-                            ? "bg-background text-foreground"
-                            : "bg-muted text-muted-foreground"
+                            ? "bg-background text-foreground shadow-sm"
+                            : "bg-muted/60 text-muted-foreground"
                         )}
                       >
                         {isLoadingTracker ? "—" : tabCounts[tab.value]}
@@ -1838,32 +1628,23 @@ const InductionDashboard: React.FC = () => {
               </Tabs>
 
               <div className="flex items-center gap-2 ml-auto flex-wrap">
-                <Select
-                  value={sortBy}
-                  onValueChange={(v) => setSortBy(v as typeof sortBy)}
-                >
-                  <SelectTrigger className="h-9 w-40 text-xs">
+                <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
+                  <SelectTrigger className="h-9 w-40 text-xs rounded-xl">
                     <ArrowUpDown className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="pending">
-                      Sort: Most pending
-                    </SelectItem>
-                    <SelectItem value="progress">
-                      Sort: Progress
-                    </SelectItem>
-                    <SelectItem value="name">Sort: Name</SelectItem>
-                    <SelectItem value="joined">
-                      Sort: Joining date
-                    </SelectItem>
+                    <SelectItem value="pending">Most pending</SelectItem>
+                    <SelectItem value="progress">Progress</SelectItem>
+                    <SelectItem value="name">Name</SelectItem>
+                    <SelectItem value="joined">Joining date</SelectItem>
                   </SelectContent>
                 </Select>
 
                 <div className="relative w-full sm:w-56">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                   <Input
-                    className="pl-9 h-9 text-sm"
+                    className="pl-9 h-9 text-sm rounded-xl"
                     placeholder="Search name, ID, role…"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -1874,8 +1655,8 @@ const InductionDashboard: React.FC = () => {
 
             <div className="flex items-center justify-between flex-wrap gap-2">
               <Legend />
-              <p className="text-xs text-muted-foreground">
-                <span className="font-medium text-foreground">
+              <p className="text-xs text-muted-foreground tabular-nums">
+                <span className="font-semibold text-foreground">
                   {isLoadingTracker ? "—" : filtered.length}
                 </span>{" "}
                 of {isLoadingTracker ? "—" : employees.length} employees
@@ -1884,12 +1665,11 @@ const InductionDashboard: React.FC = () => {
           </div>
 
           {/* ── Column Headers ── */}
-          <div className="hidden lg:flex items-center gap-3 px-4 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+          <div className="hidden lg:flex items-center gap-3 px-5 text-[10px] font-semibold text-muted-foreground/70 uppercase tracking-wider">
             <div className="flex-1">Employee</div>
             <div className="w-44">Phase Progress</div>
-            <div className="w-48">Team Breakdown</div>
-            <div className="w-36">Overall</div>
-            <div className="w-28">Required</div>
+            <div className="w-24 text-center">Progress</div>
+            <div className="w-24 text-center">Required</div>
             <div className="w-24">Joining</div>
             <div className="w-8" />
           </div>
@@ -1897,7 +1677,7 @@ const InductionDashboard: React.FC = () => {
           {/* ── List ── */}
           <div className="flex-1 min-h-0 overflow-y-auto -mx-1 px-1">
             {isLoadingTracker ? (
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 {Array.from({ length: 5 }).map((_, i) => (
                   <EmployeeRowSkeleton key={i} />
                 ))}
@@ -1908,10 +1688,12 @@ const InductionDashboard: React.FC = () => {
               <EmptyState search={searchQuery} tab={activeTab} />
             ) : (
               <div className="space-y-2">
-                {filtered.map((emp) => (
+                {filtered.map((emp, idx) => (
                   <EmployeeRow
                     key={emp.id}
                     employee={emp}
+                    index={idx}
+                    isVisible={visibleItems.has(idx)}
                     onView={(e) => {
                       setViewEmployee(e);
                       setViewOpen(true);

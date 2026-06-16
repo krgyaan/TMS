@@ -73,8 +73,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type DocStatus = "pending" | "verified" | "rejected" | "not_uploaded";
-type EmployeeDocTab = "all" | "pending" | "verified" | "rejected" | "incomplete";
+type DocStatus = "pending" | "approved" | "rejected" | "not_uploaded";
+type EmployeeDocTab = "all" | "pending" | "approved" | "rejected" | "incomplete";
 type DocCategory = "identity" | "educational" | "employment" | "other";
 
 interface Document {
@@ -154,8 +154,8 @@ const DOC_STATUS_CONFIG: Record<
       "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-800",
     rowClass: "border-l-2 border-l-amber-400",
   },
-  verified: {
-    label: "Verified",
+  approved: {
+    label: "Approved",
     icon: FileCheck,
     badgeClass:
       "bg-green-100 text-green-800 border-green-200 dark:bg-green-900/40 dark:text-green-300 dark:border-green-800",
@@ -188,7 +188,7 @@ const formatDate = (d: string) =>
 const normalizeStatus = (status: string | null | undefined): DocStatus => {
   if (!status) return "not_uploaded";
   const s = status.toLowerCase();
-  if (s === "verified" || s === "approved") return "verified";
+  if (s === "verified" || s === "approved") return "approved";
   if (s === "rejected") return "rejected";
   if (
     s === "pending" ||
@@ -259,35 +259,35 @@ const mapApiEmployee = (raw: any): EmployeeDocRecord => ({
 const computeDocStats = (docs: Document[]) => {
   const total = docs.length;
   const uploaded = docs.filter((d) => d.status !== "not_uploaded").length;
-  const verified = docs.filter((d) => d.status === "verified").length;
+  const approved = docs.filter((d) => d.status === "approved").length;
   const pending = docs.filter((d) => d.status === "pending").length;
   const rejected = docs.filter((d) => d.status === "rejected").length;
   const requiredTotal = docs.filter((d) => d.required).length;
-  const requiredVerified = docs.filter(
-    (d) => d.required && d.status === "verified"
+  const requiredApproved = docs.filter(
+    (d) => d.required && d.status === "approved"
   ).length;
   const completionPct =
-    total === 0 ? 0 : Math.round((verified / total) * 100);
-  const allRequiredDone = requiredVerified === requiredTotal;
+    total === 0 ? 0 : Math.round((approved / total) * 100);
+  const allRequiredDone = requiredApproved === requiredTotal;
   return {
     total,
     uploaded,
-    verified,
+    approved,
     pending,
     rejected,
     requiredTotal,
-    requiredVerified,
+    requiredApproved,
     completionPct,
     allRequiredDone,
   };
 };
 
 const getEmployeeDocStatus = (emp: EmployeeDocRecord): EmployeeDocTab => {
-  const { verified, total, rejected, pending } = computeDocStats(
+  const { approved, total, rejected, pending } = computeDocStats(
     emp.documents
   );
   if (rejected > 0) return "rejected";
-  if (total > 0 && verified === total) return "verified";
+  if (total > 0 && approved === total) return "approved";
   if (pending > 0) return "pending";
   return "incomplete";
 };
@@ -364,16 +364,16 @@ const StatCard: React.FC<{
 // ─── Mini Doc Status Pills ────────────────────────────────────────────────────
 
 const DocStatusMini: React.FC<{
-  verified: number;
+  approved: number;
   pending: number;
   rejected: number;
   notUploaded: number;
-}> = ({ verified, pending, rejected, notUploaded }) => (
+}> = ({ approved, pending, rejected, notUploaded }) => (
   <div className="flex items-center gap-1.5 flex-wrap">
-    {verified > 0 && (
+    {approved > 0 && (
       <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">
         <CheckCircle2 className="h-2.5 w-2.5" />
-        {verified}
+        {approved}
       </span>
     )}
     {pending > 0 && (
@@ -406,9 +406,9 @@ const CategoryBar: React.FC<{
   const cfg = CATEGORY_CONFIG[category];
   const Icon = cfg.icon;
   const catDocs = docs.filter((d) => d.category === category);
-  const verified = catDocs.filter((d) => d.status === "verified").length;
+  const approved = catDocs.filter((d) => d.status === "approved").length;
   const pct =
-    catDocs.length === 0 ? 0 : Math.round((verified / catDocs.length) * 100);
+    catDocs.length === 0 ? 0 : Math.round((approved / catDocs.length) * 100);
 
   return (
     <TooltipProvider delayDuration={100}>
@@ -437,7 +437,7 @@ const CategoryBar: React.FC<{
         <TooltipContent side="top" className="text-xs">
           <p className="font-medium">{cfg.label}</p>
           <p className="text-muted-foreground">
-            {verified}/{catDocs.length} verified
+            {approved}/{catDocs.length} approved
           </p>
         </TooltipContent>
       </Tooltip>
@@ -472,7 +472,7 @@ const EmployeeRow: React.FC<EmployeeRowProps> = ({ employee, onView }) => {
           <div
             className={cn(
               "absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-background",
-              stats.allRequiredDone && stats.verified === stats.total
+              stats.allRequiredDone && stats.approved === stats.total
                 ? "bg-green-500"
                 : stats.rejected > 0
                 ? "bg-destructive"
@@ -516,7 +516,7 @@ const EmployeeRow: React.FC<EmployeeRowProps> = ({ employee, onView }) => {
       {/* Mini Status Pills */}
       <div className="flex-shrink-0 w-36">
         <DocStatusMini
-          verified={stats.verified}
+          approved={stats.approved}
           pending={stats.pending}
           rejected={stats.rejected}
           notUploaded={notUploaded}
@@ -534,7 +534,7 @@ const EmployeeRow: React.FC<EmployeeRowProps> = ({ employee, onView }) => {
           </div>
           <Progress value={stats.completionPct} className="h-1.5" />
           <p className="text-[10px] text-muted-foreground mt-0.5">
-            {stats.verified}/{stats.total} verified
+            {stats.approved}/{stats.total} approved
           </p>
         </div>
       </div>
@@ -549,7 +549,7 @@ const EmployeeRow: React.FC<EmployeeRowProps> = ({ employee, onView }) => {
               : "bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-400"
           )}
         >
-          {stats.requiredVerified}/{stats.requiredTotal} mandatory
+          {stats.requiredApproved}/{stats.requiredTotal} mandatory
         </div>
       </div>
 
@@ -603,7 +603,7 @@ const DocRow: React.FC<DocRowProps> = ({ doc, onVerify, onReject, onView }) => {
       <div
         className={cn(
           "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0",
-          doc.status === "verified" && "bg-green-100 dark:bg-green-900/40",
+          doc.status === "approved" && "bg-green-100 dark:bg-green-900/40",
           doc.status === "pending" && "bg-amber-100 dark:bg-amber-900/40",
           doc.status === "rejected" && "bg-destructive/10",
           doc.status === "not_uploaded" && "bg-muted"
@@ -612,7 +612,7 @@ const DocRow: React.FC<DocRowProps> = ({ doc, onVerify, onReject, onView }) => {
         <StatusIcon
           className={cn(
             "h-4 w-4",
-            doc.status === "verified" && "text-green-600 dark:text-green-400",
+            doc.status === "approved" && "text-green-600 dark:text-green-400",
             doc.status === "pending" && "text-amber-600 dark:text-amber-400",
             doc.status === "rejected" && "text-destructive",
             doc.status === "not_uploaded" && "text-muted-foreground"
@@ -650,7 +650,7 @@ const DocRow: React.FC<DocRowProps> = ({ doc, onVerify, onReject, onView }) => {
             ⚠ {doc.rejectedReason}
           </p>
         )}
-        {doc.verifiedBy && doc.status === "verified" && (
+        {doc.verifiedBy && doc.status === "approved" && (
           <p className="text-[10px] text-muted-foreground mt-0.5">
             Verified by {doc.verifiedBy}
           </p>
@@ -730,8 +730,8 @@ const DocRow: React.FC<DocRowProps> = ({ doc, onVerify, onReject, onView }) => {
                   <RotateCcw className="h-3.5 w-3.5" />
                 </button>
               </TooltipTrigger>
-              <TooltipContent className="text-xs">
-                Mark as verified
+              <TooltipContent side="top" className="text-xs">
+                Mark as approved
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -754,7 +754,7 @@ const CategorySection: React.FC<{
   const [open, setOpen] = useState(defaultOpen);
   const cfg = CATEGORY_CONFIG[category];
   const Icon = cfg.icon;
-  const verified = docs.filter((d) => d.status === "verified").length;
+  const approved = docs.filter((d) => d.status === "approved").length;
   const pending = docs.filter((d) => d.status === "pending").length;
   const rejected = docs.filter((d) => d.status === "rejected").length;
 
@@ -771,9 +771,9 @@ const CategorySection: React.FC<{
           {cfg.label} Documents
         </span>
         <div className="flex items-center gap-2 mr-2">
-          {verified > 0 && (
+          {approved > 0 && (
             <span className="text-[10px] font-medium text-green-700 dark:text-green-400">
-              {verified} verified
+              {approved} approved
             </span>
           )}
           {pending > 0 && (
@@ -897,8 +897,8 @@ const EmployeeDocModal: React.FC<EmployeeDocModalProps> = ({
                 cls: "text-foreground",
               },
               {
-                label: "Verified",
-                value: stats.verified,
+                label: "Approved",
+                value: stats.approved,
                 cls: "text-green-700 dark:text-green-400",
               },
               {
@@ -962,7 +962,7 @@ const EmployeeDocModal: React.FC<EmployeeDocModalProps> = ({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="verified">Verified</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="rejected">Rejected</SelectItem>
               <SelectItem value="not_uploaded">Not Uploaded</SelectItem>
@@ -1040,15 +1040,15 @@ const EmployeeDocModal: React.FC<EmployeeDocModalProps> = ({
                 <>
                   <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
                   <span className="text-green-700 dark:text-green-400 font-medium">
-                    All mandatory documents verified
+                    All mandatory documents approved
                   </span>
                 </>
               ) : (
                 <>
                   <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
                   <span>
-                    {stats.requiredVerified}/{stats.requiredTotal} mandatory
-                    verified
+                    {stats.requiredApproved}/{stats.requiredTotal} mandatory
+                    approved
                   </span>
                 </>
               )}
@@ -1080,7 +1080,7 @@ const VerifyModal: React.FC<{
             <FileCheck className="h-5 w-5 text-green-700 dark:text-green-400" />
           </div>
           <div>
-            <DialogTitle className="text-base">Verify Document</DialogTitle>
+            <DialogTitle className="text-base">Approve Document</DialogTitle>
             <DialogDescription className="text-xs mt-0.5 truncate max-w-48">
               {doc?.name}
             </DialogDescription>
@@ -1091,7 +1091,7 @@ const VerifyModal: React.FC<{
         <p className="text-sm text-muted-foreground">
           This will mark the document as{" "}
           <span className="font-semibold text-green-700 dark:text-green-400">
-            Verified
+            Approved
           </span>
           . The employee will be notified.
         </p>
@@ -1115,7 +1115,7 @@ const VerifyModal: React.FC<{
             <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
           )}
           <CheckCheck className="h-3.5 w-3.5 mr-1.5" />
-          Confirm Verify
+          Confirm Approve
         </Button>
       </DialogFooter>
     </DialogContent>
@@ -1586,7 +1586,7 @@ const DocumentDashboard: React.FC = () => {
   const confirmVerify = () => {
     if (!verifyDoc) return;
     verifyMutate(
-      { docId: Number(verifyDoc.doc.id), status: "verified" },
+      { docId: Number(verifyDoc.doc.id), status: "approved" },
       {
         onSuccess: () => {
           setVerifyOpen(false);
@@ -1620,7 +1620,7 @@ const DocumentDashboard: React.FC = () => {
   }[] = [
     { value: "all", label: "All", icon: Users },
     { value: "pending", label: "Pending Review", icon: Clock },
-    { value: "verified", label: "Verified", icon: CheckCircle2 },
+    { value: "approved", label: "Approved", icon: CheckCircle2 },
     { value: "rejected", label: "Rejected", icon: XCircle },
     { value: "incomplete", label: "Incomplete", icon: CircleDashed },
   ];

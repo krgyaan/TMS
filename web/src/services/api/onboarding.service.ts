@@ -8,6 +8,7 @@ export interface OnboardingRequest {
   email: string;
   phone: string;
   status: "pending" | "approved" | "rejected";
+  hrStatus: "pending" | "approved" | "rejected";
   profileStatus: string;
   documentStatus: string;
   educationStatus: string;
@@ -15,6 +16,7 @@ export interface OnboardingRequest {
   bankStatus: string;
   inductionStatus: string;
   progress: number;
+  employeeProgress: number;
   approvedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -37,6 +39,7 @@ export interface ProfileListItem {
   firstName: string | null;
   lastName: string | null;
   profileStatus: string;
+  hrStatus: "pending" | "approved" | "rejected";
   progress: number;
   approvedAt: string | null;
   updatedAt: string;
@@ -52,6 +55,7 @@ export interface ProfileListItem {
   ifscCode: string | null;
   hrCompleted: boolean;
   employeeCompleted: boolean;
+  hrRemark?: string | null;
 }
 
 /** Shape returned by GET /hrms/onboarding/:id/profile (full profile) */
@@ -63,6 +67,7 @@ export interface FullProfile {
   email: string;
   phone: string;
   status: string;
+  hrStatus: string;
   profileStatus: string;
   progress: number;
   approvedAt: string | null;
@@ -123,6 +128,31 @@ export const onboardingService = {
     return data;
   },
 
+  getIncompleteOnboarding: async (): Promise<OnboardingRequest[]> => {
+    const { data } = await axiosInstance.get("/hrms/onboarding/incomplete");
+    return data;
+  },
+
+  getMyOnboardingStatus: async (): Promise<{
+    isComplete: boolean;
+    hasRequest: boolean;
+    requestId?: number;
+    profileStatus?: string;
+    documentStatus?: string;
+    educationStatus?: string;
+    experienceStatus?: string;
+    bankStatus?: string;
+    hrStatus?: string;
+    profileHrStatus?: string;
+    documentHrStatus?: string;
+    educationHrStatus?: string;
+    experienceHrStatus?: string;
+    bankHrStatus?: string;
+  }> => {
+    const { data } = await axiosInstance.get("/hrms/onboarding/my-status");
+    return data;
+  },
+
   updateStatus: async (id: number, dto: UpdateStatusDto): Promise<OnboardingRequest> => {
     const { data } = await axiosInstance.patch(`/hrms/onboarding/${id}/status`, dto);
     return data;
@@ -148,6 +178,11 @@ export const onboardingService = {
     return data;
   },
 
+  approveProfile: async (id: number, status: 'approved' | 'rejected', remark?: string): Promise<any> => {
+    const { data } = await axiosInstance.patch(`/hrms/onboarding/${id}/approve-profile`, { status, remark: remark || "" });
+    return data;
+  },
+
   // Documents
   getDocumentTrackerList: async (): Promise<any[]> => {
     const { data } = await axiosInstance.get("/hrms/onboarding/documents-tracker");
@@ -160,7 +195,7 @@ export const onboardingService = {
   },
 
   verifyDocument: async (id: number, docId: number, status: string, reason?: string): Promise<void> => {
-    await axiosInstance.patch(`/hrms/onboarding/${id}/documents/${docId}/verify`, { status, reason });
+    await axiosInstance.patch(`/hrms/onboarding/${id}/documents/${docId}/approve`, { status, remark: reason || "" });
   },
 
   // Induction

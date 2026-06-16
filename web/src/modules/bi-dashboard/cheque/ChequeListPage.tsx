@@ -1,24 +1,27 @@
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import DataTable from '@/components/ui/data-table';
-import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { paths } from '@/app/routes/paths';
+import { ExportExcelDropdown } from '@/components/bi-dashboard/ExportExcelDropdown';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, FileX2, Search, Eye, Clock, CheckCircle, XCircle, Shield, Link, Calendar, Edit, Plus } from 'lucide-react';
-import { QuickFilter } from '@/components/ui/quick-filter';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import DataTable from '@/components/ui/data-table';
+import { Input } from '@/components/ui/input';
+import { QuickFilter } from '@/components/ui/quick-filter';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useChequeDashboard, useChequeDashboardCounts } from '@/hooks/api/useCheques';
-import type { ChequeDashboardRow, ChequeDashboardTab } from './helpers/cheque.types';
-import { formatINR } from '@/hooks/useINRFormatter';
-import { formatDate } from '@/hooks/useFormatedDate';
-import { paths } from '@/app/routes/paths';
+import { useBiExport } from '@/hooks/useBiExport';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { formatDate } from '@/hooks/useFormatedDate';
+import { formatINR } from '@/hooks/useINRFormatter';
+import { chequesService } from '@/services/api/cheques.service';
+import type { ColDef } from 'ag-grid-community';
+import { AlertCircle, Calendar, CheckCircle, Clock, Edit, Eye, FileX2, Link, MessageSquare, Plus, Search, Shield, XCircle } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import type { ChequeDashboardRow, ChequeDashboardTab } from './helpers/cheque.types';
 
 const TABS_CONFIG: Array<{ key: ChequeDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -112,6 +115,60 @@ const ChequeListPage = () => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, []);
 
+    const flattenFormData = (data: Record<string, any>): Record<string, any> => {
+        const out: Record<string, any> = {};
+        if (data.chequeNo) out['Cheque No'] = data.chequeNo;
+        if (data.chequeDate) out['Cheque Date'] = new Date(data.chequeDate).toLocaleDateString('en-GB');
+        if (data.dueDate) out['Due Date'] = new Date(data.dueDate).toLocaleDateString('en-GB');
+        if (data.payeeName) out['Payee Name'] = data.payeeName;
+        if (data.amount) out['Amount'] = data.amount;
+        if (data.utr) out['UTR'] = data.utr;
+        if (data.rejectionReason) out['Rejection Reason'] = data.rejectionReason;
+        if (data.issueDate) out['Issue Date'] = new Date(data.issueDate).toLocaleDateString('en-GB');
+        if (data.expiryDate) out['Expiry Date'] = new Date(data.expiryDate).toLocaleDateString('en-GB');
+        return out;
+    };
+
+    const { exportTab, setExportTab, exporting, handleExport, exportOptions } = useBiExport({
+        getAllFn: (params) => chequesService.getAll(params),
+        getActionFormDataFn: (id) => chequesService.getActionFormData(id),
+        tabsConfig: TABS_CONFIG,
+        pendingTabKey: 'cheque-pending',
+        tabsWithForm: ['cheque-payable', 'cheque-paid-stop', 'cheque-for-security', 'cheque-for-dd-fdr', 'rejected', 'cancelled', 'expired'],
+        filenamePrefix: 'cheques',
+        flattenFormData,
+        mapPendingRow: (r: any) => ({
+            'Cheque Date': r.cheque ? new Date(r.cheque).toLocaleDateString('en-GB') : '',
+            'Cheque No': r.chequeNo || '',
+            'Payee name': r.payeeName || '',
+            'Requested By': r.requestedBy || '',
+            'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
+            'Amount': r.amount || '',
+            'Type': r.type || '',
+            'Due Date': r.dueDate ? new Date(r.dueDate).toLocaleDateString('en-GB') : '',
+            'Member': r.requestedBy || '',
+            'Expiry': r.expiry || '',
+            'Cheque Status': r.chequeStatus || '',
+        }),
+        mapRow: (r: any, isAllTab: boolean) => {
+            const base: Record<string, any> = {
+                'Cheque Date': r.cheque ? new Date(r.cheque).toLocaleDateString('en-GB') : '',
+                'Cheque No': r.chequeNo || '',
+                'Payee name': r.payeeName || '',
+                'Requested By': r.requestedBy || '',
+                'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
+                'Amount': r.amount || '',
+                'Type': r.type || '',
+                'Due Date': r.dueDate ? new Date(r.dueDate).toLocaleDateString('en-GB') : '',
+                'Member': r.requestedBy || '',
+                'Expiry': r.expiry || '',
+                'Cheque Status': r.chequeStatus || '',
+            };
+            if (isAllTab) base['Tab'] = r._tab || '';
+            return base;
+        },
+    });
+
     const { data: apiResponse, isLoading, error } = useChequeDashboard({
         tab: activeTab,
         page: pagination.pageIndex + 1,
@@ -139,6 +196,11 @@ const ChequeListPage = () => {
                 icon: <Edit className="h-4 w-4" />,
                 onClick: (row: ChequeDashboardRow) => navigate(paths.bi.chequeAction(row.id)),
             },
+            {
+                label: 'Meeting Remarks',
+                icon: <MessageSquare className="h-4 w-4" />,
+                onClick: (row: ChequeDashboardRow) => navigate(paths.bi.chequeMeetingRemarks(row.id)),
+            }
         ],
         [navigate]
     );
@@ -177,6 +239,16 @@ const ChequeListPage = () => {
                 filter: true,
             },
             {
+                field: 'requestedBy',
+                headerName: 'Requested By',
+                width: 140,
+                maxWidth: 140,
+                colId: 'requestedBy',
+                valueGetter: (params) => params.data?.requestedBy || '—',
+                sortable: true,
+                filter: true,
+            },
+            {
                 field: 'cheque',
                 headerName: 'Cheque Date',
                 width: 130,
@@ -207,16 +279,6 @@ const ChequeListPage = () => {
                 maxWidth: 230,
                 colId: 'payeeName',
                 valueGetter: (params) => params.data?.payeeName || '—',
-                sortable: true,
-                filter: true,
-            },
-            {
-                field: 'requestedBy',
-                headerName: 'Requested By',
-                width: 140,
-                maxWidth: 140,
-                colId: 'requestedBy',
-                valueGetter: (params) => params.data?.requestedBy || '—',
                 sortable: true,
                 filter: true,
             },
@@ -380,10 +442,19 @@ const ChequeListPage = () => {
                             </CardDescription>
                         </div>
                         <CardAction>
-                            <Button variant="outline" onClick={() => navigate(paths.tendering.oldEmdsForCHEQUE())}>
-                                <Plus className="w-4 h-4" />
-                                Add Old Entry
-                            </Button>
+                            <div className="flex items-center gap-2">
+                                <ExportExcelDropdown
+                                    exportOptions={exportOptions}
+                                    exportTab={exportTab}
+                                    setExportTab={setExportTab}
+                                    exporting={exporting}
+                                    handleExport={handleExport}
+                                />
+                                <Button variant="outline" onClick={() => navigate(paths.tendering.oldEmdsForCHEQUE())}>
+                                    <Plus className="w-4 h-4" />
+                                    Add Old Entry
+                                </Button>
+                            </div>
                         </CardAction>
                     </div>
                 </CardHeader>

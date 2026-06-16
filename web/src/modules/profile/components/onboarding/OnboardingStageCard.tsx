@@ -163,15 +163,16 @@ function getActionLabel(
 // Document Verification Badge
 // ─────────────────────────────────────────────────────────────────────────────
 
-function DocStatusBadge({ status }: { status: "pending" | "verified" | "rejected" }) {
-  const config = {
+function DocStatusBadge({ status }: { status: "pending" | "approved" | "rejected" }) {
+  const normalizedStatus = (status || "pending").toLowerCase() as "pending" | "approved" | "rejected";
+  const statusMap = {
     pending: {
-      label: "Pending",
+      label: "Pending Review",
       className: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800/50",
       icon: Clock,
     },
-    verified: {
-      label: "Verified",
+    approved: {
+      label: "Approved",
       className: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/50",
       icon: CheckCircle2,
     },
@@ -180,8 +181,9 @@ function DocStatusBadge({ status }: { status: "pending" | "verified" | "rejected
       className: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-800/50",
       icon: XCircle,
     },
-  }[status];
+  };
 
+  const config = statusMap[normalizedStatus] || statusMap.pending;
   const Icon = config.icon;
 
   return (
@@ -381,7 +383,7 @@ function DocumentsContent({
                 </div>
 
                 <div className="shrink-0 flex items-center gap-2">
-                  <DocStatusBadge status={doc.hrStatus === "approved" ? "verified" : doc.hrStatus === "rejected" ? "rejected" : "pending"} />
+                  <DocStatusBadge status={doc.hrStatus} />
                 </div>
               </motion.div>
             ))}
@@ -783,8 +785,6 @@ export function OnboardingStageCard({
 
   // ── Determine what to render in expanded section ─────────────────────
   const hasExpandedContent = Boolean(children || details || documents || inductionTasks || education || experience || bankAccounts);
-
-  console.log(documents);
 
   return (
     <motion.div

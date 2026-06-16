@@ -1,4 +1,5 @@
 export type BankTransferDashboardTab = 'pending' | 'accepted' | 'rejected' | 'returned' | 'settled';
+export type BankTransferExportTab = BankTransferDashboardTab | 'all';
 
 export type BankTransferDashboardFilters = {
     tab?: BankTransferDashboardTab;
@@ -13,9 +14,11 @@ export type BankTransferDashboardFilters = {
 export interface BankTransferDashboardRow {
     id: number;
     requestId: number;
+    type: string | null;
     purpose: string | null;
     date: Date | null;
     teamMember: string | null;
+    utr: string | null;
     utrNo: string | null;
     accountName: string | null;
     tenderName: string | null;

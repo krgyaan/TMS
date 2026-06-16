@@ -3,6 +3,7 @@ import { eq, desc, asc, sql, and, ilike } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { woContacts, woBasicDetails } from '@db/schemas/operations';
+import { ClientDirectorySyncService } from '@/modules/shared/client-directory/client-directory-sync.service';
 import type {
   CreateWoContactDto,
   UpdateWoContactDto,
@@ -14,7 +15,10 @@ export type WoContactRow = typeof woContacts.$inferSelect;
 
 @Injectable()
 export class WoContactsService {
-  constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: DbInstance,
+    private readonly clientDirectorySyncService: ClientDirectorySyncService,
+  ) {}
 
   // MAPPING FUNCTIONS
   private mapCreateToDb(data: CreateWoContactDto) {
@@ -179,6 +183,13 @@ export class WoContactsService {
 
     const [row] = await this.db.insert(woContacts).values(insertValues).returning();
 
+    await this.clientDirectorySyncService.syncToClientDirectory([{
+      name: data.name ?? '',
+      email: data.email,
+      phone: data.phone,
+      org: data.organization,
+    }]);
+
     return this.mapRowToResponse(row!);
   }
 
@@ -211,6 +222,17 @@ export class WoContactsService {
 
     const rows = await this.db.insert(woContacts).values(insertValues).returning();
 
+    await this.clientDirectorySyncService.syncToClientDirectory(
+      data.contacts
+        .filter((c) => c.name?.trim())
+        .map((c) => ({
+          name: c.name ?? '',
+          email: c.email,
+          phone: c.phone,
+          org: c.organization,
+        })),
+    );
+
     return {
       count: rows.length,
       contacts: rows.map((r) => this.mapRowToResponse(r)),
@@ -231,6 +253,13 @@ export class WoContactsService {
     if (!row) {
       throw new NotFoundException(`Contact with ID ${id} not found`);
     }
+
+    await this.clientDirectorySyncService.syncToClientDirectory([{
+      name: data.name ?? '',
+      email: data.email,
+      phone: data.phone,
+      org: data.organization,
+    }]);
 
     return this.mapRowToResponse(row);
   }

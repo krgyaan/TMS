@@ -1,24 +1,27 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import DataTable from '@/components/ui/data-table';
-import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { paths } from '@/app/routes/paths';
+import { ExportExcelDropdown } from '@/components/bi-dashboard/ExportExcelDropdown';
+import { tenderNameCol } from '@/components/data-grid/columns';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, FileX2, Search, Eye, Clock, CheckCircle, XCircle, RotateCcw, Wallet, Edit } from 'lucide-react';
-import { QuickFilter } from '@/components/ui/quick-filter';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import DataTable from '@/components/ui/data-table';
 import { Input } from '@/components/ui/input';
+import { QuickFilter } from '@/components/ui/quick-filter';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useBankTransferDashboard, useBankTransferDashboardCounts } from '@/hooks/api/useBankTransfers';
-import type { BankTransferDashboardRow, BankTransferDashboardTab } from './helpers/bankTransfer.types';
-import { tenderNameCol } from '@/components/data-grid/columns';
+import { useBiExport } from '@/hooks/useBiExport';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
-import { paths } from '@/app/routes/paths';
-import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { bankTransfersService } from '@/services/api/bank-transfers.service';
+import type { ColDef } from 'ag-grid-community';
+import { AlertCircle, CheckCircle, Clock, Edit, Eye, FileX2, MessageSquare, RotateCcw, Search, Wallet, XCircle } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import type { BankTransferDashboardRow, BankTransferDashboardTab } from './helpers/bankTransfer.types';
 
 const TABS_CONFIG: Array<{ key: BankTransferDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -82,7 +85,6 @@ const BankTransferListPage = () => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, [teamFilter]);
 
-
     const handlePageSizeChange = useCallback((newPageSize: number) => {
         setPagination({ pageIndex: 0, pageSize: newPageSize });
     }, []);
@@ -97,6 +99,59 @@ const BankTransferListPage = () => {
         setSortModel(sortModel);
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, []);
+
+    const flattenFormData = (data: Record<string, any>): Record<string, any> => {
+        const out: Record<string, any> = {};
+        if (data.accountName) out['Account Name'] = data.accountName;
+        if (data.accountNumber) out['Account Number'] = data.accountNumber;
+        if (data.ifsc) out['IFSC'] = data.ifsc;
+        if (data.utrNo) out['UTR'] = data.utrNo;
+        if (data.transactionDate) out['Transaction Date'] = new Date(data.transactionDate).toLocaleDateString('en-GB');
+        if (data.utrMsg) out['UTR Message'] = data.utrMsg;
+        if (data.returnTransferDate) out['Return Transfer Date'] = new Date(data.returnTransferDate).toLocaleDateString('en-GB');
+        if (data.returnUtr) out['Return UTR'] = data.returnUtr;
+        if (data.reason) out['Reason'] = data.reason;
+        if (data.remarks) out['Remarks'] = data.remarks;
+        if (data.rejectionReason) out['Rejection Reason'] = data.rejectionReason;
+        return out;
+    };
+
+    const { exportTab, setExportTab, exporting, handleExport, exportOptions } = useBiExport({
+        getAllFn: (params) => bankTransfersService.getAll(params),
+        getActionFormDataFn: (id) => bankTransfersService.getActionFormData(id),
+        tabsConfig: TABS_CONFIG,
+        pendingTabKey: 'pending',
+        tabsWithForm: ['accepted', 'rejected', 'returned', 'settled'],
+        filenamePrefix: 'bank-transfers',
+        flattenFormData,
+        mapPendingRow: (r: any) => ({
+            'Date': r.date ? new Date(r.date).toLocaleDateString('en-GB') : '',
+            'Tender Name': r.tenderNo || '',
+            'Team Member': r.teamMember || '',
+            'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
+            'Purpose': r.purpose || '',
+            'Tender Status': r.tenderStatus || '',
+            'Amount': r.amount || '',
+            'BT Status': r.btStatus || '',
+        }),
+        mapRow: (r: any, isAllTab: boolean) => {
+            const base: Record<string, any> = {
+                'Date': r.date ? new Date(r.date).toLocaleDateString('en-GB') : '',
+                'Tender Name': r.tenderNo || '',
+                'Team Member': r.teamMember || '',
+                'UTR No': r.utrNo || '',
+                'UTR': r.utr || '',
+                'Account Name': r.accountName || '',
+                'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
+                'Purpose': r.purpose || '',
+                'Tender Status': r.tenderStatus || '',
+                'Amount': r.amount || '',
+                'BT Status': r.btStatus || '',
+            };
+            if (isAllTab) base['Tab'] = r._tab || '';
+            return base;
+        },
+    });
 
     const { data: apiResponse, isLoading, error } = useBankTransferDashboard({
         tab: activeTab,
@@ -125,6 +180,11 @@ const BankTransferListPage = () => {
                 icon: <Edit className="h-4 w-4" />,
                 onClick: (row: BankTransferDashboardRow) => navigate(paths.bi.bankTransferAction(row.id)),
             },
+            {
+                label: 'Meeting Remarks',
+                icon: <MessageSquare className="h-4 w-4" />,
+                onClick: (row: BankTransferDashboardRow) => navigate(paths.bi.bankTransferMeetingRemarks(row.id)),
+            }
         ],
         [navigate]
     );
@@ -168,7 +228,7 @@ const BankTransferListPage = () => {
                 width: 130,
                 maxWidth: 130,
                 colId: 'utrNo',
-                valueGetter: (params) => params.data?.utrNo || '—',
+                valueGetter: (params) => params.data?.utrNo || params.data?.utr || '—',
                 sortable: true,
                 filter: true,
                 hide: activeTab === 'pending' || activeTab === 'rejected',
@@ -212,7 +272,7 @@ const BankTransferListPage = () => {
                 width: 130,
                 maxWidth: 130,
                 colId: 'tenderStatus',
-                valueGetter: (params) => params.data?.tenderStatus || '—',
+                valueGetter: (params) => params.data?.tenderStatus || params.data?.type || '—',
                 sortable: true,
                 filter: true,
             },
@@ -312,6 +372,17 @@ const BankTransferListPage = () => {
                                 Track and manage bank transfers for tenders.
                             </CardDescription>
                         </div>
+                        <CardAction>
+                            <div className="flex items-center gap-2">
+                                <ExportExcelDropdown
+                                    exportOptions={exportOptions}
+                                    exportTab={exportTab}
+                                    setExportTab={setExportTab}
+                                    exporting={exporting}
+                                    handleExport={handleExport}
+                                />
+                            </div>
+                        </CardAction>
                     </div>
                 </CardHeader>
                 <CardContent className="px-0">

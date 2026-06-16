@@ -1,25 +1,28 @@
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import DataTable from '@/components/ui/data-table';
-import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { paths } from '@/app/routes/paths';
+import { tenderNameCol } from '@/components/data-grid/columns';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, FileX2, Search, Eye, Clock, CheckCircle, XCircle, RotateCcw, Edit, Plus } from 'lucide-react';
-import { QuickFilter } from '@/components/ui/quick-filter';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import DataTable from '@/components/ui/data-table';
+import { Input } from '@/components/ui/input';
+import { QuickFilter } from '@/components/ui/quick-filter';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useDemandDraftDashboard, useDemandDraftDashboardCounts } from '@/hooks/api/useDemandDrafts';
-import type { DemandDraftDashboardRow, DashboardTab } from './helpers/demandDraft.types';
-import { tenderNameCol } from '@/components/data-grid/columns';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { useBiExport } from '@/hooks/useBiExport';
 import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
-import { paths } from '@/app/routes/paths';
-import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { demandDraftsService } from '@/services/api/demand-drafts.service';
+import { ExportExcelDropdown } from '@/components/bi-dashboard/ExportExcelDropdown';
+import type { ColDef } from 'ag-grid-community';
+import { AlertCircle, CheckCircle, Clock, Edit, Eye, FileX2, Plus, RotateCcw, Search, XCircle } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import type { DashboardTab, DemandDraftDashboardRow } from './helpers/demandDraft.types';
 
 const TABS_CONFIG: Array<{ key: DashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -80,7 +83,6 @@ const DemandDraftListPage = () => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, [teamFilter]);
 
-    
     const handlePageSizeChange = useCallback((newPageSize: number) => {
         setPagination({ pageIndex: 0, pageSize: newPageSize });
     }, []);
@@ -95,6 +97,62 @@ const DemandDraftListPage = () => {
         setSortModel(sortModel);
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, []);
+
+    const flattenFormData = (data: Record<string, any>): Record<string, any> => {
+        const out: Record<string, any> = {};
+        if (data.ddNo) out['DD No'] = data.ddNo;
+        if (data.ddDate) out['DD Date'] = new Date(data.ddDate).toLocaleDateString('en-GB');
+        if (data.reqNo) out['Courier Req No'] = data.reqNo;
+        if (data.ddNeeds) out['Deliver By'] = data.ddNeeds;
+        if (data.ddPurpose) out['Purpose Detail'] = data.ddPurpose;
+        if (data.ddRemarks) out['Remarks'] = data.ddRemarks;
+        if (data.utr) out['UTR'] = data.utr;
+        if (data.issueDate) out['Issue Date'] = new Date(data.issueDate).toLocaleDateString('en-GB');
+        if (data.expiryDate) out['Expiry Date'] = new Date(data.expiryDate).toLocaleDateString('en-GB');
+        if (data.payableAt) out['Payable At'] = data.payableAt;
+        if (data.docketNo) out['Docket No'] = data.docketNo;
+        return out;
+    };
+
+    const { exportTab, setExportTab, exporting, handleExport, exportOptions } = useBiExport({
+        getAllFn: (params) => demandDraftsService.getAll(params),
+        getActionFormDataFn: (id) => demandDraftsService.getActionFormData(id),
+        tabsConfig: TABS_CONFIG,
+        pendingTabKey: 'pending',
+        tabsWithForm: ['created', 'rejected', 'returned', 'cancelled'],
+        filenamePrefix: 'demand-drafts',
+        flattenFormData,
+        mapPendingRow: (r: any) => ({
+            'DD Date': r.ddCreationDate ? new Date(r.ddCreationDate).toLocaleDateString('en-GB') : '',
+            'DD No': r.ddNo || '',
+            'Tender Details': r.tenderNo || '',
+            'Tender Status': r.tenderStatus || '',
+            'Beneficiary name': r.beneficiaryName || '',
+            'Purpose': r.purpose || '',
+            'DD Amount': r.ddAmount || '',
+            'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
+            'Member': r.teamMember || '',
+            'Expiry': r.expiry || '',
+            'DD Status': r.ddStatus || '',
+        }),
+        mapRow: (r: any, isAllTab: boolean) => {
+            const base: Record<string, any> = {
+                'Tender Details': r.tenderNo || '',
+                'Tender Status': r.tenderStatus || '',
+                'Beneficiary name': r.beneficiaryName || '',
+                'Purpose': r.purpose || '',
+                'DD Amount': r.ddAmount || '',
+                'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
+                'Member': r.teamMember || '',
+                'Expiry': r.expiry || '',
+                'DD Status': r.ddStatus || '',
+            };
+            if (isAllTab) base['Tab'] = r._tab || '';
+            if (r.ddCreationDate) base['DD Date'] = new Date(r.ddCreationDate).toLocaleDateString('en-GB');
+            if (r.ddNo) base['DD No'] = r.ddNo;
+            return base;
+        },
+    });
 
     const { data: apiResponse, isLoading, error } = useDemandDraftDashboard({
         tab: activeTab,
@@ -330,10 +388,19 @@ const DemandDraftListPage = () => {
                             </CardDescription>
                         </div>
                         <CardAction>
-                            <Button variant="outline" onClick={() => navigate(paths.tendering.oldEmdsForDD())}>
-                                <Plus className="w-4 h-4" />
-                                Add Old Entry
-                            </Button>
+                            <div className="flex items-center gap-2">
+                                <ExportExcelDropdown
+                                    exportOptions={exportOptions}
+                                    exportTab={exportTab}
+                                    setExportTab={setExportTab}
+                                    exporting={exporting}
+                                    handleExport={handleExport}
+                                />
+                                <Button variant="outline" onClick={() => navigate(paths.tendering.oldEmdsForDD())}>
+                                    <Plus className="w-4 h-4" />
+                                    Add Old Entry
+                                </Button>
+                            </div>
                         </CardAction>
                     </div>
                 </CardHeader>

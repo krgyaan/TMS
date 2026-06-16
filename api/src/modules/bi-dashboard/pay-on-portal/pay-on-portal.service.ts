@@ -41,6 +41,7 @@ export class PayOnPortalService {
         const conditions: any[] = [
             eq(paymentInstruments.instrumentType, 'Portal Payment'),
             eq(paymentInstruments.isActive, true),
+            sql`${paymentRequests.purpose} NOT IN ('Tender Fee', 'Processing Fee')`,
         ];
 
         if (tab === 'pending') {
@@ -142,10 +143,12 @@ export class PayOnPortalService {
             .select({
                 id: paymentInstruments.id,
                 requestId: paymentRequests.id,
+                type: paymentRequests.type,
                 purpose: paymentRequests.purpose,
                 date: instrumentTransferDetails.transactionDate,
                 teamMember: users.name,
                 utrNo: instrumentTransferDetails.utrNum,
+                utr: paymentInstruments.utr,
                 portalName: instrumentTransferDetails.portalName,
                 tenderName: tenderInfos.tenderName,
                 tenderNo: tenderInfos.tenderNo,
@@ -159,7 +162,7 @@ export class PayOnPortalService {
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id))
-            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
             .leftJoin(this.requesterUser, eq(this.requesterUser.id, paymentRequests.requestedBy))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .where(whereClause)
@@ -176,7 +179,7 @@ export class PayOnPortalService {
             .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id));
         if (searchTerm || teamId) {
             countQueryBuilder = countQueryBuilder
-                .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+                .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
                 .leftJoin(this.requesterUser, eq(this.requesterUser.id, paymentRequests.requestedBy))
                 .leftJoin(statuses, eq(statuses.id, tenderInfos.status));
         }
@@ -187,10 +190,12 @@ export class PayOnPortalService {
         const data: PayOnPortalDashboardRow[] = rows.map((row) => ({
             id: row.id,
             requestId: row.requestId,
+            type: row.type,
             purpose: row.purpose,
             date: row.date ? new Date(row.date) : null,
             teamMember: row.teamMember,
             utrNo: row.utrNo,
+            utr: row.utr,
             portalName: row.portalName,
             tenderName: row.tenderName,
             tenderNo: row.tenderNo,

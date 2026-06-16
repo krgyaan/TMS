@@ -40,6 +40,7 @@ export class BankTransferService {
         const conditions: any[] = [
             eq(paymentInstruments.instrumentType, 'Bank Transfer'),
             eq(paymentInstruments.isActive, true),
+            sql`${paymentRequests.purpose} NOT IN ('Tender Fee', 'Processing Fee')`,
         ];
 
         if (tab === 'pending') {
@@ -141,9 +142,11 @@ export class BankTransferService {
             .select({
                 id: paymentInstruments.id,
                 requestId: paymentRequests.id,
+                type: paymentRequests.type,
                 purpose: paymentRequests.purpose,
                 date: instrumentTransferDetails.transactionDate,
                 teamMember: users.name,
+                utr: paymentInstruments.utr,
                 utrNo: instrumentTransferDetails.utrNum,
                 accountName: instrumentTransferDetails.accountName,
                 tenderName: tenderInfos.tenderName,
@@ -185,11 +188,13 @@ export class BankTransferService {
         const data: BankTransferDashboardRow[] = rows.map((row) => ({
             id: row.id,
             requestId: row.requestId,
+            type: row.type,
             purpose: row.purpose,
             date: row.date ? new Date(row.date) : null,
             teamMember: row.teamMember?.toString() ?? null,
             member: row.teamMember?.toString() ?? null,
             utrNo: row.utrNo,
+            utr: row.utr,
             accountName: row.accountName,
             tenderName: row.tenderName || row.projectName,
             tenderNo: row.tenderNo || row.projectNo,

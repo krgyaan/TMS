@@ -83,6 +83,11 @@ export class PdfGeneratorService implements OnModuleInit, OnModuleDestroy {
         imageData.img_tick_base64 = await this.loadImageAsBase64('tick.png');
         imageData.img_cross_base64 = await this.loadImageAsBase64('cross.png');
 
+        // Load PO-specific images (skip if caller already provided — allows per-team override)
+        if (!("img_sign_po_base64" in data)) {
+            imageData.img_sign_po_base64 = await this.loadImageAsBase64('sign-po.jpg');
+        }
+
         // Inject images into data at top level (will be flattened later)
         return {
             ...data,

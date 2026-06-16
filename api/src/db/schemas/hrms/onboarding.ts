@@ -28,6 +28,7 @@ export const onboardingRequests = pgTable('hrms_onboarding_requests', {
   phone: varchar('phone', { length: 20 }),
 
   status: varchar('status', { length: 50 }).notNull().default('pending'),
+  hrStatus: varchar('hr_status', { length: 50 }).notNull().default('pending'),
 
   // Aggregate stage statuses (computed from individual entity statuses)
   // Values: 'pending' | 'in_progress' | 'submitted' | 'approved' | 'rejected'
@@ -77,6 +78,7 @@ export const onboardingProfiles = pgTable('hrms_onboarding_profiles', {
   panNumber: varchar('pan_number', { length: 20 }),
   bloodGroup: varchar('blood_group', { length: 10 }),
   linkedinProfile: varchar('linkedin_profile', { length: 255 }),
+  pfNumber: varchar('pf_number', { length: 50 }),
 
   currentAddress: jsonb('current_address').default({}),
   permanentAddress: jsonb('permanent_address').default({}),

@@ -7,9 +7,10 @@ import { TenderStatusHistoryModule } from '@/modules/tendering/tender-status-his
 import { EmailModule } from '@/modules/email/email.module';
 import { TimersModule } from '@/modules/timers/timers.module';
 import { TenderInfoSheetsService } from '../info-sheets/info-sheets.service';
+import { ClientDirectoryModule } from '@/modules/shared/client-directory/client-directory.module';
 
 @Module({
-    imports: [DatabaseModule, TendersModule, TenderStatusHistoryModule, EmailModule, TimersModule],
+    imports: [DatabaseModule, TendersModule, TenderStatusHistoryModule, EmailModule, TimersModule, ClientDirectoryModule],
     controllers: [TenderApprovalController],
     providers: [TenderApprovalService, TenderInfoSheetsService],
 })

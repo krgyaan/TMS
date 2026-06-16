@@ -129,6 +129,17 @@ export const paths = {
         viewPoPage: (poId: number, projectId: number) => `/operations/project-dashboard/${projectId}/purchase-order/${poId}`,
         editPoPage: (poId: number, projectId: number) => `/operations/project-dashboard/${projectId}/purchase-order/${poId}/edit`,
         poPdfVersions: (poId: number, projectId: number) => `/operations/project-dashboard/${projectId}/purchase-order/${poId}/pdf-versions`,
+        purchaseOrders: "/operations/purchase-orders",
+
+        vendorWorkOrders: "/operations/vendor-work-orders",
+        raiseVendorWoForm: (projectId: number) => `/operations/project-dashboard/${projectId}/vendor-work-order/create`,
+        editVendorWoPage: (woId: number, projectId: number) => `/operations/project-dashboard/${projectId}/vendor-work-order/${woId}/edit`,
+        vendorWoPdfVersions: (woId: number, projectId: number) => `/operations/project-dashboard/${projectId}/vendor-work-order/${woId}/pdf-versions`,
+
+        raiseProjectPurchaseInvoiceForm: (projectId: number) => `/operations/project-dashboard/${projectId}/project-purchase-invoice/create`,
+        editProjectPurchaseInvoicePage: (piId: number, projectId: number) => `/operations/project-dashboard/${projectId}/project-purchase-invoice/${piId}/edit`,
+        raiseProjectPaymentRequestForm: (projectId: number) => `/operations/project-dashboard/${projectId}/project-payment-request/create`,
+        editProjectPaymentRequestPage: (prId: number, projectId: number) => `/operations/project-dashboard/${projectId}/project-payment-request/${prId}/edit`,
     },
 
     // ==================== SERVICES ====================
@@ -144,22 +155,31 @@ export const paths = {
         demandDraft: "/bi-dashboard/demand-draft",
         demandDraftView: (requestId: number) => `/bi-dashboard/demand-draft/details/${requestId}`,
         demandDraftAction: (id: number) => `/bi-dashboard/demand-draft/action/${id}`,
+        DDMeetingRemarks: (id: number) => `/bi-dashboard/demand-draft/meeting-remarks/${id}`,
         fdr: "/bi-dashboard/fdr",
         fdrView: (requestId: number) => `/bi-dashboard/fdr/details/${requestId}`,
         fdrAction: (id: number) => `/bi-dashboard/fdr/action/${id}`,
+        FdrMeetingRemarksPage: (id: number) => `/bi-dashboard/fdr/meeting-remarks/${id}`,
         cheque: "/bi-dashboard/cheque",
         chequeView: (requestId: number) => `/bi-dashboard/cheque/details/${requestId}`,
         chequeAction: (id: number) => `/bi-dashboard/cheque/action/${id}`,
+        chequeMeetingRemarks: (id: number) => `/bi-dashboard/cheque/meeting-remarks/${id}`,
         bankGuarantee: "/bi-dashboard/bank-guarantee",
         bankGuaranteeView: (requestId: number) => `/bi-dashboard/bank-guarantee/details/${requestId}`,
         bankGuaranteeAction: (id: number) => `/bi-dashboard/bank-guarantee/action/${id}`,
         bankGuaranteeEdit: (id: number) => `/bi-dashboard/bank-guarantee/edit/${id}`,
+        bankGuaranteeMeetingRemarks: (id: number) => `/bi-dashboard/bank-guarantee/meeting-remarks/${id}`,
         bankTransfer: "/bi-dashboard/bank-transfer",
         bankTransferView: (requestId: number) => `/bi-dashboard/bank-transfer/details/${requestId}`,
         bankTransferAction: (id: number) => `/bi-dashboard/bank-transfer/action/${id}`,
+        bankTransferMeetingRemarks: (id: number) => `/bi-dashboard/bank-transfer/meeting-remarks/${id}`,
         payOnPortal: "/bi-dashboard/pay-on-portal",
         payOnPortalView: (requestId: number) => `/bi-dashboard/pay-on-portal/details/${requestId}`,
         payOnPortalAction: (id: number) => `/bi-dashboard/pay-on-portal/action/${id}`,
+        payOnPortalMeetingRemarks: (id: number) => `/bi-dashboard/pay-on-portal/meeting-remarks/${id}`,
+        tenderFee: "/bi-dashboard/tender-fee",
+        tenderFeeView: (type: string, id: number) => `/bi-dashboard/tender-fee/details/${type}/${id}`,
+        tenderFeeAction: (type: string, id: number) => `/bi-dashboard/tender-fee/action/${type}/${id}`,
     },
 
     // ==================== ACCOUNTS ====================
@@ -191,6 +211,7 @@ export const paths = {
         delegationAdd: "/accounts/delegation/add",
         delegationView: (id: string) => `/accounts/delegation/${id}`,
         delegationUpdate: (id: string) => `/accounts/delegation/${id}/update`,
+        purchaseOrders: "/accounts/purchase-orders",
     },
 
     // ==================== CRM ====================
@@ -345,6 +366,7 @@ export const paths = {
         projectsCreate: "/document-dashboard/projects/create",
         projectsEdit: (id: number | string) => `/document-dashboard/projects/${id}/edit`,
         projectsView: (id: number | string) => `/document-dashboard/projects/${id}`,
+        clientDirectory: "/document-dashboard/client-directory",
     },
 
     // ==================== HRMS ====================

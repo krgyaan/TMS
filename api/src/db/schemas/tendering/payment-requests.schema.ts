@@ -52,7 +52,7 @@ export const paymentRequests = pgTable('payment_requests', {
     amountRequired: decimal('amount_required', { precision: 15, scale: 2 }).notNull(), // Replaces emd_*.*_amt fields
     status: varchar('status', { length: 50 }).default('Pending'), // Replaces emds_*.status fields or emd_bgs.bg_req
     remarks: text('remarks'), // Replaces emd_bgs.reason_req, emd_cheques.reason, emd_fdrs.remarks, emd_demand_drafts.remarks, bank_transfers.reason, pay_on_portals.reason
-
+    meeting_remarks: jsonb('meeting_remarks'), // New field to store structured remarks from meetings
     // For migration reference
     legacyEmdId: integer('legacy_emd_id'), // emds.id
 

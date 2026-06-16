@@ -39,10 +39,14 @@ import {
   BookOpen,
   Upload,
   ExternalLink,
+  User,
+  Phone,
+  Heart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   useOnboardingList,
+  useProfile,
   useEducation,
   useExperience,
   useDocuments,
@@ -54,8 +58,8 @@ import AvatarComponent from "./components/AvatarComponent";
 import { formatDate } from "./components/helpers";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type StageKey = "education" | "experience" | "documents" | "bankDetails";
-type EntryStatus = "pending" | "submitted" | "approved" | "rejected" | "resubmitted";
+type StageKey = "profile" | "education" | "experience" | "documents" | "bankDetails";
+type EntryStatus = "pending" | "submitted" | "approved" | "rejected" | "resubmitted" | "in_progress";
 type TabValue = "active" | "rejected";
 
 interface OnboardingUser {
@@ -83,6 +87,17 @@ const STAGES: {
   icon: React.ElementType;
   color: { base: string; light: string; dark: string; ring: string };
 }[] = [
+  {
+    key: "profile",
+    label: "Profile",
+    icon: User,
+    color: {
+      base: "text-indigo-600 dark:text-indigo-400",
+      light: "bg-indigo-100 dark:bg-indigo-900/40",
+      dark: "bg-indigo-600",
+      ring: "ring-indigo-200 dark:ring-indigo-800",
+    },
+  },
   {
     key: "experience",
     label: "Work Ex",
@@ -139,6 +154,12 @@ const STATUS_STYLES: Record<
     dot: "bg-slate-300 dark:bg-slate-600",
     label: "Pending",
   },
+  in_progress: {
+    bg: "bg-blue-50 dark:bg-blue-950/10",
+    border: "border-blue-200 dark:border-blue-900/50",
+    dot: "bg-blue-400",
+    label: "In Progress",
+  },
   submitted: {
     bg: "bg-amber-50 dark:bg-amber-950/20",
     border: "border",
@@ -178,7 +199,7 @@ interface StageBoxProps {
 const StageBox: React.FC<StageBoxProps> = ({ stageKey, status, onClick }) => {
   const stage = STAGES.find((s) => s.key === stageKey)!;
   const Icon = stage.icon;
-  const statusCfg = STATUS_STYLES[status];
+  const statusCfg = STATUS_STYLES[status] || STATUS_STYLES.pending;
 
   const isActionable = status === "submitted" || status === "resubmitted";
 
@@ -312,12 +333,12 @@ const UserRow: React.FC<UserRowProps> = ({ user, onStageClick }) => {
 // ─── Entry Card (inside modal) ────────────────────────────────────────────────
 
 interface EntryCardProps {
-  entry: StageEntry;
+  entry: any;
   stageKey: StageKey;
   index: number;
   total: number;
-  onApprove: (id: number) => void;
-  onReject: (id: number, reason: string) => void;
+  onApprove: (id?: number) => void;
+  onReject: (id: number | undefined, reason: string) => void;
   isActioning: boolean;
 }
 
@@ -334,8 +355,11 @@ const EntryCard: React.FC<EntryCardProps> = ({
   const [reason, setReason] = useState("");
   const [localStatus, setLocalStatus] = useState<EntryStatus | null>(null);
 
-  const displayStatus = localStatus ?? (entry.hrStatus as EntryStatus) ?? "pending";
-  const statusCfg = STATUS_STYLES[displayStatus];
+  const displayStatus =
+    localStatus ??
+    ((stageKey === "profile" ? entry.profileStatus : entry.hrStatus) as EntryStatus) ??
+    "pending";
+  const statusCfg = STATUS_STYLES[displayStatus] || STATUS_STYLES.pending;
   const isActionable = displayStatus !== "approved" && displayStatus !== "rejected";
 
   const handleApprove = () => {
@@ -353,6 +377,97 @@ const EntryCard: React.FC<EntryCardProps> = ({
   // Render fields based on stage type
   const renderFields = () => {
     switch (stageKey) {
+      case "profile": {
+        const currentAddress = entry.currentAddress as Record<string, string> | undefined;
+        const permanentAddress = entry.permanentAddress as Record<string, string> | undefined;
+        const emergencyContact = entry.emergencyContact as Record<string, string> | undefined;
+
+        const formatAddress = (addr?: Record<string, string> | null) => {
+          if (!addr) return null;
+          return [addr.line1, addr.line2, addr.city, addr.state, addr.pincode, addr.country]
+            .filter(Boolean)
+            .join(", ");
+        };
+
+        return (
+          <div className="space-y-6">
+            {/* Personal Info */}
+            <div>
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+                <User className="h-3.5 w-3.5 text-muted-foreground" /> Personal Information
+              </h4>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                <DetailField icon={User} label="First Name" value={entry.firstName} />
+                <DetailField icon={User} label="Middle Name" value={entry.middleName} />
+                <DetailField icon={User} label="Last Name" value={entry.lastName} />
+                <DetailField icon={Calendar} label="Date of Birth" value={entry.dob ? formatDate(entry.dob) : null} />
+                <DetailField icon={User} label="Gender" value={entry.gender} />
+                <DetailField icon={User} label="Marital Status" value={entry.maritalStatus} />
+                <DetailField icon={User} label="Nationality" value={entry.nationality} />
+                <DetailField icon={User} label="Blood Group" value={entry.bloodGroup} />
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Contact */}
+            <div>
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+                <Mail className="h-3.5 w-3.5 text-muted-foreground" /> Contact Details
+              </h4>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                <DetailField icon={Mail} label="Work Email" value={entry.email} />
+                <DetailField icon={Mail} label="Personal Email" value={entry.personalEmail} />
+                <DetailField icon={Phone} label="Phone" value={entry.phone} />
+                <div className="col-span-2">
+                  <DetailField icon={ExternalLink} label="LinkedIn" value={entry.linkedinProfile} />
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Identity Documents */}
+            <div>
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+                <CreditCard className="h-3.5 w-3.5 text-muted-foreground" /> Identity Documents
+              </h4>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                <DetailField icon={CreditCard} label="Aadhar Number" value={entry.aadharNumber} />
+                <DetailField icon={CreditCard} label="PAN Number" value={entry.panNumber} />
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Addresses */}
+            <div>
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+                <MapPin className="h-3.5 w-3.5 text-muted-foreground" /> Addresses
+              </h4>
+              <div className="grid grid-cols-1 gap-y-3">
+                <DetailField icon={MapPin} label="Current Address" value={formatAddress(currentAddress)} />
+                <DetailField icon={Building2} label="Permanent Address" value={formatAddress(permanentAddress)} />
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Emergency Contact */}
+            <div>
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+                <Heart className="h-3.5 w-3.5 text-muted-foreground" /> Emergency Contact
+              </h4>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                <DetailField icon={User} label="Name" value={emergencyContact?.name} />
+                <DetailField icon={Heart} label="Relationship" value={emergencyContact?.relationship} />
+                <DetailField icon={Phone} label="Phone" value={emergencyContact?.phone} />
+                <DetailField icon={Mail} label="Email" value={emergencyContact?.email} />
+              </div>
+            </div>
+          </div>
+        );
+      }
       case "experience":
         return (
           <div className="grid grid-cols-2 gap-x-6 gap-y-3">
@@ -630,6 +745,7 @@ const StageReviewModal: React.FC<StageModalProps> = ({
   const Icon = stage.icon;
 
   // Fetch entries based on stage
+  const profileQuery = useProfile(stageKey === "profile" ? userId : null);
   const educationQuery = useEducation(stageKey === "education" ? userId : null);
   const experienceQuery = useExperience(stageKey === "experience" ? userId : null);
   const documentsQuery = useDocuments(stageKey === "documents" ? userId : null);
@@ -640,6 +756,8 @@ const StageReviewModal: React.FC<StageModalProps> = ({
   // Select the right query
   const activeQuery = useMemo(() => {
     switch (stageKey) {
+      case "profile":
+        return profileQuery;
       case "education":
         return educationQuery;
       case "experience":
@@ -651,21 +769,27 @@ const StageReviewModal: React.FC<StageModalProps> = ({
       default:
         return { data: [], isLoading: false, isError: false };
     }
-  }, [stageKey, educationQuery, experienceQuery, documentsQuery, bankQuery]);
+  }, [stageKey, profileQuery, educationQuery, experienceQuery, documentsQuery, bankQuery]);
 
-  const entries = (activeQuery.data ?? []) as StageEntry[];
+  const entries = useMemo(() => {
+    if (stageKey === "profile") {
+      return activeQuery.data ? [activeQuery.data] : [];
+    }
+    return (activeQuery.data ?? []) as StageEntry[];
+  }, [stageKey, activeQuery.data]);
+
   const isLoading = activeQuery.isLoading;
   const isError = activeQuery.isError;
 
   const handleApprove = useCallback(
-    (entryId: number) => {
+    (entryId?: number) => {
       updateStatusMutation.mutate({ entryId, onboardingId: userId!, status: 'approved' });
     },
     [updateStatusMutation, userId]
   );
 
   const handleReject = useCallback(
-    (entryId: number, reason: string) => {
+    (entryId: number | undefined, reason: string) => {
       updateStatusMutation.mutate({ entryId, onboardingId: userId!, status: 'rejected', reason });
     },
     [updateStatusMutation, userId]
@@ -756,8 +880,7 @@ const StageReviewModal: React.FC<StageModalProps> = ({
             <div className="mt-4 flex items-center gap-2 text-xs text-destructive
               bg-destructive/5 border border-destructive/20 rounded-lg px-3 py-2">
               <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
-              {(approveMutation.error as Error)?.message ||
-                (rejectMutation.error as Error)?.message ||
+              {(updateStatusMutation.error as Error)?.message ||
                 "Something went wrong. Please try again."}
             </div>
           )}
@@ -811,7 +934,7 @@ const EmptyState: React.FC<{ tab: TabValue; hasSearch: boolean }> = ({
 
 const Legend: React.FC = () => (
   <div className="flex items-center gap-4 flex-wrap text-xs text-muted-foreground">
-    {(["pending", "submitted", "approved", "rejected"] as EntryStatus[]).map((s) => (
+    {(["pending", "in_progress", "submitted", "approved", "rejected"] as EntryStatus[]).map((s) => (
       <div key={s} className="flex items-center gap-1.5">
         <span className={cn("w-2 h-2 rounded-full", STATUS_STYLES[s].dot)} />
         <span>{STATUS_STYLES[s].label}</span>
@@ -827,23 +950,52 @@ const ApprovalDashboard: React.FC = () => {
 
   const users: OnboardingUser[] = useMemo(
     () =>
-      rawUsers.map((u: any) => ({
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        profilePhoto: u.profilePhoto,
-        stages: {
-          education: (u.educationStatus as EntryStatus) || "pending",
-          experience: (u.experienceStatus as EntryStatus) || "pending",
-          documents: (u.documentStatus as EntryStatus) || "pending",
-          bankDetails: (u.bankStatus as EntryStatus) || "pending",
-        },
-        hasRejection:
-          u.educationStatus === "rejected" ||
-          u.experienceStatus === "rejected" ||
-          u.documentStatus === "rejected" ||
-          u.bankStatus === "rejected",
-      })),
+      rawUsers
+        .filter((u: any) => {
+          // 1. Only show requests that are actively onboarding (registration approved)
+          if (u.status !== "approved") return false;
+
+          // 2. Only show employees who have actually started submitting details
+          const statuses = [
+            u.profileStatus,
+            u.documentStatus,
+            u.bankStatus,
+            u.educationStatus,
+            u.experienceStatus,
+          ];
+          
+          const hasStarted = statuses.some(
+            (status) =>
+              status === "submitted" ||
+              status === "resubmitted" ||
+              status === "approved" ||
+              status === "rejected"
+          );
+
+          // 3. Keep them in the list until HR has approved all 5 stages (hrStatus === 'approved')
+          const isFullyApproved = u.hrStatus === "approved";
+
+          return hasStarted && !isFullyApproved;
+        })
+        .map((u: any) => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          profilePhoto: u.profilePhoto,
+          stages: {
+            profile: (u.profileStatus as EntryStatus) || "pending",
+            education: (u.educationStatus as EntryStatus) || "pending",
+            experience: (u.experienceStatus as EntryStatus) || "pending",
+            documents: (u.documentStatus as EntryStatus) || "pending",
+            bankDetails: (u.bankStatus as EntryStatus) || "pending",
+          },
+          hasRejection:
+            u.profileStatus === "rejected" ||
+            u.educationStatus === "rejected" ||
+            u.experienceStatus === "rejected" ||
+            u.documentStatus === "rejected" ||
+            u.bankStatus === "rejected",
+        })),
     [rawUsers]
   );
 

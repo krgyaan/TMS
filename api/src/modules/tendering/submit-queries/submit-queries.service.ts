@@ -2,6 +2,7 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { eq, desc, asc, sql, and, or, ilike, SQL } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
+import { ClientDirectorySyncService } from '@/modules/shared/client-directory/client-directory-sync.service';
 import { CreateSubmitQueriesDto, UpdateSubmitQueriesDto, ClientContact, QueryListItem } from './dto/submit-queries.dto';
 import { submitQueries, submitQueriesLists } from '@/db/schemas/tendering/submit-queries.schema';
 import { tenderInfos, teams, userProfiles, users, companies } from '@/db/schemas';
@@ -33,6 +34,7 @@ export class SubmitQueriesService {
         @Inject(DRIZZLE) private readonly db: DbInstance,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
+        private readonly clientDirectorySyncService: ClientDirectorySyncService,
     ) {}
 
     // Map create DTO to database insert values
@@ -237,6 +239,18 @@ export class SubmitQueriesService {
             return this.findById(inserted.id, tx as unknown as DbInstance);
         });
 
+        // Sync to client directory
+        if (data.clientContacts?.length) {
+            await this.clientDirectorySyncService.syncToClientDirectory(
+                data.clientContacts.map((c) => ({
+                    name: c.client_name,
+                    email: c.client_email,
+                    phone: c.client_phone,
+                    org: c.client_org,
+                })),
+            );
+        }
+
         // Trigger email notification
         const [tender] = await this.db
             .select({ teamMember: tenderInfos.teamMember })
@@ -299,6 +313,18 @@ export class SubmitQueriesService {
             // Use transaction context for findById
             return this.findById(id, tx as unknown as DbInstance);
         });
+
+        // Sync to client directory
+        if (data.clientContacts?.length) {
+            await this.clientDirectorySyncService.syncToClientDirectory(
+                data.clientContacts.map((c) => ({
+                    name: c.client_name,
+                    email: c.client_email,
+                    phone: c.client_phone,
+                    org: c.client_org,
+                })),
+            );
+        }
 
         // Trigger email notification
         const [tender] = await this.db

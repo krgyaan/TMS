@@ -23,7 +23,7 @@ export const buildDefaultValues = (
 
     return {
         tenderId,
-        isCourierRequested: 'yes',
+        isCourierRequested: 'no',
         courierNo: undefined,
         toOrg: '',
         toName: infoSheet?.clients?.[0]?.clientName || '',

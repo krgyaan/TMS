@@ -2,12 +2,16 @@ import { Inject, Injectable, NotFoundException, BadRequestException } from '@nes
 import { eq, desc, asc, sql, and, or, ilike, SQL, lt } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
+import { ClientDirectorySyncService } from '@/modules/shared/client-directory/client-directory-sync.service';
 import { loanAdvances, loanBankContacts, loanDueEmis, loanTdsRecoveries } from '@db/schemas/accounts/loan-advance.schema';
 import { CreateLoanAdvanceDto, UpdateLoanAdvanceDto, LoanAdvanceQuery, LoanAdvanceResponse, LoanClosureDto, CreateLoanBankContactDto, UpdateLoanBankContactDto, LoanBankContactResponse, CreateDueEmiDto, UpdateDueEmiDto, DueEmiResponse, CreateTdsRecoveryDto, UpdateTdsRecoveryDto, TdsRecoveryResponse,LoanFullDetailsResponse } from './dto/loan-advance.dto';
 
 @Injectable()
 export class LoanAdvanceService {
-  constructor(@Inject(DRIZZLE) private readonly db: DbInstance) {}
+  constructor(
+    @Inject(DRIZZLE) private readonly db: DbInstance,
+    private readonly clientDirectorySyncService: ClientDirectorySyncService,
+  ) {}
 
     private shouldShowNocUpload(
         loanCloseStatus: string,
@@ -376,6 +380,13 @@ export class LoanAdvanceService {
       })
       .returning();
 
+    await this.clientDirectorySyncService.syncToClientDirectory([{
+      name: inserted.personName,
+      email: inserted.email,
+      phone: inserted.phone,
+      org: inserted.orgName,
+    }]);
+
     return this.mapContactToResponse(inserted);
   }
 
@@ -397,6 +408,13 @@ export class LoanAdvanceService {
     if (!updated) {
       throw new NotFoundException(`Contact with ID ${id} not found`);
     }
+
+    await this.clientDirectorySyncService.syncToClientDirectory([{
+      name: updated.personName,
+      email: updated.email,
+      phone: updated.phone,
+      org: updated.orgName,
+    }]);
 
     return this.mapContactToResponse(updated);
   }

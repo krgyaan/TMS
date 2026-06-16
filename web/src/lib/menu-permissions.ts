@@ -33,6 +33,14 @@ function getPermissionModule(title: string, parentMenuTitle?: string): string | 
             return 'shared.imprests';
         }
     }
+    if (title === 'Purchase Orders') {
+        if (parentMenuTitle === 'Operations') {
+            return 'ops.purchase-orders';
+        }
+        if (parentMenuTitle === 'Accounts') {
+            return 'accounts.purchase-orders';
+        }
+    }
 
     // Standard mapping for unique titles
     const MENU_PERMISSION_MAP: Record<string, string> = {

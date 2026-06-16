@@ -76,6 +76,7 @@ import { DemandDraftModule } from "@/modules/bi-dashboard/demand-draft/demand-dr
 import { FdrModule } from "@/modules/bi-dashboard/fdr/fdr.module";
 import { BankTransferModule } from "@/modules/bi-dashboard/bank-transfer/bank-transfer.module";
 import { ChequeModule } from "@/modules/bi-dashboard/cheque/cheque.module";
+import { TenderFeeModule } from "@/modules/bi-dashboard/tender-fee/tender-fee.module";
 import { TimersModule } from "@/modules/timers/timers.module";
 import { BusinessPerformanceModule } from "./modules/performance/business-performance/business-performance.module";
 import { WoBasicDetailsModule } from "@/modules/operations/wo-basic-details/wo-basic-details.module";
@@ -88,6 +89,7 @@ import { ProjectsMasterrModule } from "@/modules/shared/projects-master/projects
 import { AllExceptionsFilter } from "./logger/all-exception.filter";
 import { LoggerModule } from "@/logger/logger.module";
 import { ProjectsMasterModule } from "./modules/master/projects-master/projects-master.module";
+import { ClientDirectoryModule } from "@/modules/shared/client-directory/client-directory.module";
 import { RequestExtensionsModule } from "./modules/tendering/request_extensions/request-extension.module";
 import { SubmitQueriesModule } from "./modules/tendering/submit-queries/submit-queries.module";
 import { LoanAdvanceModule } from "./modules/accounts/loan-advance/loan-advance.module";
@@ -99,11 +101,15 @@ import { WoQueriesModule } from "./modules/operations/wo-queries/wo-queries.modu
 import { CustomerPerformanceModule } from "./modules/performance/customer-performance/customer-performance.module";
 import { LocationPerformanceModule } from "./modules/performance/location-performance/location-performance.module";
 import { ContractAgreementModule } from "./modules/operations/contract-agreement/contract-agreement.module";
+import { VendorWorkOrderModule } from "./modules/operations/vendor-work-orders/vendor-work-order.module";
+import { PurchaseInvoiceModule } from "./modules/operations/purchase-invoices/purchase-invoice.module";
+import { PaymentRequestModule } from "./modules/operations/payment-requests/payment-request.module";
 import { EmployeeProfilesModule } from "@/modules/hrms/employee-profiles/employee-profiles.module";
 import { AssetsModule } from "@/modules/hrms/assets/assets.module";
 import { AccountChecklistModule } from './modules/accounts/account-checklist/account-checklist.module';
 import { AccountChecklistSchedulerModule } from "./modules/accounts/account-checklist/account-checklist-scheduler.module";
 import { OnboardingModule } from './modules/hrms/onboarding/onboarding.module';
+import { EmployeeOnboardingModule } from './modules/hrms/employee-onboarding/employee-onboarding.module';
 import { ProfileModule } from './modules/profile/profile.module';
 @Module({
     imports: [
@@ -192,6 +198,7 @@ import { ProfileModule } from './modules/profile/profile.module';
         FdrModule,
         BankTransferModule,
         ChequeModule,
+        TenderFeeModule,
         TimersModule,
         WoBasicDetailsModule,
         WoDetailsModule,
@@ -213,12 +220,17 @@ import { ProfileModule } from './modules/profile/profile.module';
         CustomerPerformanceModule,
         LocationPerformanceModule,
         ContractAgreementModule,
+        VendorWorkOrderModule,
+        PurchaseInvoiceModule,
+        PaymentRequestModule,
         EmployeeProfilesModule,
         AssetsModule,
         AccountChecklistModule,
         AccountChecklistSchedulerModule,
         OnboardingModule,
+        EmployeeOnboardingModule,
         ProfileModule,
+        ClientDirectoryModule,
     ],
     controllers: [AppController,],
     providers: [

@@ -1,25 +1,28 @@
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import DataTable from '@/components/ui/data-table';
-import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { paths } from '@/app/routes/paths';
+import { ExportExcelDropdown } from '@/components/bi-dashboard/ExportExcelDropdown';
+import { tenderNameCol } from '@/components/data-grid/columns';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, FileX2, Search, Eye, FileText, Shield, XCircle, Edit, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { useBankGuaranteeDashboard, useBankGuaranteeDashboardCounts, useBankGuaranteeCardStats } from '@/hooks/api/useBankGuarantees';
-import type { BankGuaranteeCardStats, BankGuaranteeDashboardRow, BankGuaranteeDashboardTab } from './helpers/bankGuarantee.types';
-import { tenderNameCol } from '@/components/data-grid/columns';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import DataTable from '@/components/ui/data-table';
+import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useBankGuaranteeCardStats, useBankGuaranteeDashboard, useBankGuaranteeDashboardCounts } from '@/hooks/api/useBankGuarantees';
+import { useBiExport } from '@/hooks/useBiExport';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
+import { bankGuaranteesService } from '@/services/api/bank-guarantees.service';
+import type { ColDef } from 'ag-grid-community';
+import { AlertCircle, Edit, Eye, FileText, FileX2, MessageSquare, Plus, Search, Shield, XCircle } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import BankStatsCards from './components/BankStatsCards';
-import { paths } from '@/app/routes/paths';
-import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import type { BankGuaranteeCardStats, BankGuaranteeDashboardRow, BankGuaranteeDashboardTab } from './helpers/bankGuarantee.types';
 
 const TABS_CONFIG: Array<{ key: BankGuaranteeDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -80,7 +83,6 @@ const BankGuaranteeListPage = () => {
     const [search, setSearch] = useState<string>('');
     const debouncedSearch = useDebouncedSearch(search, 300);
 
-
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, [activeTab, debouncedSearch]);
@@ -99,6 +101,69 @@ const BankGuaranteeListPage = () => {
         setSortModel(sortModel);
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, []);
+
+    const flattenFormData = (data: Record<string, any>): Record<string, any> => {
+        const out: Record<string, any> = {};
+        if (data.bgNo) out['BG No'] = data.bgNo;
+        if (data.bgDate) out['BG Date'] = new Date(data.bgDate).toLocaleDateString('en-GB');
+        if (data.beneficiaryName) out['Beneficiary'] = data.beneficiaryName;
+        if (data.bgPurpose) out['BG Purpose'] = data.bgPurpose;
+        if (data.bgNeeds) out['BG Needs'] = data.bgNeeds;
+        if (data.bankName) out['Bank'] = data.bankName;
+        if (data.issueDate) out['Issue Date'] = new Date(data.issueDate).toLocaleDateString('en-GB');
+        if (data.expiryDate) out['Expiry Date'] = new Date(data.expiryDate).toLocaleDateString('en-GB');
+        if (data.payableAt) out['Payable At'] = data.payableAt;
+        if (data.favouring) out['Favouring'] = data.favouring;
+        return out;
+    };
+
+    const { exportTab, setExportTab, exporting, handleExport, exportOptions } = useBiExport({
+        getAllFn: (params) => bankGuaranteesService.getAll(params),
+        getActionFormDataFn: (id) => bankGuaranteesService.getActionFormData(id),
+        tabsConfig: TABS_CONFIG,
+        pendingTabKey: 'new-requests',
+        tabsWithForm: ['live-yes', 'live-pnb', 'live-bg-limit', 'cancelled', 'rejected'],
+        filenamePrefix: 'bank-guarantees',
+        flattenFormData,
+        mapPendingRow: (r: any) => ({
+            'BG Date': r.bgDate ? new Date(r.bgDate).toLocaleDateString('en-GB') : '',
+            'BG No': r.bgNo || '',
+            'Beneficiary name': r.beneficiaryName || '',
+            'Tender Details': r.tenderNo || '',
+            'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
+            'Amount': r.amount || '',
+            'Expiry Date': r.bgExpiryDate ? new Date(r.bgExpiryDate).toLocaleDateString('en-GB') : '',
+            'BG Claim Period': r.bgClaimPeriod ? `${r.bgClaimPeriod} days` : '',
+            'BG Charges paid': r.bgChargesPaid || '',
+            'BG Charges Calculated': r.bgChargesCalculated || '',
+            'FDR No': r.fdrNo || '',
+            'FDR Value': r.fdrValue || '',
+            'Tender Status': r.tenderStatus || '',
+            'Expiry': r.expiryStatus || '',
+            'BG Status': r.bgStatus || '',
+        }),
+        mapRow: (r: any, isAllTab: boolean) => {
+            const base: Record<string, any> = {
+                'BG Date': r.bgDate ? new Date(r.bgDate).toLocaleDateString('en-GB') : '',
+                'BG No': r.bgNo || '',
+                'Beneficiary name': r.beneficiaryName || '',
+                'Tender Details': r.tenderNo || '',
+                'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
+                'Amount': r.amount || '',
+                'Expiry Date': r.bgExpiryDate ? new Date(r.bgExpiryDate).toLocaleDateString('en-GB') : '',
+                'BG Claim Period': r.bgClaimPeriod ? `${r.bgClaimPeriod} days` : '',
+                'BG Charges paid': r.bgChargesPaid || '',
+                'BG Charges Calculated': r.bgChargesCalculated || '',
+                'FDR No': r.fdrNo || '',
+                'FDR Value': r.fdrValue || '',
+                'Tender Status': r.tenderStatus || '',
+                'Expiry': r.expiryStatus || '',
+                'BG Status': r.bgStatus || '',
+            };
+            if (isAllTab) base['Tab'] = r._tab || '';
+            return base;
+        },
+    });
 
     const { data: apiResponse, isLoading, error } = useBankGuaranteeDashboard({
         tab: activeTab,
@@ -132,6 +197,11 @@ const BankGuaranteeListPage = () => {
                 icon: <Edit className="h-4 w-4" />,
                 onClick: (row: BankGuaranteeDashboardRow) => navigate(paths.bi.bankGuaranteeEdit(row.requestId)),
             },
+            {
+                label: 'Meeting Remarks',
+                icon: <MessageSquare className="h-4 w-4" />,
+                onClick: (row: BankGuaranteeDashboardRow) => navigate(paths.bi.bankGuaranteeMeetingRemarks(row.id)),
+            }
         ],
         [navigate]
     );
@@ -378,10 +448,19 @@ const BankGuaranteeListPage = () => {
                             </CardDescription>
                         </div>
                         <CardAction>
-                            <Button variant="outline" onClick={() => navigate(paths.tendering.oldEmdsForBG())}>
-                                <Plus className="w-4 h-4" />
-                                Add Old Entry
-                            </Button>
+                            <div className="flex items-center gap-2">
+                                <ExportExcelDropdown
+                                    exportOptions={exportOptions}
+                                    exportTab={exportTab}
+                                    setExportTab={setExportTab}
+                                    exporting={exporting}
+                                    handleExport={handleExport}
+                                />
+                                <Button variant="outline" onClick={() => navigate(paths.tendering.oldEmdsForBG())}>
+                                    <Plus className="w-4 h-4" />
+                                    Add Old Entry
+                                </Button>
+                            </div>
                         </CardAction>
                     </div>
                 </CardHeader>

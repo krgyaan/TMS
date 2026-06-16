@@ -1,7 +1,7 @@
 import { Inject, Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
 import { randomBytes } from "node:crypto";
 import { hash, verify } from "argon2";
-import { and, eq, isNull, inArray, asc } from "drizzle-orm";
+import { and, eq, isNull, inArray, asc, sql, or } from "drizzle-orm";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
 import { users, type NewUser, type User } from "@db/schemas/auth/users.schema";
@@ -15,6 +15,7 @@ import { designations } from "@db/schemas/master/designations.schema";
 import { teams } from "@db/schemas/master/teams.schema";
 import { RoleName, DataScope, getDataScope, canSwitchTeams } from "@/common/constants/roles.constant";
 import { PermissionService } from "@/modules/auth/services/permission.service";
+import { oauthAccounts } from "@/db/schemas";
 
 export type SafeUser = Pick<User, "id" | "name" | "email" | "username" | "mobile" | "team" | "isActive" | "createdAt" | "updatedAt">;
 
@@ -28,6 +29,8 @@ export type UserProfileSummary = {
     employeeCode?: string | null;
     designationId?: number | null;
     primaryTeamId?: number | null;
+    profilePhoto : string | null;
+    googlePhoto : string | null;
     oldTeamId?: number | null;
     altEmail?: string | null;
     emergencyContactName?: string | null;
@@ -104,7 +107,7 @@ export class UsersService {
                 profileAltEmail: userProfiles.altEmail,
                 profileEmergencyContactName: userProfiles.emergencyContactName,
                 profileEmergencyContactPhone: userProfiles.emergencyContactPhone,
-                profileImage: userProfiles.image,
+                profilePhoto: userProfiles.image,
                 profileSignature: userProfiles.signature,
                 profileDateOfJoining: userProfiles.dateOfJoining,
                 profileDateOfExit: userProfiles.dateOfExit,
@@ -115,20 +118,22 @@ export class UsersService {
                 // Team fields
                 teamId: teams.id,
                 teamName: teams.name,
-                primaryTeamId: users.primaryTeamId,
+                primaryTeamId: sql<number | null>`COALESCE(${users.primaryTeamId}, ${users.team})`,
                 // Designation fields
                 designationId: designations.id,
                 designationName: designations.name,
                 // Role fields (NEW)
                 roleId: roles.id,
                 roleName: roles.name,
+                googlePhoto : oauthAccounts.avatar
             })
             .from(users)
             .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
             .leftJoin(designations, eq(userProfiles.designationId, designations.id))
-            .leftJoin(teams, eq(users.primaryTeamId, teams.id))
+            .leftJoin(teams, eq(teams.id, sql<number>`COALESCE(${users.primaryTeamId}, ${users.team})`))
             .leftJoin(userRoles, eq(userRoles.userId, users.id)) // NEW
-            .leftJoin(roles, eq(roles.id, userRoles.roleId)); // NEW
+            .leftJoin(roles, eq(roles.id, userRoles.roleId))// NEW
+            .leftJoin(oauthAccounts, eq(oauthAccounts.userId, users.id));
     }
 
     // UPDATED: Include role in mapping
@@ -139,6 +144,8 @@ export class UsersService {
                   userId: row.profileUserId,
                   firstName: row.profileFirstName,
                   lastName: row.profileLastName,
+                  profilePhoto: row.profilePhoto,
+                  googlePhoto: row.googlePhoto,
                   dateOfBirth: row.profileDateOfBirth,
                   gender: row.profileGender,
                   employeeCode: row.profileEmployeeCode,
@@ -147,7 +154,6 @@ export class UsersService {
                   altEmail: row.profileAltEmail,
                   emergencyContactName: row.profileEmergencyContactName,
                   emergencyContactPhone: row.profileEmergencyContactPhone,
-                  image: row.profileImage,
                   signature: row.profileSignature,
                   dateOfJoining: row.profileDateOfJoining,
                   dateOfExit: row.profileDateOfExit,
@@ -209,7 +215,7 @@ export class UsersService {
                 email: users.email,
                 roleName: roles.name,
                 roleId: roles.id,
-                primaryTeamId: users.primaryTeamId,
+                primaryTeamId: sql<number | null>`COALESCE(${users.primaryTeamId}, ${users.team})`,
                 oldTeamId: users.team,
                 permissionModule: permissions.module,
                 permissionAction : permissions.action,
@@ -605,7 +611,7 @@ export class UsersService {
             .from(users)
             .innerJoin(userRoles, eq(userRoles.userId, users.id))
             .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
-            .leftJoin(teams, eq(teams.id, users.primaryTeamId))
+            .leftJoin(teams, eq(teams.id, sql<number>`COALESCE(${users.primaryTeamId}, ${users.team})`))
             .where(and(eq(userRoles.roleId, roleId), isNull(users.deletedAt), eq(users.isActive, true)))
             .orderBy(asc(users.name));
     }
@@ -620,7 +626,7 @@ export class UsersService {
 
         // If a specific team is provided, also filter by users.primaryTeamId
         if (teamId !== undefined) {
-            conditions.push(eq(users.primaryTeamId, teamId));
+            conditions.push(eq(sql<number>`COALESCE(${users.primaryTeamId}, ${users.team})`, teamId));
         }
 
         return this.db
@@ -632,7 +638,7 @@ export class UsersService {
             })
             .from(users)
             .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
-            .leftJoin(teams, eq(teams.id, users.primaryTeamId))
+            .leftJoin(teams, eq(teams.id, sql<number>`COALESCE(${users.primaryTeamId}, ${users.team})`))
             .where(and(...conditions))
             .orderBy(asc(users.name));
     }

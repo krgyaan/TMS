@@ -59,6 +59,7 @@ export interface CreatePartyDTO {
 
 export interface PurchaseOrderRow {
     id: number;
+    projectId: number;
     poNumber: string;
     sellerName: string;
     sellerEmail?: string;
@@ -77,7 +78,6 @@ export interface PurchaseOrderRow {
     totalAmount: number;
     totalGstAmt: number;
     grandTotal: number;
-    poPdf?: string;
     poPdfVersions?: Record<string, { path: string; hash: string }>;
 }
 

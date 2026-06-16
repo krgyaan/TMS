@@ -62,6 +62,7 @@ const navMain: NavGroup[] = [
             { title: "Kick Off", url: paths.operations.woKickOffListPage, permission: "ops.kick-off" },
             { title: "Contract Agreement", url: paths.operations.contractAgreementListPage, permission: "ops.contract-agreement" },
             { title: "Project Dashboard", url: paths.operations.projectDashboard(), permission: "ops.dashboard" },
+            { title: "Purchase Orders", url: paths.operations.purchaseOrders, permission: "ops.purchase-orders" },
         ],
     },
     {
@@ -84,6 +85,7 @@ const navMain: NavGroup[] = [
             { title: "Pay on Portal", url: paths.bi.payOnPortal, permission: "bi.pay-on-portal" },
             { title: "Cheque", url: paths.bi.cheque, permission: "bi.cheque" },
             { title: "FDR", url: paths.bi.fdr, permission: "bi.fdr" },
+            { title: "Tender Fee", url: paths.bi.tenderFee, permission: "bi.tender-fee" },
         ],
     },
     {
@@ -98,6 +100,7 @@ const navMain: NavGroup[] = [
             { title: "GST Checklists", url: paths.accounts.gstChecklists, permission: "accounts.gst-checklists" },
             { title: "Fixed Expenses", url: paths.accounts.fixedExpenses, permission: "accounts.fixed-expenses" },
             { title: "Delegation Dashboard", url: paths.accounts.delegation, permission: "accounts.delegation" },
+            { title: "Purchase Orders", url: paths.accounts.purchaseOrders, permission: "accounts.purchase-orders" },
         ],
     },
     {
@@ -107,6 +110,7 @@ const navMain: NavGroup[] = [
             { title: "Projects", url: paths.documentDashboard.projects, permission: "document-dashboard.projects" },
             { title: "PQR Documents", url: paths.documentDashboard.pqr, permission: "document-dashboard.pqr" },
             { title: "Finance Document", url: paths.documentDashboard.financeDocument, permission: "document-dashboard.finance-document" },
+            { title: "Client Directory", url: paths.documentDashboard.clientDirectory, permission: "shared.client-directory" },
         ],
     },
     {
@@ -144,7 +148,6 @@ const navMain: NavGroup[] = [
         items: [
             // { title: "Recruitment", url: "", permission: "hrms.admin" },
             { title: "Onboarding", url: paths.hrms.onboardingDashboard, permission: "hrms.admin" },
-            { title: "Profile Details", url: paths.hrms.profileDetailsDashboard, permission: "hrms.admin" },
             { title: "Approval Dashboard", url : paths.hrms.approvalDashboard, permission: "hrms.admin"},
             { title: "Induction", url: paths.hrms.inductionDashboard, permission: "hrms.admin" },
             { title: "Assets", url: "/hrms/admin/assets", permission: "hrms.admin" },
@@ -205,8 +208,6 @@ function filterMenu(user: AuthUser | null, menu: NavGroup[]): NavGroup[] {
 export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
     const { data: currentUser } = useCurrentUser();
     const storedUser = getStoredUser();
-
-    console.log("Rendering the sidebar");
 
     const displayUser = currentUser ??
         storedUser ?? {

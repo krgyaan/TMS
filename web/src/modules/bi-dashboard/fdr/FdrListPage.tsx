@@ -1,25 +1,28 @@
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import DataTable from '@/components/ui/data-table';
-import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { paths } from '@/app/routes/paths';
+import { ExportExcelDropdown } from '@/components/bi-dashboard/ExportExcelDropdown';
+import { tenderNameCol } from '@/components/data-grid/columns';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, FileX2, Search, Eye, Clock, Shield, Link, XCircle, RotateCcw, Edit, Plus } from 'lucide-react';
-import { QuickFilter } from '@/components/ui/quick-filter';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import DataTable from '@/components/ui/data-table';
+import { Input } from '@/components/ui/input';
+import { QuickFilter } from '@/components/ui/quick-filter';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFdrDashboard, useFdrDashboardCounts } from '@/hooks/api/useFdrs';
-import type { FdrDashboardRow, DashboardTab } from './helpers/fdr.types';
-import { tenderNameCol } from '@/components/data-grid/columns';
+import { useBiExport } from '@/hooks/useBiExport';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
-import { paths } from '@/app/routes/paths';
-import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { fdrsService } from '@/services/api/fdrs.service';
+import type { ColDef } from 'ag-grid-community';
+import { AlertCircle, Clock, Edit, Eye, FileX2, Link, MessageSquare, Plus, RotateCcw, Search, Shield, XCircle } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import type { DashboardTab, FdrDashboardRow } from './helpers/fdr.types';
 
 const TABS_CONFIG: Array<{ key: DashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -98,7 +101,6 @@ const FdrListPage = () => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, [teamFilter]);
 
-
     const handlePageSizeChange = useCallback((newPageSize: number) => {
         setPagination({ pageIndex: 0, pageSize: newPageSize });
     }, []);
@@ -113,6 +115,61 @@ const FdrListPage = () => {
         setSortModel(sortModel);
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, []);
+
+    const flattenFormData = (data: Record<string, any>): Record<string, any> => {
+        const out: Record<string, any> = {};
+        if (data.fdrNo) out['FDR No'] = data.fdrNo;
+        if (data.fdrDate) out['FDR Date'] = new Date(data.fdrDate).toLocaleDateString('en-GB');
+        if (data.reqNo) out['Courier Req No'] = data.reqNo;
+        if (data.fdrNeeds) out['Deliver By'] = data.fdrNeeds;
+        if (data.fdrPurpose) out['Purpose Detail'] = data.fdrPurpose;
+        if (data.fdrRemark) out['Remarks'] = data.fdrRemark;
+        if (data.fdrSource) out['Source'] = data.fdrSource;
+        if (data.fdrExpiryDate) out['FDR Expiry'] = new Date(data.fdrExpiryDate).toLocaleDateString('en-GB');
+        if (data.utr) out['UTR'] = data.utr;
+        if (data.issueDate) out['Issue Date'] = new Date(data.issueDate).toLocaleDateString('en-GB');
+        if (data.expiryDate) out['Expiry Date'] = new Date(data.expiryDate).toLocaleDateString('en-GB');
+        if (data.payableAt) out['Payable At'] = data.payableAt;
+        if (data.favouring) out['Favouring'] = data.favouring;
+        if (data.docketNo) out['Docket No'] = data.docketNo;
+        return out;
+    };
+
+    const { exportTab, setExportTab, exporting, handleExport, exportOptions } = useBiExport({
+        getAllFn: (params) => fdrsService.getAll(params),
+        getActionFormDataFn: (id) => fdrsService.getActionFormData(id),
+        tabsConfig: TABS_CONFIG,
+        pendingTabKey: 'pending',
+        tabsWithForm: ['pnb-bg-linked', 'ybl-bg-linked', 'security-deposit', 'bond-linked', 'rejected', 'returned', 'cancelled'],
+        filenamePrefix: 'fdrs',
+        flattenFormData,
+        mapPendingRow: (r: any) => ({
+            'FDR Date': r.fdrCreationDate ? new Date(r.fdrCreationDate).toLocaleDateString('en-GB') : '',
+            'FDR No': r.fdrNo || '',
+            'Beneficiary name': r.beneficiaryName || '',
+            'FDR Amount': r.fdrAmount || '',
+            'Tender Name': r.tenderNo || '',
+            'Tender Status': r.tenderStatus || '',
+            'Member': r.member || '',
+            'Expiry': r.expiry || '',
+            'FDR Status': r.fdrStatus || '',
+        }),
+        mapRow: (r: any, isAllTab: boolean) => {
+            const base: Record<string, any> = {
+                'FDR Date': r.fdrCreationDate ? new Date(r.fdrCreationDate).toLocaleDateString('en-GB') : '',
+                'FDR No': r.fdrNo || '',
+                'Beneficiary name': r.beneficiaryName || '',
+                'FDR Amount': r.fdrAmount || '',
+                'Tender Name': r.tenderNo || '',
+                'Tender Status': r.tenderStatus || '',
+                'Member': r.member || '',
+                'Expiry': r.expiry || '',
+                'FDR Status': r.fdrStatus || '',
+            };
+            if (isAllTab) base['Tab'] = r._tab || '';
+            return base;
+        },
+    });
 
     const { data: apiResponse, isLoading, error } = useFdrDashboard({
         tab: activeTab,
@@ -141,6 +198,11 @@ const FdrListPage = () => {
                 icon: <Edit className="h-4 w-4" />,
                 onClick: (row: FdrDashboardRow) => navigate(paths.bi.fdrAction(row.id)),
             },
+            {
+                label: 'Meeting Remarks',
+                icon: <MessageSquare className="h-4 w-4" />,
+                onClick: (row: FdrDashboardRow) => navigate(paths.bi.FdrMeetingRemarksPage(row.id)),
+            }
         ],
         [navigate]
     );
@@ -316,10 +378,19 @@ const FdrListPage = () => {
                             </CardDescription>
                         </div>
                         <CardAction>
-                            <Button variant="outline" onClick={() => navigate(paths.tendering.oldEmdsForFDR())}>
-                                <Plus className="w-4 h-4" />
-                                Add Old Entry
-                            </Button>
+                            <div className="flex items-center gap-2">
+                                <ExportExcelDropdown
+                                    exportOptions={exportOptions}
+                                    exportTab={exportTab}
+                                    setExportTab={setExportTab}
+                                    exporting={exporting}
+                                    handleExport={handleExport}
+                                />
+                                <Button variant="outline" onClick={() => navigate(paths.tendering.oldEmdsForFDR())}>
+                                    <Plus className="w-4 h-4" />
+                                    Add Old Entry
+                                </Button>
+                            </div>
                         </CardAction>
                     </div>
                 </CardHeader>

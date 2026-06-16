@@ -172,6 +172,7 @@ export type OnboardingStatus = {
   id: number;
   requestType: "new_hire" | "re_onboarding";
   status: "pending" | "approved" | "rejected" | "fully_completed";
+  hrStatus: OnboardingApprovalStatus;
   
   // Employee Progress Statuses
   profileStatus: OnboardingStageStatus;

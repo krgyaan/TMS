@@ -4,7 +4,7 @@ import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 
 import { followUps, FollowUp, FollowUpContact, FollowUpHistoryEntry } from "@/db/schemas/shared/follow-ups.schema";
-import { clientDirectory } from "@/db/schemas/shared/client-directory.schema";
+import { ClientDirectorySyncService } from "@/modules/shared/client-directory/client-directory-sync.service";
 import { followUpPersons } from "@/db/schemas/shared/follow-up-persons.schema";
 import { users } from "@/db/schemas/auth/users.schema";
 import * as fs from "fs";
@@ -60,7 +60,8 @@ export class FollowUpService {
         @Inject(WINSTON_MODULE_PROVIDER)
         private readonly logger: Logger,
 
-        private readonly mailAudience: MailAudienceService
+        private readonly mailAudience: MailAudienceService,
+        private readonly clientDirectorySyncService: ClientDirectorySyncService,
     ) {}
 
     // ========================
@@ -87,8 +88,8 @@ export class FollowUpService {
                 addedAt: new Date().toISOString(),
             }));
 
-            // Sync to client directory (same behavior as before)
-            await this.syncToClientDirectory(contacts);
+            // Sync to client directory
+            await this.clientDirectorySyncService.syncToClientDirectory(contacts);
 
             // ------------------------
             // DATE NORMALIZATION
@@ -823,37 +824,6 @@ export class FollowUpService {
         }
 
         return updated;
-    }
-
-    // ========================
-    // CLIENT DIRECTORY SYNC
-    // ========================
-
-    private async syncToClientDirectory(contacts: FollowUpContact[]) {
-        for (const contact of contacts) {
-            if (!contact.email && !contact.phone) continue;
-
-            const existing = await this.db
-                .select()
-                .from(clientDirectory)
-                .where(or(contact.email ? eq(clientDirectory.email, contact.email) : undefined, contact.phone ? eq(clientDirectory.phone, contact.phone) : undefined))
-                .limit(1)
-                .then(r => r[0] ?? null);
-
-            if (!existing) {
-                await this.db.insert(clientDirectory).values({
-                    name: contact.name,
-                    email: contact.email,
-                    phone: contact.phone,
-                    organization: contact.org,
-                });
-
-                this.logger.debug("New client added to directory", {
-                    email: contact.email,
-                    phone: contact.phone,
-                });
-            }
-        }
     }
 
     // ==========================
