@@ -1,29 +1,28 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import DataTable from "@/components/ui/data-table";
-import type { ColDef } from "ag-grid-community";
-import { useMemo, useState } from "react";
-import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
-import type { ActionItem } from "@/components/ui/ActionMenu";
-import { useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Eye, Edit, Send, FileX2, ExternalLink, Plus, Search, RefreshCw, XCircle } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import type { CostingSheetDashboardRowWithTimer, CostingSheetTab } from "@/modules/tendering/costing-sheets/helpers/costingSheet.types";
 import { currencyCol, dateCol, tenderNameCol } from "@/components/data-grid/columns";
-import { useCostingSheets, useCostingSheetsCounts, useCheckDriveScopes, useCreateCostingSheet, useCreateCostingSheetWithName } from "@/hooks/api/useCostingSheets";
+import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { toast } from "sonner";
+import type { ActionItem } from "@/components/ui/ActionMenu";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import axiosInstance from "@/lib/axios";
-import { usePersistentTableState } from "@/hooks/usePersistentTableState";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import DataTable from "@/components/ui/data-table";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { QuickFilter } from "@/components/ui/quick-filter";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useCheckDriveScopes, useCostingSheets, useCostingSheetsCounts, useCreateCostingSheet, useCreateCostingSheetWithName } from "@/hooks/api/useCostingSheets";
+import { usePersistentTableState } from "@/hooks/usePersistentTableState";
+import axiosInstance from "@/lib/axios";
+import type { CostingSheetDashboardRowWithTimer, CostingSheetTab } from "@/modules/tendering/costing-sheets/helpers/costingSheet.types";
+import type { ColDef } from "ag-grid-community";
+import { AlertCircle, Edit, ExternalLink, Eye, FileX2, Plus, Search, Send, XCircle } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { ChangeStatusModal } from "../tenders/components/ChangeStatusModal";
-import { useTenderingPermissions } from "../hooks/useTenderingPermissions";
 
 const CostingSheets = () => {
     const navigate = useNavigate();
@@ -45,8 +44,6 @@ const CostingSheets = () => {
         storageKey: 'costing-sheets',
         defaultTab: 'pending' as CostingSheetTab,
     });
-
-    const { hasTenderingPermission } = useTenderingPermissions();
 
     const [connectDriveOpen, setConnectDriveOpen] = useState(false);
     const [duplicateDialogOpen, setDuplicateDialogOpen] = useState(false);
