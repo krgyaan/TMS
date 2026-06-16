@@ -873,7 +873,7 @@ export class FollowUpService {
         this.logger.info("Processing follow-up mail", { followUpId: id });
 
         try {
-            const builder = new FollowupMailDataBuilder(this.db);
+            const builder = new FollowupMailDataBuilder(this.db, this.mailAudience);
 
             const payload = await builder.build(id);
 
@@ -944,7 +944,7 @@ export class FollowUpService {
         this.logger.debug("Generating email template preview via builder", { emdId });
 
         try {
-            const builder = new FollowupMailDataBuilder(this.db);
+            const builder = new FollowupMailDataBuilder(this.db, this.mailAudience);
             const html = await builder.buildPreview(emdId);
 
             if (!html) {

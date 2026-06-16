@@ -40,4 +40,17 @@ export class MailAudienceService {
 
         return result.length ? result[0].user : null;
     }
+
+    async getTlEmail(team : number){
+        const tlMails = await this.db.select({email : users.email})
+        .from(users)
+            .innerJoin(userRoles, eq(userRoles.userId, users.id))
+            .where(and(
+                    eq(users.team, team),
+                    eq(userRoles.roleId, 3)
+                )
+            );
+
+        return tlMails.map((user) => user.email);
+    }
 }
