@@ -37,6 +37,8 @@ export const FREQUENCY_LABELS: Record<number, string> = {
     4: "Weekly (every Mon)",
     5: "Twice a Week (every Mon & Thu)",
     6: "Stop",
+    7 : "Once in 15 Days (Alternate Mondays)",
+    8 : "Once a Month (First Monday of the Month)"
 };
 
 export const STOP_REASON_LABELS: Record<number, string> = {
@@ -387,11 +389,17 @@ const FollowUpEditPage: React.FC = () => {
                                         </SelectTrigger>
 
                                         <SelectContent>
-                                            {Object.entries(FREQUENCY_LABELS).map(([value, label]) => (
-                                                <SelectItem key={value} value={value}>
-                                                    {label}
-                                                </SelectItem>
-                                            ))}
+                                            {Object.entries(FREQUENCY_LABELS)
+                                                .sort(([a], [b]) => {
+                                                    if (Number(a) === 6) return 1;
+                                                    if (Number(b) === 6) return -1;
+                                                    return Number(a) - Number(b);
+                                                })
+                                                .map(([value, label]) => (
+                                                    <SelectItem key={value} value={value}>
+                                                        {label}
+                                                    </SelectItem>
+                                                ))}
                                         </SelectContent>
                                     </Select>
                                 </div>

@@ -52,6 +52,8 @@ const FREQUENCY_CONFIG: Record<number, { label: string; variant: "default" | "se
     4: { label: "Weekly (every Mon)", variant: "secondary", icon: Calendar },
     5: { label: "Twice a Week (every Mon & Thu)", variant: "outline", icon: CalendarClock },
     6: { label: "Stop", variant: "destructive", icon: PauseCircle },
+    7: { label: "Once in 15 Days (Alternate Mondays)", variant: "outline", icon: CalendarClock },
+    8: { label: "Once a Month (First Monday of the Month)", variant: "outline", icon: CalendarClock },
 };
 const STOP_REASON_LABELS: Record<number, string> = {
     1: "Person is getting angry / requested to stop",
