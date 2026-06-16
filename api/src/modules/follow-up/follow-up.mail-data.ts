@@ -4,18 +4,22 @@ import { FollowUpDetailsDto } from "./zod/update-follow-up.dto";
 import { FollowupMailBase, FollowupMailPayload } from "./zod/mail.dto";
 import { FollowupMailTemplates } from "./follow-up.mail";
 import sanitizeHtml from "sanitize-html";
+import { MailAudienceService } from "@/core/mail/mail-audience.service";
 
 type InstrumentType = "DD" | "FDR" | "BG" | "Cheque" | "Bank Transfer" | "Portal Payment" | "Surety Bond";
 
 export class FollowupMailDataBuilder {
-    constructor(private db: DbInstance) {}
+    constructor(
+        private db: DbInstance,
+        private readonly mailAudienceService: MailAudienceService,
+    ) {}
 
     async build(followupId: number): Promise<FollowupMailPayload | null> {
         const fu = await this.getBaseFollowup(followupId);
         const to = await this.getRecipients(followupId);
         if (!to.length || !fu.assignedToId) return null;
 
-        const cc = this.resolveCc(fu.area);
+        const cc = await this.resolveCc(fu.area);
 
         const since = this.computeSince(fu.startFrom);
 
@@ -87,13 +91,18 @@ export class FollowupMailDataBuilder {
         };
     }
 
-    private resolveCc(area: string) {
+    private async resolveCc(area: string): Promise<string[]> {
         if (area === "DC team") {
-            return ["sajid@volksenergie.in", "shivani.yadav@volksenergie.in", "goyal@volksenergie.in", "kainaat@volksenergie.in"];
+            let ccMails = ["goyal@volksenergie.in", "kainaat@volksenergie.in"];
+            let tlMails = await this.mailAudienceService.getTlEmail(2);
+            return [...ccMails, ...tlMails];
         }
 
         if (area === "AC Team") {
-            return ["priyanka@volksenergie.in", "ahkamul@volksenergie.in", "arathi@volksenergie.in"];
+            let ccMails = [ "arathi@volksenergie.in"];
+            let tlMails = await this.mailAudienceService.getTlEmail(1);
+
+            return [ ...ccMails , ...tlMails];
         }
 
         return [];
