@@ -89,8 +89,6 @@ const EmdsAndTenderFeesPage = () => {
         sortModel,
         handleSortChanged,
         handlePageSizeChange,
-        saveColumnState,
-        restoreColumnState,
     } = usePersistentTableState({
         storageKey: 'emd-tenderfees',
         defaultTab: 'pending' as TabValue,
@@ -778,9 +776,6 @@ const EmdsAndTenderFeesPage = () => {
                             onPageSizeChange={handlePageSizeChange}
                             showTotalCount={true}
                             showLengthChange={true}
-                            onColumnResized={saveColumnState}
-                            onColumnMoved={saveColumnState}
-                            onGridReady={restoreColumnState}
                             gridOptions={{
                                 defaultColDef: {
                                     filter: true,
