@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -15,7 +15,7 @@ import type { RaDashboardRow, RaDashboardTab } from '@/modules/tendering/ras/hel
 import { currencyCol, dateCol, tenderNameCol } from '@/components/data-grid/columns';
 import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
-import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { usePersistentTableState } from '@/hooks/usePersistentTableState';
 import { QuickFilter } from '@/components/ui/quick-filter';
 import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
 
@@ -109,34 +109,22 @@ const getCountForTab = (
 
 const ReverseAuctionListPage = () => {
     const navigate = useNavigate();
-    const [activeTab, setActiveTab] = useState<RaDashboardTab>('under-evaluation');
-    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
-    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
-    const [search, setSearch] = useState<string>('');
-    const debouncedSearch = useDebouncedSearch(search, 300);
+    const {
+        activeTab, setActiveTab,
+        search, setSearch,
+        debouncedSearch,
+        pagination, setPagination,
+        sortModel,
+        handleSortChanged,
+        handlePageSizeChange,
+    } = usePersistentTableState({
+        storageKey: 'reverse-auctions',
+        defaultTab: 'under-evaluation' as RaDashboardTab,
+    });
     const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({
         open: false,
         tenderId: null
     });
-
-    useEffect(() => {
-        setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, debouncedSearch]);
-
-    const handlePageSizeChange = useCallback((newPageSize: number) => {
-        setPagination({ pageIndex: 0, pageSize: newPageSize });
-    }, []);
-
-    const handleSortChanged = useCallback((event: any) => {
-        const sortModel = event.api.getColumnState()
-            .filter((col: any) => col.sort)
-            .map((col: any) => ({
-                colId: col.colId,
-                sort: col.sort as 'asc' | 'desc'
-            }));
-        setSortModel(sortModel);
-        setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, []);
 
     // Fetch data with the active tab filter
     const { data: response, isLoading, error } = useReverseAuctionDashboard({

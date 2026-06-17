@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useState } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { useNavigate } from 'react-router-dom';
@@ -16,7 +16,7 @@ import { useBidSubmissions, useBidSubmissionsDashboardCounts, type BidSubmission
 import { currencyCol, dateCol, tenderNameCol } from '@/components/data-grid/columns';
 import { TenderTimerDisplay } from '@/components/TenderTimerDisplay';
 import type { BidSubmissionDashboardRowWithTimer } from './helpers/bidSubmission.types';
-import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { usePersistentTableState } from '@/hooks/usePersistentTableState';
 import { QuickFilter } from '@/components/ui/quick-filter';
 import { ChangeStatusModal } from '../tenders/components/ChangeStatusModal';
 import { useTenderingPermissions } from '../hooks/useTenderingPermissions';
@@ -24,36 +24,24 @@ import { useTenderingPermissions } from '../hooks/useTenderingPermissions';
 type TabKey = 'pending' | 'submitted' | 'disqualified' | 'tender-dnb';
 
 const BidSubmissionListPage = () => {
-    const [activeTab, setActiveTab] = useState<TabKey>('pending');
-    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
-    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
-    const [search, setSearch] = useState<string>('');
-    const debouncedSearch = useDebouncedSearch(search, 300);
+    const {
+        activeTab, setActiveTab,
+        search, setSearch,
+        debouncedSearch,
+        pagination, setPagination,
+        sortModel,
+        handleSortChanged,
+        handlePageSizeChange,
+    } = usePersistentTableState({
+        storageKey: 'bid-submissions',
+        defaultTab: 'pending' as TabKey,
+    });
     const [changeStatusModal, setChangeStatusModal] = useState<{ open: boolean; tenderId: number | null; currentStatus?: number | null }>({
         open: false,
         tenderId: null
     });
     const navigate = useNavigate();
     const {hasTenderingPermission} = useTenderingPermissions();
-
-    useEffect(() => {
-        setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, debouncedSearch]);
-
-    const handleSortChanged = useCallback((event: any) => {
-        const sortModel = event.api.getColumnState()
-            .filter((col: any) => col.sort)
-            .map((col: any) => ({
-                colId: col.colId,
-                sort: col.sort as 'asc' | 'desc'
-            }));
-        setSortModel(sortModel);
-        setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, []);
-
-    const handlePageSizeChange = useCallback((newPageSize: number) => {
-        setPagination({ pageIndex: 0, pageSize: newPageSize });
-    }, []);
 
     const { data: apiResponse, isLoading: loading, error } = useBidSubmissions(
         activeTab as TabKey,
