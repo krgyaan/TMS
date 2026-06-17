@@ -34,9 +34,7 @@ const CostingApprovalListPage = () => {
         setPagination,
         handleSortChanged,
         handlePageSizeChange,
-        saveColumnState,
         sortModel,
-        restoreColumnState,
     } = usePersistentTableState({
         storageKey: 'costing-approval',
         defaultTab: 'pending' as CostingApprovalTab,
@@ -373,9 +371,6 @@ const CostingApprovalListPage = () => {
                                             onPageSizeChange={handlePageSizeChange}
                                             showTotalCount={true}
                                             showLengthChange={true}
-                                            onColumnResized={saveColumnState}
-                                            onColumnMoved={saveColumnState}
-                                            onGridReady={restoreColumnState}
                                             gridOptions={{
                                                 defaultColDef: {
                                                     editable: false,

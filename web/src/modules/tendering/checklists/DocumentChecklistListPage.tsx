@@ -35,8 +35,6 @@ const Checklists = () => {
         sortModel,
         handleSortChanged,
         handlePageSizeChange,
-        saveColumnState,
-        restoreColumnState,
     } = usePersistentTableState({
         storageKey: 'document-checklist',
         defaultTab: 'pending' as "pending" | "submitted" | "tender-dnb",
@@ -304,9 +302,6 @@ const Checklists = () => {
                                             onPageSizeChange={handlePageSizeChange}
                                             showTotalCount={true}
                                             showLengthChange={true}
-                                            onColumnResized={saveColumnState}
-                                            onColumnMoved={saveColumnState}
-                                            onGridReady={restoreColumnState}
                                             gridOptions={{
                                                 defaultColDef: {
                                                     editable: false,

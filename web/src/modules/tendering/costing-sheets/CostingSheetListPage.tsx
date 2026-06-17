@@ -37,9 +37,7 @@ const CostingSheets = () => {
         setPagination,
         handleSortChanged,
         handlePageSizeChange,
-        saveColumnState,
         sortModel,
-        restoreColumnState,
     } = usePersistentTableState({
         storageKey: 'costing-sheets',
         defaultTab: 'pending' as CostingSheetTab,
@@ -478,9 +476,6 @@ const CostingSheets = () => {
                                             onPageSizeChange={handlePageSizeChange}
                                             showTotalCount={true}
                                             showLengthChange={true}
-                                            onColumnResized={saveColumnState}
-                                            onColumnMoved={saveColumnState}
-                                            onGridReady={restoreColumnState}
                                             gridOptions={{
                                                 defaultColDef: {
                                                     editable: false,
