@@ -43,9 +43,7 @@ const TenderApprovalListPage = () => {
         setPagination,
         handleSortChanged,
         handlePageSizeChange,
-        saveColumnState,
         sortModel,
-        restoreColumnState,
     } = usePersistentTableState({
         storageKey: 'tender-approval',
         defaultTab: 'pending' as TenderApprovalTab,
@@ -378,9 +376,6 @@ const TenderApprovalListPage = () => {
                                                 onPageSizeChange={handlePageSizeChange}
                                                 showTotalCount={true}
                                                 showLengthChange={true}
-                                                onColumnResized={saveColumnState}
-                                                onColumnMoved={saveColumnState}
-                                                onGridReady={restoreColumnState}
                                                 gridOptions={{
                                                     defaultColDef: {
                                                         editable: false,
