@@ -13,16 +13,17 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useBankGuaranteeCardStats, useBankGuaranteeDashboard, useBankGuaranteeDashboardCounts } from '@/hooks/api/useBankGuarantees';
 import { useBiExport } from '@/hooks/useBiExport';
-import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+
 import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { bankGuaranteesService } from '@/services/api/bank-guarantees.service';
 import type { ColDef } from 'ag-grid-community';
 import { AlertCircle, Edit, Eye, FileText, FileX2, MessageSquare, Plus, Search, Shield, XCircle } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import BankStatsCards from './components/BankStatsCards';
 import type { BankGuaranteeCardStats, BankGuaranteeDashboardRow, BankGuaranteeDashboardTab } from './helpers/bankGuarantee.types';
+import { usePersistentTableState } from '@/hooks/usePersistentTableState';
 
 const TABS_CONFIG: Array<{ key: BankGuaranteeDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -76,31 +77,19 @@ const getStatusVariant = (status: string | null): string => {
 };
 
 const BankGuaranteeListPage = () => {
-    const [activeTab, setActiveTab] = useState<BankGuaranteeDashboardTab>('new-requests');
+    const {
+        activeTab, setActiveTab,
+        search, setSearch,
+        debouncedSearch,
+        pagination, setPagination,
+        sortModel,
+        handleSortChanged,
+        handlePageSizeChange,
+    } = usePersistentTableState({
+        storageKey: 'bank-guarantees',
+        defaultTab: 'new-requests' as BankGuaranteeDashboardTab,
+    });
     const navigate = useNavigate();
-    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
-    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
-    const [search, setSearch] = useState<string>('');
-    const debouncedSearch = useDebouncedSearch(search, 300);
-
-    useEffect(() => {
-        setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, debouncedSearch]);
-
-    const handlePageSizeChange = useCallback((newPageSize: number) => {
-        setPagination({ pageIndex: 0, pageSize: newPageSize });
-    }, []);
-
-    const handleSortChanged = useCallback((event: any) => {
-        const sortModel = event.api.getColumnState()
-            .filter((col: any) => col.sort)
-            .map((col: any) => ({
-                colId: col.colId,
-                sort: col.sort as 'asc' | 'desc'
-            }));
-        setSortModel(sortModel);
-        setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, []);
 
     const flattenFormData = (data: Record<string, any>): Record<string, any> => {
         const out: Record<string, any> = {};

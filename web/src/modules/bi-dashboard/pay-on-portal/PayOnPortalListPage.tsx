@@ -13,15 +13,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { usePayOnPortalDashboard, usePayOnPortalDashboardCounts } from '@/hooks/api/usePayOnPortals';
 import { useBiExport } from '@/hooks/useBiExport';
-import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+
 import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { payOnPortalsService } from '@/services/api/pay-on-portals.service';
 import type { ColDef } from 'ag-grid-community';
 import { AlertCircle, CheckCircle, Clock, Edit, Eye, FileX2, MessageSquare, RotateCcw, Search, Wallet, XCircle } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { PayOnPortalDashboardRow, PayOnPortalDashboardTab } from './helpers/payOnPortal.types';
+import { usePersistentTableState } from '@/hooks/usePersistentTableState';
 
 const TABS_CONFIG: Array<{ key: PayOnPortalDashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -72,32 +73,24 @@ const getStatusVariant = (status: string | null): string => {
 };
 
 const PayOnPortalListPage = () => {
-    const [activeTab, setActiveTab] = useState<PayOnPortalDashboardTab>('pending');
-    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
-    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
-    const [search, setSearch] = useState<string>('');
-    const debouncedSearch = useDebouncedSearch(search, 300);
+    const {
+        activeTab, setActiveTab,
+        search, setSearch,
+        debouncedSearch,
+        pagination, setPagination,
+        sortModel,
+        handleSortChanged,
+        handlePageSizeChange,
+    } = usePersistentTableState({
+        storageKey: 'pay-on-portal',
+        defaultTab: 'pending' as PayOnPortalDashboardTab,
+    });
     const [teamFilter, setTeamFilter] = useState<string>('All');
     const teamId = teamFilter === 'All' ? undefined : teamFilter === 'AC' ? 1 : 2;
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, debouncedSearch, teamFilter]);
-
-    const handlePageSizeChange = useCallback((newPageSize: number) => {
-        setPagination({ pageIndex: 0, pageSize: newPageSize });
-    }, []);
-
-    const handleSortChanged = useCallback((event: any) => {
-        const sortModel = event.api.getColumnState()
-            .filter((col: any) => col.sort)
-            .map((col: any) => ({
-                colId: col.colId,
-                sort: col.sort as 'asc' | 'desc'
-            }));
-        setSortModel(sortModel);
-        setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, []);
+    }, [teamFilter]);
 
     const flattenFormData = (data: Record<string, any>): Record<string, any> => {
         const out: Record<string, any> = {};
