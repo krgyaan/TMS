@@ -45,6 +45,7 @@ export default function BidSubmitPage() {
     // Checkpoint Logic
     const rfqRequired = approval?.rfqRequired !== 'no' && tenderDetails.rfqTo !== '0' && tenderDetails.rfqTo !== '1';
     const emdNA = infoSheet?.emdRequired === 'NO' || infoSheet?.emdRequired === 'EXEMPT';
+    const emdIsSB = infoSheet?.emdMode?.includes('SB');
 
     const checkpoints: Checkpoint[] = [
         {
@@ -56,7 +57,7 @@ export default function BidSubmitPage() {
         {
             id: 'emd',
             label: 'EMD Status',
-            status: emdNA ? 'na' : (Array.isArray(paymentRequests) && paymentRequests.some(r => r.tenderId === id) ? 'fulfilled' : 'pending'),
+            status: emdNA ? 'na' : (emdIsSB || (Array.isArray(paymentRequests) && paymentRequests.some(r => r.tenderId === id)) ? 'fulfilled' : 'pending'),
             description: emdNA ? 'EMD not required' : 'Process EMD payment'
         },
         {
@@ -68,8 +69,8 @@ export default function BidSubmitPage() {
     ];
 
     const isChecklistFulfilled = checkpoints.every(cp => cp.status === 'fulfilled' || cp.status === 'na');
-    const emdConsented = !emdNA && Array.isArray(paymentRequests) &&
-        paymentRequests.some(r => r.instruments?.some((i: any) => i.consentForPay));
+    const emdConsented = !emdNA && (emdIsSB || (Array.isArray(paymentRequests) &&
+        paymentRequests.some(r => r.instruments?.some((i: any) => i.consentForPay))));
 
     return (
         <div className="space-y-6">
