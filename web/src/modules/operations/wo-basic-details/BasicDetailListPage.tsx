@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { useNavigate } from 'react-router-dom';
@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { useWoBasicDetails, useWoBasicDetailsDashboardSummary } from '@/hooks/api/useWoBasicDetails';
 import type { WoBasicDetail, WoBasicDetailsFilters, WorkflowStage } from '@/modules/operations/types/wo.types';
 import { currencyCol, dateCol } from '@/components/data-grid';
-import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { usePersistentTableState } from '@/hooks/usePersistentTableState';
 import { QuickFilter } from '@/components/ui/quick-filter';
 import { Tooltip, TooltipTrigger } from '@radix-ui/react-tooltip';
 import { TooltipContent } from '@/components/ui/tooltip';
@@ -24,33 +24,19 @@ import { TooltipContent } from '@/components/ui/tooltip';
 type TabKey = 'basic_details' | 'wo_details' | 'completed';
 
 const BasicDetailListPage = () => {
-    const [activeTab, setActiveTab] = useState<TabKey>('basic_details');
-    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
-    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
-    const [search, setSearch] = useState<string>('');
-    const debouncedSearch = useDebouncedSearch(search, 300);
+    const {
+        activeTab, setActiveTab,
+        search, setSearch,
+        debouncedSearch,
+        pagination, setPagination,
+        sortModel,
+        handleSortChanged,
+        handlePageSizeChange,
+    } = usePersistentTableState({
+        storageKey: 'wo-basic-details',
+        defaultTab: 'basic_details' as TabKey,
+    });
     const navigate = useNavigate();
-
-    // Reset pagination on tab/search change
-    useEffect(() => {
-        setPagination((p) => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, debouncedSearch]);
-
-    const handleSortChanged = useCallback((event: any) => {
-        const sortModel = event.api
-            .getColumnState()
-            .filter((col: any) => col.sort)
-            .map((col: any) => ({
-                colId: col.colId,
-                sort: col.sort as 'asc' | 'desc',
-            }));
-        setSortModel(sortModel);
-        setPagination((p) => ({ ...p, pageIndex: 0 }));
-    }, []);
-
-    const handlePageSizeChange = useCallback((newPageSize: number) => {
-        setPagination({ pageIndex: 0, pageSize: newPageSize });
-    }, []);
 
     // Build filters based on active tab
     const filters: WoBasicDetailsFilters = useMemo(() => {
