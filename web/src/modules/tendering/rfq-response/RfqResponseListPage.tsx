@@ -3,7 +3,7 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useMemo, useEffect } from 'react';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -22,6 +22,7 @@ import { createActionColumnRenderer } from '@/components/data-grid/renderers/Act
 import { getRfqResponseListColumnDefs } from './helpers/rfqResponseListColDefs';
 import type { RfqResponseListItem } from './helpers/rfqResponse.types';
 import type { RfqDashboardRowWithTimer } from '@/modules/tendering/rfqs/helpers/rfq.types';
+import { usePersistentTableState } from '@/hooks/usePersistentTableState';
 
 export default function RfqResponseListPage() {
     const { rfqId } = useParams<{ rfqId?: string }>();
@@ -29,14 +30,22 @@ export default function RfqResponseListPage() {
     const rfqIdNum = rfqId ? Number(rfqId) : null;
     const isGlobalList = rfqIdNum == null;
 
-    const [activeTab, setActiveTab] = useState<'sent' | 'responses'>('sent');
-    const [search, setSearch] = useState('');
-    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
-    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
+    const {
+        activeTab, setActiveTab,
+        search, setSearch,
+        debouncedSearch,
+        pagination, setPagination,
+        sortModel,
+        handleSortChanged,
+        handlePageSizeChange,
+    } = usePersistentTableState({
+        storageKey: 'rfq-responses',
+        defaultTab: 'sent',
+    });
 
     useEffect(() => {
         setPagination((p) => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, search]);
+    }, [search]);
 
     // Data for "Responses" tab
     const { data: responsesData, isLoading: loadingByRfq, error: errorByRfq } = useRfqResponses(rfqIdNum);
@@ -49,7 +58,7 @@ export default function RfqResponseListPage() {
         limit: pagination.pageSize,
         sortBy: sortModel[0]?.colId,
         sortOrder: sortModel[0]?.sort,
-        search: search || undefined,
+        search: debouncedSearch || undefined,
     });
     const { data: rfqCounts } = useRfqsDashboardCounts();
 
@@ -83,20 +92,7 @@ export default function RfqResponseListPage() {
         return filteredResponses.slice(start, start + pagination.pageSize);
     }, [filteredResponses, pagination]);
 
-    const handlePageSizeChange = useCallback((newPageSize: number) => {
-        setPagination({ pageIndex: 0, pageSize: newPageSize });
-    }, []);
 
-    const handleSortChanged = useCallback((event: any) => {
-        const nextSortModel = event.api.getColumnState()
-            .filter((col: any) => col.sort)
-            .map((col: any) => ({
-                colId: col.colId,
-                sort: col.sort as 'asc' | 'desc',
-            }));
-        setSortModel(nextSortModel);
-        setPagination((p) => ({ ...p, pageIndex: 0 }));
-    }, []);
 
     // Actions for "Responses" tab
     const responseActions = useMemo<ActionItem<RfqResponseListItem>[]>(

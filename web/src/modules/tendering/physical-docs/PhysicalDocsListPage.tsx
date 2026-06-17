@@ -34,9 +34,7 @@ const PhysicalDocsListPage = () => {
         setPagination,
         handleSortChanged,
         handlePageSizeChange,
-        saveColumnState,
         sortModel,
-        restoreColumnState,
     } = usePersistentTableState({
         storageKey: 'physical-docs',
         defaultTab: 'pending' as "pending" | "sent" | "tender-dnb",
@@ -305,9 +303,6 @@ const PhysicalDocsListPage = () => {
                                             onPageSizeChange={handlePageSizeChange}
                                             showTotalCount={true}
                                             showLengthChange={true}
-                                            onColumnResized={saveColumnState}
-                                            onColumnMoved={saveColumnState}
-                                            onGridReady={restoreColumnState}
                                             gridOptions={{
                                                 defaultColDef: {
                                                     editable: false,

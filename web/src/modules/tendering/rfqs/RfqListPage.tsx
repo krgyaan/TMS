@@ -36,9 +36,7 @@ const Rfqs = () => {
         setPagination,
         handleSortChanged,
         handlePageSizeChange,
-        saveColumnState,
         sortModel,
-        restoreColumnState,
     } = usePersistentTableState({
         storageKey: 'rfqs',
         defaultTab: 'pending' as 'pending' | 'sent' | 'responses' | 'rfq-rejected' | 'tender-dnb',
@@ -439,9 +437,6 @@ const Rfqs = () => {
                                             onPageSizeChange={handlePageSizeChange}
                                             showTotalCount={true}
                                             showLengthChange={true}
-                                            onColumnResized={saveColumnState}
-                                            onColumnMoved={saveColumnState}
-                                            onGridReady={restoreColumnState}
                                             gridOptions={{
                                                 defaultColDef: {
                                                     editable: false,
