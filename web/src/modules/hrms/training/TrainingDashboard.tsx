@@ -42,6 +42,8 @@ import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { useNavigate } from "react-router-dom";
+import { paths } from "@/app/routes/paths";
 
 const staggerContainer = {
     hidden: { opacity: 0 },
@@ -70,6 +72,8 @@ const MOCK_EMPLOYEES = [
 ];
 
 const TrainingVideos = () => {
+    const navigate = useNavigate();
+
     const [videos, setVideos] = useState([
         {
             id: 1,
@@ -136,6 +140,8 @@ const TrainingVideos = () => {
     ]);
 
     const [activeTab, setActiveTab] = useState("courses");
+    const [employeeSearch, setEmployeeSearch] = useState("");
+
     const [searchQuery, setSearchQuery] = useState("");
     const [deptFilter, setDeptFilter] = useState("All");
     const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -360,7 +366,7 @@ const TrainingVideos = () => {
                     </div>
                     <div className="flex items-center gap-3">
                         <Button
-                            onClick={() => { setIsUploadOpen(true); setUploadStep(0); setUploadedFile(null); }}
+                            onClick={() => navigate(paths.hrms.uploadVideo)}
                             className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl px-5 py-2.5 flex items-center gap-2 shadow-lg shadow-primary/20 transition-all hover:shadow-xl hover:shadow-primary/25"
                         >
                             <Plus className="h-4 w-4" />
@@ -745,331 +751,352 @@ const TrainingVideos = () => {
                 </motion.div>
             </div>
 
-            {/* ═══════════════════════════════════════════════════════
-                UPLOAD VIDEO MODAL — Modern Multi-step
-               ═══════════════════════════════════════════════════════ */}
-            <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
-                <DialogContent className="sm:max-w-lg rounded-2xl border-border/50 bg-card shadow-2xl p-0 overflow-hidden">
-                    {/* Header with gradient */}
-                    <div className="relative bg-gradient-to-br from-primary/10 via-primary/5 to-transparent px-6 pt-6 pb-4">
-                        <div className="absolute top-3 right-3">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => setIsUploadOpen(false)}>
-                                <X className="h-4 w-4" />
-                            </Button>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center">
-                                <CloudUpload className="h-5 w-5 text-primary" />
-                            </div>
-                            <div>
-                                <h2 className="text-lg font-bold">Upload Training Video</h2>
-                                <p className="text-[10px] text-muted-foreground">Add a new course to your training library</p>
-                            </div>
-                        </div>
-
-                        {/* Step indicator */}
-                        <div className="flex items-center gap-2 mt-4">
-                            {[0, 1].map((step) => (
-                                <div key={step} className="flex items-center gap-2 flex-1">
-                                    <div className={cn(
-                                        "h-1.5 rounded-full flex-1 transition-all duration-500",
-                                        uploadStep >= step ? "bg-primary" : "bg-primary/15"
-                                    )} />
-                                </div>
-                            ))}
-                        </div>
-                        <div className="flex justify-between mt-1.5">
-                            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Select File</span>
-                            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Course Details</span>
-                        </div>
-                    </div>
-
-                    <form onSubmit={handleUploadSubmit} className="px-6 pb-6 pt-2">
-                        <AnimatePresence mode="wait">
-                            {uploadStep === 0 && (
-                                <motion.div
-                                    key="step0"
-                                    initial={{ opacity: 0, x: -20 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    exit={{ opacity: 0, x: -20 }}
-                                    transition={{ duration: 0.3 }}
-                                    className="space-y-4"
-                                >
-                                    {/* Drag & Drop Zone */}
-                                    <div
-                                        onClick={simulateFileDrop}
-                                        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                                        onDragLeave={() => setIsDragging(false)}
-                                        onDrop={(e) => { e.preventDefault(); setIsDragging(false); simulateFileDrop(); }}
-                                        className={cn(
-                                            "relative border-2 border-dashed rounded-2xl p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 group",
-                                            isDragging
-                                                ? "border-primary bg-primary/5 scale-[1.02]"
-                                                : uploadedFile
-                                                    ? "border-emerald-500/30 bg-emerald-500/5"
-                                                    : "border-border/60 bg-background/40 hover:border-primary/30 hover:bg-primary/[0.02]"
-                                        )}
-                                    >
-                                        {uploadedFile ? (
-                                            <motion.div
-                                                initial={{ scale: 0.8, opacity: 0 }}
-                                                animate={{ scale: 1, opacity: 1 }}
-                                                className="flex flex-col items-center"
-                                            >
-                                                <div className="h-14 w-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-3">
-                                                    <FileVideo className="h-7 w-7 text-emerald-500" />
-                                                </div>
-                                                <span className="text-sm font-bold text-emerald-600">{uploadedFile}</span>
-                                                <span className="text-[10px] text-muted-foreground mt-1">48.7 MB • MP4</span>
-                                                <Badge className="mt-2 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[9px] rounded-md">
-                                                    <CheckCircle2 className="h-2.5 w-2.5 mr-1" />
-                                                    File Ready
-                                                </Badge>
-                                            </motion.div>
-                                        ) : (
-                                            <>
-                                                <div className="h-14 w-14 rounded-2xl bg-muted/20 border border-border/30 flex items-center justify-center mb-3 group-hover:bg-primary/10 group-hover:border-primary/20 transition-colors">
-                                                    <Upload className="h-7 w-7 text-muted-foreground/60 group-hover:text-primary transition-colors" />
-                                                </div>
-                                                <span className="text-sm font-semibold group-hover:text-primary transition-colors">
-                                                    Drop your video file here
-                                                </span>
-                                                <span className="text-[10px] text-muted-foreground mt-1">
-                                                    or <span className="text-primary font-semibold underline underline-offset-2">click to browse</span>
-                                                </span>
-                                                <div className="flex items-center gap-3 mt-3">
-                                                    <Badge variant="outline" className="text-[9px] font-medium px-2 py-0.5 rounded-md border-border/40">MP4</Badge>
-                                                    <Badge variant="outline" className="text-[9px] font-medium px-2 py-0.5 rounded-md border-border/40">MOV</Badge>
-                                                    <Badge variant="outline" className="text-[9px] font-medium px-2 py-0.5 rounded-md border-border/40">WEBM</Badge>
-                                                    <span className="text-[9px] text-muted-foreground">Max 500 MB</span>
-                                                </div>
-                                            </>
-                                        )}
-                                    </div>
-
-                                    {uploadedFile && (
-                                        <motion.div
-                                            initial={{ opacity: 0, y: 10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            className="flex justify-end"
-                                        >
-                                            <Button
-                                                type="button"
-                                                onClick={() => setUploadStep(1)}
-                                                className="bg-primary hover:bg-primary/90 rounded-xl px-6 shadow-md shadow-primary/20"
-                                            >
-                                                Continue
-                                                <ChevronRight className="h-4 w-4 ml-1" />
-                                            </Button>
-                                        </motion.div>
-                                    )}
-                                </motion.div>
-                            )}
-
-                            {uploadStep === 1 && (
-                                <motion.div
-                                    key="step1"
-                                    initial={{ opacity: 0, x: 20 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    exit={{ opacity: 0, x: 20 }}
-                                    transition={{ duration: 0.3 }}
-                                    className="space-y-4"
-                                >
-                                    {/* File preview pill */}
-                                    <div className="flex items-center gap-3 p-2.5 rounded-xl bg-emerald-500/5 border border-emerald-500/15">
-                                        <FileVideo className="h-4 w-4 text-emerald-500" />
-                                        <span className="text-xs font-semibold flex-1">{uploadedFile}</span>
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-6 text-[10px] text-muted-foreground hover:text-foreground"
-                                            onClick={() => { setUploadStep(0); setUploadedFile(null); }}
-                                        >
-                                            Change
-                                        </Button>
-                                    </div>
-
-                                    <div className="space-y-1.5">
-                                        <Label htmlFor="title" className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Course Title *</Label>
-                                        <Input
-                                            id="title"
-                                            placeholder="e.g. Health and Safety Guidelines 2026"
-                                            value={newTitle}
-                                            onChange={(e) => setNewTitle(e.target.value)}
-                                            className="bg-background/60 border-border/40 rounded-xl h-10 focus-visible:ring-primary/50 text-sm"
-                                        />
-                                    </div>
-
-                                    <div className="space-y-1.5">
-                                        <Label htmlFor="desc" className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Description</Label>
-                                        <Textarea
-                                            id="desc"
-                                            placeholder="What will employees learn from this course?"
-                                            value={newDesc}
-                                            onChange={(e) => setNewDesc(e.target.value)}
-                                            className="bg-background/60 border-border/40 rounded-xl min-h-[72px] text-sm resize-none"
-                                        />
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="space-y-1.5">
-                                            <Label className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Category</Label>
-                                            <Select value={newCategory} onValueChange={setNewCategory}>
-                                                <SelectTrigger className="bg-background/60 border-border/40 rounded-xl h-10 text-sm">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="Onboarding">Onboarding</SelectItem>
-                                                    <SelectItem value="Compliance">Compliance</SelectItem>
-                                                    <SelectItem value="Tendering">Tendering</SelectItem>
-                                                    <SelectItem value="Operations">Operations</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <Label className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Threshold (%)</Label>
-                                            <Input
-                                                type="number"
-                                                min="10"
-                                                max="100"
-                                                value={newThreshold}
-                                                onChange={(e) => setNewThreshold(e.target.value)}
-                                                className="bg-background/60 border-border/40 rounded-xl h-10 text-sm"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center justify-between pt-2 gap-3">
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            onClick={() => setUploadStep(0)}
-                                            className="rounded-xl text-sm"
-                                        >
-                                            Back
-                                        </Button>
-                                        <Button
-                                            type="submit"
-                                            className="bg-primary hover:bg-primary/90 rounded-xl px-6 shadow-md shadow-primary/20 flex items-center gap-2"
-                                        >
-                                            <Sparkles className="h-3.5 w-3.5" />
-                                            Upload & Process
-                                        </Button>
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </form>
-                </DialogContent>
-            </Dialog>
 
             {/* ═══════════════════════════════════════════════════════
                 ASSIGN VIDEO MODAL
-               ═══════════════════════════════════════════════════════ */}
+            ═══════════════════════════════════════════════════════ */}
             <Dialog open={isAssignOpen} onOpenChange={setIsAssignOpen}>
-                <DialogContent className="sm:max-w-md rounded-2xl border-border/50 bg-card shadow-2xl p-0 overflow-hidden">
-                    <div className="relative bg-gradient-to-br from-primary/10 via-primary/5 to-transparent px-6 pt-6 pb-4">
-                        <div className="absolute top-3 right-3">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg" onClick={() => setIsAssignOpen(false)}>
-                                <X className="h-4 w-4" />
-                            </Button>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <div className="h-10 w-10 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center">
-                                <UserPlus className="h-5 w-5 text-primary" />
+                <DialogContent className="sm:max-w-2xl max-h-[90vh] rounded-3xl border-border/40 bg-card/95 backdrop-blur-2xl shadow-2xl p-0 overflow-hidden">
+                    {/* Gradient Header */}
+                    <div className="relative overflow-hidden">
+                        {/* Background decorative elements */}
+                        <div className="absolute inset-0 bg-gradient-to-br from-primary/12 via-primary/6 to-violet-500/8" />
+                        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-primary/10 blur-3xl" />
+                        <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full bg-violet-500/10 blur-3xl" />
+
+                        <div className="relative px-7 pt-7 pb-5">
+                            <div className="absolute top-4 right-4">
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-9 w-9 rounded-xl bg-background/40 backdrop-blur-sm hover:bg-background/60 border border-border/20"
+                                    onClick={() => setIsAssignOpen(false)}
+                                >
+                                    <X className="h-4 w-4" />
+                                </Button>
                             </div>
-                            <div>
-                                <h2 className="text-lg font-bold">Assign Training Course</h2>
-                                <p className="text-[10px] text-muted-foreground">Select a course and assign to team members</p>
+
+                            <div className="flex items-center gap-4">
+                                <div className="h-12 w-12 rounded-2xl bg-primary/15 border border-primary/20 flex items-center justify-center shadow-lg shadow-primary/10">
+                                    <UserPlus className="h-6 w-6 text-primary" />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-extrabold tracking-tight">Assign Training Course</h2>
+                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                        Select a course and assign it to your team members
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Quick Stats */}
+                            <div className="flex items-center gap-3 mt-5">
+                                <div className="flex items-center gap-1.5 bg-background/50 backdrop-blur-sm border border-border/20 px-3 py-1.5 rounded-xl">
+                                    <Film className="h-3 w-3 text-primary" />
+                                    <span className="text-[10px] font-bold text-muted-foreground">
+                                        {videos.filter(v => v.status === "ready").length} courses available
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-1.5 bg-background/50 backdrop-blur-sm border border-border/20 px-3 py-1.5 rounded-xl">
+                                    <Users className="h-3 w-3 text-violet-500" />
+                                    <span className="text-[10px] font-bold text-muted-foreground">
+                                        {MOCK_EMPLOYEES.length} team members
+                                    </span>
+                                </div>
+                                {selectedEmployeeIds.length > 0 && (
+                                    <motion.div
+                                        initial={{ opacity: 0, scale: 0.8 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        className="flex items-center gap-1.5 bg-primary/10 border border-primary/15 px-3 py-1.5 rounded-xl"
+                                    >
+                                        <CheckCircle2 className="h-3 w-3 text-primary" />
+                                        <span className="text-[10px] font-bold text-primary">
+                                            {selectedEmployeeIds.length} selected
+                                        </span>
+                                    </motion.div>
+                                )}
                             </div>
                         </div>
                     </div>
 
-                    <form onSubmit={handleAssignSubmit} className="px-6 pb-6 pt-2 space-y-4">
-                        <div className="space-y-1.5">
-                            <Label className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Select Course</Label>
+                    <form onSubmit={handleAssignSubmit} className="px-7 pb-7 pt-2 space-y-5 overflow-y-auto max-h-[calc(90vh-200px)]">
+                        {/* Course Selection */}
+                        <div className="space-y-2">
+                            <Label className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground flex items-center gap-1.5">
+                                <Video className="h-3 w-3" />
+                                Select Training Course
+                                <span className="text-destructive">*</span>
+                            </Label>
                             <Select value={assignVideoId} onValueChange={setAssignVideoId}>
-                                <SelectTrigger className="bg-background/60 border-border/40 rounded-xl h-10 text-sm">
-                                    <SelectValue placeholder="Choose a video course..." />
+                                <SelectTrigger className="bg-background/60 border-border/30 rounded-xl h-12 text-sm hover:border-border/50 transition-colors">
+                                    <SelectValue placeholder="Choose a course to assign..." />
                                 </SelectTrigger>
-                                <SelectContent>
+                                <SelectContent className="rounded-xl">
                                     {videos.filter(v => v.status === "ready").map(v => (
-                                        <SelectItem key={v.id} value={String(v.id)}>
-                                            <div className="flex items-center gap-2">
-                                                <Play className="h-3 w-3 text-primary" />
-                                                {v.title}
+                                        <SelectItem key={v.id} value={String(v.id)} className="rounded-lg">
+                                            <div className="flex items-center gap-3 py-0.5">
+                                                <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                                    <Play className="h-3 w-3 text-primary" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs font-semibold">{v.title}</p>
+                                                    <p className="text-[9px] text-muted-foreground">{v.category} • {v.duration}</p>
+                                                </div>
                                             </div>
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
-                        </div>
 
-                        <div className="space-y-1.5">
-                            <div className="flex items-center justify-between">
-                                <Label className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Select Employees</Label>
-                                {selectedEmployeeIds.length > 0 && (
-                                    <Badge className="bg-primary/10 text-primary border-primary/20 text-[9px] font-bold rounded-md">
-                                        {selectedEmployeeIds.length} selected
-                                    </Badge>
-                                )}
-                            </div>
-                            <div className="border border-border/30 rounded-xl max-h-[220px] overflow-y-auto bg-background/30 p-1.5 space-y-1">
-                                {MOCK_EMPLOYEES.map((employee) => {
-                                    const isSelected = selectedEmployeeIds.includes(employee.id);
+                            {/* Selected Course Preview */}
+                            <AnimatePresence>
+                                {assignVideoId && (() => {
+                                    const selected = videos.find(v => v.id === Number(assignVideoId));
+                                    if (!selected) return null;
+                                    const catColor = getCategoryColor(selected.category);
                                     return (
                                         <motion.div
-                                            key={employee.id}
-                                            whileTap={{ scale: 0.98 }}
-                                            className={cn(
-                                                "flex items-center gap-3 p-2.5 rounded-xl transition-all cursor-pointer border",
-                                                isSelected
-                                                    ? "bg-primary/5 border-primary/15"
-                                                    : "border-transparent hover:bg-muted/10"
-                                            )}
-                                            onClick={() => handleToggleEmployee(employee.id)}
+                                            initial={{ opacity: 0, y: -8, height: 0 }}
+                                            animate={{ opacity: 1, y: 0, height: "auto" }}
+                                            exit={{ opacity: 0, y: -8, height: 0 }}
+                                            transition={{ duration: 0.3 }}
+                                            className="overflow-hidden"
                                         >
-                                            <Checkbox
-                                                checked={isSelected}
-                                                onCheckedChange={() => handleToggleEmployee(employee.id)}
-                                                className="pointer-events-none"
-                                            />
-                                            <div className={cn(
-                                                "h-8 w-8 rounded-lg flex items-center justify-center text-[10px] font-bold flex-shrink-0",
-                                                isSelected ? "bg-primary/15 text-primary" : "bg-muted/30 text-muted-foreground"
-                                            )}>
-                                                {employee.avatar}
-                                            </div>
-                                            <div className="flex-1 text-left">
-                                                <div className="text-xs font-bold leading-tight">{employee.name}</div>
-                                                <div className="text-[9px] text-muted-foreground mt-0.5">
-                                                    {employee.dept} • {employee.designation}
+                                            <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/[0.03] border border-primary/10">
+                                                <div className="w-16 aspect-video rounded-lg bg-gradient-to-br from-primary/15 to-primary/5 border border-primary/10 flex items-center justify-center flex-shrink-0">
+                                                    <Play className="h-4 w-4 text-primary/70" />
                                                 </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-xs font-bold truncate">{selected.title}</p>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <Badge className={cn("text-[8px] font-bold px-1.5 py-0 rounded-md border", catColor)}>
+                                                            {selected.category}
+                                                        </Badge>
+                                                        <span className="text-[9px] text-muted-foreground flex items-center gap-1">
+                                                            <Clock className="h-2 w-2" />{selected.duration}
+                                                        </span>
+                                                        <span className="text-[9px] text-muted-foreground flex items-center gap-1">
+                                                            <Eye className="h-2 w-2" />{selected.views} views
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <Badge className="bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[8px] font-bold rounded-md">
+                                                    <CheckCircle2 className="h-2 w-2 mr-0.5" />
+                                                    Ready
+                                                </Badge>
                                             </div>
-                                            {isSelected && (
-                                                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}>
-                                                    <CheckCircle2 className="h-4 w-4 text-primary" />
-                                                </motion.div>
-                                            )}
                                         </motion.div>
                                     );
-                                })}
-                            </div>
+                                })()}
+                            </AnimatePresence>
                         </div>
 
-                        <div className="flex items-center justify-end gap-3 pt-2">
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                onClick={() => setIsAssignOpen(false)}
-                                className="rounded-xl"
-                            >
-                                Cancel
-                            </Button>
-                            <Button type="submit" className="bg-primary hover:bg-primary/90 rounded-xl px-6 shadow-md shadow-primary/20">
-                                Assign Course
-                            </Button>
+                        {/* Divider */}
+                        <div className="flex items-center gap-3">
+                            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border/40 to-transparent" />
+                            <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-[0.2em]">Team Members</span>
+                            <div className="h-px flex-1 bg-gradient-to-r from-transparent via-border/40 to-transparent" />
+                        </div>
+
+                        {/* Employee Selection */}
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-2">
+                                <div className="relative flex-1">
+                                    <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                                    <Input
+                                        placeholder="Search by name or department..."
+                                        value={employeeSearch || ""}
+                                        onChange={(e) => {
+                                            // Using a local handler since employeeSearch may not exist in parent
+                                            const target = e.target as HTMLInputElement;
+                                            setEmployeeSearch?.(target.value);
+                                        }}
+                                        className="pl-9 bg-background/50 border-border/30 rounded-xl h-10 text-xs focus-visible:ring-primary/40"
+                                    />
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                        if (selectedEmployeeIds.length === MOCK_EMPLOYEES.length) {
+                                            setSelectedEmployeeIds([]);
+                                        } else {
+                                            setSelectedEmployeeIds(MOCK_EMPLOYEES.map(e => e.id));
+                                        }
+                                    }}
+                                    className="rounded-xl h-10 text-[10px] font-bold border-border/30 px-4 hover:bg-primary/5 hover:border-primary/20 hover:text-primary transition-all"
+                                >
+                                    {selectedEmployeeIds.length === MOCK_EMPLOYEES.length ? (
+                                        <>
+                                            <X className="h-3 w-3 mr-1" />
+                                            Deselect All
+                                        </>
+                                    ) : (
+                                        <>
+                                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                                            Select All
+                                        </>
+                                    )}
+                                </Button>
+                            </div>
+
+                            {/* Employee Grid */}
+                            <div className="border border-border/20 rounded-2xl bg-background/20 p-2 max-h-[280px] overflow-y-auto">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                                    <AnimatePresence>
+                                        {MOCK_EMPLOYEES.map((employee, index) => {
+                                            const isSelected = selectedEmployeeIds.includes(employee.id);
+                                            return (
+                                                <motion.div
+                                                    key={employee.id}
+                                                    initial={{ opacity: 0, y: 5 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    transition={{ delay: index * 0.03 }}
+                                                    whileTap={{ scale: 0.98 }}
+                                                    className={cn(
+                                                        "flex items-center gap-3 p-3 rounded-xl transition-all cursor-pointer border-2 group",
+                                                        isSelected
+                                                            ? "bg-primary/[0.06] border-primary/20 shadow-sm shadow-primary/5"
+                                                            : "border-transparent hover:bg-muted/8 hover:border-border/20"
+                                                    )}
+                                                    onClick={() => handleToggleEmployee(employee.id)}
+                                                >
+                                                    <div className="relative">
+                                                        <div className={cn(
+                                                            "h-10 w-10 rounded-xl flex items-center justify-center text-[11px] font-bold flex-shrink-0 transition-all duration-300",
+                                                            isSelected
+                                                                ? "bg-primary text-primary-foreground shadow-md shadow-primary/25"
+                                                                : "bg-muted/25 text-muted-foreground group-hover:bg-muted/40"
+                                                        )}>
+                                                            {employee.avatar}
+                                                        </div>
+                                                        {isSelected && (
+                                                            <motion.div
+                                                                initial={{ scale: 0 }}
+                                                                animate={{ scale: 1 }}
+                                                                exit={{ scale: 0 }}
+                                                                className="absolute -top-1 -right-1 h-4.5 w-4.5 rounded-full bg-primary border-2 border-card flex items-center justify-center"
+                                                            >
+                                                                <CheckCircle2 className="h-3 w-3 text-primary-foreground" />
+                                                            </motion.div>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className={cn(
+                                                            "text-xs font-bold leading-tight truncate transition-colors",
+                                                            isSelected && "text-primary"
+                                                        )}>
+                                                            {employee.name}
+                                                        </p>
+                                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                                            <Badge
+                                                                variant="outline"
+                                                                className="text-[8px] font-semibold px-1.5 py-0 rounded-md border-border/30 text-muted-foreground"
+                                                            >
+                                                                {employee.dept}
+                                                            </Badge>
+                                                            <span className="text-[9px] text-muted-foreground/70">
+                                                                {employee.designation}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </motion.div>
+                                            );
+                                        })}
+                                    </AnimatePresence>
+                                </div>
+                            </div>
+
+                            {/* Selection Summary */}
+                            <AnimatePresence>
+                                {selectedEmployeeIds.length > 0 && (
+                                    <motion.div
+                                        initial={{ opacity: 0, height: 0 }}
+                                        animate={{ opacity: 1, height: "auto" }}
+                                        exit={{ opacity: 0, height: 0 }}
+                                        transition={{ duration: 0.3 }}
+                                        className="overflow-hidden"
+                                    >
+                                        <div className="bg-primary/[0.03] border border-primary/10 rounded-xl p-3.5">
+                                            <div className="flex items-center justify-between mb-2.5">
+                                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                                                    Selected Members
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSelectedEmployeeIds([])}
+                                                    className="text-[10px] text-muted-foreground hover:text-primary font-semibold underline underline-offset-2 transition-colors"
+                                                >
+                                                    Clear all
+                                                </button>
+                                            </div>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {selectedEmployeeIds.map(id => {
+                                                    const emp = MOCK_EMPLOYEES.find(e => e.id === id);
+                                                    if (!emp) return null;
+                                                    return (
+                                                        <motion.div
+                                                            key={id}
+                                                            initial={{ opacity: 0, scale: 0.8 }}
+                                                            animate={{ opacity: 1, scale: 1 }}
+                                                            exit={{ opacity: 0, scale: 0.8 }}
+                                                            layout
+                                                        >
+                                                            <Badge
+                                                                className="bg-primary/10 text-primary border border-primary/15 text-[10px] font-semibold pl-1 pr-1.5 py-0.5 rounded-lg flex items-center gap-1.5 cursor-default hover:bg-primary/15 transition-colors"
+                                                            >
+                                                                <span className="h-4.5 w-4.5 rounded-md bg-primary/20 flex items-center justify-center text-[8px] font-bold">
+                                                                    {emp.avatar}
+                                                                </span>
+                                                                {emp.name}
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => { e.stopPropagation(); handleToggleEmployee(id); }}
+                                                                    className="hover:text-destructive transition-colors ml-0.5"
+                                                                >
+                                                                    <X className="h-2.5 w-2.5" />
+                                                                </button>
+                                                            </Badge>
+                                                        </motion.div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+
+                        {/* Footer Actions */}
+                        <div className="flex items-center justify-between pt-3 border-t border-border/15">
+                            <p className="text-[10px] text-muted-foreground">
+                                {!assignVideoId && !selectedEmployeeIds.length
+                                    ? "Select a course and team members to assign"
+                                    : !assignVideoId
+                                        ? "Select a course to continue"
+                                        : selectedEmployeeIds.length === 0
+                                            ? "Select at least one team member"
+                                            : `Ready to assign to ${selectedEmployeeIds.length} member${selectedEmployeeIds.length > 1 ? "s" : ""}`
+                                }
+                            </p>
+                            <div className="flex items-center gap-3">
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    onClick={() => setIsAssignOpen(false)}
+                                    className="rounded-xl h-10 px-5 text-sm font-semibold hover:bg-muted/10"
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    disabled={!assignVideoId || selectedEmployeeIds.length === 0}
+                                    className="bg-primary hover:bg-primary/90 rounded-xl h-10 px-6 shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/25 transition-all disabled:opacity-40 disabled:shadow-none flex items-center gap-2 text-sm font-semibold"
+                                >
+                                    <Sparkles className="h-3.5 w-3.5" />
+                                    Assign Course
+                                </Button>
+                            </div>
                         </div>
                     </form>
                 </DialogContent>
