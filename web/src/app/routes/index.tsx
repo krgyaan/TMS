@@ -26,7 +26,7 @@ const SharedRoutes = lazy(() => import("./sections/shared.routes"));
 const DocumentDashboardRoutes = lazy(() => import("./sections/document-dashboard.routes"));
 const HrmsRoutes = lazy(() => import("./sections/hrms.routes"));
 const Profile = lazy(() => import("@/modules/profile"));
-const Training = lazy(() => import("@/modules/hrms/employees/EmployeeTrainingDashboard"))
+const TrainingRoutes = lazy(() => import("./sections/training.routes"));
 
 import { ProfileProvider } from "@/modules/profile/contexts/ProfileContext";
 
@@ -66,13 +66,12 @@ export default function AppRoutes() {
                     />
 
                     <Route
-                        path="/training"
-                        element= {
+                        path="training/*"
+                        element={
                             <RouteWrapper>
-                                <Training />
+                                <TrainingRoutes />
                             </RouteWrapper>
                         }
-                    
                     />
 
                     {/* Integrations */}

@@ -15,7 +15,12 @@ export const paths = {
 
     dashboard: "/",
     profile: "/profile",
-    training: "/training",
+
+
+    training: {
+        root: "/training",
+        // Add future nested training paths here
+    },
 
     // ==================== TENDERING ====================
     tendering: {
@@ -395,5 +400,6 @@ export const paths = {
 
         // =========================training =======================//
         trainingDashboard: "/hrms/training",
+        uploadVideo: "/hrms/training/upload-video"
     },
 };

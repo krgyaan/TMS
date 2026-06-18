@@ -19,6 +19,8 @@ const ApprovalDashboard = lazy(() => import('@/modules/hrms/onboarding/ApprovalD
 const InductionDashboard = lazy(() => import('@/modules/hrms/onboarding/InductionDashboard'))
 
 const TrainingDashboard = lazy(() => import('@/modules/hrms/training/TrainingDashboard'))
+const UploadVideo = lazy(() => import("@/modules/hrms/training/components/UploadVideo"))
+
 
 export default function HrmsRoutes() {
     return (
@@ -41,6 +43,7 @@ export default function HrmsRoutes() {
             <Route path="admin/assets/assign" element={<AssetAssignment />} />
 
             <Route path="training" element={<TrainingDashboard />} />
+            <Route path="training/upload-video" element={ <UploadVideo />} />
         </Routes>
     );
 }
