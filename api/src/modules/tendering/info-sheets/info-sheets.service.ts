@@ -490,7 +490,7 @@ export class TenderInfoSheetsService {
                             ? null
                             : (payload.physicalDocsRequired
                                 ? String(payload.physicalDocsRequired).trim()
-                                : null),
+                                : 'NO'),
                         physicalDocsDeadline: isRejection
                             ? null
                             : (payload.physicalDocsDeadline ?? null),
