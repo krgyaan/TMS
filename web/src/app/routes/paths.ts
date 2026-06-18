@@ -15,6 +15,7 @@ export const paths = {
 
     dashboard: "/",
     profile: "/profile",
+    training: "/training",
 
     // ==================== TENDERING ====================
     tendering: {
@@ -373,22 +374,26 @@ export const paths = {
     hrms: {
         employeeRegistration: "/hrms/employees/register",
         employeeProfile: (id: number | string) => `/hrms/employees/${id}`,
+
         
         myAssets: "/hrms/assets/my",
         
         dashboard: "/hrms/admin",
-
+        
         assetAdminDashboard: "/hrms/admin/assets",
         assignAsset: "/hrms/admin/assets/assign",
         assetEdit: (id: number) => `/hrms/admin/assets/edit/${id}`,
         assetStatus: (id: number) => `/hrms/admin/assets/status/${id}`,
         assetView: (id: number) => `/hrms/admin/assets/view/${id}`,
-
+        
         //================ onboarding  ==============================//
         onboardingDashboard: "/hrms/onboarding/dashboard",
         profileDetailsDashboard: "/hrms/onboarding/profile-details",
         documentDashboard: "/hrms/onboarding/documents",
         approvalDashboard: "/hrms/onboarding/approval",
         inductionDashboard: "/hrms/onboarding/induction",
+
+        // =========================training =======================//
+        trainingDashboard: "/hrms/training",
     },
 };

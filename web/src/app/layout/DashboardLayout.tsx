@@ -59,7 +59,7 @@ export default function DashboardLayout() {
                                         variant="ghost" 
                                         size="icon" 
                                         className="h-9 w-9 rounded-xl transition-colors"
-                                        onClick={() => navigate("/training-videos")}
+                                        onClick={() => navigate("/training")}
                                         aria-label="Training Videos"
                                     >
                                         <Video className="h-5 w-5" />
