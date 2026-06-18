@@ -2,11 +2,12 @@ import { Injectable, Logger, NotFoundException, Inject, forwardRef } from '@nest
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { eq, and, sql } from 'drizzle-orm';
-import { paymentRequests, paymentInstruments, instrumentDdDetails, instrumentFdrDetails, instrumentBgDetails, instrumentChequeDetails, instrumentTransferDetails, instrumentStatusHistory } from '@db/schemas/tendering/payment-requests.schema';
+import { paymentRequests, paymentInstruments, instrumentDdDetails, instrumentFdrDetails, instrumentBgDetails, instrumentChequeDetails, instrumentTransferDetails, instrumentStatusHistory, paymentRequestMom } from '@db/schemas/tendering/payment-requests.schema';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import { users } from '@/db/schemas/auth/users.schema';
 import { userRoles } from '@/db/schemas/auth/user-roles.schema';
 import type { CreatePaymentRequestDto, UpdatePaymentRequestDto, UpdateStatusDto, PaymentPurpose } from '../dto/payment-requests.dto';
+import type { CreateMomRemarkDto } from '../dto/payment-mom.dto';
 import { extractAmountFromDetails, extractPurposeFromDetails } from './payment-requests.shared';
 import { tenderInformation } from '@/db/schemas';
 import { PaymentRequestsNotificationService } from './payment-requests-notification.service';
@@ -858,5 +859,39 @@ export class PaymentRequestsCommandService {
         }).execute();
         
         this.logger.log(`Status history created for instrument ${instrumentId} with status ${toStatus}`);
+    }
+
+    async createRemark(
+        requestId: number,
+        dto: CreateMomRemarkDto,
+        user: ValidatedUser,
+    ) {
+        const [userRecord] = await this.db
+            .select({ name: users.name })
+            .from(users)
+            .where(eq(users.id, user.sub))
+            .limit(1);
+
+        const [remark] = await this.db
+            .insert(paymentRequestMom)
+            .values({
+                requestId,
+                instrumentId: dto.instrumentId ?? null,
+                remark: dto.remark,
+                addedBy: user.sub,
+                addedByName: userRecord?.name || 'Unknown',
+            })
+            .returning();
+
+        return {
+            id: remark.id,
+            requestId: remark.requestId,
+            instrumentId: remark.instrumentId,
+            remark: remark.remark,
+            addedBy: remark.addedBy,
+            addedByName: remark.addedByName,
+            createdAt: remark.createdAt ? remark.createdAt.toISOString() : '',
+            updatedAt: remark.updatedAt ? remark.updatedAt.toISOString() : null,
+        };
     }
 }

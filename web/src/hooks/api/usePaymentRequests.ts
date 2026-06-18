@@ -208,3 +208,34 @@ export const useEmdTenderFeeDetails = (tenderId: number | null) => {
         staleTime: Infinity,
     });
 };
+
+// MOM Remarks
+export const useMomRemarks = (requestId: number | null) => {
+    return useQuery({
+        queryKey: [...paymentRequestsKey.all, 'mom', requestId],
+        queryFn: () => paymentRequestsService.getMomRemarks(requestId!),
+        enabled: !!requestId,
+    });
+};
+
+export const useAddMomRemark = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ requestId, data }: { requestId: number; data: { remark: string; instrumentId?: number | null } }) =>
+            paymentRequestsService.addMomRemark(requestId, data),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: [...paymentRequestsKey.all, 'mom', variables.requestId] });
+            toast.success('Remark added successfully');
+        },
+        onError: (error) => {
+            toast.error(handleQueryError(error));
+        },
+    });
+};
+
+export const useTodayMomRemarks = () => {
+    return useQuery({
+        queryKey: [...paymentRequestsKey.all, 'mom', 'today'],
+        queryFn: () => paymentRequestsService.getTodayMomRemarks(),
+    });
+};

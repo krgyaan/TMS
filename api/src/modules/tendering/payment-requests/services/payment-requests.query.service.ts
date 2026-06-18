@@ -2,8 +2,8 @@ import { Injectable, Logger, NotFoundException, StreamableFile } from '@nestjs/c
 import { Inject } from '@nestjs/common';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
-import { eq, and, or, inArray, gt, sql, desc, asc, not } from 'drizzle-orm';
-import { paymentRequests, paymentInstruments, instrumentDdDetails, instrumentFdrDetails, instrumentBgDetails, instrumentChequeDetails, instrumentTransferDetails } from '@db/schemas/tendering/payment-requests.schema';
+import { eq, and, or, inArray, gt, gte, sql, desc, asc, not } from 'drizzle-orm';
+import { paymentRequests, paymentInstruments, instrumentDdDetails, instrumentFdrDetails, instrumentBgDetails, instrumentChequeDetails, instrumentTransferDetails, paymentRequestMom } from '@db/schemas/tendering/payment-requests.schema';
 import { createReadStream, existsSync } from 'fs';
 import * as path from 'path';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -18,6 +18,7 @@ import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import { StatusCache } from '@/utils/status-cache';
 import type { DashboardTab, DashboardCounts, PendingTabResponse, RequestTabResponse, PaymentRequestRow, PendingTenderRow } from '../dto/payment-requests.dto';
 import type { InstrumentResponse, PaymentRequestEditResponseType } from '../dto/payment-response.dto';
+import type { MomRemarkResponseType } from '../dto/payment-mom.dto';
 import { buildTenderRoleFilters, buildRequestRoleFilters, getDefaultSortByTab, getTabSqlCondition, deriveDisplayStatus } from './payment-requests.shared';
 
 @Injectable()
@@ -811,6 +812,7 @@ export class PaymentRequestsQueryService {
                 projectName: paymentRequests.projectName,
                 dueDate: paymentRequests.dueDate,
                 requestedBy: paymentRequests.requestedBy,
+                requestedByName: users.name,
                 purpose: paymentRequests.purpose,
                 amountRequired: paymentRequests.amountRequired,
                 status: paymentRequests.status,
@@ -819,6 +821,7 @@ export class PaymentRequestsQueryService {
                 updatedAt: paymentRequests.updatedAt,
             })
             .from(paymentRequests)
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
             .where(eq(paymentRequests.id, requestId))
             .limit(1);
 
@@ -1150,6 +1153,70 @@ export class PaymentRequestsQueryService {
             createdAt: request.createdAt ? request.createdAt.toISOString() : null,
             instruments: instrumentsWithCourier,
         };
+    }
+
+    // ============================================================================
+    // MOM (Minutes of Meeting) Remarks
+    // ============================================================================
+
+    async getRemarksByRequestId(requestId: number): Promise<MomRemarkResponseType[]> {
+        const remarks = await this.db
+            .select()
+            .from(paymentRequestMom)
+            .where(eq(paymentRequestMom.requestId, requestId))
+            .orderBy(desc(paymentRequestMom.createdAt));
+
+        return remarks.map(r => ({
+            id: r.id,
+            requestId: r.requestId,
+            instrumentId: r.instrumentId,
+            remark: r.remark,
+            addedBy: r.addedBy,
+            addedByName: r.addedByName,
+            createdAt: r.createdAt ? r.createdAt.toISOString() : '',
+            updatedAt: r.updatedAt ? r.updatedAt.toISOString() : null,
+        }));
+    }
+
+    async getRemarksByInstrumentId(instrumentId: number): Promise<MomRemarkResponseType[]> {
+        const remarks = await this.db
+            .select()
+            .from(paymentRequestMom)
+            .where(eq(paymentRequestMom.instrumentId, instrumentId))
+            .orderBy(desc(paymentRequestMom.createdAt));
+
+        return remarks.map(r => ({
+            id: r.id,
+            requestId: r.requestId,
+            instrumentId: r.instrumentId,
+            remark: r.remark,
+            addedBy: r.addedBy,
+            addedByName: r.addedByName,
+            createdAt: r.createdAt ? r.createdAt.toISOString() : '',
+            updatedAt: r.updatedAt ? r.updatedAt.toISOString() : null,
+        }));
+    }
+
+    async getTodayRemarks(): Promise<MomRemarkResponseType[]> {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const remarks = await this.db
+            .select()
+            .from(paymentRequestMom)
+            .where(gte(paymentRequestMom.createdAt, today))
+            .orderBy(desc(paymentRequestMom.createdAt));
+
+        return remarks.map(r => ({
+            id: r.id,
+            requestId: r.requestId,
+            instrumentId: r.instrumentId,
+            remark: r.remark,
+            addedBy: r.addedBy,
+            addedByName: r.addedByName,
+            createdAt: r.createdAt ? r.createdAt.toISOString() : '',
+            updatedAt: r.updatedAt ? r.updatedAt.toISOString() : null,
+        }));
     }
 
     // ============================================================================
