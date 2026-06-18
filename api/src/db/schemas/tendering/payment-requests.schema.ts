@@ -416,7 +416,6 @@ export const paymentRequestMom = pgTable('payment_request_mom', {
     instrumentId: integer('instrument_id').references(() => paymentInstruments.id),
     remark: text('remark').notNull(),
     addedBy: integer('added_by').notNull().references(() => users.id),
-    addedByName: varchar('added_by_name', { length: 200 }).notNull(),
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
 }, (table) => ({

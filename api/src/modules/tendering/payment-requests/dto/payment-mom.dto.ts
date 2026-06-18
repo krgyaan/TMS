@@ -13,7 +13,6 @@ export const MomRemarkResponse = z.object({
     addedBy: z.number(),
     addedByName: z.string(),
     createdAt: z.string(),
-    updatedAt: z.string().nullable(),
 });
 
 export type CreateMomRemarkDto = z.infer<typeof CreateMomRemarkSchema>;

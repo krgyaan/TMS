@@ -866,12 +866,6 @@ export class PaymentRequestsCommandService {
         dto: CreateMomRemarkDto,
         user: ValidatedUser,
     ) {
-        const [userRecord] = await this.db
-            .select({ name: users.name })
-            .from(users)
-            .where(eq(users.id, user.sub))
-            .limit(1);
-
         const [remark] = await this.db
             .insert(paymentRequestMom)
             .values({
@@ -879,7 +873,6 @@ export class PaymentRequestsCommandService {
                 instrumentId: dto.instrumentId ?? null,
                 remark: dto.remark,
                 addedBy: user.sub,
-                addedByName: userRecord?.name || 'Unknown',
             })
             .returning();
 
@@ -889,7 +882,6 @@ export class PaymentRequestsCommandService {
             instrumentId: remark.instrumentId,
             remark: remark.remark,
             addedBy: remark.addedBy,
-            addedByName: remark.addedByName,
             createdAt: remark.createdAt ? remark.createdAt.toISOString() : '',
             updatedAt: remark.updatedAt ? remark.updatedAt.toISOString() : null,
         };
