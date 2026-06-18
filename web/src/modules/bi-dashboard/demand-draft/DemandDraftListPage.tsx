@@ -19,7 +19,7 @@ import { formatINR } from '@/hooks/useINRFormatter';
 import { demandDraftsService } from '@/services/api/demand-drafts.service';
 import { ExportExcelDropdown } from '@/components/bi-dashboard/ExportExcelDropdown';
 import type { ColDef } from 'ag-grid-community';
-import { AlertCircle, CheckCircle, Clock, Edit, Eye, FileX2, Plus, RotateCcw, Search, XCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle, Clock, Edit, Eye, FileX2, MessageSquare, Plus, RotateCcw, Search, XCircle } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { DashboardTab, DemandDraftDashboardRow } from './helpers/demandDraft.types';
@@ -174,6 +174,11 @@ const DemandDraftListPage = () => {
                 icon: <Edit className="h-4 w-4" />,
                 onClick: (row: DemandDraftDashboardRow) => navigate(paths.bi.demandDraftAction(row.id))
             },
+            {
+                label: "Meeting Remark",
+                icon: <MessageSquare className='h-4 w-4' />,
+                onClick: (row: DemandDraftDashboardRow) => navigate(paths.bi.DDMeetingRemarks(row.requestId))
+            }
         ],
         [navigate]
     );

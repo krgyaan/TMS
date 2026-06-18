@@ -194,7 +194,7 @@ const FdrListPage = () => {
             {
                 label: 'Meeting Remarks',
                 icon: <MessageSquare className="h-4 w-4" />,
-                onClick: (row: FdrDashboardRow) => navigate(paths.bi.FdrMeetingRemarksPage(row.id)),
+                onClick: (row: FdrDashboardRow) => navigate(paths.bi.FdrMeetingRemarksPage(row.requestId)),
             }
         ],
         [navigate]

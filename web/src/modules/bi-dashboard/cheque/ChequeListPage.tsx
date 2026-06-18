@@ -192,7 +192,7 @@ const ChequeListPage = () => {
             {
                 label: 'Meeting Remarks',
                 icon: <MessageSquare className="h-4 w-4" />,
-                onClick: (row: ChequeDashboardRow) => navigate(paths.bi.chequeMeetingRemarks(row.id)),
+                onClick: (row: ChequeDashboardRow) => navigate(paths.bi.chequeMeetingRemarks(row.requestId)),
             }
         ],
         [navigate]

@@ -173,7 +173,7 @@ const PayOnPortalListPage = () => {
             {
                 label: 'Meeting Remarks',
                 icon: <MessageSquare className="h-4 w-4" />,
-                onClick: (row: PayOnPortalDashboardRow) => navigate(paths.bi.payOnPortalMeetingRemarks(row.id)),
+                onClick: (row: PayOnPortalDashboardRow) => navigate(paths.bi.payOnPortalMeetingRemarks(row.requestId)),
             }
         ],
         [navigate]

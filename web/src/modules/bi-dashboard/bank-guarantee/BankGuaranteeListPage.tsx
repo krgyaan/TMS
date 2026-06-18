@@ -189,7 +189,7 @@ const BankGuaranteeListPage = () => {
             {
                 label: 'Meeting Remarks',
                 icon: <MessageSquare className="h-4 w-4" />,
-                onClick: (row: BankGuaranteeDashboardRow) => navigate(paths.bi.bankGuaranteeMeetingRemarks(row.id)),
+                onClick: (row: BankGuaranteeDashboardRow) => navigate(paths.bi.bankGuaranteeMeetingRemarks(row.requestId)),
             }
         ],
         [navigate]
