@@ -176,7 +176,7 @@ const BankTransferListPage = () => {
             {
                 label: 'Meeting Remarks',
                 icon: <MessageSquare className="h-4 w-4" />,
-                onClick: (row: BankTransferDashboardRow) => navigate(paths.bi.bankTransferMeetingRemarks(row.id)),
+                onClick: (row: BankTransferDashboardRow) => navigate(paths.bi.bankTransferMeetingRemarks(row.requestId)),
             }
         ],
         [navigate]

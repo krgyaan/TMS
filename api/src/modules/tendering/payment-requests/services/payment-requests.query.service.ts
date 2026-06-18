@@ -1,24 +1,24 @@
-import { Injectable, Logger, NotFoundException, StreamableFile } from '@nestjs/common';
-import { Inject } from '@nestjs/common';
-import { DRIZZLE } from '@db/database.module';
-import type { DbInstance } from '@db';
-import { eq, and, or, inArray, gt, sql, desc, asc, not } from 'drizzle-orm';
-import { paymentRequests, paymentInstruments, instrumentDdDetails, instrumentFdrDetails, instrumentBgDetails, instrumentChequeDetails, instrumentTransferDetails } from '@db/schemas/tendering/payment-requests.schema';
-import { createReadStream, existsSync } from 'fs';
-import * as path from 'path';
-import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
-import { tenderInformation } from '@/db/schemas/tendering/tender-info-sheet.schema';
-import { bidSubmissions } from '@db/schemas/tendering/bid-submissions.schema';
-import { couriers } from '@/db/schemas/shared/couriers.schema';
-import { users } from '@db/schemas/auth/users.schema';
 import { statuses } from '@/db/schemas/master/statuses.schema';
-import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
+import { couriers } from '@/db/schemas/shared/couriers.schema';
+import { tenderInformation } from '@/db/schemas/tendering/tender-info-sheet.schema';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
+import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 import { StatusCache } from '@/utils/status-cache';
-import type { DashboardTab, DashboardCounts, PendingTabResponse, RequestTabResponse, PaymentRequestRow, PendingTenderRow } from '../dto/payment-requests.dto';
+import type { DbInstance } from '@db';
+import { DRIZZLE } from '@db/database.module';
+import { users } from '@db/schemas/auth/users.schema';
+import { bidSubmissions } from '@db/schemas/tendering/bid-submissions.schema';
+import { instrumentBgDetails, instrumentChequeDetails, instrumentDdDetails, instrumentFdrDetails, instrumentTransferDetails, paymentInstruments, paymentRequestMom, paymentRequests } from '@db/schemas/tendering/payment-requests.schema';
+import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
+import { Inject, Injectable, Logger, NotFoundException, StreamableFile } from '@nestjs/common';
+import { and, asc, desc, eq, gt, gte, inArray, or, sql } from 'drizzle-orm';
+import { createReadStream, existsSync } from 'fs';
+import * as path from 'path';
+import type { MomRemarkResponseType } from '../dto/payment-mom.dto';
+import type { DashboardCounts, PaymentRequestRow, PendingTabResponse, PendingTenderRow, RequestTabResponse } from '../dto/payment-requests.dto';
 import type { InstrumentResponse, PaymentRequestEditResponseType } from '../dto/payment-response.dto';
-import { buildTenderRoleFilters, buildRequestRoleFilters, getDefaultSortByTab, getTabSqlCondition, deriveDisplayStatus } from './payment-requests.shared';
+import { buildRequestRoleFilters, buildTenderRoleFilters, deriveDisplayStatus, getDefaultSortByTab, getTabSqlCondition } from './payment-requests.shared';
 
 @Injectable()
 export class PaymentRequestsQueryService {
@@ -811,6 +811,7 @@ export class PaymentRequestsQueryService {
                 projectName: paymentRequests.projectName,
                 dueDate: paymentRequests.dueDate,
                 requestedBy: paymentRequests.requestedBy,
+                requestedByName: users.name,
                 purpose: paymentRequests.purpose,
                 amountRequired: paymentRequests.amountRequired,
                 status: paymentRequests.status,
@@ -819,6 +820,7 @@ export class PaymentRequestsQueryService {
                 updatedAt: paymentRequests.updatedAt,
             })
             .from(paymentRequests)
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
             .where(eq(paymentRequests.id, requestId))
             .limit(1);
 
@@ -847,9 +849,68 @@ export class PaymentRequestsQueryService {
                 eq(paymentInstruments.isActive, true)
             ));
 
+        const instrumentsWithDetails = await Promise.all(instruments.map(async (instrument) => {
+            let details: any = null;
+            if (instrument.instrumentType === 'DD') {
+                [details] = await this.db.select({
+                    ddNo: instrumentDdDetails.ddNo,
+                    ddDate: instrumentDdDetails.ddDate,
+                    reqNo: instrumentDdDetails.reqNo,
+                    ddNeeds: instrumentDdDetails.ddNeeds,
+                    ddPurpose: instrumentDdDetails.ddPurpose,
+                    ddRemarks: instrumentDdDetails.ddRemarks,
+                }).from(instrumentDdDetails).where(eq(instrumentDdDetails.instrumentId, instrument.id)).limit(1);
+            } else if (instrument.instrumentType === 'FDR') {
+                [details] = await this.db.select({
+                    fdrNo: instrumentFdrDetails.fdrNo,
+                    fdrDate: instrumentFdrDetails.fdrDate,
+                    fdrSource: instrumentFdrDetails.fdrSource,
+                    fdrPurpose: instrumentFdrDetails.fdrPurpose,
+                    fdrExpiryDate: instrumentFdrDetails.fdrExpiryDate,
+                    fdrNeeds: instrumentFdrDetails.fdrNeeds,
+                    fdrRemark: instrumentFdrDetails.fdrRemark,
+                }).from(instrumentFdrDetails).where(eq(instrumentFdrDetails.instrumentId, instrument.id)).limit(1);
+            } else if (instrument.instrumentType === 'BG') {
+                [details] = await this.db.select({
+                    bgNo: instrumentBgDetails.bgNo,
+                    bgDate: instrumentBgDetails.bgDate,
+                    validityDate: instrumentBgDetails.validityDate,
+                    claimExpiryDate: instrumentBgDetails.claimExpiryDate,
+                    beneficiaryName: instrumentBgDetails.beneficiaryName,
+                    beneficiaryAddress: instrumentBgDetails.beneficiaryAddress,
+                    bankName: instrumentBgDetails.bankName,
+                    bgNeeds: instrumentBgDetails.bgNeeds,
+                    bgPurpose: instrumentBgDetails.bgPurpose,
+                }).from(instrumentBgDetails).where(eq(instrumentBgDetails.instrumentId, instrument.id)).limit(1);
+            } else if (instrument.instrumentType === 'Cheque') {
+                [details] = await this.db.select({
+                    chequeNo: instrumentChequeDetails.chequeNo,
+                    chequeDate: instrumentChequeDetails.chequeDate,
+                    bankName: instrumentChequeDetails.bankName,
+                    chequeNeeds: instrumentChequeDetails.chequeNeeds,
+                    chequeReason: instrumentChequeDetails.chequeReason,
+                }).from(instrumentChequeDetails).where(eq(instrumentChequeDetails.instrumentId, instrument.id)).limit(1);
+            } else if (instrument.instrumentType === 'Bank Transfer' || instrument.instrumentType === 'Portal Payment') {
+                [details] = await this.db.select({
+                    utrNum: instrumentTransferDetails.utrNum,
+                    transactionDate: instrumentTransferDetails.transactionDate,
+                    accountName: instrumentTransferDetails.accountName,
+                    accountNumber: instrumentTransferDetails.accountNumber,
+                    ifsc: instrumentTransferDetails.ifsc,
+                    reason: instrumentTransferDetails.reason,
+                    remarks: instrumentTransferDetails.remarks,
+                    portalName: instrumentTransferDetails.portalName,
+                    isNetbanking: instrumentTransferDetails.isNetbanking,
+                    isDebit: instrumentTransferDetails.isDebit,
+                }).from(instrumentTransferDetails).where(eq(instrumentTransferDetails.instrumentId, instrument.id)).limit(1);
+            }
+            return this.mapInstrumentResponse(instrument, details);
+        }));
+
         return {
             ...this.mapPaymentRequest(request),
-            instruments: instruments.map(i => this.mapInstrumentBase(i)),
+            requestedByName: request.requestedByName,
+            instruments: instrumentsWithDetails,
         };
     }
 
@@ -1153,6 +1214,94 @@ export class PaymentRequestsQueryService {
     }
 
     // ============================================================================
+    // MOM (Minutes of Meeting) Remarks
+    // ============================================================================
+
+    async getRemarksByRequestId(requestId: number): Promise<MomRemarkResponseType[]> {
+        const remarks = await this.db
+            .select({
+                id: paymentRequestMom.id,
+                requestId: paymentRequestMom.requestId,
+                instrumentId: paymentRequestMom.instrumentId,
+                remark: paymentRequestMom.remark,
+                addedBy: paymentRequestMom.addedBy,
+                createdAt: paymentRequestMom.createdAt,
+                username: users.name
+            })
+            .from(paymentRequestMom)
+            .leftJoin(users, eq(users.id, paymentRequestMom.addedBy))
+            .where(eq(paymentRequestMom.requestId, requestId))
+            .orderBy(desc(paymentRequestMom.createdAt));
+
+        return remarks.map(r => ({
+            id: r.id,
+            requestId: r.requestId,
+            instrumentId: r.instrumentId,
+            remark: r.remark,
+            addedBy: r.addedBy,
+            addedByName: r.username ?? '',
+            createdAt: r.createdAt ? r.createdAt.toISOString() : '',
+        }));
+    }
+
+    async getRemarksByInstrumentId(instrumentId: number): Promise<MomRemarkResponseType[]> {
+        const remarks = await this.db
+            .select({
+                id: paymentRequestMom.id,
+                requestId: paymentRequestMom.requestId,
+                instrumentId: paymentRequestMom.instrumentId,
+                remark: paymentRequestMom.remark,
+                addedBy: paymentRequestMom.addedBy,
+                createdAt: paymentRequestMom.createdAt,
+                username: users.name
+            })
+            .from(paymentRequestMom)
+            .leftJoin(users, eq(users.id, paymentRequestMom.addedBy))
+            .where(eq(paymentRequestMom.instrumentId, instrumentId))
+            .orderBy(desc(paymentRequestMom.createdAt));
+
+        return remarks.map(r => ({
+            id: r.id,
+            requestId: r.requestId,
+            instrumentId: r.instrumentId,
+            remark: r.remark,
+            addedBy: r.addedBy,
+            addedByName: r.username ?? '',
+            createdAt: r.createdAt ? r.createdAt.toISOString() : '',
+        }));
+    }
+
+    async getTodayRemarks(): Promise<MomRemarkResponseType[]> {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const remarks = await this.db
+            .select({
+                id: paymentRequestMom.id,
+                requestId: paymentRequestMom.requestId,
+                instrumentId: paymentRequestMom.instrumentId,
+                remark: paymentRequestMom.remark,
+                addedBy: paymentRequestMom.addedBy,
+                createdAt: paymentRequestMom.createdAt,
+                username: users.name
+            })
+            .from(paymentRequestMom)
+            .leftJoin(users, eq(users.id, paymentRequestMom.addedBy))
+            .where(gte(paymentRequestMom.createdAt, today))
+            .orderBy(desc(paymentRequestMom.createdAt));
+
+        return remarks.map(r => ({
+            id: r.id,
+            requestId: r.requestId,
+            instrumentId: r.instrumentId,
+            remark: r.remark,
+            addedBy: r.addedBy,
+            addedByName: r.username ?? '',
+            createdAt: r.createdAt ? r.createdAt.toISOString() : '',
+        }));
+    }
+
+    // ============================================================================
     // Response Mapping Helpers
     // ============================================================================
 
@@ -1219,9 +1368,6 @@ export class PaymentRequestsQueryService {
 
     private mapInstrumentResponse(instrument: any, details: any): InstrumentResponse {
         const base = this.mapInstrumentBase(instrument);
-
-        console.log("instrument in mapInstrumentResponse", instrument);
-        console.log("details in mapInstrumentResponse", details);
         
         switch (instrument.instrumentType) {
             case 'DD':

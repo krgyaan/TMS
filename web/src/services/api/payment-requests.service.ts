@@ -74,6 +74,23 @@ class PaymentRequestsService extends BaseApiService {
             `/instruments/${instrumentId}/consent`, { consentRemark }
         );
     }
+
+    // MOM Remarks
+    async getMomRemarks(requestId: number) {
+        return this.get<any[]>(`/${requestId}/mom`);
+    }
+
+    async addMomRemark(requestId: number, data: { remark: string; instrumentId?: number | null }) {
+        return this.post<any, typeof data>(`/${requestId}/mom`, data);
+    }
+
+    async getTodayMomRemarks() {
+        return this.get<any[]>('/mom/today');
+    }
+
+    async getInstrumentMomRemarks(requestId: number, instrumentId: number) {
+        return this.get<any[]>(`/${requestId}/mom/instruments/${instrumentId}`);
+    }
 }
 
 export const paymentRequestsService = new PaymentRequestsService();
