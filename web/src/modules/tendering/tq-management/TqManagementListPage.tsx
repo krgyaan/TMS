@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useMarkAsNoTq, useTqManagement, useTqManagementDashboardCounts, useTqQualified } from '@/hooks/api/useTqManagement';
 import { usePersistentTableState } from '@/hooks/usePersistentTableState';
 import type { ColDef } from 'ag-grid-community';
-import { AlertCircle, CheckCircle, Edit, Eye, FileCheck, FileX2, Search, Send, XCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle, Edit, Eye, FileCheck, FileX2, Plus, Search, Send, XCircle } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { useMemo, useState } from 'react';
@@ -115,18 +115,12 @@ const TqManagementListPage = () => {
     };
 
     const tqManagementActions: ActionItem<TqManagementDashboardRowWithTimer>[] = useMemo(() => [
-        // {
-        //     label: 'Change Status',
-        //     onClick: (row: TqManagementDashboardRowWithTimer) => setChangeStatusModal({ open: true, tenderId: row.tenderId }),
-        //     icon: <RefreshCw className="h-4 w-4" />,
-        // },
         {
             label: 'TQ Received',
             onClick: (row: TqManagementDashboardRowWithTimer) => {
                 navigate(paths.tendering.tqReceived(row.tenderId));
             },
-            icon: <Send className="h-4 w-4" />,
-            visible: (row) => row.tqStatus === 'TQ awaited',
+            icon: <Plus className="h-4 w-4" />,
         },
         {
             label: 'Mark as No TQ',
@@ -142,7 +136,7 @@ const TqManagementListPage = () => {
                 navigate(paths.tendering.tqReplied(row.tenderId));
             },
             icon: <Send className="h-4 w-4" />,
-            visible: (row) => row.tqStatus === 'TQ received' && row.tqId !== null,
+            visible: (row) => row.tqTooltipData?.some(tq => tq.status === 'TQ received') ?? false,
         },
         {
             label: 'TQ Missed',
@@ -150,7 +144,7 @@ const TqManagementListPage = () => {
                 navigate(paths.tendering.tqMissed(row.tenderId));
             },
             icon: <XCircle className="h-4 w-4" />,
-            visible: (row) => row.tqStatus === 'TQ received' && row.tqId !== null,
+            visible: (row) => row.tqTooltipData?.some(tq => tq.status === 'TQ received') ?? false,
         },
         {
             label: 'Edit TQ Received',
@@ -158,7 +152,7 @@ const TqManagementListPage = () => {
                 navigate(paths.tendering.tqEditReceived(row.tenderId));
             },
             icon: <Edit className="h-4 w-4" />,
-            visible: (row) => row.tqStatus === 'TQ received' && row.tqId !== null,
+            visible: (row) => hasTenderingPermission && (row.tqTooltipData?.some(tq => tq.status === 'TQ received') ?? false),
         },
         {
             label: 'Edit Submit TQ',
@@ -166,7 +160,7 @@ const TqManagementListPage = () => {
                 navigate(paths.tendering.tqEditReplied(row.tenderId));
             },
             icon: <Edit className="h-4 w-4" />,
-            visible: (row) => row.tqStatus === 'TQ replied' && row.tqId !== null,
+            visible: (row) => hasTenderingPermission && (row.tqTooltipData?.some(tq => tq.status === 'TQ replied') ?? false),
         },
         {
             label: 'Edit TQ Missed',
@@ -174,7 +168,7 @@ const TqManagementListPage = () => {
                 navigate(paths.tendering.tqEditMissed(row.tenderId));
             },
             icon: <Edit className="h-4 w-4" />,
-            visible: (row) => hasTenderingPermission && row.tqStatus === 'Disqualified, TQ missed' && row.tqId !== null,
+            visible: (row) => hasTenderingPermission && (row.tqTooltipData?.some(tq => tq.status === 'Disqualified, TQ missed') ?? false),
         },
         {
             label: 'TQ Qualified',
@@ -182,7 +176,7 @@ const TqManagementListPage = () => {
                 handleTqQualified(row.tqId!);
             },
             icon: <FileCheck className="h-4 w-4" />,
-            visible: (row) => row.tqStatus === 'TQ replied' && row.tqId !== null,
+            visible: (row) => row.tqTooltipData?.some(tq => tq.status === 'TQ replied') ?? false,
         },
         {
             label: 'View Details',
@@ -191,7 +185,7 @@ const TqManagementListPage = () => {
             },
             icon: <Eye className="h-4 w-4" />,
         },
-    ], [navigate, markNoTqMutation, handleTqQualified]);
+    ], [navigate, markNoTqMutation, handleTqQualified, hasTenderingPermission]);
 
     const tabsConfig = useMemo(() => {
         return [
