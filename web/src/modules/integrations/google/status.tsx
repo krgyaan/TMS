@@ -1,4 +1,4 @@
-﻿import { useMemo } from "react";
+﻿import { useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +15,20 @@ const GoogleIntegrationStatus = () => {
     const userId = params.get("userId");
 
     const success = status === "success";
+
+    // If opened as a popup, notify opener and close
+    useEffect(() => {
+        if (window.opener) {
+            window.opener.postMessage({
+                type: 'GOOGLE_DRIVE_AUTH',
+                status: success ? 'success' : 'error',
+                userId: userId ? Number(userId) : undefined,
+                connectionId: connectionId ? Number(connectionId) : undefined,
+                error: errorMessage || undefined,
+            }, '*');
+            window.close();
+        }
+    }, [success, userId, connectionId, errorMessage]);
 
     const heading = success ? "Google account linked" : "Google connection failed";
     const description = success

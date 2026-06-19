@@ -19,7 +19,7 @@ import axiosInstance from "@/lib/axios";
 import type { CostingSheetDashboardRowWithTimer, CostingSheetTab } from "@/modules/tendering/costing-sheets/helpers/costingSheet.types";
 import type { ColDef } from "ag-grid-community";
 import { AlertCircle, Edit, ExternalLink, Eye, FileX2, Plus, Search, Send, XCircle } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { ChangeStatusModal } from "../tenders/components/ChangeStatusModal";
@@ -56,10 +56,50 @@ const CostingSheets = () => {
         open: false,
         tenderId: null
     });
+    const pendingTenderId = useRef<number | null>(null);
 
-    const { data: driveScopes } = useCheckDriveScopes();
+    const { data: driveScopes, refetch: refetchDriveScopes } = useCheckDriveScopes();
     const createSheetMutation = useCreateCostingSheet();
     const createSheetWithNameMutation = useCreateCostingSheetWithName();
+
+    useEffect(() => {
+        const handler = (event: MessageEvent) => {
+            if (event.data?.type !== 'GOOGLE_DRIVE_AUTH') return;
+
+            if (event.data.status === 'success') {
+                refetchDriveScopes();
+                setConnectDriveOpen(false);
+                toast.success('Google Drive connected!');
+
+                if (pendingTenderId.current) {
+                    const tenderId = pendingTenderId.current;
+                    pendingTenderId.current = null;
+                    createSheetMutation.mutateAsync(tenderId)
+                        .then((result) => {
+                            if (result.success && result.sheetUrl) {
+                                window.open(result.sheetUrl, '_blank');
+                            } else if (result.isDuplicate) {
+                                setDuplicateInfo({
+                                    tenderId,
+                                    existingUrl: result.existingSheetUrl,
+                                    suggestedName: result.suggestedName,
+                                });
+                                setDuplicateDialogOpen(true);
+                            } else if (result.message) {
+                                toast.error(result.message);
+                            }
+                        })
+                        .catch(() => {/* error handled by mutation */});
+                }
+            } else {
+                toast.error(`Failed to connect Google Drive: ${event.data.error}`);
+                setIsConnectingDrive(false);
+            }
+        };
+
+        window.addEventListener('message', handler);
+        return () => window.removeEventListener('message', handler);
+    }, [refetchDriveScopes, createSheetMutation]);
 
     const { data: apiResponse, isLoading: loading, error } = useCostingSheets(
         activeTab,
@@ -75,6 +115,7 @@ const CostingSheets = () => {
     const handleCreateCosting = useCallback(async (row: CostingSheetDashboardRowWithTimer) => {
         // Check if user has Drive scopes
         if (!driveScopes?.hasScopes) {
+            pendingTenderId.current = row.tenderId;
             setConnectDriveOpen(true);
             return;
         }
@@ -146,8 +187,16 @@ const CostingSheets = () => {
 
             // Extract the OAuth URL from the response
             if (data.url && typeof data.url === 'string') {
-                // Redirect to Google OAuth
-                window.location.href = data.url;
+                // Open Google OAuth in a popup
+                const w = 600;
+                const h = 700;
+                const left = Math.max(0, (window.screen.width - w) / 2);
+                const top = Math.max(0, (window.screen.height - h) / 2);
+                window.open(
+                    data.url,
+                    'google-drive-auth',
+                    `width=${w},height=${h},left=${left},top=${top},menubar=no,toolbar=no,location=no`,
+                );
             } else {
                 throw new Error('Invalid response from server: missing OAuth URL');
             }
