@@ -130,11 +130,11 @@ export default function TenderingRoutes() {
             <Route path="bid-submissions/view/:tenderId" element={<RouteWrapper><BidSubmissionViewPage /></RouteWrapper>} />
             <Route path="tq-management" element={<RouteWrapper><TqManagementListPage /></RouteWrapper>} />
             <Route path="tq-management/received/:tenderId" element={<RouteWrapper><TqReceivedPage /></RouteWrapper>} />
-            <Route path="tq-management/edit-received/:id" element={<RouteWrapper><TqEditReceivedPage /></RouteWrapper>} />
-            <Route path="tq-management/replied/:id" element={<RouteWrapper><TqRepliedPage /></RouteWrapper>} />
-            <Route path="tq-management/edit-replied/:id" element={<RouteWrapper><TqEditRepliedPage /></RouteWrapper>} />
-            <Route path="tq-management/missed/:id" element={<RouteWrapper><TqMissedPage /></RouteWrapper>} />
-            <Route path="tq-management/edit-missed/:id" element={<RouteWrapper><TqEditMissedPage /></RouteWrapper>} />
+            <Route path="tq-management/edit-received/:tenderId" element={<RouteWrapper><TqEditReceivedPage /></RouteWrapper>} />
+            <Route path="tq-management/replied/:tenderId" element={<RouteWrapper><TqRepliedPage /></RouteWrapper>} />
+            <Route path="tq-management/edit-replied/:tenderId" element={<RouteWrapper><TqEditRepliedPage /></RouteWrapper>} />
+            <Route path="tq-management/missed/:tenderId" element={<RouteWrapper><TqMissedPage /></RouteWrapper>} />
+            <Route path="tq-management/edit-missed/:tenderId" element={<RouteWrapper><TqEditMissedPage /></RouteWrapper>} />
             <Route path="tq-management/view/:tenderId" element={<RouteWrapper><TqViewPage /></RouteWrapper>} />
             <Route path="reverse-auctions" element={<RouteWrapper><Tendering_RAs /></RouteWrapper>} />
             <Route path="reverse-auctions/schedule/:tenderId" element={<RouteWrapper><Tendering_RA_Schedule /></RouteWrapper>} />

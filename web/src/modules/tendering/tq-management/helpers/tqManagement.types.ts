@@ -65,8 +65,6 @@ export interface TqManagementDashboardCounts {
 
 export type TenderQueryStatus = 'TQ awaited' | 'TQ received' | 'TQ replied' | 'Disqualified, TQ missed' | 'Disqualified, No TQ received' | 'TQ replied, Qualified' | 'Qualified, No TQ received';
 
-export type TqStatus = 'TQ awaited' | 'TQ received' | 'TQ replied' | 'TQ missed' | 'No TQ';
-
 export type TenderQuery = {
     id: number;
     tenderId: number;
@@ -82,7 +80,7 @@ export type TenderQuery = {
     missedReason: string | null;
     preventionMeasures: string | null;
     tmsImprovements: string | null;
-    status: TqStatus;
+    status: TenderQueryStatus;
     createdAt: Date;
     updatedAt: Date;
 };
@@ -98,6 +96,13 @@ export type TenderQueryItem = {
     updatedAt: Date;
 };
 
+export type TqTooltipItem = {
+    seqNo: number;
+    status: string;
+    receivedAt: Date | null;
+    typeNames: string[];
+};
+
 export type TqManagementDashboardRow = {
     tenderId: number;
     tenderNo: string;
@@ -111,6 +116,7 @@ export type TqManagementDashboardRow = {
     tqId: number | null;
     tqCount: number;
     bidSubmissionId: number | null;
+    tqTooltipData: TqTooltipItem[];
 };
 
 export interface TqManagementDashboardRowWithTimer extends TqManagementDashboardRow {
