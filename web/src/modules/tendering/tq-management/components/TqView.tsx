@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { FileText, Download, ExternalLink, AlertCircle } from 'lucide-react';
-import type { TenderQuery, TenderQueryItem, TenderQueryStatus } from '../helpers/tqManagement.types';
+import type { TenderQuery, TenderQueryItem } from '../helpers/tqManagement.types';
 import type { TqType } from '@/types/api.types';
 import { useTqById, useTqItems, useTqByTender } from '@/hooks/api/useTqManagement';
 import { useTqTypes } from '@/hooks/api/useTqTypes';
@@ -119,13 +119,13 @@ export function TqView({
             <CardContent className="space-y-8">
                 {/* Status Badge */}
                 <div className="flex items-center gap-3">
-                    <Badge variant={getStatusVariant(tqData.status) as any}>
+                    <Badge variant={getStatusVariant(tqData.status) as 'default' | 'secondary' | 'destructive' | 'outline'}>
                         {tqData.status}
                     </Badge>
                 </div>
 
                 {/* TQ Received Details */}
-                {(tqData.status as TenderQueryStatus) !== 'Qualified, No TQ received' && (tqData.status as TenderQueryStatus) !== 'Disqualified, No TQ received' && (
+                {tqData.status !== 'Qualified, No TQ received' && tqData.status !== 'Disqualified, No TQ received' && (
                     <div className="space-y-4">
                         <h4 className="font-semibold text-base text-primary border-b pb-2">
                             TQ Received Details
@@ -263,7 +263,7 @@ export function TqView({
                 )}
 
                 {/* TQ Missed Details */}
-                {(tqData.status as TenderQueryStatus) === 'Disqualified, TQ missed' && (
+                {tqData.status === 'Disqualified, TQ missed' && (
                     <div className="space-y-4">
                         <h4 className="font-semibold text-base text-destructive border-b pb-2">
                             Missed TQ Analysis
@@ -292,7 +292,7 @@ export function TqView({
                 )}
 
                 {/* No TQ */}
-                {(tqData.status as TenderQueryStatus) === 'Qualified, No TQ received' || (tqData.status as TenderQueryStatus) === 'Disqualified, No TQ received' && (
+                {tqData.status === 'Qualified, No TQ received' || tqData.status === 'Disqualified, No TQ received' && (
                     <div className="space-y-4">
                         <Alert>
                             <AlertCircle className="h-4 w-4" />

@@ -7,10 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Form } from '@/components/ui/form';
 import { FieldWrapper } from '@/components/form/FieldWrapper';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Save } from 'lucide-react';
+import { ArrowLeft, Save, FileText } from 'lucide-react';
 import { paths } from '@/app/routes/paths';
 import { useEffect } from 'react';
-import { useUpdateTqReplied } from '@/hooks/api/useTqManagement';
+import { useUpdateTqReplied, useTqItems } from '@/hooks/api/useTqManagement';
+import { useTqTypes } from '@/hooks/api/useTqTypes';
+import { Badge } from '@/components/ui/badge';
 import type { TenderQuery } from '../helpers/tqManagement.types';
 import { TenderFileUploader } from '@/components/tender-file-upload';
 
@@ -30,6 +32,12 @@ interface TqRepliedFormProps {
 export default function TqRepliedForm({ tqData, mode }: TqRepliedFormProps) {
     const navigate = useNavigate();
     const updateMutation = useUpdateTqReplied();
+    const { data: tqItems } = useTqItems(tqData.id);
+    const { data: tqTypes } = useTqTypes();
+
+    const getTqTypeName = (tqTypeId: number) => {
+        return tqTypes?.find((t: any) => t.id === tqTypeId)?.name || 'Unknown';
+    };
 
     const form = useForm<FormValues>({
         resolver: zodResolver(TqRepliedFormSchema) as Resolver<FormValues>,
@@ -99,6 +107,42 @@ export default function TqRepliedForm({ tqData, mode }: TqRepliedFormProps) {
             <CardContent>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                        {/* TQ Items Context */}
+                        {tqItems && tqItems.length > 0 && (
+                            <div className="space-y-4">
+                                <h4 className="font-semibold text-base text-primary border-b pb-2 flex items-center gap-2">
+                                    <FileText className="h-4 w-4" />
+                                    TQ Items ({tqItems.length})
+                                </h4>
+                                <div className="border rounded-lg overflow-hidden bg-muted/30">
+                                    <table className="w-full">
+                                        <thead className="bg-muted">
+                                            <tr>
+                                                <th className="px-4 py-2 text-left text-xs font-semibold w-16">Sr.</th>
+                                                <th className="px-4 py-2 text-left text-xs font-semibold">Type</th>
+                                                <th className="px-4 py-2 text-left text-xs font-semibold">Query Description</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y">
+                                            {tqItems.map((item) => (
+                                                <tr key={item.id} className="hover:bg-muted/50">
+                                                    <td className="px-4 py-2 text-xs font-medium">{item.srNo}</td>
+                                                    <td className="px-4 py-2 text-xs">
+                                                        <Badge variant="outline" className="text-[10px]">
+                                                            {getTqTypeName(item.tqTypeId)}
+                                                        </Badge>
+                                                    </td>
+                                                    <td className="px-4 py-2 text-xs whitespace-pre-wrap break-words">
+                                                        {item.queryDescription}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
                         {/* TQ Reply Details */}
                         <div className="space-y-4">
                             <h4 className="font-semibold text-base text-primary border-b pb-2">
