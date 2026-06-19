@@ -15,6 +15,8 @@ import { useMarkAsNoTq, useTqManagement, useTqManagementDashboardCounts, useTqQu
 import { usePersistentTableState } from '@/hooks/usePersistentTableState';
 import type { ColDef } from 'ag-grid-community';
 import { AlertCircle, CheckCircle, Edit, Eye, FileCheck, FileX2, Search, Send, XCircle } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
+import { formatDateTime } from '@/hooks/useFormatedDate';
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTenderingPermissions } from '../hooks/useTenderingPermissions';
@@ -137,7 +139,7 @@ const TqManagementListPage = () => {
         {
             label: 'Reply TQ',
             onClick: (row: TqManagementDashboardRowWithTimer) => {
-                navigate(paths.tendering.tqReplied(row.tqId!));
+                navigate(paths.tendering.tqReplied(row.tenderId));
             },
             icon: <Send className="h-4 w-4" />,
             visible: (row) => row.tqStatus === 'TQ received' && row.tqId !== null,
@@ -145,7 +147,7 @@ const TqManagementListPage = () => {
         {
             label: 'TQ Missed',
             onClick: (row: TqManagementDashboardRowWithTimer) => {
-                navigate(paths.tendering.tqMissed(row.tqId!));
+                navigate(paths.tendering.tqMissed(row.tenderId));
             },
             icon: <XCircle className="h-4 w-4" />,
             visible: (row) => row.tqStatus === 'TQ received' && row.tqId !== null,
@@ -153,7 +155,7 @@ const TqManagementListPage = () => {
         {
             label: 'Edit TQ Received',
             onClick: (row: TqManagementDashboardRowWithTimer) => {
-                navigate(paths.tendering.tqEditReceived(row.tqId!));
+                navigate(paths.tendering.tqEditReceived(row.tenderId));
             },
             icon: <Edit className="h-4 w-4" />,
             visible: (row) => row.tqStatus === 'TQ received' && row.tqId !== null,
@@ -161,7 +163,7 @@ const TqManagementListPage = () => {
         {
             label: 'Edit Submit TQ',
             onClick: (row: TqManagementDashboardRowWithTimer) => {
-                navigate(paths.tendering.tqEditReplied(row.tqId!));
+                navigate(paths.tendering.tqEditReplied(row.tenderId));
             },
             icon: <Edit className="h-4 w-4" />,
             visible: (row) => row.tqStatus === 'TQ replied' && row.tqId !== null,
@@ -169,7 +171,7 @@ const TqManagementListPage = () => {
         {
             label: 'Edit TQ Missed',
             onClick: (row: TqManagementDashboardRowWithTimer) => {
-                navigate(paths.tendering.tqEditMissed(row.tqId!));
+                navigate(paths.tendering.tqEditMissed(row.tenderId));
             },
             icon: <Edit className="h-4 w-4" />,
             visible: (row) => hasTenderingPermission && row.tqStatus === 'Disqualified, TQ missed' && row.tqId !== null,
@@ -290,8 +292,37 @@ const TqManagementListPage = () => {
             sortable: true,
             cellRenderer: (params: any) => {
                 const count = params.value;
-                if (count > 0) {
-                    return <Badge variant="outline">{count}</Badge>;
+                const tqData = params.data?.tqTooltipData;
+                if (count > 0 && tqData?.length > 0) {
+                    return (
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger>
+                                    <Badge variant="outline" className="cursor-pointer">{count}</Badge>
+                                </TooltipTrigger>
+                                <TooltipContent className="w-50 bg-accent" side="right" align="start">
+                                    <div className="space-y-2">
+                                        {tqData.map((tq: any) => (
+                                            <div key={tq.seqNo} className="border-b last:border-0 pb-2 last:pb-0">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <Badge variant="outline" className="text-[10px]">TQ #{tq.seqNo}</Badge>
+                                                    <Badge variant='secondary' className="text-[10px]">
+                                                        {tq.status}
+                                                    </Badge>
+                                                </div>
+                                                <div className="text-xs text-muted-foreground mb-0.5">
+                                                    {tq.receivedAt ? formatDateTime(tq.receivedAt) : '—'}
+                                                </div>
+                                                <div className="text-xs font-medium">
+                                                    {tq.typeNames?.join(', ') || '—'}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    );
                 }
                 return count;
             },

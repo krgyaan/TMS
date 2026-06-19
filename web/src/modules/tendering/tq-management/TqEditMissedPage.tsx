@@ -1,34 +1,56 @@
-import { paths } from '@/app/routes/paths';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useTqById } from '@/hooks/api/useTqManagement';
-import { AlertCircle } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useParams } from 'react-router-dom';
 import TqMissedForm from './components/TqMissedForm';
+import TqSelector from './components/TqSelector';
+import { useTqByTender } from '@/hooks/api/useTqManagement';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle } from 'lucide-react';
 
 export default function TqEditMissedPage() {
-    const { id } = useParams<{ id: string }>();
-    const navigate = useNavigate();
-    const { data: tqData, isLoading: tqLoading } = useTqById(Number(id));
+    const { tenderId } = useParams<{ tenderId: string }>();
+    const parsedTenderId = Number(tenderId);
+    const { data: allTqs, isLoading: tqsLoading } = useTqByTender(parsedTenderId);
+    const [selectedTqId, setSelectedTqId] = useState<number | null>(null);
 
-    if (tqLoading) return <Skeleton className="h-[800px]" />;
-    if (!tqData) return (
-        <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-                TQ not found or failed to load.
-            </AlertDescription>
-            <Button variant="outline" size="sm" onClick={() => navigate(paths.tendering.tqManagement)}>
-                Back to List
-            </Button>
-        </Alert>
-    );
+    const filteredTqs = (allTqs || []).filter(tq => tq.status === 'Disqualified, TQ missed');
+
+    useEffect(() => {
+        if (filteredTqs.length === 1 && !selectedTqId) {
+            setSelectedTqId(filteredTqs[0].id);
+        }
+    }, [filteredTqs, selectedTqId]);
+
+    const selectedTq = allTqs?.find(tq => tq.id === selectedTqId) ?? null;
+
+    if (tqsLoading) return <Skeleton className="h-[800px]" />;
+
+    if (filteredTqs.length === 0) {
+        return (
+            <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                    No TQ records with "Disqualified, TQ missed" status found for this tender.
+                </AlertDescription>
+            </Alert>
+        );
+    }
 
     return (
-        <TqMissedForm
-            tqData={tqData}
-            mode="edit"
-        />
+        <div className="space-y-6">
+            <TqSelector
+                tqs={filteredTqs}
+                selectedTqId={selectedTqId}
+                onSelect={(tq) => setSelectedTqId(tq.id)}
+                label="Select Missed TQ to Edit"
+                emptyMessage="No TQ records with 'Disqualified, TQ missed' status found for this tender."
+            />
+            {selectedTq && (
+                <TqMissedForm
+                    tqData={selectedTq}
+                    mode="edit"
+                />
+            )}
+        </div>
     );
 }
