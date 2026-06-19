@@ -8,7 +8,7 @@ import { users } from '@db/schemas/auth/users.schema';
 import { items } from '@db/schemas/master/items.schema';
 import { bidSubmissions } from '@db/schemas/tendering/bid-submissions.schema';
 import { tenderQueries } from '@db/schemas/tendering/tender-queries.schema';
-import { tenderQueryItems, tenderResults } from '@db/schemas/tendering';
+import { tenderQueryItems, tenderResults, tqTypes } from '@db/schemas/tendering';
 import { teams } from '@db/schemas/master/teams.schema';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
@@ -38,6 +38,13 @@ export type TqManagementFilters = {
     sortOrder?: 'asc' | 'desc';
 };
 
+export type TqTooltipItem = {
+    seqNo: number;
+    status: string;
+    receivedAt: Date | null;
+    typeNames: string[];
+}
+
 export type TqManagementDashboardRow = {
     tenderId: number;
     tenderNo: string;
@@ -51,6 +58,7 @@ export type TqManagementDashboardRow = {
     tqId: number | null;
     tqCount: number;
     bidSubmissionId: number | null;
+    tqTooltipData: TqTooltipItem[];
 }
 
 @Injectable()
@@ -342,8 +350,61 @@ export class TqManagementService {
             tqSubmissionDeadline: row.tqSubmissionDeadline ?? null,
             bidSubmissionId: row.bidSubmissionId,
             tqCount: row.tqCount ?? 0,
+            tqTooltipData: [],
         }));
 
+        // Fetch TQ tooltip data for the current page's tenders
+        const pageTenderIds = result.map(r => r.tenderId).filter(Boolean);
+        if (pageTenderIds.length > 0) {
+            const tooltipRows = await this.db
+                .select({
+                    tenderId: tenderQueries.tenderId,
+                    tqId: tenderQueries.id,
+                    status: tenderQueries.status,
+                    receivedAt: tenderQueries.receivedAt,
+                    createdAt: tenderQueries.createdAt,
+                    srNo: tenderQueryItems.srNo,
+                    typeName: tqTypes.name,
+                })
+                .from(tenderQueries)
+                .leftJoin(tenderQueryItems, eq(tenderQueryItems.tenderQueryId, tenderQueries.id))
+                .leftJoin(tqTypes, eq(tqTypes.id, tenderQueryItems.tqTypeId))
+                .where(inArray(tenderQueries.tenderId, pageTenderIds))
+                .orderBy(tenderQueries.createdAt, tenderQueryItems.srNo);
+
+            // Build tooltip data per tender
+            const tooltipMap = new Map<number, TqTooltipItem[]>();
+            const tqSeen = new Map<string, number>();
+
+            for (const tqRow of tooltipRows) {
+                if (!tooltipMap.has(tqRow.tenderId)) {
+                    tooltipMap.set(tqRow.tenderId, []);
+                }
+                const tenderTqs = tooltipMap.get(tqRow.tenderId)!;
+                const tqKey = `${tqRow.tenderId}-${tqRow.tqId}`;
+                let entryIdx = tqSeen.get(tqKey);
+
+                if (entryIdx === undefined) {
+                    entryIdx = tenderTqs.length;
+                    tqSeen.set(tqKey, entryIdx);
+                    tenderTqs.push({
+                        seqNo: entryIdx + 1,
+                        status: tqRow.status ?? '',
+                        receivedAt: tqRow.receivedAt,
+                        typeNames: [],
+                    });
+                }
+
+                if (tqRow.typeName && !tenderTqs[entryIdx].typeNames.includes(tqRow.typeName)) {
+                    tenderTqs[entryIdx].typeNames.push(tqRow.typeName);
+                }
+            }
+
+            // Attach tooltip data to each dashboard row
+            for (const row of result) {
+                row.tqTooltipData = tooltipMap.get(row.tenderId) ?? [];
+            }
+        }
 
         return wrapPaginatedResponse(result, total, page, limit);
     }
