@@ -33,19 +33,6 @@ const normalizeCredentials = (credentials: CredentialPayload): GoogleTokenPayloa
     };
 };
 
-/**
- * Merge and deduplicate scope arrays
- * Combines existing scopes with newly granted scopes, removing duplicates
- */
-const mergeScopes = (existingScopes: string | null | undefined, newScopes: string | null | undefined): string => {
-    const existing = existingScopes ? existingScopes.split(/\s+/).filter(Boolean) : [];
-    const newlyGranted = newScopes ? newScopes.split(/\s+/).filter(Boolean) : [];
-
-    // Combine and deduplicate
-    const merged = [...new Set([...existing, ...newlyGranted])];
-    return merged.join(" ");
-};
-
 export type GoogleConnection = {
     id: number;
     userId: number;
@@ -194,9 +181,12 @@ export class GoogleService {
         let stored: OauthAccount;
 
         if (existing.length) {
-            // Merge existing scopes with newly granted scopes
+            // Use actual scopes from this token exchange, not a merge of old+new.
+            // If the token was obtained through a login flow (no Drive scopes), the stored
+            // scopes should reflect that. Otherwise checkUserHasDriveScopes returns false
+            // positives, leading to "Insufficient Permission" errors at runtime.
             const current = existing[0];
-            const mergedScopes = mergeScopes(current.scopes, tokens.scope ?? this.config.scopes.join(" "));
+            const actualScopes = tokens.scope ?? this.config.scopes.join(" ");
 
             const updated = await this.db
                 .update(oauthAccounts)
@@ -207,7 +197,7 @@ export class GoogleService {
                     accessToken: tokens.accessToken ?? current.accessToken,
                     refreshToken: tokens.refreshToken ?? current.refreshToken,
                     expiresAt,
-                    scopes: mergedScopes,
+                    scopes: actualScopes,
                     rawPayload: profile as Record<string, unknown>,
                     updatedAt: now,
                 })
