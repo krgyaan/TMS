@@ -260,6 +260,20 @@
       "when": 1748900000000,
       "tag": "0067_fix_payment_instrument_default_status",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1781940291054,
+      "tag": "0070_add_tender_costing_details",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1781940292054,
+      "tag": "0071_drop_old_costing_sheet_columns",
+      "breakpoints": true
     }
   ]
 }

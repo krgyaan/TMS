@@ -20,6 +20,8 @@ export * from './tender-info-sheet.relations';
 
 // Tender Costing
 export * from './tender-costing-sheets.schema';
+export * from './tender-costing-details.schema';
+export * from './tender-costing-details.relations';
 
 // Tender Checklists
 export * from './tender-document-checklists.schema';
