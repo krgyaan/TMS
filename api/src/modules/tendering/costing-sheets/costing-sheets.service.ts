@@ -8,6 +8,7 @@ import { users } from '@db/schemas/auth/users.schema';
 import { items } from '@db/schemas/master/items.schema';
 import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
 import { tenderCostingSheets } from '@db/schemas/tendering/tender-costing-sheets.schema';
+import { tenderCostingDetails } from '@db/schemas/tendering/tender-costing-details.schema';
 import { tenderStatusHistory } from '@db/schemas/tendering/tender-status-history.schema';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
@@ -65,27 +66,22 @@ export class CostingSheetsService {
     ) { }
 
     private determineCostingStatus(
-        costingSheetId: number | null,
-        costingSheetStatus: string | null
+        detailId: number | null,
+        detailStatus: string | null
     ): 'Pending' | 'Created' | 'Submitted' | 'Approved' | 'Rejected/Redo' {
-        if (!costingSheetId) {
+        if (!detailId) {
             return 'Pending';
         }
-        if (!costingSheetStatus) {
+        if (!detailStatus) {
             return 'Created';
         }
-        return costingSheetStatus as 'Submitted' | 'Approved' | 'Rejected/Redo';
+        return detailStatus as 'Submitted' | 'Approved' | 'Rejected/Redo';
     }
 
-    /**
-     * Get dashboard data by tab - Direct queries without config
-     */
-    
     private buildDashboardConditions(user?: ValidatedUser, teamId?: number, tab?: string): any[] {
         const baseCondition = TenderInfosService.getActiveCondition();
         const baseConditions = [baseCondition, TenderInfosService.getApprovedCondition()];
 
-        // Apply role-based filtering
         const roleFilterConditions: any[] = [];
         if (user && user.roleId) {
             if (user.dataScope === 'all') {
@@ -115,22 +111,24 @@ export class CostingSheetsService {
 
         if (tab === 'pending') {
             conditions.push(TenderInfosService.getExcludeStatusCondition(['lost']));
-            conditions.push(or(inArray(tenderCostingSheets.status, ['Pending', 'Rejected/Redo']),
-                isNull(tenderCostingSheets.submittedFinalPrice)) as any);
+            conditions.push(or(
+                inArray(tenderCostingDetails.status, ['Pending', 'Rejected/Redo']),
+                isNull(tenderCostingDetails.submittedFinalPrice)
+            ) as any);
             conditions.push(or(ne(bidSubmissions.status, 'Tender Missed'), isNull(bidSubmissions)));
         } else if (tab === 'submitted') {
             conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb']));
-            conditions.push(or(eq(tenderCostingSheets.status, 'Submitted'),
-                isNotNull(tenderCostingSheets.submittedFinalPrice)) as any);
+            conditions.push(or(
+                eq(tenderCostingDetails.status, 'Submitted'),
+                isNotNull(tenderCostingDetails.submittedFinalPrice)
+            ) as any);
             conditions.push(or(ne(bidSubmissions.status, 'Tender Missed'), isNull(bidSubmissions)));
         } else if (tab === 'tender-dnb') {
             conditions.push(eq(bidSubmissions.status, 'Tender Missed'));
-            // conditions.push(isNotNull(tenderCostingSheets.id));
         }
 
         return conditions;
     }
-
 
     async getDashboardData(
         tabKey?: 'pending' | 'submitted' | 'tender-dnb',
@@ -143,14 +141,13 @@ export class CostingSheetsService {
         const offset = (page - 1) * limit;
 
         const activeTab = tabKey || 'pending';
-        
+
         if (!['pending', 'submitted', 'tender-dnb'].includes(activeTab)) {
             throw new BadRequestException(`Invalid tab: ${activeTab}`);
         }
 
         const conditions = this.buildDashboardConditions(user, teamId, activeTab);
 
-        // Add search conditions
         if (filters?.search) {
             const searchStr = `%${filters.search}%`;
             conditions.push(
@@ -166,10 +163,9 @@ export class CostingSheetsService {
 
         const whereClause = and(...conditions);
 
-        // Build orderBy clause
         const sortBy = filters?.sortBy;
-        const sortOrder = filters?.sortOrder || 'desc'; // Default to desc like Laravel
-        let orderByClause: any = desc(tenderInfos.dueDate); // Default to desc
+        const sortOrder = filters?.sortOrder || 'desc';
+        let orderByClause: any = desc(tenderInfos.dueDate);
 
         if (sortBy) {
             const sortFn = sortOrder === 'desc' ? desc : asc;
@@ -187,7 +183,7 @@ export class CostingSheetsService {
                     orderByClause = sortFn(tenderInfos.dueDate);
                     break;
                 case 'submissionDate':
-                    orderByClause = sortFn(tenderCostingSheets.createdAt);
+                    orderByClause = sortFn(tenderCostingDetails.createdAt);
                     break;
                 case 'statusChangeDate':
                     orderByClause = sortFn(tenderInfos.updatedAt);
@@ -203,7 +199,6 @@ export class CostingSheetsService {
             }
         }
 
-        // Get total count
         const [countResult] = await this.db
             .select({ count: sql<number>`count(distinct ${tenderInfos.id})` })
             .from(tenderInfos)
@@ -213,10 +208,10 @@ export class CostingSheetsService {
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
             .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+            .leftJoin(tenderCostingDetails, eq(tenderCostingDetails.tenderCostingSheetId, tenderCostingSheets.id))
             .where(whereClause);
         const total = Number(countResult?.count || 0);
 
-        // Get paginated data
         const rows = await this.db
             .select({
                 tenderId: tenderInfos.id,
@@ -230,9 +225,10 @@ export class CostingSheetsService {
                 emdAmount: tenderInfos.emd,
                 gstValues: tenderInfos.gstValues,
                 costingSheetId: tenderCostingSheets.id,
-                costingSheetStatus: tenderCostingSheets.status,
-                submittedFinalPrice: tenderCostingSheets.submittedFinalPrice,
-                submittedBudgetPrice: tenderCostingSheets.submittedBudgetPrice,
+                costingDetailId: tenderCostingDetails.id,
+                costingDetailStatus: tenderCostingDetails.status,
+                submittedFinalPrice: tenderCostingDetails.submittedFinalPrice,
+                submittedBudgetPrice: tenderCostingDetails.submittedBudgetPrice,
                 googleSheetUrl: tenderCostingSheets.googleSheetUrl,
             })
             .from(tenderInfos)
@@ -242,6 +238,7 @@ export class CostingSheetsService {
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
             .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+            .leftJoin(tenderCostingDetails, eq(tenderCostingDetails.tenderCostingSheetId, tenderCostingSheets.id))
             .where(whereClause)
             .orderBy(orderByClause)
             .limit(limit)
@@ -261,7 +258,7 @@ export class CostingSheetsService {
             dueDate: row.dueDate,
             emdAmount: row.emdAmount,
             gstValues: row.gstValues ? Number(row.gstValues) : 0,
-            costingStatus: this.determineCostingStatus(row.costingSheetId, row.costingSheetStatus),
+            costingStatus: this.determineCostingStatus(row.costingDetailId, row.costingDetailStatus),
             submittedFinalPrice: row.submittedFinalPrice,
             submittedBudgetPrice: row.submittedBudgetPrice,
             googleSheetUrl: row.googleSheetUrl,
@@ -282,6 +279,7 @@ export class CostingSheetsService {
                 .leftJoin(items, eq(items.id, tenderInfos.item))
                 .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
                 .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+                .leftJoin(tenderCostingDetails, eq(tenderCostingDetails.tenderCostingSheetId, tenderCostingSheets.id))
                 .where(and(...this.buildDashboardConditions(user, teamId, 'pending')))
                 .then(([result]) => Number(result?.count || 0)),
             this.db
@@ -293,6 +291,7 @@ export class CostingSheetsService {
                 .leftJoin(items, eq(items.id, tenderInfos.item))
                 .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
                 .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+                .leftJoin(tenderCostingDetails, eq(tenderCostingDetails.tenderCostingSheetId, tenderCostingSheets.id))
                 .where(and(...this.buildDashboardConditions(user, teamId, 'submitted')))
                 .then(([result]) => Number(result?.count || 0)),
             this.db
@@ -304,6 +303,7 @@ export class CostingSheetsService {
                 .leftJoin(items, eq(items.id, tenderInfos.item))
                 .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
                 .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
+                .leftJoin(tenderCostingDetails, eq(tenderCostingDetails.tenderCostingSheetId, tenderCostingSheets.id))
                 .where(and(...this.buildDashboardConditions(user, teamId, 'tender-dnb')))
                 .then(([result]) => Number(result?.count || 0)),
         ]);
@@ -317,68 +317,134 @@ export class CostingSheetsService {
     }
 
     async findByTenderId(tenderId: number) {
-        const result = await this.db
+        const [sheet] = await this.db
             .select()
             .from(tenderCostingSheets)
             .where(eq(tenderCostingSheets.tenderId, tenderId))
             .limit(1);
 
-        return result[0] || null;
+        if (!sheet[0]) return null;
+
+        const details = await this.db
+            .select()
+            .from(tenderCostingDetails)
+            .where(eq(tenderCostingDetails.tenderCostingSheetId, sheet[0].id))
+            .orderBy(asc(tenderCostingDetails.id));
+
+        return {
+            ...sheet[0],
+            details,
+        };
     }
 
     async findById(id: number) {
-        const result = await this.db
+        const [sheet] = await this.db
             .select()
             .from(tenderCostingSheets)
             .where(eq(tenderCostingSheets.id, id))
             .limit(1);
 
-        if (!result[0]) {
-            throw new NotFoundException('Costing sheet not found');
-        }
+        if (!sheet) throw new NotFoundException('Costing sheet not found');
 
-        return result[0];
+        const details = await this.db
+            .select()
+            .from(tenderCostingDetails)
+            .where(eq(tenderCostingDetails.tenderCostingSheetId, id))
+            .orderBy(asc(tenderCostingDetails.id));
+
+        return {
+            ...sheet,
+            details,
+        };
+    }
+
+    private normalizeDetails(data: any): any[] {
+        if (data.details && Array.isArray(data.details) && data.details.length > 0) {
+            return data.details.map((d: any) => ({
+                submittedFinalPrice: d.submittedFinalPrice,
+                submittedReceiptPrice: d.submittedReceiptPrice,
+                submittedBudgetPrice: d.submittedBudgetPrice,
+                submittedGrossMargin: d.submittedGrossMargin,
+                teRemarks: d.teRemarks,
+            }));
+        }
+        // Backward compat: single-field format
+        if (data.submittedFinalPrice) {
+            return [{
+                submittedFinalPrice: data.submittedFinalPrice,
+                submittedReceiptPrice: data.submittedReceiptPrice,
+                submittedBudgetPrice: data.submittedBudgetPrice,
+                submittedGrossMargin: data.submittedGrossMargin,
+                teRemarks: data.teRemarks,
+            }];
+        }
+        return [];
     }
 
     async create(data: {
         tenderId: number;
-        submittedFinalPrice: string;
-        submittedReceiptPrice: string;
-        submittedBudgetPrice: string;
-        submittedGrossMargin: string;
-        teRemarks: string;
+        details?: Array<{
+            submittedFinalPrice: string;
+            submittedReceiptPrice: string;
+            submittedBudgetPrice: string;
+            submittedGrossMargin: string;
+            teRemarks: string;
+        }>;
+        submittedFinalPrice?: string;
+        submittedReceiptPrice?: string;
+        submittedBudgetPrice?: string;
+        submittedGrossMargin?: string;
+        teRemarks?: string;
         submittedBy: number;
     }) {
-        // Get current tender status before update
         const currentTender = await this.tenderInfosService.findById(data.tenderId);
         const prevStatus = currentTender?.status ?? null;
+        const newStatus = 6;
+        const detailsInput = this.normalizeDetails(data);
 
-        // AUTO STATUS CHANGE: Update tender status to 6 (Price Bid ready) and track it
-        const newStatus = 6; // Status ID for "Price Bid ready"
+        if (detailsInput.length === 0) {
+            throw new BadRequestException('At least one costing detail is required');
+        }
+
+        // Ensure sheet exists
+        let [sheet] = await this.db
+            .select()
+            .from(tenderCostingSheets)
+            .where(eq(tenderCostingSheets.tenderId, data.tenderId))
+            .limit(1);
+
+        if (!sheet) {
+            [sheet] = await this.db
+                .insert(tenderCostingSheets)
+                .values({ tenderId: data.tenderId })
+                .returning();
+        }
 
         const result = await this.db.transaction(async (tx) => {
-            const costingSheet = await tx
-                .insert(tenderCostingSheets)
-                .values({
-                    tenderId: data.tenderId,
-                    submittedFinalPrice: data.submittedFinalPrice,
-                    submittedReceiptPrice: data.submittedReceiptPrice,
-                    submittedBudgetPrice: data.submittedBudgetPrice,
-                    submittedGrossMargin: data.submittedGrossMargin,
-                    teRemarks: data.teRemarks,
-                    submittedBy: data.submittedBy,
-                    status: 'Submitted',
-                    submittedAt: new Date(),
-                })
-                .returning();
+            const created: any[] = [];
+            for (const detail of detailsInput) {
+                const [d] = await tx
+                    .insert(tenderCostingDetails)
+                    .values({
+                        tenderCostingSheetId: sheet.id,
+                        submittedFinalPrice: detail.submittedFinalPrice,
+                        submittedReceiptPrice: detail.submittedReceiptPrice,
+                        submittedBudgetPrice: detail.submittedBudgetPrice,
+                        submittedGrossMargin: detail.submittedGrossMargin,
+                        teRemarks: detail.teRemarks,
+                        submittedBy: data.submittedBy,
+                        status: 'Submitted',
+                        submittedAt: new Date(),
+                    })
+                    .returning();
+                created.push(d);
+            }
 
-            // Update tender status
             await tx
                 .update(tenderInfos)
                 .set({ status: newStatus, updatedAt: new Date() })
                 .where(eq(tenderInfos.id, data.tenderId));
 
-            // Track status change
             await this.tenderStatusHistoryService.trackStatusChange(
                 data.tenderId,
                 newStatus,
@@ -388,15 +454,12 @@ export class CostingSheetsService {
                 tx
             );
 
-            return costingSheet;
+            return created;
         });
 
-        // Send email notification
         await this.sendCostingSheetSubmittedEmail(data.tenderId, result[0], data.submittedBy);
 
-        // TIMER TRANSITION: Stop costing_sheet timer
         try {
-            this.logger.log(`Stopping timer for tender ${data.tenderId} after costing sheet submitted`);
             await this.timersService.stopTimer({
                 entityType: 'TENDER',
                 entityId: data.tenderId,
@@ -404,60 +467,95 @@ export class CostingSheetsService {
                 userId: data.submittedBy,
                 reason: 'Costing sheet submitted'
             });
-            this.logger.log(`Successfully stopped costing_sheet timer for tender ${data.tenderId}`);
         } catch (error) {
-            this.logger.error(`Failed to stop timer for tender ${data.tenderId} after costing sheet submitted:`, error);
-            // Don't fail the entire operation if timer transition fails
+            this.logger.error(`Failed to stop timer: ${error}`);
         }
 
-        return result[0];
+        return result;
     }
 
     async update(id: number, data: {
+        details?: Array<{
+            submittedFinalPrice?: string;
+            submittedReceiptPrice?: string;
+            submittedBudgetPrice?: string;
+            submittedGrossMargin?: string;
+            teRemarks?: string;
+        }>;
         submittedFinalPrice?: string;
         submittedReceiptPrice?: string;
         submittedBudgetPrice?: string;
         submittedGrossMargin?: string;
         teRemarks?: string;
     }, changedBy: number) {
-        // Get costing sheet to find tenderId
-        const costingSheet = await this.findById(id);
+        const [sheet] = await this.db
+            .select()
+            .from(tenderCostingSheets)
+            .where(eq(tenderCostingSheets.id, id))
+            .limit(1);
 
-        // Get current tender status before update
-        const currentTender = await this.tenderInfosService.findById(costingSheet.tenderId);
+        if (!sheet) throw new NotFoundException('Costing sheet not found');
+
+        const currentTender = await this.tenderInfosService.findById(sheet.tenderId);
         const prevStatus = currentTender?.status ?? null;
+        const newStatus = 6;
+        const detailsInput = this.normalizeDetails(data);
 
-        // AUTO STATUS CHANGE: Update tender status to 6 (Price Bid ready) when resubmitted
-        const newStatus = 6; // Status ID for "Price Bid ready"
+        if (detailsInput.length === 0) {
+            throw new BadRequestException('At least one costing detail is required');
+        }
 
-        const updateData: any = {
-            status: 'Submitted',
-            submittedAt: new Date(),
-            updatedAt: new Date(),
-        };
-
-        if (data.submittedFinalPrice !== undefined) updateData.submittedFinalPrice = data.submittedFinalPrice;
-        if (data.submittedReceiptPrice !== undefined) updateData.submittedReceiptPrice = data.submittedReceiptPrice;
-        if (data.submittedBudgetPrice !== undefined) updateData.submittedBudgetPrice = data.submittedBudgetPrice;
-        if (data.submittedGrossMargin !== undefined) updateData.submittedGrossMargin = data.submittedGrossMargin;
-        if (data.teRemarks !== undefined) updateData.teRemarks = data.teRemarks;
+        const existingDetails = await this.db
+            .select()
+            .from(tenderCostingDetails)
+            .where(eq(tenderCostingDetails.tenderCostingSheetId, id))
+            .orderBy(asc(tenderCostingDetails.id));
 
         const [result] = await this.db.transaction(async (tx) => {
-            const updated = await tx
-                .update(tenderCostingSheets)
-                .set(updateData)
-                .where(eq(tenderCostingSheets.id, id))
-                .returning();
+            const updated: any[] = [];
 
-            // Update tender status
+            for (let i = 0; i < detailsInput.length; i++) {
+                const detailData = detailsInput[i];
+                const updateFields: any = {
+                    status: 'Submitted',
+                    submittedAt: new Date(),
+                    updatedAt: new Date(),
+                };
+                if (detailData.submittedFinalPrice !== undefined) updateFields.submittedFinalPrice = detailData.submittedFinalPrice;
+                if (detailData.submittedReceiptPrice !== undefined) updateFields.submittedReceiptPrice = detailData.submittedReceiptPrice;
+                if (detailData.submittedBudgetPrice !== undefined) updateFields.submittedBudgetPrice = detailData.submittedBudgetPrice;
+                if (detailData.submittedGrossMargin !== undefined) updateFields.submittedGrossMargin = detailData.submittedGrossMargin;
+                if (detailData.teRemarks !== undefined) updateFields.teRemarks = detailData.teRemarks;
+
+                if (i < existingDetails.length) {
+                    // Update existing detail
+                    const [d] = await tx
+                        .update(tenderCostingDetails)
+                        .set(updateFields)
+                        .where(eq(tenderCostingDetails.id, existingDetails[i].id))
+                        .returning();
+                    updated.push(d);
+                } else {
+                    // Insert new detail
+                    const [d] = await tx
+                        .insert(tenderCostingDetails)
+                        .values({
+                            tenderCostingSheetId: id,
+                            ...updateFields,
+                            submittedBy: changedBy,
+                        })
+                        .returning();
+                    updated.push(d);
+                }
+            }
+
             await tx
                 .update(tenderInfos)
                 .set({ status: newStatus, updatedAt: new Date() })
-                .where(eq(tenderInfos.id, costingSheet.tenderId));
+                .where(eq(tenderInfos.id, sheet.tenderId));
 
-            // Track status change
             await this.tenderStatusHistoryService.trackStatusChange(
-                costingSheet.tenderId,
+                sheet.tenderId,
                 newStatus,
                 changedBy,
                 prevStatus,
@@ -468,40 +566,116 @@ export class CostingSheetsService {
             return updated;
         });
 
-        // Send email notification
-        await this.sendCostingSheetSubmittedEmail(costingSheet.tenderId, result, changedBy);
+        await this.sendCostingSheetSubmittedEmail(sheet.tenderId, result[0], changedBy);
 
-        // TIMER TRANSITION: Stop costing_sheet timer if status is 'Submitted'
-        if (updateData.status === 'Submitted') {
-            try {
-                this.logger.log(`Stopping timer for tender ${costingSheet.tenderId} after costing sheet resubmitted`);
-                await this.timersService.stopTimer({
-                    entityType: 'TENDER',
-                    entityId: costingSheet.tenderId,
-                    stage: 'costing_sheet',
-                    userId: changedBy,
-                    reason: 'Costing sheet resubmitted'
-                });
-                this.logger.log(`Successfully stopped costing_sheet timer for tender ${costingSheet.tenderId}`);
-            } catch (error) {
-                this.logger.error(`Failed to stop timer for tender ${costingSheet.tenderId} after costing sheet resubmitted:`, error);
-                // Don't fail the entire operation if timer transition fails
-            }
+        try {
+            await this.timersService.stopTimer({
+                entityType: 'TENDER',
+                entityId: sheet.tenderId,
+                stage: 'costing_sheet',
+                userId: changedBy,
+                reason: 'Costing sheet resubmitted'
+            });
+        } catch (error) {
+            this.logger.error(`Failed to stop timer: ${error}`);
         }
 
         return result;
     }
 
-    /**
- * Check user's Drive scope status
- */
+    async addDetail(sheetId: number, data: {
+        submittedFinalPrice: string;
+        submittedReceiptPrice: string;
+        submittedBudgetPrice: string;
+        submittedGrossMargin: string;
+        teRemarks: string;
+    }, submittedBy: number) {
+        const [sheet] = await this.db
+            .select()
+            .from(tenderCostingSheets)
+            .where(eq(tenderCostingSheets.id, sheetId))
+            .limit(1);
+
+        if (!sheet) throw new NotFoundException('Costing sheet not found');
+
+        const [detail] = await this.db
+            .insert(tenderCostingDetails)
+            .values({
+                tenderCostingSheetId: sheetId,
+                submittedFinalPrice: data.submittedFinalPrice,
+                submittedReceiptPrice: data.submittedReceiptPrice,
+                submittedBudgetPrice: data.submittedBudgetPrice,
+                submittedGrossMargin: data.submittedGrossMargin,
+                teRemarks: data.teRemarks,
+                submittedBy,
+                status: 'Submitted',
+                submittedAt: new Date(),
+            })
+            .returning();
+
+        return detail;
+    }
+
+    async removeDetail(detailId: number) {
+        const [detail] = await this.db
+            .select()
+            .from(tenderCostingDetails)
+            .where(eq(tenderCostingDetails.id, detailId))
+            .limit(1);
+
+        if (!detail) throw new NotFoundException('Costing detail not found');
+        if (detail.status !== 'Pending' && detail.status !== 'Rejected/Redo') {
+            throw new BadRequestException('Can only remove pending or rejected details');
+        }
+
+        await this.db
+            .delete(tenderCostingDetails)
+            .where(eq(tenderCostingDetails.id, detailId));
+
+        return { success: true };
+    }
+
+    async getCombinedPricing(tenderId: number): Promise<{
+        totalFinalPrice: string | null;
+        totalReceiptPrice: string | null;
+        totalBudgetPrice: string | null;
+        detailsCount: number;
+        approvedCount: number;
+    }> {
+        const sheet = await this.db
+            .select({ id: tenderCostingSheets.id })
+            .from(tenderCostingSheets)
+            .where(eq(tenderCostingSheets.tenderId, tenderId))
+            .limit(1);
+
+        if (!sheet[0]) {
+            return { totalFinalPrice: null, totalReceiptPrice: null, totalBudgetPrice: null, detailsCount: 0, approvedCount: 0 };
+        }
+
+        const result = await this.db
+            .select({
+                totalFinalPrice: sql<string>`SUM(${tenderCostingDetails.finalPrice})`,
+                totalReceiptPrice: sql<string>`SUM(${tenderCostingDetails.receiptPrice})`,
+                totalBudgetPrice: sql<string>`SUM(${tenderCostingDetails.budgetPrice})`,
+                detailsCount: sql<number>`count(*)`,
+                approvedCount: sql<number>`COUNT(*) FILTER (WHERE ${tenderCostingDetails.status} = 'Approved')`,
+            })
+            .from(tenderCostingDetails)
+            .where(eq(tenderCostingDetails.tenderCostingSheetId, sheet[0].id));
+
+        return {
+            totalFinalPrice: result[0]?.totalFinalPrice ?? null,
+            totalReceiptPrice: result[0]?.totalReceiptPrice ?? null,
+            totalBudgetPrice: result[0]?.totalBudgetPrice ?? null,
+            detailsCount: Number(result[0]?.detailsCount ?? 0),
+            approvedCount: Number(result[0]?.approvedCount ?? 0),
+        };
+    }
+
     async checkDriveScopes(userId: number) {
         return this.googleDriveService.checkUserHasDriveScopes(userId);
     }
 
-    /**
-     * Create Google Sheet for a tender
-     */
     async createGoogleSheet(tenderId: number, userId: number): Promise<{
         success: boolean;
         sheetUrl?: string;
@@ -511,31 +685,23 @@ export class CostingSheetsService {
         existingSheetUrl?: string;
         suggestedName?: string;
     }> {
-        // 1. Get tender details
         const tender = await this.tenderInfosService.findById(tenderId);
-        if (!tender) {
-            throw new NotFoundException(`Tender with ID ${tenderId} not found`);
-        }
+        if (!tender) throw new NotFoundException(`Tender with ID ${tenderId} not found`);
 
         const teamId = tender.team;
         const sheetName = tender.tenderName;
 
-        // 2. Check team config
         const teamConfig = this.googleDriveService.getTeamConfig(teamId);
-        if (!teamConfig) {
-            throw new BadRequestException(
-                `Team ${teamId} is not configured for Google Drive integration`,
-            );
-        }
+        if (!teamConfig) throw new BadRequestException(`Team ${teamId} is not configured for Google Drive integration`);
+        if (!teamConfig.folderId) throw new BadRequestException(`Google Drive folder not configured for team "${teamConfig.teamName}"`);
 
-        if (!teamConfig.folderId) {
-            throw new BadRequestException(
-                `Google Drive folder not configured for team "${teamConfig.teamName}". Please contact administrator.`,
-            );
-        }
+        const existingSheet = await this.db
+            .select()
+            .from(tenderCostingSheets)
+            .where(eq(tenderCostingSheets.tenderId, tenderId))
+            .limit(1)
+            .then(r => r[0] || null);
 
-        // 3. Check if costing sheet already exists for this tender
-        const existingSheet = await this.findByTenderId(tenderId);
         if (existingSheet?.googleSheetUrl) {
             return {
                 success: false,
@@ -545,58 +711,34 @@ export class CostingSheetsService {
             };
         }
 
-        // 4. Check for duplicate name in Drive folder
         let duplicateCheck;
         try {
-            duplicateCheck = await this.googleDriveService.checkDuplicateInFolder(
-                userId,
-                teamId,
-                sheetName,
-            );
+            duplicateCheck = await this.googleDriveService.checkDuplicateInFolder(userId, teamId, sheetName);
         } catch (error) {
             this.logger.error(`Error checking for duplicate sheet: ${error instanceof Error ? error.message : String(error)}`);
-            throw new BadRequestException(
-                `Failed to check for duplicate sheet: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            );
+            throw new BadRequestException(`Failed to check for duplicate sheet: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
 
         if (duplicateCheck.isDuplicate) {
             return {
                 success: false,
                 isDuplicate: true,
-                message: `A costing sheet with name "${sheetName}" already exists in the folder.`,
+                message: `A costing sheet with name "${sheetName}" already exists.`,
                 existingSheetUrl: duplicateCheck.existingSheetUrl,
                 suggestedName: duplicateCheck.suggestedName,
             };
         }
 
-        // 5. Create the Google Sheet
         let sheetResult;
         try {
-            sheetResult = await this.googleDriveService.createSheet(
-                userId,
-                teamId,
-                sheetName,
-            );
+            sheetResult = await this.googleDriveService.createSheet(userId, teamId, sheetName);
         } catch (error) {
-            this.logger.error(`Error creating Google Sheet: ${error instanceof Error ? error.message : String(error)}`);
-            // Re-throw NestJS exceptions (BadRequestException, ForbiddenException, NotFoundException, etc.)
-            if (error instanceof BadRequestException ||
-                error instanceof NotFoundException ||
-                error instanceof ForbiddenException) {
-                throw error;
-            }
-            // Wrap other errors
-            throw new BadRequestException(
-                `Failed to create Google Sheet: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            );
+            if (error instanceof BadRequestException || error instanceof NotFoundException || error instanceof ForbiddenException) throw error;
+            throw new BadRequestException(`Failed to create Google Sheet: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
 
-        // 6. Save to database
         const now = new Date();
-
         if (existingSheet) {
-            // Update existing record
             await this.db
                 .update(tenderCostingSheets)
                 .set({
@@ -610,7 +752,6 @@ export class CostingSheetsService {
                 })
                 .where(eq(tenderCostingSheets.id, existingSheet.id));
         } else {
-            // Create new record
             await this.db.insert(tenderCostingSheets).values({
                 tenderId,
                 googleSheetId: sheetResult.sheetId,
@@ -622,64 +763,34 @@ export class CostingSheetsService {
             });
         }
 
-        this.logger.log(
-            `Created costing sheet for tender ${tenderId}: ${sheetResult.sheetUrl}`,
-        );
-
-        return {
-            success: true,
-            sheetUrl: sheetResult.sheetUrl,
-            sheetId: sheetResult.sheetId,
-        };
+        return { success: true, sheetUrl: sheetResult.sheetUrl, sheetId: sheetResult.sheetId };
     }
 
-    /**
-     * Create Google Sheet with a custom name (for duplicate resolution)
-     */
-    async createGoogleSheetWithName(
-        tenderId: number,
-        userId: number,
-        customName: string,
-    ): Promise<{
+    async createGoogleSheetWithName(tenderId: number, userId: number, customName: string): Promise<{
         success: boolean;
         sheetUrl?: string;
         sheetId?: string;
         message?: string;
     }> {
-        // 1. Get tender details
         const tender = await this.tenderInfosService.findById(tenderId);
-        if (!tender) {
-            throw new NotFoundException(`Tender with ID ${tenderId} not found`);
-        }
+        if (!tender) throw new NotFoundException(`Tender with ID ${tenderId} not found`);
 
         const teamId = tender.team;
-
-        // 2. Check team config
         const teamConfig = this.googleDriveService.getTeamConfig(teamId);
-        if (!teamConfig || !teamConfig.folderId) {
-            throw new BadRequestException(
-                `Google Drive not configured for this team`,
-            );
-        }
+        if (!teamConfig || !teamConfig.folderId) throw new BadRequestException(`Google Drive not configured for this team`);
 
-        // 3. Check if costing sheet already exists
-        const existingSheet = await this.findByTenderId(tenderId);
+        const existingSheet = await this.db
+            .select()
+            .from(tenderCostingSheets)
+            .where(eq(tenderCostingSheets.tenderId, tenderId))
+            .limit(1)
+            .then(r => r[0] || null);
+
         if (existingSheet?.googleSheetUrl) {
-            return {
-                success: false,
-                message: 'Costing sheet already exists for this tender',
-                sheetUrl: existingSheet.googleSheetUrl,
-            };
+            return { success: false, message: 'Costing sheet already exists for this tender', sheetUrl: existingSheet.googleSheetUrl };
         }
 
-        // 4. Create the Google Sheet with custom name
-        const sheetResult = await this.googleDriveService.createSheet(
-            userId,
-            teamId,
-            customName,
-        );
-
-        // 5. Save to database
+        const sheetResult = await this.googleDriveService.createSheet(userId, teamId, customName);
         const now = new Date();
 
         if (existingSheet) {
@@ -707,16 +818,9 @@ export class CostingSheetsService {
             });
         }
 
-        return {
-            success: true,
-            sheetUrl: sheetResult.sheetUrl,
-            sheetId: sheetResult.sheetId,
-        };
+        return { success: true, sheetUrl: sheetResult.sheetUrl, sheetId: sheetResult.sheetId };
     }
 
-    /**
-     * Helper method to send email notifications
-     */
     private async sendEmail(
         eventType: string,
         tenderId: number,
@@ -728,33 +832,32 @@ export class CostingSheetsService {
     ) {
         try {
             await this.emailService.sendTenderEmail({
-                tenderId,
-                eventType,
-                fromUserId,
+                tenderId, eventType, fromUserId,
                 to: recipients.to || [],
                 cc: recipients.cc,
-                subject,
-                template,
-                data,
+                subject, template, data,
             });
         } catch (error) {
             this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
-            // Don't throw - email failure shouldn't break main operation
         }
     }
 
-    /**
-     * Send costing sheet submitted email
-     */
     private async sendCostingSheetSubmittedEmail(
         tenderId: number,
-        costingSheet: { googleSheetUrl: string | null; submittedFinalPrice: string | null; submittedReceiptPrice: string | null; submittedBudgetPrice: string | null; submittedGrossMargin: string | null; teRemarks: string | null },
+        costingDetail: { googleSheetUrl?: string | null; submittedFinalPrice: string | null; submittedReceiptPrice: string | null; submittedBudgetPrice: string | null; submittedGrossMargin: string | null; teRemarks: string | null },
         submittedBy: number
     ) {
+        // Get sheet URL if available
+        const sheet = await this.db
+            .select({ googleSheetUrl: tenderCostingSheets.googleSheetUrl })
+            .from(tenderCostingSheets)
+            .where(eq(tenderCostingSheets.tenderId, tenderId))
+            .limit(1)
+            .then(r => r[0] || null);
+
         const tender = await this.tenderInfosService.findById(tenderId);
         if (!tender || !tender.teamMember) return;
 
-        // Get Team Leader name
         const teamLeaderEmails = await this.recipientResolver.getEmailsByRole('Team Leader', tender.team);
         let tlName = 'Team Leader';
         if (teamLeaderEmails.length > 0) {
@@ -763,27 +866,15 @@ export class CostingSheetsService {
                 .from(users)
                 .where(eq(users.email, teamLeaderEmails[0]))
                 .limit(1);
-            if (tlUser?.name) {
-                tlName = tlUser.name;
-            }
+            if (tlUser?.name) tlName = tlUser.name;
         }
 
-        // Get TE name
         const teUser = await this.recipientResolver.getUserById(tender.teamMember);
         const teName = teUser?.name || 'Tender Executive';
 
-        // Format due date and time
-        const dueDate = tender.dueDate ? new Date(tender.dueDate).toLocaleDateString('en-IN', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-        }) : 'Not specified';
-        const dueTime = tender.dueDate ? new Date(tender.dueDate).toLocaleTimeString('en-IN', {
-            hour: '2-digit',
-            minute: '2-digit',
-        }) : 'Not specified';
+        const dueDate = tender.dueDate ? new Date(tender.dueDate).toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Not specified';
+        const dueTime = tender.dueDate ? new Date(tender.dueDate).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : 'Not specified';
 
-        // Format currency values
         const formatCurrency = (value: string | null) => {
             if (!value) return '₹0';
             const num = Number(value);
@@ -793,30 +884,22 @@ export class CostingSheetsService {
         const emailData = {
             tlName,
             tender_name: tender.tenderName,
-            costingSheetLink: costingSheet.googleSheetUrl || '#',
+            costingSheetLink: sheet?.googleSheetUrl || '#',
             tenderValue: formatCurrency(tender.gstValues),
-            finalPrice: formatCurrency(costingSheet.submittedFinalPrice),
-            receipt: formatCurrency(costingSheet.submittedReceiptPrice),
-            budget: formatCurrency(costingSheet.submittedBudgetPrice),
-            grossMargin: costingSheet.submittedGrossMargin ? `${costingSheet.submittedGrossMargin}%` : '0%',
-            remarks: costingSheet.teRemarks || 'None',
-            dueDate,
-            dueTime,
-            teName,
+            finalPrice: formatCurrency(costingDetail.submittedFinalPrice),
+            receipt: formatCurrency(costingDetail.submittedReceiptPrice),
+            budget: formatCurrency(costingDetail.submittedBudgetPrice),
+            grossMargin: costingDetail.submittedGrossMargin ? `${costingDetail.submittedGrossMargin}%` : '0%',
+            remarks: costingDetail.teRemarks || 'None',
+            dueDate, dueTime, teName,
         };
 
-        await this.sendEmail(
-            'costing-sheet.submitted',
-            tenderId,
-            submittedBy,
+        await this.sendEmail('costing-sheet.submitted', tenderId, submittedBy,
             `Costing Sheet submitted - ${tender.tenderName}`,
-            'costing-sheet-submitted',
-            emailData,
+            'costing-sheet-submitted', emailData,
             {
                 to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
-                cc: [
-                    { type: 'role', role: 'Admin', teamId: tender.team },
-                ],
+                cc: [{ type: 'role', role: 'Admin', teamId: tender.team }],
             }
         );
     }

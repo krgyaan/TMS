@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, ParseIntPipe, Query, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, ParseIntPipe, Query, Logger } from '@nestjs/common';
 import { CostingSheetsService, type CostingSheetFilters } from '@/modules/tendering/costing-sheets/costing-sheets.service';
 import type { SubmitCostingSheetDto, UpdateCostingSheetDto, CreateSheetDto, CreateSheetWithNameDto } from './dto/costing-sheet.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
@@ -77,6 +77,11 @@ export class CostingSheetsController {
         return this.costingSheetsService.findByTenderId(tenderId);
     }
 
+    @Get('tender/:tenderId/combined')
+    getCombinedPricing(@Param('tenderId', ParseIntPipe) tenderId: number) {
+        return this.costingSheetsService.getCombinedPricing(tenderId);
+    }
+
     @Get(':id')
     findById(@Param('id', ParseIntPipe) id: number) {
         return this.costingSheetsService.findById(id);
@@ -84,7 +89,7 @@ export class CostingSheetsController {
 
     @Post()
     create(
-        @Body() dto: SubmitCostingSheetDto,
+        @Body() dto: any,
         @CurrentUser() user: ValidatedUser
     ) {
         return this.costingSheetsService.create({
@@ -96,10 +101,27 @@ export class CostingSheetsController {
     @Patch(':id')
     update(
         @Param('id', ParseIntPipe) id: number,
-        @Body() dto: UpdateCostingSheetDto,
+        @Body() dto: any,
         @CurrentUser() user: ValidatedUser
     ) {
         return this.costingSheetsService.update(id, dto, user.sub);
+    }
+
+    @Post(':id/add-detail')
+    addDetail(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() dto: any,
+        @CurrentUser() user: ValidatedUser
+    ) {
+        return this.costingSheetsService.addDetail(id, dto, user.sub);
+    }
+
+    @Delete(':sheetId/details/:detailId')
+    removeDetail(
+        @Param('sheetId', ParseIntPipe) sheetId: number,
+        @Param('detailId', ParseIntPipe) detailId: number,
+    ) {
+        return this.costingSheetsService.removeDetail(detailId);
     }
 
     @Post('create-sheet')

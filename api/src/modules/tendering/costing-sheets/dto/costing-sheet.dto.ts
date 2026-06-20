@@ -5,83 +5,77 @@ import {
     textField,
 } from '@/utils/zod-schema-generator';
 
-/**
- * Submit Costing Sheet Schema - Based on tenderCostingSheets table
- */
-export const SubmitCostingSheetSchema = z.object({
-    tenderId: bigintField().positive('Tender ID must be positive'),
-    submittedFinalPrice: z.string().min(1, 'Submitted final price is required').transform((val) => {
+const costingDetailFields = {
+    submittedFinalPrice: z.string().min(1, 'Final price is required').transform((val) => {
         const num = Number(val);
         if (isNaN(num) || num < 0) {
             throw new z.ZodError([
-                {
-                    code: z.ZodIssueCode.custom,
-                    path: ['submittedFinalPrice'],
-                    message: 'Submitted final price must be a valid non-negative number',
-                },
+                { code: z.ZodIssueCode.custom, path: ['submittedFinalPrice'], message: 'Must be a valid non-negative number' },
             ]);
         }
         return val;
     }),
-    submittedReceiptPrice: z.string().min(1, 'Submitted receipt price is required').transform((val) => {
+    submittedReceiptPrice: z.string().min(1, 'Receipt price is required').transform((val) => {
         const num = Number(val);
         if (isNaN(num) || num < 0) {
             throw new z.ZodError([
-                {
-                    code: z.ZodIssueCode.custom,
-                    path: ['submittedReceiptPrice'],
-                    message: 'Submitted receipt price must be a valid non-negative number',
-                },
+                { code: z.ZodIssueCode.custom, path: ['submittedReceiptPrice'], message: 'Must be a valid non-negative number' },
             ]);
         }
         return val;
     }),
-    submittedBudgetPrice: z.string().min(1, 'Submitted budget price is required').transform((val) => {
+    submittedBudgetPrice: z.string().min(1, 'Budget price is required').transform((val) => {
         const num = Number(val);
         if (isNaN(num) || num < 0) {
             throw new z.ZodError([
-                {
-                    code: z.ZodIssueCode.custom,
-                    path: ['submittedBudgetPrice'],
-                    message: 'Submitted budget price must be a valid non-negative number',
-                },
+                { code: z.ZodIssueCode.custom, path: ['submittedBudgetPrice'], message: 'Must be a valid non-negative number' },
             ]);
         }
         return val;
     }),
-    submittedGrossMargin: z.string().min(1, 'Submitted gross margin is required').transform((val) => {
+    submittedGrossMargin: z.string().min(1, 'Gross margin is required').transform((val) => {
         const num = Number(val);
         if (isNaN(num) || num < 0 || num > 100) {
             throw new z.ZodError([
-                {
-                    code: z.ZodIssueCode.custom,
-                    path: ['submittedGrossMargin'],
-                    message: 'Submitted gross margin must be between 0 and 100',
-                },
+                { code: z.ZodIssueCode.custom, path: ['submittedGrossMargin'], message: 'Must be between 0 and 100' },
             ]);
         }
         return val;
     }),
     teRemarks: textField().min(1, 'TE remarks are required'),
-});
+};
+
+const CostingDetailSchema = z.object(costingDetailFields);
+
+/**
+ * Submit Costing Sheet — accepts either a single set of pricing fields (old format)
+ * or a `details[]` array (new multi-detail format).
+ */
+export const SubmitCostingSheetSchema = z.object({
+    tenderId: bigintField().positive('Tender ID must be positive'),
+    details: z.array(CostingDetailSchema).min(1).optional(),
+}).passthrough();
 
 export type SubmitCostingSheetDto = z.infer<typeof SubmitCostingSheetSchema>;
 
 /**
- * Update Costing Sheet Schema - Partial update
+ * Update Costing Sheet — accepts partial detail updates or a details[] array.
  */
+const costingDetailUpdateFields: Record<string, any> = {};
+for (const [key, schema] of Object.entries(costingDetailFields)) {
+    costingDetailUpdateFields[key] = schema.optional();
+}
+
+const CostingDetailUpdateSchema = z.object(costingDetailUpdateFields);
+
 export const UpdateCostingSheetSchema = z.object({
-    submittedFinalPrice: z.string().min(1, 'Submitted final price is required').optional(),
-    submittedReceiptPrice: z.string().min(1, 'Submitted receipt price is required').optional(),
-    submittedBudgetPrice: z.string().min(1, 'Submitted budget price is required').optional(),
-    submittedGrossMargin: z.string().min(1, 'Submitted gross margin is required').optional(),
-    teRemarks: textField().min(1, 'TE remarks are required').optional(),
-});
+    details: z.array(CostingDetailUpdateSchema).min(1).optional(),
+}).passthrough();
 
 export type UpdateCostingSheetDto = z.infer<typeof UpdateCostingSheetSchema>;
 
 /**
- * Create Sheet Schema - For Google Sheet creation
+ * Create Sheet Schema — For Google Sheet creation
  */
 export const CreateSheetSchema = z.object({
     tenderId: bigintField().positive('Tender ID must be positive'),
@@ -90,7 +84,7 @@ export const CreateSheetSchema = z.object({
 export type CreateSheetDto = z.infer<typeof CreateSheetSchema>;
 
 /**
- * Create Sheet With Name Schema - For named sheet creation
+ * Create Sheet With Name Schema — For named sheet creation
  */
 export const CreateSheetWithNameSchema = z.object({
     tenderId: bigintField().positive('Tender ID must be positive'),
