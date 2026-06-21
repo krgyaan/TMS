@@ -7,7 +7,7 @@ import { woBasicDetails, woContacts, woDetails } from '@db/schemas/operations';
 import { users } from '@db/schemas/auth/users.schema';
 import type { CreateWoBasicDetailDto, UpdateWoBasicDetailDto, AssignOeDto, BulkAssignOeDto, RemoveOeAssignmentDto, WoBasicDetailsQueryDto } from './dto/wo-basic-details.dto';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { projects, teams, tenderInfos, organizations, items, locations, tenderClients, tenderCostingSheets } from '@/db/schemas';
+import { projects, teams, tenderInfos, organizations, items, locations, tenderClients, tenderCostingSheets, tenderCostingDetails } from '@/db/schemas';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
 import { wrapPaginatedResponse } from '@/utils/responseWrapper';
 
@@ -791,15 +791,19 @@ export class WoBasicDetailsService {
             .where(eq(tenderInfos.id, tenderId))
             .limit(1);
 
-        const [costingSheet] = await this.db
+        const [costingDetail] = await this.db
             .select({
-                budgetPrice: tenderCostingSheets.budgetPrice,
-                receiptPrice: tenderCostingSheets.receiptPrice,
-                grossMargin: tenderCostingSheets.grossMargin,
-                finalPrice: tenderCostingSheets.finalPrice,
+                budgetPrice: sql<string>`COALESCE(SUM(${tenderCostingDetails.budgetPrice}), '0')`,
+                receiptPrice: sql<string>`COALESCE(SUM(${tenderCostingDetails.receiptPrice}), '0')`,
+                grossMargin: sql<string>`AVG(${tenderCostingDetails.grossMargin})`,
+                finalPrice: sql<string>`COALESCE(SUM(${tenderCostingDetails.finalPrice}), '0')`,
             })
-            .from(tenderCostingSheets)
-            .where(eq(tenderCostingSheets.tenderId, tenderId))
+            .from(tenderCostingDetails)
+            .innerJoin(tenderCostingSheets, eq(tenderCostingSheets.id, tenderCostingDetails.tenderCostingSheetId))
+            .where(and(
+                eq(tenderCostingSheets.tenderId, tenderId),
+                eq(tenderCostingDetails.status, 'Approved'),
+            ))
             .limit(1);
 
         const clients = await this.db
@@ -817,10 +821,10 @@ export class WoBasicDetailsService {
             organizationAcronym: tender?.organizationAcronym ?? null,
             itemName: tender?.itemName ?? null,
             locationName: tender?.locationName ?? null,
-            budgetPrice: costingSheet?.budgetPrice ?? null,
-            receiptPrice: costingSheet?.receiptPrice ?? null,
-            grossMargin: costingSheet?.grossMargin ?? null,
-            finalPrice: costingSheet?.finalPrice ?? null,
+            budgetPrice: costingDetail?.budgetPrice ?? null,
+            receiptPrice: costingDetail?.receiptPrice ?? null,
+            grossMargin: costingDetail?.grossMargin ?? null,
+            finalPrice: costingDetail?.finalPrice ?? null,
             clients: clients.map(c => ({
                 clientName: c.clientName,
                 clientDesignation: c.clientDesignation,

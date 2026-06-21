@@ -8,6 +8,7 @@ import { reverseAuctions } from '@db/schemas/tendering/reverse-auction.schema';
 import { bidSubmissions, bidSubmissionStatusEnum } from '@db/schemas/tendering/bid-submissions.schema';
 import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
 import { tenderCostingSheets } from '@db/schemas/tendering/tender-costing-sheets.schema';
+import { tenderCostingDetails } from '@db/schemas/tendering/tender-costing-details.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { items } from '@db/schemas/master/items.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
@@ -120,12 +121,14 @@ export class TenderResultService {
         .as('latestTenderResult');
 
     const latestCostingSheetSq = this.db
-        .selectDistinctOn([tenderCostingSheets.tenderId], {
+        .select({
             tenderId: tenderCostingSheets.tenderId,
-            finalPrice: tenderCostingSheets.finalPrice,
+            finalPrice: sql<string>`COALESCE(SUM(${tenderCostingDetails.finalPrice}), '0')`,
         })
         .from(tenderCostingSheets)
-        .orderBy(tenderCostingSheets.tenderId, desc(tenderCostingSheets.createdAt))
+        .leftJoin(tenderCostingDetails, eq(tenderCostingDetails.tenderCostingSheetId, tenderCostingSheets.id))
+        .where(eq(tenderCostingDetails.status, 'Approved'))
+        .groupBy(tenderCostingSheets.tenderId)
         .as('latestCostingSheet');
 
     // Build base conditions (removed bidSubmissions.status since it's in subquery now)
@@ -351,12 +354,14 @@ export class TenderResultService {
             .as('latestTenderResult');
 
         const latestCostingSheetSq = this.db
-            .selectDistinctOn([tenderCostingSheets.tenderId], {
+            .select({
                 tenderId: tenderCostingSheets.tenderId,
-                finalPrice: tenderCostingSheets.finalPrice,
+                finalPrice: sql<string>`COALESCE(SUM(${tenderCostingDetails.finalPrice}), '0')`,
             })
             .from(tenderCostingSheets)
-            .orderBy(tenderCostingSheets.tenderId, desc(tenderCostingSheets.createdAt))
+            .leftJoin(tenderCostingDetails, eq(tenderCostingDetails.tenderCostingSheetId, tenderCostingSheets.id))
+            .where(eq(tenderCostingDetails.status, 'Approved'))
+            .groupBy(tenderCostingSheets.tenderId)
             .as('latestCostingSheet');
 
         const baseConditions = [
@@ -547,7 +552,11 @@ export class TenderResultService {
                 teamExecutiveName: users.name,
                 tenderValue: tenderInfos.gstValues,
                 emdAmount: tenderInfos.emd,
-                costingFinalPrice: tenderCostingSheets.finalPrice,
+                costingFinalPrice: sql<string>`(SELECT COALESCE(SUM(${tenderCostingDetails.finalPrice}), '0')
+                    FROM ${tenderCostingDetails}
+                    INNER JOIN ${tenderCostingSheets} s ON s.id = ${tenderCostingDetails.tenderCostingSheetId}
+                    WHERE s.${tenderCostingSheets.tenderId} = ${tenderInfos.id}
+                    AND ${tenderCostingDetails.status} = 'Approved')`,
                 itemName: items.name,
                 tenderStatus: statuses.name,
                 reverseAuctionApplicable: tenderInformation.reverseAuctionApplicable,
@@ -561,7 +570,6 @@ export class TenderResultService {
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
-            .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
             .leftJoin(woBasicDetails, eq(woBasicDetails.tenderId, tenderInfos.id))
             .leftJoin(latestBidSubmissionSq, eq(latestBidSubmissionSq.tenderId, tenderInfos.id))
             .where(eq(tenderResults.id, id))
@@ -611,7 +619,11 @@ export class TenderResultService {
                 teamExecutiveName: users.name,
                 tenderValue: tenderInfos.gstValues,
                 emdAmount: tenderInfos.emd,
-                costingFinalPrice: tenderCostingSheets.finalPrice,
+                costingFinalPrice: sql<string>`(SELECT COALESCE(SUM(${tenderCostingDetails.finalPrice}), '0')
+                    FROM ${tenderCostingDetails}
+                    INNER JOIN ${tenderCostingSheets} s ON s.id = ${tenderCostingDetails.tenderCostingSheetId}
+                    WHERE s.${tenderCostingSheets.tenderId} = ${tenderInfos.id}
+                    AND ${tenderCostingDetails.status} = 'Approved')`,
                 itemName: items.name,
                 tenderStatus: statuses.name,
                 reverseAuctionApplicable: tenderInformation.reverseAuctionApplicable,
@@ -625,7 +637,6 @@ export class TenderResultService {
             .leftJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .leftJoin(tenderInformation, eq(tenderInformation.tenderId, tenderInfos.id))
-            .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
             .leftJoin(woBasicDetails, eq(woBasicDetails.tenderId, tenderInfos.id))
             .leftJoin(latestBidSubmissionSq, eq(latestBidSubmissionSq.tenderId, tenderInfos.id))
             .where(eq(tenderResults.tenderId, tenderId))
@@ -986,14 +997,15 @@ export class TenderResultService {
         const tender = await this.tenderInfosService.findById(tenderId);
         if (!tender || !tender.teamMember) return;
 
-        // Get costing sheet data
-        const costingSheet = await this.db
+        // Get costing detail data (combined from first detail)
+        const costingDetail = await this.db
             .select({
-                submittedReceiptPrice: tenderCostingSheets.submittedReceiptPrice,
-                submittedBudgetPrice: tenderCostingSheets.submittedBudgetPrice,
-                submittedGrossMargin: tenderCostingSheets.submittedGrossMargin,
+                submittedReceiptPrice: sql<string>`SUM(${tenderCostingDetails.submittedReceiptPrice})`,
+                submittedBudgetPrice: sql<string>`SUM(${tenderCostingDetails.submittedBudgetPrice})`,
+                submittedGrossMargin: sql<string>`AVG(${tenderCostingDetails.submittedGrossMargin})`,
             })
-            .from(tenderCostingSheets)
+            .from(tenderCostingDetails)
+            .innerJoin(tenderCostingSheets, eq(tenderCostingSheets.id, tenderCostingDetails.tenderCostingSheetId))
             .where(eq(tenderCostingSheets.tenderId, tenderId))
             .limit(1);
 
@@ -1012,9 +1024,9 @@ export class TenderResultService {
             l2_price_formatted: formatCurrency(dto.l2Price?.toString() ?? null),
             our_price_formatted: formatCurrency(dto.ourPrice?.toString() ?? null),
             result_reason: dto.resultReason || 'Not specified',
-            costing_receipt_formatted: formatCurrency(costingSheet[0]?.submittedReceiptPrice || null),
-            costing_budget_formatted: formatCurrency(costingSheet[0]?.submittedBudgetPrice || null),
-            costing_gross_margin: costingSheet[0]?.submittedGrossMargin ? `${costingSheet[0].submittedGrossMargin}%` : '0%',
+            costing_receipt_formatted: formatCurrency(costingDetail[0]?.submittedReceiptPrice || null),
+            costing_budget_formatted: formatCurrency(costingDetail[0]?.submittedBudgetPrice || null),
+            costing_gross_margin: costingDetail[0]?.submittedGrossMargin ? `${costingDetail[0].submittedGrossMargin}%` : '0%',
             qualified_parties_screenshot: !!resultRecord.qualifiedPartiesScreenshot,
             final_result_screenshot: !!resultRecord.finalResultScreenshot,
             isWon: dto.result === 'Won',
