@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle, XCircle, Eye, Edit, FileX2, ExternalLink, Search, RefreshCw } from 'lucide-react';
+import { AlertCircle, CheckCircle, XCircle, Eye, Edit, FileX2, ExternalLink, Search } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useCostingApprovals, useCostingApprovalsDashboardCounts } from '@/hooks/api/useCostingApprovals';
@@ -57,11 +57,20 @@ const CostingApprovalListPage = () => {
     const costingApprovalsData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
 
+    const makeDetailUrl = (basePath: string, row: CostingApprovalDashboardRow) => {
+        const url = basePath;
+        const params = new URLSearchParams();
+        if (row.costingDetailId) params.set('detailId', String(row.costingDetailId));
+        const qs = params.toString();
+        return qs ? `${url}?${qs}` : url;
+    };
+
     const costingApprovalActions: ActionItem<CostingApprovalDashboardRowWithTimer>[] = useMemo(() => [
         {
             label: 'Approve Costing',
             onClick: (row: CostingApprovalDashboardRow) => {
-                navigate(paths.tendering.costingApprove(row.costingSheetId!));
+                const base = paths.tendering.costingApprove(row.costingSheetId!);
+                navigate(makeDetailUrl(base, row));
             },
             icon: <CheckCircle className="h-4 w-4" />,
             visible: (row) => row.costingStatus === 'Submitted',
@@ -69,7 +78,8 @@ const CostingApprovalListPage = () => {
         {
             label: 'Reject Costing',
             onClick: (row: CostingApprovalDashboardRow) => {
-                navigate(paths.tendering.costingReject(row.costingSheetId!));
+                const base = paths.tendering.costingReject(row.costingSheetId!);
+                navigate(makeDetailUrl(base, row));
             },
             icon: <XCircle className="h-4 w-4" />,
             visible: (row) => row.costingStatus === 'Submitted',
@@ -77,7 +87,8 @@ const CostingApprovalListPage = () => {
         {
             label: 'Edit Approval',
             onClick: (row: CostingApprovalDashboardRow) => {
-                navigate(paths.tendering.costingEditApproval(row.costingSheetId!));
+                const base = paths.tendering.costingEditApproval(row.costingSheetId!);
+                navigate(makeDetailUrl(base, row));
             },
             icon: <Edit className="h-4 w-4" />,
             visible: (row) => row.costingStatus === 'Approved',

@@ -126,6 +126,7 @@ export type CostingApprovalDashboardRow = {
     submittedBudgetPrice: string | null;
     googleSheetUrl: string | null;
     costingSheetId: number | null;
+    costingDetailId: number | null;
 };
 
 export interface CostingApprovalDashboardRowWithTimer extends CostingApprovalDashboardRow {

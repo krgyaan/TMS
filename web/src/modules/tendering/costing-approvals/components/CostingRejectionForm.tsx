@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, XCircle } from 'lucide-react';
 import { paths } from '@/app/routes/paths';
 import { useRejectCosting } from '@/hooks/api/useCostingApprovals';
+import { useRejectCostingDetail } from '@/hooks/api/useCostingSheets';
 import type { TenderCostingSheet } from '@/modules/tendering/costing-sheets/helpers/costingSheet.types';
 import { formatINR } from '@/hooks/useINRFormatter';
 
@@ -20,21 +21,24 @@ const CostingRejectionFormSchema = z.object({
 type FormValues = z.infer<typeof CostingRejectionFormSchema>;
 
 interface CostingRejectionFormProps {
-    costingSheet: TenderCostingSheet;
+    costingSheet: TenderCostingSheet & { costingDetailId?: number };
     tenderDetails: {
         tenderNo: string;
         tenderName: string;
         dueDate: Date | null;
         teamMemberName: string | null;
     };
+    isDetailFlow?: boolean;
 }
 
 export default function CostingRejectionForm({
     costingSheet,
     tenderDetails,
+    isDetailFlow = false
 }: CostingRejectionFormProps) {
     const navigate = useNavigate();
     const rejectMutation = useRejectCosting();
+    const rejectDetailMutation = useRejectCostingDetail();
 
     const form = useForm<FormValues>({
         resolver: zodResolver(CostingRejectionFormSchema),
@@ -47,10 +51,17 @@ export default function CostingRejectionForm({
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
         try {
-            await rejectMutation.mutateAsync({
-                id: costingSheet.id,
-                data: data,
-            });
+            if (isDetailFlow) {
+                await rejectDetailMutation.mutateAsync({
+                    id: costingSheet.id,
+                    rejectionReason: data.rejectionReason,
+                });
+            } else {
+                await rejectMutation.mutateAsync({
+                    id: costingSheet.id,
+                    data: data,
+                });
+            }
             navigate(paths.tendering.costingApprovals);
         } catch (error) {
             console.error('Error rejecting costing:', error);

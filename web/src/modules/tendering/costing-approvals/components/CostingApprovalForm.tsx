@@ -1,31 +1,29 @@
-import { z } from 'zod';
+import { paths } from '@/app/routes/paths';
+import { FieldWrapper } from '@/components/form/FieldWrapper';
+import { MultiSelectField } from '@/components/form/MultiSelectField';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Form } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Textarea } from '@/components/ui/textarea';
+import { useApproveCosting, useUpdateApprovedCosting } from '@/hooks/api/useCostingApprovals';
+import { useApproveCostingDetail, useUpdateApprovedCostingDetail } from '@/hooks/api/useCostingSheets';
+import { useRfqResponses } from '@/hooks/api/useRfqResponses';
+import { useRfqByTenderId } from '@/hooks/api/useRfqs';
+import { useVendorOrganizations } from '@/hooks/api/useVendorOrganizations';
+import { formatDateTime } from '@/hooks/useFormatedDate';
+import { formatINR } from '@/hooks/useINRFormatter';
+import type { TenderCostingSheet } from '@/modules/tendering/costing-sheets/helpers/costingSheet.types';
+import type { VendorOrganization } from '@/types/api.types';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { AlertTriangle, ArrowLeft, Building2, Calendar, CheckCircle2, Clock, ExternalLink, FileText, FileWarning, IndianRupee, Paperclip, Percent, Save, User } from 'lucide-react';
+import { useEffect } from 'react';
 import { type SubmitHandler, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardAction } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Form } from '@/components/ui/form';
-import { FieldWrapper } from '@/components/form/FieldWrapper';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { 
-    ArrowLeft, Save, IndianRupee, Percent,
-    Clock, CheckCircle2, AlertTriangle, Building2, User, FileText, FileWarning, ExternalLink, Calendar, Paperclip, Loader2
-} from 'lucide-react';
-import { paths } from '@/app/routes/paths';
-import { useEffect } from 'react';
-import { useApproveCosting, useUpdateApprovedCosting } from '@/hooks/api/useCostingApprovals';
-import type { TenderCostingSheet } from '@/modules/tendering/costing-sheets/helpers/costingSheet.types';
-import { formatDateTime } from '@/hooks/useFormatedDate';
-import { MultiSelectField } from '@/components/form/MultiSelectField';
-import { useVendorOrganizations } from '@/hooks/api/useVendorOrganizations';
-import { formatINR } from '@/hooks/useINRFormatter';
-import type { VendorOrganization } from '@/types/api.types';
-import { Badge } from '@/components/ui/badge';
-import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useRfqByTenderId } from '@/hooks/api/useRfqs';
-import { useRfqResponses } from '@/hooks/api/useRfqResponses';
+import { z } from 'zod';
 
 
 // Schema for form values (MultiSelectField returns strings)
@@ -41,7 +39,7 @@ const CostingApprovalFormSchema = z.object({
 type FormValues = z.infer<typeof CostingApprovalFormSchema>;
 
 interface CostingApprovalFormProps {
-    costingSheet: TenderCostingSheet;
+    costingSheet: TenderCostingSheet & { costingDetailId?: number };
     tenderDetails: {
         tenderNo: string;
         tenderName: string;
@@ -49,16 +47,20 @@ interface CostingApprovalFormProps {
         teamMemberName: string | null;
     };
     mode: 'approve' | 'edit';
+    isDetailFlow?: boolean;
 }
 
 export default function CostingApprovalForm({
     costingSheet,
     tenderDetails,
-    mode
+    mode,
+    isDetailFlow = false
 }: CostingApprovalFormProps) {
     const navigate = useNavigate();
     const approveMutation = useApproveCosting();
     const updateMutation = useUpdateApprovedCosting();
+    const approveDetailMutation = useApproveCostingDetail();
+    const updateDetailMutation = useUpdateApprovedCostingDetail();
     const { data: vendors } = useVendorOrganizations();
 
     const vendorOptions = vendors?.map((v: VendorOrganization) => ({
@@ -120,27 +122,27 @@ export default function CostingApprovalForm({
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
         try {
-            // Transform form data: convert string vendor IDs to numbers
             const transformedData = {
                 ...data,
                 oemVendorIds: data.oemVendorIds.map(id => Number(id)),
             };
 
             if (mode === 'approve') {
-                await approveMutation.mutateAsync({
-                    id: costingSheet.id,
-                    data: transformedData,
-                });
+                if (isDetailFlow) {
+                    await approveDetailMutation.mutateAsync({ id: costingSheet.id, data: transformedData });
+                } else {
+                    await approveMutation.mutateAsync({ id: costingSheet.id, data: transformedData });
+                }
             } else {
-                await updateMutation.mutateAsync({
-                    id: costingSheet.id,
-                    data: transformedData,
-                });
+                if (isDetailFlow) {
+                    await updateDetailMutation.mutateAsync({ id: costingSheet.id, data: transformedData });
+                } else {
+                    await updateMutation.mutateAsync({ id: costingSheet.id, data: transformedData });
+                }
             }
             navigate(paths.tendering.costingApprovals);
         } catch (error) {
             console.error('Error processing approval:', error);
-            // Error toast is handled by the mutation hooks
         }
     };
 
