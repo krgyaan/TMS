@@ -132,3 +132,57 @@ export type DriveScopesResponse = {
     missingScopes: string[];
     grantedScopes: string[];
 };
+
+// --- Costing Detail types (merged from costingDetail.types) ---
+
+export type TenderCostingDetail = {
+    id: number;
+    tenderCostingSheetId: number;
+    submittedFinalPrice: string | null;
+    submittedReceiptPrice: string | null;
+    submittedBudgetPrice: string | null;
+    submittedGrossMargin: string | null;
+    teRemarks: string | null;
+    submittedBy: number | null;
+    submittedAt: Date | null;
+    finalPrice: string | null;
+    receiptPrice: string | null;
+    budgetPrice: string | null;
+    grossMargin: string | null;
+    tlRemarks: string | null;
+    rejectionReason: string | null;
+    approvedBy: number | null;
+    approvedAt: Date | null;
+    status: CostingSheetStatus;
+    createdAt: Date;
+    updatedAt: Date;
+    tenderId: number;
+    googleSheetUrl: string | null;
+    sheetTitle: string | null;
+    oemVendorIds: number[] | null;
+};
+
+export type CreateCostingDetailDto = {
+    tenderId: number;
+    submittedFinalPrice: string;
+    submittedReceiptPrice: string;
+    submittedBudgetPrice: string;
+    submittedGrossMargin: string;
+    teRemarks: string;
+};
+
+export type UpdateCostingDetailDto = {
+    submittedFinalPrice?: string;
+    submittedReceiptPrice?: string;
+    submittedBudgetPrice?: string;
+    submittedGrossMargin?: string;
+    teRemarks?: string;
+};
+
+export type CombinedPricing = {
+    totalFinalPrice: string | null;
+    totalReceiptPrice: string | null;
+    totalBudgetPrice: string | null;
+    detailsCount: number;
+    approvedCount: number;
+};

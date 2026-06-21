@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { costingSheetsService } from '@/services/api/costing-sheets.service';
+import { costingApprovalsService } from '@/services/api/costing-approvals.service';
 import type { PaginatedResult } from '@/types/api.types';
 import { toast } from 'sonner';
-import type { CostingSheetDashboardCounts, CostingSheetDashboardRow, TabKey, CostingSheetListParams } from '@/modules/tendering/costing-sheets/helpers/costingSheet.types';
+import type { CostingSheetDashboardCounts, CostingSheetDashboardRow, TabKey, CostingSheetListParams, CreateCostingDetailDto } from '@/modules/tendering/costing-sheets/helpers/costingSheet.types';
 import { useTeamFilter } from '@/hooks/useTeamFilter';
 
 export const costingSheetsKey = {
@@ -159,6 +160,103 @@ export const useCreateCostingSheetWithName = () => {
         onError: (error: any) => {
             const message = error?.response?.data?.message || 'Failed to create costing sheet';
             toast.error(message);
+        },
+    });
+};
+
+// --- Costing Detail Hooks (merged from useCostingDetails) ---
+
+export const costingDetailsKey = {
+    all: ['costing-details'] as const,
+    byTender: (tenderId: number) => [...costingDetailsKey.all, 'byTender', tenderId] as const,
+    combined: (tenderId: number) => [...costingDetailsKey.all, 'combined', tenderId] as const,
+    detail: (id: number) => [...costingDetailsKey.all, 'detail', id] as const,
+};
+
+export const useCostingDetailById = (id: number) => {
+    return useQuery({
+        queryKey: costingDetailsKey.detail(id),
+        queryFn: () => costingSheetsService.getDetailById(id),
+        enabled: !!id,
+    });
+};
+
+export const useCostingDetailsByTender = (tenderId: number) => {
+    return useQuery({
+        queryKey: costingDetailsKey.byTender(tenderId),
+        queryFn: () => costingSheetsService.getDetailsByTender(tenderId),
+        enabled: !!tenderId,
+    });
+};
+
+export const useCostingDetailsCombined = (tenderId: number) => {
+    return useQuery({
+        queryKey: costingDetailsKey.combined(tenderId),
+        queryFn: () => costingSheetsService.getCombinedPricing(tenderId),
+        enabled: !!tenderId,
+    });
+};
+
+export const useCreateCostingDetail = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (data: CreateCostingDetailDto) => costingSheetsService.submit(data),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: costingDetailsKey.byTender(variables.tenderId) });
+            queryClient.invalidateQueries({ queryKey: costingDetailsKey.combined(variables.tenderId) });
+            toast.success('Costing detail added successfully');
+        },
+        onError: (error: any) => {
+            toast.error(error?.response?.data?.message || 'Failed to add costing detail');
+        },
+    });
+};
+
+export const useApproveCostingDetail = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, data }: { id: number; data: { finalPrice: string; receiptPrice: string; budgetPrice: string; grossMargin: string; oemVendorIds: number[]; tlRemarks: string } }) =>
+            costingApprovalsService.approve(id, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: costingDetailsKey.all });
+            toast.success('Costing detail approved');
+        },
+        onError: (error: any) => {
+            toast.error(error?.response?.data?.message || 'Failed to approve costing detail');
+        },
+    });
+};
+
+export const useRejectCostingDetail = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, rejectionReason }: { id: number; rejectionReason: string }) =>
+            costingApprovalsService.reject(id, { rejectionReason }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: costingDetailsKey.all });
+            toast.success('Costing detail rejected');
+        },
+        onError: (error: any) => {
+            toast.error(error?.response?.data?.message || 'Failed to reject costing detail');
+        },
+    });
+};
+
+export const useUpdateApprovedCostingDetail = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, data }: { id: number; data: { finalPrice?: string; receiptPrice?: string; budgetPrice?: string; grossMargin?: string; tlRemarks?: string } }) =>
+            costingApprovalsService.updateApproved(id, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: costingDetailsKey.all });
+            toast.success('Approved costing detail updated');
+        },
+        onError: (error: any) => {
+            toast.error(error?.response?.data?.message || 'Failed to update approved costing detail');
         },
     });
 };

@@ -1,6 +1,11 @@
 import { BaseApiService } from './base.service';
 import type { PaginatedResult } from '@/types/api.types';
-import type { CostingSheetListParams, TenderCostingSheet, CostingSheetDashboardRow, SubmitCostingSheetDto, UpdateCostingSheetDto, CostingSheetDashboardCounts, CreateSheetResponse, DriveScopesResponse } from '@/modules/tendering/costing-sheets/helpers/costingSheet.types';
+import type {
+    CostingSheetListParams, TenderCostingSheet, CostingSheetDashboardRow,
+    SubmitCostingSheetDto, UpdateCostingSheetDto, CostingSheetDashboardCounts,
+    CreateSheetResponse, DriveScopesResponse,
+    TenderCostingDetail, CreateCostingDetailDto, CombinedPricing,
+} from '@/modules/tendering/costing-sheets/helpers/costingSheet.types';
 
 class CostingSheetsService extends BaseApiService {
     constructor() {
@@ -42,16 +47,16 @@ class CostingSheetsService extends BaseApiService {
         return this.get<TenderCostingSheet>(`/${id}`);
     }
 
-    async getByTenderId(tenderId: number): Promise<TenderCostingSheet | null> {
-        return this.get<TenderCostingSheet>(`/tender/${tenderId}`);
+    async getByTenderId(tenderId: number): Promise<any | null> {
+        return this.get<any>(`/tender/${tenderId}`);
     }
 
-    async submit(data: SubmitCostingSheetDto): Promise<TenderCostingSheet> {
-        return this.post<TenderCostingSheet>('', data);
+    async submit(data: SubmitCostingSheetDto | any): Promise<any> {
+        return this.post<any>('', data);
     }
 
-    async update(id: number, data: UpdateCostingSheetDto): Promise<TenderCostingSheet> {
-        return this.patch<TenderCostingSheet>(`/${id}`, data);
+    async update(id: number, data: UpdateCostingSheetDto | any): Promise<any> {
+        return this.patch<any>(`/${id}`, data);
     }
 
     async getDashboardCounts(teamId?: number): Promise<CostingSheetDashboardCounts> {
@@ -73,6 +78,29 @@ class CostingSheetsService extends BaseApiService {
 
     async createSheetWithName(tenderId: number, customName: string): Promise<CreateSheetResponse> {
         return this.post<CreateSheetResponse>('/create-sheet-with-name', { tenderId, customName });
+    }
+
+    // --- Detail methods (route through costing-sheets endpoints) ---
+
+    async getDetailsByTender(tenderId: number): Promise<TenderCostingDetail[]> {
+        const sheet = await this.getByTenderId(tenderId);
+        return (sheet as any)?.details || [];
+    }
+
+    async getDetailById(id: number): Promise<TenderCostingDetail> {
+        return this.get<TenderCostingDetail>(`/${id}`);
+    }
+
+    async getCombinedPricing(tenderId: number): Promise<CombinedPricing> {
+        return this.get<CombinedPricing>(`/tender/${tenderId}/combined`);
+    }
+
+    async addDetail(sheetId: number, data: CreateCostingDetailDto): Promise<TenderCostingDetail> {
+        return this.post<TenderCostingDetail>(`/${sheetId}/add-detail`, data);
+    }
+
+    async removeDetail(sheetId: number, detailId: number): Promise<{ success: boolean }> {
+        return this.delete<{ success: boolean }>(`/${sheetId}/details/${detailId}`);
     }
 }
 
