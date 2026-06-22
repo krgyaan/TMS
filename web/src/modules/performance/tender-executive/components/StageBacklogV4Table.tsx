@@ -133,7 +133,7 @@ function BidTable({ stage }: { stage: any }) {
                                 <ColumnHeader title="Bid Submitted" description="Tenders bid during the period (Final Price)" />
                             </TableHead>
                             <TableHead className="text-center">
-                                <ColumnHeader title="Missed" description="Tenders missed during the period (Final Price)" />
+                                <ColumnHeader title="Did Not Bid" description="Tenders sent to DNB during the period (Final Price)" />
                             </TableHead>
                             <TableHead className="text-center">
                                 <ColumnHeader title="Pending at End" description="Approved but bidding pending at the end of the period" />
