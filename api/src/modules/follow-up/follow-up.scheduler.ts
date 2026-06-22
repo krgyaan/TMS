@@ -53,6 +53,11 @@ export class FollowupScheduler {
         const hour = date.getHours();
         const minute = date.getMinutes();
 
-        return FOLLOWUP_WINDOWS.find(w => w.hour === hour && w.minute === minute && w.days.includes(day));
+        return FOLLOWUP_WINDOWS.find(w => {
+            const basicMatch = w.hour === hour && w.minute === minute && w.days.includes(day);
+            if (!basicMatch) return false;
+            if (w.customCheck && !w.customCheck(date)) return false;
+            return true;
+        });
     }
 }

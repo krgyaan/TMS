@@ -57,6 +57,8 @@ const FREQUENCY_LABELS: Record<number, string> = {
     4: "Weekly",
     5: "Biweekly",
     6: "Stop",
+    7: "Once in 15 Days (Alternate Mondays)",
+    8: "Once a Month (First Monday of the Month)",
 };
 
 const STOP_REASON_LABELS: Record<number, string> = {
@@ -549,14 +551,20 @@ const FollowupPage: React.FC = () => {
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {Object.entries(FREQUENCY_LABELS).map(([v, l]) => (
-                                            <SelectItem key={v} value={v}>
-                                                <div className="flex items-center gap-2">
-                                                    {v === "6" && <span className="h-2 w-2 rounded-full bg-destructive" />}
-                                                    {l}
-                                                </div>
-                                            </SelectItem>
-                                        ))}
+                                        {Object.entries(FREQUENCY_LABELS)
+                                            .sort(([a], [b]) => {
+                                                if (Number(a) === 6) return 1;
+                                                if (Number(b) === 6) return -1;
+                                                return Number(a) - Number(b);
+                                            })
+                                            .map(([v, l]) => (
+                                                <SelectItem key={v} value={v}>
+                                                    <div className="flex items-center gap-2">
+                                                        {v === "6" && <span className="h-2 w-2 rounded-full bg-destructive" />}
+                                                        {l}
+                                                    </div>
+                                                </SelectItem>
+                                            ))}
                                     </SelectContent>
                                 </Select>
                             </div>

@@ -215,6 +215,7 @@ const FollowUpCreatePage = () => {
                                         ))}
                                     </SelectContent>
                                 </Select>
+                                {errors.followupFor && <p className="text-red-500 text-xs">{errors.followupFor.message}</p>}
                             </div>
 
                             <div>

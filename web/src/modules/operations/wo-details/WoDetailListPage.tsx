@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useEffect } from 'react';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
@@ -17,41 +17,32 @@ import { TooltipContent } from '@/components/ui/tooltip';
 import { useWoDetails, useWoDetailsDashboardSummary } from '@/hooks/api/useWoDetails';
 import type { WoDetailsListResponseDto, WoDetailsFilters } from '@/modules/operations/types/wo.types';
 import { currencyCol, dateCol } from '@/components/data-grid';
-import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { usePersistentTableState } from '@/hooks/usePersistentTableState';
 import { QuickFilter } from '@/components/ui/quick-filter';
 import { useTeamFilter } from '@/hooks/useTeamFilter';
 
 type TabKey = 'pending' | 'accepted' | 'amendment-needed';
 
 const WoDetailListPage = () => {
-    const [activeTab, setActiveTab] = useState<TabKey>('pending');
-    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
-    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
-    const [search, setSearch] = useState<string>('');
-    const debouncedSearch = useDebouncedSearch(search, 300);
+    const {
+        activeTab, setActiveTab,
+        search, setSearch,
+        debouncedSearch,
+        pagination, setPagination,
+        sortModel,
+        handleSortChanged,
+        handlePageSizeChange,
+    } = usePersistentTableState({
+        storageKey: 'wo-details',
+        defaultTab: 'pending' as TabKey,
+    });
     const navigate = useNavigate();
     const { teamId } = useTeamFilter();
 
-    // Reset pagination on tab/search/team change
+    // Reset pagination on team change (hook handles tab/search)
     useEffect(() => {
         setPagination((p) => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, debouncedSearch, teamId]);
-
-    const handleSortChanged = useCallback((event: any) => {
-        const sortModel = event.api
-            .getColumnState()
-            .filter((col: any) => col.sort)
-            .map((col: any) => ({
-                colId: col.colId,
-                sort: col.sort as 'asc' | 'desc',
-            }));
-        setSortModel(sortModel);
-        setPagination((p) => ({ ...p, pageIndex: 0 }));
-    }, []);
-
-    const handlePageSizeChange = useCallback((newPageSize: number) => {
-        setPagination({ pageIndex: 0, pageSize: newPageSize });
-    }, []);
+    }, [teamId]);
 
     // Build filters based on active tab
     const filters: WoDetailsFilters = useMemo(() => {

@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import DataTable from "@/components/ui/data-table";
 import type { ColDef } from "ag-grid-community";
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { NavLink, useNavigate } from "react-router-dom";
@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { currencyCol, dateCol, tenderNameCol } from "@/components/data-grid/columns";
 import { TenderTimerDisplay } from "@/components/TenderTimerDisplay";
-import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
+import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { QuickFilter } from "@/components/ui/quick-filter";
 import { TenderRejectionModal } from "./components/TenderRejectionModal";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,26 +23,24 @@ import { useAuth } from "@/contexts/AuthContext";
 type TenderDashboardTab = 'under-preparation' | 'did-not-bid' | 'tenders-bid' | 'tender-won' | 'tender-lost' | 'unallocated';
 
 const TenderListPage = () => {
-    const [activeTab, setActiveTab] = useState<TenderDashboardTab>('under-preparation');
-    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
-    const [search, setSearch] = useState<string>('');
-    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
-    const debouncedSearch = useDebouncedSearch(search, 300);
+    const {
+        activeTab, setActiveTab,
+        search, setSearch,
+        debouncedSearch,
+        pagination, setPagination,
+        sortModel,
+        handleSortChanged,
+        handlePageSizeChange,
+    } = usePersistentTableState({
+        storageKey: 'tenders',
+        defaultTab: 'under-preparation' as TenderDashboardTab,
+    });
 
     const { isAdmin, isSuperUser, roleId, teamId, canDelete} = useAuth();
 
     const isTeamLead = (teamId == 1 || teamId == 2) && roleId == 3;
 
     const hasTenderingPermission = isAdmin || isSuperUser || isTeamLead;
-
-
-    useEffect(() => {
-        setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, debouncedSearch]);
-
-    const handlePageSizeChange = useCallback((newPageSize: number) => {
-        setPagination({ pageIndex: 0, pageSize: newPageSize });
-    }, []);
 
     const elligibleForRejection = (row): boolean => {
         if (row.statusName && row.statusName == 'Read Tender'){
@@ -60,18 +58,6 @@ const TenderListPage = () => {
         }
 
     }
-
-    const handleSortChanged = useCallback((event: any) => {
-        const sortModel = event.api.getColumnState()
-            .filter((col: any) => col.sort)
-            .map((col: any) => ({
-                colId: col.colId,
-                sort: col.sort as 'asc' | 'desc'
-            }));
-        setSortModel(sortModel);
-        setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, []);
-
 
     const { data: counts } = useTendersDashboardCounts();
 

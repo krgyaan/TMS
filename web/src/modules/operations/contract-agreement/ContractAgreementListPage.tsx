@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useState } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { useNavigate } from 'react-router-dom';
@@ -16,43 +16,29 @@ import { Tooltip, TooltipTrigger } from '@radix-ui/react-tooltip';
 import { TooltipContent } from '@/components/ui/tooltip';
 import type { ContractAgreementListDto } from '@/modules/operations/types/wo.types';
 import { currencyCol, dateCol } from '@/components/data-grid';
-import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { usePersistentTableState } from '@/hooks/usePersistentTableState';
 import { useContractAgreementDashboardCounts, useContractAgreements } from '@/hooks/api/useContractAgreement';
 import { UploadContractAgreementDialog } from './components/UploadContractAgreement';
 
 type TabKey = 'uploaded' | 'not_uploaded';
 
 const ContractAgreementListPage = () => {
-    const [activeTab, setActiveTab] = useState<TabKey>('not_uploaded');
-    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
-    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
-    const [search, setSearch] = useState<string>('');
-    const debouncedSearch = useDebouncedSearch(search, 300);
+    const {
+        activeTab, setActiveTab,
+        search, setSearch,
+        debouncedSearch,
+        pagination, setPagination,
+        sortModel,
+        handleSortChanged,
+        handlePageSizeChange,
+    } = usePersistentTableState({
+        storageKey: 'contract-agreements',
+        defaultTab: 'not_uploaded' as TabKey,
+    });
     const navigate = useNavigate();
 
     const [isUploadContractOpen, setIsUploadContractOpen] = useState(false);
     const [selectedWo, setSelectedWo] = useState<ContractAgreementListDto | null>(null);
-
-    // Reset pagination on tab/search change
-    useEffect(() => {
-        setPagination((p) => ({ ...p, pageIndex: 0 }));
-    }, [activeTab, debouncedSearch]);
-
-    const handleSortChanged = useCallback((event: any) => {
-        const sortModel = event.api
-            .getColumnState()
-            .filter((col: any) => col.sort)
-            .map((col: any) => ({
-                colId: col.colId,
-                sort: col.sort as 'asc' | 'desc',
-            }));
-        setSortModel(sortModel);
-        setPagination((p) => ({ ...p, pageIndex: 0 }));
-    }, []);
-
-    const handlePageSizeChange = useCallback((newPageSize: number) => {
-        setPagination({ pageIndex: 0, pageSize: newPageSize });
-    }, []);
 
     // Fetch data
     const { data: apiResponse, isLoading: loading, error } = useContractAgreements(

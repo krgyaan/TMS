@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import DataTable from '@/components/ui/data-table';
 import type { ColDef } from 'ag-grid-community';
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo } from 'react';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
 import { useNavigate } from 'react-router-dom';
@@ -11,33 +11,23 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Eye, Edit, FileX2, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { formatDateTime } from '@/hooks/useFormatedDate';
-import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { usePersistentTableState } from '@/hooks/usePersistentTableState';
 import { useRequestExtensions } from '@/hooks/api/useRequestExtension';
 import type { RequestExtensionListRow } from './helpers/requestExtension.types';
 
 const RequestExtensionListPage = () => {
-    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
-    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
-    const [search, setSearch] = useState('');
-    const debouncedSearch = useDebouncedSearch(search, 300);
+    const {
+        search, setSearch,
+        debouncedSearch,
+        pagination, setPagination,
+        sortModel,
+        handleSortChanged,
+        handlePageSizeChange,
+    } = usePersistentTableState({
+        storageKey: 'request-extensions',
+        defaultTab: '' as '',
+    });
     const navigate = useNavigate();
-
-    useEffect(() => {
-        setPagination((p) => ({ ...p, pageIndex: 0 }));
-    }, [debouncedSearch]);
-
-    const handleSortChanged = useCallback((event: any) => {
-        const next = event.api
-            .getColumnState()
-            .filter((col: any) => col.sort)
-            .map((col: any) => ({ colId: col.colId, sort: col.sort as 'asc' | 'desc' }));
-        setSortModel(next);
-        setPagination((p) => ({ ...p, pageIndex: 0 }));
-    }, []);
-
-    const handlePageSizeChange = useCallback((newPageSize: number) => {
-        setPagination({ pageIndex: 0, pageSize: newPageSize });
-    }, []);
 
     const { data: apiResponse, isLoading: loading, error } = useRequestExtensions(
         {

@@ -36,14 +36,16 @@ const ContactPersonFormSchema = ContactPersonSchema.extend({
    NUMERIC ENUMS (CANONICAL)
 ===================================== */
 
-export const FrequencyEnum = z.number().int().min(1).max(6);
+export const FrequencyEnum = z.number().int().min(1).max(8);
 /*
 1 = Daily
 2 = Alternate Days
-3 = Weekly
-4 = Bi-Weekly
-5 = Monthly
+3 = Twice a day
+4 = Weekly
+5 = Twice a Week
 6 = Stopped
+7 = Once in 15 Days (Alternate Mondays)
+8 = Once a Month (First Monday of the Month)
 */
 
 export type Frequency = z.infer<typeof FrequencyEnum>;
@@ -73,7 +75,7 @@ export const CreateFollowUpSchema = z.object({
     comment: z.string().optional(),
 
     contacts: z.array(ContactPersonSchema),
-    followupFor: z.string().optional(),
+    followupFor: z.string().min(1, "Followup reason is required"),
 
     startFrom: z.string().optional(), // YYYY-MM-DD
     emdId: z.number().nullable().optional(),
@@ -92,7 +94,7 @@ export const CreateFollowUpFormSchema = z.object({
 
     contacts: z.array(ContactPersonFormSchema).min(1, "Add at least one contact person"),
 
-    followupFor: z.string().optional(),
+    followupFor: z.string().min(1, "Followup reason is required"),
 });
 
 export type CreateFollowUpFormValues = z.infer<typeof CreateFollowUpFormSchema>;

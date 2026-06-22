@@ -1,5 +1,6 @@
 import { pgTable, varchar, text, decimal, timestamp, date, pgEnum, serial, index, integer, jsonb, boolean } from 'drizzle-orm/pg-core';
 import { teams } from '@/db/schemas/master/teams.schema';
+import { users } from '@/db/schemas/auth/users.schema';
 
 // Enums
 export const paymentPurposeEnum = pgEnum('payment_purpose', [
@@ -407,6 +408,23 @@ export const instrumentStatusHistory = pgTable('instrument_status_history', {
 });
 
 // ============================================
+// PAYMENT REQUEST MOM (Minutes of Meeting) REMARKS
+// ============================================
+export const paymentRequestMom = pgTable('payment_request_mom', {
+    id: serial('id').primaryKey(),
+    requestId: integer('request_id').notNull().references(() => paymentRequests.id),
+    instrumentId: integer('instrument_id').references(() => paymentInstruments.id),
+    remark: text('remark').notNull(),
+    addedBy: integer('added_by').notNull().references(() => users.id),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow().$onUpdate(() => new Date()),
+}, (table) => ({
+    momRequestIdx: index('mom_request_id_idx').on(table.requestId),
+    momInstrumentIdx: index('mom_instrument_id_idx').on(table.instrumentId),
+    momCreatedAtIdx: index('mom_created_at_idx').on(table.createdAt),
+}));
+
+// ============================================
 // TYPES
 // ============================================
 export type PaymentRequest = typeof paymentRequests.$inferSelect;
@@ -417,6 +435,7 @@ export type InstrumentBgDetails = typeof instrumentBgDetails.$inferSelect;
 export type InstrumentChequeDetails = typeof instrumentChequeDetails.$inferSelect;
 export type InstrumentTransferDetails = typeof instrumentTransferDetails.$inferSelect;
 export type InstrumentStatusHistory = typeof instrumentStatusHistory.$inferSelect;
+export type PaymentRequestMom = typeof paymentRequestMom.$inferSelect;
 
 export type NewPaymentRequest = typeof paymentRequests.$inferInsert;
 export type NewPaymentInstrument = typeof paymentInstruments.$inferInsert;
@@ -426,3 +445,4 @@ export type NewInstrumentBgDetails = typeof instrumentBgDetails.$inferInsert;
 export type NewInstrumentChequeDetails = typeof instrumentChequeDetails.$inferInsert;
 export type NewInstrumentTransferDetails = typeof instrumentTransferDetails.$inferInsert;
 export type NewInstrumentStatusHistory = typeof instrumentStatusHistory.$inferInsert;
+export type NewPaymentRequestMom = typeof paymentRequestMom.$inferInsert;

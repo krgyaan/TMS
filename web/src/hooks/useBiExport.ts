@@ -38,8 +38,10 @@ export function useBiExport(config: UseBiExportConfig) {
                 const tabRows: any[] = [];
                 do {
                     const data = await config.getAllFn({ tab: t.key, page, limit });
-                    tabRows.push(...(data.data || []));
-                    total = data.meta?.total || data.data?.length || 0;
+                    const newRows = data.data || [];
+                    if (newRows.length === 0) break;
+                    tabRows.push(...newRows);
+                    total = data.meta?.total || tabRows.length;
                     page++;
                 } while (tabRows.length < total);
                 allRows.push(...tabRows.map(r => ({ ...r, _tab: t.name })));
@@ -52,8 +54,10 @@ export function useBiExport(config: UseBiExportConfig) {
         let total = 0;
         do {
             const data = await config.getAllFn({ tab: tab as any, page, limit });
-            allRows.push(...(data.data || []));
-            total = data.meta?.total || data.data?.length || 0;
+            const newRows = data.data || [];
+            if (newRows.length === 0) break;
+            allRows.push(...newRows);
+            total = data.meta?.total || allRows.length;
             page++;
         } while (allRows.length < total);
         return allRows;

@@ -3,6 +3,7 @@ import type { Response } from 'express';
 import { PaymentRequestsQueryService } from './services/payment-requests.query.service';
 import { PaymentRequestsCommandService } from './services/payment-requests.command.service';
 import { CreatePaymentRequestSchema, UpdatePaymentRequestSchema, UpdateStatusSchema, DashboardQuerySchema, type DashboardResponse, type DashboardCounts, type DashboardTab } from './dto/payment-requests.dto';
+import { CreateMomRemarkSchema } from './dto/payment-mom.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
 import { TimersService } from '@/modules/timers/timers.service';
@@ -92,6 +93,11 @@ export class PaymentRequestsController {
         return this.queryService.findByTenderIdWithTender(tenderId);
     }
 
+    @Get('mom/today')
+    async getTodayMomRemarks() {
+        return this.queryService.getTodayRemarks();
+    }
+
     @Get(':id')
     async findById(@Param('id', ParseIntPipe) id: number) {
         return this.queryService.findById(id);
@@ -105,6 +111,30 @@ export class PaymentRequestsController {
     @Get(':id/edit')
     async findByIdForEdit(@Param('id', ParseIntPipe) id: number) {
         return this.queryService.findByIdForEdit(id);
+    }
+
+    @Post(':requestId/mom')
+    @HttpCode(HttpStatus.CREATED)
+    async addMomRemark(
+        @Param('requestId', ParseIntPipe) requestId: number,
+        @Body() body: unknown,
+        @CurrentUser() user: ValidatedUser,
+    ) {
+        const payload = CreateMomRemarkSchema.parse(body);
+        return this.commandService.createRemark(requestId, payload, user);
+    }
+
+    @Get(':requestId/mom')
+    async getMomRemarksByRequest(@Param('requestId', ParseIntPipe) requestId: number) {
+        return this.queryService.getRemarksByRequestId(requestId);
+    }
+
+    @Get(':requestId/mom/instruments/:instrumentId')
+    async getMomRemarksByInstrument(
+        @Param('requestId', ParseIntPipe) requestId: number,
+        @Param('instrumentId', ParseIntPipe) instrumentId: number,
+    ) {
+        return this.queryService.getRemarksByInstrumentId(instrumentId);
     }
 
     @Patch(':id')

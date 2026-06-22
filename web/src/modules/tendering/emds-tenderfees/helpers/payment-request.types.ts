@@ -226,3 +226,20 @@ export type UpdateStatusDto = {
     status: string;
     remarks?: string;
 };
+
+// MOM (Minutes of Meeting) Remarks
+export interface MomRemark {
+    id: number;
+    requestId: number;
+    instrumentId: number | null;
+    remark: string;
+    addedBy: number;
+    addedByName: string;
+    createdAt: string;
+    updatedAt: string | null;
+}
+
+export interface CreateMomRemarkDto {
+    remark: string;
+    instrumentId?: number | null;
+}

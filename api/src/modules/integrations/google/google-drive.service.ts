@@ -355,6 +355,7 @@ export class GoogleDriveService {
                 sheetId = copyResponse.data.id!;
                 sheetUrl = copyResponse.data.webViewLink!;
             } catch (error: any) {
+                const errorMessage = error?.message || String(error);
                 if (error.code === 404) {
                     this.logger.warn(
                         `Template not found for team ${teamConfig.teamName}, creating blank sheet`,
@@ -365,6 +366,13 @@ export class GoogleDriveService {
                         sheetName,
                         teamConfig.folderId,
                     );
+                }
+                if (errorMessage.includes('Insufficient Permission') || errorMessage.includes('insufficient')) {
+                    throw new ForbiddenException({
+                        message: 'Google Drive permission missing. Please reconnect your Google account with Drive access.',
+                        requiresReconnect: true,
+                        missingScopes: this.driveConfig.requiredScopes,
+                    });
                 }
                 throw error;
             }
@@ -397,17 +405,29 @@ export class GoogleDriveService {
             parents: [folderId],
         };
 
-        const response = await drive.files.create({
-            requestBody: fileMetadata,
-            fields: 'id, webViewLink',
-        });
+        try {
+            const response = await drive.files.create({
+                requestBody: fileMetadata,
+                fields: 'id, webViewLink',
+            });
 
-        return {
-            sheetId: response.data.id!,
-            sheetUrl: response.data.webViewLink!,
-            sheetTitle: sheetName,
-            folderId,
-        };
+            return {
+                sheetId: response.data.id!,
+                sheetUrl: response.data.webViewLink!,
+                sheetTitle: sheetName,
+                folderId,
+            };
+        } catch (error: any) {
+            const errorMessage = error?.message || String(error);
+            if (errorMessage.includes('Insufficient Permission') || errorMessage.includes('insufficient')) {
+                throw new ForbiddenException({
+                    message: 'Google Drive permission missing. Please reconnect your Google account with Drive access.',
+                    requiresReconnect: true,
+                    missingScopes: this.driveConfig.requiredScopes,
+                });
+            }
+            throw error;
+        }
     }
 
     /**

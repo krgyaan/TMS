@@ -14,15 +14,16 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFdrDashboard, useFdrDashboardCounts } from '@/hooks/api/useFdrs';
 import { useBiExport } from '@/hooks/useBiExport';
-import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+
 import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
 import { fdrsService } from '@/services/api/fdrs.service';
 import type { ColDef } from 'ag-grid-community';
 import { AlertCircle, Clock, Edit, Eye, FileX2, Link, MessageSquare, Plus, RotateCcw, Search, Shield, XCircle } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type { DashboardTab, FdrDashboardRow } from './helpers/fdr.types';
+import { usePersistentTableState } from '@/hooks/usePersistentTableState';
 
 const TABS_CONFIG: Array<{ key: DashboardTab; name: string; icon: React.ReactNode; description: string; }> = [
     {
@@ -88,33 +89,25 @@ const getStatusVariant = (status: string | null): string => {
 };
 
 const FdrListPage = () => {
-    const [activeTab, setActiveTab] = useState<DashboardTab>('pending');
+    const {
+        activeTab, setActiveTab,
+        search, setSearch,
+        debouncedSearch,
+        pagination, setPagination,
+        sortModel,
+        handleSortChanged,
+        handlePageSizeChange,
+    } = usePersistentTableState({
+        storageKey: 'fdrs',
+        defaultTab: 'pending' as DashboardTab,
+    });
     const navigate = useNavigate();
-    const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 50 });
-    const [sortModel, setSortModel] = useState<{ colId: string; sort: 'asc' | 'desc' }[]>([]);
-    const [search, setSearch] = useState<string>('');
-    const debouncedSearch = useDebouncedSearch(search, 300);
     const [teamFilter, setTeamFilter] = useState<string>('All');
     const teamId = teamFilter === 'All' ? undefined : teamFilter === 'AC' ? 1 : 2;
 
     useEffect(() => {
         setPagination(p => ({ ...p, pageIndex: 0 }));
     }, [teamFilter]);
-
-    const handlePageSizeChange = useCallback((newPageSize: number) => {
-        setPagination({ pageIndex: 0, pageSize: newPageSize });
-    }, []);
-
-    const handleSortChanged = useCallback((event: any) => {
-        const sortModel = event.api.getColumnState()
-            .filter((col: any) => col.sort)
-            .map((col: any) => ({
-                colId: col.colId,
-                sort: col.sort as 'asc' | 'desc'
-            }));
-        setSortModel(sortModel);
-        setPagination(p => ({ ...p, pageIndex: 0 }));
-    }, []);
 
     const flattenFormData = (data: Record<string, any>): Record<string, any> => {
         const out: Record<string, any> = {};
@@ -201,7 +194,7 @@ const FdrListPage = () => {
             {
                 label: 'Meeting Remarks',
                 icon: <MessageSquare className="h-4 w-4" />,
-                onClick: (row: FdrDashboardRow) => navigate(paths.bi.FdrMeetingRemarksPage(row.id)),
+                onClick: (row: FdrDashboardRow) => navigate(paths.bi.FdrMeetingRemarksPage(row.requestId)),
             }
         ],
         [navigate]
