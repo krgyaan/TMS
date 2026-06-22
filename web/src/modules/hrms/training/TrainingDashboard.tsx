@@ -765,16 +765,6 @@ const TrainingVideos = () => {
                         <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full bg-violet-500/10 blur-3xl" />
 
                         <div className="relative px-7 pt-7 pb-5">
-                            <div className="absolute top-4 right-4">
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-9 w-9 rounded-xl bg-background/40 backdrop-blur-sm hover:bg-background/60 border border-border/20"
-                                    onClick={() => setIsAssignOpen(false)}
-                                >
-                                    <X className="h-4 w-4" />
-                                </Button>
-                            </div>
 
                             <div className="flex items-center gap-4">
                                 <div className="h-12 w-12 rounded-2xl bg-primary/15 border border-primary/20 flex items-center justify-center shadow-lg shadow-primary/10">
