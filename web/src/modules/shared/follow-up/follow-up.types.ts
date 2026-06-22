@@ -75,7 +75,7 @@ export const CreateFollowUpSchema = z.object({
     comment: z.string().optional(),
 
     contacts: z.array(ContactPersonSchema),
-    followupFor: z.string().optional(),
+    followupFor: z.string().min(1, "Followup reason is required"),
 
     startFrom: z.string().optional(), // YYYY-MM-DD
     emdId: z.number().nullable().optional(),
@@ -94,7 +94,7 @@ export const CreateFollowUpFormSchema = z.object({
 
     contacts: z.array(ContactPersonFormSchema).min(1, "Add at least one contact person"),
 
-    followupFor: z.string().optional(),
+    followupFor: z.string().min(1, "Followup reason is required"),
 });
 
 export type CreateFollowUpFormValues = z.infer<typeof CreateFollowUpFormSchema>;

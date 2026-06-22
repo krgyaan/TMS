@@ -31,7 +31,7 @@ export const createFollowUpSchema = z.object({
         .default(0),
 
     // VARCHAR(50) in DB
-    followupFor: z.string().nullable().optional(),
+    followupFor: z.string().min(1, "Followup reason is required"),
 
     assignedToId: z.number().nonnegative().nullable(), // DB allows NULL
     createdById: z.number().nonnegative().nullable(), // DB allows NULL
