@@ -19,7 +19,7 @@ import { formatINR } from '@/hooks/useINRFormatter';
 import type { TenderCostingSheet } from '@/modules/tendering/costing-sheets/helpers/costingSheet.types';
 import type { VendorOrganization } from '@/types/api.types';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { AlertTriangle, ArrowLeft, Building2, Calendar, CheckCircle2, Clock, ExternalLink, FileText, FileWarning, IndianRupee, Paperclip, Percent, Save, User } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Building2, Calendar, CheckCircle2, Clock, ExternalLink, FileText, FileWarning, Paperclip, Save, User } from 'lucide-react';
 import { useEffect } from 'react';
 import { type SubmitHandler, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
@@ -179,7 +179,7 @@ export default function CostingApprovalForm({
                             <h4 className="font-semibold text-base text-primary border-b pb-2">
                                 Tender Information
                             </h4>
-                            <div className="grid gap-4 md:grid-cols-2 bg-muted/30 p-4 rounded-lg">
+                            <div className="grid gap-4 grid-cols-1 md:grid-cols-3 lg:grid-cols-4 bg-muted/30 p-4 rounded-lg">
                                 <div>
                                     <p className="text-sm font-medium text-muted-foreground">Tender No</p>
                                     <p className="text-base font-semibold">{tenderDetails.tenderNo}</p>
@@ -188,7 +188,7 @@ export default function CostingApprovalForm({
                                     <p className="text-sm font-medium text-muted-foreground">Team Member</p>
                                     <p className="text-base font-semibold">{tenderDetails.teamMemberName || '—'}</p>
                                 </div>
-                                <div className="md:col-span-2">
+                                <div>
                                     <p className="text-sm font-medium text-muted-foreground">Tender Name</p>
                                     <p className="text-base font-semibold">{tenderDetails.tenderName}</p>
                                 </div>
@@ -220,40 +220,39 @@ export default function CostingApprovalForm({
                                         </h5>
                                     </div>
 
-                                    <div>
-                                        <p className="text-xs font-medium text-muted-foreground mb-1">Final Price (GST Inclusive)</p>
-                                        <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
-                                            {costingSheet.submittedFinalPrice
-                                                ? formatINR(parseFloat(costingSheet.submittedFinalPrice))
-                                                : '—'}
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <p className="text-xs font-medium text-muted-foreground mb-1">Receipt (Pre GST)</p>
-                                        <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
-                                            {costingSheet.submittedReceiptPrice
-                                                ? formatINR(parseFloat(costingSheet.submittedReceiptPrice))
-                                                : '—'}
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <p className="text-xs font-medium text-muted-foreground mb-1">Budget (Pre GST)</p>
-                                        <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
-                                            {costingSheet.submittedBudgetPrice
-                                                ? formatINR(parseFloat(costingSheet.submittedBudgetPrice))
-                                                : '—'}
-                                        </p>
-                                    </div>
-
-                                    <div>
-                                        <p className="text-xs font-medium text-muted-foreground mb-1">Gross Margin</p>
-                                        <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
-                                            {costingSheet.submittedGrossMargin
-                                                ? `${costingSheet.submittedGrossMargin}%`
-                                                : '—'}
-                                        </p>
+                                    <div className='grid grid-cols-1 md:grid-cols-2'>
+                                        <div>
+                                            <p className="text-xs font-medium text-muted-foreground mb-1">Final Price (GST Inclusive)</p>
+                                            <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
+                                                {costingSheet.submittedFinalPrice
+                                                    ? formatINR(parseFloat(costingSheet.submittedFinalPrice))
+                                                    : '—'}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-medium text-muted-foreground mb-1">Receipt (Pre GST)</p>
+                                            <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
+                                                {costingSheet.submittedReceiptPrice
+                                                    ? formatINR(parseFloat(costingSheet.submittedReceiptPrice))
+                                                    : '—'}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-medium text-muted-foreground mb-1">Budget (Pre GST)</p>
+                                            <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
+                                                {costingSheet.submittedBudgetPrice
+                                                    ? formatINR(parseFloat(costingSheet.submittedBudgetPrice))
+                                                    : '—'}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-medium text-muted-foreground mb-1">Gross Margin</p>
+                                            <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
+                                                {costingSheet.submittedGrossMargin
+                                                    ? `${costingSheet.submittedGrossMargin}%`
+                                                    : '—'}
+                                            </p>
+                                        </div>
                                     </div>
 
                                     <div>
@@ -272,82 +271,68 @@ export default function CostingApprovalForm({
                                             TL Approved Values
                                         </h5>
                                     </div>
-
-                                    <FieldWrapper
-                                        control={form.control}
-                                        name="finalPrice"
-                                        label="Final Price (GST Inclusive)"
-                                    >
-                                        {(field) => (
-                                            <div className="relative">
-                                                <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                    <div className='grid grid-cols-1 md:grid-cols-2 gap-3'>
+                                        <FieldWrapper
+                                            control={form.control}
+                                            name="finalPrice"
+                                            label="Final Price (GST Inclusive)"
+                                        >
+                                            {(field) => (
                                                 <Input
                                                     {...field}
                                                     type="number"
                                                     step="0.01"
-                                                    className="pl-10"
                                                     placeholder="Enter final price"
                                                 />
-                                            </div>
-                                        )}
-                                    </FieldWrapper>
-
-                                    <FieldWrapper
-                                        control={form.control}
-                                        name="receiptPrice"
-                                        label="Receipt (Pre GST)"
-                                    >
-                                        {(field) => (
-                                            <div className="relative">
-                                                <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                            )}
+                                        </FieldWrapper>
+    
+                                        <FieldWrapper
+                                            control={form.control}
+                                            name="receiptPrice"
+                                            label="Receipt (Pre GST)"
+                                        >
+                                            {(field) => (
                                                 <Input
                                                     {...field}
                                                     type="number"
                                                     step="0.01"
-                                                    className="pl-10"
                                                     placeholder="Enter receipt price"
                                                 />
-                                            </div>
-                                        )}
-                                    </FieldWrapper>
-
-                                    <FieldWrapper
-                                        control={form.control}
-                                        name="budgetPrice"
-                                        label="Budget (Pre GST)"
-                                    >
-                                        {(field) => (
-                                            <div className="relative">
-                                                <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                            )}
+                                        </FieldWrapper>
+    
+                                        <FieldWrapper
+                                            control={form.control}
+                                            name="budgetPrice"
+                                            label="Budget (Pre GST)"
+                                        >
+                                            {(field) => (
                                                 <Input
                                                     {...field}
                                                     type="number"
                                                     step="0.01"
-                                                    className="pl-10"
                                                     placeholder="Enter budget price"
                                                 />
-                                            </div>
-                                        )}
-                                    </FieldWrapper>
-
-                                    <FieldWrapper
-                                        control={form.control}
-                                        name="grossMargin"
-                                        label="Gross Margin %"
-                                    >
-                                        {(field) => (
-                                            <div className="relative">
-                                                <Percent className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                            )}
+                                        </FieldWrapper>
+    
+                                        <FieldWrapper
+                                            control={form.control}
+                                            name="grossMargin"
+                                            label="Gross Margin %"
+                                        >
+                                            {(field) => (
                                                 <Input
                                                     {...field}
                                                     type="text"
-                                                    className="pl-10 bg-muted"
+                                                    className="bg-muted"
                                                     placeholder="Auto-calculated"
                                                     readOnly
                                                 />
-                                            </div>
-                                        )}
-                                    </FieldWrapper>
+                                            )}
+                                        </FieldWrapper>
+                                    </div>
                                 </div>
                             </div>
                         </div>

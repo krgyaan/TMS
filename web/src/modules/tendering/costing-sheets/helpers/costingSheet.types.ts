@@ -84,19 +84,23 @@ export interface CostingSheetDashboardRowWithTimer extends CostingSheetDashboard
 }
 export type SubmitCostingSheetDto = {
     tenderId: number;
-    submittedFinalPrice: string;
-    submittedReceiptPrice: string;
-    submittedBudgetPrice: string;
-    submittedGrossMargin: string;
-    teRemarks: string;
+    details: {
+        submittedFinalPrice: string;
+        submittedReceiptPrice: string;
+        submittedBudgetPrice: string;
+        submittedGrossMargin: string;
+        teRemarks: string;
+    }[];
 };
 
 export type UpdateCostingSheetDto = {
-    submittedFinalPrice: string;
-    submittedReceiptPrice: string;
-    submittedBudgetPrice: string;
-    submittedGrossMargin: string;
-    teRemarks: string;
+    details: {
+        submittedFinalPrice: string;
+        submittedReceiptPrice: string;
+        submittedBudgetPrice: string;
+        submittedGrossMargin: string;
+        teRemarks: string;
+    }[];
 };
 
 export type CostingSheetTab = 'pending' | 'submitted' | 'tender-dnb';

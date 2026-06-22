@@ -894,12 +894,12 @@ export class CostingSheetsService {
             dueDate, dueTime, teName,
         };
 
-        await this.sendEmail('costing-sheet.submitted', tenderId, submittedBy,
+        await this.sendEmail('costing-sheet.submitted', tenderId, 13,
             `Costing Sheet submitted - ${tender.tenderName}`,
             'costing-sheet-submitted', emailData,
             {
-                to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
-                cc: [{ type: 'role', role: 'Admin', teamId: tender.team }],
+                to: [{ type: 'emails', emails: ['gyan@volksenergie.in'] }],
+                // cc: [{ type: 'role', role: 'Admin', teamId: tender.team }],
             }
         );
     }

@@ -3,7 +3,8 @@ import { costingSheetsService } from '@/services/api/costing-sheets.service';
 import { costingApprovalsService } from '@/services/api/costing-approvals.service';
 import type { PaginatedResult } from '@/types/api.types';
 import { toast } from 'sonner';
-import type { CostingSheetDashboardCounts, CostingSheetDashboardRow, TabKey, CostingSheetListParams, CreateCostingDetailDto } from '@/modules/tendering/costing-sheets/helpers/costingSheet.types';
+import type { CostingSheetDashboardCounts, CostingSheetDashboardRow, CostingSheetTab, CostingSheetListParams, CreateCostingDetailDto, SubmitCostingSheetDto } from '@/modules/tendering/costing-sheets/helpers/costingSheet.types';
+import type { ApproveCostingDto } from '@/modules/tendering/costing-approvals/helpers/costingApproval.types';
 import { useTeamFilter } from '@/hooks/useTeamFilter';
 
 export const costingSheetsKey = {
@@ -16,7 +17,7 @@ export const costingSheetsKey = {
 };
 
 export const useCostingSheets = (
-    tab?: TabKey,
+    tab?: CostingSheetTab,
     pagination: { page: number; limit: number; search?: string } = { page: 1, limit: 50 },
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
@@ -72,7 +73,7 @@ export const useSubmitCostingSheet = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (data) => costingSheetsService.submit(data),
+        mutationFn: (data: SubmitCostingSheetDto) => costingSheetsService.submit(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: costingSheetsKey.all });
             queryClient.invalidateQueries({ queryKey: costingSheetsKey.dashboardCounts() });
@@ -249,7 +250,7 @@ export const useUpdateApprovedCostingDetail = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: { finalPrice?: string; receiptPrice?: string; budgetPrice?: string; grossMargin?: string; tlRemarks?: string } }) =>
+        mutationFn: ({ id, data }: { id: number; data: ApproveCostingDto }) =>
             costingApprovalsService.updateApproved(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: costingDetailsKey.all });

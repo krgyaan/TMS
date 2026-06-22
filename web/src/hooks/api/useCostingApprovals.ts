@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { costingApprovalsService } from '@/services/api/costing-approvals.service';
-import type { CostingApprovalListParams, CostingApprovalDashboardRow, CostingApprovalDashboardCounts, TabKey, ApproveCostingDto, RejectCostingDto } from '@/modules/tendering/costing-approvals/helpers/costingApproval.types';
+import type { CostingApprovalListParams, CostingApprovalDashboardRow, CostingApprovalDashboardCounts, CostingApprovalTab, ApproveCostingDto, RejectCostingDto } from '@/modules/tendering/costing-approvals/helpers/costingApproval.types';
 import { toast } from 'sonner';
 import type { PaginatedResult } from '@/types/api.types';
 import { useTeamFilter } from '@/hooks/useTeamFilter';
@@ -14,7 +14,7 @@ export const costingApprovalsKey = {
 };
 
 export const useCostingApprovals = (
-    tab?: TabKey,
+    tab?: CostingApprovalTab,
     pagination: { page: number; limit: number; search?: string } = { page: 1, limit: 50 },
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
