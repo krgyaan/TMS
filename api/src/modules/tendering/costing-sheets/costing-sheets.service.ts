@@ -316,22 +316,23 @@ export class CostingSheetsService {
     }
 
     async findByTenderId(tenderId: number) {
+        this.logger.debug(`Getting Sheet for tenderId: ${tenderId}`)
         const [sheet] = await this.db
             .select()
             .from(tenderCostingSheets)
             .where(eq(tenderCostingSheets.tenderId, tenderId))
             .limit(1);
-
-        if (!sheet[0]) return null;
+            
+        if (!sheet) throw new NotFoundException('Costing sheet not found');
 
         const details = await this.db
             .select()
             .from(tenderCostingDetails)
-            .where(eq(tenderCostingDetails.tenderCostingSheetId, sheet[0].id))
+            .where(eq(tenderCostingDetails.tenderCostingSheetId, sheet.id))
             .orderBy(asc(tenderCostingDetails.id));
 
         return {
-            ...sheet[0],
+            ...sheet,
             details,
         };
     }

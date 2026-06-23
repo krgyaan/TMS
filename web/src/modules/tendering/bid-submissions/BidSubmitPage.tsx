@@ -31,7 +31,7 @@ export default function BidSubmitPage() {
 
     if (!tenderDetails) return <div>Tender not found</div>;
 
-    if (!costingSheet || costingSheet.status !== 'Approved') {
+    if (!costingSheet || costingSheet.details[0].status !== 'Approved') {
         return (
             <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />

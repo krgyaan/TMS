@@ -226,8 +226,8 @@ export class BidSubmissionsService {
                 case 'finalCosting':
                     orderByClause = sortFn(
                         sql`(SELECT SUM(${tenderCostingDetails.finalPrice}) FROM ${tenderCostingDetails}
-                            INNER JOIN ${tenderCostingSheets} s ON s.id = ${tenderCostingDetails.tenderCostingSheetId}
-                            WHERE s.${tenderCostingSheets.tenderId} = ${tenderInfos.id}
+                            INNER JOIN ${tenderCostingSheets} ON ${tenderCostingSheets.id} = ${tenderCostingDetails.tenderCostingSheetId}
+                            WHERE ${tenderCostingSheets.tenderId} = ${tenderInfos.id}
                             AND ${tenderCostingDetails.status} = 'Approved')`
                     );
                     break;
@@ -265,12 +265,12 @@ export class BidSubmissionsService {
                 gstValues: tenderInfos.gstValues,
                 costingSheetId: tenderCostingSheets.id,
                 finalCosting: sql<string>`(SELECT SUM(${tenderCostingDetails.finalPrice}) FROM ${tenderCostingDetails}
-                    INNER JOIN ${tenderCostingSheets} s ON s.id = ${tenderCostingDetails.tenderCostingSheetId}
-                    WHERE s.${tenderCostingSheets.tenderId} = ${tenderInfos.id}
+                    INNER JOIN ${tenderCostingSheets} ON ${tenderCostingSheets.id} = ${tenderCostingDetails.tenderCostingSheetId}
+                    WHERE ${tenderCostingSheets.tenderId} = ${tenderInfos.id}
                     AND ${tenderCostingDetails.status} = 'Approved')`,
                 costingStatus: sql<string>`(SELECT ${tenderCostingDetails.status} FROM ${tenderCostingDetails}
-                    INNER JOIN ${tenderCostingSheets} s ON s.id = ${tenderCostingDetails.tenderCostingSheetId}
-                    WHERE s.${tenderCostingSheets.tenderId} = ${tenderInfos.id}
+                    INNER JOIN ${tenderCostingSheets} ON ${tenderCostingSheets.id} = ${tenderCostingDetails.tenderCostingSheetId}
+                    WHERE ${tenderCostingSheets.tenderId} = ${tenderInfos.id}
                     AND ${tenderCostingDetails.status} = 'Approved'
                     LIMIT 1)`,
                 bidSubmissionId: bidSubmissions.id,
