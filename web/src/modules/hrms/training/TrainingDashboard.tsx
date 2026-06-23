@@ -72,13 +72,6 @@ const scaleIn = {
     visible: { opacity: 1, scale: 1, transition: { duration: 0.4, ease: "easeOut" } }
 };
 
-const MOCK_EMPLOYEES = [
-    { id: 101, name: "Aarav Sharma", dept: "Tendering", designation: "Executive", avatar: "AS" },
-    { id: 102, name: "Ishita Patel", dept: "Operations", designation: "Engineer", avatar: "IP" },
-    { id: 103, name: "Kabir Mehta", dept: "Services", designation: "Field Engineer", avatar: "KM" },
-    { id: 104, name: "Meera Nair", dept: "Accounts", designation: "Team Leader", avatar: "MN" },
-    { id: 105, name: "Rohan Das", dept: "HR", designation: "Coordinator", avatar: "RD" }
-];
 
 const TrainingVideos = () => {
     const navigate = useNavigate();
@@ -92,7 +85,7 @@ const TrainingVideos = () => {
     const assignMutation = useAssignTrainingVideo();
 
     const employeesList = useMemo(() => {
-        if (dbEmployees.length === 0) return MOCK_EMPLOYEES;
+        if (dbEmployees.length === 0) return [];
         return dbEmployees.map(e => ({
             id: e.id,
             name: e.name,
