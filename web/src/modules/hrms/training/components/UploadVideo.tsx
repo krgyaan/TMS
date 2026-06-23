@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import {
@@ -45,6 +45,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
+import { paths } from "@/app/routes/paths";
+import { useUploadTrainingVideo, useTrainingEmployees, useAssignTrainingVideo } from "@/hooks/api/useTraining";
+
+
 
 const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
@@ -84,6 +88,7 @@ const UploadVideo = () => {
     // File State
     const [isDragging, setIsDragging] = useState(false);
     const [selectedFile, setSelectedFile] = useState<{ name: string; size: string; type: string } | null>(null);
+    const [fileObject, setFileObject] = useState<File | null>(null);
     const [uploadPhase, setUploadPhase] = useState<UploadPhase>("idle");
     const [uploadProgress, setUploadProgress] = useState(0);
     const [processingStep, setProcessingStep] = useState("");
@@ -103,6 +108,18 @@ const UploadVideo = () => {
     const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<number[]>([]);
     const [employeeSearch, setEmployeeSearch] = useState("");
 
+    const { data: dbEmployees = [] } = useTrainingEmployees();
+    const employeesList = useMemo(() => {
+        if (dbEmployees.length === 0) return MOCK_EMPLOYEES;
+        return dbEmployees.map(e => ({
+            id: e.id,
+            name: e.name,
+            dept: e.dept || "General",
+            designation: e.designation || "Staff",
+            avatar: e.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
+        }));
+    }, [dbEmployees]);
+
     // Extracted metadata (simulated)
     const [metadata, setMetadata] = useState<{
         duration: string;
@@ -112,36 +129,52 @@ const UploadVideo = () => {
         bitrate: string;
     } | null>(null);
 
-    const filteredEmployees = MOCK_EMPLOYEES.filter(emp =>
-        emp.name.toLowerCase().includes(employeeSearch.toLowerCase()) ||
-        emp.dept.toLowerCase().includes(employeeSearch.toLowerCase())
-    );
+    const filteredEmployees = useMemo(() => {
+        return employeesList.filter(emp =>
+            emp.name.toLowerCase().includes(employeeSearch.toLowerCase()) ||
+            emp.dept.toLowerCase().includes(employeeSearch.toLowerCase())
+        );
+    }, [employeesList, employeeSearch]);
+
 
     const handleFileDrop = useCallback((e: React.DragEvent) => {
         e.preventDefault();
         setIsDragging(false);
-        simulateFileSelect("training_module_2026.mp4", "124.8 MB");
+        const file = e.dataTransfer.files?.[0];
+        if (file) {
+            const sizeStr = (file.size / (1024 * 1024)).toFixed(1) + " MB";
+            setFileObject(file);
+            setSelectedFile({ name: file.name, size: sizeStr, type: file.type });
+            toast.success("Video file selected successfully!");
+            setMetadata({
+                duration: "Calculating...",
+                resolution: "Processing...",
+                codec: "MP4 / H.264",
+                fps: "30 fps",
+                bitrate: "Auto"
+            });
+        } else {
+            toast.error("Please drop a valid video file.");
+        }
     }, []);
 
-    const handleFileInputChange = () => {
-        simulateFileSelect("training_module_2026.mp4", "124.8 MB");
-    };
-
-    const simulateFileSelect = (name: string, size: string) => {
-        setSelectedFile({ name, size, type: "video/mp4" });
-        toast.success("Video file selected successfully!");
-
-        // Simulate metadata extraction
-        setTimeout(() => {
+    const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const sizeStr = (file.size / (1024 * 1024)).toFixed(1) + " MB";
+            setFileObject(file);
+            setSelectedFile({ name: file.name, size: sizeStr, type: file.type });
+            toast.success("Video file selected successfully!");
             setMetadata({
-                duration: "18m 42s",
-                resolution: "1920×1080",
-                codec: "H.264 (AVC)",
+                duration: "Calculating...",
+                resolution: "Processing...",
+                codec: "MP4 / H.264",
                 fps: "30 fps",
-                bitrate: "8.2 Mbps"
+                bitrate: "Auto"
             });
-        }, 800);
+        }
     };
+
 
     const removeFile = () => {
         setSelectedFile(null);
@@ -170,16 +203,19 @@ const UploadVideo = () => {
         );
     };
 
+    const uploadMutation = useUploadTrainingVideo();
+    const assignMutation = useAssignTrainingVideo();
+
     const selectAllEmployees = () => {
-        if (selectedEmployeeIds.length === MOCK_EMPLOYEES.length) {
+        if (selectedEmployeeIds.length === employeesList.length) {
             setSelectedEmployeeIds([]);
         } else {
-            setSelectedEmployeeIds(MOCK_EMPLOYEES.map(e => e.id));
+            setSelectedEmployeeIds(employeesList.map(e => e.id));
         }
     };
 
-    const handleSubmit = () => {
-        if (!selectedFile) {
+    const handleSubmit = async () => {
+        if (!fileObject) {
             toast.error("Please select a video file first.");
             return;
         }
@@ -192,53 +228,52 @@ const UploadVideo = () => {
             return;
         }
 
-        // Start upload simulation
-        setUploadPhase("uploading");
-        setUploadProgress(0);
+        try {
+            setUploadPhase("uploading");
+            setUploadProgress(20);
 
-        const uploadInterval = setInterval(() => {
-            setUploadProgress(prev => {
-                if (prev >= 100) {
-                    clearInterval(uploadInterval);
-                    setUploadPhase("processing");
-                    simulateProcessing();
-                    return 100;
-                }
-                return prev + Math.random() * 8 + 2;
-            });
-        }, 200);
-    };
+            const formData = new FormData();
+            formData.append("file", fileObject);
+            formData.append("title", title);
+            formData.append("description", description);
+            formData.append("category", category);
+            formData.append("completionThreshold", completionThreshold);
 
-    const simulateProcessing = () => {
-        const steps = [
-            "Analyzing video container...",
-            "Extracting audio streams...",
-            "Generating thumbnail previews...",
-            "Encoding adaptive bitrate variants...",
-            "Building chapter markers...",
-            "Optimizing for streaming delivery...",
-            "Finalizing course metadata..."
-        ];
+            setUploadProgress(50);
+            const newVideo = await uploadMutation.mutateAsync(formData);
 
-        let stepIndex = 0;
-        const stepInterval = setInterval(() => {
-            if (stepIndex < steps.length) {
-                setProcessingStep(steps[stepIndex]);
-                stepIndex++;
-            } else {
-                clearInterval(stepInterval);
-                setUploadPhase("complete");
-                toast.success(`"${title}" has been uploaded and processed successfully!`);
-                if (assignOnUpload && selectedEmployeeIds.length > 0) {
-                    const names = selectedEmployeeIds.map(id => MOCK_EMPLOYEES.find(e => e.id === id)?.name).filter(Boolean).join(", ");
-                    toast.success(`Course assigned to: ${names}`);
-                }
+            setUploadProgress(85);
+            setUploadPhase("processing");
+            setProcessingStep("Finalizing course metadata...");
+
+            if (assignOnUpload && selectedEmployeeIds.length > 0) {
+                setProcessingStep("Assigning course to team members...");
+                await assignMutation.mutateAsync({
+                    videoId: newVideo.id,
+                    userIds: selectedEmployeeIds
+                });
             }
-        }, 700);
+
+            setUploadProgress(100);
+            setUploadPhase("complete");
+            toast.success(`"${title}" uploaded and queued for processing!`);
+
+            setTimeout(() => {
+                navigate(paths.hrms.trainingDashboard);
+            }, 1200);
+
+        } catch (error: any) {
+            setUploadPhase("idle");
+            console.error("Upload failed:", error);
+            const msg = error?.response?.data?.message || "Failed to upload video course";
+            toast.error(msg);
+        }
     };
+
 
     const resetForm = () => {
         setSelectedFile(null);
+        setFileObject(null);
         setMetadata(null);
         setUploadPhase("idle");
         setUploadProgress(0);

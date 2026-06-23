@@ -37,6 +37,16 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import {
+    useEmployeeAssignments,
+    useLogProgress,
+    useVideoReactions,
+    useAddReaction,
+    useRemoveReaction,
+    useVideoComments,
+    useAddComment
+} from "@/hooks/api/useTraining";
+import { type VideoCourse as ApiVideoCourse } from "@/services/api/training.service";
 
 const staggerContainer = {
     hidden: { opacity: 0 },
@@ -85,85 +95,28 @@ interface Comment {
 }
 
 const EmployeeTrainingDashboard = () => {
-    const [assignedVideos, setAssignedVideos] = useState<VideoCourse[]>([
-        {
-            id: 1,
-            title: "Introduction to Company Values & Culture",
-            description: "Learn about our company's core values, mission statement, and workplace culture guidelines that define how we work together.",
-            category: "Onboarding",
-            duration: "0m 15s",
-            progress: 45,
-            status: "In Progress",
-            videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4"
-        },
-        {
-            id: 2,
-            title: "Information Security & Cyber Awareness",
-            description: "Important security rules regarding password hygiene, phishing recognition, and confidential data handling procedures.",
-            category: "Compliance",
-            duration: "0m 15s",
-            progress: 0,
-            status: "Assigned",
-            videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4"
-        },
-        {
-            id: 3,
-            title: "Government Tender Submission Guidelines",
-            description: "Step-by-step procedures for preparing and submitting procurement proposals for government bids and tenders.",
-            category: "Tendering",
-            duration: "0m 15s",
-            progress: 10,
-            status: "In Progress",
-            videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4"
-        }
-    ]);
-
-    const [completedVideos, setCompletedVideos] = useState<VideoCourse[]>([
-        {
-            id: 10,
-            title: "Workplace Safety & First Aid Basics",
-            description: "Basic safety training covering fire exits, first aid box usage, and building emergency contacts for all employees.",
-            category: "Compliance",
-            duration: "0m 15s",
-            progress: 100,
-            status: "Completed",
-            videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4"
-        }
-    ]);
+    const { data: apiAssignments = [], isLoading: isAssignmentsLoading } = useEmployeeAssignments();
+    const assignments = apiAssignments as any as VideoCourse[];
 
     const [activeVideo, setActiveVideo] = useState<VideoCourse | null>(null);
 
-    const [commentsMap, setCommentsMap] = useState<Record<number, Comment[]>>({
-        1: [
-            {
-                id: 1001,
-                userName: "Aarav Sharma",
-                body: "Great intro video! Very clear explanation of our key principles. Would love to see more content like this.",
-                createdAt: "2 Hours ago",
-                replies: [
-                    { id: 1002, userName: "Meera Nair (TL)", body: "Glad you found it helpful Aarav! More coming soon.", createdAt: "1 Hour ago" }
-                ]
-            },
-            {
-                id: 1003,
-                userName: "Rohan Das",
-                body: "The section about team collaboration was really insightful. Thanks for putting this together!",
-                createdAt: "4 Hours ago",
-                replies: []
-            }
-        ]
-    });
+    // Fetch comments and reactions for active video
+    const { data: activeVideoComments = [] } = useVideoComments(activeVideo?.id ?? 0, !!activeVideo);
+    const { data: activeVideoReactions = { helpful: 0, important: 0, confusing: 0, myReaction: null } } = useVideoReactions(activeVideo?.id ?? 0, !!activeVideo);
 
-    const [reactionsMap, setReactionsMap] = useState<Record<number, { helpful: number; important: number; confusing: number; myReaction: string | null }>>({
-        1: { helpful: 12, important: 4, confusing: 0, myReaction: null },
-        2: { helpful: 8, important: 2, confusing: 0, myReaction: null },
-        3: { helpful: 5, important: 1, confusing: 1, myReaction: null }
-    });
+    const logProgressMutation = useLogProgress();
+    const addCommentMutation = useAddComment(activeVideo?.id ?? 0);
+    const addReactionMutation = useAddReaction(activeVideo?.id ?? 0);
+    const removeReactionMutation = useRemoveReaction(activeVideo?.id ?? 0);
 
     const [commentText, setCommentText] = useState("");
     const [replyTextMap, setReplyTextMap] = useState<Record<number, string>>({});
     const [activeReplyId, setActiveReplyId] = useState<number | null>(null);
     const videoRef = useRef<HTMLVideoElement | null>(null);
+    const lastPingTimeRef = useRef<number>(0);
+
+    const assignedVideos = useMemo(() => assignments.filter(v => v.status !== "Completed"), [assignments]);
+    const completedVideos = useMemo(() => assignments.filter(v => v.status === "Completed"), [assignments]);
 
     const counts = useMemo(() => ({
         assigned: assignedVideos.length,
@@ -174,6 +127,17 @@ const EmployeeTrainingDashboard = () => {
             ? Math.round(assignedVideos.reduce((acc, v) => acc + v.progress, 0) / assignedVideos.length)
             : 0
     }), [assignedVideos, completedVideos]);
+
+    if (isAssignmentsLoading) {
+        return (
+            <div className="min-h-screen bg-background flex items-center justify-center">
+                <div className="flex flex-col items-center gap-3">
+                    <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                    <span className="text-sm font-semibold text-muted-foreground">Loading trainings...</span>
+                </div>
+            </div>
+        );
+    }
 
     const getCategoryStyle = (category: string) => {
         const styles: Record<string, { bg: string; text: string; border: string; icon: string }> = {
@@ -191,35 +155,35 @@ const EmployeeTrainingDashboard = () => {
         if (!videoRef.current || !activeVideo) return;
         const video = videoRef.current;
         if (video.duration) {
-            const currentPct = Math.round((video.currentTime / video.duration) * 100);
-            if (currentPct > activeVideo.progress && currentPct <= 100) {
+            const currentPct = Math.min(100, Math.round((video.currentTime / video.duration) * 100));
+            
+            if (currentPct !== activeVideo.progress && currentPct <= 100) {
                 setActiveVideo(prev => prev ? { ...prev, progress: currentPct } : null);
-                setAssignedVideos(prev => prev.map(v => {
-                    if (v.id === activeVideo.id) {
-                        const nextStatus = currentPct >= 90 ? "Completed" as const : "In Progress" as const;
-                        return { ...v, progress: currentPct, status: nextStatus };
-                    }
-                    return v;
-                }));
-                if (currentPct >= 90 && activeVideo.status !== "Completed") {
-                    handleVideoCompletion(activeVideo);
+            }
+
+            const nowTime = Date.now();
+            const elapsedSinceLastPing = nowTime - lastPingTimeRef.current;
+            const threshold = activeVideo.completionThreshold || 90;
+
+            if (elapsedSinceLastPing >= 15000 || (currentPct >= threshold && activeVideo.progress < threshold)) {
+                lastPingTimeRef.current = nowTime;
+                logProgressMutation.mutate({
+                    videoId: activeVideo.id,
+                    lastPositionSecs: Math.round(video.currentTime),
+                    totalWatchSecs: Math.round(Math.max(1, elapsedSinceLastPing / 1000)),
+                    completionPct: currentPct
+                });
+
+                if (currentPct >= threshold && activeVideo.progress < threshold) {
+                    toast.success(`🎉 Congratulations! You completed "${activeVideo.title}"`);
                 }
             }
         }
     };
 
-    const handleVideoCompletion = (video: VideoCourse) => {
-        toast.success(`🎉 Congratulations! You completed "${video.title}"`);
-        setAssignedVideos(prev => prev.filter(v => v.id !== video.id));
-        setCompletedVideos(prev => {
-            if (prev.some(v => v.id === video.id)) return prev;
-            return [...prev, { ...video, progress: 100, status: "Completed" as const }];
-        });
-        setActiveVideo(prev => prev ? { ...prev, progress: 100, status: "Completed" as const } : null);
-    };
-
     const handleStartWatch = (video: VideoCourse) => {
         setActiveVideo(video);
+        lastPingTimeRef.current = Date.now();
         if (video.progress > 0 && video.progress < 90) {
             toast.info(`Resuming from ${video.progress}% — keep going!`);
         }
@@ -237,62 +201,31 @@ const EmployeeTrainingDashboard = () => {
     const handleAddComment = (e: React.FormEvent) => {
         e.preventDefault();
         if (!commentText.trim() || !activeVideo) return;
-        const newComment: Comment = {
-            id: Date.now(),
-            userName: "You",
-            body: commentText,
-            createdAt: "Just now",
-            replies: []
-        };
-        setCommentsMap(prev => ({
-            ...prev,
-            [activeVideo.id]: [newComment, ...(prev[activeVideo.id] || [])]
-        }));
-        setCommentText("");
-        toast.success("Comment posted!");
+        addCommentMutation.mutate({ body: commentText }, {
+            onSuccess: () => {
+                setCommentText("");
+            }
+        });
     };
 
     const handleAddReply = (commentId: number) => {
         const replyText = replyTextMap[commentId];
         if (!replyText?.trim() || !activeVideo) return;
-        const newReply: CommentReply = {
-            id: Date.now(),
-            userName: "You",
-            body: replyText,
-            createdAt: "Just now"
-        };
-        setCommentsMap(prev => ({
-            ...prev,
-            [activeVideo.id]: (prev[activeVideo.id] || []).map(c =>
-                c.id === commentId ? { ...c, replies: [...c.replies, newReply] } : c
-            )
-        }));
-        setReplyTextMap(prev => ({ ...prev, [commentId]: "" }));
-        setActiveReplyId(null);
-        toast.success("Reply posted!");
+        addCommentMutation.mutate({ body: replyText, parentCommentId: commentId }, {
+            onSuccess: () => {
+                setReplyTextMap(prev => ({ ...prev, [commentId]: "" }));
+                setActiveReplyId(null);
+            }
+        });
     };
 
     const handleReaction = (reactionType: "helpful" | "important" | "confusing") => {
         if (!activeVideo) return;
-        setReactionsMap(prev => {
-            const data = prev[activeVideo.id] || { helpful: 0, important: 0, confusing: 0, myReaction: null };
-            if (data.myReaction === reactionType) {
-                return { ...prev, [activeVideo.id]: { ...data, [reactionType]: Math.max(0, data[reactionType] - 1), myReaction: null } };
-            }
-            let h = data.helpful, im = data.important, c = data.confusing;
-            if (data.myReaction === "helpful") h = Math.max(0, h - 1);
-            if (data.myReaction === "important") im = Math.max(0, im - 1);
-            if (data.myReaction === "confusing") c = Math.max(0, c - 1);
-            return {
-                ...prev,
-                [activeVideo.id]: {
-                    helpful: reactionType === "helpful" ? h + 1 : h,
-                    important: reactionType === "important" ? im + 1 : im,
-                    confusing: reactionType === "confusing" ? c + 1 : c,
-                    myReaction: reactionType
-                }
-            };
-        });
+        if (activeVideoReactions.myReaction === reactionType) {
+            removeReactionMutation.mutate(reactionType);
+        } else {
+            addReactionMutation.mutate(reactionType);
+        }
     };
 
     return (
@@ -358,7 +291,7 @@ const EmployeeTrainingDashboard = () => {
                                         <div className="relative w-full aspect-video rounded-2xl bg-black border border-border/30 overflow-hidden shadow-2xl shadow-black/20">
                                             <video
                                                 ref={videoRef}
-                                                src={activeVideo.videoUrl}
+                                                src={activeVideo.videoUrl?.startsWith('http') ? activeVideo.videoUrl : `${import.meta.env.VITE_API_URL || '/api/v1'}/hrms/training/${activeVideo.id}/stream`}
                                                 controls
                                                 className="w-full h-full object-contain"
                                                 onTimeUpdate={handleTimeUpdate}
@@ -411,7 +344,7 @@ const EmployeeTrainingDashboard = () => {
                                                 {/* Reactions */}
                                                 <div className="flex items-center gap-2 flex-wrap">
                                                     {(() => {
-                                                        const r = reactionsMap[activeVideo.id] || { helpful: 0, important: 0, confusing: 0, myReaction: null };
+                                                        const r = activeVideoReactions || { helpful: 0, important: 0, confusing: 0, myReaction: null };
                                                         const reactions = [
                                                             { type: "helpful" as const, label: "Helpful", icon: ThumbsUp, count: r.helpful, activeColor: "bg-blue-500 text-white border-blue-500 shadow-blue-500/25" },
                                                             { type: "important" as const, label: "Key Info", icon: Lightbulb, count: r.important, activeColor: "bg-amber-500 text-white border-amber-500 shadow-amber-500/25" },
@@ -503,7 +436,7 @@ const EmployeeTrainingDashboard = () => {
                                             <div>
                                                 <h3 className="font-bold text-sm">Discussion</h3>
                                                 <p className="text-[10px] text-muted-foreground">
-                                                    {(commentsMap[activeVideo.id] || []).length} comments
+                                                    {activeVideoComments.length} comments
                                                 </p>
                                             </div>
                                         </div>
@@ -535,7 +468,7 @@ const EmployeeTrainingDashboard = () => {
 
                                         {/* Comments Scroll Area */}
                                         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
-                                            {(commentsMap[activeVideo.id] || []).length === 0 ? (
+                                            {activeVideoComments.length === 0 ? (
                                                 <div className="flex flex-col items-center justify-center py-16 text-center">
                                                     <div className="h-12 w-12 rounded-2xl bg-muted/20 flex items-center justify-center mb-3">
                                                         <MessageSquare className="h-6 w-6 text-muted-foreground/40" />
@@ -544,7 +477,7 @@ const EmployeeTrainingDashboard = () => {
                                                     <p className="text-[10px] text-muted-foreground/60 mt-1">Be the first to share your thoughts!</p>
                                                 </div>
                                             ) : (
-                                                (commentsMap[activeVideo.id] || []).map((comment, ci) => (
+                                                activeVideoComments.map((comment, ci) => (
                                                     <motion.div
                                                         key={comment.id}
                                                         initial={{ opacity: 0, y: 10 }}

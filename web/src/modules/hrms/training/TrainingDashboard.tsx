@@ -44,6 +44,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
+import {
+    useTrainingVideos,
+    useDeleteTrainingVideo,
+    useTrainingEmployees,
+    useAssignTrainingVideo,
+    useLearnersProgress,
+    useTogglePublishTrainingVideo
+} from "@/hooks/api/useTraining";
+
 
 const staggerContainer = {
     hidden: { opacity: 0 },
@@ -74,73 +83,67 @@ const MOCK_EMPLOYEES = [
 const TrainingVideos = () => {
     const navigate = useNavigate();
 
-    const [videos, setVideos] = useState([
-        {
-            id: 1,
-            title: "Introduction to Company Values & Culture",
-            category: "Onboarding",
-            duration: "12m 45s",
-            resolution: "1920x1080",
-            size: "45.2 MB",
-            views: 32,
-            completionRate: 88,
-            status: "ready",
-            isPublished: true,
-            reactions: { helpful: 18, important: 8, confusing: 1 }
-        },
-        {
-            id: 2,
-            title: "Information Security & Cyber Awareness",
-            category: "Compliance",
-            duration: "24m 10s",
-            resolution: "1920x1080",
-            size: "110.5 MB",
-            views: 28,
-            completionRate: 92,
-            status: "ready",
-            isPublished: true,
-            reactions: { helpful: 22, important: 14, confusing: 0 }
-        },
-        {
-            id: 3,
-            title: "Government Tender Submission Guidelines",
-            category: "Tendering",
-            duration: "18m 30s",
-            resolution: "1280x720",
-            size: "65.8 MB",
-            views: 15,
-            completionRate: 65,
-            status: "ready",
-            isPublished: true,
-            reactions: { helpful: 10, important: 5, confusing: 3 }
-        },
-        {
-            id: 4,
-            title: "Site Kick-off & DC Installation Procedures",
-            category: "Operations",
-            duration: "35m 15s",
-            resolution: "1920x1080",
-            size: "182.4 MB",
-            views: 8,
-            completionRate: 40,
-            status: "ready",
-            isPublished: false,
-            reactions: { helpful: 2, important: 1, confusing: 0 }
-        }
-    ]);
+    const { data: rawVideos = [], isLoading: isVideosLoading } = useTrainingVideos();
+    const { data: progressList = [] } = useLearnersProgress();
+    const { data: dbEmployees = [] } = useTrainingEmployees();
 
-    const [progressList, setProgressList] = useState([
-        { id: 201, userName: "Aarav Sharma", dept: "Tendering", videoTitle: "Introduction to Company Values & Culture", progress: 100, status: "Completed", completedAt: "2026-06-15" },
-        { id: 202, userName: "Aarav Sharma", dept: "Tendering", videoTitle: "Information Security & Cyber Awareness", progress: 60, status: "In Progress", completedAt: null },
-        { id: 203, userName: "Ishita Patel", dept: "Operations", videoTitle: "Introduction to Company Values & Culture", progress: 45, status: "In Progress", completedAt: null },
-        { id: 204, userName: "Ishita Patel", dept: "Operations", videoTitle: "Site Kick-off & DC Installation Procedures", progress: 100, status: "Completed", completedAt: "2026-06-18" },
-        { id: 205, userName: "Kabir Mehta", dept: "Services", videoTitle: "Information Security & Cyber Awareness", progress: 95, status: "Completed", completedAt: "2026-06-17" },
-        { id: 206, userName: "Kabir Mehta", dept: "Services", videoTitle: "Government Tender Submission Guidelines", progress: 30, status: "In Progress", completedAt: null },
-        { id: 207, userName: "Meera Nair", dept: "Accounts", videoTitle: "Government Tender Submission Guidelines", progress: 10, status: "In Progress", completedAt: null }
-    ]);
+    const deleteVideoMutation = useDeleteTrainingVideo();
+    const togglePublishMutation = useTogglePublishTrainingVideo();
+    const assignMutation = useAssignTrainingVideo();
+
+    const employeesList = useMemo(() => {
+        if (dbEmployees.length === 0) return MOCK_EMPLOYEES;
+        return dbEmployees.map(e => ({
+            id: e.id,
+            name: e.name,
+            dept: e.dept || "General",
+            designation: e.designation || "Staff",
+            avatar: e.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
+        }));
+    }, [dbEmployees]);
+
+    const videos = useMemo(() => {
+        return rawVideos.map(v => {
+            let durationStr = "0m";
+            if (v.durationSeconds) {
+                const mins = Math.floor(v.durationSeconds / 60);
+                const secs = v.durationSeconds % 60;
+                durationStr = secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
+            }
+
+            let sizeStr = "0 MB";
+            if (v.filesize) {
+                const mb = (v.filesize / (1024 * 1024)).toFixed(1);
+                sizeStr = `${mb} MB`;
+            }
+
+            const viewsCount = progressList.filter(p => p.videoTitle === v.title).length;
+
+            return {
+                id: v.id,
+                title: v.title,
+                category: v.category || "General",
+                duration: durationStr,
+                resolution: v.resolution || "Processing...",
+                size: sizeStr,
+                views: viewsCount,
+                status: v.status,
+                isPublished: v.isPublished,
+                reactions: (v as any).reactions || { helpful: 0, important: 0, confusing: 0 }
+            };
+        });
+    }, [rawVideos, progressList]);
 
     const [activeTab, setActiveTab] = useState("courses");
     const [employeeSearch, setEmployeeSearch] = useState("");
+
+    const filteredEmployees = useMemo(() => {
+        return employeesList.filter(emp =>
+            emp.name.toLowerCase().includes(employeeSearch.toLowerCase()) ||
+            emp.dept.toLowerCase().includes(employeeSearch.toLowerCase())
+        );
+    }, [employeesList, employeeSearch]);
+
 
     const [searchQuery, setSearchQuery] = useState("");
     const [deptFilter, setDeptFilter] = useState("All");
@@ -200,66 +203,13 @@ const TrainingVideos = () => {
     }, [progressList]);
 
     const handleTogglePublish = (id: number) => {
-        setVideos(prev => prev.map(v => {
-            if (v.id === id) {
-                const nextState = !v.isPublished;
-                toast.success(`"${v.title}" has been ${nextState ? "published" : "hidden"}.`);
-                return { ...v, isPublished: nextState };
-            }
-            return v;
-        }));
+        togglePublishMutation.mutate(id);
     };
 
     const handleDeleteVideo = (id: number, title: string) => {
         if (confirm(`Are you sure you want to delete "${title}"?`)) {
-            setVideos(prev => prev.filter(v => v.id !== id));
-            setProgressList(prev => prev.filter(p => p.videoTitle !== title));
-            toast.success("Video deleted successfully.");
+            deleteVideoMutation.mutate(id);
         }
-    };
-
-    const handleUploadSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!newTitle.trim()) {
-            toast.error("Please enter a title.");
-            return;
-        }
-
-        const newId = Date.now();
-        const createdVideo = {
-            id: newId,
-            title: newTitle,
-            category: newCategory,
-            duration: "Calculating...",
-            resolution: "Processing...",
-            size: uploadedFile ? "48.7 MB" : "12.4 MB",
-            views: 0,
-            completionRate: 0,
-            status: "processing" as const,
-            isPublished: true,
-            reactions: { helpful: 0, important: 0, confusing: 0 }
-        };
-
-        setVideos(prev => [createdVideo, ...prev]);
-        setIsUploadOpen(false);
-        toast.info(`Uploading "${newTitle}"... Processing will start in background.`);
-
-        setNewTitle("");
-        setNewDesc("");
-        setNewCategory("Onboarding");
-        setNewThreshold("90");
-        setUploadStep(0);
-        setUploadedFile(null);
-
-        setTimeout(() => {
-            setVideos(currentVideos => currentVideos.map(v => {
-                if (v.id === newId) {
-                    toast.success(`"${v.title}" processing complete!`);
-                    return { ...v, duration: "8m 12s", resolution: "1920x1080", status: "ready" as const };
-                }
-                return v;
-            }));
-        }, 5000);
     };
 
     const handleAssignSubmit = (e: React.FormEvent) => {
@@ -267,35 +217,18 @@ const TrainingVideos = () => {
         if (!assignVideoId) { toast.error("Please select a video."); return; }
         if (selectedEmployeeIds.length === 0) { toast.error("Please select at least one employee."); return; }
 
-        const targetVideo = videos.find(v => v.id === Number(assignVideoId));
-        if (!targetVideo) return;
-
-        const newProgressEntries = selectedEmployeeIds.map(empId => {
-            const employee = MOCK_EMPLOYEES.find(e => e.id === empId);
-            return {
-                id: Date.now() + Math.random(),
-                userName: employee?.name || "Unknown",
-                dept: employee?.dept || "HR",
-                videoTitle: targetVideo.title,
-                progress: 0,
-                status: "In Progress",
-                completedAt: null
-            };
+        assignMutation.mutate({
+            videoId: Number(assignVideoId),
+            userIds: selectedEmployeeIds
+        }, {
+            onSuccess: () => {
+                setIsAssignOpen(false);
+                setSelectedEmployeeIds([]);
+                setAssignVideoId("");
+            }
         });
-
-        setProgressList(prev => {
-            const filtered = prev.filter(p =>
-                !(p.videoTitle === targetVideo.title && newProgressEntries.some(n => n.userName === p.userName))
-            );
-            return [...newProgressEntries, ...filtered];
-        });
-
-        const employeeNames = selectedEmployeeIds.map(id => MOCK_EMPLOYEES.find(emp => emp.id === id)?.name).join(", ");
-        toast.success(`Assigned "${targetVideo.title}" to: ${employeeNames}`);
-        setIsAssignOpen(false);
-        setSelectedEmployeeIds([]);
-        setAssignVideoId("");
     };
+
 
     const handleToggleEmployee = (id: number) => {
         setSelectedEmployeeIds(prev => prev.includes(id) ? prev.filter(empId => empId !== id) : [...prev, id]);
@@ -476,7 +409,16 @@ const TrainingVideos = () => {
                                     </TableHeader>
                                     <TableBody>
                                         <AnimatePresence mode="popLayout">
-                                            {filteredVideos.length === 0 ? (
+                                            {isVideosLoading ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={6} className="text-center py-16">
+                                                        <div className="flex flex-col items-center gap-3">
+                                                            <Loader2 className="h-7 w-7 text-primary animate-spin" />
+                                                            <p className="text-sm text-muted-foreground font-medium">Loading courses...</p>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : filteredVideos.length === 0 ? (
                                                 <TableRow>
                                                     <TableCell colSpan={6} className="text-center py-16">
                                                         <div className="flex flex-col items-center gap-3">
@@ -789,7 +731,7 @@ const TrainingVideos = () => {
                                 <div className="flex items-center gap-1.5 bg-background/50 backdrop-blur-sm border border-border/20 px-3 py-1.5 rounded-xl">
                                     <Users className="h-3 w-3 text-violet-500" />
                                     <span className="text-[10px] font-bold text-muted-foreground">
-                                        {MOCK_EMPLOYEES.length} team members
+                                        {employeesList.length} team members
                                     </span>
                                 </div>
                                 {selectedEmployeeIds.length > 0 && (
@@ -908,15 +850,15 @@ const TrainingVideos = () => {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => {
-                                        if (selectedEmployeeIds.length === MOCK_EMPLOYEES.length) {
+                                        if (selectedEmployeeIds.length === employeesList.length) {
                                             setSelectedEmployeeIds([]);
                                         } else {
-                                            setSelectedEmployeeIds(MOCK_EMPLOYEES.map(e => e.id));
+                                            setSelectedEmployeeIds(employeesList.map(e => e.id));
                                         }
                                     }}
                                     className="rounded-xl h-10 text-[10px] font-bold border-border/30 px-4 hover:bg-primary/5 hover:border-primary/20 hover:text-primary transition-all"
                                 >
-                                    {selectedEmployeeIds.length === MOCK_EMPLOYEES.length ? (
+                                    {selectedEmployeeIds.length === employeesList.length ? (
                                         <>
                                             <X className="h-3 w-3 mr-1" />
                                             Deselect All
@@ -934,7 +876,7 @@ const TrainingVideos = () => {
                             <div className="border border-border/20 rounded-2xl bg-background/20 p-2 max-h-[280px] overflow-y-auto">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                                     <AnimatePresence>
-                                        {MOCK_EMPLOYEES.map((employee, index) => {
+                                        {filteredEmployees.map((employee, index) => {
                                             const isSelected = selectedEmployeeIds.includes(employee.id);
                                             return (
                                                 <motion.div
@@ -1022,7 +964,7 @@ const TrainingVideos = () => {
                                             </div>
                                             <div className="flex flex-wrap gap-1.5">
                                                 {selectedEmployeeIds.map(id => {
-                                                    const emp = MOCK_EMPLOYEES.find(e => e.id === id);
+                                                    const emp = employeesList.find(e => e.id === id);
                                                     if (!emp) return null;
                                                     return (
                                                         <motion.div
