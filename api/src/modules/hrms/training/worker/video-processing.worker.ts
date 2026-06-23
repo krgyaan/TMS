@@ -7,6 +7,10 @@ import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import { trainingVideos } from "@/db/schemas/hrms/training-videos.schema";
 import { eq } from "drizzle-orm";
+import * as ffmpeg from "fluent-ffmpeg";
+import * as ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
+import * as ffprobeInstaller from "@ffprobe-installer/ffprobe";
+
 
 @Injectable()
 export class VideoProcessingWorker implements OnModuleInit {
@@ -28,15 +32,6 @@ export class VideoProcessingWorker implements OnModuleInit {
                 });
 
                 try {
-                    let durationSeconds = 15; // default fallback
-                    let resolution = "1280x720"; // default fallback
-
-                    try {
-                        // Dynamically import fluent-ffmpeg and installers to avoid crash if not installed
-                        const ffmpeg = require('fluent-ffmpeg');
-                        const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
-                        const ffprobeInstaller = require('@ffprobe-installer/ffprobe');
-
                         ffmpeg.setFfmpegPath(ffmpegInstaller.path);
                         ffmpeg.setFfprobePath(ffprobeInstaller.path);
 
@@ -47,14 +42,12 @@ export class VideoProcessingWorker implements OnModuleInit {
                             });
                         });
 
-                        durationSeconds = Math.round(metadata.format.duration || 15);
+                    const durationSeconds = Math.round(metadata.format.duration || 15);
+                    let resolution = "1280x720";
                         const videoStream = metadata.streams.find(s => s.codec_type === 'video');
                         if (videoStream) {
                             resolution = `${videoStream.width}x${videoStream.height}`;
                         }
-                    } catch (err: any) {
-                        this.logger.warn("FFmpeg not available or failed. Falling back to default metadata.", { error: err.message });
-                    }
 
                     // Update video record in DB
                     await this.db

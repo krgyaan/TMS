@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { DatabaseModule } from "@/db/database.module";
-import { TrainingModule } from "../training.module";
+// import { TrainingModule } from "../training.module";
 import { VideoProcessingWorker } from "./video-processing.worker";
 import { LoggerModule } from "@/logger/logger.module";
 
@@ -10,7 +10,7 @@ import { LoggerModule } from "@/logger/logger.module";
         ConfigModule,
         DatabaseModule,
         LoggerModule,
-        TrainingModule,
+        // TrainingModule,
     ],
     providers: [VideoProcessingWorker],
 })
