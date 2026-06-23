@@ -266,6 +266,7 @@ export class TrainingService {
                 description: trainingVideos.description,
                 category: trainingVideos.category,
                 durationSeconds: trainingVideos.durationSeconds,
+                thumbnailPath: trainingVideos.thumbnailPath,
                 status: trainingAssignments.status,
                 progress: trainingWatchHistory.completionPct,
                 isCompleted: trainingWatchHistory.isCompleted,
@@ -290,6 +291,7 @@ export class TrainingService {
             progress: r.progress ? Math.round(parseFloat(r.progress)) : 0,
             status: r.status as 'Assigned' | 'In Progress' | 'Completed',
             videoUrl: `/api/v1/hrms/training/${r.id}/stream`,
+            thumbnailPath: r.thumbnailPath ?? null,
         }));
     }
 

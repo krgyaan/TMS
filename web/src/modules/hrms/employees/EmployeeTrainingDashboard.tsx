@@ -68,6 +68,14 @@ const slideInRight = {
     visible: { opacity: 1, x: 0, transition: { duration: 0.5, ease: "easeOut" } }
 };
 
+const getServerOrigin = () => {
+    const base = import.meta.env.VITE_API_URL as string | undefined;
+    if (base) {
+        try { return new URL(base).origin; } catch { /* fallback */ }
+    }
+    return "http://localhost:3000";
+};
+
 interface VideoCourse {
     id: number;
     title: string;
@@ -77,6 +85,7 @@ interface VideoCourse {
     progress: number;
     status: "Assigned" | "In Progress" | "Completed";
     videoUrl: string;
+    thumbnailPath?: string | null;
 }
 
 interface CommentReply {
@@ -713,6 +722,16 @@ const EmployeeTrainingDashboard = () => {
                                                             >
                                                                 {/* Thumbnail */}
                                                                 <div className="relative aspect-video bg-gradient-to-br from-muted/30 to-muted/10 flex items-center justify-center flex-shrink-0 border-b border-border/15 overflow-hidden">
+                                                                    {/* Thumbnail image or gradient placeholder */}
+                                                                    {video.thumbnailPath ? (
+                                                                        <img
+                                                                            src={`${getServerOrigin()}/${video.thumbnailPath}`}
+                                                                            alt={video.title}
+                                                                            className="absolute inset-0 w-full h-full object-cover"
+                                                                        />
+                                                                    ) : (
+                                                                        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-muted/20 to-muted/10" />
+                                                                    )}
                                                                     {/* Animated gradient overlay */}
                                                                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
 

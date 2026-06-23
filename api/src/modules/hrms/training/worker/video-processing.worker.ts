@@ -7,9 +7,11 @@ import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import { trainingVideos } from "@/db/schemas/hrms/training-videos.schema";
 import { eq } from "drizzle-orm";
-import * as ffmpeg from "fluent-ffmpeg";
+import ffmpeg from "fluent-ffmpeg";
 import * as ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 import * as ffprobeInstaller from "@ffprobe-installer/ffprobe";
+import * as path from "path";
+import * as fs from "fs";
 
 
 @Injectable()
@@ -32,22 +34,46 @@ export class VideoProcessingWorker implements OnModuleInit {
                 });
 
                 try {
-                        ffmpeg.setFfmpegPath(ffmpegInstaller.path);
-                        ffmpeg.setFfprobePath(ffprobeInstaller.path);
+                    ffmpeg.setFfmpegPath(ffmpegInstaller.path);
+                    ffmpeg.setFfprobePath(ffprobeInstaller.path);
 
-                        const metadata: any = await new Promise((resolveProj, rejectProj) => {
-                            ffmpeg.ffprobe(filepath, (err, data) => {
-                                if (err) rejectProj(err);
-                                else resolveProj(data);
-                            });
+                    const metadata: any = await new Promise((resolveProj, rejectProj) => {
+                        ffmpeg.ffprobe(filepath, (err, data) => {
+                            if (err) rejectProj(err);
+                            else resolveProj(data);
                         });
+                    });
 
                     const durationSeconds = Math.round(metadata.format.duration || 15);
                     let resolution = "1280x720";
-                        const videoStream = metadata.streams.find(s => s.codec_type === 'video');
-                        if (videoStream) {
-                            resolution = `${videoStream.width}x${videoStream.height}`;
-                        }
+                    const videoStream = metadata.streams.find((s: any) => s.codec_type === "video");
+                    if (videoStream) {
+                        resolution = `${videoStream.width}x${videoStream.height}`;
+                    }
+
+                    // ── Generate thumbnail ─────────────────────────────────────────
+                    const thumbnailDir = path.join(process.cwd(), "uploads", "hrms", "training", "thumbnails");
+                    if (!fs.existsSync(thumbnailDir)) {
+                        fs.mkdirSync(thumbnailDir, { recursive: true });
+                    }
+
+                    const thumbnailFilename = `thumb-${videoId}-${Date.now()}.jpg`;
+                    // Capture frame at 10% of video duration (min 2s)
+                    const seekTime = Math.max(2, Math.floor(durationSeconds * 0.1));
+
+                    await new Promise<void>((resolveThumb, rejectThumb) => {
+                        ffmpeg(filepath)
+                            .seekInput(seekTime)
+                            .frames(1)
+                            .size("640x?")      // 640px wide, keep aspect ratio
+                            .output(path.join(thumbnailDir, thumbnailFilename))
+                            .on("end", () => resolveThumb())
+                            .on("error", (err: Error) => rejectThumb(err))
+                            .run();
+                    });
+
+                    // Relative web path served under /uploads/*
+                    const thumbnailPath = `uploads/hrms/training/thumbnails/${thumbnailFilename}`;
 
                     // Update video record in DB
                     await this.db
@@ -55,6 +81,7 @@ export class VideoProcessingWorker implements OnModuleInit {
                         .set({
                             durationSeconds,
                             resolution,
+                            thumbnailPath,
                             status: "ready",
                             updatedAt: new Date(),
                         })
@@ -64,6 +91,7 @@ export class VideoProcessingWorker implements OnModuleInit {
                         videoId,
                         durationSeconds,
                         resolution,
+                        thumbnailPath,
                     });
                 } catch (err: any) {
                     this.logger.error("Video processing job failed", {
