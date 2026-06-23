@@ -60,23 +60,12 @@ const staggerContainer = {
     visible: { opacity: 1, transition: { staggerChildren: 0.08 } }
 };
 
-const MOCK_EMPLOYEES = [
-    { id: 101, name: "Aarav Sharma", dept: "Tendering", designation: "Executive", avatar: "AS" },
-    { id: 102, name: "Ishita Patel", dept: "Operations", designation: "Engineer", avatar: "IP" },
-    { id: 103, name: "Kabir Mehta", dept: "Services", designation: "Field Engineer", avatar: "KM" },
-    { id: 104, name: "Meera Nair", dept: "Accounts", designation: "Team Leader", avatar: "MN" },
-    { id: 105, name: "Rohan Das", dept: "HR", designation: "Coordinator", avatar: "RD" },
-    { id: 106, name: "Priya Singh", dept: "IT", designation: "Developer", avatar: "PS" },
-    { id: 107, name: "Vikram Joshi", dept: "Operations", designation: "Manager", avatar: "VJ" },
-    { id: 108, name: "Ananya Gupta", dept: "HR", designation: "Executive", avatar: "AG" }
-];
 
 const CATEGORIES = [
-    { value: "Onboarding", label: "Onboarding", icon: "🎯", color: "bg-blue-500/10 text-blue-600 border-blue-500/20" },
-    { value: "Compliance", label: "Compliance", icon: "🛡️", color: "bg-purple-500/10 text-purple-600 border-purple-500/20" },
     { value: "Tendering", label: "Tendering", icon: "📋", color: "bg-orange-500/10 text-orange-600 border-orange-500/20" },
     { value: "Operations", label: "Operations", icon: "⚙️", color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" },
-    { value: "Safety", label: "Safety", icon: "🦺", color: "bg-red-500/10 text-red-600 border-red-500/20" },
+    { value: "Onboarding", label: "Onboarding", icon: "🎯", color: "bg-blue-500/10 text-blue-600 border-blue-500/20" },
+    { value: "Compliance", label: "Compliance", icon: "🛡️", color: "bg-purple-500/10 text-purple-600 border-purple-500/20" },
     { value: "Technical", label: "Technical", icon: "💻", color: "bg-cyan-500/10 text-cyan-600 border-cyan-500/20" }
 ];
 
@@ -110,7 +99,7 @@ const UploadVideo = () => {
 
     const { data: dbEmployees = [] } = useTrainingEmployees();
     const employeesList = useMemo(() => {
-        if (dbEmployees.length === 0) return MOCK_EMPLOYEES;
+        if (dbEmployees.length === 0) return [];
         return dbEmployees.map(e => ({
             id: e.id,
             name: e.name,
@@ -619,7 +608,7 @@ const UploadVideo = () => {
                                         <span className="text-destructive">*</span>
                                     </Label>
                                     <Input
-                                        placeholder="e.g. Workplace Safety & Emergency Protocols 2026"
+                                        placeholder="e.g. The correct method to fill a tender"
                                         value={title}
                                         onChange={(e) => setTitle(e.target.value)}
                                         disabled={isUploading || uploadPhase === "complete"}
@@ -840,7 +829,7 @@ const UploadVideo = () => {
                                                     onClick={selectAllEmployees}
                                                     className="rounded-xl h-9 text-[10px] font-bold border-border/30 px-3"
                                                 >
-                                                    {selectedEmployeeIds.length === MOCK_EMPLOYEES.length ? "Deselect All" : "Select All"}
+                                                    {selectedEmployeeIds.length === employeesList.length ? "Deselect All" : "Select All"}
                                                 </Button>
                                             </div>
 
