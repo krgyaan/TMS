@@ -150,10 +150,10 @@ const EmployeeTrainingDashboard = () => {
 
     const getCategoryStyle = (category: string) => {
         const styles: Record<string, { bg: string; text: string; border: string; icon: string }> = {
-            "Onboarding": { bg: "bg-blue-500/10", text: "text-blue-600", border: "border-blue-500/20", icon: "🎯" },
-            "Compliance": { bg: "bg-purple-500/10", text: "text-purple-600", border: "border-purple-500/20", icon: "🛡️" },
             "Tendering": { bg: "bg-orange-500/10", text: "text-orange-600", border: "border-orange-500/20", icon: "📋" },
             "Operations": { bg: "bg-emerald-500/10", text: "text-emerald-600", border: "border-emerald-500/20", icon: "⚙️" },
+            "Onboarding": { bg: "bg-blue-500/10", text: "text-blue-600", border: "border-blue-500/20", icon: "🎯" },
+            "Compliance": { bg: "bg-purple-500/10", text: "text-purple-600", border: "border-purple-500/20", icon: "🛡️" },
         };
         return styles[category] || { bg: "bg-gray-500/10", text: "text-gray-600", border: "border-gray-500/20", icon: "📄" };
     };
