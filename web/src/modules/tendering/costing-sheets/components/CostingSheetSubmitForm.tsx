@@ -316,8 +316,8 @@ export default function CostingSheetSubmitForm({
                     <Button
                         type="button"
                         onClick={onSubmit}
-                        // disabled={isSaveDisabled}
-                        // className={!isChecklistFulfilled ? "cursor-not-allowed opacity-50" : ""}
+                        disabled={isSaveDisabled}
+                        className={!isChecklistFulfilled ? "cursor-not-allowed opacity-50" : ""}
                         title={!isChecklistFulfilled ? "Please complete all mandatory checkpoints first" : ""}
                     >
                         {submitting && <span className="animate-spin mr-2">⏳</span>}

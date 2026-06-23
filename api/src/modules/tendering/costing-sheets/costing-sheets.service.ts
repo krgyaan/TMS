@@ -897,8 +897,8 @@ export class CostingSheetsService {
             `Costing Sheet submitted - ${tender.tenderName}`,
             'costing-sheet-submitted', emailData,
             {
-                to: [{ type: 'emails', emails: ['gyan@volksenergie.in'] }],
-                // cc: [{ type: 'role', role: 'Admin', teamId: tender.team }],
+                to: [{ type: 'role', role: 'Team Leader', teamId: tender.team }],
+                cc: [{ type: 'role', role: 'Admin', teamId: tender.team }],
             }
         );
     }
