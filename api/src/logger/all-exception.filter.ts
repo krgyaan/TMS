@@ -40,7 +40,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
             url: request?.url,
             method: request?.method,
             body: request?.body,
-            exception,
+            exceptionMessage: exception instanceof Error ? exception.message : String(exception),
+            exceptionStack: exception instanceof Error ? exception.stack : undefined,
+            exceptionName: exception instanceof Error ? exception.name : typeof exception,
         });
 
         // ✅ THIS IS THE MISSING PIECE

@@ -123,7 +123,7 @@ export class TenderResultService {
     const latestCostingSheetSq = this.db
         .select({
             tenderId: tenderCostingSheets.tenderId,
-            finalPrice: sql<string>`COALESCE(SUM(${tenderCostingDetails.finalPrice}), '0')`,
+            finalPrice: sql<string>`COALESCE(SUM(${tenderCostingDetails.finalPrice}), '0')`.as('finalPrice'),
         })
         .from(tenderCostingSheets)
         .leftJoin(tenderCostingDetails, eq(tenderCostingDetails.tenderCostingSheetId, tenderCostingSheets.id))
@@ -356,7 +356,7 @@ export class TenderResultService {
         const latestCostingSheetSq = this.db
             .select({
                 tenderId: tenderCostingSheets.tenderId,
-                finalPrice: sql<string>`COALESCE(SUM(${tenderCostingDetails.finalPrice}), '0')`,
+                finalPrice: sql<string>`COALESCE(SUM(${tenderCostingDetails.finalPrice}), '0')`.as('finalPrice'),
             })
             .from(tenderCostingSheets)
             .leftJoin(tenderCostingDetails, eq(tenderCostingDetails.tenderCostingSheetId, tenderCostingSheets.id))
@@ -554,8 +554,8 @@ export class TenderResultService {
                 emdAmount: tenderInfos.emd,
                 costingFinalPrice: sql<string>`(SELECT COALESCE(SUM(${tenderCostingDetails.finalPrice}), '0')
                     FROM ${tenderCostingDetails}
-                    INNER JOIN ${tenderCostingSheets} s ON s.id = ${tenderCostingDetails.tenderCostingSheetId}
-                    WHERE s.${tenderCostingSheets.tenderId} = ${tenderInfos.id}
+                    INNER JOIN ${tenderCostingSheets} ON ${tenderCostingSheets.id} = ${tenderCostingDetails.tenderCostingSheetId}
+                    WHERE ${tenderCostingSheets.tenderId} = ${tenderInfos.id}
                     AND ${tenderCostingDetails.status} = 'Approved')`,
                 itemName: items.name,
                 tenderStatus: statuses.name,
@@ -621,8 +621,8 @@ export class TenderResultService {
                 emdAmount: tenderInfos.emd,
                 costingFinalPrice: sql<string>`(SELECT COALESCE(SUM(${tenderCostingDetails.finalPrice}), '0')
                     FROM ${tenderCostingDetails}
-                    INNER JOIN ${tenderCostingSheets} s ON s.id = ${tenderCostingDetails.tenderCostingSheetId}
-                    WHERE s.${tenderCostingSheets.tenderId} = ${tenderInfos.id}
+                    INNER JOIN ${tenderCostingSheets} ON ${tenderCostingSheets.id} = ${tenderCostingDetails.tenderCostingSheetId}
+                    WHERE ${tenderCostingSheets.tenderId} = ${tenderInfos.id}
                     AND ${tenderCostingDetails.status} = 'Approved')`,
                 itemName: items.name,
                 tenderStatus: statuses.name,
