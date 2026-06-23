@@ -41,7 +41,6 @@ const Tendering_CostingSheetResubmit = lazy(() => import('@/modules/tendering/co
 const Tendering_CostingSheetShow = lazy(() => import('@/modules/tendering/costing-sheets/CostingSheetShowPage'));
 const CostingApprovalListPage = lazy(() => import('@/modules/tendering/costing-approvals/CostingApprovalListPage'));
 const CostingApprovePage = lazy(() => import('@/modules/tendering/costing-approvals/CostingApprovePage'));
-const CostingRejectPage = lazy(() => import('@/modules/tendering/costing-approvals/CostingRejectPage'));
 const CostingEditApprovalPage = lazy(() => import('@/modules/tendering/costing-approvals/CostingEditApprovalPage'));
 const CostingApprovalViewPage = lazy(() => import('@/modules/tendering/costing-approvals/CostingApprovalViewPage'));
 const BidSubmissionListPage = lazy(() => import('@/modules/tendering/bid-submissions/BidSubmissionListPage'));
@@ -119,7 +118,6 @@ export default function TenderingRoutes() {
             <Route path="costing-approvals" element={<RouteWrapper><CostingApprovalListPage /></RouteWrapper>} />
             <Route path="costing-approvals/view/:tenderId" element={<RouteWrapper><CostingApprovalViewPage /></RouteWrapper>} />
             <Route path="costing-approvals/approve/:id" element={<RouteWrapper><CostingApprovePage /></RouteWrapper>} />
-            <Route path="costing-approvals/reject/:id" element={<RouteWrapper><CostingRejectPage /></RouteWrapper>} />
             <Route path="costing-approvals/edit/:id" element={<RouteWrapper><CostingEditApprovalPage /></RouteWrapper>} />
             <Route path="bid-submissions" element={<RouteWrapper><BidSubmissionListPage /></RouteWrapper>} />
             <Route path="bid-submissions/submit/:tenderId" element={<RouteWrapper><BidSubmitPage /></RouteWrapper>} />

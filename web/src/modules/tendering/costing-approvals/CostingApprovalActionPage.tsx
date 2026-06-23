@@ -1,6 +1,5 @@
 import { useParams } from 'react-router-dom';
 import CostingApprovalForm from './components/CostingApprovalForm';
-import CostingRejectionForm from './components/CostingRejectionForm';
 import { useCostingApprovalById } from '@/hooks/api/useCostingApprovals';
 import { useTender } from '@/hooks/api/useTenders';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -8,7 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 
 interface CostingApprovalActionPageProps {
-    mode: 'approve' | 'edit' | 'reject';
+    mode: 'approve' | 'edit';
 }
 
 export default function CostingApprovalActionPage({ mode }: CostingApprovalActionPageProps) {
@@ -20,7 +19,7 @@ export default function CostingApprovalActionPage({ mode }: CostingApprovalActio
         Number(costingSheet?.tenderId)
     );
 
-    if (isLoading || tenderLoading) return <Skeleton className={mode === 'reject' ? 'h-[600px]' : 'h-[800px]'} />;
+    if (isLoading || tenderLoading) return <Skeleton className="h-[800px]" />;
 
     if (error) {
         return (
@@ -41,15 +40,6 @@ export default function CostingApprovalActionPage({ mode }: CostingApprovalActio
         dueDate: tenderDetails.dueDate as Date,
         teamMemberName: tenderDetails.teamMemberName as string,
     };
-
-    if (mode === 'reject') {
-        return (
-            <CostingRejectionForm
-                costingSheet={costingSheet}
-                tenderDetails={tenderDetailProps}
-            />
-        );
-    }
 
     if (mode === 'edit') {
         const hasApproved = costingSheet.details?.some(d => d.status === 'Approved');

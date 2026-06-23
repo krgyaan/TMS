@@ -6,7 +6,9 @@ import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle }
 import { Form } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { useApproveAllCosting, useApproveCosting, useUpdateApprovedCosting } from '@/hooks/api/useCostingApprovals';
+import { Badge } from '@/components/ui/badge';
+import { useApproveAllCosting, useApproveCosting, useRejectCosting, useUpdateApprovedCosting } from '@/hooks/api/useCostingApprovals';
+import { costingApprovalsKey } from '@/hooks/api/useCostingApprovals';
 import { useVendorOrganizations } from '@/hooks/api/useVendorOrganizations';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
@@ -14,10 +16,11 @@ import { MultiDetailFormSchema } from '@/modules/tendering/costing-approvals/hel
 import type { CostingSheetWithDetails } from '@/modules/tendering/costing-approvals/helpers/costingApproval.types';
 import type { VendorOrganization } from '@/types/api.types';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ArrowLeft, CheckCircle, Save } from 'lucide-react';
+import { ArrowLeft, CheckCircle, Save, XCircle } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { type SubmitHandler, useFieldArray, useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import type { z } from 'zod';
 import CostingApprovalRejectDialog from './CostingApprovalRejectDialog';
 import SentRfqsResponsesHistory from './SentRfqsResponsesHistory';
@@ -41,8 +44,10 @@ export default function CostingApprovalForm({
     mode,
 }: CostingApprovalFormProps) {
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
     const approveDetailMutation = useApproveCosting();
     const approveAllMutation = useApproveAllCosting();
+    const rejectMutation = useRejectCosting();
     const updateDetailMutation = useUpdateApprovedCosting();
     const { data: vendors } = useVendorOrganizations();
 
@@ -54,6 +59,16 @@ export default function CostingApprovalForm({
     const relevantDetails = mode === 'edit'
         ? costingSheet.details.filter(d => d.status === 'Approved')
         : costingSheet.details.filter(d => d.status === 'Submitted');
+
+    const [processedIds, setProcessedIds] = useState<Set<number>>(new Set());
+
+    const refreshData = useCallback(() => {
+        queryClient.invalidateQueries({ queryKey: costingApprovalsKey.detail(costingSheet.id) });
+    }, [queryClient, costingSheet.id]);
+
+    const isRelevantProcessed = (detailId: number) => processedIds.has(detailId);
+    const allRelevantProcessed = relevantDetails.every(d => isRelevantProcessed(d.id));
+    const hasAnyPending = relevantDetails.some(d => !isRelevantProcessed(d.id));
 
     const buildDefaultValues = (detail: CostingSheetWithDetails['details'][number]) => {
         if (mode === 'edit') {
@@ -93,9 +108,6 @@ export default function CostingApprovalForm({
         name: 'details',
     });
 
-    // Watch for auto-calc gross margin per detail
-    const formValues = form.watch('details');
-
     const handleGrossMarginChange = useCallback((index: number, receiptVal: string, budgetVal: string) => {
         const receipt = parseFloat(receiptVal) || 0;
         const budget = parseFloat(budgetVal) || 0;
@@ -127,7 +139,8 @@ export default function CostingApprovalForm({
                     oemVendorIds: getSheetVendorIds(),
                 },
             });
-            navigate(paths.tendering.costingApprovals);
+            setProcessedIds(prev => new Set(prev).add(detail.detailId));
+            refreshData();
         } catch (error) {
             console.error('Error approving detail:', error);
         }
@@ -147,7 +160,8 @@ export default function CostingApprovalForm({
                     tlRemarks: detail.tlRemarks,
                 },
             });
-            navigate(paths.tendering.costingApprovals);
+            setProcessedIds(prev => new Set(prev).add(detail.detailId));
+            refreshData();
         } catch (error) {
             console.error('Error updating detail:', error);
         }
@@ -169,9 +183,28 @@ export default function CostingApprovalForm({
                     oemVendorIds: data.oemVendorIds.map(Number),
                 },
             });
+            data.details.forEach(d => {
+                setProcessedIds(prev => new Set(prev).add(d.detailId));
+            });
             navigate(paths.tendering.costingApprovals);
         } catch (error) {
             console.error('Error approving all:', error);
+        }
+    };
+
+    const handleRejectAll = async () => {
+        try {
+            const pendingIds = relevantDetails.filter(d => !isRelevantProcessed(d.id)).map(d => d.id);
+            for (const detailId of pendingIds) {
+                await rejectMutation.mutateAsync({
+                    id: costingSheet.id,
+                    data: { detailId, rejectionReason: 'Bulk rejected by team lead' },
+                });
+                setProcessedIds(prev => new Set(prev).add(detailId));
+            }
+            refreshData();
+        } catch (error) {
+            console.error('Error rejecting all:', error);
         }
     };
 
@@ -180,6 +213,36 @@ export default function CostingApprovalForm({
     };
 
     const [rejectDetailId, setRejectDetailId] = useState<number | null>(null);
+
+    const handleRejectDialogSuccess = (detailId: number) => {
+        setProcessedIds(prev => new Set(prev).add(detailId));
+        setRejectDetailId(null);
+        refreshData();
+    };
+
+    if (allRelevantProcessed && relevantDetails.length > 0) {
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle>All Done</CardTitle>
+                    <CardDescription>
+                        All {relevantDetails.length} costing detail{relevantDetails.length !== 1 ? 's have' : ' has'} been processed.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="flex justify-center gap-4">
+                    <Button variant="outline" onClick={() => navigate(paths.tendering.costingApprovals)}>
+                        Back to Costing Approvals
+                    </Button>
+                    <Button variant="default" onClick={() => {
+                        setProcessedIds(new Set());
+                        refreshData();
+                    }}>
+                        Review Again
+                    </Button>
+                </CardContent>
+            </Card>
+        );
+    }
 
     return (
         <>
@@ -197,7 +260,7 @@ export default function CostingApprovalForm({
                             </CardDescription>
                         </div>
                         <CardAction>
-                            <Button variant="outline" onClick={() => navigate(-1)}>
+                            <Button variant="outline" onClick={() => navigate(paths.tendering.costingApprovals)}>
                                 <ArrowLeft className="mr-2 h-4 w-4" /> Back
                             </Button>
                         </CardAction>
@@ -250,35 +313,59 @@ export default function CostingApprovalForm({
                                 />
                             </div>
 
-                            {/* Approve All Action (top of details section) */}
+                            {/* Bulk Actions Header */}
                             <div className="flex items-center justify-between">
                                 <h4 className="font-semibold text-base text-primary border-b pb-2">
                                     Costing Details ({relevantDetails.length})
                                 </h4>
-                                {mode === 'approve' && relevantDetails.length > 1 && (
-                                    <Button
-                                        type="submit"
-                                        disabled={isSubmitting}
-                                        variant="default"
-                                        size="sm"
-                                    >
-                                        <CheckCircle className="mr-2 h-4 w-4" />
-                                        Approve All
-                                    </Button>
-                                )}
+                                <div className="flex gap-2">
+                                    {mode === 'approve' && hasAnyPending && (
+                                        <>
+                                            <Button
+                                                type="button"
+                                                variant="destructive"
+                                                size="sm"
+                                                onClick={handleRejectAll}
+                                                disabled={isSubmitting}
+                                            >
+                                                <XCircle className="mr-2 h-4 w-4" />
+                                                Reject All
+                                            </Button>
+                                            {relevantDetails.length > 1 && (
+                                                <Button
+                                                    type="submit"
+                                                    disabled={isSubmitting}
+                                                    variant="default"
+                                                    size="sm"
+                                                >
+                                                    <CheckCircle className="mr-2 h-4 w-4" />
+                                                    Approve All
+                                                </Button>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Per-Detail Cards */}
                             {fields.map((field, index) => {
                                 const detail = relevantDetails[index];
                                 if (!detail) return null;
+                                const processed = isRelevantProcessed(detail.id);
 
                                 return (
-                                    <div key={field.id} className="border rounded-lg p-4 space-y-4 bg-white dark:bg-gray-950">
-                                        <h5 className="font-semibold text-sm flex items-center gap-2">
-                                            <span className="h-2 w-2 rounded-full bg-primary" />
-                                            {detail.detailName || detail.categoryName || `Detail #${index + 1}`}
-                                        </h5>
+                                    <div key={field.id} className={`border rounded-lg p-4 space-y-4 bg-white dark:bg-gray-950 ${processed ? 'opacity-60' : ''}`}>
+                                        <div className="flex items-center justify-between">
+                                            <h5 className="font-semibold text-sm flex items-center gap-2">
+                                                <span className="h-2 w-2 rounded-full bg-primary" />
+                                                {detail.detailName || detail.categoryName || `Detail #${index + 1}`}
+                                            </h5>
+                                            {processed && (
+                                                <Badge variant={mode === 'edit' ? 'default' : 'secondary'}>
+                                                    {mode === 'edit' ? 'Updated' : 'Approved'}
+                                                </Badge>
+                                            )}
+                                        </div>
 
                                         {/* Side-by-Side Comparison */}
                                         <div className="grid gap-6">
@@ -327,139 +414,143 @@ export default function CostingApprovalForm({
                                             </div>
 
                                             {/* TL Approval Values (Editable) */}
-                                            <div className="space-y-4 p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
-                                                <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3'>
-                                                    <FieldWrapper
-                                                        control={form.control}
-                                                        name={`details.${index}.finalPrice`}
-                                                        label="Final Price (GST Inclusive)"
-                                                    >
-                                                        {(field) => (
-                                                            <Input
-                                                                {...field}
-                                                                type="number"
-                                                                step="0.01"
-                                                                placeholder="Enter final price"
-                                                            />
-                                                        )}
-                                                    </FieldWrapper>
+                                            {!processed && (
+                                                <div className="space-y-4 p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
+                                                    <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3'>
+                                                        <FieldWrapper
+                                                            control={form.control}
+                                                            name={`details.${index}.finalPrice`}
+                                                            label="Final Price (GST Inclusive)"
+                                                        >
+                                                            {(field) => (
+                                                                <Input
+                                                                    {...field}
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    placeholder="Enter final price"
+                                                                />
+                                                            )}
+                                                        </FieldWrapper>
+
+                                                        <FieldWrapper
+                                                            control={form.control}
+                                                            name={`details.${index}.receiptPrice`}
+                                                            label="Receipt (Pre GST)"
+                                                        >
+                                                            {(field) => (
+                                                                <Input
+                                                                    {...field}
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    placeholder="Enter receipt price"
+                                                                    onChange={(e) => {
+                                                                        field.onChange(e);
+                                                                        handleGrossMarginChange(
+                                                                            index,
+                                                                            e.target.value,
+                                                                            form.getValues(`details.${index}.budgetPrice`) || ''
+                                                                        );
+                                                                    }}
+                                                                />
+                                                            )}
+                                                        </FieldWrapper>
+
+                                                        <FieldWrapper
+                                                            control={form.control}
+                                                            name={`details.${index}.budgetPrice`}
+                                                            label="Budget (Pre GST)"
+                                                        >
+                                                            {(field) => (
+                                                                <Input
+                                                                    {...field}
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    placeholder="Enter budget price"
+                                                                    onChange={(e) => {
+                                                                        field.onChange(e);
+                                                                        handleGrossMarginChange(
+                                                                            index,
+                                                                            form.getValues(`details.${index}.receiptPrice`) || '',
+                                                                            e.target.value
+                                                                        );
+                                                                    }}
+                                                                />
+                                                            )}
+                                                        </FieldWrapper>
+
+                                                        <FieldWrapper
+                                                            control={form.control}
+                                                            name={`details.${index}.grossMargin`}
+                                                            label="Gross Margin %"
+                                                        >
+                                                            {(field) => (
+                                                                <Input
+                                                                    {...field}
+                                                                    type="text"
+                                                                    className="bg-muted"
+                                                                    placeholder="Auto-calculated"
+                                                                    readOnly
+                                                                />
+                                                            )}
+                                                        </FieldWrapper>
+                                                    </div>
 
                                                     <FieldWrapper
                                                         control={form.control}
-                                                        name={`details.${index}.receiptPrice`}
-                                                        label="Receipt (Pre GST)"
+                                                        name={`details.${index}.tlRemarks`}
+                                                        label="TL Remarks"
                                                     >
                                                         {(field) => (
-                                                            <Input
+                                                            <Textarea
                                                                 {...field}
-                                                                type="number"
-                                                                step="0.01"
-                                                                placeholder="Enter receipt price"
-                                                                onChange={(e) => {
-                                                                    field.onChange(e);
-                                                                    handleGrossMarginChange(
-                                                                        index,
-                                                                        e.target.value,
-                                                                        form.getValues(`details.${index}.budgetPrice`) || ''
-                                                                    );
-                                                                }}
-                                                            />
-                                                        )}
-                                                    </FieldWrapper>
-
-                                                    <FieldWrapper
-                                                        control={form.control}
-                                                        name={`details.${index}.budgetPrice`}
-                                                        label="Budget (Pre GST)"
-                                                    >
-                                                        {(field) => (
-                                                            <Input
-                                                                {...field}
-                                                                type="number"
-                                                                step="0.01"
-                                                                placeholder="Enter budget price"
-                                                                onChange={(e) => {
-                                                                    field.onChange(e);
-                                                                    handleGrossMarginChange(
-                                                                        index,
-                                                                        form.getValues(`details.${index}.receiptPrice`) || '',
-                                                                        e.target.value
-                                                                    );
-                                                                }}
-                                                            />
-                                                        )}
-                                                    </FieldWrapper>
-
-                                                    <FieldWrapper
-                                                        control={form.control}
-                                                        name={`details.${index}.grossMargin`}
-                                                        label="Gross Margin %"
-                                                    >
-                                                        {(field) => (
-                                                            <Input
-                                                                {...field}
-                                                                type="text"
-                                                                className="bg-muted"
-                                                                placeholder="Auto-calculated"
-                                                                readOnly
+                                                                rows={3}
+                                                                placeholder="Enter remarks for this detail"
                                                             />
                                                         )}
                                                     </FieldWrapper>
                                                 </div>
-
-                                                <FieldWrapper
-                                                    control={form.control}
-                                                    name={`details.${index}.tlRemarks`}
-                                                    label="TL Remarks"
-                                                >
-                                                    {(field) => (
-                                                        <Textarea
-                                                            {...field}
-                                                            rows={3}
-                                                            placeholder="Enter remarks for this detail"
-                                                        />
-                                                    )}
-                                                </FieldWrapper>
-                                            </div>
+                                            )}
                                         </div>
 
                                         {/* Per-Detail Action Buttons */}
-                                        <div className="flex justify-end gap-2 pt-2 border-t">
-                                            {mode === 'approve' && (
-                                                <>
-                                                    <Button
-                                                        type="button"
-                                                        variant="destructive"
-                                                        size="sm"
-                                                        onClick={() => setRejectDetailId(detail.id)}
-                                                    >
-                                                        Reject Detail
-                                                    </Button>
+                                        {!processed && (
+                                            <div className="flex justify-end gap-2 pt-2 border-t">
+                                                {mode === 'approve' && (
+                                                    <>
+                                                        <Button
+                                                            type="button"
+                                                            variant="destructive"
+                                                            size="sm"
+                                                            onClick={() => setRejectDetailId(detail.id)}
+                                                        >
+                                                            Reject Detail
+                                                        </Button>
+                                                        <Button
+                                                            type="button"
+                                                            variant="default"
+                                                            size="sm"
+                                                            onClick={() => submitIndividualApprove(index)}
+                                                            disabled={isSubmitting}
+                                                        >
+                                                            <CheckCircle className="mr-2 h-4 w-4" />
+                                                            Approve Detail
+                                                        </Button>
+                                                    </>
+                                                )}
+                                                {mode === 'edit' && (
                                                     <Button
                                                         type="button"
                                                         variant="default"
                                                         size="sm"
-                                                        onClick={() => submitIndividualApprove(index)}
+                                                        onClick={() => submitIndividualUpdate(index)}
                                                         disabled={isSubmitting}
                                                     >
-                                                        <CheckCircle className="mr-2 h-4 w-4" />
-                                                        Approve Detail
+                                                        <Save className="mr-2 h-4 w-4" />
+                                                        Update Detail
                                                     </Button>
-                                                </>
-                                            )}
-                                            {mode === 'edit' && (
-                                                <Button
-                                                    type="button"
-                                                    variant="default"
-                                                    size="sm"
-                                                    onClick={() => submitIndividualUpdate(index)}
-                                                    disabled={isSubmitting}
-                                                >
-                                                    <Save className="mr-2 h-4 w-4" />
-                                                    Update Detail
-                                                </Button>
-                                            )}
-                                        </div>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}
@@ -469,7 +560,7 @@ export default function CostingApprovalForm({
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    onClick={() => navigate(-1)}
+                                    onClick={() => navigate(paths.tendering.costingApprovals)}
                                     disabled={isSubmitting}
                                 >
                                     Cancel
@@ -482,22 +573,6 @@ export default function CostingApprovalForm({
                                 >
                                     Reset
                                 </Button>
-                                {mode === 'edit' && (
-                                    <Button
-                                        type="button"
-                                        variant="default"
-                                        onClick={async () => {
-                                            const vals = form.getValues();
-                                            for (let i = 0; i < vals.details.length; i++) {
-                                                await submitIndividualUpdate(i);
-                                            }
-                                        }}
-                                        disabled={isSubmitting}
-                                    >
-                                        <Save className="mr-2 h-4 w-4" />
-                                        Update All
-                                    </Button>
-                                )}
                             </div>
                         </form>
                     </Form>
@@ -512,7 +587,7 @@ export default function CostingApprovalForm({
                     onOpenChange={(open) => {
                         if (!open) setRejectDetailId(null);
                     }}
-                    onSuccess={() => navigate(paths.tendering.costingApprovals)}
+                    onSuccess={() => handleRejectDialogSuccess(rejectDetailId)}
                 />
             )}
         </>
