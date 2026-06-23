@@ -15,19 +15,6 @@ interface CostingSheetViewProps {
 export function CostingSheetView({ costingSheet, vendors }: CostingSheetViewProps) {
     if (!costingSheet) return null;
 
-    const getStatusVariant = (status: string) => {
-        switch (status) {
-            case 'Approved':
-                return 'default';
-            case 'Rejected/Redo':
-                return 'destructive';
-            case 'Submitted':
-                return 'secondary';
-            default:
-                return 'outline';
-        }
-    };
-
     return (
         <Card>
             <CardHeader>
@@ -39,23 +26,6 @@ export function CostingSheetView({ costingSheet, vendors }: CostingSheetViewProp
             <CardContent>
                 <Table>
                     <TableBody>
-                        {/* Status */}
-                        <TableRow className="bg-muted/50">
-                            <TableCell colSpan={4} className="font-semibold text-sm">
-                                Status
-                            </TableCell>
-                        </TableRow>
-                        <TableRow className="hover:bg-muted/30 transition-colors">
-                            <TableCell className="text-sm font-medium text-muted-foreground">
-                                Status
-                            </TableCell>
-                            <TableCell colSpan={3}>
-                                <Badge variant={getStatusVariant(costingSheet.status) as any}>
-                                    {costingSheet.status}
-                                </Badge>
-                            </TableCell>
-                        </TableRow>
-
                         {/* Google Sheet */}
                         {costingSheet.googleSheetUrl && (
                             <>
@@ -315,31 +285,21 @@ export function CostingSheetSection({ tenderId }: { tenderId: number | null }) {
                         <div className="space-y-3">
                             {details.map((detail: TenderCostingDetail) => (
                                 <Card key={detail.id} className="border-l-4 border-l-primary">
-                                    <CardHeader className="py-2">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-sm font-semibold">{detail.sheetTitle}</span>
-                                            <Badge variant={
-                                                detail.status === 'Approved' ? 'default' :
-                                                detail.status === 'Submitted' ? 'secondary' :
-                                                detail.status === 'Rejected/Redo' ? 'destructive' : 'outline'
-                                            }>{detail.status}</Badge>
-                                        </div>
-                                    </CardHeader>
                                     <CardContent className="py-2">
-                                        <div className="grid grid-cols-2 gap-2 text-sm">
-                                            <div>Final Price: <strong>₹{Number(detail.submittedFinalPrice || 0).toLocaleString('en-IN')}</strong></div>
-                                            <div>Receipt: <strong>₹{Number(detail.submittedReceiptPrice || 0).toLocaleString('en-IN')}</strong></div>
-                                            <div>Budget: <strong>₹{Number(detail.submittedBudgetPrice || 0).toLocaleString('en-IN')}</strong></div>
-                                            <div>Gross Margin: <strong>{detail.submittedGrossMargin || '0'}%</strong></div>
+                                        <div className="grid grid-cols-1 md:grid-cols-5 gap-2 text-sm">
+                                            <div>Final Price <br /> <strong className='text-lg'>{formatINR(detail.submittedFinalPrice || 0)}</strong></div>
+                                            <div>Receipt <br /> <strong className='text-lg'>{formatINR(detail.submittedReceiptPrice || 0)}</strong></div>
+                                            <div>Budget <br /> <strong className='text-lg'>{formatINR(detail.submittedBudgetPrice || 0)}</strong></div>
+                                            <div>Gross Margin <br /> <strong className='text-lg'>{detail.submittedGrossMargin || '0'}%</strong></div>
+                                            <div>TE Remark <br /> <strong>{detail.teRemarks}</strong></div>
                                         </div>
-                                        {detail.teRemarks && <p className="text-xs text-muted-foreground mt-1">{detail.teRemarks}</p>}
                                         {detail.approvedBy && (
-                                            <div className="mt-2 p-2 bg-green-50 dark:bg-green-950/20 rounded text-sm">
-                                                Approved: Final ₹{Number(detail.finalPrice || 0).toLocaleString('en-IN')} |
-                                                Receipt ₹{Number(detail.receiptPrice || 0).toLocaleString('en-IN')} |
-                                                Budget ₹{Number(detail.budgetPrice || 0).toLocaleString('en-IN')} |
-                                                Margin {detail.grossMargin || '0'}%
-                                                {detail.tlRemarks && <><br />Remarks: {detail.tlRemarks}</>}
+                                            <div className="grid grid-cols-1 md:grid-cols-5 gap-2 m-2 p-2 text-sm bg-green-50 dark:bg-green-950/20 rounded">
+                                                <div>Approved Final Price <br /> <strong className='text-lg'>{formatINR(detail.finalPrice || 0)}</strong></div>
+                                                <div>Approved Receipt <br /> <strong className='text-lg'>{formatINR(detail.receiptPrice || 0)}</strong></div>
+                                                <div>Approved Budget <br /> <strong className='text-lg'>{formatINR(detail.budgetPrice || 0)}</strong></div>
+                                                <div>Approved Gross Margin <br /> <strong className='text-lg'>{detail.grossMargin || '0'}%</strong></div>
+                                                <div>TL Remark <br /> <strong>{detail.tlRemarks}</strong></div>
                                             </div>
                                         )}
                                         {detail.rejectionReason && (
@@ -354,10 +314,10 @@ export function CostingSheetSection({ tenderId }: { tenderId: number | null }) {
                             <div className="mt-4 p-3 bg-muted/30 rounded-lg">
                                 <p className="text-sm font-semibold mb-1">Combined Totals (Approved Only)</p>
                                 <div className="grid grid-cols-4 gap-2 text-sm">
-                                    <div>Final: <strong>₹{Number(combined.totalFinalPrice || 0).toLocaleString('en-IN')}</strong></div>
-                                    <div>Receipt: <strong>₹{Number(combined.totalReceiptPrice || 0).toLocaleString('en-IN')}</strong></div>
-                                    <div>Budget: <strong>₹{Number(combined.totalBudgetPrice || 0).toLocaleString('en-IN')}</strong></div>
-                                    <div>Approved: <strong>{combined.approvedCount}/{combined.detailsCount}</strong></div>
+                                    <div>Final Price <br/> <strong>{formatINR(combined.totalFinalPrice || 0)}</strong></div>
+                                    <div>Receipt <br/> <strong>{formatINR(combined.totalReceiptPrice || 0)}</strong></div>
+                                    <div>Budget <br/> <strong>{formatINR(combined.totalBudgetPrice || 0)}</strong></div>
+                                    <div>Approved <br/> <strong>{combined.approvedCount}/{combined.detailsCount}</strong></div>
                                 </div>
                             </div>
                         )}
