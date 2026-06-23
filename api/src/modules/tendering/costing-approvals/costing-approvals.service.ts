@@ -1,5 +1,5 @@
 import { Inject, Injectable, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
-import { and, eq, inArray, asc, desc, sql, isNull, notInArray, isNotNull, ne, or } from 'drizzle-orm';
+import { and, eq, inArray, asc, desc, sql, isNull, isNotNull, ne, or } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
@@ -36,6 +36,8 @@ export type CostingApprovalDashboardRow = {
     dueDate: Date | null;
     emdAmount: string | null;
     gstValues: number;
+    submittedFinalPrice: string | null;
+    submittedBudgetPrice: string | null;
     costingStatus: 'Submitted' | 'Approved' | 'Rejected/Redo';
     googleSheetUrl: string | null;
     costingSheetId: number | null;
@@ -210,6 +212,8 @@ export class CostingApprovalsService {
             dueDate: tenderInfos.dueDate,
             emdAmount: tenderInfos.emd,
             gstValues: tenderInfos.gstValues,
+            submittedFinalPrice: tenderCostingDetails.submittedFinalPrice,
+            submittedBudgetPrice: tenderCostingDetails.submittedBudgetPrice,
             costingSheetId: tenderCostingSheets.id,
             costingDetailId: tenderCostingDetails.id,
             costingDetailStatus: tenderCostingDetails.status,
@@ -235,6 +239,8 @@ export class CostingApprovalsService {
             dueDate: row.dueDate,
             emdAmount: row.emdAmount,
             gstValues: row.gstValues ? Number(row.gstValues) : 0,
+            submittedFinalPrice: row.submittedFinalPrice,
+            submittedBudgetPrice: row.submittedBudgetPrice,
             costingStatus: row.costingDetailStatus,
             googleSheetUrl: row.googleSheetUrl,
             costingSheetId: row.costingSheetId,
@@ -272,46 +278,25 @@ export class CostingApprovalsService {
     }
 
     async findById(id: number, userTeam: number) {
-        // Accepts sheet ID, returns merged sheet + first detail data (backward compat)
-        const result = await this.db
-            .select({
-                sheet: tenderCostingSheets,
-                detail: tenderCostingDetails,
-                tenderTeam: tenderInfos.team,
-            })
+        const [sheet] = await this.db
+            .select()
             .from(tenderCostingSheets)
-            .innerJoin(tenderInfos, eq(tenderInfos.id, tenderCostingSheets.tenderId))
-            .leftJoin(tenderCostingDetails, eq(tenderCostingDetails.tenderCostingSheetId, tenderCostingSheets.id))
             .where(eq(tenderCostingSheets.id, id))
-            .orderBy(asc(tenderCostingDetails.id))
             .limit(1);
 
-        if (!result[0]) {
+        if (!sheet) {
             throw new NotFoundException('Costing sheet not found');
         }
 
-        const { sheet, detail } = result[0];
+        const details = await this.db
+            .select()
+            .from(tenderCostingDetails)
+            .where(eq(tenderCostingDetails.tenderCostingSheetId, id))
+            .orderBy(asc(tenderCostingDetails.id));
 
         return {
             ...sheet,
-            ...(detail ? {
-                status: detail.status,
-                submittedFinalPrice: detail.submittedFinalPrice,
-                submittedReceiptPrice: detail.submittedReceiptPrice,
-                submittedBudgetPrice: detail.submittedBudgetPrice,
-                submittedGrossMargin: detail.submittedGrossMargin,
-                teRemarks: detail.teRemarks,
-                submittedBy: detail.submittedBy,
-                submittedAt: detail.submittedAt,
-                finalPrice: detail.finalPrice,
-                receiptPrice: detail.receiptPrice,
-                budgetPrice: detail.budgetPrice,
-                grossMargin: detail.grossMargin,
-                tlRemarks: detail.tlRemarks,
-                rejectionReason: detail.rejectionReason,
-                approvedBy: detail.approvedBy,
-                approvedAt: detail.approvedAt,
-            } : {}),
+            details: details || [],
         };
     }
 
@@ -320,6 +305,7 @@ export class CostingApprovalsService {
         userTeam: number,
         userId: number,
         data: {
+            detailId?: number;
             finalPrice: string;
             receiptPrice: string;
             budgetPrice: string;
@@ -328,38 +314,39 @@ export class CostingApprovalsService {
             tlRemarks: string;
         }
     ) {
-        // Accepts sheet ID, approves the first detail
-        const result = await this.db
-            .select({
-                sheet: tenderCostingSheets,
-                detail: tenderCostingDetails,
-                tenderTeam: tenderInfos.team,
-                tenderId: tenderInfos.id,
-            })
+        const [sheet] = await this.db
+            .select({ tenderId: tenderInfos.id, team: tenderInfos.team })
             .from(tenderCostingSheets)
             .innerJoin(tenderInfos, eq(tenderInfos.id, tenderCostingSheets.tenderId))
-            .leftJoin(tenderCostingDetails, eq(tenderCostingDetails.tenderCostingSheetId, tenderCostingSheets.id))
             .where(eq(tenderCostingSheets.id, id))
-            .orderBy(asc(tenderCostingDetails.id))
             .limit(1);
 
-        if (!result[0] || !result[0].detail) {
-            throw new NotFoundException('Costing sheet or detail not found');
+        if (!sheet) {
+            throw new NotFoundException('Costing sheet not found');
         }
 
-        const { sheet, detail, tenderId } = result[0];
-        const currentTender = await this.tenderInfosService.findById(tenderId);
-        const prevStatus = currentTender?.status ?? null;
-        const newStatus = 7;
+        const { tenderId } = sheet;
+        const detailId = data.detailId;
 
-        // Update sheet-level oemVendorIds + approve the detail
-        const updatedDetail = await this.db.transaction(async (tx) => {
-            await tx
-                .update(tenderCostingSheets)
-                .set({ oemVendorIds: data.oemVendorIds, updatedAt: new Date() })
-                .where(eq(tenderCostingSheets.id, id));
+        if (detailId) {
+            const [detail] = await this.db
+                .select()
+                .from(tenderCostingDetails)
+                .where(and(
+                    eq(tenderCostingDetails.id, detailId),
+                    eq(tenderCostingDetails.tenderCostingSheetId, id),
+                ))
+                .limit(1);
 
-            const [updated] = await tx
+            if (!detail) {
+                throw new NotFoundException('Costing detail not found');
+            }
+
+            if (detail.status !== 'Submitted') {
+                throw new BadRequestException('Only submitted details can be approved');
+            }
+
+            const [updated] = await this.db
                 .update(tenderCostingDetails)
                 .set({
                     status: 'Approved',
@@ -373,7 +360,57 @@ export class CostingApprovalsService {
                     rejectionReason: null,
                     updatedAt: new Date(),
                 })
-                .where(eq(tenderCostingDetails.id, detail.id))
+                .where(eq(tenderCostingDetails.id, detailId))
+                .returning();
+
+            await this.db
+                .update(tenderCostingSheets)
+                .set({ oemVendorIds: data.oemVendorIds, updatedAt: new Date() })
+                .where(eq(tenderCostingSheets.id, id));
+
+            return updated;
+        }
+
+        const allSubmitted = await this.db
+            .select()
+            .from(tenderCostingDetails)
+            .where(and(
+                eq(tenderCostingDetails.tenderCostingSheetId, id),
+                eq(tenderCostingDetails.status, 'Submitted'),
+            ));
+
+        if (allSubmitted.length === 0) {
+            throw new NotFoundException('No submitted details found to approve');
+        }
+
+        const currentTender = await this.tenderInfosService.findById(tenderId);
+        const prevStatus = currentTender?.status ?? null;
+        const newStatus = 7;
+
+        const updatedDetails = await this.db.transaction(async (tx) => {
+            await tx
+                .update(tenderCostingSheets)
+                .set({ oemVendorIds: data.oemVendorIds, updatedAt: new Date() })
+                .where(eq(tenderCostingSheets.id, id));
+
+            const updated = await tx
+                .update(tenderCostingDetails)
+                .set({
+                    status: 'Approved',
+                    finalPrice: data.finalPrice,
+                    receiptPrice: data.receiptPrice,
+                    budgetPrice: data.budgetPrice,
+                    grossMargin: data.grossMargin,
+                    tlRemarks: data.tlRemarks,
+                    approvedBy: userId,
+                    approvedAt: new Date(),
+                    rejectionReason: null,
+                    updatedAt: new Date(),
+                })
+                .where(and(
+                    eq(tenderCostingDetails.tenderCostingSheetId, id),
+                    eq(tenderCostingDetails.status, 'Submitted'),
+                ))
                 .returning();
 
             await tx
@@ -388,7 +425,9 @@ export class CostingApprovalsService {
             return updated;
         });
 
-        await this.sendCostingSheetApprovedEmail(tenderId, updatedDetail, userId);
+        if (updatedDetails.length > 0) {
+            await this.sendCostingSheetApprovedEmail(tenderId, updatedDetails[0], userId);
+        }
 
         try {
             await this.timersService.stopTimer({
@@ -402,35 +441,67 @@ export class CostingApprovalsService {
             this.logger.error(`Failed to stop timer: ${error}`);
         }
 
-        return updatedDetail;
+        return updatedDetails;
     }
 
     async reject(
         id: number,
         userTeam: number,
         userId: number,
-        rejectionReason: string
+        rejectionReason: string,
+        detailId?: number,
     ) {
-        const result = await this.db
-            .select({
-                sheet: tenderCostingSheets,
-                detail: tenderCostingDetails,
-                tenderId: tenderInfos.id,
-            })
-            .from(tenderCostingSheets)
-            .innerJoin(tenderInfos, eq(tenderInfos.id, tenderCostingSheets.tenderId))
-            .leftJoin(tenderCostingDetails, eq(tenderCostingDetails.tenderCostingSheetId, tenderCostingSheets.id))
-            .where(eq(tenderCostingSheets.id, id))
-            .orderBy(asc(tenderCostingDetails.id))
-            .limit(1);
+        if (detailId) {
+            const [detail] = await this.db
+                .select()
+                .from(tenderCostingDetails)
+                .where(and(
+                    eq(tenderCostingDetails.id, detailId),
+                    eq(tenderCostingDetails.tenderCostingSheetId, id),
+                ))
+                .limit(1);
 
-        if (!result[0] || !result[0].detail) {
-            throw new NotFoundException('Costing sheet or detail not found');
+            if (!detail) {
+                throw new NotFoundException('Costing detail not found');
+            }
+
+            const [updated] = await this.db
+                .update(tenderCostingDetails)
+                .set({
+                    status: 'Rejected/Redo',
+                    rejectionReason,
+                    finalPrice: null,
+                    receiptPrice: null,
+                    budgetPrice: null,
+                    grossMargin: null,
+                    tlRemarks: null,
+                    approvedBy: null,
+                    approvedAt: null,
+                    updatedAt: new Date(),
+                })
+                .where(eq(tenderCostingDetails.id, detailId))
+                .returning();
+
+            return updated;
         }
 
-        const { detail, tenderId } = result[0];
+        const allSubmitted = await this.db
+            .select({ id: tenderCostingDetails.id, tenderId: tenderInfos.id })
+            .from(tenderCostingDetails)
+            .innerJoin(tenderCostingSheets, eq(tenderCostingSheets.id, tenderCostingDetails.tenderCostingSheetId))
+            .innerJoin(tenderInfos, eq(tenderInfos.id, tenderCostingSheets.tenderId))
+            .where(and(
+                eq(tenderCostingDetails.tenderCostingSheetId, id),
+                eq(tenderCostingDetails.status, 'Submitted'),
+            ));
 
-        const [updated] = await this.db
+        if (allSubmitted.length === 0) {
+            throw new NotFoundException('No submitted details found to reject');
+        }
+
+        const tenderId = allSubmitted[0].tenderId;
+
+        const updated = await this.db
             .update(tenderCostingDetails)
             .set({
                 status: 'Rejected/Redo',
@@ -444,10 +515,13 @@ export class CostingApprovalsService {
                 approvedAt: null,
                 updatedAt: new Date(),
             })
-            .where(eq(tenderCostingDetails.id, detail.id))
+            .where(and(
+                eq(tenderCostingDetails.tenderCostingSheetId, id),
+                eq(tenderCostingDetails.status, 'Submitted'),
+            ))
             .returning();
 
-        await this.sendCostingSheetRejectedEmail(tenderId, updated, userId);
+        await this.sendCostingSheetRejectedEmail(tenderId, updated[0], userId);
         return updated;
     }
 
@@ -456,32 +530,29 @@ export class CostingApprovalsService {
         userTeam: number,
         userId: number,
         data: {
+            detailId: number;
             finalPrice?: string;
             receiptPrice?: string;
             budgetPrice?: string;
             grossMargin?: string;
-            oemVendorIds?: number[];
             tlRemarks?: string;
         }
     ) {
-        const result = await this.db
-            .select({
-                sheet: tenderCostingSheets,
-                detail: tenderCostingDetails,
-            })
-            .from(tenderCostingSheets)
-            .leftJoin(tenderCostingDetails, eq(tenderCostingDetails.tenderCostingSheetId, tenderCostingSheets.id))
-            .where(eq(tenderCostingSheets.id, id))
-            .orderBy(asc(tenderCostingDetails.id))
+        const [detail] = await this.db
+            .select()
+            .from(tenderCostingDetails)
+            .where(and(
+                eq(tenderCostingDetails.id, data.detailId),
+                eq(tenderCostingDetails.tenderCostingSheetId, id),
+            ))
             .limit(1);
 
-        if (!result[0] || !result[0].detail) {
-            throw new NotFoundException('Costing sheet or detail not found');
+        if (!detail) {
+            throw new NotFoundException('Costing detail not found');
         }
 
-        const { detail } = result[0];
         if (detail.status !== 'Approved') {
-            throw new ForbiddenException('Can only edit already approved costing sheets');
+            throw new ForbiddenException('Can only edit already approved costing details');
         }
 
         const updateData: any = {
@@ -495,20 +566,124 @@ export class CostingApprovalsService {
         if (data.grossMargin !== undefined) updateData.grossMargin = data.grossMargin;
         if (data.tlRemarks !== undefined) updateData.tlRemarks = data.tlRemarks;
 
-        if (data.oemVendorIds !== undefined) {
-            await this.db
-                .update(tenderCostingSheets)
-                .set({ oemVendorIds: data.oemVendorIds, updatedAt: new Date() })
-                .where(eq(tenderCostingSheets.id, id));
-        }
-
         const [updated] = await this.db
             .update(tenderCostingDetails)
             .set(updateData)
-            .where(eq(tenderCostingDetails.id, detail.id))
+            .where(eq(tenderCostingDetails.id, data.detailId))
             .returning();
 
         return updated;
+    }
+
+    async approveAll(
+        id: number,
+        userTeam: number,
+        userId: number,
+        data: {
+            approvals: {
+                detailId: number;
+                finalPrice: string;
+                receiptPrice: string;
+                budgetPrice: string;
+                grossMargin: string;
+                tlRemarks: string;
+            }[];
+            oemVendorIds: number[];
+        }
+    ) {
+        const [sheet] = await this.db
+            .select({ tenderId: tenderInfos.id })
+            .from(tenderCostingSheets)
+            .innerJoin(tenderInfos, eq(tenderInfos.id, tenderCostingSheets.tenderId))
+            .where(eq(tenderCostingSheets.id, id))
+            .limit(1);
+
+        if (!sheet) {
+            throw new NotFoundException('Costing sheet not found');
+        }
+
+        const { tenderId } = sheet;
+        const detailIds = data.approvals.map(a => a.detailId);
+
+        const existing = await this.db
+            .select()
+            .from(tenderCostingDetails)
+            .where(and(
+                eq(tenderCostingDetails.tenderCostingSheetId, id),
+                inArray(tenderCostingDetails.id, detailIds),
+                eq(tenderCostingDetails.status, 'Submitted'),
+            ));
+
+        if (existing.length === 0) {
+            throw new NotFoundException('No submitted details found to approve');
+        }
+
+        const currentTender = await this.tenderInfosService.findById(tenderId);
+        const prevStatus = currentTender?.status ?? null;
+        const newStatus = 7;
+
+        const updatedDetails = await this.db.transaction(async (tx) => {
+            await tx
+                .update(tenderCostingSheets)
+                .set({ oemVendorIds: data.oemVendorIds, updatedAt: new Date() })
+                .where(eq(tenderCostingSheets.id, id));
+
+            const results: any[] = [];
+            for (const approval of data.approvals) {
+                const isSubmitted = existing.some(e => e.id === approval.detailId);
+                if (!isSubmitted) continue;
+
+                const [updated] = await tx
+                    .update(tenderCostingDetails)
+                    .set({
+                        status: 'Approved',
+                        finalPrice: approval.finalPrice,
+                        receiptPrice: approval.receiptPrice,
+                        budgetPrice: approval.budgetPrice,
+                        grossMargin: approval.grossMargin,
+                        tlRemarks: approval.tlRemarks,
+                        approvedBy: userId,
+                        approvedAt: new Date(),
+                        rejectionReason: null,
+                        updatedAt: new Date(),
+                    })
+                    .where(eq(tenderCostingDetails.id, approval.detailId))
+                    .returning();
+
+                if (updated) results.push(updated[0]);
+            }
+
+            if (results.length > 0) {
+                await tx
+                    .update(tenderInfos)
+                    .set({ status: newStatus, updatedAt: new Date() })
+                    .where(eq(tenderInfos.id, tenderId));
+
+                await this.tenderStatusHistoryService.trackStatusChange(
+                    tenderId, newStatus, userId, prevStatus, 'Price bid approved'
+                );
+            }
+
+            return results;
+        });
+
+        if (updatedDetails.length > 0) {
+            await this.sendCostingSheetApprovedEmail(tenderId, updatedDetails[0], userId);
+        }
+
+        try {
+            await this.timersService.stopTimer({
+                entityType: 'TENDER',
+                entityId: tenderId,
+                stage: 'costing_sheet_approval',
+                userId,
+                reason: 'Costing approved'
+            });
+        } catch (error) {
+            this.logger.error(`Failed to stop timer: ${error}`);
+        }
+
+        return updatedDetails;
     }
 
     private async sendEmail(
