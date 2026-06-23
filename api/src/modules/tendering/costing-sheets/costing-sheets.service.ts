@@ -1,15 +1,13 @@
 import { Inject, Injectable, NotFoundException, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
-import { and, eq, inArray, or, asc, desc, sql, isNull, isNotNull, notInArray, ne } from 'drizzle-orm';
+import { and, eq, or, asc, desc, sql, isNull, ne } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
 import { users } from '@db/schemas/auth/users.schema';
-import { items } from '@db/schemas/master/items.schema';
 import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
 import { tenderCostingSheets } from '@db/schemas/tendering/tender-costing-sheets.schema';
 import { tenderCostingDetails } from '@db/schemas/tendering/tender-costing-details.schema';
-import { tenderStatusHistory } from '@db/schemas/tendering/tender-status-history.schema';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
 import type { PaginatedResult } from '@/modules/tendering/types/shared.types';
 import { TenderStatusHistoryService } from '@/modules/tendering/tender-status-history/tender-status-history.service';
@@ -27,12 +25,8 @@ export type CostingSheetDashboardRow = {
     tenderNo: string;
     tenderName: string;
     teamMemberName: string | null;
-    itemName: string | null;
     status: number;
     statusName: string | null;
-    latestStatus: number | null;
-    latestStatusName: string | null;
-    statusRemark: string | null;
     dueDate: Date | null;
     emdAmount: string | null;
     gstValues: number;
@@ -64,19 +58,6 @@ export class CostingSheetsService {
         private readonly recipientResolver: RecipientResolver,
         private readonly timersService: TimersService,
     ) { }
-
-    private determineCostingStatus(
-        detailId: number | null,
-        detailStatus: string | null
-    ): 'Pending' | 'Created' | 'Submitted' | 'Approved' | 'Rejected/Redo' {
-        if (!detailId) {
-            return 'Pending';
-        }
-        if (!detailStatus) {
-            return 'Created';
-        }
-        return detailStatus as 'Submitted' | 'Approved' | 'Rejected/Redo';
-    }
 
     private buildDashboardConditions(user?: ValidatedUser, teamId?: number, tab?: string): any[] {
         const baseCondition = TenderInfosService.getActiveCondition();
@@ -111,17 +92,27 @@ export class CostingSheetsService {
 
         if (tab === 'pending') {
             conditions.push(TenderInfosService.getExcludeStatusCondition(['lost']));
-            conditions.push(or(
-                inArray(tenderCostingDetails.status, ['Pending', 'Rejected/Redo']),
-                isNull(tenderCostingDetails.submittedFinalPrice)
-            ) as any);
+            conditions.push(sql`(
+                EXISTS (SELECT 1 FROM ${tenderCostingDetails}
+                        WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+                        AND ${tenderCostingDetails.status} IN ('Pending', 'Rejected/Redo'))
+                OR
+                NOT EXISTS (SELECT 1 FROM ${tenderCostingDetails}
+                            WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+                            AND ${tenderCostingDetails.submittedFinalPrice} IS NOT NULL)
+            )`);
             conditions.push(or(ne(bidSubmissions.status, 'Tender Missed'), isNull(bidSubmissions)));
         } else if (tab === 'submitted') {
             conditions.push(TenderInfosService.getExcludeStatusCondition(['dnb']));
-            conditions.push(or(
-                eq(tenderCostingDetails.status, 'Submitted'),
-                isNotNull(tenderCostingDetails.submittedFinalPrice)
-            ) as any);
+            conditions.push(sql`(
+                EXISTS (SELECT 1 FROM ${tenderCostingDetails}
+                        WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+                        AND ${tenderCostingDetails.status} = 'Submitted')
+                OR
+                EXISTS (SELECT 1 FROM ${tenderCostingDetails}
+                        WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+                        AND ${tenderCostingDetails.submittedFinalPrice} IS NOT NULL)
+            )`);
             conditions.push(or(ne(bidSubmissions.status, 'Tender Missed'), isNull(bidSubmissions)));
         } else if (tab === 'tender-dnb') {
             conditions.push(eq(bidSubmissions.status, 'Tender Missed'));
@@ -183,7 +174,11 @@ export class CostingSheetsService {
                     orderByClause = sortFn(tenderInfos.dueDate);
                     break;
                 case 'submissionDate':
-                    orderByClause = sortFn(tenderCostingDetails.createdAt);
+                    orderByClause = sortFn(sql`(
+                        SELECT COALESCE(MIN(${tenderCostingDetails.createdAt}), ${tenderInfos.updatedAt})
+                        FROM ${tenderCostingDetails}
+                        WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+                    )`);
                     break;
                 case 'statusChangeDate':
                     orderByClause = sortFn(tenderInfos.updatedAt);
@@ -205,10 +200,8 @@ export class CostingSheetsService {
             .leftJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .leftJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
             .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
-            .leftJoin(tenderCostingDetails, eq(tenderCostingDetails.tenderCostingSheetId, tenderCostingSheets.id))
             .where(whereClause);
         const total = Number(countResult?.count || 0);
 
@@ -218,27 +211,43 @@ export class CostingSheetsService {
                 tenderNo: tenderInfos.tenderNo,
                 tenderName: tenderInfos.tenderName,
                 teamMemberName: users.name,
-                itemName: items.name,
                 status: tenderInfos.status,
                 statusName: statuses.name,
                 dueDate: tenderInfos.dueDate,
                 emdAmount: tenderInfos.emd,
                 gstValues: tenderInfos.gstValues,
                 costingSheetId: tenderCostingSheets.id,
-                costingDetailId: tenderCostingDetails.id,
-                costingDetailStatus: tenderCostingDetails.status,
-                submittedFinalPrice: tenderCostingDetails.submittedFinalPrice,
-                submittedBudgetPrice: tenderCostingDetails.submittedBudgetPrice,
+                costingDetailStatus: sql<string | null>`(
+                    SELECT ${tenderCostingDetails.status}
+                    FROM ${tenderCostingDetails}
+                    WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+                    ORDER BY CASE ${tenderCostingDetails.status}
+                        WHEN 'Submitted' THEN 1
+                        WHEN 'Pending' THEN 2
+                        WHEN 'Rejected/Redo' THEN 3
+                        WHEN 'Approved' THEN 4
+                        ELSE 5
+                    END
+                    LIMIT 1
+                )`,
+                submittedFinalPrice: sql<string | null>`(
+                    SELECT COALESCE(SUM(CAST(${tenderCostingDetails.submittedFinalPrice} AS NUMERIC)), '0')::text
+                    FROM ${tenderCostingDetails}
+                    WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+                )`,
+                submittedBudgetPrice: sql<string | null>`(
+                    SELECT COALESCE(SUM(CAST(${tenderCostingDetails.submittedBudgetPrice} AS NUMERIC)), '0')::text
+                    FROM ${tenderCostingDetails}
+                    WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+                )`,
                 googleSheetUrl: tenderCostingSheets.googleSheetUrl,
             })
             .from(tenderInfos)
             .leftJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
             .leftJoin(users, eq(users.id, tenderInfos.teamMember))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .leftJoin(items, eq(items.id, tenderInfos.item))
             .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
             .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
-            .leftJoin(tenderCostingDetails, eq(tenderCostingDetails.tenderCostingSheetId, tenderCostingSheets.id))
             .where(whereClause)
             .orderBy(orderByClause)
             .limit(limit)
@@ -249,16 +258,12 @@ export class CostingSheetsService {
             tenderNo: row.tenderNo,
             tenderName: row.tenderName,
             teamMemberName: row.teamMemberName,
-            itemName: row.itemName,
             status: row.status,
             statusName: row.statusName,
-            latestStatus: null,
-            latestStatusName: null,
-            statusRemark: null,
             dueDate: row.dueDate,
             emdAmount: row.emdAmount,
             gstValues: row.gstValues ? Number(row.gstValues) : 0,
-            costingStatus: this.determineCostingStatus(row.costingDetailId, row.costingDetailStatus),
+            costingStatus: (row.costingDetailStatus || 'Pending') as CostingSheetDashboardRow['costingStatus'],
             submittedFinalPrice: row.submittedFinalPrice,
             submittedBudgetPrice: row.submittedBudgetPrice,
             googleSheetUrl: row.googleSheetUrl,
@@ -276,10 +281,8 @@ export class CostingSheetsService {
                 .leftJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
                 .leftJoin(users, eq(users.id, tenderInfos.teamMember))
                 .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-                .leftJoin(items, eq(items.id, tenderInfos.item))
                 .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
                 .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
-                .leftJoin(tenderCostingDetails, eq(tenderCostingDetails.tenderCostingSheetId, tenderCostingSheets.id))
                 .where(and(...this.buildDashboardConditions(user, teamId, 'pending')))
                 .then(([result]) => Number(result?.count || 0)),
             this.db
@@ -288,10 +291,8 @@ export class CostingSheetsService {
                 .leftJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
                 .leftJoin(users, eq(users.id, tenderInfos.teamMember))
                 .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-                .leftJoin(items, eq(items.id, tenderInfos.item))
                 .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
                 .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
-                .leftJoin(tenderCostingDetails, eq(tenderCostingDetails.tenderCostingSheetId, tenderCostingSheets.id))
                 .where(and(...this.buildDashboardConditions(user, teamId, 'submitted')))
                 .then(([result]) => Number(result?.count || 0)),
             this.db
@@ -300,10 +301,8 @@ export class CostingSheetsService {
                 .leftJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
                 .leftJoin(users, eq(users.id, tenderInfos.teamMember))
                 .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
-                .leftJoin(items, eq(items.id, tenderInfos.item))
                 .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
                 .leftJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
-                .leftJoin(tenderCostingDetails, eq(tenderCostingDetails.tenderCostingSheetId, tenderCostingSheets.id))
                 .where(and(...this.buildDashboardConditions(user, teamId, 'tender-dnb')))
                 .then(([result]) => Number(result?.count || 0)),
         ]);

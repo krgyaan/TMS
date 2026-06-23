@@ -1,10 +1,9 @@
 import { Inject, Injectable, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
-import { and, eq, inArray, asc, desc, sql, isNull, isNotNull, ne, or } from 'drizzle-orm';
+import { and, eq, inArray, asc, desc, sql, isNull, ne, or } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import { tenderInfos } from '@db/schemas/tendering/tenders.schema';
 import { statuses } from '@db/schemas/master/statuses.schema';
-import { items } from '@db/schemas/master/items.schema';
 import { tenderInformation } from '@db/schemas/tendering/tender-info-sheet.schema';
 import { tenderCostingSheets } from '@db/schemas/tendering/tender-costing-sheets.schema';
 import { tenderCostingDetails } from '@db/schemas/tendering/tender-costing-details.schema';
@@ -27,12 +26,8 @@ export type CostingApprovalDashboardRow = {
     tenderName: string;
     teamMember: number | null;
     teamMemberName: string | null;
-    itemName: string | null;
     status: number;
     statusName: string | null;
-    latestStatus: number | null;
-    latestStatusName: string | null;
-    statusRemark: string | null;
     dueDate: Date | null;
     emdAmount: string | null;
     gstValues: number;
@@ -80,9 +75,7 @@ export class CostingApprovalsService {
             .leftJoin(bidSubmissions, eq(bidSubmissions.tenderId, tenderInfos.id))
             .innerJoin(tenderInformation, eq(tenderInfos.id, tenderInformation.tenderId))
             .innerJoin(statuses, eq(statuses.id, tenderInfos.status))
-            .leftJoin(items, eq(items.id, tenderInfos.item))
             .innerJoin(tenderCostingSheets, eq(tenderCostingSheets.tenderId, tenderInfos.id))
-            .innerJoin(tenderCostingDetails, eq(tenderCostingDetails.tenderCostingSheetId, tenderCostingSheets.id))
             .leftJoin(users, eq(users.id, tenderInfos.teamMember));
     }
 
@@ -95,7 +88,17 @@ export class CostingApprovalsService {
             case 'dueDate': return sortOrder(tenderInfos.dueDate);
             case 'gstValues': return sortOrder(tenderInfos.gstValues);
             case 'statusName': return sortOrder(statuses.name);
-            case 'costingStatus': return sortOrder(tenderCostingDetails.status);
+            case 'costingStatus': return sortOrder(sql`(
+                SELECT CASE
+                    WHEN EXISTS(SELECT 1 FROM ${tenderCostingDetails}
+                                WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+                                AND ${tenderCostingDetails.status} = 'Submitted') THEN 1
+                    WHEN EXISTS(SELECT 1 FROM ${tenderCostingDetails}
+                                WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+                                AND ${tenderCostingDetails.status} = 'Rejected/Redo') THEN 2
+                    ELSE 3
+                END
+            )`);
             default: return desc(tenderInfos.dueDate);
         }
     }
@@ -104,7 +107,9 @@ export class CostingApprovalsService {
         const conditions: any[] = [
             TenderInfosService.getActiveCondition(),
             TenderInfosService.getApprovedCondition(),
-            isNotNull(tenderCostingDetails.submittedFinalPrice),
+            sql`EXISTS (SELECT 1 FROM ${tenderCostingDetails}
+                        WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+                        AND ${tenderCostingDetails.submittedFinalPrice} IS NOT NULL)`,
         ];
 
         const roleFilterConditions: any[] = [];
@@ -135,10 +140,14 @@ export class CostingApprovalsService {
 
         if (activeTab === 'pending') {
             conditions.push(TenderInfosService.getExcludeStatusCondition(['lost']));
-            conditions.push(eq(tenderCostingDetails.status, 'Submitted'));
+            conditions.push(sql`EXISTS (SELECT 1 FROM ${tenderCostingDetails}
+                                       WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+                                       AND ${tenderCostingDetails.status} = 'Submitted')`);
             conditions.push(or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)));
         } else if (activeTab === 'approved') {
-            conditions.push(eq(tenderCostingDetails.status, 'Approved'));
+            conditions.push(sql`NOT EXISTS (SELECT 1 FROM ${tenderCostingDetails}
+                                           WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+                                           AND ${tenderCostingDetails.status} != 'Approved')`);
             conditions.push(or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)));
         } else if (activeTab === 'tender-dnb') {
             conditions.push(eq(bidSubmissions.status, "Tender Missed"));
@@ -179,17 +188,6 @@ export class CostingApprovalsService {
             );
         }
 
-        if (activeTab === 'pending') {
-            conditions.push(TenderInfosService.getExcludeStatusCondition(['lost']));
-            conditions.push(eq(tenderCostingDetails.status, 'Submitted'));
-            conditions.push(or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)));
-        } else if (activeTab === 'approved') {
-            conditions.push(eq(tenderCostingDetails.status, 'Approved'));
-            conditions.push(or(ne(bidSubmissions.status, "Tender Missed"), isNull(bidSubmissions.status)));
-        } else if (activeTab === 'tender-dnb') {
-            conditions.push(eq(bidSubmissions.status, "Tender Missed"));
-        }
-
         const whereClause = and(...conditions);
         const sortBy = filters?.sortBy;
         const sortOrder = filters?.sortOrder || 'desc';
@@ -207,16 +205,38 @@ export class CostingApprovalsService {
             teamMember: tenderInfos.teamMember,
             status: tenderInfos.status,
             teamMemberName: users.name,
-            itemName: items.name,
             statusName: statuses.name,
             dueDate: tenderInfos.dueDate,
             emdAmount: tenderInfos.emd,
             gstValues: tenderInfos.gstValues,
-            submittedFinalPrice: tenderCostingDetails.submittedFinalPrice,
-            submittedBudgetPrice: tenderCostingDetails.submittedBudgetPrice,
+            submittedFinalPrice: sql<string | null>`(
+                SELECT COALESCE(SUM(CAST(${tenderCostingDetails.submittedFinalPrice} AS NUMERIC)), '0')::text
+                FROM ${tenderCostingDetails}
+                WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+            )`,
+            submittedBudgetPrice: sql<string | null>`(
+                SELECT COALESCE(SUM(CAST(${tenderCostingDetails.submittedBudgetPrice} AS NUMERIC)), '0')::text
+                FROM ${tenderCostingDetails}
+                WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+            )`,
             costingSheetId: tenderCostingSheets.id,
-            costingDetailId: tenderCostingDetails.id,
-            costingDetailStatus: tenderCostingDetails.status,
+            costingDetailId: sql<number | null>`(
+                SELECT MIN(${tenderCostingDetails.id})
+                FROM ${tenderCostingDetails}
+                WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+            )`,
+            costingDetailStatus: sql<string | null>`(
+                SELECT ${tenderCostingDetails.status}
+                FROM ${tenderCostingDetails}
+                WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
+                ORDER BY CASE ${tenderCostingDetails.status}
+                    WHEN 'Submitted' THEN 1
+                    WHEN 'Rejected/Redo' THEN 2
+                    WHEN 'Approved' THEN 3
+                    ELSE 4
+                END
+                LIMIT 1
+            )`,
             googleSheetUrl: tenderCostingSheets.googleSheetUrl,
         })
             .where(whereClause)
@@ -230,18 +250,14 @@ export class CostingApprovalsService {
             tenderName: row.tenderName,
             teamMember: row.teamMember,
             teamMemberName: row.teamMemberName,
-            itemName: row.itemName,
             status: row.status,
             statusName: row.statusName,
-            latestStatus: null,
-            latestStatusName: null,
-            statusRemark: null,
             dueDate: row.dueDate,
             emdAmount: row.emdAmount,
             gstValues: row.gstValues ? Number(row.gstValues) : 0,
             submittedFinalPrice: row.submittedFinalPrice,
             submittedBudgetPrice: row.submittedBudgetPrice,
-            costingStatus: row.costingDetailStatus,
+            costingStatus: row.costingDetailStatus || 'Submitted',
             googleSheetUrl: row.googleSheetUrl,
             costingSheetId: row.costingSheetId,
             costingDetailId: row.costingDetailId,
