@@ -613,27 +613,11 @@ const EmployeeTrainingDashboard = () => {
                                                     My Training
                                                 </h1>
                                                 <p className="text-xs text-muted-foreground mt-0.5">
-                                                    Complete your courses and earn certifications
+                                                    Complete your courses
                                                 </p>
                                             </div>
                                         </div>
                                     </div>
-
-                                    {/* Welcome Badge */}
-                                    <motion.div
-                                        initial={{ opacity: 0, scale: 0.95 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        transition={{ delay: 0.2 }}
-                                        className="flex items-center gap-2 bg-card/50 backdrop-blur-xl border border-border/30 px-4 py-2.5 rounded-2xl shadow-sm"
-                                    >
-                                        <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/10 flex items-center justify-center">
-                                            <Flame className="h-4 w-4 text-amber-500" />
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] text-muted-foreground font-medium">Learning Streak</p>
-                                            <p className="text-xs font-bold">3 days active</p>
-                                        </div>
-                                    </motion.div>
                                 </div>
                             </motion.div>
 
