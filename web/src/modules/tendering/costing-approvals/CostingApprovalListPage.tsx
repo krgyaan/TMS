@@ -57,20 +57,11 @@ const CostingApprovalListPage = () => {
     const costingApprovalsData = apiResponse?.data || [];
     const totalRows = apiResponse?.meta?.total || 0;
 
-    const makeDetailUrl = (basePath: string, row: CostingApprovalDashboardRow) => {
-        const url = basePath;
-        const params = new URLSearchParams();
-        if (row.costingDetailId) params.set('detailId', String(row.costingDetailId));
-        const qs = params.toString();
-        return qs ? `${url}?${qs}` : url;
-    };
-
     const costingApprovalActions: ActionItem<CostingApprovalDashboardRowWithTimer>[] = useMemo(() => [
         {
             label: 'Approve Costing',
             onClick: (row: CostingApprovalDashboardRow) => {
-                const base = paths.tendering.costingApprove(row.costingSheetId!);
-                navigate(makeDetailUrl(base, row));
+                navigate(paths.tendering.costingApprove(row.costingSheetId!));
             },
             icon: <CheckCircle className="h-4 w-4" />,
             visible: (row) => row.costingStatus === 'Submitted',
@@ -78,8 +69,7 @@ const CostingApprovalListPage = () => {
         {
             label: 'Reject Costing',
             onClick: (row: CostingApprovalDashboardRow) => {
-                const base = paths.tendering.costingReject(row.costingSheetId!);
-                navigate(makeDetailUrl(base, row));
+                navigate(paths.tendering.costingReject(row.costingSheetId!));
             },
             icon: <XCircle className="h-4 w-4" />,
             visible: (row) => row.costingStatus === 'Submitted',
@@ -87,8 +77,7 @@ const CostingApprovalListPage = () => {
         {
             label: 'Edit Approval',
             onClick: (row: CostingApprovalDashboardRow) => {
-                const base = paths.tendering.costingEditApproval(row.costingSheetId!);
-                navigate(makeDetailUrl(base, row));
+                navigate(paths.tendering.costingEditApproval(row.costingSheetId!));
             },
             icon: <Edit className="h-4 w-4" />,
             visible: (row) => row.costingStatus === 'Approved',

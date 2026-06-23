@@ -10,8 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, XCircle } from 'lucide-react';
 import { paths } from '@/app/routes/paths';
 import { useRejectCosting } from '@/hooks/api/useCostingApprovals';
-import { useRejectCostingDetail } from '@/hooks/api/useCostingSheets';
-import type { TenderCostingSheet } from '@/modules/tendering/costing-sheets/helpers/costingSheet.types';
+import type { CostingSheetWithDetails } from '@/modules/tendering/costing-approvals/helpers/costingApproval.types';
 import { formatINR } from '@/hooks/useINRFormatter';
 
 const CostingRejectionFormSchema = z.object({
@@ -21,24 +20,21 @@ const CostingRejectionFormSchema = z.object({
 type FormValues = z.infer<typeof CostingRejectionFormSchema>;
 
 interface CostingRejectionFormProps {
-    costingSheet: TenderCostingSheet & { costingDetailId?: number };
+    costingSheet: CostingSheetWithDetails;
     tenderDetails: {
         tenderNo: string;
         tenderName: string;
         dueDate: Date | null;
         teamMemberName: string | null;
     };
-    isDetailFlow?: boolean;
 }
 
 export default function CostingRejectionForm({
     costingSheet,
     tenderDetails,
-    isDetailFlow = false
 }: CostingRejectionFormProps) {
     const navigate = useNavigate();
     const rejectMutation = useRejectCosting();
-    const rejectDetailMutation = useRejectCostingDetail();
 
     const form = useForm<FormValues>({
         resolver: zodResolver(CostingRejectionFormSchema),
@@ -51,22 +47,17 @@ export default function CostingRejectionForm({
 
     const onSubmit: SubmitHandler<FormValues> = async (data) => {
         try {
-            if (isDetailFlow) {
-                await rejectDetailMutation.mutateAsync({
-                    id: costingSheet.id,
-                    rejectionReason: data.rejectionReason,
-                });
-            } else {
-                await rejectMutation.mutateAsync({
-                    id: costingSheet.id,
-                    data: data,
-                });
-            }
+            await rejectMutation.mutateAsync({
+                id: costingSheet.id,
+                data: { rejectionReason: data.rejectionReason },
+            });
             navigate(paths.tendering.costingApprovals);
         } catch (error) {
             console.error('Error rejecting costing:', error);
         }
     };
+
+    const submittedDetails = costingSheet.details.filter(d => d.status === 'Submitted');
 
     return (
         <Card>
@@ -75,7 +66,12 @@ export default function CostingRejectionForm({
                     <div>
                         <CardTitle className="text-destructive">Reject Costing Sheet</CardTitle>
                         <CardDescription className="mt-2">
-                            Provide a detailed reason for rejecting this costing sheet
+                            Provide a detailed reason for rejecting this costing sheet.
+                            {submittedDetails.length > 0 && (
+                                <span className="block mt-1 text-muted-foreground">
+                                    This will reject all {submittedDetails.length} pending detail{submittedDetails.length !== 1 ? 's' : ''}.
+                                </span>
+                            )}
                         </CardDescription>
                     </div>
                     <CardAction>
@@ -109,44 +105,53 @@ export default function CostingRejectionForm({
                             </div>
                         </div>
 
-                        {/* Submitted Values Summary */}
-                        <div className="space-y-4">
-                            <h4 className="font-semibold text-base text-primary border-b pb-2">
-                                Submitted Costing Details
-                            </h4>
-                            <div className="grid gap-4 md:grid-cols-3 bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
-                                <div>
-                                    <p className="text-xs font-medium text-muted-foreground mb-1">Final Price</p>
-                                    <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
-                                        {costingSheet.submittedFinalPrice
-                                            ? formatINR(parseFloat(costingSheet.submittedFinalPrice))
-                                            : '—'}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-xs font-medium text-muted-foreground mb-1">Receipt</p>
-                                    <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
-                                        {costingSheet.submittedReceiptPrice
-                                            ? formatINR(parseFloat(costingSheet.submittedReceiptPrice))
-                                            : '—'}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-xs font-medium text-muted-foreground mb-1">Budget</p>
-                                    <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
-                                        {costingSheet.submittedBudgetPrice
-                                            ? formatINR(parseFloat(costingSheet.submittedBudgetPrice))
-                                            : '—'}
-                                    </p>
-                                </div>
-                                <div className="md:col-span-3">
-                                    <p className="text-xs font-medium text-muted-foreground mb-1">TE Remarks</p>
-                                    <p className="text-sm text-muted-foreground">
-                                        {costingSheet.teRemarks || '—'}
-                                    </p>
-                                </div>
+                        {/* Submitted Details Summary */}
+                        {submittedDetails.length > 0 && (
+                            <div className="space-y-4">
+                                <h4 className="font-semibold text-base text-primary border-b pb-2">
+                                    Submitted Costing Details ({submittedDetails.length})
+                                </h4>
+                                {submittedDetails.map((detail, idx) => (
+                                    <div key={detail.id} className="border rounded-lg p-4 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+                                        <h5 className="font-semibold text-sm mb-3">
+                                            {detail.detailName || detail.categoryName || `Detail #${idx + 1}`}
+                                        </h5>
+                                        <div className="grid gap-4 md:grid-cols-3">
+                                            <div>
+                                                <p className="text-xs font-medium text-muted-foreground mb-1">Final Price</p>
+                                                <p className="font-bold text-blue-700 dark:text-blue-300">
+                                                    {detail.submittedFinalPrice
+                                                        ? formatINR(parseFloat(detail.submittedFinalPrice))
+                                                        : '—'}
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <p className="text-xs font-medium text-muted-foreground mb-1">Receipt</p>
+                                                <p className="font-bold text-blue-700 dark:text-blue-300">
+                                                    {detail.submittedReceiptPrice
+                                                        ? formatINR(parseFloat(detail.submittedReceiptPrice))
+                                                        : '—'}
+                                                </p>
+                                            </div>
+                                            <div>
+                                                <p className="text-xs font-medium text-muted-foreground mb-1">Budget</p>
+                                                <p className="font-bold text-blue-700 dark:text-blue-300">
+                                                    {detail.submittedBudgetPrice
+                                                        ? formatINR(parseFloat(detail.submittedBudgetPrice))
+                                                        : '—'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        {detail.teRemarks && (
+                                            <div className="mt-2">
+                                                <p className="text-xs font-medium text-muted-foreground mb-1">TE Remarks</p>
+                                                <p className="text-sm text-muted-foreground">{detail.teRemarks}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
                             </div>
-                        </div>
+                        )}
 
                         {/* Rejection Reason */}
                         <div className="space-y-4">
@@ -187,7 +192,7 @@ export default function CostingRejectionForm({
                             >
                                 {isSubmitting && <span className="animate-spin mr-2">⏳</span>}
                                 <XCircle className="mr-2 h-4 w-4" />
-                                Reject Costing
+                                Reject All Pending Details
                             </Button>
                         </div>
                     </form>
