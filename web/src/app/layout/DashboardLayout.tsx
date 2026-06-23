@@ -7,7 +7,7 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useProfileContext } from "@/modules/profile/contexts/ProfileContext";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, CheckCircle2, XCircle } from "lucide-react";
+import { AlertCircle, CheckCircle2, XCircle, Play, Video } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
     Tooltip,
@@ -53,6 +53,22 @@ export default function DashboardLayout() {
                         </div>
                         
                         <div className="flex items-center gap-4">
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-9 w-9 rounded-xl transition-colors"
+                                        onClick={() => navigate("/training")}
+                                        aria-label="Training Videos"
+                                    >
+                                        <Video className="h-5 w-5" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" align="end" className="text-xs font-medium">
+                                    Training Videos
+                                </TooltipContent>
+                            </Tooltip>
                             {isOnboarding && !isOnboardingPage && (
                                 <Tooltip>
                                     <TooltipTrigger asChild>

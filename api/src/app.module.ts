@@ -111,6 +111,8 @@ import { AccountChecklistSchedulerModule } from "./modules/accounts/account-chec
 import { OnboardingModule } from './modules/hrms/onboarding/onboarding.module';
 import { EmployeeOnboardingModule } from './modules/hrms/employee-onboarding/employee-onboarding.module';
 import { ProfileModule } from './modules/profile/profile.module';
+import { TrainingModule } from './modules/hrms/training/training.module';
+
 @Module({
     imports: [
         ServeStaticModule.forRoot({
@@ -231,6 +233,7 @@ import { ProfileModule } from './modules/profile/profile.module';
         EmployeeOnboardingModule,
         ProfileModule,
         ClientDirectoryModule,
+        TrainingModule,
     ],
     controllers: [AppController,],
     providers: [

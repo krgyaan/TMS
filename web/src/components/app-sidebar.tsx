@@ -151,6 +151,7 @@ const navMain: NavGroup[] = [
             { title: "Approval Dashboard", url : paths.hrms.approvalDashboard, permission: "hrms.admin"},
             { title: "Induction", url: paths.hrms.inductionDashboard, permission: "hrms.admin" },
             { title: "Assets", url: "/hrms/admin/assets", permission: "hrms.admin" },
+            { title: "Training", url: "/hrms/training", permission: "hrms.admin"} // -> naya module hai bhai
             // { title: "Probation", url: "", permission: "hrms.admin" },
         ],
     },

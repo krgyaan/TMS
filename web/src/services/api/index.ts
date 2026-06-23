@@ -42,3 +42,5 @@ export { pqrService } from './pqr.service';
 export { financeDocumentsService } from './finance-documents.service';
 export { financeDocTypeService } from './finance-doc-type.service';
 export { projectMasterService } from './projects-master.service';
+export { trainingApiService } from './training.service';
+

@@ -10,3 +10,7 @@ export * from './employee-education.schema';
 export * from './employee-experience.schema';
 export * from './employee-bank-details.schema';
 export * from './onboarding';
+export * from './training-assignments.schema';
+export * from './training-video-reactions.schema';
+export * from './training-video-events.schema';
+
