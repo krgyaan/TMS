@@ -223,8 +223,8 @@ export class CostingSheetsService {
                     WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
                     ORDER BY CASE ${tenderCostingDetails.status}
                         WHEN 'Submitted' THEN 1
-                        WHEN 'Pending' THEN 2
-                        WHEN 'Rejected/Redo' THEN 3
+                        WHEN 'Rejected/Redo' THEN 2
+                        WHEN 'Pending' THEN 3
                         WHEN 'Approved' THEN 4
                         ELSE 5
                     END
