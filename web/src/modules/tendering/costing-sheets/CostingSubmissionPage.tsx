@@ -1,18 +1,21 @@
-import { useParams, useNavigate } from 'react-router-dom';
-import CostingSheetSubmitForm from './components/CostingSheetSubmitForm';
-import { useTender } from '@/hooks/api/useTenders';
+import { SubmissionChecklist, type Checkpoint } from '@/components/tendering/SubmissionChecklist';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useCostingSheetByTender } from '@/hooks/api/useCostingSheets';
+import { useDocumentChecklistByTender } from '@/hooks/api/useDocumentChecklists';
 import { useInfoSheet } from '@/hooks/api/useInfoSheets';
-import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
-import { useRfqByTenderId } from '@/hooks/api/useRfqs';
 import { usePaymentRequestsByTender } from '@/hooks/api/usePaymentRequests';
 import { usePhysicalDocByTenderId } from '@/hooks/api/usePhysicalDocs';
-import { useDocumentChecklistByTender } from '@/hooks/api/useDocumentChecklists';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { AlertCircle, ArrowLeft } from 'lucide-react';
-import { SubmissionChecklist, type Checkpoint } from '@/components/tendering/SubmissionChecklist';
+import { useRfqByTenderId } from '@/hooks/api/useRfqs';
+import { useTenderApproval } from '@/hooks/api/useTenderApprovals';
+import { useTender } from '@/hooks/api/useTenders';
+import { AlertCircle, ArrowLeft, Layers } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
+import CostingSheetSubmitForm from './components/CostingSheetSubmitForm';
+
+const ITEM_WISE_TYPES = ['ITEM_WISE_PRE_GST', 'ITEM_WISE_GST_INCLUSIVE'];
 
 export default function CostingSheetSubmitPage() {
     const navigate = useNavigate();
@@ -31,6 +34,8 @@ export default function CostingSheetSubmitPage() {
     const isLoading = tenderLoading || costingLoading || infoLoading || approvalLoading ||
         rfqsLoading || emdLoading || physicalLoading || checklistLoading;
 
+    const isItemWise = infoSheet && ITEM_WISE_TYPES.includes(infoSheet.commercialEvaluation ?? '');
+
     if (isLoading) return <Skeleton className="h-[600px]" />;
     if (!tenderDetails) return (
         <Alert variant="destructive">
@@ -40,7 +45,6 @@ export default function CostingSheetSubmitPage() {
         </Alert>
     );
 
-    // Checkpoint Logic
     const rfqNA = approval?.rfqRequired === 'no' || tenderDetails.rfqTo === '0' || tenderDetails.rfqTo === '1';
     const emdNA = infoSheet?.emdRequired === 'NO' || infoSheet?.emdRequired === 'EXEMPT';
     const emdIsSB = infoSheet?.emdMode?.includes('SB');
@@ -90,6 +94,16 @@ export default function CostingSheetSubmitPage() {
                 </Alert>
             )}
 
+            {isItemWise && (
+                <Alert variant="default" className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+                    <Layers className="h-4 w-4" />
+                    <AlertDescription className="flex items-center gap-2">
+                        Item-wise costing mode enabled.
+                        <Badge variant="secondary">{infoSheet?.commercialEvaluation}</Badge>
+                    </AlertDescription>
+                </Alert>
+            )}
+
             <CostingSheetSubmitForm
                 tenderId={id}
                 tenderDetails={{
@@ -101,6 +115,7 @@ export default function CostingSheetSubmitPage() {
                 mode="submit"
                 existingData={costingSheet || undefined}
                 isChecklistFulfilled={isChecklistFulfilled}
+                isItemWise={isItemWise}
             />
         </div>
     );

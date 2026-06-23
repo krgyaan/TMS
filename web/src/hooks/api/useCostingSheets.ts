@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { costingSheetsService } from '@/services/api/costing-sheets.service';
 import type { PaginatedResult } from '@/types/api.types';
 import { toast } from 'sonner';
-import type { CostingSheetDashboardCounts, CostingSheetDashboardRow, TabKey, CostingSheetListParams } from '@/modules/tendering/costing-sheets/helpers/costingSheet.types';
+import type { CostingSheetDashboardCounts, CostingSheetDashboardRow, CostingSheetTab, CostingSheetListParams, CreateCostingDetailDto, SubmitCostingSheetDto } from '@/modules/tendering/costing-sheets/helpers/costingSheet.types';
 import { useTeamFilter } from '@/hooks/useTeamFilter';
 
 export const costingSheetsKey = {
@@ -15,7 +15,7 @@ export const costingSheetsKey = {
 };
 
 export const useCostingSheets = (
-    tab?: TabKey,
+    tab?: CostingSheetTab,
     pagination: { page: number; limit: number; search?: string } = { page: 1, limit: 50 },
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
@@ -71,7 +71,7 @@ export const useSubmitCostingSheet = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (data) => costingSheetsService.submit(data),
+        mutationFn: (data: SubmitCostingSheetDto) => costingSheetsService.submit(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: costingSheetsKey.all });
             queryClient.invalidateQueries({ queryKey: costingSheetsKey.dashboardCounts() });
@@ -162,3 +162,54 @@ export const useCreateCostingSheetWithName = () => {
         },
     });
 };
+
+// --- Costing Detail Hooks (merged from useCostingDetails) ---
+
+export const costingDetailsKey = {
+    all: ['costing-details'] as const,
+    byTender: (tenderId: number) => [...costingDetailsKey.all, 'byTender', tenderId] as const,
+    combined: (tenderId: number) => [...costingDetailsKey.all, 'combined', tenderId] as const,
+    detail: (id: number) => [...costingDetailsKey.all, 'detail', id] as const,
+};
+
+export const useCostingDetailById = (id: number) => {
+    return useQuery({
+        queryKey: costingDetailsKey.detail(id),
+        queryFn: () => costingSheetsService.getDetailById(id),
+        enabled: !!id,
+    });
+};
+
+export const useCostingDetailsByTender = (tenderId: number) => {
+    return useQuery({
+        queryKey: costingDetailsKey.byTender(tenderId),
+        queryFn: () => costingSheetsService.getDetailsByTender(tenderId),
+        enabled: !!tenderId,
+    });
+};
+
+export const useCostingDetailsCombined = (tenderId: number) => {
+    return useQuery({
+        queryKey: costingDetailsKey.combined(tenderId),
+        queryFn: () => costingSheetsService.getCombinedPricing(tenderId),
+        enabled: !!tenderId,
+    });
+};
+
+export const useCreateCostingDetail = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (data: CreateCostingDetailDto) => costingSheetsService.submit(data),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: costingDetailsKey.byTender(variables.tenderId) });
+            queryClient.invalidateQueries({ queryKey: costingDetailsKey.combined(variables.tenderId) });
+            toast.success('Costing detail added successfully');
+        },
+        onError: (error: any) => {
+            toast.error(error?.response?.data?.message || 'Failed to add costing detail');
+        },
+    });
+};
+
+

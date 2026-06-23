@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { paths } from '@/app/routes/paths';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, CheckCircle, XCircle, Eye, Edit, FileX2, ExternalLink, Search, RefreshCw } from 'lucide-react';
+import { AlertCircle, CheckCircle, Eye, FileX2, ExternalLink, Search, XCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { useCostingApprovals, useCostingApprovalsDashboardCounts } from '@/hooks/api/useCostingApprovals';
@@ -59,28 +59,15 @@ const CostingApprovalListPage = () => {
 
     const costingApprovalActions: ActionItem<CostingApprovalDashboardRowWithTimer>[] = useMemo(() => [
         {
-            label: 'Approve Costing',
+            label: 'Review Costing',
             onClick: (row: CostingApprovalDashboardRow) => {
-                navigate(paths.tendering.costingApprove(row.costingSheetId!));
+                const target = row.costingStatus === 'Approved'
+                    ? paths.tendering.costingEditApproval(row.costingSheetId!)
+                    : paths.tendering.costingApprove(row.costingSheetId!);
+                navigate(target);
             },
             icon: <CheckCircle className="h-4 w-4" />,
-            visible: (row) => row.costingStatus === 'Submitted',
-        },
-        {
-            label: 'Reject Costing',
-            onClick: (row: CostingApprovalDashboardRow) => {
-                navigate(paths.tendering.costingReject(row.costingSheetId!));
-            },
-            icon: <XCircle className="h-4 w-4" />,
-            visible: (row) => row.costingStatus === 'Submitted',
-        },
-        {
-            label: 'Edit Approval',
-            onClick: (row: CostingApprovalDashboardRow) => {
-                navigate(paths.tendering.costingEditApproval(row.costingSheetId!));
-            },
-            icon: <Edit className="h-4 w-4" />,
-            visible: (row) => row.costingStatus === 'Approved',
+            visible: (row) => row.costingStatus === 'Submitted' || row.costingStatus === 'Approved',
         },
         {
             label: 'View Details',

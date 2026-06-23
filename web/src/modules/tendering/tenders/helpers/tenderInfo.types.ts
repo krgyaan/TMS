@@ -29,6 +29,7 @@ export interface TenderInfo {
     tenderApprovalStatus: string | null;
     tlRejectionRemarks: string | null;
     oemNotAllowed: string | null;
+    rfqRequired?: string | null;
 
     createdAt: Date | string;
     updatedAt: Date | string;

@@ -1,12 +1,11 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Table, TableBody, TableRow, TableCell } from '@/components/ui/table';
-import { FileText, ExternalLink } from 'lucide-react';
-import type { TenderCostingSheet } from '../helpers/costingSheet.types';
-import { formatINR } from '@/hooks/useINRFormatter';
+import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
 import { formatDateTime } from '@/hooks/useFormatedDate';
+import { formatINR } from '@/hooks/useINRFormatter';
+import { ExternalLink, FileText } from 'lucide-react';
+import type { TenderCostingSheet } from '../helpers/costingSheet.types';
 
 interface CostingSheetViewProps {
     costingSheet?: TenderCostingSheet | null;
@@ -255,14 +254,25 @@ export function CostingSheetView({ costingSheet, vendors }: CostingSheetViewProp
     );
 }
 
+import { Badge } from '@/components/ui/badge';
+import { useCostingDetailsByTender, useCostingDetailsCombined } from '@/hooks/api/useCostingSheets';
 import { useCostingSheetByTender } from '@/hooks/api/useCostingSheets';
+import { useInfoSheet } from '@/hooks/api/useInfoSheets';
 import { useVendorOrganizations } from '@/hooks/api/useVendorOrganizations';
 import type { VendorOrganization } from '@/types/api.types';
+import type { TenderCostingDetail } from '../helpers/costingSheet.types';
+
+const ITEM_WISE_TYPES = ['ITEM_WISE_PRE_GST', 'ITEM_WISE_GST_INCLUSIVE'];
 
 /** Smart Section component for Costing Sheet and Approval Details */
 export function CostingSheetSection({ tenderId }: { tenderId: number | null }) {
     const { data: costingSheet, isLoading } = useCostingSheetByTender(tenderId ?? 0);
+    const { data: infoSheet } = useInfoSheet(tenderId);
+    const { data: details } = useCostingDetailsByTender(tenderId ?? 0);
+    const { data: combined } = useCostingDetailsCombined(tenderId ?? 0);
     const { data: vendorOrganizations } = useVendorOrganizations();
+
+    const isItemWise = infoSheet && ITEM_WISE_TYPES.includes(infoSheet.commercialEvaluation ?? '');
 
     if (isLoading) {
         return (
@@ -281,26 +291,90 @@ export function CostingSheetSection({ tenderId }: { tenderId: number | null }) {
         );
     }
 
-    if (!costingSheet) {
-        return (
-            <Card>
-                <CardContent className="pt-0">
-                    <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-                        <FileText className="h-8 w-8 mb-2 opacity-50" />
-                        <p className="text-sm">Costing sheet not created for this tender yet.</p>
-                    </div>
-                </CardContent>
-            </Card>
-        );
-    }
-
     const selectedVendorOrganizations = vendorOrganizations?.filter(vo =>
         costingSheet?.oemVendorIds?.includes(vo.id) || false
     ) || [];
 
     return (
         <div className="space-y-6">
-            <CostingSheetView costingSheet={costingSheet ?? null} vendors={selectedVendorOrganizations} />
+            {/* Show primary costing sheet view (first detail merged) */}
+            {costingSheet && (
+                <CostingSheetView costingSheet={costingSheet} vendors={selectedVendorOrganizations} />
+            )}
+
+            {/* Show all details for item-wise tenders */}
+            {isItemWise && details && details.length > 0 && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <FileText className="h-5 w-5" />
+                            Costing Details ({details.length})
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-3">
+                            {details.map((detail: TenderCostingDetail) => (
+                                <Card key={detail.id} className="border-l-4 border-l-primary">
+                                    <CardHeader className="py-2">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm font-semibold">{detail.sheetTitle}</span>
+                                            <Badge variant={
+                                                detail.status === 'Approved' ? 'default' :
+                                                detail.status === 'Submitted' ? 'secondary' :
+                                                detail.status === 'Rejected/Redo' ? 'destructive' : 'outline'
+                                            }>{detail.status}</Badge>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="py-2">
+                                        <div className="grid grid-cols-2 gap-2 text-sm">
+                                            <div>Final Price: <strong>₹{Number(detail.submittedFinalPrice || 0).toLocaleString('en-IN')}</strong></div>
+                                            <div>Receipt: <strong>₹{Number(detail.submittedReceiptPrice || 0).toLocaleString('en-IN')}</strong></div>
+                                            <div>Budget: <strong>₹{Number(detail.submittedBudgetPrice || 0).toLocaleString('en-IN')}</strong></div>
+                                            <div>Gross Margin: <strong>{detail.submittedGrossMargin || '0'}%</strong></div>
+                                        </div>
+                                        {detail.teRemarks && <p className="text-xs text-muted-foreground mt-1">{detail.teRemarks}</p>}
+                                        {detail.approvedBy && (
+                                            <div className="mt-2 p-2 bg-green-50 dark:bg-green-950/20 rounded text-sm">
+                                                Approved: Final ₹{Number(detail.finalPrice || 0).toLocaleString('en-IN')} |
+                                                Receipt ₹{Number(detail.receiptPrice || 0).toLocaleString('en-IN')} |
+                                                Budget ₹{Number(detail.budgetPrice || 0).toLocaleString('en-IN')} |
+                                                Margin {detail.grossMargin || '0'}%
+                                                {detail.tlRemarks && <><br />Remarks: {detail.tlRemarks}</>}
+                                            </div>
+                                        )}
+                                        {detail.rejectionReason && (
+                                            <div className="mt-2 p-2 bg-destructive/10 rounded text-sm">{detail.rejectionReason}</div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+
+                        {combined && combined.detailsCount > 0 && (
+                            <div className="mt-4 p-3 bg-muted/30 rounded-lg">
+                                <p className="text-sm font-semibold mb-1">Combined Totals (Approved Only)</p>
+                                <div className="grid grid-cols-4 gap-2 text-sm">
+                                    <div>Final: <strong>₹{Number(combined.totalFinalPrice || 0).toLocaleString('en-IN')}</strong></div>
+                                    <div>Receipt: <strong>₹{Number(combined.totalReceiptPrice || 0).toLocaleString('en-IN')}</strong></div>
+                                    <div>Budget: <strong>₹{Number(combined.totalBudgetPrice || 0).toLocaleString('en-IN')}</strong></div>
+                                    <div>Approved: <strong>{combined.approvedCount}/{combined.detailsCount}</strong></div>
+                                </div>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
+
+            {!costingSheet && !(details && details.length > 0) && (
+                <Card>
+                    <CardContent className="pt-0">
+                        <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                            <FileText className="h-8 w-8 mb-2 opacity-50" />
+                            <p className="text-sm">Costing sheet not created for this tender yet.</p>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
         </div>
     );
 }

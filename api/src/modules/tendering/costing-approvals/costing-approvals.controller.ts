@@ -1,21 +1,10 @@
-import {
-    Controller,
-    Get,
-    Post,
-    Patch,
-    Body,
-    Param,
-    ParseIntPipe,
-    ForbiddenException,
-    Query,
-    Logger
-} from '@nestjs/common';
-import { CostingApprovalsService, type CostingApprovalFilters } from '@/modules/tendering/costing-approvals/costing-approvals.service';
-import type { ApproveCostingDto, RejectCostingDto, UpdateApprovedCostingDto } from './dto/costing-approval.dto';
 import { CurrentUser } from '@/modules/auth/decorators/current-user.decorator';
 import type { ValidatedUser } from '@/modules/auth/strategies/jwt.strategy';
-import { TimersService } from '@/modules/timers/timers.service';
+import { CostingApprovalsService } from '@/modules/tendering/costing-approvals/costing-approvals.service';
 import { getFrontendTimer } from '@/modules/timers/timer-helper';
+import { TimersService } from '@/modules/timers/timers.service';
+import { Body, Controller, Get, Logger, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
+import type { ApproveAllCostingDto, ApproveCostingDto, RejectCostingDto, UpdateApprovedCostingDto } from './dto/costing-approval.dto';
 
 @Controller('costing-approvals')
 export class CostingApprovalsController {
@@ -102,6 +91,21 @@ export class CostingApprovalsController {
         );
     }
 
+    @Post(':id/approve-all')
+    approveAll(
+        @Param('id', ParseIntPipe) id: number,
+        @Body() dto: ApproveAllCostingDto,
+        @CurrentUser() user: ValidatedUser
+    ) {
+        // this.validateTeamLeader(user);
+        return this.costingApprovalsService.approveAll(
+            id,
+            (user as any).team,
+            user.sub,
+            dto
+        );
+    }
+
     @Post(':id/reject')
     reject(
         @Param('id', ParseIntPipe) id: number,
@@ -113,7 +117,8 @@ export class CostingApprovalsController {
             id,
             (user as any).team,
             user.sub,
-            dto.rejectionReason
+            dto.rejectionReason,
+            dto.detailId,
         );
     }
 

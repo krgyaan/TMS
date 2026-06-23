@@ -1,11 +1,13 @@
 import { BaseApiService } from './base.service';
 import type {
-    TenderCostingSheet,
+    CostingSheetWithDetails,
     CostingApprovalDashboardCounts,
     CostingApprovalListParams,
     CostingApprovalDashboardRow,
     ApproveCostingDto,
     RejectCostingDto,
+    UpdateApprovedCostingDto,
+    ApproveAllCostingDto,
 } from '@/modules/tendering/costing-approvals/helpers/costingApproval.types';
 import type { PaginatedResult } from '@/types/api.types';
 
@@ -49,20 +51,24 @@ class CostingApprovalsService extends BaseApiService {
         return this.get<PaginatedResult<CostingApprovalDashboardRow>>(queryString ? `/dashboard?${queryString}` : '/dashboard');
     }
 
-    async getById(id: number): Promise<TenderCostingSheet> {
-        return this.get<TenderCostingSheet>(`/${id}`);
+    async getById(id: number): Promise<CostingSheetWithDetails> {
+        return this.get<CostingSheetWithDetails>(`/${id}`);
     }
 
-    async approve(id: number, data: ApproveCostingDto): Promise<TenderCostingSheet> {
-        return this.post<TenderCostingSheet>(`/${id}/approve`, data);
+    async approve(id: number, data: ApproveCostingDto): Promise<any> {
+        return this.post<any>(`/${id}/approve`, data);
     }
 
-    async reject(id: number, data: RejectCostingDto): Promise<TenderCostingSheet> {
-        return this.post<TenderCostingSheet>(`/${id}/reject`, data);
+    async approveAll(id: number, data: ApproveAllCostingDto): Promise<any> {
+        return this.post<any>(`/${id}/approve-all`, data);
     }
 
-    async updateApproved(id: number, data: ApproveCostingDto): Promise<TenderCostingSheet> {
-        return this.patch<TenderCostingSheet>(`/${id}`, data);
+    async reject(id: number, data: RejectCostingDto): Promise<any> {
+        return this.post<any>(`/${id}/reject`, data);
+    }
+
+    async updateApproved(id: number, data: UpdateApprovedCostingDto): Promise<any> {
+        return this.patch<any>(`/${id}`, data);
     }
 
     async getDashboardCounts(teamId?: number): Promise<CostingApprovalDashboardCounts> {

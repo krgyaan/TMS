@@ -7,6 +7,7 @@ import { statuses } from '@db/schemas/master/statuses.schema';
 import { users } from '@db/schemas/auth/users.schema';
 import { items } from '@db/schemas/master/items.schema';
 import { tenderCostingSheets } from '@db/schemas/tendering/tender-costing-sheets.schema';
+import { tenderCostingDetails } from '@db/schemas/tendering/tender-costing-details.schema';
 import { bidSubmissions } from '@db/schemas/tendering/bid-submissions.schema';
 import { teams } from '@db/schemas/master/teams.schema';
 import { TenderInfosService } from '@/modules/tendering/tenders/tenders.service';
@@ -126,7 +127,12 @@ export class BidSubmissionsService {
         //building the tab conditions
         
         if (activeTab === 'pending') {
-            conditions.push(eq(tenderCostingSheets.status, 'Approved'));
+            conditions.push(
+                sql`EXISTS (SELECT 1 FROM ${tenderCostingDetails}, ${tenderCostingSheets}
+                    WHERE ${tenderCostingSheets.id} = ${tenderCostingDetails.tenderCostingSheetId}
+                    AND ${tenderCostingSheets.tenderId} = ${tenderInfos.id}
+                    AND ${tenderCostingDetails.status} = 'Approved')`
+            );
             conditions.push(isNull(bidSubmissions.id));
             conditions.push(TenderInfosService.getExcludeStatusCondition(['lost']));
             conditions.push(or(ne(bidSubmissions.status, 'Tender Missed'), isNull(bidSubmissions.status)));
@@ -218,7 +224,12 @@ export class BidSubmissionsService {
                     orderByClause = sortFn(tenderInfos.gstValues);
                     break;
                 case 'finalCosting':
-                    orderByClause = sortFn(tenderCostingSheets.finalPrice);
+                    orderByClause = sortFn(
+                        sql`(SELECT SUM(${tenderCostingDetails.finalPrice}) FROM ${tenderCostingDetails}
+                            INNER JOIN ${tenderCostingSheets} s ON s.id = ${tenderCostingDetails.tenderCostingSheetId}
+                            WHERE s.${tenderCostingSheets.tenderId} = ${tenderInfos.id}
+                            AND ${tenderCostingDetails.status} = 'Approved')`
+                    );
                     break;
                 case 'statusName':
                     orderByClause = sortFn(statuses.name);
@@ -253,8 +264,15 @@ export class BidSubmissionsService {
                 emdAmount: tenderInfos.emd,
                 gstValues: tenderInfos.gstValues,
                 costingSheetId: tenderCostingSheets.id,
-                finalCosting: tenderCostingSheets.finalPrice,
-                costingStatus: tenderCostingSheets.status,
+                finalCosting: sql<string>`(SELECT SUM(${tenderCostingDetails.finalPrice}) FROM ${tenderCostingDetails}
+                    INNER JOIN ${tenderCostingSheets} s ON s.id = ${tenderCostingDetails.tenderCostingSheetId}
+                    WHERE s.${tenderCostingSheets.tenderId} = ${tenderInfos.id}
+                    AND ${tenderCostingDetails.status} = 'Approved')`,
+                costingStatus: sql<string>`(SELECT ${tenderCostingDetails.status} FROM ${tenderCostingDetails}
+                    INNER JOIN ${tenderCostingSheets} s ON s.id = ${tenderCostingDetails.tenderCostingSheetId}
+                    WHERE s.${tenderCostingSheets.tenderId} = ${tenderInfos.id}
+                    AND ${tenderCostingDetails.status} = 'Approved'
+                    LIMIT 1)`,
                 bidSubmissionId: bidSubmissions.id,
                 bidSubmissionStatus: bidSubmissions.status,
             })

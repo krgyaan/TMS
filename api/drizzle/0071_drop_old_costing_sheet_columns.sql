@@ -1,0 +1,16 @@
+ALTER TABLE "tender_costing_sheets" DROP COLUMN IF EXISTS "status";--> statement-breakpoint
+ALTER TABLE "tender_costing_sheets" DROP COLUMN IF EXISTS "submitted_final_price";--> statement-breakpoint
+ALTER TABLE "tender_costing_sheets" DROP COLUMN IF EXISTS "submitted_receipt_price";--> statement-breakpoint
+ALTER TABLE "tender_costing_sheets" DROP COLUMN IF EXISTS "submitted_budget_price";--> statement-breakpoint
+ALTER TABLE "tender_costing_sheets" DROP COLUMN IF EXISTS "submitted_gross_margin";--> statement-breakpoint
+ALTER TABLE "tender_costing_sheets" DROP COLUMN IF EXISTS "te_remarks";--> statement-breakpoint
+ALTER TABLE "tender_costing_sheets" DROP COLUMN IF EXISTS "submitted_by";--> statement-breakpoint
+ALTER TABLE "tender_costing_sheets" DROP COLUMN IF EXISTS "submitted_at";--> statement-breakpoint
+ALTER TABLE "tender_costing_sheets" DROP COLUMN IF EXISTS "final_price";--> statement-breakpoint
+ALTER TABLE "tender_costing_sheets" DROP COLUMN IF EXISTS "receipt_price";--> statement-breakpoint
+ALTER TABLE "tender_costing_sheets" DROP COLUMN IF EXISTS "budget_price";--> statement-breakpoint
+ALTER TABLE "tender_costing_sheets" DROP COLUMN IF EXISTS "gross_margin";--> statement-breakpoint
+ALTER TABLE "tender_costing_sheets" DROP COLUMN IF EXISTS "tl_remarks";--> statement-breakpoint
+ALTER TABLE "tender_costing_sheets" DROP COLUMN IF EXISTS "rejection_reason";--> statement-breakpoint
+ALTER TABLE "tender_costing_sheets" DROP COLUMN IF EXISTS "approved_by";--> statement-breakpoint
+ALTER TABLE "tender_costing_sheets" DROP COLUMN IF EXISTS "approved_at";--> statement-breakpoint

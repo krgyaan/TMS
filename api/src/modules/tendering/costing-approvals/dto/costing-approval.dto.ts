@@ -5,62 +5,57 @@ import {
     optionalString,
 } from '@/utils/zod-schema-generator';
 
+const priceField = z.string().min(1).transform((val) => {
+    const num = Number(val);
+    if (isNaN(num) || num < 0) {
+        throw new z.ZodError([
+            {
+                code: z.ZodIssueCode.custom,
+                path: ['finalPrice'],
+                message: 'Price must be a valid non-negative number',
+            },
+        ]);
+    }
+    return val;
+});
+
+const marginField = z.string().min(1).transform((val) => {
+    const num = Number(val);
+    if (isNaN(num) || num < 0 || num > 100) {
+        throw new z.ZodError([
+            {
+                code: z.ZodIssueCode.custom,
+                path: ['grossMargin'],
+                message: 'Gross margin must be between 0 and 100',
+            },
+        ]);
+    }
+    return val;
+});
+
 /**
- * Approve Costing Schema - For approval action
+ * Single detail approval within a bulk approve
+ */
+export const DetailApprovalSchema = z.object({
+    detailId: z.number().int().positive(),
+    finalPrice: priceField,
+    receiptPrice: priceField,
+    budgetPrice: priceField,
+    grossMargin: marginField,
+    tlRemarks: textField().min(1, 'TL remarks are required'),
+});
+
+export type DetailApprovalDto = z.infer<typeof DetailApprovalSchema>;
+
+/**
+ * Approve Costing Schema - For approving a single detail or all
  */
 export const ApproveCostingSchema = z.object({
-    finalPrice: z.string().min(1, 'Final price is required').transform((val) => {
-        const num = Number(val);
-        if (isNaN(num) || num < 0) {
-            throw new z.ZodError([
-                {
-                    code: z.ZodIssueCode.custom,
-                    path: ['finalPrice'],
-                    message: 'Final price must be a valid non-negative number',
-                },
-            ]);
-        }
-        return val;
-    }),
-    receiptPrice: z.string().min(1, 'Receipt price is required').transform((val) => {
-        const num = Number(val);
-        if (isNaN(num) || num < 0) {
-            throw new z.ZodError([
-                {
-                    code: z.ZodIssueCode.custom,
-                    path: ['receiptPrice'],
-                    message: 'Receipt price must be a valid non-negative number',
-                },
-            ]);
-        }
-        return val;
-    }),
-    budgetPrice: z.string().min(1, 'Budget price is required').transform((val) => {
-        const num = Number(val);
-        if (isNaN(num) || num < 0) {
-            throw new z.ZodError([
-                {
-                    code: z.ZodIssueCode.custom,
-                    path: ['budgetPrice'],
-                    message: 'Budget price must be a valid non-negative number',
-                },
-            ]);
-        }
-        return val;
-    }),
-    grossMargin: z.string().min(1, 'Gross margin is required').transform((val) => {
-        const num = Number(val);
-        if (isNaN(num) || num < 0 || num > 100) {
-            throw new z.ZodError([
-                {
-                    code: z.ZodIssueCode.custom,
-                    path: ['grossMargin'],
-                    message: 'Gross margin must be between 0 and 100',
-                },
-            ]);
-        }
-        return val;
-    }),
+    detailId: z.number().int().positive().optional(),
+    finalPrice: priceField,
+    receiptPrice: priceField,
+    budgetPrice: priceField,
+    grossMargin: marginField,
     oemVendorIds: z.array(z.coerce.number().int().positive()).min(0),
     tlRemarks: textField().min(1, 'TL remarks are required'),
 });
@@ -68,23 +63,34 @@ export const ApproveCostingSchema = z.object({
 export type ApproveCostingDto = z.infer<typeof ApproveCostingSchema>;
 
 /**
- * Reject Costing Schema - For rejection action
+ * Approve All Schema - For bulk approving all details
+ */
+export const ApproveAllCostingSchema = z.object({
+    approvals: z.array(DetailApprovalSchema).min(1),
+    oemVendorIds: z.array(z.coerce.number().int().positive()).min(0),
+});
+
+export type ApproveAllCostingDto = z.infer<typeof ApproveAllCostingSchema>;
+
+/**
+ * Reject Costing Schema - For rejecting a single detail or all
  */
 export const RejectCostingSchema = z.object({
+    detailId: z.number().int().positive().optional(),
     rejectionReason: textField().min(1, 'Rejection reason is required'),
 });
 
 export type RejectCostingDto = z.infer<typeof RejectCostingSchema>;
 
 /**
- * Update Approved Costing Schema - Update approved costing
+ * Update Approved Costing Schema - Update a single approved detail
  */
 export const UpdateApprovedCostingSchema = z.object({
-    finalPrice: z.string().min(1, 'Final price is required').optional(),
-    receiptPrice: z.string().min(1, 'Receipt price is required').optional(),
-    budgetPrice: z.string().min(1, 'Budget price is required').optional(),
-    grossMargin: z.string().min(1, 'Gross margin is required').optional(),
-    oemVendorIds: z.array(z.coerce.number().int().positive()).optional(),
+    detailId: z.number().int().positive(),
+    finalPrice: priceField.optional(),
+    receiptPrice: priceField.optional(),
+    budgetPrice: priceField.optional(),
+    grossMargin: marginField.optional(),
     tlRemarks: textField().min(1, 'TL remarks are required').optional(),
 });
 
