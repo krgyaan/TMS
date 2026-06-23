@@ -1,10 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { costingSheetsService } from '@/services/api/costing-sheets.service';
-import { costingApprovalsService } from '@/services/api/costing-approvals.service';
 import type { PaginatedResult } from '@/types/api.types';
 import { toast } from 'sonner';
 import type { CostingSheetDashboardCounts, CostingSheetDashboardRow, CostingSheetTab, CostingSheetListParams, CreateCostingDetailDto, SubmitCostingSheetDto } from '@/modules/tendering/costing-sheets/helpers/costingSheet.types';
-import type { ApproveCostingDto } from '@/modules/tendering/costing-approvals/helpers/costingApproval.types';
 import { useTeamFilter } from '@/hooks/useTeamFilter';
 
 export const costingSheetsKey = {
@@ -214,50 +212,4 @@ export const useCreateCostingDetail = () => {
     });
 };
 
-export const useApproveCostingDetail = () => {
-    const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: { finalPrice: string; receiptPrice: string; budgetPrice: string; grossMargin: string; oemVendorIds: number[]; tlRemarks: string } }) =>
-            costingApprovalsService.approve(id, data),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: costingDetailsKey.all });
-            toast.success('Costing detail approved');
-        },
-        onError: (error: any) => {
-            toast.error(error?.response?.data?.message || 'Failed to approve costing detail');
-        },
-    });
-};
-
-export const useRejectCostingDetail = () => {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: ({ id, rejectionReason }: { id: number; rejectionReason: string }) =>
-            costingApprovalsService.reject(id, { rejectionReason }),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: costingDetailsKey.all });
-            toast.success('Costing detail rejected');
-        },
-        onError: (error: any) => {
-            toast.error(error?.response?.data?.message || 'Failed to reject costing detail');
-        },
-    });
-};
-
-export const useUpdateApprovedCostingDetail = () => {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: ApproveCostingDto }) =>
-            costingApprovalsService.updateApproved(id, data),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: costingDetailsKey.all });
-            toast.success('Approved costing detail updated');
-        },
-        onError: (error: any) => {
-            toast.error(error?.response?.data?.message || 'Failed to update approved costing detail');
-        },
-    });
-};

@@ -80,7 +80,7 @@ class CostingSheetsService extends BaseApiService {
         return this.post<CreateSheetResponse>('/create-sheet-with-name', { tenderId, customName });
     }
 
-    // --- Detail methods (route through costing-sheets endpoints) ---
+    // --- Detail methods ---
 
     async getDetailsByTender(tenderId: number): Promise<TenderCostingDetail[]> {
         const sheet = await this.getByTenderId(tenderId);

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { costingApprovalsService } from '@/services/api/costing-approvals.service';
-import type { CostingApprovalListParams, CostingApprovalDashboardRow, CostingApprovalDashboardCounts, CostingApprovalTab, ApproveCostingDto, RejectCostingDto } from '@/modules/tendering/costing-approvals/helpers/costingApproval.types';
+import type { CostingApprovalListParams, CostingApprovalDashboardRow, CostingApprovalDashboardCounts, CostingApprovalTab, ApproveCostingDto, RejectCostingDto, ApproveAllCostingDto, UpdateApprovedCostingDto } from '@/modules/tendering/costing-approvals/helpers/costingApproval.types';
 import { toast } from 'sonner';
 import type { PaginatedResult } from '@/types/api.types';
 import { useTeamFilter } from '@/hooks/useTeamFilter';
@@ -19,7 +19,6 @@ export const useCostingApprovals = (
     sort?: { sortBy?: string; sortOrder?: 'asc' | 'desc' }
 ) => {
     const { teamId, userId, dataScope } = useTeamFilter();
-    // Only pass teamId for Super User/Admin (dataScope === 'all') when a team is selected
     const teamIdParam = teamId !== null ? teamId : undefined;
 
     const params: CostingApprovalListParams = {
@@ -69,10 +68,27 @@ export const useApproveCosting = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: costingApprovalsKey.all });
             queryClient.invalidateQueries({ queryKey: costingApprovalsKey.dashboardCounts() });
-            toast.success('Costing sheet approved successfully');
+            toast.success('Costing detail approved');
         },
         onError: (error: any) => {
-            toast.error(error?.response?.data?.message || 'Failed to approve costing sheet');
+            toast.error(error?.response?.data?.message || 'Failed to approve costing');
+        },
+    });
+};
+
+export const useApproveAllCosting = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ id, data }: { id: number; data: ApproveAllCostingDto }) =>
+            costingApprovalsService.approveAll(id, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: costingApprovalsKey.all });
+            queryClient.invalidateQueries({ queryKey: costingApprovalsKey.dashboardCounts() });
+            toast.success('All costing details approved');
+        },
+        onError: (error: any) => {
+            toast.error(error?.response?.data?.message || 'Failed to approve all costing');
         },
     });
 };
@@ -86,10 +102,10 @@ export const useRejectCosting = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: costingApprovalsKey.all });
             queryClient.invalidateQueries({ queryKey: costingApprovalsKey.dashboardCounts() });
-            toast.success('Costing sheet rejected');
+            toast.success('Costing detail rejected');
         },
         onError: (error: any) => {
-            toast.error(error?.response?.data?.message || 'Failed to reject costing sheet');
+            toast.error(error?.response?.data?.message || 'Failed to reject costing');
         },
     });
 };
@@ -98,7 +114,7 @@ export const useUpdateApprovedCosting = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, data }: { id: number; data: any }) =>
+        mutationFn: ({ id, data }: { id: number; data: UpdateApprovedCostingDto }) =>
             costingApprovalsService.updateApproved(id, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: costingApprovalsKey.all });
@@ -113,17 +129,14 @@ export const useUpdateApprovedCosting = () => {
 
 export const useCostingApprovalsDashboardCounts = () => {
     const { teamId, userId, dataScope } = useTeamFilter();
-    // Only pass teamId for Super User/Admin (dataScope === 'all') when a team is selected
     const teamIdParam = teamId !== null ? teamId : undefined;
-    
-    // Include all filter context in query key to ensure proper cache invalidation
-    // Use explicit values (including null) so React Query can properly differentiate cache entries
+
     const queryKey = [...costingApprovalsKey.dashboardCounts(), dataScope, teamId ?? null, userId ?? null];
-    
+
     return useQuery<CostingApprovalDashboardCounts>({
         queryKey,
         queryFn: () => costingApprovalsService.getDashboardCounts(teamIdParam),
-        staleTime: 0, // Always refetch when query key changes to ensure counts are up-to-date
+        staleTime: 0,
     });
 };
 
