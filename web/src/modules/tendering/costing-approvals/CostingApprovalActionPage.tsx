@@ -39,6 +39,7 @@ export default function CostingApprovalActionPage({ mode }: CostingApprovalActio
         tenderName: tenderDetails.tenderName,
         dueDate: tenderDetails.dueDate as Date,
         teamMemberName: tenderDetails.teamMemberName as string,
+        rfqRequired: (tenderDetails as any).rfqRequired as string | null | undefined,
     };
 
     if (mode === 'edit') {

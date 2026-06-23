@@ -34,6 +34,7 @@ interface CostingApprovalFormProps {
         tenderName: string;
         dueDate: Date | null;
         teamMemberName: string | null;
+        rfqRequired?: string | null;
     };
     mode: 'approve' | 'edit';
 }
@@ -220,30 +221,6 @@ export default function CostingApprovalForm({
         refreshData();
     };
 
-    if (allRelevantProcessed && relevantDetails.length > 0) {
-        return (
-            <Card>
-                <CardHeader>
-                    <CardTitle>All Done</CardTitle>
-                    <CardDescription>
-                        All {relevantDetails.length} costing detail{relevantDetails.length !== 1 ? 's have' : ' has'} been processed.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="flex justify-center gap-4">
-                    <Button variant="outline" onClick={() => navigate(paths.tendering.costingApprovals)}>
-                        Back to Costing Approvals
-                    </Button>
-                    <Button variant="default" onClick={() => {
-                        setProcessedIds(new Set());
-                        refreshData();
-                    }}>
-                        Review Again
-                    </Button>
-                </CardContent>
-            </Card>
-        );
-    }
-
     return (
         <>
             <Card>
@@ -297,7 +274,7 @@ export default function CostingApprovalForm({
                             </div>
 
                             {/* RFQ & Responses Details */}
-                            <SentRfqsResponsesHistory tenderId={costingSheet.tenderId} />
+                            <SentRfqsResponsesHistory tenderId={costingSheet.tenderId} rfqRequired={tenderDetails.rfqRequired} />
 
                             {/* Sheet-level Vendor Selection */}
                             <div className="space-y-4">
@@ -413,8 +390,42 @@ export default function CostingApprovalForm({
                                                 </div>
                                             </div>
 
-                                            {/* TL Approval Values (Editable) */}
-                                            {!processed && (
+                                            {/* TL Approval Values */}
+                                            {processed ? (
+                                                <div className="space-y-4 p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
+                                                    <h6 className="text-xs font-semibold text-green-700 dark:text-green-400 uppercase tracking-wider">TL Approved Values</h6>
+                                                    <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3'>
+                                                        <div>
+                                                            <p className="text-xs font-medium text-muted-foreground mb-1">Final Price (GST Inclusive)</p>
+                                                            <p className="font-bold text-green-700 dark:text-green-300">
+                                                                {detail.finalPrice ? formatINR(parseFloat(detail.finalPrice)) : '—'}
+                                                            </p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-xs font-medium text-muted-foreground mb-1">Receipt (Pre GST)</p>
+                                                            <p className="font-bold text-green-700 dark:text-green-300">
+                                                                {detail.receiptPrice ? formatINR(parseFloat(detail.receiptPrice)) : '—'}
+                                                            </p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-xs font-medium text-muted-foreground mb-1">Budget (Pre GST)</p>
+                                                            <p className="font-bold text-green-700 dark:text-green-300">
+                                                                {detail.budgetPrice ? formatINR(parseFloat(detail.budgetPrice)) : '—'}
+                                                            </p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-xs font-medium text-muted-foreground mb-1">Gross Margin</p>
+                                                            <p className="font-bold text-green-700 dark:text-green-300">
+                                                                {detail.grossMargin ? `${detail.grossMargin}%` : '—'}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-xs font-medium text-muted-foreground mb-1">TL Remarks</p>
+                                                        <p className="text-sm text-muted-foreground">{detail.tlRemarks || '—'}</p>
+                                                    </div>
+                                                </div>
+                                            ) : (
                                                 <div className="space-y-4 p-4 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
                                                     <div className='grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3'>
                                                         <FieldWrapper

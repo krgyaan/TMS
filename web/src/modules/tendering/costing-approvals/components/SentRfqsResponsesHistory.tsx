@@ -1,3 +1,4 @@
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -6,11 +7,31 @@ import { useRfqByTenderId } from '@/hooks/api/useRfqs';
 import { formatDateTime } from '@/hooks/useFormatedDate';
 import RfqResponsesViewer from './RfqResponsesViewer';
 import {
-    Building2, Calendar, Clock, ExternalLink, FileText, Paperclip,
+    AlertCircle, Building2, Calendar, Clock, ExternalLink, FileText, MessageCircleOff, Paperclip,
 } from 'lucide-react';
 
-export default function SentRfqsResponsesHistory({ tenderId }: { tenderId: number }) {
-    const { data: rfqs, isLoading: isLoadingRfqData } = useRfqByTenderId(tenderId);
+export default function SentRfqsResponsesHistory({ tenderId, rfqRequired }: { tenderId: number; rfqRequired?: string | null }) {
+    console.log({rfqRequired})
+    const { data: rfqs, isLoading: isLoadingRfqData, error } = useRfqByTenderId(
+        rfqRequired === 'no' ? null : tenderId
+    );
+
+    if (rfqRequired === 'no') {
+        return (
+            <Card className="border border-muted shadow-sm bg-background">
+                <CardHeader className="border-b border-muted bg-muted/10 pb-4">
+                    <div className="flex items-center justify-between">
+                        <CardDescription>
+                            RFQs were not required for this tender by the approving authority.
+                        </CardDescription>
+                        <Badge variant="secondary" className="text-[10px] font-medium px-2.5 py-0.5 shadow-none">
+                            Not Required
+                        </Badge>
+                    </div>
+                </CardHeader>
+            </Card>
+        );
+    }
 
     if (isLoadingRfqData) {
         return (
@@ -32,7 +53,29 @@ export default function SentRfqsResponsesHistory({ tenderId }: { tenderId: numbe
         );
     }
 
-    if (!rfqs || rfqs.length === 0) return null;
+    if (!rfqs || rfqs.length === 0) {
+        return (
+            <Card className="border border-muted shadow-sm bg-background">
+                <CardHeader className="border-b border-muted bg-muted/10 pb-4">
+                    <CardTitle className="text-base font-semibold flex items-center gap-2 text-foreground">
+                        <MessageCircleOff className="h-4 w-4 text-muted-foreground" />
+                        Sent RFQs & Responses History
+                    </CardTitle>
+                    <CardDescription>
+                        No RFQs have been sent for this tender yet.
+                    </CardDescription>
+                </CardHeader>
+                {error && (
+                    <CardContent className="p-4">
+                        <Alert variant="destructive">
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertDescription>Failed to load RFQ data</AlertDescription>
+                        </Alert>
+                    </CardContent>
+                )}
+            </Card>
+        );
+    }
 
     return (
         <Card className="border border-muted shadow-sm overflow-hidden bg-background">
@@ -47,9 +90,16 @@ export default function SentRfqsResponsesHistory({ tenderId }: { tenderId: numbe
                             View all previously sent RFQs for this tender and their live response statuses.
                         </CardDescription>
                     </div>
-                    <Badge className="bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 text-xs font-semibold px-2.5 py-0.5 rounded-full shadow-none">
-                        {rfqs.length} {rfqs.length === 1 ? 'RFQ' : 'RFQs'} Sent
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                        {rfqRequired && (
+                            <Badge variant="outline" className="text-[10px] font-medium px-2.5 py-0.5 shadow-none">
+                                {rfqRequired === 'yes' ? 'Required' : 'Not Required'}
+                            </Badge>
+                        )}
+                        <Badge className="bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20 text-xs font-semibold px-2.5 py-0.5 rounded-full shadow-none">
+                            {rfqs.length} {rfqs.length === 1 ? 'RFQ' : 'RFQs'} Sent
+                        </Badge>
+                    </div>
                 </div>
             </CardHeader>
             <CardContent className="p-0 bg-card">

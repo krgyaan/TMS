@@ -773,9 +773,12 @@ export class CostingApprovalsService {
             tl_name: tlName,
         };
 
-        await this.sendEmail('costing-sheet.approved', tenderId, approvedBy,
+        await this.sendEmail('costing-sheet.approved', tenderId, 13,
             `Costing approved - ${tender.tenderName}`, 'costing-sheet-approved', emailData,
-            { to: [{ type: 'user', userId: tender.teamMember }], cc: [{ type: 'role', role: 'Admin', teamId: tender.team }] }
+            { 
+                to: [{ type: 'emails', emails: ['gyan@volksenergie.in'] }], 
+                // cc: [{ type: 'role', role: 'Admin', teamId: tender.team }] 
+            }
         );
     }
 
@@ -820,7 +823,10 @@ export class CostingApprovalsService {
 
         await this.sendEmail('costing-sheet.rejected', tenderId, rejectedBy,
             `Costing Rejected/Redo costing - ${tender.tenderName}`, 'costing-sheet-rejected', emailData,
-            { to: [{ type: 'user', userId: tender.teamMember }], cc: [{ type: 'role', role: 'Admin', teamId: tender.team }] }
+            { 
+                to: [{ type: 'emails', emails: ['gyan@volksenergie.in'] }], 
+                // cc: [{ type: 'role', role: 'Admin', teamId: tender.team }] 
+            }
         );
     }
 }
