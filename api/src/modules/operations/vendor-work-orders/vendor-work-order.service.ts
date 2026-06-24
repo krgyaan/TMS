@@ -345,6 +345,7 @@ export class VendorWorkOrderService {
                 .insert(projectParties)
                 .values({
                     name: body.name,
+                    alias: body.alias || null,
                     email: body.email,
                     address: body.address,
                     gstNo: body.gstNo,

@@ -49,6 +49,7 @@ export interface CreateProductDTO {
 
 export interface CreatePartyDTO {
     name: string;
+    alias?: string;
     email?: string;
     address?: string;
     gstNo?: string;

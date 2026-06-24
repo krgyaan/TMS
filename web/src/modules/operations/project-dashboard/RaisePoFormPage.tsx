@@ -30,6 +30,7 @@ import { purchaseOrderFormSchema, type PurchaseOrderFormValues } from "./helpers
 
 interface NewPartyForm {
   name: string;
+  alias: string;
   email: string;
   address: string;
   gstNo: string;
@@ -109,7 +110,7 @@ export default function RaisePoFormPage() {
   const [isAddPartyOpen, setIsAddPartyOpen] = useState(false);
   const [isShipToPartyOpen, setIsShipToPartyOpen] = useState(false);
   const [partyCreationType, setPartyCreationType] = useState<"seller" | "ship_to">("seller");
-  const [newParty, setNewParty] = useState<NewPartyForm>({ name: "", email: "", address: "", gstNo: "", pan: "", msme: "" });
+  const [newParty, setNewParty] = useState<NewPartyForm>({ name: "", alias: "", email: "", address: "", gstNo: "", pan: "", msme: "" });
 
   const form = useForm<PurchaseOrderFormValues>({
     resolver: zodResolver(purchaseOrderFormSchema) as any,
@@ -129,13 +130,13 @@ export default function RaisePoFormPage() {
   const sellerOptions = useMemo(() => [
     ...(parties || [])
       .filter((p: any) => !p.type || p.type === "seller")
-      .map((p: any) => ({ id: String(p.id), name: p.name })),
+      .map((p: any) => ({ id: String(p.id), name: p.alias ? `${p.name} (${p.alias})` : p.name })),
   ], [parties]);
 
   const partyOptions = useMemo(() => [
     ...(parties || [])
       .filter((p: any) => p.type === "ship_to")
-      .map((p: any) => ({ id: String(p.id), name: p.name })),
+      .map((p: any) => ({ id: String(p.id), name: p.alias ? `${p.name} (${p.alias})` : p.name })),
   ], [parties]);
 
   useEffect(() => {
@@ -177,6 +178,7 @@ export default function RaisePoFormPage() {
     try {
       const partyData: CreatePartyDTO = {
         name: newParty.name,
+        alias: newParty.alias || undefined,
         email: newParty.email || undefined,
         address: newParty.address || undefined,
         gstNo: newParty.gstNo || undefined,
@@ -186,7 +188,7 @@ export default function RaisePoFormPage() {
       };
       await createPartyMutation.mutateAsync(partyData);
       toast.success(`Party "${newParty.name}" has been added successfully.`);
-      setNewParty({ name: "", email: "", address: "", gstNo: "", pan: "", msme: "" });
+      setNewParty({ name: "", alias: "", email: "", address: "", gstNo: "", pan: "", msme: "" });
       setIsAddPartyOpen(false);
       setIsShipToPartyOpen(false);
     } catch (error: any) {
@@ -555,6 +557,10 @@ const AddPartyDialog: React.FC<AddPartyDialogProps> = ({ newParty, setNewParty, 
           <div className="space-y-2">
             <Label>Party Name <span className="text-destructive">*</span></Label>
             <Input value={newParty.name} onChange={(e) => setNewParty({ ...newParty, name: e.target.value })} placeholder="Enter party name" />
+          </div>
+          <div className="space-y-2">
+            <Label>Alias</Label>
+            <Input value={newParty.alias} onChange={(e) => setNewParty({ ...newParty, alias: e.target.value })} placeholder="e.g. Factory, HO, Branch" />
           </div>
           <div className="space-y-2">
             <Label>Email</Label>

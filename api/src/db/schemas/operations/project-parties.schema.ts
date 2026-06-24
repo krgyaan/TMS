@@ -3,6 +3,7 @@ import { pgTable, integer, varchar, text, timestamp, bigserial } from "drizzle-o
 export const projectParties = pgTable("project_parties", {
     id: bigserial("id", { mode: "number" }).primaryKey(), 
     name: varchar("name", { length: 255 }),
+    alias: varchar("alias", { length: 255 }),
     gstNo: varchar("gst_no", { length: 50 }),
     msme: varchar("msme", { length: 50 }),
     pan: varchar("pan", { length: 100 }),

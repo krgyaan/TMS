@@ -597,6 +597,7 @@ export class ProjectDashboardService {
             .insert(projectParties)
             .values({
                 name: body.name,
+                alias: body.alias || null,
                 email: body.email || null,
                 address: body.address || null,
                 gstNo: body.gstNo || null,
