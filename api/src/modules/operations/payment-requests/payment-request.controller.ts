@@ -37,12 +37,7 @@ export class PaymentRequestController {
         return this.service.getAll();
     }
 
-    @Get(":id")
-    getById(@Param("id", ParseIntPipe) id: number) {
-        return this.service.getById(id);
-    }
-
-    // ── Beneficiary routes ──
+    // ── Beneficiary routes (must be before :id routes) ──
 
     @Post("beneficiaries")
     @HttpCode(HttpStatus.CREATED)
@@ -66,5 +61,10 @@ export class PaymentRequestController {
         @Body() body: any,
     ) {
         return this.service.updateBeneficiary(id, body);
+    }
+
+    @Get(":id")
+    getById(@Param("id", ParseIntPipe) id: number) {
+        return this.service.getById(id);
     }
 }

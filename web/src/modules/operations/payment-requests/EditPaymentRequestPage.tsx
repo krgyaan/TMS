@@ -169,15 +169,13 @@ export default function EditPaymentRequestPage() {
                                 Bank Details
                             </h3>
                             <div className="flex items-end gap-4">
-                                <div className="flex-1">
-                                    <SelectField
-                                        control={form.control}
-                                        name="selectedBeneficiaryId"
-                                        label="Beneficiary (Master)"
-                                        options={beneficiaryOptions}
-                                        placeholder="Select beneficiary..."
-                                    />
-                                </div>
+                                <SelectField
+                                    control={form.control}
+                                    name="selectedBeneficiaryId"
+                                    label="Beneficiary (Master)"
+                                    options={beneficiaryOptions}
+                                    placeholder="Select beneficiary..."
+                                />
                                 <Dialog open={isAddBeneficiaryOpen} onOpenChange={setIsAddBeneficiaryOpen}>
                                     <DialogTrigger asChild>
                                         <Button variant="outline" size="sm" type="button" className="mb-1">
