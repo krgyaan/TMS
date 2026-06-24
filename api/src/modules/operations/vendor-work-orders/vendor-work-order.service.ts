@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { eq, like, desc, sql } from "drizzle-orm";
+import { eq, like, desc, sql, inArray } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { rename, readFile } from "node:fs/promises";
@@ -90,6 +90,7 @@ export class VendorWorkOrderService {
                     accessoriesPackagingListAttachments: body.accessoriesPackagingListAttachments,
                     remarks: body.remarks,
                     certRecipient: body.certRecipient,
+                    certRecipients: body.certRecipients ?? [],
                     woRaisedBy: userId,
                     projectId: body.projectId,
                 })
@@ -164,6 +165,7 @@ export class VendorWorkOrderService {
                     accessoriesPackagingListAttachments: body.accessoriesPackagingListAttachments,
                     remarks: body.remarks,
                     certRecipient: body.certRecipient,
+                    certRecipients: body.certRecipients ?? [],
                     updatedAt: sql`now()`,
                 })
                 .where(eq(vendorWorkOrders.id, id))
@@ -345,6 +347,7 @@ export class VendorWorkOrderService {
                 .insert(projectParties)
                 .values({
                     name: body.name,
+                    alias: body.alias || null,
                     email: body.email,
                     address: body.address,
                     gstNo: body.gstNo,
@@ -514,6 +517,7 @@ export class VendorWorkOrderService {
             contactPersonEmail: wo.contactPersonEmail,
             termsAndConditions: wo.termsAndConditions,
             certRecipient: wo.certRecipient,
+            certRecipients: wo.certRecipients,
             remarks: wo.remarks,
             products: (products || []).map((p: any) => ({
                 description: p.description,
@@ -596,9 +600,7 @@ export class VendorWorkOrderService {
             grand_total: grandTotal,
             grand_total_in_words: this.pdfGenerator.grandTotalInWords(grandTotal),
             terms_and_conditions: Array.isArray(wo.termsAndConditions) ? wo.termsAndConditions : [],
-            test_certificate_email: wo.certRecipient
-                ? await this.getUserEmail(wo.certRecipient)
-                : "goyal@volksenergie.in",
+            test_certificate_email: await this.resolveCertRecipientEmails(wo),
         };
 
         try {
@@ -668,12 +670,16 @@ export class VendorWorkOrderService {
         return result.trim() + " Only";
     }
 
-    private async getUserEmail(userId: number): Promise<string> {
-        const [user] = await this.db
+    private async resolveCertRecipientEmails(wo: any): Promise<string> {
+        const ids: number[] = Array.isArray(wo.certRecipients) && wo.certRecipients.length > 0
+            ? wo.certRecipients
+            : wo.certRecipient ? [wo.certRecipient] : [];
+        if (ids.length === 0) return "goyal@volksenergie.in";
+        const users_data = await this.db
             .select({ email: users.email })
             .from(users)
-            .where(eq(users.id, userId));
-        return user?.email || "goyal@volksenergie.in";
+            .where(inArray(users.id, ids));
+        return users_data.map(u => u.email).filter(Boolean).join(", ");
     }
 
     private sanitizeProjectName(name: string): string {

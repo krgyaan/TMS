@@ -2,6 +2,7 @@ import { paths } from "@/app/routes/paths";
 import { DateInput } from "@/components/form/DateInput";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
+import { MultiSelectField } from "@/components/form/MultiSelectField";
 import { TenderFileUploader } from "@/components/tender-file-upload";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ import { purchaseOrderFormSchema, type PurchaseOrderFormValues } from "./helpers
 
 interface NewPartyForm {
   name: string;
+  alias: string;
   email: string;
   address: string;
   gstNo: string;
@@ -52,7 +54,7 @@ const defaultFormValues: PurchaseOrderFormValues = {
   contactPersonEmail: "",
   partyId: "",
   selectedUserId: "",
-  selectedCertRecipient: "",
+  selectedCertRecipients: [],
   shipToName: "",
   shippingAddress: "",
   shipToGst: "",
@@ -109,7 +111,7 @@ export default function RaisePoFormPage() {
   const [isAddPartyOpen, setIsAddPartyOpen] = useState(false);
   const [isShipToPartyOpen, setIsShipToPartyOpen] = useState(false);
   const [partyCreationType, setPartyCreationType] = useState<"seller" | "ship_to">("seller");
-  const [newParty, setNewParty] = useState<NewPartyForm>({ name: "", email: "", address: "", gstNo: "", pan: "", msme: "" });
+  const [newParty, setNewParty] = useState<NewPartyForm>({ name: "", alias: "", email: "", address: "", gstNo: "", pan: "", msme: "" });
 
   const form = useForm<PurchaseOrderFormValues>({
     resolver: zodResolver(purchaseOrderFormSchema) as any,
@@ -129,13 +131,13 @@ export default function RaisePoFormPage() {
   const sellerOptions = useMemo(() => [
     ...(parties || [])
       .filter((p: any) => !p.type || p.type === "seller")
-      .map((p: any) => ({ id: String(p.id), name: p.name })),
+      .map((p: any) => ({ id: String(p.id), name: p.alias ? `${p.name} (${p.alias})` : p.name })),
   ], [parties]);
 
   const partyOptions = useMemo(() => [
     ...(parties || [])
       .filter((p: any) => p.type === "ship_to")
-      .map((p: any) => ({ id: String(p.id), name: p.name })),
+      .map((p: any) => ({ id: String(p.id), name: p.alias ? `${p.name} (${p.alias})` : p.name })),
   ], [parties]);
 
   useEffect(() => {
@@ -177,6 +179,7 @@ export default function RaisePoFormPage() {
     try {
       const partyData: CreatePartyDTO = {
         name: newParty.name,
+        alias: newParty.alias || undefined,
         email: newParty.email || undefined,
         address: newParty.address || undefined,
         gstNo: newParty.gstNo || undefined,
@@ -186,7 +189,7 @@ export default function RaisePoFormPage() {
       };
       await createPartyMutation.mutateAsync(partyData);
       toast.success(`Party "${newParty.name}" has been added successfully.`);
-      setNewParty({ name: "", email: "", address: "", gstNo: "", pan: "", msme: "" });
+      setNewParty({ name: "", alias: "", email: "", address: "", gstNo: "", pan: "", msme: "" });
       setIsAddPartyOpen(false);
       setIsShipToPartyOpen(false);
     } catch (error: any) {
@@ -465,15 +468,15 @@ export default function RaisePoFormPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 my-6">
               <div className="space-y-1">
-                <SelectField
+                <MultiSelectField
                   control={form.control}
-                  name="selectedCertRecipient"
-                  label="Test Certificate Recipient"
-                  options={activeTeamMembers.map((u: any) => ({ id: String(u.id), name: u.name }))}
-                  placeholder="Select recipient for test certificate..."
+                  name="selectedCertRecipients"
+                  label="Test Certificate Recipients"
+                  options={activeTeamMembers.map((u: any) => ({ value: String(u.id), label: `${u.name} (${u.email})` }))}
+                  placeholder="Select recipients for test certificate..."
                 />
                 <p className="text-xs text-muted-foreground">
-                  Select the team member who should receive the test certificate and invoice via email
+                  Select the team members who should receive the test certificate and invoice via email
                 </p>
               </div>
             </div>
@@ -555,6 +558,10 @@ const AddPartyDialog: React.FC<AddPartyDialogProps> = ({ newParty, setNewParty, 
           <div className="space-y-2">
             <Label>Party Name <span className="text-destructive">*</span></Label>
             <Input value={newParty.name} onChange={(e) => setNewParty({ ...newParty, name: e.target.value })} placeholder="Enter party name" />
+          </div>
+          <div className="space-y-2">
+            <Label>Alias</Label>
+            <Input value={newParty.alias} onChange={(e) => setNewParty({ ...newParty, alias: e.target.value })} placeholder="e.g. Factory, HO, Branch" />
           </div>
           <div className="space-y-2">
             <Label>Email</Label>
