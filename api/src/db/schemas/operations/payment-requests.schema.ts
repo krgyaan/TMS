@@ -1,4 +1,4 @@
-import { pgTable, bigserial, bigint, varchar, text, numeric, date, timestamp, index } from "drizzle-orm/pg-core";
+import { pgTable, bigserial, bigint, varchar, text, numeric, timestamp, index } from "drizzle-orm/pg-core";
 
 export const paymentRequests = pgTable(
     "project_payment_requests",
@@ -8,7 +8,7 @@ export const paymentRequests = pgTable(
         requestNo: varchar("request_no", { length: 255 }),
         partyName: varchar("party_name", { length: 255 }),
         accountNumber: varchar("account_number", { length: 100 }),
-        accountName: varchar("account_name", { length: 255 }),
+        bankName: varchar("bank_name", { length: 255 }),
         ifsc: varchar("ifsc", { length: 50 }),
         amount: numeric("amount", { precision: 20, scale: 2 }),
         paymentAgainst: varchar("payment_against", { length: 50 }),
