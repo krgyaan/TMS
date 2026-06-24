@@ -3,6 +3,7 @@ import { eq, like, desc } from "drizzle-orm";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import { paymentRequests } from "@/db/schemas/operations/payment-requests.schema";
+import { beneficiaries } from "@/db/schemas/operations/beneficiaries.schema";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 
@@ -50,7 +51,7 @@ export class PaymentRequestService {
                     requestNo,
                     partyName: body.partyName,
                     accountNumber: body.accountNumber,
-                    accountName: body.accountName,
+                    bankName: body.bankName,
                     ifsc: body.ifsc,
                     amount: body.amount?.toString(),
                     paymentAgainst: body.paymentAgainst,
@@ -81,7 +82,7 @@ export class PaymentRequestService {
                 .set({
                     partyName: body.partyName,
                     accountNumber: body.accountNumber,
-                    accountName: body.accountName,
+                    bankName: body.bankName,
                     ifsc: body.ifsc,
                     amount: body.amount?.toString(),
                     paymentAgainst: body.paymentAgainst,
@@ -121,6 +122,64 @@ export class PaymentRequestService {
             .from(paymentRequests)
             .where(eq(paymentRequests.projectId, projectId))
             .orderBy(desc(paymentRequests.id));
+    }
+
+    // ── Beneficiary CRUD ──
+
+    async createBeneficiary(body: any) {
+        const ben = (
+            await this.db
+                .insert(beneficiaries)
+                .values({
+                    name: body.name,
+                    accountNumber: body.accountNumber,
+                    ifsc: body.ifsc,
+                    bankName: body.bankName,
+                })
+                .returning()
+        )[0];
+        return ben;
+    }
+
+    async listBeneficiaries() {
+        return this.db
+            .select()
+            .from(beneficiaries)
+            .orderBy(desc(beneficiaries.createdAt));
+    }
+
+    async getBeneficiary(id: number) {
+        const ben = await this.db
+            .select()
+            .from(beneficiaries)
+            .where(eq(beneficiaries.id, id))
+            .then(rows => rows[0]);
+        if (!ben) throw new NotFoundException("Beneficiary not found");
+        return ben;
+    }
+
+    async updateBeneficiary(id: number, body: any) {
+        const existing = await this.db
+            .select()
+            .from(beneficiaries)
+            .where(eq(beneficiaries.id, id))
+            .then(rows => rows[0]);
+        if (!existing) throw new NotFoundException("Beneficiary not found");
+
+        const updated = (
+            await this.db
+                .update(beneficiaries)
+                .set({
+                    name: body.name,
+                    accountNumber: body.accountNumber,
+                    ifsc: body.ifsc,
+                    bankName: body.bankName,
+                    updatedAt: new Date(),
+                })
+                .where(eq(beneficiaries.id, id))
+                .returning()
+        )[0];
+        return updated;
     }
 
     private sanitizeProjectName(name: string): string {

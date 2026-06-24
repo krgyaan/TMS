@@ -41,4 +41,30 @@ export class PaymentRequestController {
     getById(@Param("id", ParseIntPipe) id: number) {
         return this.service.getById(id);
     }
+
+    // ── Beneficiary routes ──
+
+    @Post("beneficiaries")
+    @HttpCode(HttpStatus.CREATED)
+    createBeneficiary(@Body() body: any) {
+        return this.service.createBeneficiary(body);
+    }
+
+    @Get("beneficiaries")
+    listBeneficiaries() {
+        return this.service.listBeneficiaries();
+    }
+
+    @Get("beneficiaries/:id")
+    getBeneficiary(@Param("id", ParseIntPipe) id: number) {
+        return this.service.getBeneficiary(id);
+    }
+
+    @Put("beneficiaries/:id")
+    updateBeneficiary(
+        @Param("id", ParseIntPipe) id: number,
+        @Body() body: any,
+    ) {
+        return this.service.updateBeneficiary(id, body);
+    }
 }
