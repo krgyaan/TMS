@@ -44,6 +44,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { paths } from "@/app/routes/paths";
+import { VideoPlayerView } from "../employees/VideoPlayer";
 import {
     useTrainingVideos,
     useDeleteTrainingVideo,
@@ -70,6 +71,14 @@ const fadeInUp = {
 const scaleIn = {
     hidden: { opacity: 0, scale: 0.95 },
     visible: { opacity: 1, scale: 1, transition: { duration: 0.4, ease: "easeOut" } }
+};
+
+const getServerOrigin = () => {
+    const base = import.meta.env.VITE_API_URL as string | undefined;
+    if (base) {
+        try { return new URL(base).origin; } catch { /* fallback */ }
+    }
+    return "http://localhost:3000";
 };
 
 
@@ -122,7 +131,9 @@ const TrainingVideos = () => {
                 views: viewsCount,
                 status: v.status,
                 isPublished: v.isPublished,
-                reactions: (v as any).reactions || { helpful: 0, important: 0, confusing: 0 }
+                reactions: (v as any).reactions || { helpful: 0, important: 0, confusing: 0 },
+                thumbnailPath: v.thumbnailPath,
+                videoUrl: v.videoUrl
             };
         });
     }, [rawVideos, progressList]);
@@ -146,6 +157,7 @@ const TrainingVideos = () => {
     const [uploadStep, setUploadStep] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
     const [uploadedFile, setUploadedFile] = useState<string | null>(null);
+    const [previewVideo, setPreviewVideo] = useState<any | null>(null);
 
     const [newTitle, setNewTitle] = useState("");
     const [newDesc, setNewDesc] = useState("");
@@ -267,14 +279,31 @@ const TrainingVideos = () => {
                 <div className="absolute top-[40%] right-[20%] w-[25%] h-[25%] rounded-full bg-primary/[0.02] blur-[80px]" />
             </div>
 
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative space-y-8">
-                {/* Header */}
-                <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5 }}
-                    className="flex flex-col md:flex-row md:items-end md:justify-between gap-4"
-                >
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative">
+                <AnimatePresence mode="wait">
+                    {previewVideo ? (
+                        <VideoPlayerView
+                            key="video-player"
+                            activeVideo={previewVideo}
+                            onBack={() => setPreviewVideo(null)}
+                            isAdmin={true}
+                        />
+                    ) : (
+                        <motion.div
+                            key="dashboard-view"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.3 }}
+                            className="space-y-8"
+                        >
+                            {/* Header */}
+                            <motion.div
+                                initial={{ opacity: 0, y: -10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.5 }}
+                                className="flex flex-col md:flex-row md:items-end md:justify-between gap-4"
+                            >
                     <div>
                         <div className="flex items-center gap-3 mb-2">
                             <div className="h-10 w-10 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
@@ -435,11 +464,27 @@ const TrainingVideos = () => {
                                                     >
                                                         <TableCell className="align-middle py-4">
                                                             <div className="flex items-start gap-3">
-                                                                <div className="w-[72px] aspect-video rounded-xl bg-gradient-to-br from-primary/15 to-primary/5 border border-primary/10 flex items-center justify-center flex-shrink-0 group-hover:border-primary/25 transition-colors">
-                                                                    <Play className="h-5 w-5 text-primary/70" />
+                                                                <div 
+                                                                    onClick={() => setPreviewVideo(video)}
+                                                                    className="w-[72px] aspect-video rounded-xl bg-gradient-to-br from-primary/15 to-primary/5 border border-primary/10 flex items-center justify-center flex-shrink-0 group-hover:border-primary/25 transition-colors relative overflow-hidden cursor-pointer shadow-sm hover:shadow-md"
+                                                                >
+                                                                    {video.thumbnailPath ? (
+                                                                        <img
+                                                                            src={`${getServerOrigin()}/${video.thumbnailPath}`}
+                                                                            alt={video.title}
+                                                                            className="absolute inset-0 w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                                                                        />
+                                                                    ) : (
+                                                                        <Play className="h-5 w-5 text-primary/70" />
+                                                                    )}
                                                                 </div>
                                                                 <div className="space-y-1.5 min-w-0">
-                                                                    <div className="font-semibold text-sm leading-tight text-foreground truncate max-w-[280px]">{video.title}</div>
+                                                                    <div 
+                                                                        onClick={() => setPreviewVideo(video)}
+                                                                        className="font-semibold text-sm leading-tight text-foreground truncate max-w-[280px] hover:text-primary hover:underline cursor-pointer transition-all"
+                                                                    >
+                                                                        {video.title}
+                                                                    </div>
                                                                     <div className="flex items-center gap-2">
                                                                         <Badge variant="secondary" className={cn("text-[9px] font-bold px-2 py-0.5 rounded-md border", getCategoryColor(video.category))}>
                                                                             {video.category}
@@ -684,8 +729,10 @@ const TrainingVideos = () => {
                         </TabsContent>
                     </Tabs>
                 </motion.div>
-            </div>
-
+            </motion.div>
+            )}
+        </AnimatePresence>
+    </div>
 
             {/* ═══════════════════════════════════════════════════════
                 ASSIGN VIDEO MODAL
