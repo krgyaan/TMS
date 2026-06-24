@@ -24,6 +24,7 @@ export const vendorWorkOrders = pgTable(
         termsAndConditions: jsonb("terms_and_conditions").notNull().default('[]'),
         woRaisedBy: bigint("wo_raised_by", { mode: "number" }),
         certRecipient: bigint("cert_recipient", { mode: "number" }),
+        certRecipients: jsonb("cert_recipients").notNull().default([]),
         remarks: text("remarks"),
         scopeOfWork: text("scope_of_work"),
         accessoriesPackagingListAttachments: text("accessories_packaging_list_attachments"),

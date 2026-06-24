@@ -26,6 +26,7 @@ export const purchaseOrders = pgTable(
         termsAndConditions: jsonb("terms_and_conditions").notNull().default('[]'),
         poRaisedBy: bigint("po_raised_by", { mode: "number" }),
         certRecipient: bigint("cert_recipient", { mode: "number" }),
+        certRecipients: jsonb("cert_recipients").notNull().default([]),
         remarks: text("remarks"),
         technicalSpecsAttachments: text("technical_specs_attachments"),
         accessoriesPackagingListAttachments: text("accessories_packaging_list_attachments"),
