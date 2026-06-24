@@ -2,6 +2,7 @@ import { paths } from "@/app/routes/paths";
 import { DateInput } from "@/components/form/DateInput";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
+import { MultiSelectField } from "@/components/form/MultiSelectField";
 import { TenderFileUploader } from "@/components/tender-file-upload";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -53,7 +54,7 @@ const defaultFormValues: PurchaseOrderFormValues = {
   contactPersonEmail: "",
   partyId: "",
   selectedUserId: "",
-  selectedCertRecipient: "",
+  selectedCertRecipients: [],
   shipToName: "",
   shippingAddress: "",
   shipToGst: "",
@@ -467,15 +468,15 @@ export default function RaisePoFormPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 my-6">
               <div className="space-y-1">
-                <SelectField
+                <MultiSelectField
                   control={form.control}
-                  name="selectedCertRecipient"
-                  label="Test Certificate Recipient"
-                  options={activeTeamMembers.map((u: any) => ({ id: String(u.id), name: u.name }))}
-                  placeholder="Select recipient for test certificate..."
+                  name="selectedCertRecipients"
+                  label="Test Certificate Recipients"
+                  options={activeTeamMembers.map((u: any) => ({ value: String(u.id), label: `${u.name} (${u.email})` }))}
+                  placeholder="Select recipients for test certificate..."
                 />
                 <p className="text-xs text-muted-foreground">
-                  Select the team member who should receive the test certificate and invoice via email
+                  Select the team members who should receive the test certificate and invoice via email
                 </p>
               </div>
             </div>

@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
-import { eq, like, desc, sql } from "drizzle-orm";
+import { eq, like, desc, sql, inArray } from "drizzle-orm";
 import { createHash, randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { rename, readFile } from "node:fs/promises";
@@ -282,6 +282,7 @@ export class ProjectDashboardService {
             accessoriesPackagingListAttachments: body.accessoriesPackagingListAttachments,
             remarks: body.remarks,
             certRecipient: body.certRecipient,
+            certRecipients: body.certRecipients ?? [],
             poRaisedBy: userId,
             projectId: body.projectId,
         })
@@ -360,6 +361,7 @@ export class ProjectDashboardService {
             quotationDate: po.quotationDate,
             termsAndConditions: po.termsAndConditions,
             certRecipient: po.certRecipient,
+            certRecipients: po.certRecipients,
             remarks: po.remarks,
             products: (products || []).map((p: any) => ({
                 description: p.description,
@@ -443,9 +445,7 @@ export class ProjectDashboardService {
             grand_total: grandTotal,
             grand_total_in_words: this.pdfGenerator.grandTotalInWords(grandTotal),
             terms_and_conditions: Array.isArray(po.termsAndConditions) ? po.termsAndConditions : [],
-            test_certificate_email: po.certRecipient
-                ? ((await this.db.select().from(users).where(eq(users.id, po.certRecipient)))[0]?.email ?? "")
-                : "",
+            test_certificate_email: await this.resolveCertRecipientEmails(po),
         };
 
         try {
@@ -660,6 +660,7 @@ export class ProjectDashboardService {
                     accessoriesPackagingListAttachments: body.accessoriesPackagingListAttachments,
                     remarks: body.remarks,
                     certRecipient: body.certRecipient,
+                    certRecipients: body.certRecipients ?? [],
                     poRaisedBy: userId ?? body.poRaisedBy,
                     
                     updatedAt: new Date(),
@@ -742,6 +743,18 @@ export class ProjectDashboardService {
                 })
                 .where(eq(projectParties.id, body.shipToPartyId));
         }
+    }
+
+    private async resolveCertRecipientEmails(po: any): Promise<string> {
+        const ids: number[] = Array.isArray(po.certRecipients) && po.certRecipients.length > 0
+            ? po.certRecipients
+            : po.certRecipient ? [po.certRecipient] : [];
+        if (ids.length === 0) return "";
+        const users_data = await this.db
+            .select({ email: users.email })
+            .from(users)
+            .where(inArray(users.id, ids));
+        return users_data.map(u => u.email).filter(Boolean).join(", ");
     }
 
     async listParties(type?: string) {
