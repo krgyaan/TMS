@@ -9,6 +9,7 @@ export interface PaymentRequestRow {
     amount: number;
     paymentAgainst: string;
     purchaseInvoiceId?: number;
+    purchaseOrderId?: number;
     uploadedInvoiceFile?: string;
     poFile?: string;
     remark?: string;
@@ -27,6 +28,7 @@ export interface CreatePaymentRequestDTO {
     amount: number;
     paymentAgainst: string;
     purchaseInvoiceId?: number;
+    purchaseOrderId?: number;
     uploadedInvoiceFile?: string;
     poFile?: string;
     remark?: string;
@@ -40,6 +42,7 @@ export interface UpdatePaymentRequestDTO {
     amount: number;
     paymentAgainst: string;
     purchaseInvoiceId?: number;
+    purchaseOrderId?: number;
     uploadedInvoiceFile?: string;
     poFile?: string;
     remark?: string;

@@ -45,6 +45,7 @@ export default function EditPaymentRequestPage() {
             bankName: "",
             ifsc: "",
             amount: null,
+            selectedPoId: "",
             paymentAgainst: "",
             uploadedInvoiceFile: [],
             poFile: [],
@@ -62,6 +63,7 @@ export default function EditPaymentRequestPage() {
         if (paymentRequest) {
             form.reset({
                 selectedBeneficiaryId: "",
+                selectedPoId: paymentRequest.purchaseOrderId ? String(paymentRequest.purchaseOrderId) : "",
                 partyName: paymentRequest.partyName || "",
                 accountNumber: paymentRequest.accountNumber || "",
                 bankName: paymentRequest.bankName || "",
@@ -269,7 +271,7 @@ export default function EditPaymentRequestPage() {
 
                         <div className="border rounded-lg border-dashed p-4 space-y-4">
                             <h3 className="text-lg font-semibold">Payment Details</h3>
-                            <PaymentAgainstField control={form.control} />
+                            <PaymentAgainstField control={form.control} projectId={projectId} />
                         </div>
 
                         <div className="flex items-end justify-end">

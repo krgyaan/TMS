@@ -29,6 +29,7 @@ const defaultFormValues: PaymentRequestFormValues = {
     bankName: "",
     ifsc: "",
     amount: null,
+    selectedPoId: "",
     paymentAgainst: "",
     uploadedInvoiceFile: [],
     poFile: [],
@@ -281,7 +282,7 @@ export default function CreatePaymentRequestPage() {
                         </div>
 
                         <div className="border rounded-lg border-dashed p-4 space-y-4">
-                            <PaymentAgainstField control={form.control} />
+                            <PaymentAgainstField control={form.control} projectId={projectId} />
                         </div>
 
                         <div className="flex items-end justify-end">
