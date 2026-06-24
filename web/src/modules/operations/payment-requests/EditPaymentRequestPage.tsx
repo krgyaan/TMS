@@ -95,7 +95,7 @@ export default function EditPaymentRequestPage() {
 
     const beneficiaryOptions = (beneficiaries || []).map((b: any) => ({
         id: String(b.id),
-        name: b.name,
+        name: `${b.name} (${b.account_number})`,
     }));
 
     const handleAddBeneficiary = async () => {
