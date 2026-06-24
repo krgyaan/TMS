@@ -8,9 +8,10 @@ export const paymentAgainstOptions = [
 ] as const;
 
 export const paymentRequestFormSchema = z.object({
+    selectedBeneficiaryId: z.string().default(""),
     partyName: z.string().min(1, "Party name is required"),
     accountNumber: z.string().min(1, "Account number is required"),
-    accountName: z.string().min(1, "Account name is required"),
+    bankName: z.string().default(""),
     ifsc: z.string().min(1, "IFSC is required"),
     amount: z.number().nullable().refine(v => v !== null && v >= 0, "Amount must be >= 0"),
     paymentAgainst: z.string().min(1, "Payment against is required"),

@@ -11,7 +11,7 @@ export function mapPaymentRequestFormToCreateDTO(
         projectName: projectName || undefined,
         partyName: values.partyName,
         accountNumber: values.accountNumber,
-        accountName: values.accountName,
+        bankName: values.bankName || undefined,
         ifsc: values.ifsc,
         amount: values.amount!,
         paymentAgainst: values.paymentAgainst,
@@ -27,7 +27,7 @@ export function mapPaymentRequestFormToUpdateDTO(
     return {
         partyName: values.partyName,
         accountNumber: values.accountNumber,
-        accountName: values.accountName,
+        bankName: values.bankName || undefined,
         ifsc: values.ifsc,
         amount: values.amount!,
         paymentAgainst: values.paymentAgainst,

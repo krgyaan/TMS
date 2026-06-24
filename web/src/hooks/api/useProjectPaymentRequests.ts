@@ -42,6 +42,25 @@ export function useCreatePaymentRequest() {
     });
 }
 
+// ── Beneficiary hooks ──
+
+export function useBeneficiaries() {
+    return useQuery({
+        queryKey: ["beneficiaries"],
+        queryFn: () => paymentRequestApi.getBeneficiaries(),
+    });
+}
+
+export function useCreateBeneficiary() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (data: any) => paymentRequestApi.createBeneficiary(data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["beneficiaries"] });
+        },
+    });
+}
+
 export function useUpdatePaymentRequest() {
     const queryClient = useQueryClient();
     return useMutation({

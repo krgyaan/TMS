@@ -4,7 +4,7 @@ export interface PaymentRequestRow {
     requestNo: string;
     partyName: string;
     accountNumber: string;
-    accountName: string;
+    bankName?: string;
     ifsc: string;
     amount: number;
     paymentAgainst: string;
@@ -22,7 +22,7 @@ export interface CreatePaymentRequestDTO {
     projectName?: string;
     partyName: string;
     accountNumber: string;
-    accountName: string;
+    bankName?: string;
     ifsc: string;
     amount: number;
     paymentAgainst: string;
@@ -35,7 +35,7 @@ export interface CreatePaymentRequestDTO {
 export interface UpdatePaymentRequestDTO {
     partyName: string;
     accountNumber: string;
-    accountName: string;
+    bankName?: string;
     ifsc: string;
     amount: number;
     paymentAgainst: string;
