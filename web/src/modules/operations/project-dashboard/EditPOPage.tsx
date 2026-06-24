@@ -502,7 +502,7 @@ export default function EditPOPage() {
                                     control={form.control}
                                     name="selectedCertRecipients"
                                     label="Test Certificate Recipients"
-                                    options={activeTeamMembers.map((u: any) => ({ id: String(u.id), name: u.name }))}
+                                    options={activeTeamMembers.map((u: any) => ({ value: String(u.id), label: `${u.name} (${u.email})` }))}
                                     placeholder="Select recipients for test certificate..."
                                 />
                                 <p className="text-xs text-muted-foreground">

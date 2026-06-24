@@ -33,7 +33,7 @@ export const vendorWorkOrderFormSchema = z.object({
 
     partyId: z.string().default(""),
     selectedUserId: z.string().default(""),
-    selectedCertRecipient: z.string().default(""),
+    selectedCertRecipients: z.array(z.string()).default([]),
     shipToName: z.string().min(1, "Ship to name is required"),
     shippingAddress: z.string().min(1, "Shipping address is required"),
     shipToGst: z.string().default(""),

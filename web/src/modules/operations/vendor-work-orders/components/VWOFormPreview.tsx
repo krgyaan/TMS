@@ -81,10 +81,12 @@ export function VWOFormPreview({
   onSubmit,
   teamMembers,
 }: VWOFormPreviewProps) {
-  const certRecipientUser = formValues.selectedCertRecipient
-    ? teamMembers?.find((u: any) => String(u.id) === formValues.selectedCertRecipient)
-    : undefined;
-  const certRecipientEmail = certRecipientUser?.email || "goyal@volksenergie.in";
+  const certRecipientEmails = (formValues.selectedCertRecipients || [])
+    .map((id: string) => teamMembers?.find((u: any) => String(u.id) === id))
+    .filter(Boolean)
+    .map((u: any) => u.email)
+    .filter(Boolean)
+    .join(", ") || "goyal@volksenergie.in";
 
   const validProducts = formValues.products.filter(
     (p) => p.description && p.qty !== null && p.rate !== null && p.qty > 0
@@ -209,7 +211,7 @@ export function VWOFormPreview({
 
           {/* Test Certificate Email */}
           <p className="text-sm px-4 py-3 border-t">
-            Test certificate and invoice with machine serial no. need to be shared on {certRecipientEmail}
+            Test certificate and invoice with machine serial no. need to be shared on {certRecipientEmails}
           </p>
 
           {/* Terms & Conditions */}
