@@ -1,18 +1,20 @@
 import { paths } from "@/app/routes/paths";
 import { FieldWrapper } from "@/components/form/FieldWrapper";
+import { SelectField } from "@/components/form/SelectField";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProjectOverview } from "@/hooks/api/useProjectDashboard";
-import { usePaymentRequestDetails, useUpdatePaymentRequest } from "@/hooks/api/useProjectPaymentRequests";
+import { useBeneficiaries, useCreateBeneficiary, usePaymentRequestDetails, useUpdatePaymentRequest } from "@/hooks/api/useProjectPaymentRequests";
 import { PaymentAgainstField } from "./components/PaymentAgainstField";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, Building2, Landmark, Loader2 } from "lucide-react";
-import React, { useEffect } from "react";
+import { ArrowLeft, Building2, Landmark, Loader2, Plus, UserPlus } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -25,18 +27,25 @@ export default function EditPaymentRequestPage() {
     const projectId = Number(projectIdParam);
     const prId = Number(prIdParam);
 
+    const { data: beneficiaries } = useBeneficiaries();
+    const createBeneficiaryMutation = useCreateBeneficiary();
     const { data: overview } = useProjectOverview(projectId);
     const { data: paymentRequest, isLoading } = usePaymentRequestDetails(prId);
     const updateMutation = useUpdatePaymentRequest();
 
+    const [isAddBeneficiaryOpen, setIsAddBeneficiaryOpen] = useState(false);
+    const [newBeneficiary, setNewBeneficiary] = useState({ name: "", accountNumber: "", ifsc: "", bankName: "" });
+
     const form = useForm<PaymentRequestFormValues>({
         resolver: zodResolver(paymentRequestFormSchema) as any,
         defaultValues: {
+            selectedBeneficiaryId: "",
             partyName: "",
             accountNumber: "",
-            accountName: "",
+            bankName: "",
             ifsc: "",
             amount: null,
+            selectedPoId: "",
             paymentAgainst: "",
             uploadedInvoiceFile: [],
             poFile: [],
@@ -53,9 +62,11 @@ export default function EditPaymentRequestPage() {
     useEffect(() => {
         if (paymentRequest) {
             form.reset({
+                selectedBeneficiaryId: "",
+                selectedPoId: paymentRequest.purchaseOrderId ? String(paymentRequest.purchaseOrderId) : "",
                 partyName: paymentRequest.partyName || "",
                 accountNumber: paymentRequest.accountNumber || "",
-                accountName: paymentRequest.accountName || "",
+                bankName: paymentRequest.bankName || "",
                 ifsc: paymentRequest.ifsc || "",
                 amount: Number(paymentRequest.amount) || null,
                 paymentAgainst: paymentRequest.paymentAgainst || "",
@@ -71,6 +82,35 @@ export default function EditPaymentRequestPage() {
             });
         }
     }, [paymentRequest, form]);
+
+    const selectedBeneficiaryId = form.watch("selectedBeneficiaryId");
+
+    useEffect(() => {
+        if (!selectedBeneficiaryId || !beneficiaries) return;
+        const ben = beneficiaries.find((b: any) => String(b.id) === selectedBeneficiaryId);
+        if (!ben) return;
+        form.setValue("partyName", ben.name || "");
+        form.setValue("accountNumber", ben.accountNumber || "");
+        form.setValue("bankName", ben.bankName || "");
+        form.setValue("ifsc", ben.ifsc || "");
+    }, [selectedBeneficiaryId, beneficiaries, form]);
+
+    const beneficiaryOptions = (beneficiaries || []).map((b: any) => ({
+        id: String(b.id),
+        name: `${b.name} (${b.account_number})`,
+    }));
+
+    const handleAddBeneficiary = async () => {
+        try {
+            const created = await createBeneficiaryMutation.mutateAsync(newBeneficiary);
+            form.setValue("selectedBeneficiaryId", String(created.id));
+            setNewBeneficiary({ name: "", accountNumber: "", ifsc: "", bankName: "" });
+            setIsAddBeneficiaryOpen(false);
+            toast.success("Beneficiary added successfully");
+        } catch {
+            toast.error("Failed to add beneficiary");
+        }
+    };
 
     const handleSubmit = async (values: PaymentRequestFormValues) => {
         try {
@@ -125,21 +165,85 @@ export default function EditPaymentRequestPage() {
                             </div>
                         </div>
 
-                        <FieldWrapper control={form.control} name="partyName" label={<>Party Name <span className="text-destructive">*</span></>}>
-                            {(field) => <Input {...field} placeholder="Enter party name" />}
-                        </FieldWrapper>
-
                         <div className="border rounded-lg border-dashed p-4 space-y-4">
                             <h3 className="text-lg font-semibold flex items-center gap-2">
                                 <Landmark className="h-5 w-5" />
                                 Bank Details
                             </h3>
+                            <div className="flex items-end gap-4">
+                                <SelectField
+                                    control={form.control}
+                                    name="selectedBeneficiaryId"
+                                    label="Beneficiary (Master)"
+                                    options={beneficiaryOptions}
+                                    placeholder="Select beneficiary..."
+                                />
+                                <Dialog open={isAddBeneficiaryOpen} onOpenChange={setIsAddBeneficiaryOpen}>
+                                    <DialogTrigger asChild>
+                                        <Button variant="outline" size="sm" type="button" className="mb-1">
+                                            <UserPlus className="mr-2 h-4 w-4" />
+                                            Add New
+                                        </Button>
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                        <DialogHeader>
+                                            <DialogTitle>Add New Beneficiary</DialogTitle>
+                                            <DialogDescription>Save beneficiary bank details for future use</DialogDescription>
+                                        </DialogHeader>
+                                        <div className="space-y-4 py-4">
+                                            <div className="space-y-1">
+                                                <Label>Beneficiary Name <span className="text-destructive">*</span></Label>
+                                                <Input
+                                                    value={newBeneficiary.name}
+                                                    onChange={(e) => setNewBeneficiary(prev => ({ ...prev, name: e.target.value }))}
+                                                    placeholder="Enter beneficiary name"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label>Account Number <span className="text-destructive">*</span></Label>
+                                                <Input
+                                                    value={newBeneficiary.accountNumber}
+                                                    onChange={(e) => setNewBeneficiary(prev => ({ ...prev, accountNumber: e.target.value }))}
+                                                    placeholder="Enter account number"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label>IFSC Code <span className="text-destructive">*</span></Label>
+                                                <Input
+                                                    value={newBeneficiary.ifsc}
+                                                    onChange={(e) => setNewBeneficiary(prev => ({ ...prev, ifsc: e.target.value.toUpperCase() }))}
+                                                    placeholder="e.g. SBIN0001234"
+                                                    className="font-mono"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label>Bank Name</Label>
+                                                <Input
+                                                    value={newBeneficiary.bankName}
+                                                    onChange={(e) => setNewBeneficiary(prev => ({ ...prev, bankName: e.target.value }))}
+                                                    placeholder="e.g. State Bank of India"
+                                                />
+                                            </div>
+                                        </div>
+                                        <DialogFooter>
+                                            <Button variant="outline" type="button" onClick={() => setIsAddBeneficiaryOpen(false)}>Cancel</Button>
+                                            <Button type="button" onClick={handleAddBeneficiary} disabled={!newBeneficiary.name || !newBeneficiary.accountNumber || !newBeneficiary.ifsc}>
+                                                <Plus className="mr-2 h-4 w-4" />
+                                                Add
+                                            </Button>
+                                        </DialogFooter>
+                                    </DialogContent>
+                                </Dialog>
+                            </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <FieldWrapper control={form.control} name="partyName" label={<>Party Name <span className="text-destructive">*</span></>}>
+                                    {(field) => <Input {...field} placeholder="Enter party name" />}
+                                </FieldWrapper>
                                 <FieldWrapper control={form.control} name="accountNumber" label={<>Account Number <span className="text-destructive">*</span></>}>
                                     {(field) => <Input {...field} placeholder="Enter account number" />}
                                 </FieldWrapper>
-                                <FieldWrapper control={form.control} name="accountName" label={<>Account Name <span className="text-destructive">*</span></>}>
-                                    {(field) => <Input {...field} placeholder="Enter account name" />}
+                                <FieldWrapper control={form.control} name="bankName" label="Bank Name">
+                                    {(field) => <Input {...field} placeholder="e.g. State Bank of India" />}
                                 </FieldWrapper>
                                 <FieldWrapper control={form.control} name="ifsc" label={<>IFSC <span className="text-destructive">*</span></>}>
                                     {(field) => (
@@ -167,7 +271,7 @@ export default function EditPaymentRequestPage() {
 
                         <div className="border rounded-lg border-dashed p-4 space-y-4">
                             <h3 className="text-lg font-semibold">Payment Details</h3>
-                            <PaymentAgainstField control={form.control} />
+                            <PaymentAgainstField control={form.control} projectId={projectId} />
                         </div>
 
                         <div className="flex items-end justify-end">

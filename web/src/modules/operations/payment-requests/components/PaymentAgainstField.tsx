@@ -3,10 +3,10 @@ import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { TenderFileUploader } from "@/components/tender-file-upload";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import React from "react";
 import type { Control } from "react-hook-form";
 import { useFormContext } from "react-hook-form";
+import { useProjectPurchaseOrders } from "@/hooks/api/useProjectDashboard";
 import { paymentAgainstOptions } from "../helpers/paymentRequest.schema";
 
 const BUDGET_CATEGORIES = [
@@ -22,11 +22,17 @@ const PAYMENT_AGAINST_OPTIONS = paymentAgainstOptions.map(o => ({ id: o.value, n
 
 interface PaymentAgainstFieldProps {
     control: Control<any>;
+    projectId: number;
 }
 
-export const PaymentAgainstField: React.FC<PaymentAgainstFieldProps> = ({ control }) => {
+export const PaymentAgainstField: React.FC<PaymentAgainstFieldProps> = ({ control, projectId }) => {
     const { watch, setValue } = useFormContext();
     const paymentAgainst = watch("paymentAgainst");
+    const { data: poData } = useProjectPurchaseOrders(projectId);
+    const poOptions = (poData?.purchaseOrders || []).map((po: any) => ({
+        id: String(po.id),
+        name: `${po.poNumber} - ${po.sellerName}`,
+    }));
 
     return (
         <div className="space-y-4">
@@ -101,18 +107,24 @@ export const PaymentAgainstField: React.FC<PaymentAgainstFieldProps> = ({ contro
             )}
 
             {paymentAgainst === "po" && (
-                <TenderFileUploader
-                    label="Upload PO Document"
-                    context="tender-documents"
-                    value={watch("poFile")}
-                    onChange={(paths) => setValue("poFile", paths)}
-                />
-            )}
-
-            {paymentAgainst === "others" && (
-                <FieldWrapper control={control} name="remark" label="Remark">
-                    {(field) => <Textarea {...field} placeholder="Enter remark for other payment type..." rows={3} />}
-                </FieldWrapper>
+                <>
+                    <p className="text-muted-foreground text-xs">Select an existing PO Number, or upload an older PO if you have one.</p>
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
+                        <SelectField
+                            control={control}
+                            name="selectedPoId"
+                            label="Select PO"
+                            options={poOptions}
+                            placeholder="Choose a PO..."
+                        />
+                        <TenderFileUploader
+                            label="Upload PO Document"
+                            context="tender-documents"
+                            value={watch("poFile")}
+                            onChange={(paths) => setValue("poFile", paths)}
+                        />
+                    </div>
+                </>
             )}
         </div>
     );
