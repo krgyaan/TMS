@@ -40,7 +40,8 @@ export class FollowupMailDataBuilder {
 
         const instrument = fu.emdId ? await this.resolveInstrumentData(Number(fu.emdId)) : null;
 
-        const template = instrument?.template ?? FollowupMailTemplates.DEFAULT;
+        // const template = instrument?.template ?? FollowupMailTemplates.DEFAULT;
+        const template =  FollowupMailTemplates.DEFAULT;
 
         const context = {
             ...baseContext,
