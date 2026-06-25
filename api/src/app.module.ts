@@ -104,6 +104,7 @@ import { ContractAgreementModule } from "./modules/operations/contract-agreement
 import { VendorWorkOrderModule } from "./modules/operations/vendor-work-orders/vendor-work-order.module";
 import { PurchaseInvoiceModule } from "./modules/operations/purchase-invoices/purchase-invoice.module";
 import { PaymentRequestModule } from "./modules/operations/payment-requests/payment-request.module";
+import { MakerRequestModule } from "./modules/operations/maker-requests/maker-request.module";
 import { EmployeeProfilesModule } from "@/modules/hrms/employee-profiles/employee-profiles.module";
 import { AssetsModule } from "@/modules/hrms/assets/assets.module";
 import { AccountChecklistModule } from './modules/accounts/account-checklist/account-checklist.module';
@@ -225,6 +226,7 @@ import { TrainingModule } from './modules/hrms/training/training.module';
         VendorWorkOrderModule,
         PurchaseInvoiceModule,
         PaymentRequestModule,
+        MakerRequestModule,
         EmployeeProfilesModule,
         AssetsModule,
         AccountChecklistModule,
