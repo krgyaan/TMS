@@ -112,6 +112,6 @@ export const useProjectMasterOptions = () => {
 
     return data?.data.map(project => ({
         id: String(project.id),
-        name: `${project.tenderId ? "✅" : ""} ${project.projectName}`,
+        name: `${project.tenderId ? "✅" : ""} ${project.projectName} (${project.poNo})`,
     })) || [];
 }
