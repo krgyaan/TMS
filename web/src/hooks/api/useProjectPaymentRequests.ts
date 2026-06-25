@@ -61,6 +61,17 @@ export function useCreateBeneficiary() {
     });
 }
 
+export function useUpdatePaymentRequestStatus() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ id, data }: { id: number; data: { status: string; utrNumber?: string; rejectionReason?: string } }) =>
+            paymentRequestApi.updateStatus(id, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["payment-requests"] });
+        },
+    });
+}
+
 export function useUpdatePaymentRequest() {
     const queryClient = useQueryClient();
     return useMutation({

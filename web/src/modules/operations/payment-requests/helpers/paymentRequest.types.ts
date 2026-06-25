@@ -15,6 +15,11 @@ export interface PaymentRequestRow {
     remark?: string;
     status: string;
     requestedBy: string;
+    requestedByName?: string;
+    utrNumber?: string;
+    rejectionReason?: string;
+    projectName?: string;
+    poNumber?: string;
     createdAt: string;
 }
 

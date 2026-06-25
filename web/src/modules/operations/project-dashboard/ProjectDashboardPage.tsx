@@ -52,7 +52,7 @@ export default function ProjectDashboardPage() {
                 <CardContent className="space-y-6">
 
                     {/* Project Selection */}
-                    {(isOpsTeamLeader || isAdmin || isSuperUser) && (
+                    {/* {(isOpsTeamLeader || isAdmin || isSuperUser) && ( */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 justify-between">
                             <FormProvider {...form}>
                                 <SelectField
@@ -75,7 +75,7 @@ export default function ProjectDashboardPage() {
                                 </div>
                             )}
                         </div>
-                    )}
+                    {/* )} */}
 
 
                     {/* Empty State */}
