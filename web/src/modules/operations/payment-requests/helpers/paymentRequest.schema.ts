@@ -4,6 +4,7 @@ export const paymentAgainstOptions = [
     { value: "upload_invoice", label: "Upload Purchase Invoice" },
     { value: "new_pi", label: "New PI" },
     { value: "po", label: "PO" },
+    { value: "others", label: "Others" },
 ] as const;
 
 export const paymentRequestFormSchema = z.object({
