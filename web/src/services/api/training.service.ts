@@ -46,6 +46,7 @@ export interface CommentReply {
     userName: string;
     body: string;
     createdAt: string;
+    profilePhoto?: string | null;
 }
 
 export interface Comment {
@@ -54,6 +55,7 @@ export interface Comment {
     body: string;
     createdAt: string;
     replies: CommentReply[];
+    profilePhoto?: string | null;
 }
 
 export interface Reactions {

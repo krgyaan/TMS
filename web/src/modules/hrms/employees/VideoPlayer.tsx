@@ -31,6 +31,7 @@ import {
     useVideoComments,
     useAddComment
 } from "@/hooks/api/useTraining";
+import AvatarComponent from "../onboarding/components/AvatarComponent";
 export interface VideoPlayerCourse {
     id: number;
     title: string;
@@ -49,13 +50,6 @@ const slideInRight = {
     visible: { opacity: 1, x: 0, transition: { duration: 0.5, ease: "easeOut" } }
 };
 
-const getServerOrigin = () => {
-    const base = import.meta.env.VITE_API_URL as string | undefined;
-    if (base) {
-        try { return new URL(base).origin; } catch { /* fallback */ }
-    }
-    return "http://localhost:3000";
-};
 
 const getCategoryStyle = (category: string) => {
     const styles: Record<string, { bg: string; text: string; border: string; icon: string }> = {
@@ -415,12 +409,14 @@ export const VideoPlayerView = ({ activeVideo, onBack, isAdmin = false }: VideoP
                                         {/* Parent Comment */}
                                         <div className="bg-background/40 border border-border/15 p-3.5 rounded-xl space-y-2 hover:border-border/30 transition-colors">
                                             <div className="flex items-center gap-2.5">
-                                                <div className={cn(
-                                                    "h-7 w-7 rounded-lg flex items-center justify-center text-[10px] font-bold flex-shrink-0",
-                                                    comment.userName === "You" ? "bg-primary/15 text-primary" : "bg-muted/40 text-muted-foreground"
-                                                )}>
-                                                    {getInitials(comment.userName)}
-                                                </div>
+                                                <AvatarComponent
+                                                    user={comment}
+                                                    className="h-7 w-7 rounded-lg ring-0 flex-shrink-0"
+                                                    fallbackClassName={cn(
+                                                        "rounded-lg text-[10px] font-bold",
+                                                        comment.userName === "You" ? "bg-primary/15 text-primary" : "bg-muted/40 text-muted-foreground"
+                                                    )}
+                                                />
                                                 <div className="flex-1 min-w-0">
                                                     <span className="text-xs font-bold">{comment.userName}</span>
                                                     <span className="text-[9px] text-muted-foreground/70 ml-2">{comment.createdAt}</span>
@@ -480,12 +476,14 @@ export const VideoPlayerView = ({ activeVideo, onBack, isAdmin = false }: VideoP
                                                 <CornerDownRight className="h-3.5 w-3.5 text-muted-foreground/30 shrink-0 mt-3" />
                                                 <div className="flex-1 bg-muted/10 border border-border/10 p-3 rounded-xl space-y-1.5">
                                                     <div className="flex items-center gap-2">
-                                                        <div className={cn(
-                                                            "h-6 w-6 rounded-md flex items-center justify-center text-[9px] font-bold flex-shrink-0",
-                                                            reply.userName === "You" ? "bg-primary/15 text-primary" : "bg-muted/40 text-muted-foreground"
-                                                        )}>
-                                                            {getInitials(reply.userName)}
-                                                        </div>
+                                                        <AvatarComponent
+                                                            user={reply}
+                                                            className="h-6 w-6 rounded-md ring-0 flex-shrink-0"
+                                                            fallbackClassName={cn(
+                                                                "rounded-md text-[9px] font-bold",
+                                                                reply.userName === "You" ? "bg-primary/15 text-primary" : "bg-muted/40 text-muted-foreground"
+                                                            )}
+                                                        />
                                                         <span className="text-[11px] font-bold">{reply.userName}</span>
                                                         <span className="text-[9px] text-muted-foreground/60">{reply.createdAt}</span>
                                                     </div>
