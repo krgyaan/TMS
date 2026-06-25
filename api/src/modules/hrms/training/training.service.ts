@@ -15,6 +15,7 @@ import { users } from '@/db/schemas/auth/users.schema';
 import { userProfiles } from '@/db/schemas/auth/user-profiles.schema';
 import { teams } from '@/db/schemas/master/teams.schema';
 import { designations } from '@/db/schemas/master/designations.schema';
+import { oauthAccounts } from '@/db/schemas/auth/oauth-accounts.schema';
 
 @Injectable()
 export class TrainingService {
@@ -470,9 +471,13 @@ export class TrainingService {
                 depthLevel: trainingComments.depthLevel,
                 body: trainingComments.body,
                 createdAt: trainingComments.createdAt,
+                profilePhoto: userProfiles.image,
+                googlePhoto: oauthAccounts.avatar,
             })
             .from(trainingComments)
             .innerJoin(users, eq(trainingComments.userId, users.id))
+            .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+            .leftJoin(oauthAccounts, eq(oauthAccounts.userId, users.id))
             .where(eq(trainingComments.videoId, videoId))
             .orderBy(trainingComments.createdAt);
 
@@ -499,6 +504,7 @@ export class TrainingService {
             const c = {
                 id: r.id,
                 userName: r.userName,
+                profilePhoto: r.profilePhoto || r.googlePhoto || null,
                 body: r.body,
                 createdAt: timeAgo(r.createdAt),
                 replies: [] as any[],
