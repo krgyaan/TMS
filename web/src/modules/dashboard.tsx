@@ -12,6 +12,7 @@ import {
     ChevronUp,
     FileText, 
     Landmark, 
+    Receipt,
     Send, 
     Truck, 
     Wallet, 
@@ -493,6 +494,14 @@ const Dashboard = () => {
             color: "text-pink-600",
             bgColor: "bg-pink-50 dark:bg-pink-950/30",
             path: paths.tendering.biOtherThanEmdsCreate()
+        },
+        {
+            title: "New Maker Request",
+            subtitle: "Create Non-Project Payment Request",
+            icon: Receipt,
+            color: "text-teal-600",
+            bgColor: "bg-teal-50 dark:bg-teal-950/30",
+            path: paths.accounts.makerRequestCreate
         },
     ];
 
