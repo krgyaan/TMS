@@ -17,6 +17,8 @@ export const paymentRequests = pgTable(
         uploadedInvoiceFile: varchar("uploaded_invoice_file", { length: 500 }),
         poFile: varchar("po_file", { length: 500 }),
         remark: text("remark"),
+        utrNumber: text("utr_number"),
+        rejectionReason: text("rejection_reason"),
         status: varchar("status", { length: 50 }).notNull().default("pending"),
         requestedBy: bigint("requested_by", { mode: "number" }),
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
