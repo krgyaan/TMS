@@ -47,6 +47,10 @@ class PaymentRequestApiService extends BaseApiService {
     async updateBeneficiary(id: number, data: any) {
         return this.put<any>(`/beneficiaries/${id}`, data);
     }
+
+    async updateStatus(id: number, data: { status: string; utrNumber?: string; rejectionReason?: string }) {
+        return this.patch<any>(`/${id}/status`, data);
+    }
 }
 
 export const paymentRequestApi = new PaymentRequestApiService();

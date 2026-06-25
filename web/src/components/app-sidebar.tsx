@@ -1,16 +1,16 @@
 "use client";
 
+import { Banknote, BarChart3, FileSearch, Gauge, Headset, LayoutDashboard, Settings, Share2, Shield, Users, Wrench } from "lucide-react";
 import * as React from "react";
-import { FileSearch, Wrench, Headset, BarChart3, Banknote, Users, Gauge, Settings, Share2, LayoutDashboard, Briefcase, Shield } from "lucide-react";
 
+import { paths } from "@/app/routes/paths";
 import { NavMain } from "@/components/nav-main";
 import { NavUser } from "@/components/nav-user";
 import { TeamSwitcher } from "@/components/team-switcher";
-import { paths } from "@/app/routes/paths";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarRail } from "@/components/ui/sidebar";
 
-import { getStoredUser } from "@/lib/auth";
 import { useCurrentUser, useLogout } from "@/hooks/api/useAuth";
+import { getStoredUser } from "@/lib/auth";
 
 import type { AuthUser } from "@/types/auth.types";
 import { canRead } from "@/types/auth.types";
@@ -101,6 +101,7 @@ const navMain: NavGroup[] = [
             { title: "Fixed Expenses", url: paths.accounts.fixedExpenses, permission: "accounts.fixed-expenses" },
             { title: "Delegation Dashboard", url: paths.accounts.delegation, permission: "accounts.delegation" },
             { title: "Purchase Orders", url: paths.accounts.purchaseOrders, permission: "accounts.purchase-orders" },
+            { title: "Payment Requests", url: paths.accounts.paymentRequests, permission: "accounts.payment-requests" },
         ],
     },
     {

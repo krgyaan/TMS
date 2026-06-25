@@ -217,6 +217,7 @@ export const paths = {
         delegationView: (id: string) => `/accounts/delegation/${id}`,
         delegationUpdate: (id: string) => `/accounts/delegation/${id}/update`,
         purchaseOrders: "/accounts/purchase-orders",
+        paymentRequests: "/accounts/payment-requests",
     },
 
     // ==================== CRM ====================
