@@ -140,10 +140,33 @@ export class PaymentRequestService {
         return updated;
     }
 
+    private readonly prFields = {
+        id: paymentRequests.id,
+        projectId: paymentRequests.projectId,
+        requestNo: paymentRequests.requestNo,
+        partyName: paymentRequests.partyName,
+        accountNumber: paymentRequests.accountNumber,
+        bankName: paymentRequests.bankName,
+        ifsc: paymentRequests.ifsc,
+        amount: paymentRequests.amount,
+        paymentAgainst: paymentRequests.paymentAgainst,
+        purchaseInvoiceId: paymentRequests.purchaseInvoiceId,
+        purchaseOrderId: paymentRequests.purchaseOrderId,
+        uploadedInvoiceFile: paymentRequests.uploadedInvoiceFile,
+        poFile: paymentRequests.poFile,
+        remark: paymentRequests.remark,
+        utrNumber: paymentRequests.utrNumber,
+        rejectionReason: paymentRequests.rejectionReason,
+        status: paymentRequests.status,
+        requestedBy: paymentRequests.requestedBy,
+        createdAt: paymentRequests.createdAt,
+        updatedAt: paymentRequests.updatedAt,
+    };
+
     async getById(id: number) {
         const rows = await this.db
             .select({
-                ...paymentRequests,
+                ...this.prFields,
                 requestedByName: users.name,
                 projectName: projects.projectName,
                 poNumber: purchaseOrders.poNumber,
@@ -162,7 +185,7 @@ export class PaymentRequestService {
     async getAll() {
         return this.db
             .select({
-                ...paymentRequests,
+                ...this.prFields,
                 requestedByName: users.name,
                 projectName: projects.projectName,
                 poNumber: purchaseOrders.poNumber,
