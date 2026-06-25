@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Param, Body, Query, ParseIntPipe, HttpCode, HttpStatus } from "@nestjs/common";
+import { Controller, Get, Post, Put, Patch, Param, Body, Query, ParseIntPipe, HttpCode, HttpStatus } from "@nestjs/common";
 import { PaymentRequestService } from "./payment-request.service";
 import { CurrentUser } from "@/modules/auth/decorators/current-user.decorator";
 import type { ValidatedUser } from "@/modules/auth/strategies/jwt.strategy";
@@ -35,6 +35,15 @@ export class PaymentRequestController {
     @Get()
     getAll() {
         return this.service.getAll();
+    }
+
+    @Patch(":id/status")
+    @HttpCode(HttpStatus.OK)
+    updateStatus(
+        @Param("id", ParseIntPipe) id: number,
+        @Body() body: any,
+    ) {
+        return this.service.updateStatus(id, body);
     }
 
     // ── Beneficiary routes (must be before :id routes) ──

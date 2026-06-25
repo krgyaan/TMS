@@ -1,9 +1,12 @@
-import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { Inject, Injectable, NotFoundException, BadRequestException } from "@nestjs/common";
 import { eq, like, desc } from "drizzle-orm";
 import { DRIZZLE } from "@/db/database.module";
 import type { DbInstance } from "@/db";
 import { paymentRequests } from "@/db/schemas/operations/payment-requests.schema";
 import { beneficiaries } from "@/db/schemas/operations/beneficiaries.schema";
+import { users } from "@/db/schemas/";
+import { projects } from "@/db/schemas/master/projects.schema";
+import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 
@@ -101,20 +104,73 @@ export class PaymentRequestService {
         return updated;
     }
 
-    async getById(id: number) {
-        const pr = await this.db
+    async updateStatus(id: number, body: { status: string; utrNumber?: string; rejectionReason?: string }) {
+        const existing = await this.db
             .select()
             .from(paymentRequests)
             .where(eq(paymentRequests.id, id))
             .then(rows => rows[0]);
+        if (!existing) throw new NotFoundException("Payment Request not found");
+
+        const validTransitions: Record<string, string[]> = {
+            pending: ["maker_done", "rejected"],
+            maker_done: ["payment_done", "rejected"],
+        };
+
+        if (!validTransitions[existing.status]?.includes(body.status)) {
+            throw new BadRequestException(
+                `Cannot transition from "${existing.status}" to "${body.status}"`
+            );
+        }
+
+        const updated = (
+            await this.db
+                .update(paymentRequests)
+                .set({
+                    status: body.status,
+                    utrNumber: body.utrNumber || null,
+                    rejectionReason: body.rejectionReason || null,
+                    updatedAt: new Date(),
+                })
+                .where(eq(paymentRequests.id, id))
+                .returning()
+        )[0];
+
+        this.logger.info(`Payment Request #${id} status updated to "${body.status}"`);
+        return updated;
+    }
+
+    async getById(id: number) {
+        const rows = await this.db
+            .select({
+                ...paymentRequests,
+                requestedByName: users.name,
+                projectName: projects.projectName,
+                poNumber: purchaseOrders.poNumber,
+            })
+            .from(paymentRequests)
+            .leftJoin(users, eq(paymentRequests.requestedBy, users.id))
+            .leftJoin(projects, eq(paymentRequests.projectId, projects.id))
+            .leftJoin(purchaseOrders, eq(paymentRequests.purchaseOrderId, purchaseOrders.id))
+            .where(eq(paymentRequests.id, id));
+
+        const pr = rows[0];
         if (!pr) throw new NotFoundException("Payment Request not found");
         return pr;
     }
 
     async getAll() {
         return this.db
-            .select()
+            .select({
+                ...paymentRequests,
+                requestedByName: users.name,
+                projectName: projects.projectName,
+                poNumber: purchaseOrders.poNumber,
+            })
             .from(paymentRequests)
+            .leftJoin(users, eq(paymentRequests.requestedBy, users.id))
+            .leftJoin(projects, eq(paymentRequests.projectId, projects.id))
+            .leftJoin(purchaseOrders, eq(paymentRequests.purchaseOrderId, purchaseOrders.id))
             .orderBy(desc(paymentRequests.id));
     }
 
