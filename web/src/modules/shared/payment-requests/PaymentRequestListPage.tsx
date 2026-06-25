@@ -18,6 +18,7 @@ import type { CustomCellRendererProps } from "ag-grid-react";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { useAllPaymentRequests, usePaymentRequestDetails, useUpdatePaymentRequestStatus } from "@/hooks/api/useProjectPaymentRequests";
+import { tenderFilesService } from "@/services/api/tender-files.service";
 import type { PaymentRequestRow } from "@/modules/operations/payment-requests/helpers/paymentRequest.types";
 
 const PAYMENT_AGAINST_LABELS: Record<string, string> = {
@@ -354,12 +355,12 @@ const PaymentRequestListPage: React.FC = () => {
                                     <Label className="text-muted-foreground text-xs">Uploaded Files</Label>
                                     <div className="flex gap-2 mt-1">
                                         {detail.poFile && (
-                                            <a href={detail.poFile} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">
+                                            <a href={tenderFilesService.getFileUrl(detail.poFile)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">
                                                 PO File
                                             </a>
                                         )}
                                         {detail.uploadedInvoiceFile && (
-                                            <a href={detail.uploadedInvoiceFile} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">
+                                            <a href={tenderFilesService.getFileUrl(detail.uploadedInvoiceFile)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">
                                                 Invoice File
                                             </a>
                                         )}

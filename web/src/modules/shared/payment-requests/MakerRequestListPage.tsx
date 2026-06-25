@@ -17,6 +17,7 @@ import type { CustomCellRendererProps } from "ag-grid-react";
 import { formatDate } from "@/hooks/useFormatedDate";
 import { formatINR } from "@/hooks/useINRFormatter";
 import { useMakerRequests, useMakerRequestDetails, useUpdateMakerRequestStatus } from "@/hooks/api/useMakerRequests";
+import { tenderFilesService } from "@/services/api/tender-files.service";
 import type { MakerRequestRow } from "@/modules/operations/maker-requests/helpers/makerRequest.types";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
@@ -155,7 +156,7 @@ const MakerRequestListPage: React.FC = () => {
                                     <Label className="text-muted-foreground text-xs">Bill / Proof Files</Label>
                                     <div className="flex flex-wrap gap-2 mt-1">
                                         {detail.billFiles.map((f, i) => (
-                                            <a key={i} href={f} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
+                                            <a key={i} href={tenderFilesService.getFileUrl(f)} target="_blank" rel="noopener noreferrer" className="text-sm text-blue-600 underline">File {i + 1}</a>
                                         ))}
                                     </div>
                                 </div>
