@@ -85,6 +85,7 @@ function getPermissionModule(title: string, parentMenuTitle?: string): string | 
         'TDS Checklists': 'accounts.tds-checklists',
         'GST Checklists': 'accounts.gst-checklists',
         'Fixed Expenses': 'accounts.fixed-expenses',
+        'Payment Requests': 'accounts.payment-requests',
 
         // CRM sub-items
         'Leads': 'crm.leads',
