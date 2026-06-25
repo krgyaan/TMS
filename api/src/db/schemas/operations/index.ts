@@ -5,4 +5,5 @@ export * from "./vendor-work-order-items.schema";
 export * from "./purchase-invoices.schema";
 export * from "./payment-requests.schema";
 export * from "./beneficiaries.schema";
+export * from "./maker-requests.schema";
 // export * from "../master/projects.schema";
