@@ -28,7 +28,8 @@ const TaskDetail = lazy(() => import("@/modules/accounts/delegation/TaskDetail")
 const TaskStatusUpdate = lazy(() => import("@/modules/accounts/delegation/TaskStatusUpdate"));
 
 const Accounts_PurchaseOrderList = lazy(() => import("@/modules/shared/purchase-orders/PurchaseOrderListPage"));
-const Accounts_PaymentRequestList = lazy(() => import("@/modules/shared/payment-requests/PaymentRequestListPage"));
+const Accounts_PaymentRequestTabs = lazy(() => import("@/modules/shared/payment-requests/PaymentRequestTabsPage"));
+const Accounts_CreateMakerRequest = lazy(() => import("@/modules/operations/maker-requests/CreateMakerRequestPage"));
 
 export default function AccountsRoutes() {
     return (
@@ -57,7 +58,8 @@ export default function AccountsRoutes() {
 
             <Route path="delegation" element={<RouteWrapper><TaskDashboard /></RouteWrapper>} />
             <Route path="purchase-orders" element={<RouteWrapper><Accounts_PurchaseOrderList /></RouteWrapper>} />
-            <Route path="payment-requests" element={<RouteWrapper><Accounts_PaymentRequestList /></RouteWrapper>} />
+            <Route path="payment-requests" element={<RouteWrapper><Accounts_PaymentRequestTabs /></RouteWrapper>} />
+            <Route path="maker-requests/create" element={<RouteWrapper><Accounts_CreateMakerRequest /></RouteWrapper>} />
             <Route path="delegation/add" element={<RouteWrapper><AddTask /></RouteWrapper>} />
             <Route path="delegation/:id" element={<RouteWrapper><TaskDetail /></RouteWrapper>} />
             <Route path="delegation/:id/update" element={<RouteWrapper><TaskStatusUpdate /></RouteWrapper>} />
