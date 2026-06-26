@@ -38,6 +38,14 @@ class TenderFeesService extends BaseApiService {
         return this.get<TenderFeeDDDashboardCounts>('/dd/dashboard/counts');
     }
 
+    async getDDExportData(params?: { tab?: string; team?: number }): Promise<{ data: any[] }> {
+        const search = new URLSearchParams();
+        if (params?.tab) search.set('tab', params.tab);
+        if (params?.team) search.set('teamId', String(params.team));
+        const qs = search.toString();
+        return this.get<{ data: any[] }>(`/dd/dashboard/export${qs ? `?${qs}` : ''}`);
+    }
+
     async getPortalDashboard(params?: DashboardFilters): Promise<PaginatedResult<TenderFeePortalDashboardRow>> {
         return this.get<PaginatedResult<TenderFeePortalDashboardRow>>(`/portal/dashboard${this.buildQuery(params)}`);
     }
@@ -46,12 +54,28 @@ class TenderFeesService extends BaseApiService {
         return this.get<TenderFeePortalDashboardCounts>('/portal/dashboard/counts');
     }
 
+    async getPortalExportData(params?: { tab?: string; team?: number }): Promise<{ data: any[] }> {
+        const search = new URLSearchParams();
+        if (params?.tab) search.set('tab', params.tab);
+        if (params?.team) search.set('teamId', String(params.team));
+        const qs = search.toString();
+        return this.get<{ data: any[] }>(`/portal/dashboard/export${qs ? `?${qs}` : ''}`);
+    }
+
     async getTransferDashboard(params?: DashboardFilters): Promise<PaginatedResult<TenderFeeTransferDashboardRow>> {
         return this.get<PaginatedResult<TenderFeeTransferDashboardRow>>(`/transfer/dashboard${this.buildQuery(params)}`);
     }
 
     async getTransferCounts(): Promise<TenderFeeTransferDashboardCounts> {
         return this.get<TenderFeeTransferDashboardCounts>('/transfer/dashboard/counts');
+    }
+
+    async getTransferExportData(params?: { tab?: string; team?: number }): Promise<{ data: any[] }> {
+        const search = new URLSearchParams();
+        if (params?.tab) search.set('tab', params.tab);
+        if (params?.team) search.set('teamId', String(params.team));
+        const qs = search.toString();
+        return this.get<{ data: any[] }>(`/transfer/dashboard/export${qs ? `?${qs}` : ''}`);
     }
 
     async getById(id: number): Promise<any> {

@@ -677,6 +677,240 @@ export class TenderFeeService {
         return { ...result, instrumentType: result.instrumentType };
     }
 
+    async getDDExportData(
+        tab?: string,
+        options?: { teamId?: number },
+    ): Promise<{ data: any[] }> {
+        const conditions = this.buildDDConditions(tab);
+        const teamId = options?.teamId;
+        if (teamId) {
+            conditions.push(sql`COALESCE(${tenderInfos.team}, ${users.team}) = ${teamId}`);
+        }
+        const whereClause = and(...conditions);
+
+        const rows = await this.db
+            .select({
+                id: paymentInstruments.id,
+                requestId: paymentRequests.id,
+                purpose: paymentRequests.purpose,
+                projectName: paymentRequests.projectName,
+                projectNo: paymentRequests.tenderNo,
+                ddCreationDate: instrumentDdDetails.ddDate,
+                ddNo: instrumentDdDetails.ddNo,
+                beneficiaryName: paymentInstruments.favouring,
+                ddAmount: paymentInstruments.amount,
+                bidValidity: tenderInfos.dueDate,
+                tenderStatus: statuses.name,
+                teamMember: users.name,
+                ddStatus: paymentInstruments.status,
+                action: paymentInstruments.action,
+                payableAt: paymentInstruments.payableAt,
+                issueDate: paymentInstruments.issueDate,
+                expiryDate: paymentInstruments.expiryDate,
+                utr: paymentInstruments.utr,
+                docketNo: paymentInstruments.docketNo,
+                courierAddress: paymentInstruments.courierAddress,
+                courierDeadline: paymentInstruments.courierDeadline,
+                favouring: paymentInstruments.favouring,
+                reqNo: instrumentDdDetails.reqNo,
+                ddNeeds: instrumentDdDetails.ddNeeds,
+                ddPurpose: instrumentDdDetails.ddPurpose,
+                ddRemarks: instrumentDdDetails.ddRemarks,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(instrumentDdDetails, eq(instrumentDdDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+            .where(whereClause)
+            .orderBy(desc(paymentInstruments.createdAt));
+
+        const data = rows.map((row) => ({
+            id: row.id,
+            requestId: row.requestId,
+            purpose: row.purpose,
+            projectName: row.projectName,
+            projectNo: row.projectNo,
+            ddCreationDate: row.ddCreationDate ? new Date(row.ddCreationDate) : null,
+            ddNo: row.ddNo,
+            beneficiaryName: row.beneficiaryName,
+            ddAmount: row.ddAmount ? Number(row.ddAmount) : null,
+            bidValidity: row.bidValidity ? new Date(row.bidValidity) : null,
+            tenderStatus: row.tenderStatus,
+            teamMember: row.teamMember?.toString() ?? null,
+            expiry: this.deriveDdExpiryStatus(row.ddCreationDate ? new Date(row.ddCreationDate) : null),
+            ddStatus: this.deriveDdStatus(row.ddStatus),
+            action: row.action,
+            payableAt: row.payableAt,
+            issueDate: row.issueDate ? new Date(row.issueDate) : null,
+            expiryDate: row.expiryDate ? new Date(row.expiryDate) : null,
+            utr: row.utr,
+            docketNo: row.docketNo,
+            courierAddress: row.courierAddress,
+            courierDeadline: row.courierDeadline ? Number(row.courierDeadline) : null,
+            favouring: row.favouring,
+            reqNo: row.reqNo,
+            ddNeeds: row.ddNeeds,
+            ddPurpose: row.ddPurpose,
+            ddRemarks: row.ddRemarks,
+        }));
+
+        return { data };
+    }
+
+    async getPortalExportData(
+        tab?: string,
+        options?: { teamId?: number },
+    ): Promise<{ data: any[] }> {
+        const conditions = this.buildPortalConditions(tab);
+        const teamId = options?.teamId;
+        if (teamId) {
+            conditions.push(sql`COALESCE(${tenderInfos.team}, ${this.requesterUser.team}) = ${teamId}`);
+        }
+        const whereClause = and(...conditions);
+
+        const rows = await this.db
+            .select({
+                id: paymentInstruments.id,
+                requestId: paymentRequests.id,
+                purpose: paymentRequests.purpose,
+                projectName: paymentRequests.projectName,
+                projectNo: paymentRequests.tenderNo,
+                date: instrumentTransferDetails.transactionDate,
+                teamMember: users.name,
+                utrNo: instrumentTransferDetails.utrNum,
+                portalName: instrumentTransferDetails.portalName,
+                bidValidity: tenderInfos.dueDate,
+                tenderStatus: statuses.name,
+                amount: paymentInstruments.amount,
+                popStatus: paymentInstruments.status,
+                action: paymentInstruments.action,
+                utr: paymentInstruments.utr,
+                utrMsg: instrumentTransferDetails.utrMsg,
+                returnTransferDate: instrumentTransferDetails.returnTransferDate,
+                returnUtr: instrumentTransferDetails.returnUtr,
+                remarks: instrumentTransferDetails.remarks,
+                reason: instrumentTransferDetails.reason,
+                paymentMethod: instrumentTransferDetails.paymentMethod,
+                isNetbanking: instrumentTransferDetails.isNetbanking,
+                isDebit: instrumentTransferDetails.isDebit,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(this.requesterUser, eq(this.requesterUser.id, paymentRequests.requestedBy))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .where(whereClause)
+            .orderBy(desc(paymentInstruments.createdAt));
+
+        const data = rows.map((row) => ({
+            id: row.id,
+            requestId: row.requestId,
+            purpose: row.purpose,
+            projectName: row.projectName,
+            projectNo: row.projectNo,
+            date: row.date ? new Date(row.date) : null,
+            teamMember: row.teamMember,
+            utrNo: row.utrNo,
+            portalName: row.portalName,
+            bidValidity: row.bidValidity ? new Date(row.bidValidity) : null,
+            tenderStatus: row.tenderStatus,
+            amount: row.amount ? Number(row.amount) : null,
+            popStatus: this.portalStatusMap()[row.popStatus],
+            action: row.action,
+            utr: row.utr,
+            utrMsg: row.utrMsg,
+            returnTransferDate: row.returnTransferDate ? new Date(row.returnTransferDate) : null,
+            returnUtr: row.returnUtr,
+            remarks: row.remarks,
+            rejectionReason: row.reason,
+            paymentMethod: row.paymentMethod,
+            isNetbanking: row.isNetbanking,
+            isDebit: row.isDebit,
+        }));
+
+        return { data };
+    }
+
+    async getTransferExportData(
+        tab?: string,
+        options?: { teamId?: number },
+    ): Promise<{ data: any[] }> {
+        const conditions = this.buildTransferConditions(tab);
+        const teamId = options?.teamId;
+        if (teamId) {
+            conditions.push(sql`COALESCE(${tenderInfos.team}, ${users.team}) = ${teamId}`);
+        }
+        const whereClause = and(...conditions);
+
+        const rows = await this.db
+            .select({
+                id: paymentInstruments.id,
+                requestId: paymentRequests.id,
+                purpose: paymentRequests.purpose,
+                projectName: paymentRequests.projectName,
+                projectNo: paymentRequests.tenderNo,
+                date: instrumentTransferDetails.transactionDate,
+                teamMember: users.name,
+                utrNo: instrumentTransferDetails.utrNum,
+                accountName: instrumentTransferDetails.accountName,
+                bidValidity: tenderInfos.dueDate,
+                tenderStatus: statuses.name,
+                amount: paymentInstruments.amount,
+                btStatus: paymentInstruments.status,
+                action: paymentInstruments.action,
+                utr: paymentInstruments.utr,
+                accountNumber: instrumentTransferDetails.accountNumber,
+                ifsc: instrumentTransferDetails.ifsc,
+                utrMsg: instrumentTransferDetails.utrMsg,
+                returnTransferDate: instrumentTransferDetails.returnTransferDate,
+                returnUtr: instrumentTransferDetails.returnUtr,
+                remarks: instrumentTransferDetails.remarks,
+                reason: instrumentTransferDetails.reason,
+                paymentMethod: instrumentTransferDetails.paymentMethod,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .where(whereClause)
+            .orderBy(desc(paymentInstruments.createdAt));
+
+        const data = rows.map((row) => ({
+            id: row.id,
+            requestId: row.requestId,
+            purpose: row.purpose,
+            projectName: row.projectName,
+            projectNo: row.projectNo,
+            date: row.date ? new Date(row.date) : null,
+            teamMember: row.teamMember?.toString() ?? null,
+            member: row.teamMember?.toString() ?? null,
+            utrNo: row.utrNo,
+            accountName: row.accountName,
+            bidValidity: row.bidValidity ? new Date(row.bidValidity) : null,
+            tenderStatus: row.tenderStatus,
+            amount: row.amount ? Number(row.amount) : null,
+            btStatus: this.transferStatusMap()[row.btStatus],
+            action: row.action,
+            utr: row.utr,
+            accountNumber: row.accountNumber,
+            ifsc: row.ifsc,
+            utrMsg: row.utrMsg,
+            returnTransferDate: row.returnTransferDate ? new Date(row.returnTransferDate) : null,
+            returnUtr: row.returnUtr,
+            remarks: row.remarks,
+            rejectionReason: row.reason,
+            paymentMethod: row.paymentMethod,
+        }));
+
+        return { data };
+    }
+
     async getActionFormData(instrumentId: number) {
         const [result] = await this.db
             .select({

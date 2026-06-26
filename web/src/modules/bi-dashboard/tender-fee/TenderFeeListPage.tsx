@@ -1,4 +1,5 @@
 import { paths } from '@/app/routes/paths';
+import { ExportExcelDropdown } from '@/components/bi-dashboard/ExportExcelDropdown';
 import { tenderNameCol } from '@/components/data-grid/columns';
 import { createActionColumnRenderer } from '@/components/data-grid/renderers/ActionColumnRenderer';
 import type { ActionItem } from '@/components/ui/ActionMenu';
@@ -15,9 +16,11 @@ import {
     useTenderFeePortalDashboard, useTenderFeePortalDashboardCounts,
     useTenderFeeTransferDashboard, useTenderFeeTransferDashboardCounts,
 } from '@/hooks/api/useTenderFees';
+import { useBiExport } from '@/hooks/useBiExport';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { formatDate } from '@/hooks/useFormatedDate';
 import { formatINR } from '@/hooks/useINRFormatter';
+import { tenderFeesService } from '@/services/api/tender-fees.service';
 import type { ColDef } from 'ag-grid-community';
 import { Banknote, CheckCircle, Clock, Edit, Eye, FileX2, Landmark, RotateCcw, Search, Wallet, XCircle } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
@@ -51,6 +54,141 @@ const TRANSFER_TABS_CONFIG: Array<{ key: TransferSubTab; name: string; icon: Rea
     { key: 'returned', name: 'Returned', icon: <RotateCcw className="h-4 w-4" />, description: 'Returned bank transfers' },
     { key: 'settled', name: 'Settled', icon: <Wallet className="h-4 w-4" />, description: 'Settled bank transfers' },
 ];
+
+const flattenDDFormData = (data: Record<string, any>): Record<string, any> => {
+    const out: Record<string, any> = {};
+    if (data.payableAt) out['Payable At'] = data.payableAt;
+    if (data.issueDate) out['Issue Date'] = new Date(data.issueDate).toLocaleDateString('en-GB');
+    if (data.expiryDate) out['Expiry Date'] = new Date(data.expiryDate).toLocaleDateString('en-GB');
+    if (data.utr) out['UTR'] = data.utr;
+    if (data.docketNo) out['Docket No'] = data.docketNo;
+    if (data.courierAddress) out['Courier Address'] = data.courierAddress;
+    if (data.courierDeadline) out['Courier Deadline'] = String(data.courierDeadline);
+    if (data.reqNo) out['Req No'] = data.reqNo;
+    if (data.ddNeeds) out['DD Needs'] = data.ddNeeds;
+    if (data.ddPurpose) out['DD Purpose'] = data.ddPurpose;
+    if (data.ddRemarks) out['DD Remarks'] = data.ddRemarks;
+    return out;
+};
+
+const flattenPortalFormData = (data: Record<string, any>): Record<string, any> => {
+    const out: Record<string, any> = {};
+    if (data.utr) out['UTR'] = data.utr;
+    if (data.utrMsg) out['UTR Msg'] = data.utrMsg;
+    if (data.returnTransferDate) out['Return Transfer Date'] = new Date(data.returnTransferDate).toLocaleDateString('en-GB');
+    if (data.returnUtr) out['Return UTR'] = data.returnUtr;
+    if (data.remarks) out['Remarks'] = data.remarks;
+    if (data.rejectionReason) out['Rejection Reason'] = data.rejectionReason;
+    if (data.paymentMethod) out['Payment Method'] = data.paymentMethod;
+    if (data.isNetbanking) out['Is Netbanking'] = data.isNetbanking ? 'Yes' : 'No';
+    if (data.isDebit) out['Is Debit'] = data.isDebit ? 'Yes' : 'No';
+    return out;
+};
+
+const flattenTransferFormData = (data: Record<string, any>): Record<string, any> => {
+    const out: Record<string, any> = {};
+    if (data.utr) out['UTR'] = data.utr;
+    if (data.accountNumber) out['Account Number'] = data.accountNumber;
+    if (data.ifsc) out['IFSC'] = data.ifsc;
+    if (data.utrMsg) out['UTR Msg'] = data.utrMsg;
+    if (data.returnTransferDate) out['Return Transfer Date'] = new Date(data.returnTransferDate).toLocaleDateString('en-GB');
+    if (data.returnUtr) out['Return UTR'] = data.returnUtr;
+    if (data.remarks) out['Remarks'] = data.remarks;
+    if (data.rejectionReason) out['Rejection Reason'] = data.rejectionReason;
+    if (data.paymentMethod) out['Payment Method'] = data.paymentMethod;
+    return out;
+};
+
+const mapDDPendingRow = (r: any) => ({
+    'Tender Name': r.projectName || '',
+    'Tender No': r.projectNo || '',
+    'Beneficiary name': r.beneficiaryName || '',
+    'Purpose': r.purpose || '',
+    'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
+    'Amount': r.ddAmount || '',
+    'Tender Status': r.tenderStatus || '',
+    'Member': r.teamMember || '',
+    'Expiry': r.expiry || '',
+    'DD Status': r.ddStatus || '',
+});
+
+const mapDDRow = (r: any, isAllTab: boolean) => {
+    const base: Record<string, any> = {
+        'Tender Name': r.projectName || '',
+        'Tender No': r.projectNo || '',
+        'DD Date': r.ddCreationDate ? new Date(r.ddCreationDate).toLocaleDateString('en-GB') : '',
+        'DD No': r.ddNo || '',
+        'Beneficiary name': r.beneficiaryName || '',
+        'Purpose': r.purpose || '',
+        'Amount': r.ddAmount || '',
+        'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
+        'Tender Status': r.tenderStatus || '',
+        'Member': r.teamMember || '',
+        'Expiry': r.expiry || '',
+        'DD Status': r.ddStatus || '',
+    };
+    if (isAllTab) base['Tab'] = r._tab || '';
+    return base;
+};
+
+const mapPortalPendingRow = (r: any) => ({
+    'Tender Name': r.projectName || '',
+    'Tender No': r.projectNo || '',
+    'Team Member': r.teamMember || '',
+    'Tender Status': r.tenderStatus || '',
+    'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
+    'Purpose': r.purpose || '',
+    'Amount': r.amount || '',
+    'POP Status': r.popStatus || '',
+});
+
+const mapPortalRow = (r: any, isAllTab: boolean) => {
+    const base: Record<string, any> = {
+        'Tender Name': r.projectName || '',
+        'Tender No': r.projectNo || '',
+        'Date': r.date ? new Date(r.date).toLocaleDateString('en-GB') : '',
+        'Team Member': r.teamMember || '',
+        'Tender Status': r.tenderStatus || '',
+        'UTR No': r.utrNo || '',
+        'Portal Name': r.portalName || '',
+        'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
+        'Purpose': r.purpose || '',
+        'Amount': r.amount || '',
+        'POP Status': r.popStatus || '',
+    };
+    if (isAllTab) base['Tab'] = r._tab || '';
+    return base;
+};
+
+const mapTransferPendingRow = (r: any) => ({
+    'Tender Name': r.projectName || '',
+    'Tender No': r.projectNo || '',
+    'Date': r.date ? new Date(r.date).toLocaleDateString('en-GB') : '',
+    'Team Member': r.teamMember || '',
+    'Tender Status': r.tenderStatus || '',
+    'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
+    'Purpose': r.purpose || '',
+    'Amount': r.amount || '',
+    'BT Status': r.btStatus || '',
+});
+
+const mapTransferRow = (r: any, isAllTab: boolean) => {
+    const base: Record<string, any> = {
+        'Tender Name': r.projectName || '',
+        'Tender No': r.projectNo || '',
+        'Date': r.date ? new Date(r.date).toLocaleDateString('en-GB') : '',
+        'Team Member': r.teamMember || '',
+        'Tender Status': r.tenderStatus || '',
+        'UTR No': r.utrNo || '',
+        'Account Name': r.accountName || '',
+        'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
+        'Purpose': r.purpose || '',
+        'Amount': r.amount || '',
+        'BT Status': r.btStatus || '',
+    };
+    if (isAllTab) base['Tab'] = r._tab || '';
+    return base;
+};
 
 const getDDStatusVariant = (status: string | null): string => {
     if (!status) return 'secondary';
@@ -131,6 +269,32 @@ const TenderFeeListPage = () => {
         team: teamId,
     });
     const { data: transferCounts } = useTenderFeeTransferDashboardCounts();
+
+    // ─── Export ───
+    const getExportDataFn = useCallback((params: any) => {
+        if (parentTab === 'dd') return tenderFeesService.getDDExportData(params);
+        if (parentTab === 'portal') return tenderFeesService.getPortalExportData(params);
+        return tenderFeesService.getTransferExportData(params);
+    }, [parentTab]);
+
+    const exportConfig = useMemo(() => {
+        const isDD = parentTab === 'dd';
+        const isPortal = parentTab === 'portal';
+        return {
+            getExportDataFn,
+            tabsConfig: isDD ? DD_TABS_CONFIG : isPortal ? PORTAL_TABS_CONFIG : TRANSFER_TABS_CONFIG,
+            pendingTabKey: 'pending' as const,
+            tabsWithForm: isDD
+                ? ['created', 'rejected', 'returned', 'cancelled']
+                : ['accepted', 'rejected', 'returned', 'settled'],
+            filenamePrefix: `tender-fee-${parentTab}`,
+            flattenFormData: isDD ? flattenDDFormData : isPortal ? flattenPortalFormData : flattenTransferFormData,
+            mapPendingRow: isDD ? mapDDPendingRow : isPortal ? mapPortalPendingRow : mapTransferPendingRow,
+            mapRow: isDD ? mapDDRow : isPortal ? mapPortalRow : mapTransferRow,
+        };
+    }, [parentTab, getExportDataFn]);
+
+    const { exportTab, setExportTab, exporting, handleExport, exportOptions } = useBiExport(exportConfig);
 
     // ─── DD column defs ───
     const ddActions: ActionItem<any>[] = useMemo(
@@ -492,6 +656,13 @@ const TenderFeeListPage = () => {
                             Track and manage tender fee and processing fee payments across all instrument types.
                         </CardDescription>
                     </div>
+                    <ExportExcelDropdown
+                        exportOptions={exportOptions}
+                        exportTab={exportTab}
+                        setExportTab={setExportTab}
+                        exporting={exporting}
+                        handleExport={handleExport}
+                    />
                 </div>
             </CardHeader>
             <CardContent className="px-0">

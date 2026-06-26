@@ -38,6 +38,16 @@ export class TenderFeeController {
         return this.tenderFeeService.getDDDashboardCounts();
     }
 
+    @Get('dd/dashboard/export')
+    getDDExportData(
+        @Query('tab') tab?: string,
+        @Query('teamId') teamId?: string,
+    ) {
+        return this.tenderFeeService.getDDExportData(tab, {
+            teamId: teamId ? parseInt(teamId, 10) : undefined,
+        });
+    }
+
     // ─── Portal Dashboard ───
 
     @Get('portal/dashboard')
@@ -63,6 +73,16 @@ export class TenderFeeController {
         return this.tenderFeeService.getPortalDashboardCounts();
     }
 
+    @Get('portal/dashboard/export')
+    getPortalExportData(
+        @Query('tab') tab?: string,
+        @Query('teamId') teamId?: string,
+    ) {
+        return this.tenderFeeService.getPortalExportData(tab, {
+            teamId: teamId ? parseInt(teamId, 10) : undefined,
+        });
+    }
+
     // ─── Bank Transfer Dashboard ───
 
     @Get('transfer/dashboard')
@@ -86,6 +106,16 @@ export class TenderFeeController {
     @Get('transfer/dashboard/counts')
     getTransferDashboardCounts() {
         return this.tenderFeeService.getTransferDashboardCounts();
+    }
+
+    @Get('transfer/dashboard/export')
+    getTransferExportData(
+        @Query('tab') tab?: string,
+        @Query('teamId') teamId?: string,
+    ) {
+        return this.tenderFeeService.getTransferExportData(tab, {
+            teamId: teamId ? parseInt(teamId, 10) : undefined,
+        });
     }
 
     // ─── Shared endpoints (delegate based on instrument type) ───
