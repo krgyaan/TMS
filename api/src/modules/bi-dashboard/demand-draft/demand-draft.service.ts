@@ -217,6 +217,86 @@ export class DemandDraftService {
         return wrapPaginatedResponse(data, total, page, limit);
     }
 
+    async getExportData(
+        tab?: string,
+        options?: {
+            teamId?: number;
+        },
+    ): Promise<{ data: any[] }> {
+        const conditions = this.buildDdDashboardConditions(tab);
+
+        const teamId = options?.teamId;
+        if (teamId) {
+            conditions.push(sql`COALESCE(${tenderInfos.team}, ${users.team}) = ${teamId}`);
+        }
+
+        const whereClause = and(...conditions);
+
+        const rows = await this.db
+            .select({
+                id: paymentInstruments.id,
+                requestId: paymentRequests.id,
+                purpose: paymentRequests.purpose,
+                ddCreationDate: instrumentDdDetails.ddDate,
+                ddNo: instrumentDdDetails.ddNo,
+                beneficiaryName: paymentInstruments.favouring,
+                ddAmount: paymentInstruments.amount,
+                tenderName: tenderInfos.tenderName,
+                projectName: paymentRequests.projectName,
+                projectNo: paymentRequests.tenderNo,
+                tenderNo: tenderInfos.tenderNo,
+                bidValidity: tenderInfos.dueDate,
+                tenderStatus: statuses.name,
+                teamMember: users.name,
+                ddStatus: paymentInstruments.status,
+                reqNo: instrumentDdDetails.reqNo,
+                ddNeeds: instrumentDdDetails.ddNeeds,
+                ddPurpose: instrumentDdDetails.ddPurpose,
+                ddRemarks: instrumentDdDetails.ddRemarks,
+                utr: paymentInstruments.utr,
+                issueDate: paymentInstruments.issueDate,
+                expiryDate: paymentInstruments.expiryDate,
+                payableAt: paymentInstruments.payableAt,
+                docketNo: paymentInstruments.docketNo,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .innerJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(instrumentDdDetails, eq(instrumentDdDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+            .where(whereClause)
+            .orderBy(desc(paymentInstruments.createdAt));
+
+        const data = rows.map((row) => ({
+            id: row.id,
+            requestId: row.requestId,
+            purpose: row.purpose,
+            ddCreationDate: row.ddCreationDate ? new Date(row.ddCreationDate) : null,
+            ddNo: row.ddNo,
+            beneficiaryName: row.beneficiaryName,
+            ddAmount: row.ddAmount ? Number(row.ddAmount) : null,
+            tenderName: row.tenderName || row.projectName,
+            tenderNo: row.tenderNo || row.projectNo,
+            bidValidity: row.bidValidity ? new Date(row.bidValidity) : null,
+            tenderStatus: row.tenderStatus,
+            teamMember: row.teamMember?.toString() ?? null,
+            expiry: this.deriveDdExpiryStatus(row.ddCreationDate ? new Date(row.ddCreationDate) : null),
+            ddStatus: this.deriveDdStatus(row.ddStatus),
+            reqNo: row.reqNo,
+            ddNeeds: row.ddNeeds,
+            ddPurpose: row.ddPurpose,
+            ddRemarks: row.ddRemarks,
+            utr: row.utr,
+            issueDate: row.issueDate ? new Date(row.issueDate) : null,
+            expiryDate: row.expiryDate ? new Date(row.expiryDate) : null,
+            payableAt: row.payableAt,
+            docketNo: row.docketNo,
+        }));
+
+        return { data };
+    }
+
     private async countDdByConditions(conditions: any[]) {
         const [result] = await this.db
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })

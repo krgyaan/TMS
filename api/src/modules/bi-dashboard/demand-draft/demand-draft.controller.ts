@@ -25,6 +25,16 @@ export class DemandDraftController {
         });
     }
 
+    @Get('dashboard/export')
+    getExportData(
+        @Query('tab') tab?: string,
+        @Query('teamId') teamId?: string,
+    ) {
+        return this.demandDraftService.getExportData(tab, {
+            teamId: teamId ? parseInt(teamId, 10) : undefined,
+        });
+    }
+
     @Get('dashboard/counts')
     getDashboardCounts() {
         return this.demandDraftService.getDashboardCounts();

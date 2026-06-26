@@ -109,7 +109,7 @@ const DemandDraftListPage = () => {
 
     const { exportTab, setExportTab, exporting, handleExport, exportOptions } = useBiExport({
         getAllFn: (params) => demandDraftsService.getAll(params),
-        getActionFormDataFn: (id) => demandDraftsService.getActionFormData(id),
+        getExportDataFn: (params) => demandDraftsService.getExportData(params),
         tabsConfig: TABS_CONFIG,
         pendingTabKey: 'pending',
         tabsWithForm: ['created', 'rejected', 'returned', 'cancelled'],
