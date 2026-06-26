@@ -75,6 +75,14 @@ class ChequesService extends BaseApiService {
         return this.get<any>(`/instruments/${id}/action-form`);
     }
 
+    async getExportData(params?: { tab?: string; teamId?: number }): Promise<{ data: any[] }> {
+        const search = new URLSearchParams();
+        if (params?.tab) search.set('tab', params.tab);
+        if (params?.teamId) search.set('teamId', String(params.teamId));
+        const queryString = search.toString();
+        return this.get(`/dashboard/export${queryString ? `?${queryString}` : ''}`);
+    }
+
     async getFollowupData(id: number): Promise<any> {
         return this.get<any>(`/instruments/${id}/followup`);
     }

@@ -124,7 +124,7 @@ const ChequeListPage = () => {
 
     const { exportTab, setExportTab, exporting, handleExport, exportOptions } = useBiExport({
         getAllFn: (params) => chequesService.getAll(params),
-        getActionFormDataFn: (id) => chequesService.getActionFormData(id),
+        getExportDataFn: (params) => chequesService.getExportData(params),
         tabsConfig: TABS_CONFIG,
         pendingTabKey: 'cheque-pending',
         tabsWithForm: ['cheque-payable', 'cheque-paid-stop', 'cheque-for-security', 'cheque-for-dd-fdr', 'rejected', 'cancelled', 'expired'],

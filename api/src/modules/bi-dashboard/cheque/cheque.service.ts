@@ -272,6 +272,83 @@ export class ChequeService {
         return wrapPaginatedResponse(data, total, page, limit);
     }
 
+    async getExportData(
+        tab?: string,
+        options?: {
+            teamId?: number;
+        },
+    ): Promise<{ data: any[] }> {
+        const conditions = this.buildChequeDashboardConditions(tab);
+
+        const teamId = options?.teamId;
+        if (teamId) {
+            conditions.push(sql`COALESCE(${tenderInfos.team}, ${this.requestedByUser.team}) = ${teamId}`);
+        }
+
+        const whereClause = and(...conditions);
+
+        const rows = await this.db
+            .select({
+                id: paymentInstruments.id,
+                requestId: paymentRequests.id,
+                purpose: paymentRequests.purpose,
+                requestType: paymentRequests.type,
+                tenderNo: tenderInfos.tenderNo,
+                tenderName: tenderInfos.tenderName,
+                tenderStatus: statuses.name,
+                chequeNo: instrumentChequeDetails.chequeNo,
+                payeeName: paymentInstruments.favouring,
+                bidValidity: tenderInfos.dueDate,
+                amount: paymentInstruments.amount,
+                type: instrumentChequeDetails.chequeReason,
+                cheque: instrumentChequeDetails.chequeDate,
+                dueDate: instrumentChequeDetails.dueDate,
+                chequeStatus: paymentInstruments.status,
+                requestedBy: this.requestedByUser.name,
+                utr: paymentInstruments.utr,
+                rejectionReason: paymentInstruments.rejectionReason,
+                issueDate: paymentInstruments.issueDate,
+                expiryDate: paymentInstruments.expiryDate,
+                chequeDate: instrumentChequeDetails.chequeDate,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
+            .leftJoin(this.requestedByUser, eq(this.requestedByUser.id, paymentRequests.requestedBy))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .where(whereClause)
+            .orderBy(desc(paymentInstruments.createdAt));
+
+        const data = rows.map((row) => ({
+            id: row.id,
+            requestId: row.requestId,
+            purpose: row.purpose,
+            requestType: row.requestType?.toString() ?? null,
+            tenderNo: row.tenderNo?.toString() ?? null,
+            tenderName: row.tenderName?.toString() ?? null,
+            tenderStatus: row.tenderStatus?.toString() ?? null,
+            requestedBy: row.requestedBy,
+            chequeNo: row.chequeNo,
+            payeeName: row.payeeName,
+            bidValidity: row.bidValidity ? new Date(row.bidValidity) : null,
+            amount: row.amount ? Number(row.amount) : null,
+            type: row.type,
+            cheque: row.cheque,
+            dueDate: row.dueDate ? new Date(row.dueDate) : null,
+            expiry: this.deriveExpiryStatus(row.dueDate ? new Date(row.dueDate) : null, row.type, row.chequeStatus),
+            chequeStatus: this.deriveChequeStatus(row.chequeStatus, row.type),
+            utr: row.utr,
+            rejectionReason: row.rejectionReason,
+            issueDate: row.issueDate ? new Date(row.issueDate) : null,
+            expiryDate: row.expiryDate ? new Date(row.expiryDate) : null,
+            chequeDate: row.chequeDate,
+        }));
+
+        return { data };
+    }
+
     private async countChequeByConditions(conditions: any[]) {
         // FIXED: Added Left Join to instrumentChequeDetails
         // Without this, filters like 'eq(instrumentChequeDetails.chequeReason, ...)' would fail
