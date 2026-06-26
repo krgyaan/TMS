@@ -240,6 +240,88 @@ export class FdrService {
         return wrapPaginatedResponse(data, total, page, limit);
     }
 
+    async getExportData(
+        tab?: string,
+        options?: {
+            teamId?: number;
+        },
+    ): Promise<{ data: any[] }> {
+        const { conditions } = this.buildFdrDashboardConditions(tab);
+
+        const teamId = options?.teamId;
+        if (teamId) {
+            conditions.push(sql`${tenderInfos.team} = ${teamId}`);
+        }
+
+        const rows = await this.db
+            .select({
+                id: paymentInstruments.id,
+                requestId: paymentRequests.id,
+                fdrCreationDate: instrumentFdrDetails.fdrDate,
+                fdrNo: instrumentFdrDetails.fdrNo,
+                beneficiaryName: paymentInstruments.favouring,
+                fdrAmount: paymentInstruments.amount,
+                tenderName: tenderInfos.tenderName,
+                projectName: paymentRequests.projectName,
+                projectNo: paymentRequests.tenderNo,
+                tenderNo: tenderInfos.tenderNo,
+                tenderStatus: statuses.name,
+                teamMember: users.name,
+                source: instrumentFdrDetails.fdrSource,
+                expiry: instrumentFdrDetails.fdrExpiryDate,
+                fdrStatus: paymentInstruments.status,
+                reqNo: paymentInstruments.reqNo,
+                fdrNeeds: instrumentFdrDetails.fdrNeeds,
+                fdrPurpose: instrumentFdrDetails.fdrPurpose,
+                fdrRemark: instrumentFdrDetails.fdrRemark,
+                fdrSource: instrumentFdrDetails.fdrSource,
+                fdrExpiryDate: instrumentFdrDetails.fdrExpiryDate,
+                utr: paymentInstruments.utr,
+                issueDate: paymentInstruments.issueDate,
+                expiryDate: paymentInstruments.expiryDate,
+                payableAt: paymentInstruments.payableAt,
+                favouring: paymentInstruments.favouring,
+                docketNo: paymentInstruments.docketNo,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .innerJoin(instrumentFdrDetails, eq(instrumentFdrDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .where(and(...conditions))
+            .orderBy(desc(paymentInstruments.createdAt));
+
+        const data = rows.map(row => ({
+            id: row.id,
+            requestId: row.requestId,
+            fdrCreationDate: row.fdrCreationDate ? new Date(row.fdrCreationDate) : null,
+            fdrNo: row.fdrNo,
+            beneficiaryName: row.beneficiaryName,
+            fdrAmount: row.fdrAmount ? Number(row.fdrAmount) : null,
+            tenderName: row.tenderName || row.projectName,
+            tenderNo: row.tenderNo || row.projectNo,
+            tenderStatus: row.tenderStatus || row.tenderStatus,
+            member: row.teamMember?.toString() ?? null,
+            expiry: this.deriveFdrExpiryStatus(row.expiry ? new Date(row.expiry) : null),
+            fdrStatus: this.deriveFdrStatus(row.fdrStatus),
+            reqNo: row.reqNo,
+            fdrNeeds: row.fdrNeeds,
+            fdrPurpose: row.fdrPurpose,
+            fdrRemark: row.fdrRemark,
+            fdrSource: row.fdrSource,
+            fdrExpiryDate: row.fdrExpiryDate ? new Date(row.fdrExpiryDate) : null,
+            utr: row.utr,
+            issueDate: row.issueDate ? new Date(row.issueDate) : null,
+            expiryDate: row.expiryDate ? new Date(row.expiryDate) : null,
+            payableAt: row.payableAt,
+            favouring: row.favouring,
+            docketNo: row.docketNo,
+        }));
+
+        return { data };
+    }
+
     async getDashboardCounts(): Promise<FdrDashboardCounts> {
         const pending = await this.countFdrByConditions(this.buildFdrDashboardConditions("pending").conditions, this.buildFdrDashboardConditions("pending").needsFdrDetails);
 

@@ -130,7 +130,7 @@ const FdrListPage = () => {
 
     const { exportTab, setExportTab, exporting, handleExport, exportOptions } = useBiExport({
         getAllFn: (params) => fdrsService.getAll(params),
-        getActionFormDataFn: (id) => fdrsService.getActionFormData(id),
+        getExportDataFn: (params) => fdrsService.getExportData(params),
         tabsConfig: TABS_CONFIG,
         pendingTabKey: 'pending',
         tabsWithForm: ['pnb-bg-linked', 'ybl-bg-linked', 'security-deposit', 'bond-linked', 'rejected', 'returned', 'cancelled'],

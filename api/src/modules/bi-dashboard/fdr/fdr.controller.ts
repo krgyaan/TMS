@@ -25,6 +25,16 @@ export class FdrController {
         });
     }
 
+    @Get('dashboard/export')
+    getExportData(
+        @Query('tab') tab?: string,
+        @Query('teamId') teamId?: string,
+    ) {
+        return this.fdrService.getExportData(tab, {
+            teamId: teamId ? parseInt(teamId, 10) : undefined,
+        });
+    }
+
     @Get('dashboard/counts')
     getDashboardCounts() {
         return this.fdrService.getDashboardCounts();
