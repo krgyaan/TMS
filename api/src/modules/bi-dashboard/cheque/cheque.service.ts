@@ -295,8 +295,6 @@ export class ChequeService {
                 requestType: paymentRequests.type,
                 projectName: paymentRequests.projectName,
                 projectNo: paymentRequests.tenderNo,
-                tenderNo: tenderInfos.tenderNo,
-                tenderName: tenderInfos.tenderName,
                 tenderStatus: statuses.name,
                 chequeNo: instrumentChequeDetails.chequeNo,
                 payeeName: paymentInstruments.favouring,
@@ -317,7 +315,6 @@ export class ChequeService {
             .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
             .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
             .leftJoin(instrumentChequeDetails, eq(instrumentChequeDetails.instrumentId, paymentInstruments.id))
-            .leftJoin(users, eq(users.id, tenderInfos.teamMember))
             .leftJoin(this.requestedByUser, eq(this.requestedByUser.id, paymentRequests.requestedBy))
             .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
             .where(whereClause)
@@ -330,8 +327,6 @@ export class ChequeService {
             requestType: row.requestType?.toString() ?? null,
             projectName: row.projectName?.toString() ?? null,
             projectNo: row.projectNo?.toString() ?? null,
-            tenderNo: row.tenderNo?.toString() ?? null,
-            tenderName: row.tenderName?.toString() ?? null,
             tenderStatus: row.tenderStatus?.toString() ?? null,
             requestedBy: row.requestedBy,
             chequeNo: row.chequeNo,

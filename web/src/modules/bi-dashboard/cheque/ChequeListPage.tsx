@@ -131,8 +131,8 @@ const ChequeListPage = () => {
         filenamePrefix: 'cheques',
         flattenFormData,
         mapPendingRow: (r: any) => ({
-            'Tender Name': r.projectName || r.tenderName || '',
-            'Tender No': r.tenderNo || r.projectNo || '',
+            'Tender Name': r.projectName || '',
+            'Tender No': r.projectNo || '',
             'Cheque Date': r.cheque ? new Date(r.cheque).toLocaleDateString('en-GB') : '',
             'Cheque No': r.chequeNo || '',
             'Payee name': r.payeeName || '',

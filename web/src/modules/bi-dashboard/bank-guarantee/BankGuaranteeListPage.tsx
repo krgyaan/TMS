@@ -115,8 +115,8 @@ const BankGuaranteeListPage = () => {
         filenamePrefix: 'bank-guarantees',
         flattenFormData,
         mapPendingRow: (r: any) => ({
-            'Tender Name': r.projectName || r.tenderName || '',
-            'Tender No': r.tenderNo || r.projectNo || '',
+            'Tender Name': r.projectName || '',
+            'Tender No': r.projectNo || '',
             'BG Date': r.bgDate ? new Date(r.bgDate).toLocaleDateString('en-GB') : '',
             'BG No': r.bgNo || '',
             'Beneficiary name': r.beneficiaryName || '',

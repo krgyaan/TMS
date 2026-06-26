@@ -137,8 +137,8 @@ const FdrListPage = () => {
         filenamePrefix: 'fdrs',
         flattenFormData,
         mapPendingRow: (r: any) => ({
-            'Tender Name': r.projectName || r.tenderName || '',
-            'Tender No': r.tenderNo || r.projectNo || '',
+            'Tender Name': r.projectName || '',
+            'Tender No': r.projectNo || '',
             'FDR Date': r.fdrCreationDate ? new Date(r.fdrCreationDate).toLocaleDateString('en-GB') : '',
             'FDR No': r.fdrNo || '',
             'Beneficiary name': r.beneficiaryName || '',

@@ -116,8 +116,8 @@ const DemandDraftListPage = () => {
         filenamePrefix: 'demand-drafts',
         flattenFormData,
         mapPendingRow: (r: any) => ({
-            'Tender Name': r.projectName || r.tenderName || '',
-            'Tender No': r.tenderNo || r.projectNo || '',
+            'Tender Name': r.projectName || '',
+            'Tender No': r.projectNo || '',
             'DD Date': r.ddCreationDate ? new Date(r.ddCreationDate).toLocaleDateString('en-GB') : '',
             'DD No': r.ddNo || '',
             'Tender Status': r.tenderStatus || '',

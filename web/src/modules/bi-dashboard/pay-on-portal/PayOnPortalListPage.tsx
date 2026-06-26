@@ -115,8 +115,8 @@ const PayOnPortalListPage = () => {
         filenamePrefix: 'pay-on-portals',
         flattenFormData,
         mapPendingRow: (r: any) => ({
-            'Tender Name': r.projectName || r.tenderName || '',
-            'Tender No': r.tenderNo || r.projectNo || '',
+            'Tender Name': r.projectName || '',
+            'Tender No': r.projectNo || '',
             'Date': r.date ? new Date(r.date).toLocaleDateString('en-GB') : '',
             'Team Member': r.teamMember || '',
             'Tender Status': r.tenderStatus || '',
