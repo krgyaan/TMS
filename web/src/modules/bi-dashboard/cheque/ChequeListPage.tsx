@@ -131,6 +131,8 @@ const ChequeListPage = () => {
         filenamePrefix: 'cheques',
         flattenFormData,
         mapPendingRow: (r: any) => ({
+            'Tender Name': r.projectName || r.tenderName || '',
+            'Tender No': r.tenderNo || r.projectNo || '',
             'Cheque Date': r.cheque ? new Date(r.cheque).toLocaleDateString('en-GB') : '',
             'Cheque No': r.chequeNo || '',
             'Payee name': r.payeeName || '',
@@ -145,6 +147,8 @@ const ChequeListPage = () => {
         }),
         mapRow: (r: any, isAllTab: boolean) => {
             const base: Record<string, any> = {
+                'Tender Name': r.projectName || r.tenderName || '',
+                'Tender No': r.tenderNo || r.projectNo || '',
                 'Cheque Date': r.cheque ? new Date(r.cheque).toLocaleDateString('en-GB') : '',
                 'Cheque No': r.chequeNo || '',
                 'Payee name': r.payeeName || '',

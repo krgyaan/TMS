@@ -118,8 +118,9 @@ const BankTransferListPage = () => {
         filenamePrefix: 'bank-transfers',
         flattenFormData,
         mapPendingRow: (r: any) => ({
+            'Tender Name': r.projectName || r.tenderName || '',
+            'Tender No': r.tenderNo || r.projectNo || '',
             'Date': r.date ? new Date(r.date).toLocaleDateString('en-GB') : '',
-            'Tender Name': r.tenderNo || '',
             'Team Member': r.teamMember || '',
             'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
             'Purpose': r.purpose || '',
@@ -129,8 +130,9 @@ const BankTransferListPage = () => {
         }),
         mapRow: (r: any, isAllTab: boolean) => {
             const base: Record<string, any> = {
+                'Tender Name': r.projectName || r.tenderName || '',
+                'Tender No': r.tenderNo || r.projectNo || '',
                 'Date': r.date ? new Date(r.date).toLocaleDateString('en-GB') : '',
-                'Tender Name': r.tenderNo || '',
                 'Team Member': r.teamMember || '',
                 'UTR No': r.utrNo || '',
                 'UTR': r.utr || '',

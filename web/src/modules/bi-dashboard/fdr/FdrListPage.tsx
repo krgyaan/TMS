@@ -137,11 +137,12 @@ const FdrListPage = () => {
         filenamePrefix: 'fdrs',
         flattenFormData,
         mapPendingRow: (r: any) => ({
+            'Tender Name': r.projectName || r.tenderName || '',
+            'Tender No': r.tenderNo || r.projectNo || '',
             'FDR Date': r.fdrCreationDate ? new Date(r.fdrCreationDate).toLocaleDateString('en-GB') : '',
             'FDR No': r.fdrNo || '',
             'Beneficiary name': r.beneficiaryName || '',
             'FDR Amount': r.fdrAmount || '',
-            'Tender Name': r.tenderNo || '',
             'Tender Status': r.tenderStatus || '',
             'Member': r.member || '',
             'Expiry': r.expiry || '',
@@ -149,11 +150,12 @@ const FdrListPage = () => {
         }),
         mapRow: (r: any, isAllTab: boolean) => {
             const base: Record<string, any> = {
+                'Tender Name': r.projectName || r.tenderName || '',
+                'Tender No': r.tenderNo || r.projectNo || '',
                 'FDR Date': r.fdrCreationDate ? new Date(r.fdrCreationDate).toLocaleDateString('en-GB') : '',
                 'FDR No': r.fdrNo || '',
                 'Beneficiary name': r.beneficiaryName || '',
                 'FDR Amount': r.fdrAmount || '',
-                'Tender Name': r.tenderNo || '',
                 'Tender Status': r.tenderStatus || '',
                 'Member': r.member || '',
                 'Expiry': r.expiry || '',

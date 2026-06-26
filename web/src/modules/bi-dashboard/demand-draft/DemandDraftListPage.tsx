@@ -116,9 +116,10 @@ const DemandDraftListPage = () => {
         filenamePrefix: 'demand-drafts',
         flattenFormData,
         mapPendingRow: (r: any) => ({
+            'Tender Name': r.projectName || r.tenderName || '',
+            'Tender No': r.tenderNo || r.projectNo || '',
             'DD Date': r.ddCreationDate ? new Date(r.ddCreationDate).toLocaleDateString('en-GB') : '',
             'DD No': r.ddNo || '',
-            'Tender Details': r.tenderNo || '',
             'Tender Status': r.tenderStatus || '',
             'Beneficiary name': r.beneficiaryName || '',
             'Purpose': r.purpose || '',
@@ -130,7 +131,8 @@ const DemandDraftListPage = () => {
         }),
         mapRow: (r: any, isAllTab: boolean) => {
             const base: Record<string, any> = {
-                'Tender Details': r.tenderNo || '',
+                'Tender Name': r.projectName || r.tenderName || '',
+                'Tender No': r.tenderNo || r.projectNo || '',
                 'Tender Status': r.tenderStatus || '',
                 'Beneficiary name': r.beneficiaryName || '',
                 'Purpose': r.purpose || '',

@@ -115,10 +115,11 @@ const BankGuaranteeListPage = () => {
         filenamePrefix: 'bank-guarantees',
         flattenFormData,
         mapPendingRow: (r: any) => ({
+            'Tender Name': r.projectName || r.tenderName || '',
+            'Tender No': r.tenderNo || r.projectNo || '',
             'BG Date': r.bgDate ? new Date(r.bgDate).toLocaleDateString('en-GB') : '',
             'BG No': r.bgNo || '',
             'Beneficiary name': r.beneficiaryName || '',
-            'Tender Details': r.tenderNo || '',
             'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
             'Amount': r.amount || '',
             'Expiry Date': r.bgExpiryDate ? new Date(r.bgExpiryDate).toLocaleDateString('en-GB') : '',
@@ -133,10 +134,11 @@ const BankGuaranteeListPage = () => {
         }),
         mapRow: (r: any, isAllTab: boolean) => {
             const base: Record<string, any> = {
+                'Tender Name': r.projectName || r.tenderName || '',
+                'Tender No': r.tenderNo || r.projectNo || '',
                 'BG Date': r.bgDate ? new Date(r.bgDate).toLocaleDateString('en-GB') : '',
                 'BG No': r.bgNo || '',
                 'Beneficiary name': r.beneficiaryName || '',
-                'Tender Details': r.tenderNo || '',
                 'Bid Validity': r.bidValidity ? new Date(r.bidValidity).toLocaleDateString('en-GB') : '',
                 'Amount': r.amount || '',
                 'Expiry Date': r.bgExpiryDate ? new Date(r.bgExpiryDate).toLocaleDateString('en-GB') : '',
