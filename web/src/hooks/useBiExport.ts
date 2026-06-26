@@ -9,7 +9,7 @@ interface TabConfig {
 
 interface UseBiExportConfig {
     getAllFn: (params: any) => Promise<{ data?: any[]; meta?: { total: number } }>;
-    getActionFormDataFn: (id: number) => Promise<Record<string, any>>;
+    getActionFormDataFn?: (id: number) => Promise<Record<string, any>>;
     tabsConfig: TabConfig[];
     pendingTabKey: string;
     tabsWithForm: string[];
@@ -17,6 +17,7 @@ interface UseBiExportConfig {
     flattenFormData: (data: Record<string, any>) => Record<string, any>;
     mapPendingRow: (row: any) => Record<string, any>;
     mapRow: (row: any, isAllTab: boolean) => Record<string, any>;
+    getExportDataFn?: (params: any) => Promise<{ data: any[] }>;
 }
 
 export function useBiExport(config: UseBiExportConfig) {
@@ -29,6 +30,19 @@ export function useBiExport(config: UseBiExportConfig) {
     ], [config.tabsConfig]);
 
     const fetchAllRows = useCallback(async (tab: string): Promise<any[]> => {
+        if (config.getExportDataFn) {
+            if (tab === 'all') {
+                const results = await Promise.all(
+                    config.tabsConfig.map(t =>
+                        config.getExportDataFn!({ tab: t.key })
+                            .then(res => (res.data || []).map(r => ({ ...r, _tab: t.name })))
+                    )
+                );
+                return results.flat();
+            }
+            const res = await config.getExportDataFn({ tab });
+            return res.data || [];
+        }
         if (tab === 'all') {
             const allRows: any[] = [];
             for (const t of config.tabsConfig) {
@@ -61,7 +75,7 @@ export function useBiExport(config: UseBiExportConfig) {
             page++;
         } while (allRows.length < total);
         return allRows;
-    }, [config.getAllFn, config.tabsConfig]);
+    }, [config.getAllFn, config.tabsConfig, config.getExportDataFn]);
 
     const handleExport = useCallback(async () => {
         if (!exportTab) return;
@@ -75,14 +89,24 @@ export function useBiExport(config: UseBiExportConfig) {
 
             let exportRows: Record<string, any>[];
 
-            if (isPendingTab) {
+            if (config.getExportDataFn) {
+                if (isPendingTab) {
+                    exportRows = rows.map(config.mapPendingRow);
+                } else {
+                    exportRows = rows.map((r: any) => {
+                        const base = config.mapRow(r, isAllTab);
+                        Object.assign(base, config.flattenFormData(r));
+                        return base;
+                    });
+                }
+            } else if (isPendingTab) {
                 exportRows = rows.map(config.mapPendingRow);
             } else {
                 exportRows = rows.map((r: any) => config.mapRow(r, isAllTab));
                 if (isAllTab || config.tabsWithForm.includes(exportTab)) {
                     for (let i = 0; i < rows.length; i++) {
                         try {
-                            const formData = await config.getActionFormDataFn(rows[i].id);
+                            const formData = await config.getActionFormDataFn!(rows[i].id);
                             if (formData && Object.keys(formData).length > 0) {
                                 Object.assign(exportRows[i], config.flattenFormData(formData));
                             }

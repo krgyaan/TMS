@@ -111,7 +111,7 @@ const BankTransferListPage = () => {
 
     const { exportTab, setExportTab, exporting, handleExport, exportOptions } = useBiExport({
         getAllFn: (params) => bankTransfersService.getAll(params),
-        getActionFormDataFn: (id) => bankTransfersService.getActionFormData(id),
+        getExportDataFn: (params) => bankTransfersService.getExportData(params),
         tabsConfig: TABS_CONFIG,
         pendingTabKey: 'pending',
         tabsWithForm: ['accepted', 'rejected', 'returned', 'settled'],

@@ -207,6 +207,89 @@ export class BankTransferService {
         return wrapPaginatedResponse(data, total, page, limit);
     }
 
+    async getExportData(
+        tab?: string,
+        options?: {
+            teamId?: number;
+        },
+    ): Promise<{ data: any[] }> {
+        const conditions = this.buildBtDashboardConditions(tab);
+
+        const teamId = options?.teamId;
+        if (teamId) {
+            conditions.push(sql`COALESCE(${tenderInfos.team}, ${users.team}) = ${teamId}`);
+        }
+
+        const whereClause = and(...conditions);
+
+        const rows = await this.db
+            .select({
+                id: paymentInstruments.id,
+                requestId: paymentRequests.id,
+                type: paymentRequests.type,
+                purpose: paymentRequests.purpose,
+                date: instrumentTransferDetails.transactionDate,
+                teamMember: users.name,
+                utr: paymentInstruments.utr,
+                utrNo: instrumentTransferDetails.utrNum,
+                accountName: instrumentTransferDetails.accountName,
+                tenderName: tenderInfos.tenderName,
+                projectName: paymentRequests.projectName,
+                tenderNo: tenderInfos.tenderNo,
+                projectNo: paymentRequests.tenderNo,
+                bidValidity: tenderInfos.dueDate,
+                tenderStatus: statuses.name,
+                amount: paymentInstruments.amount,
+                btStatus: paymentInstruments.status,
+                accountNumber: instrumentTransferDetails.accountNumber,
+                ifsc: instrumentTransferDetails.ifsc,
+                utrMsg: instrumentTransferDetails.utrMsg,
+                returnTransferDate: instrumentTransferDetails.returnTransferDate,
+                returnUtr: instrumentTransferDetails.returnUtr,
+                reason: instrumentTransferDetails.reason,
+                remarks: instrumentTransferDetails.remarks,
+                transactionDate: instrumentTransferDetails.transactionDate,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .where(whereClause)
+            .orderBy(desc(paymentInstruments.createdAt));
+
+        const data = rows.map((row) => ({
+            id: row.id,
+            requestId: row.requestId,
+            type: row.type,
+            purpose: row.purpose,
+            date: row.date ? new Date(row.date) : null,
+            teamMember: row.teamMember?.toString() ?? null,
+            member: row.teamMember?.toString() ?? null,
+            utrNo: row.utrNo,
+            utr: row.utr,
+            accountName: row.accountName,
+            tenderName: row.tenderName || row.projectName,
+            tenderNo: row.tenderNo || row.projectNo,
+            bidValidity: row.bidValidity ? new Date(row.bidValidity) : null,
+            tenderStatus: row.tenderStatus,
+            amount: row.amount ? Number(row.amount) : null,
+            btStatus: this.statusMap()[row.btStatus],
+            accountNumber: row.accountNumber,
+            ifsc: row.ifsc,
+            utrMsg: row.utrMsg,
+            returnTransferDate: row.returnTransferDate ? new Date(row.returnTransferDate) : null,
+            returnUtr: row.returnUtr,
+            reason: row.reason,
+            remarks: row.remarks,
+            rejectionReason: row.reason,
+            transactionDate: row.transactionDate ? new Date(row.transactionDate) : null,
+        }));
+
+        return { data };
+    }
+
     private async countBtByConditions(conditions: any[]) {
         const [result] = await this.db
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
