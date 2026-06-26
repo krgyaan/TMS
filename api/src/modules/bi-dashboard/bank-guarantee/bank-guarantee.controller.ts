@@ -40,6 +40,13 @@ export class BankGuaranteeController {
         });
     }
 
+    @Get('dashboard/export')
+    getExportData(
+        @Query('tab') tab?: string,
+    ) {
+        return this.bankGuaranteeService.getExportData(tab);
+    }
+
     @Get('dashboard/counts')
     getDashboardCounts() {
         return this.bankGuaranteeService.getDashboardCounts();

@@ -108,7 +108,7 @@ const BankGuaranteeListPage = () => {
 
     const { exportTab, setExportTab, exporting, handleExport, exportOptions } = useBiExport({
         getAllFn: (params) => bankGuaranteesService.getAll(params),
-        getActionFormDataFn: (id) => bankGuaranteesService.getActionFormData(id),
+        getExportDataFn: (params) => bankGuaranteesService.getExportData(params),
         tabsConfig: TABS_CONFIG,
         pendingTabKey: 'new-requests',
         tabsWithForm: ['live-yes', 'live-pnb', 'live-bg-limit', 'cancelled', 'rejected'],

@@ -75,6 +75,13 @@ class BankGuaranteesService extends BaseApiService {
         }
     }
 
+    async getExportData(params?: { tab?: string }): Promise<{ data: any[] }> {
+        const search = new URLSearchParams();
+        if (params?.tab) search.set('tab', params.tab);
+        const queryString = search.toString();
+        return this.get(`/dashboard/export${queryString ? `?${queryString}` : ''}`);
+    }
+
     async getActionFormData(id: number): Promise<any> {
         return this.get<any>(`/instruments/${id}/action-form`);
     }

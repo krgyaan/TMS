@@ -258,6 +258,107 @@ export class BankGuaranteeService {
         return wrapPaginatedResponse(data, total, page, limit);
     }
 
+    async getExportData(
+        tab?: string,
+    ): Promise<{ data: any[] }> {
+        const conditions = this.buildDashboardConditions(tab);
+        const whereClause = and(...conditions);
+
+        const rows = await this.db
+            .select({
+                id: paymentInstruments.id,
+                requestId: paymentRequests.id,
+                bgDate: instrumentBgDetails.bgDate,
+                bgNo: instrumentBgDetails.bgNo,
+                beneficiaryName: instrumentBgDetails.beneficiaryName,
+                tenderName: tenderInfos.tenderName,
+                tenderNo: tenderInfos.tenderNo,
+                tenderDueDate: tenderInfos.dueDate,
+                requestDueDate: paymentRequests.dueDate,
+                projectName: paymentRequests.projectName,
+                projectNo: paymentRequests.tenderNo,
+                requestType: paymentRequests.type,
+                amount: paymentInstruments.amount,
+                bgExpiryDate: paymentInstruments.expiryDate,
+                claimExpiryDate: paymentInstruments.claimExpiryDate,
+                stampCharges: instrumentBgDetails.stampCharges,
+                sfmsCharges: instrumentBgDetails.sfmsCharges,
+                stampChargesDeducted: instrumentBgDetails.stampChargesDeducted,
+                sfmsChargesDeducted: instrumentBgDetails.sfmsChargesDeducted,
+                otherChargesDeducted: instrumentBgDetails.otherChargesDeducted,
+                bgChargeDeducted: instrumentBgDetails.bgChargeDeducted,
+                fdrNo: instrumentBgDetails.fdrNo,
+                fdrValue: instrumentBgDetails.fdrAmt,
+                tenderStatusFromTender: statuses.name,
+                bgStatus: paymentInstruments.status,
+                bgPurpose: instrumentBgDetails.bgPurpose,
+                bgNeeds: instrumentBgDetails.bgNeeds,
+                bankName: instrumentBgDetails.bankName,
+                issueDate: paymentInstruments.issueDate,
+                expiryDate: paymentInstruments.expiryDate,
+                payableAt: paymentInstruments.payableAt,
+                favouring: paymentInstruments.favouring,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(instrumentBgDetails, eq(instrumentBgDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(tenderInfos, and(
+                eq(tenderInfos.id, paymentRequests.tenderId),
+                ne(paymentRequests.tenderId, 0)
+            ))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .where(whereClause)
+            .orderBy(sql`${instrumentBgDetails.validityDate} DESC NULLS LAST, ${paymentInstruments.createdAt} DESC`);
+
+        const data = rows.map((row) => {
+            const bgDate = row.bgDate ? new Date(row.bgDate) : null;
+            const bgExpiryDate = row.bgExpiryDate ? new Date(row.bgExpiryDate) : null;
+            const claimExpiryDate = row.claimExpiryDate ? new Date(row.claimExpiryDate) : null;
+            const amount = row.amount ? Number(row.amount) : null;
+
+            return {
+                id: row.id,
+                requestId: row.requestId,
+                bgDate,
+                bgNo: row.bgNo,
+                beneficiaryName: row.beneficiaryName,
+                tenderName: row.tenderName || row.projectName,
+                tenderNo: row.tenderNo || row.projectNo,
+                amount,
+                bgExpiryDate,
+                bgClaimPeriod: this.calculateBgClaimPeriod(bgExpiryDate, claimExpiryDate),
+                bgChargesPaid: this.calculateBgChargesPaid(
+                    row.bgChargeDeducted ? Number(row.bgChargeDeducted) : null,
+                    row.stampChargesDeducted ? Number(row.stampChargesDeducted) : null,
+                    row.sfmsChargesDeducted ? Number(row.sfmsChargesDeducted) : null,
+                    row.otherChargesDeducted ? Number(row.otherChargesDeducted) : null
+                ),
+                bgChargesCalculated: this.calculateBgChargesCalculated(
+                    amount,
+                    bgDate,
+                    claimExpiryDate,
+                    row.stampCharges ? Number(row.stampCharges) : null,
+                    row.sfmsCharges ? Number(row.sfmsCharges) : null
+                ),
+                fdrNo: row.fdrNo,
+                fdrValue: row.fdrValue ? Number(row.fdrValue) : null,
+                tenderStatus: row.tenderStatusFromTender,
+                bidValidity: row.tenderDueDate || row.requestDueDate,
+                bgStatus: this.statusMap()[row.bgStatus],
+                expiryStatus: this.calculateExpiryStatus(bgExpiryDate, claimExpiryDate),
+                expiryDate: bgExpiryDate,
+                bgPurpose: row.bgPurpose,
+                bgNeeds: row.bgNeeds,
+                bankName: row.bankName,
+                issueDate: row.issueDate ? new Date(row.issueDate) : null,
+                payableAt: row.payableAt,
+                favouring: row.favouring,
+            };
+        });
+
+        return { data };
+    }
+
     private async countByConditions(conditions: any[]) {
         const [result] = await this.db
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })
