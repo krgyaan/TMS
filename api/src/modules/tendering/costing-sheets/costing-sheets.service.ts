@@ -99,7 +99,7 @@ export class CostingSheetsService {
                 OR
                 NOT EXISTS (SELECT 1 FROM ${tenderCostingDetails}
                             WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
-                            -- AND ${tenderCostingDetails.submittedFinalPrice} IS NOT NULL)
+                            AND ${tenderCostingDetails.submittedFinalPrice} IS NOT NULL)
             )`);
             conditions.push(or(ne(bidSubmissions.status, 'Tender Missed'), isNull(bidSubmissions)));
         } else if (tab === 'submitted') {
@@ -111,7 +111,7 @@ export class CostingSheetsService {
                 OR
                 EXISTS (SELECT 1 FROM ${tenderCostingDetails}
                         WHERE ${tenderCostingDetails.tenderCostingSheetId} = ${tenderCostingSheets.id}
-                        -- AND ${tenderCostingDetails.submittedFinalPrice} IS NOT NULL)
+                        AND ${tenderCostingDetails.submittedFinalPrice} IS NOT NULL)
             )`);
             conditions.push(or(ne(bidSubmissions.status, 'Tender Missed'), isNull(bidSubmissions)));
         } else if (tab === 'tender-dnb') {
