@@ -1,6 +1,7 @@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useWoBasicDetailById } from "@/hooks/api/useWoBasicDetails";
+import { useWoContactsByBasicDetail } from "@/hooks/api/useWoContacts";
 import { AlertCircle } from "lucide-react";
 import BasicDetailView from "./BasicDetailView";
 
@@ -10,6 +11,7 @@ interface BasicDetailsSectionProps {
 
 export function BasicDetailsSection({ woBasicDetailId }: BasicDetailsSectionProps) {
     const { data, isLoading, error } = useWoBasicDetailById(woBasicDetailId);
+    const { data: contactsData } = useWoContactsByBasicDetail(woBasicDetailId);
 
     if (error) {
         return (
@@ -33,5 +35,5 @@ export function BasicDetailsSection({ woBasicDetailId }: BasicDetailsSectionProp
         return <p className="text-sm text-muted-foreground italic">No basic details found.</p>;
     }
 
-    return <BasicDetailView data={data} />;
+    return <BasicDetailView data={data} contacts={contactsData} />;
 }

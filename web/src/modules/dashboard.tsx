@@ -503,6 +503,14 @@ const Dashboard = () => {
             bgColor: "bg-teal-50 dark:bg-teal-950/30",
             path: paths.accounts.makerRequestCreate
         },
+        {
+            title: "New Work Order",
+            subtitle: "Create Work Order Entry",
+            icon: FileText,
+            color: "text-indigo-600",
+            bgColor: "bg-indigo-50 dark:bg-indigo-950/30",
+            path: paths.operations.woBasicDetailCreatePage
+        },
     ];
 
     // Update current time

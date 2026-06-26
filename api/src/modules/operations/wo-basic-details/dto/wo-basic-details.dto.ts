@@ -14,6 +14,11 @@ export const CreateWoBasicDetailSchema = z.object({
   tenderId: z.number().int().positive().optional(),
   enquiryId: z.number().int().positive().optional(),
 
+  // Non-tender source identifiers (for project creation without a tender)
+  organizationId: z.number().int().positive().optional(),
+  itemId: z.number().int().positive().optional(),
+  locationId: z.number().int().positive().optional(),
+
   // Core WO information
   woNumber: z.string().max(255).optional(),
   woDate: z.string().date().optional(), // ISO date string "YYYY-MM-DD"

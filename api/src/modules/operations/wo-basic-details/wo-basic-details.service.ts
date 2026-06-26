@@ -392,6 +392,9 @@ export class WoBasicDetailsService {
 
             teamId = tender.teamId;
             prevStatus = tender.status;
+        } else if (data.teamId) {
+            // For non-tender WOs, use the provided teamId directly
+            teamId = data.teamId;
         }
 
         const insertValues = this.mapCreateToDb(data);
@@ -441,7 +444,7 @@ export class WoBasicDetailsService {
                 let locationId: number | null = null;
                 let organisationId: number | null = null;
 
-                // Fetch details from tender (required for project creation)
+                // Fetch details from tender or use DTO-provided values (non-tender)
                 if (data.tenderId) {
                     const [tender] = await this.db
                         .select({
@@ -464,9 +467,11 @@ export class WoBasicDetailsService {
                     locationId = tender.locationId;
                     organisationId = tender.organisationId;
                 } else {
-                    // No tender linked - cannot create project without item
-                    this.logger.warn(`No tender linked to WO Basic Detail: ${woBasicDetailId}, skipping project creation`);
-                    return;
+                    // Non-tender WO: use values provided directly in the DTO
+                    teamId = data.teamId ?? null;
+                    itemId = data.itemId ?? null;
+                    locationId = data.locationId ?? null;
+                    organisationId = data.organizationId ?? null;
                 }
 
                 // Validate required field
