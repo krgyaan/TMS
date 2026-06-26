@@ -209,6 +209,84 @@ export class PayOnPortalService {
         return wrapPaginatedResponse(data, total, page, limit);
     }
 
+    async getExportData(
+        tab?: string,
+        options?: {
+            teamId?: number;
+        },
+    ): Promise<{ data: any[] }> {
+        const conditions = this.buildPopDashboardConditions(tab);
+
+        const teamId = options?.teamId;
+        if (teamId) {
+            conditions.push(sql`COALESCE(${tenderInfos.team}, ${this.requesterUser.team}) = ${teamId}`);
+        }
+
+        const whereClause = and(...conditions);
+
+        const rows = await this.db
+            .select({
+                id: paymentInstruments.id,
+                requestId: paymentRequests.id,
+                type: paymentRequests.type,
+                purpose: paymentRequests.purpose,
+                date: instrumentTransferDetails.transactionDate,
+                teamMember: users.name,
+                utrNo: instrumentTransferDetails.utrNum,
+                utr: paymentInstruments.utr,
+                portalName: instrumentTransferDetails.portalName,
+                tenderName: tenderInfos.tenderName,
+                tenderNo: tenderInfos.tenderNo,
+                bidValidity: tenderInfos.dueDate,
+                tenderStatus: statuses.name,
+                amount: paymentInstruments.amount,
+                popStatus: paymentInstruments.status,
+                action: paymentInstruments.action,
+                utrMsg: instrumentTransferDetails.utrMsg,
+                returnTransferDate: instrumentTransferDetails.returnTransferDate,
+                returnUtr: instrumentTransferDetails.returnUtr,
+                remarks: instrumentTransferDetails.remarks,
+                reason: instrumentTransferDetails.reason,
+                transactionDate: instrumentTransferDetails.transactionDate,
+            })
+            .from(paymentInstruments)
+            .innerJoin(paymentRequests, eq(paymentRequests.id, paymentInstruments.requestId))
+            .leftJoin(tenderInfos, eq(tenderInfos.id, paymentRequests.tenderId))
+            .leftJoin(instrumentTransferDetails, eq(instrumentTransferDetails.instrumentId, paymentInstruments.id))
+            .leftJoin(users, eq(users.id, paymentRequests.requestedBy))
+            .leftJoin(this.requesterUser, eq(this.requesterUser.id, paymentRequests.requestedBy))
+            .leftJoin(statuses, eq(statuses.id, tenderInfos.status))
+            .where(whereClause)
+            .orderBy(desc(paymentInstruments.createdAt));
+
+        const data = rows.map((row) => ({
+            id: row.id,
+            requestId: row.requestId,
+            type: row.type,
+            purpose: row.purpose,
+            date: row.date ? new Date(row.date) : null,
+            teamMember: row.teamMember,
+            utrNo: row.utrNo,
+            utr: row.utr,
+            portalName: row.portalName,
+            tenderName: row.tenderName,
+            tenderNo: row.tenderNo,
+            bidValidity: row.bidValidity ? new Date(row.bidValidity) : null,
+            tenderStatus: row.tenderStatus,
+            amount: row.amount ? Number(row.amount) : null,
+            popStatus: this.statusMap()[row.popStatus],
+            action: row.action,
+            utrMsg: row.utrMsg,
+            returnTransferDate: row.returnTransferDate ? new Date(row.returnTransferDate) : null,
+            returnUtr: row.returnUtr,
+            remarks: row.remarks,
+            rejectionReason: row.reason,
+            transactionDate: row.transactionDate ? new Date(row.transactionDate) : null,
+        }));
+
+        return { data };
+    }
+
     private async countPopByConditions(conditions: any[]) {
         const [result] = await this.db
             .select({ count: sql<number>`count(distinct ${paymentInstruments.id})` })

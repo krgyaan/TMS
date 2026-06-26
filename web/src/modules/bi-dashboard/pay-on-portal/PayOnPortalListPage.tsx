@@ -108,7 +108,7 @@ const PayOnPortalListPage = () => {
 
     const { exportTab, setExportTab, exporting, handleExport, exportOptions } = useBiExport({
         getAllFn: (params) => payOnPortalsService.getAll(params),
-        getActionFormDataFn: (id) => payOnPortalsService.getActionFormData(id),
+        getExportDataFn: (params) => payOnPortalsService.getExportData(params),
         tabsConfig: TABS_CONFIG,
         pendingTabKey: 'pending',
         tabsWithForm: ['accepted', 'rejected', 'returned', 'settled'],
