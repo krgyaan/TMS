@@ -323,7 +323,7 @@ export class CostingSheetsService {
             .where(eq(tenderCostingSheets.tenderId, tenderId))
             .limit(1);
             
-        if (!sheet) throw new NotFoundException('Costing sheet not found');
+        if (!sheet) return null;
 
         const details = await this.db
             .select()
