@@ -42,7 +42,7 @@ export default function BidMarkMissedPage() {
                 teamMemberName: tenderDetails.teamMemberName as string,
                 emdAmount: tenderDetails.emd as string,
                 gstValues: Number(tenderDetails.gstValues) || 0,
-                finalCosting: costingSheet?.finalPrice || null,
+                finalCosting: costingSheet?.details?.reduce((sum, d) => sum + Number(d.finalPrice || 0), 0).toString() || null,
             }}
             stage ={stage}
         />

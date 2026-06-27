@@ -94,7 +94,7 @@ export default function BidSubmitPage() {
                     teamMemberName: tenderDetails.teamMemberName as string,
                     emdAmount: tenderDetails.emd,
                     gstValues: Number(tenderDetails.gstValues) || 0,
-                    finalCosting: costingSheet.finalPrice,
+                    finalCosting: costingSheet.details.reduce((sum, d) => sum + Number(d.finalPrice || 0), 0).toString(),
                 }}
                 mode="submit"
                 isChecklistFulfilled={isChecklistFulfilled}

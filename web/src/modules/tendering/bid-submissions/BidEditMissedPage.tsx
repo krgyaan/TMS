@@ -54,7 +54,7 @@ export default function BidEditMissedPage() {
                 teamMemberName: tenderDetails.teamMemberName as string,
                 emdAmount: tenderDetails.emd,
                 gstValues: Number(tenderDetails.gstValues) || 0,
-                finalCosting: costingSheet?.finalPrice || null,
+                finalCosting: costingSheet?.details?.reduce((sum, d) => sum + Number(d.finalPrice || 0), 0).toString() || null,
             }}
             mode="edit"
             existingData={bidSubmission}
