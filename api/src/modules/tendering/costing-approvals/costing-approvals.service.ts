@@ -442,7 +442,7 @@ export class CostingApprovalsService {
         });
 
         if (updatedDetails.length > 0) {
-            await this.sendCostingSheetApprovedEmail(tenderId, updatedDetails[0], userId);
+            await this.sendCostingSheetApprovedEmail(tenderId, updatedDetails, userId);
         }
 
         try {
@@ -537,7 +537,7 @@ export class CostingApprovalsService {
             ))
             .returning();
 
-        await this.sendCostingSheetRejectedEmail(tenderId, updated[0], userId);
+        await this.sendCostingSheetRejectedEmail(tenderId, updated, userId);
         return updated;
     }
 
@@ -684,7 +684,7 @@ export class CostingApprovalsService {
         });
 
         if (updatedDetails.length > 0) {
-            await this.sendCostingSheetApprovedEmail(tenderId, updatedDetails[0], userId);
+            await this.sendCostingSheetApprovedEmail(tenderId, updatedDetails, userId);
         }
 
         try {
@@ -725,7 +725,7 @@ export class CostingApprovalsService {
 
     private async sendCostingSheetApprovedEmail(
         tenderId: number,
-        costingDetail: { googleSheetUrl?: string | null; finalPrice: string | null; tlRemarks: string | null },
+        approvedDetails: any[],
         approvedBy: number
     ) {
         const tender = await this.tenderInfosService.findById(tenderId);
@@ -762,13 +762,28 @@ export class CostingApprovalsService {
             return isNaN(num) ? value : `₹${num.toLocaleString('en-IN')}`;
         };
 
+        const totals = approvedDetails.reduce((acc, d) => ({
+            finalPrice: acc.finalPrice + Number(d.finalPrice || 0),
+            receipt: acc.receipt + Number(d.receiptPrice || 0),
+            budget: acc.budget + Number(d.budgetPrice || 0),
+        }), { finalPrice: 0, receipt: 0, budget: 0 });
+
         const emailData = {
             te_name: teUser.name,
             tender_name: tender.tenderName,
             costing_sheet_link: sheet?.googleSheetUrl || '#',
             tender_value: formatCurrency(tender.gstValues),
-            approved_final_price: formatCurrency(costingDetail.finalPrice),
-            remarks: costingDetail.tlRemarks || 'None',
+            details: approvedDetails.map((d: any, i: number) => ({
+                index: i + 1,
+                approvedFinalPrice: formatCurrency(d.finalPrice),
+                approvedReceipt: formatCurrency(d.receiptPrice),
+                approvedBudget: formatCurrency(d.budgetPrice),
+                approvedGrossMargin: d.grossMargin ? `${d.grossMargin}%` : '0%',
+                tlRemarks: d.tlRemarks || '—',
+            })),
+            totalApprovedFinalPrice: formatCurrency(totals.finalPrice.toString()),
+            totalApprovedReceipt: formatCurrency(totals.receipt.toString()),
+            totalApprovedBudget: formatCurrency(totals.budget.toString()),
             due_date_time: dueDateTime,
             tl_name: tlName,
         };
@@ -784,7 +799,7 @@ export class CostingApprovalsService {
 
     private async sendCostingSheetRejectedEmail(
         tenderId: number,
-        costingDetail: { googleSheetUrl?: string | null; rejectionReason: string | null },
+        rejectedDetails: any[],
         rejectedBy: number
     ) {
         const tender = await this.tenderInfosService.findById(tenderId);
@@ -818,6 +833,10 @@ export class CostingApprovalsService {
             teName: teUser.name,
             tenderName: tender.tenderName,
             costingSheetLink: sheet?.googleSheetUrl || '#',
+            details: rejectedDetails.map((d: any, i: number) => ({
+                index: i + 1,
+                rejectionReason: d.rejectionReason || '—',
+            })),
             dueDate, dueTime, tlName,
         };
 

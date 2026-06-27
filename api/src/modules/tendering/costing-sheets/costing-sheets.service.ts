@@ -457,7 +457,7 @@ export class CostingSheetsService {
             return created;
         });
 
-        await this.sendCostingSheetSubmittedEmail(data.tenderId, result[0], data.submittedBy);
+        await this.sendCostingSheetSubmittedEmail(data.tenderId, result, data.submittedBy);
 
         try {
             await this.timersService.stopTimer({
@@ -566,7 +566,7 @@ export class CostingSheetsService {
             return updated;
         });
 
-        await this.sendCostingSheetSubmittedEmail(sheet.tenderId, result[0], changedBy);
+        await this.sendCostingSheetSubmittedEmail(sheet.tenderId, result, changedBy);
 
         try {
             await this.timersService.stopTimer({
@@ -844,10 +844,9 @@ export class CostingSheetsService {
 
     private async sendCostingSheetSubmittedEmail(
         tenderId: number,
-        costingDetail: { googleSheetUrl?: string | null; submittedFinalPrice: string | null; submittedReceiptPrice: string | null; submittedBudgetPrice: string | null; submittedGrossMargin: string | null; teRemarks: string | null },
+        costingDetails: any[],
         submittedBy: number
     ) {
-        // Get sheet URL if available
         const sheet = await this.db
             .select({ googleSheetUrl: tenderCostingSheets.googleSheetUrl })
             .from(tenderCostingSheets)
@@ -881,16 +880,28 @@ export class CostingSheetsService {
             return isNaN(num) ? value : `₹${num.toLocaleString('en-IN')}`;
         };
 
+        const totals = costingDetails.reduce((acc, d) => ({
+            finalPrice: acc.finalPrice + Number(d.submittedFinalPrice || 0),
+            receipt: acc.receipt + Number(d.submittedReceiptPrice || 0),
+            budget: acc.budget + Number(d.submittedBudgetPrice || 0),
+        }), { finalPrice: 0, receipt: 0, budget: 0 });
+
         const emailData = {
             tlName,
             tender_name: tender.tenderName,
             costingSheetLink: sheet?.googleSheetUrl || '#',
             tenderValue: formatCurrency(tender.gstValues),
-            finalPrice: formatCurrency(costingDetail.submittedFinalPrice),
-            receipt: formatCurrency(costingDetail.submittedReceiptPrice),
-            budget: formatCurrency(costingDetail.submittedBudgetPrice),
-            grossMargin: costingDetail.submittedGrossMargin ? `${costingDetail.submittedGrossMargin}%` : '0%',
-            remarks: costingDetail.teRemarks || 'None',
+            details: costingDetails.map((d: any, i: number) => ({
+                index: i + 1,
+                finalPrice: formatCurrency(d.submittedFinalPrice),
+                receipt: formatCurrency(d.submittedReceiptPrice),
+                budget: formatCurrency(d.submittedBudgetPrice),
+                grossMargin: d.submittedGrossMargin ? `${d.submittedGrossMargin}%` : '0%',
+                remarks: d.teRemarks || '—',
+            })),
+            totalFinalPrice: formatCurrency(totals.finalPrice.toString()),
+            totalReceipt: formatCurrency(totals.receipt.toString()),
+            totalBudget: formatCurrency(totals.budget.toString()),
             dueDate, dueTime, teName,
         };
 
