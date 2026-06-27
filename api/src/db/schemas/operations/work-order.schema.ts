@@ -79,7 +79,10 @@ export const woDetails = pgTable("wo_details", {
         tenderInfo: boolean;
         emdInformation: boolean;
         physicalDocumentsSubmission: boolean;
-        rfqAndQuotation: boolean;
+        rfq: boolean;
+        quotation: boolean;
+        tqDocument: boolean;
+        priceBreakup: boolean;
         documentChecklist: boolean;
         costingSheet: boolean;
         result: boolean;
@@ -94,11 +97,11 @@ export const woDetails = pgTable("wo_details", {
     maxLdDate: date("max_ld_date"),
 
     isPbgApplicable: boolean("is_pbg_applicable").default(false),
-    filledBgFormat: varchar("filled_bg_format", { length: 255 }),
+    filledBgFormat: jsonb("filled_bg_format").$type<string[]>(),
     pbgBgId: bigint("pbg_bg_id", { mode: "number" }),
 
     isContractAgreement: boolean("is_contract_agreement").default(false),
-    contractAgreementFormat: varchar("contract_agreement_format", { length: 255 }),
+    contractAgreementFormat: jsonb("contract_agreement_format").$type<string[]>(),
 
     detailedPoApplicable: boolean("detailed_po_applicable").default(false),
     detailedPoFollowupId: bigint("detailed_po_followup_id", { mode: "number" }),

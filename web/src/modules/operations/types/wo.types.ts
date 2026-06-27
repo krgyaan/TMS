@@ -317,10 +317,10 @@ export interface WoDetail {
   ldStartDate: string | null;
   maxLdDate: string | null;
   isPbgApplicable: boolean;
-  filledBgFormat: string | null;
+  filledBgFormat: string[];
   pbgBgId: number | null;
   isContractAgreement: boolean;
-  contractAgreementFormat: string | null;
+  contractAgreementFormat: string[];
   detailedPoApplicable: boolean;
   detailedPoFollowupId: number | null;
 
@@ -414,10 +414,10 @@ export interface UpdateWoDetailDto {
   ldStartDate?: string;
   maxLdDate?: string;
   isPbgApplicable?: boolean;
-  filledBgFormat?: string;
+  filledBgFormat?: string[];
   pbgBgId?: number;
   isContractAgreement?: boolean;
-  contractAgreementFormat?: string;
+  contractAgreementFormat?: string[];
   detailedPoApplicable?: boolean;
   detailedPoFollowupId?: number;
 
@@ -1038,10 +1038,10 @@ export interface Page2Data {
   ldStartDate: string | null;
   maxLdDate: string | null;
   isPbgApplicable: boolean;
-  filledBgFormat: string | null;
+  filledBgFormat: string[];
   pbgBgId: number | null;
   isContractAgreement: boolean;
-  contractAgreementFormat: string | null;
+  contractAgreementFormat: string[];
   detailedPoApplicable: boolean;
   detailedPoFollowupId: number | null;
 }

@@ -5,6 +5,7 @@ import { Form, FormControl, FormField, FormItem, FormMessage } from "@/component
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { useAutoSave } from "@/hooks/api/useWoDetails";
+import { infoSheetsService } from "@/services/api/info-sheet.service";
 import { WizardNavigation } from "@/modules/operations/wo-details/components/WizardNavigation";
 import { DEPARTMENT_OPTIONS, TENDER_CHECKLIST_ITEMS, WIZARD_CONFIG, YES_NO_OPTIONS } from "@/modules/operations/wo-details/helpers/constants";
 import { Page1FormSchema } from "@/modules/operations/wo-details/helpers/woDetail.schema";
@@ -37,7 +38,10 @@ const defaultChecklist: Page1FormValues["tenderDocumentsChecklist"] = {
     tenderInfo: "false",
     emdInformation: "false",
     physicalDocumentsSubmission: "false",
-    rfqAndQuotation: "false",
+    rfq: "false",
+    quotation: "false",
+    tqDocument: "false",
+    priceBreakup: "false",
     documentChecklist: "false",
     costingSheet: "false",
     result: "false",
@@ -45,6 +49,7 @@ const defaultChecklist: Page1FormValues["tenderDocumentsChecklist"] = {
 
 export function Page1Handover({
     woDetailId,
+    tenderId,
     initialData,
     onSaveDraft,
     onSaveDraftOnly,
@@ -70,6 +75,32 @@ export function Page1Handover({
     });
 
     const { autoSave, isSaving: isAutoSaving } = useAutoSave(woDetailId, 1);
+
+    useEffect(() => {
+        if (!tenderId) return;
+        const currentContacts = form.getValues("contacts");
+        if (currentContacts?.length && currentContacts.some((c) => c.name)) return;
+
+        (async () => {
+            try {
+                const result = await infoSheetsService.getTenderContacts(tenderId);
+                if (result?.contacts?.length > 0) {
+                    form.setValue("contacts", result.contacts.map((c) => ({
+                        name: c.name,
+                        designation: "",
+                        phone: c.phone ?? "",
+                        email: c.email ?? "",
+                        organization: result.organisationName,
+                        departments: undefined,
+                    })), { shouldValidate: false });
+                } else if (result?.organisationName) {
+                    form.setValue("contacts.0.organization", result.organisationName, { shouldValidate: false });
+                }
+            } catch (err) {
+                console.error("Failed to load tender contacts:", err);
+            }
+        })();
+    }, [tenderId, form]);
 
     useEffect(() => {
         const subscription = form.watch((values) => {

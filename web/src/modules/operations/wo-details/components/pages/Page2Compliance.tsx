@@ -1,7 +1,7 @@
 import { ConditionalSection } from "@/components/form/ConditionalSection";
 import { DateInput } from "@/components/form/DateInput";
-import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
+import { TenderFileUploader } from "@/components/tender-file-upload/TenderFileUploader";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -18,6 +18,7 @@ import { Page2FormSchema } from "../../helpers/woDetail.schema";
 import { WizardNavigation } from "../WizardNavigation";
 
 import type { Page2FormValues, PageFormProps } from "../../helpers/woDetail.types";
+import FieldWrapper from "@/components/form/FieldWrapper";
 
 interface Page2ComplianceProps extends PageFormProps {
     initialData?: Partial<Page2FormValues>;
@@ -29,9 +30,9 @@ const defaultValues: Page2FormValues = {
     ldStartDate: "",
     maxLdDate: "",
     isPbgApplicable: "false",
-    filledBgFormat: "",
+    filledBgFormat: [],
     isContractAgreement: "false",
-    contractAgreementFormat: "",
+    contractAgreementFormat: [],
     detailedPoApplicable: "false",
 };
 
@@ -168,9 +169,14 @@ export function Page2Compliance({
                                     placeholder="Select"
                                 />
                                 <ConditionalSection show={watchPbgApplicable === "true"}>
-                                    <FieldWrapper control={form.control} name="filledBgFormat" label="BG Format Required">
-                                        {(field) => <Input {...field} placeholder="Enter BG format name or code" />}
-                                    </FieldWrapper>
+                                    <div className="space-y-1">
+                                        <label className="text-sm font-medium">BG Format / Instrument File</label>
+                                        <TenderFileUploader
+                                            context="tender-documents"
+                                            value={form.watch("filledBgFormat") || []}
+                                            onChange={(paths) => form.setValue("filledBgFormat", paths, { shouldValidate: true })}
+                                        />
+                                    </div>
                                 </ConditionalSection>
                             </div>
                             <ConditionalSection show={watchPbgApplicable === "true"}>
@@ -201,9 +207,14 @@ export function Page2Compliance({
                                     placeholder="Select"
                                 />
                                 <ConditionalSection show={watchContractAgreement === "true"}>
-                                    <FieldWrapper control={form.control} name="contractAgreementFormat" label="Contract Agreement Format">
-                                        {(field) => <Input {...field} placeholder="Specify contract format" />}
-                                    </FieldWrapper>
+                                    <div className="space-y-1">
+                                        <label className="text-sm font-medium">Contract Agreement File</label>
+                                        <TenderFileUploader
+                                            context="tender-documents"
+                                            value={form.watch("contractAgreementFormat") || []}
+                                            onChange={(paths) => form.setValue("contractAgreementFormat", paths, { shouldValidate: true })}
+                                        />
+                                    </div>
                                 </ConditionalSection>
                             </div>
                         </div>

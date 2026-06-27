@@ -114,10 +114,10 @@ export interface Page2Data {
   ldStartDate: string;
   maxLdDate: string;
   isPbgApplicable: string;
-  filledBgFormat: string;
+  filledBgFormat: string[];
   pbgBgId?: number;
   isContractAgreement: string;
-  contractAgreementFormat: string;
+  contractAgreementFormat: string[];
   detailedPoApplicable: string;
   detailedPoFollowupId?: number;
 }
@@ -186,10 +186,10 @@ export interface WoDetailData {
   ldStartDate: string | null;
   maxLdDate: string | null;
   isPbgApplicable: string;
-  filledBgFormat: string | null;
+  filledBgFormat: string[];
   pbgBgId: number | null;
   isContractAgreement: string;
-  contractAgreementFormat: string | null;
+  contractAgreementFormat: string[];
   detailedPoApplicable: string;
   detailedPoFollowupId: number | null;
 

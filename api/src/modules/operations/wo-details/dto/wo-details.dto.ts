@@ -73,7 +73,10 @@ export const TenderDocumentsChecklistSchema = z.object({
   tenderInfo: BooleanSchema.default(false),
   emdInformation: BooleanSchema.default(false),
   physicalDocumentsSubmission: BooleanSchema.default(false),
-  rfqAndQuotation: BooleanSchema.default(false),
+  rfq: BooleanSchema.default(false),
+  quotation: BooleanSchema.default(false),
+  tqDocument: BooleanSchema.default(false),
+  priceBreakup: BooleanSchema.default(false),
   documentChecklist: BooleanSchema.default(false),
   costingSheet: BooleanSchema.default(false),
   result: BooleanSchema.default(false),
@@ -109,10 +112,10 @@ export const UpdateWoDetailSchema = z.object({
   ldStartDate: z.string().date().nullable().optional(),
   maxLdDate: z.string().date().nullable().optional(),
   isPbgApplicable: OptionalBooleanSchema,
-  filledBgFormat: z.string().max(255).nullable().optional(),
+  filledBgFormat: z.array(z.string()).nullable().optional(),
   pbgBgId: z.number().int().positive().nullable().optional(),
   isContractAgreement: OptionalBooleanSchema,
-  contractAgreementFormat: z.string().max(255).nullable().optional(),
+  contractAgreementFormat: z.array(z.string()).nullable().optional(),
   detailedPoApplicable: OptionalBooleanSchema,
   detailedPoFollowupId: z.number().int().positive().nullable().optional(),
 
@@ -239,10 +242,10 @@ export const SavePage2Schema = z.object({
   ldStartDate: z.string().date().nullable().optional(),
   maxLdDate: z.string().date().nullable().optional(),
   isPbgApplicable: OptionalBooleanSchema,
-  filledBgFormat: z.string().max(255).nullable().optional(),
+  filledBgFormat: z.array(z.string()).nullable().optional(),
   pbgBgId: z.number().int().positive().nullable().optional(),
   isContractAgreement: OptionalBooleanSchema,
-  contractAgreementFormat: z.string().max(255).nullable().optional(),
+  contractAgreementFormat: z.array(z.string()).nullable().optional(),
   detailedPoApplicable: OptionalBooleanSchema,
   detailedPoFollowupId: z.number().int().positive().nullable().optional(),
 });
@@ -254,10 +257,10 @@ export const SubmitPage2Schema = z
     ldStartDate: z.string().date().nullable().optional(),
     maxLdDate: z.string().date().nullable().optional(),
     isPbgApplicable: BooleanSchema,
-    filledBgFormat: z.string().max(255).nullable().optional(),
+    filledBgFormat: z.array(z.string()).nullable().optional(),
     pbgBgId: z.number().int().positive().nullable().optional(),
     isContractAgreement: BooleanSchema,
-    contractAgreementFormat: z.string().max(255).nullable().optional(),
+    contractAgreementFormat: z.array(z.string()).nullable().optional(),
     detailedPoApplicable: BooleanSchema,
     detailedPoFollowupId: z.number().int().positive().nullable().optional(),
   })
@@ -286,7 +289,7 @@ export const SubmitPage2Schema = z
       }
     }
 
-    if (data.isPbgApplicable && !data.filledBgFormat && !data.pbgBgId) {
+    if (data.isPbgApplicable && !data.filledBgFormat?.length && !data.pbgBgId) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: 'BG format or BG ID is required when PBG is applicable',
@@ -294,10 +297,10 @@ export const SubmitPage2Schema = z
       });
     }
 
-    if (data.isContractAgreement && !data.contractAgreementFormat) {
+    if (data.isContractAgreement && !data.contractAgreementFormat?.length) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'Contract agreement format is required',
+        message: 'Contract agreement file is required',
         path: ['contractAgreementFormat'],
       });
     }

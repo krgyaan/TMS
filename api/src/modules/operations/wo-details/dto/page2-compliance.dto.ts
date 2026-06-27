@@ -11,11 +11,11 @@ export const SavePage2Schema = z.object({
   maxLdDate: z.string().date().nullable().optional(),
 
   isPbgApplicable: z.boolean().optional(),
-  filledBgFormat: z.string().max(255).nullable().optional(),
+  filledBgFormat: z.array(z.string()).nullable().optional(),
   pbgBgId: PositiveIntSchema.nullable().optional(),
 
   isContractAgreement: z.boolean().optional(),
-  contractAgreementFormat: z.string().max(255).nullable().optional(),
+  contractAgreementFormat: z.array(z.string()).nullable().optional(),
 
   detailedPoApplicable: z.boolean().optional(),
   detailedPoFollowupId: PositiveIntSchema.nullable().optional(),
@@ -34,11 +34,11 @@ export const SubmitPage2Schema = z
     maxLdDate: z.string().date().nullable().optional(),
 
     isPbgApplicable: z.boolean(),
-    filledBgFormat: z.string().max(255).nullable().optional(),
+    filledBgFormat: z.array(z.string()).nullable().optional(),
     pbgBgId: PositiveIntSchema.nullable().optional(),
 
     isContractAgreement: z.boolean(),
-    contractAgreementFormat: z.string().max(255).nullable().optional(),
+    contractAgreementFormat: z.array(z.string()).nullable().optional(),
 
     detailedPoApplicable: z.boolean(),
     detailedPoFollowupId: PositiveIntSchema.nullable().optional(),
@@ -70,7 +70,7 @@ export const SubmitPage2Schema = z
     }
 
     // Validate PBG fields
-    if (data.isPbgApplicable && !data.filledBgFormat && !data.pbgBgId) {
+    if (data.isPbgApplicable && !data.filledBgFormat?.length && !data.pbgBgId) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Either BG format or BG ID is required when PBG is applicable",
@@ -79,7 +79,7 @@ export const SubmitPage2Schema = z
     }
 
     // Validate Contract Agreement
-    if (data.isContractAgreement && !data.contractAgreementFormat) {
+    if (data.isContractAgreement && !data.contractAgreementFormat?.length) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Contract agreement format is required",
@@ -100,11 +100,11 @@ export const Page2ResponseSchema = z.object({
   maxLdDate: z.string().nullable(),
 
   isPbgApplicable: z.boolean(),
-  filledBgFormat: z.string().nullable(),
+  filledBgFormat: z.array(z.string()).nullable(),
   pbgBgId: z.number().nullable(),
 
   isContractAgreement: z.boolean(),
-  contractAgreementFormat: z.string().nullable(),
+  contractAgreementFormat: z.array(z.string()).nullable(),
 
   detailedPoApplicable: z.boolean(),
   detailedPoFollowupId: z.number().nullable(),

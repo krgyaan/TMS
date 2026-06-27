@@ -28,7 +28,10 @@ const TENDER_CHECKLIST_ITEMS = [
   'tenderInfo',
   'emdInformation',
   'physicalDocumentsSubmission',
-  'rfqAndQuotation',
+  'rfq',
+  'quotation',
+  'tqDocument',
+  'priceBreakup',
   'documentChecklist',
   'costingSheet',
   'result',
@@ -763,14 +766,14 @@ export class WoDetailsService {
 
       if (
         detail.isPbgApplicable &&
-        !detail.filledBgFormat &&
+        !(detail.filledBgFormat as string[] | null)?.length &&
         !detail.pbgBgId
       ) {
         page2Errors.push('PBG details are incomplete');
       }
 
-      if (detail.isContractAgreement && !detail.contractAgreementFormat) {
-        page2Errors.push('Contract agreement format is required');
+      if (detail.isContractAgreement && !(detail.contractAgreementFormat as string[] | null)?.length) {
+        page2Errors.push('Contract agreement file is required');
       }
 
       if (page2Errors.length > 0) {
