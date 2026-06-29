@@ -780,7 +780,7 @@ export class TenderInfosService {
         subject: string,
         template: string,
         data: Record<string, any>,
-        recipients: { to?: RecipientSource[]; cc?: RecipientSource[]; attachments?: { filename: string, path: string }[] }
+        recipients: { to?: RecipientSource[]; cc?: RecipientSource[] }
     ) {
         try {
             await this.emailService.sendTenderEmail({
@@ -792,7 +792,6 @@ export class TenderInfosService {
                 subject,
                 template,
                 data,
-                attachments: recipients.attachments ? { files: recipients.attachments.map(a => a.path) } : undefined,
             });
         } catch (error) {
             this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
@@ -850,6 +849,24 @@ export class TenderInfosService {
             minute: '2-digit',
         }) : 'Not specified';
 
+        const apiUrl = this.configService.get<string>('app.apiUrl') || '';
+
+        // Build document URLs instead of file attachments
+        let documentUrls: string[] = [];
+        if (data.documents) {
+            try {
+                const docPaths = Array.isArray(data.documents)
+                  ? data.documents
+                  : JSON.parse(data.documents);
+
+                if (Array.isArray(docPaths)) {
+                    documentUrls = docPaths.map(path => `${apiUrl}/tender-files/serve/${path}`);
+                }
+            } catch (e) {
+                this.logger.error(`Failed to parse tender documents: ${e}`);
+            }
+        }
+
         const emailData = {
             tenderName: tender.tenderName,
             tenderNo: tender.tenderNo,
@@ -860,27 +877,8 @@ export class TenderInfosService {
             emd: tender.emd ? `₹${Number(tender.emd).toLocaleString('en-IN')}` : 'Not specified',
             remarks: tender.remarks || 'None',
             coordinator: coordinatorName,
+            documentUrls,
         };
-
-        // Parse documents array and map into attachments format
-        let attachments: { filename: string, path: string }[] = [];
-        if (data.documents) {
-            try {
-                // Ensure it's an array for attachment resolution
-                const docPaths = Array.isArray(data.documents)
-                  ? data.documents
-                  : JSON.parse(data.documents);
-
-                if (Array.isArray(docPaths)) {
-                    attachments = docPaths.map(path => ({
-                        filename: path.split('/').pop() || 'document.pdf',
-                        path: path
-                    }));
-                }
-            } catch (e) {
-                this.logger.error(`Failed to parse tender documents for attachment: ${e}`);
-            }
-        }
 
         if (tender.teamMember) {
             // Tender assigned - send to team member, from coordinator
@@ -905,7 +903,6 @@ export class TenderInfosService {
                             { type: 'role', role: 'Team Leader', teamId },
                             { type: 'role', role: 'Admin', teamId },
                         ],
-                        attachments: attachments.length > 0 ? attachments : undefined,
                     }
                 );
             }
@@ -926,7 +923,6 @@ export class TenderInfosService {
                         cc: [
                             { type: 'role', role: 'Admin', teamId },
                         ],
-                        attachments: attachments.length > 0 ? attachments : undefined,
                     }
                 );
             }
@@ -1000,8 +996,10 @@ export class TenderInfosService {
         const coordinatorUserId = await this.getCoordinatorUserId(teamId)  || 8;
         if (!coordinatorUserId) return;
 
-        // Collect newly updated documents or existing documents if not updated
-        let attachments: { filename: string, path: string }[] = [];
+        const apiUrl = this.configService.get<string>('app.apiUrl') || '';
+
+        // Build document URLs instead of file attachments
+        let documentUrls: string[] = [];
         const documentsString = changedData.documents !== undefined ? changedData.documents : newTender.documents;
 
         if (documentsString) {
@@ -1011,13 +1009,10 @@ export class TenderInfosService {
                   : JSON.parse(documentsString);
 
                 if (Array.isArray(docPaths)) {
-                    attachments = docPaths.map(path => ({
-                        filename: path.split('/').pop() || 'document.pdf',
-                        path: path
-                    }));
+                    documentUrls = docPaths.map(path => `${apiUrl}/tender-files/serve/${path}`);
                 }
             } catch (e) {
-                this.logger.error(`Failed to parse tender documents for attachment in update: ${e}`);
+                this.logger.error(`Failed to parse tender documents for update: ${e}`);
             }
         }
 
@@ -1043,6 +1038,7 @@ export class TenderInfosService {
                 isTeamMemberChange,
                 isTeamChange,
                 isTenderNoChange,
+                documentUrls,
             },
             {
                 to: [{ type: 'user', userId: newTender.teamMember }],
@@ -1050,7 +1046,6 @@ export class TenderInfosService {
                     { type: 'role', role: 'Team Leader', teamId },
                     { type: 'role', role: 'Admin', teamId },
                 ],
-                attachments: attachments.length > 0 ? attachments : undefined,
             }
         );
     }
