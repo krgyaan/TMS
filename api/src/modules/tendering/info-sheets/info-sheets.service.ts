@@ -1488,7 +1488,7 @@ export class TenderInfoSheetsService {
             te_final_remark: infoSheet.teFinalRemark || null,
 
             // ── Link / Assignee 
-            link: `/tendering/tender-approvals/${tenderId}/approval`,
+            link: `${this.configService.get<string>('app.publicAppUrl')}/tendering/tender-approvals/${tenderId}/approval`,
             assignee: assignee.name,
         };
 

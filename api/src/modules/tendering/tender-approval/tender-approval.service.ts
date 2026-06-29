@@ -862,9 +862,10 @@ export class TenderApprovalService {
         const isReview = payload.tlStatus === "3";
 
         // Generate links (TODO: Update with actual frontend URLs)
-        const emdLink = `#/tendering/emds?tenderId=${tenderId}`;
-        const tenderFeesLink = `#/tendering/tender-fees?tenderId=${tenderId}`;
-        const rfqLink = `#/tendering/rfqs?tenderId=${tenderId}`;
+        const publicAppUrl = this.configService.get<string>('app.publicAppUrl') || '';
+        const emdLink = `${publicAppUrl}/tendering/emds?tenderId=${tenderId}`;
+        const tenderFeesLink = `${publicAppUrl}/tendering/tender-fees?tenderId=${tenderId}`;
+        const rfqLink = `${publicAppUrl}/tendering/rfqs?tenderId=${tenderId}`;
 
         // Get vendor names from rfqTo
         let vendor = "Selected Vendors";

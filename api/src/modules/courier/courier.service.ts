@@ -1,5 +1,6 @@
 // src/modules/courier/courier.service.ts
 import { Inject, Injectable, ForbiddenException, NotFoundException, BadRequestException, LoggerService } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { eq, and, desc } from "drizzle-orm";
 
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
@@ -57,7 +58,8 @@ export class CourierService {
         private readonly mailerService: MailerService,
         private readonly googleService: GoogleService,
 
-        private readonly mailAudience: MailAudienceService
+        private readonly mailAudience: MailAudienceService,
+        private readonly configService: ConfigService,
     ) {}
 
     //General db helper functions to carry out simple DB ops
@@ -349,7 +351,7 @@ export class CourierService {
                         {
                             ...courier,
                             fromName: fromUser?.name ?? "",
-                            dispatchLink: `${process.env.FRONTEND_URL}/shared/couriers/dispatch/${courier.id}`,
+                            dispatchLink: `${this.configService.get<string>('app.publicAppUrl')}/shared/couriers/dispatch/${courier.id}`,
                         },
                         {
                             to: Array.isArray(toEmail) ? toEmail : [toEmail],

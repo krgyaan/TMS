@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, Inject, LoggerService, InternalServerErrorException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { eq, ne, and, or, isNull, sql, desc, asc, like, SQL, inArray, ilike, lte, gt } from "drizzle-orm";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
@@ -64,6 +65,7 @@ export class FollowUpService {
 
         private readonly mailAudience: MailAudienceService,
         private readonly clientDirectorySyncService: ClientDirectorySyncService,
+        private readonly configService: ConfigService,
     ) {}
 
     // ========================
@@ -229,7 +231,7 @@ export class FollowUpService {
                         organizationName: followUp.partyName,
                         followUpFor: followUp.followupFor,
                         followUpInitiator: fromUser?.name ?? "",
-                        formLink: `${process.env.FRONTEND_URL}/shared/follow-up/edit/${followUp.id}`,
+                        formLink: `${this.configService.get<string>('app.publicAppUrl')}/shared/follow-up/edit/${followUp.id}`,
                         comment: followUp.comment ?? "",
                     };
 

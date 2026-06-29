@@ -1,4 +1,5 @@
 import { Inject, Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { eq, and, inArray, isNull, notInArray, sql, desc, asc, SQL } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
@@ -45,6 +46,7 @@ export class TenderInfosService {
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
         private readonly timersService: TimersService,
+        private readonly configService: ConfigService,
     ) { }
 
     static getExcludeStatusCondition(categories: string[]) {
@@ -895,7 +897,7 @@ export class TenderInfosService {
                     {
                         ...emailData,
                         assignee: assignee.name,
-                        tenderInfoSheet: `/tendering/info-sheet/${tender.id}`,
+                        tenderInfoSheet: `${this.configService.get<string>('app.publicAppUrl')}/tendering/info-sheet/${tender.id}`,
                     },
                     {
                         to: [{ type: 'user', userId: tender.teamMember }],
