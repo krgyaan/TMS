@@ -80,12 +80,18 @@ export interface FullProfile {
   gender: string | null;
   maritalStatus: string | null;
   nationality: string | null;
+  personalEmail: string | null;
+  bloodGroup: string | null;
+  linkedinProfile: string | null;
   aadharNumber: string | null;
   panNumber: string | null;
   currentAddress: Record<string, any>;
   permanentAddress: Record<string, any>;
   emergencyContact: Record<string, any>;
   // HR
+  designation: string | null;
+  department: string | null;
+  reportingTl: string | null;
   employeeType: string | null;
   workLocation: string | null;
   dateOfJoining: string | null;
@@ -93,13 +99,20 @@ export interface FullProfile {
   probationEndDate: string | null;
   salaryType: string | null;
   basicSalary: string | null;
-  bankName: string | null;
-  accountNumber: string | null;
-  ifscCode: string | null;
+  hra: string | null;
+  allowances: string | null;
+  bonus: string | null;
+  pfApplicable: boolean;
+  esicApplicable: boolean;
   hrCompleted: boolean;
   employeeCompleted: boolean;
   updatedAt: string;
   createdAt: string;
+  // Lists
+  education: any[];
+  experience: any[];
+  bankDetails: any[];
+  documents: any[];
 }
 
 export interface UpdateProfileDto {

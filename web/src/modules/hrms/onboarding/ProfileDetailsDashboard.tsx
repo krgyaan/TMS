@@ -42,6 +42,7 @@ import {
   X,
   AlertTriangle,
   FileText,
+  DollarSign,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useProfileList, useProfile, useUpdateProfile } from "./useOnboarding";
@@ -81,12 +82,16 @@ const getInitials = (name: string) => {
   return name.slice(0, 2).toUpperCase();
 };
 
-const formatDate = (d: string) =>
-  new Date(d).toLocaleDateString("en-GB", {
+const formatDate = (d: string | null | undefined) => {
+  if (!d) return "—";
+  const dateObj = new Date(d);
+  if (isNaN(dateObj.getTime())) return "—";
+  return dateObj.toLocaleDateString("en-GB", {
     day: "2-digit",
     month: "short",
     year: "numeric",
   });
+};
 
 const timeAgo = (d: string) => {
   const diff = Date.now() - new Date(d).getTime();
@@ -333,6 +338,67 @@ const ReviewModal: React.FC<ReviewModalProps> = ({ profileId, open, onClose }) =
                 <Field label="Aadhar Number" value={profile.aadharNumber} />
                 <Field label="PAN Number" value={profile.panNumber} />
               </DetailSection>
+
+              <Separator />
+
+              {/* Work Details */}
+              <DetailSection icon={Briefcase} title="Work Information">
+                <Field label="Designation" value={profile.designation} />
+                <Field label="Department" value={profile.department} />
+                <Field label="Reporting TL" value={profile.reportingTl} />
+                <Field label="Employee Type" value={profile.employeeType} />
+                <Field label="Work Location" value={profile.workLocation} />
+                <Field label="Date of Joining" value={profile.dateOfJoining ? formatDate(profile.dateOfJoining) : null} />
+                <Field label="Probation Months" value={profile.probationMonths} />
+                <Field label="Probation End Date" value={profile.probationEndDate ? formatDate(profile.probationEndDate) : null} />
+              </DetailSection>
+
+              <Separator />
+
+              {/* Compensation */}
+              <DetailSection icon={DollarSign} title="Compensation Details">
+                <Field label="Salary Type" value={profile.salaryType} />
+                <Field label="Basic Salary" value={profile.basicSalary} />
+                <Field label="HRA" value={profile.hra} />
+                <Field label="Allowances" value={profile.allowances} />
+                <Field label="Bonus" value={profile.bonus} />
+                <Field label="PF Applicable" value={profile.pfApplicable ? "Yes" : "No"} />
+                <Field label="ESIC Applicable" value={profile.esicApplicable ? "Yes" : "No"} />
+              </DetailSection>
+
+              {profile.bankDetails && profile.bankDetails.length > 0 && (
+                <>
+                  <Separator />
+                  <DetailSection icon={Building2} title="Bank Details">
+                    <div className="col-span-2 space-y-3">
+                      {profile.bankDetails.map((bank: any, index: number) => (
+                        <div key={bank.id || index} className="p-3 rounded-lg border bg-muted/20 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-foreground">
+                              {bank.bankName} {bank.isPrimary && (
+                                <Badge variant="secondary" className="ml-2 text-[9px] px-1.5 py-0 bg-primary/10 text-primary border-0">
+                                  Primary
+                                </Badge>
+                              )}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground uppercase">{bank.ifscCode}</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                              <span className="text-muted-foreground block text-[10px]">Account Holder</span>
+                              <span className="font-medium text-foreground">{bank.accountHolderName}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground block text-[10px]">Account Number</span>
+                              <span className="font-medium text-foreground">{bank.accountNumber}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </DetailSection>
+                </>
+              )}
 
               <Separator />
 

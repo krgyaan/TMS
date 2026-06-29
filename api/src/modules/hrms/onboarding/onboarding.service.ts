@@ -906,7 +906,7 @@ export class OnboardingService {
         name: onboardingRequests.name,
         email: onboardingRequests.email,
         personalEmail: onboardingProfiles.email,
-        phone: onboardingRequests.phone,
+        phone: onboardingProfiles.phone,
         profileStatus: onboardingRequests.profileStatus,
         hrStatus: onboardingProfiles.hrStatus,
         progress: onboardingRequests.progress,
@@ -1012,8 +1012,30 @@ export class OnboardingService {
 
     return {
       ...profileRow.profile,
-      ...request,
+      // request fields
+      onboardingStatus: request.status,
+      onboardingHrStatus: request.hrStatus,
+      profileStatus: request.profileStatus,
+      documentStatus: request.documentStatus,
+      educationStatus: request.educationStatus,
+      experienceStatus: request.experienceStatus,
+      bankStatus: request.bankStatus,
+      inductionStatus: request.inductionStatus,
+      progress: request.progress,
+      approvedAt: request.approvedAt,
+      reviewedBy: request.reviewedBy,
+      
+      // Explicit overrides for profile fields to ensure they are not overwritten by request fields
+      id: profileRow.profile.id,
+      onboardingId: id,
+      name: request.name,
+      email: request.email,
       personalEmail: profileRow.profile.email,
+      phone: profileRow.profile.phone || request.phone,
+      status: profileRow.profile.status,
+      hrStatus: profileRow.profile.hrStatus,
+      hrRemark: profileRow.profile.hrRemark,
+      
       designation: profileRow.designationName,
       department: profileRow.departmentName,
       reportingTl: profileRow.reportingTlName,
@@ -1024,7 +1046,6 @@ export class OnboardingService {
         ...d,
         fileName: d.fileUrl ? d.fileUrl.split('/').pop() : null,
       })),
-      onboardingId: id,
     };
   }
 
