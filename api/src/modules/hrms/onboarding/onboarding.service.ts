@@ -1707,24 +1707,24 @@ export class OnboardingService {
             .where(
               and(
                 eq(employeeDocuments.userId, onboardingRequest.userId),
-                eq(employeeDocuments.docType, doc.docType),
+                eq(employeeDocuments.docType, doc.docType!),
               ),
             );
 
           // Insert into employeeDocuments
           await tx.insert(employeeDocuments).values({
             userId: onboardingRequest.userId,
-            docCategory: doc.docCategory,
-            docType: doc.docType,
+            docCategory: doc.docCategory!,
+            docType: doc.docType!,
             docNumber: doc.docNumber,
-            fileUrl: doc.fileUrl,
+            fileUrl: doc.fileUrl!,
             issueDate: doc.issueDate,
             expiryDate: doc.expiryDate,
             verificationStatus: 'approved',
             verifiedBy: adminId,
-            verificationDate: new Date(),
+            verificationDate: new Date().toISOString().split('T')[0],
             remarks: reason || null,
-          });
+          } as any);
         }
       } else {
         const [onboardingRequest] = await tx
@@ -1739,7 +1739,7 @@ export class OnboardingService {
             .where(
               and(
                 eq(employeeDocuments.userId, onboardingRequest.userId),
-                eq(employeeDocuments.docType, doc.docType),
+                eq(employeeDocuments.docType, doc.docType!),
               ),
             );
         }
