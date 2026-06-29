@@ -214,8 +214,25 @@ export class OnboardingService {
       const [req] = await tx.select({ requestType: onboardingRequests.requestType, userId: onboardingRequests.userId })
         .from(onboardingRequests).where(eq(onboardingRequests.id, onboardingId)).limit(1);
       
-      if (req?.requestType === 're_onboarding' && req.userId) {
-        await this.completeReOnboarding(onboardingId, 0, tx); // 0 = system-triggered
+      if (req?.userId) {
+        if (req.requestType === 're_onboarding') {
+          await this.completeReOnboarding(onboardingId, 0, tx); // 0 = system-triggered
+        } else {
+          // Complete new_hire onboarding
+          await tx.update(onboardingRequests)
+            .set({ status: 'fully_completed', updatedAt: new Date() })
+            .where(eq(onboardingRequests.id, onboardingId));
+
+          await tx.update(userProfiles)
+            .set({ profileCompleted: true, updatedAt: new Date() })
+            .where(eq(userProfiles.userId, req.userId));
+
+          await tx.insert(onboardingActivityLogs).values({
+            onboardingId,
+            action: 'ONBOARDING_COMPLETED',
+            performedBy: null, // system-triggered
+          });
+        }
       }
     }
   }
@@ -906,7 +923,7 @@ export class OnboardingService {
         name: onboardingRequests.name,
         email: onboardingRequests.email,
         personalEmail: onboardingProfiles.email,
-        phone: onboardingRequests.phone,
+        phone: onboardingProfiles.phone,
         profileStatus: onboardingRequests.profileStatus,
         hrStatus: onboardingProfiles.hrStatus,
         progress: onboardingRequests.progress,
@@ -1012,8 +1029,30 @@ export class OnboardingService {
 
     return {
       ...profileRow.profile,
-      ...request,
+      // request fields
+      onboardingStatus: request.status,
+      onboardingHrStatus: request.hrStatus,
+      profileStatus: request.profileStatus,
+      documentStatus: request.documentStatus,
+      educationStatus: request.educationStatus,
+      experienceStatus: request.experienceStatus,
+      bankStatus: request.bankStatus,
+      inductionStatus: request.inductionStatus,
+      progress: request.progress,
+      approvedAt: request.approvedAt,
+      reviewedBy: request.reviewedBy,
+      
+      // Explicit overrides for profile fields to ensure they are not overwritten by request fields
+      id: profileRow.profile.id,
+      onboardingId: id,
+      name: request.name,
+      email: request.email,
       personalEmail: profileRow.profile.email,
+      phone: profileRow.profile.phone || request.phone,
+      status: profileRow.profile.status,
+      hrStatus: profileRow.profile.hrStatus,
+      hrRemark: profileRow.profile.hrRemark,
+      
       designation: profileRow.designationName,
       department: profileRow.departmentName,
       reportingTl: profileRow.reportingTlName,
@@ -1024,7 +1063,6 @@ export class OnboardingService {
         ...d,
         fileName: d.fileUrl ? d.fileUrl.split('/').pop() : null,
       })),
-      onboardingId: id,
     };
   }
 
@@ -1606,7 +1644,6 @@ export class OnboardingService {
           .where(eq(onboardingRequests.id, id))
           .limit(1);
 
-
         if (onboardingRequest?.userId) {
           const [existingProfile] = await tx
             .select()
@@ -1655,6 +1692,59 @@ export class OnboardingService {
         },
       });
 
+      // Sync document to employeeDocuments when approved
+      if (status === 'approved') {
+        const [onboardingRequest] = await tx
+          .select({ userId: onboardingRequests.userId })
+          .from(onboardingRequests)
+          .where(eq(onboardingRequests.id, id))
+          .limit(1);
+
+        if (onboardingRequest?.userId) {
+          // Delete existing permanent document of the same type for this user to prevent duplicates
+          await tx
+            .delete(employeeDocuments)
+            .where(
+              and(
+                eq(employeeDocuments.userId, onboardingRequest.userId),
+                eq(employeeDocuments.docType, doc.docType!),
+              ),
+            );
+
+          // Insert into employeeDocuments
+          await tx.insert(employeeDocuments).values({
+            userId: onboardingRequest.userId,
+            docCategory: doc.docCategory!,
+            docType: doc.docType!,
+            docNumber: doc.docNumber,
+            fileUrl: doc.fileUrl!,
+            issueDate: doc.issueDate,
+            expiryDate: doc.expiryDate,
+            verificationStatus: 'approved',
+            verifiedBy: adminId,
+            verificationDate: new Date().toISOString().split('T')[0],
+            remarks: reason || null,
+          } as any);
+        }
+      } else {
+        const [onboardingRequest] = await tx
+          .select({ userId: onboardingRequests.userId })
+          .from(onboardingRequests)
+          .where(eq(onboardingRequests.id, id))
+          .limit(1);
+
+        if (onboardingRequest?.userId) {
+          await tx
+            .delete(employeeDocuments)
+            .where(
+              and(
+                eq(employeeDocuments.userId, onboardingRequest.userId),
+                eq(employeeDocuments.docType, doc.docType!),
+              ),
+            );
+        }
+      }
+
       await this.recalculateProgress(tx, id);
       return { success: true };
     });
@@ -1663,9 +1753,27 @@ export class OnboardingService {
   // ─── Data Sync Helpers (Onboarding -> Employee) ──────────────────────────────
 
   private async syncProfileToEmployee(tx: any, userId: number, onProf: any) {
-    const fullName = [onProf.firstName, onProf.middleName, onProf.lastName].filter(Boolean).join(' ');
-    
-    // 1. Upsert userProfiles
+    const sanitize = (val: any) => (val === '' || val === null || val === undefined ? null : val);
+    const sanitizeNum = (val: any) => {
+      if (val === '' || val === null || val === undefined) return null;
+      const num = Number(val);
+      return isNaN(num) ? null : num;
+    };
+
+    // 1. Update team/department on Users record
+    const sanitizedDeptId = sanitizeNum(onProf.departmentId);
+    if (sanitizedDeptId) {
+      await tx
+        .update(users)
+        .set({
+          team: sanitizedDeptId,
+          primaryTeamId: sanitizedDeptId,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, userId));
+    }
+
+    // 2. Upsert userProfiles
     const [existingProfile] = await tx
       .select()
       .from(userProfiles)
@@ -1673,24 +1781,24 @@ export class OnboardingService {
       .limit(1);
 
     const profileData = {
-      firstName: onProf.firstName,
-      middleName: onProf.middleName,
-      lastName: onProf.lastName,
-      dateOfBirth: onProf.dob,
-      gender: onProf.gender,
-      maritalStatus: onProf.maritalStatus,
-      nationality: onProf.nationality,
-      aadharNumber: onProf.aadharNumber,
-      panNumber: onProf.panNumber,
-      pfNumber: onProf.pfNumber,
-      phone: onProf.phone,
-      altEmail: onProf.email,
-      bloodGroup: onProf.bloodGroup,
-      linkedinProfile: onProf.linkedinProfile,
+      firstName: sanitize(onProf.firstName),
+      middleName: sanitize(onProf.middleName),
+      lastName: sanitize(onProf.lastName),
+      dateOfBirth: sanitize(onProf.dob),
+      gender: sanitize(onProf.gender),
+      maritalStatus: sanitize(onProf.maritalStatus),
+      nationality: sanitize(onProf.nationality),
+      aadharNumber: sanitize(onProf.aadharNumber),
+      panNumber: sanitize(onProf.panNumber),
+      pfNumber: sanitize(onProf.pfNumber),
+      phone: sanitize(onProf.phone),
+      altEmail: sanitize(onProf.email),
+      bloodGroup: sanitize(onProf.bloodGroup),
+      linkedinProfile: sanitize(onProf.linkedinProfile),
       currentAddress: onProf.currentAddress,
       permanentAddress: onProf.permanentAddress,
       emergencyContact: onProf.emergencyContact,
-      profileCompleted: true,
+      designationId: sanitizeNum(onProf.designationId),
       updatedAt: new Date(),
     };
 
@@ -1700,27 +1808,25 @@ export class OnboardingService {
       await tx.insert(userProfiles).values({ userId, ...profileData, createdAt: new Date() } as any);
     }
 
-    // 2. Upsert employeeProfiles
+    // 3. Upsert employeeProfiles
     const [existingEmp] = await tx.select().from(employeeProfiles).where(eq(employeeProfiles.userId, userId)).limit(1);
     const empData = {
       userId,
-      employeeType: onProf.employeeType,
-      status: onProf.employeeStatus || 'Active',
-      designationId: onProf.designationId,
-      departmentId: onProf.departmentId,
-      reportingManagerId: onProf.reportingManagerId,
-      workLocation: onProf.workLocation,
-      dateOfJoining: onProf.dateOfJoining,
-      probationMonths: onProf.probationMonths,
-      probationEndDate: onProf.probationEndDate,
-      salaryType: onProf.salaryType,
-      basicSalary: onProf.basicSalary,
-      pfNumber: onProf.pfNumber,
-      hra: onProf.hra,
-      allowances: onProf.allowances,
-      bonus: onProf.bonus,
-      pfApplicable: onProf.pfApplicable,
-      esicApplicable: onProf.esicApplicable,
+      employeeType: onProf.employeeType === '' || !onProf.employeeType ? undefined : onProf.employeeType,
+      status: onProf.employeeStatus === '' || !onProf.employeeStatus ? undefined : onProf.employeeStatus,
+      reportingTl: sanitizeNum(onProf.reportingTl),
+      workLocation: sanitize(onProf.workLocation),
+      dateOfJoining: sanitize(onProf.dateOfJoining),
+      probationMonths: sanitizeNum(onProf.probationMonths),
+      probationEndDate: sanitize(onProf.probationEndDate),
+      salaryType: sanitize(onProf.salaryType),
+      basicSalary: sanitize(onProf.basicSalary),
+      pfNumber: sanitize(onProf.pfNumber),
+      hra: sanitize(onProf.hra),
+      allowances: sanitize(onProf.allowances),
+      bonus: sanitize(onProf.bonus),
+      pfApplicable: onProf.pfApplicable ?? false,
+      esicApplicable: onProf.esicApplicable ?? false,
       updatedAt: new Date(),
     };
 
@@ -1732,6 +1838,7 @@ export class OnboardingService {
   }
 
   private async syncEducationToEmployee(tx: any, userId: number, edu: any) {
+    const sanitize = (val: any) => (val === '' || val === null || val === undefined ? null : val);
     let yearOfCompletion = new Date().getFullYear();
     if (edu.endDate) {
       const parsedYear = new Date(edu.endDate).getFullYear();
@@ -1742,41 +1849,43 @@ export class OnboardingService {
 
     await tx.insert(employeeEducation).values({
       userId,
-      degree: edu.degree,
-      institution: edu.institution,
-      fieldOfStudy: edu.fieldOfStudy,
+      degree: edu.degree || '',
+      institution: edu.institution || '',
+      fieldOfStudy: sanitize(edu.fieldOfStudy),
       yearOfCompletion,
-      grade: edu.grade,
+      grade: sanitize(edu.grade),
       createdAt: new Date(),
       updatedAt: new Date(),
     });
   }
 
   private async syncExperienceToEmployee(tx: any, userId: number, exp: any) {
+    const sanitize = (val: any) => (val === '' || val === null || val === undefined ? null : val);
     await tx.insert(employeeExperience).values({
       userId,
-      companyName: exp.companyName,
-      designation: exp.designation,
-      fromDate: exp.fromDate,
-      toDate: exp.toDate,
-      currentlyWorking: exp.currentlyWorking,
-      responsibilities: exp.responsibilities,
+      companyName: sanitize(exp.companyName),
+      designation: sanitize(exp.designation),
+      fromDate: sanitize(exp.fromDate),
+      toDate: sanitize(exp.toDate),
+      currentlyWorking: exp.currentlyWorking === true || exp.currentlyWorking === 'true',
+      responsibilities: sanitize(exp.responsibilities),
       createdAt: new Date(),
       updatedAt: new Date(),
     });
   }
 
   private async syncBankToEmployee(tx: any, userId: number, bank: any) {
+    const sanitize = (val: any) => (val === '' || val === null || val === undefined ? null : val);
     await tx.insert(employeeBankDetails).values({
       userId,
-      bankName: bank.bankName,
-      accountHolderName: bank.accountHolderName,
-      accountNumber: bank.accountNumber,
-      ifscCode: bank.ifscCode,
-      branchName: bank.branchName,
-      branchAddress: bank.branchAddress,
-      upiId: bank.upiId,
-      isPrimary: bank.isPrimary,
+      bankName: bank.bankName || '',
+      accountHolderName: bank.accountHolderName || '',
+      accountNumber: bank.accountNumber || '',
+      ifscCode: bank.ifscCode || '',
+      branchName: sanitize(bank.branchName),
+      branchAddress: sanitize(bank.branchAddress),
+      upiId: sanitize(bank.upiId),
+      isPrimary: bank.isPrimary === true || bank.isPrimary === 'true',
       status: 'active',
       createdAt: new Date(),
       updatedAt: new Date(),

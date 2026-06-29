@@ -55,6 +55,7 @@ export class EmployeeProfilesController {
         const parsed = CreateEmployeeProfileSchema.parse(body);
         const cleanParsed = {
             ...parsed,
+            reportingTl: parsed.reportingManagerId,
             probationEndDate: toDateString(parsed.probationEndDate),
             offerLetterDate: toDateString(parsed.offerLetterDate),
             inductionDate: toDateString(parsed.inductionDate),
@@ -74,6 +75,7 @@ export class EmployeeProfilesController {
         const parsed = UpdateEmployeeProfileSchema.parse(body);
         const cleanParsed = {
             ...parsed,
+            reportingTl: parsed.reportingManagerId,
             probationEndDate: toDateString(parsed.probationEndDate),
             offerLetterDate: toDateString(parsed.offerLetterDate),
             inductionDate: toDateString(parsed.inductionDate),
