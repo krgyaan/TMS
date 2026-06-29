@@ -1,4 +1,5 @@
 import { Inject, Injectable, BadRequestException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { and, eq, asc, desc, sql, isNull, isNotNull, inArray, notInArray, ne, or } from "drizzle-orm";
 import { DRIZZLE } from "@db/database.module";
 import type { DbInstance } from "@db";
@@ -48,6 +49,7 @@ export class DocumentChecklistsService {
 
     constructor(
         @Inject(DRIZZLE) private readonly db: DbInstance,
+        private readonly configService: ConfigService,
         private readonly emailService: EmailService,
         private readonly recipientResolver: RecipientResolver,
         private readonly tenderInfosService: TenderInfosService,
@@ -418,7 +420,7 @@ export class DocumentChecklistsService {
         subject: string,
         template: string,
         data: Record<string, any>,
-        recipients: { to?: RecipientSource[]; cc?: RecipientSource[]; attachments?: { files: string[]; baseDir?: string } }
+        recipients: { to?: RecipientSource[]; cc?: RecipientSource[] }
     ) {
         try {
             await this.emailService.sendTenderEmail({
@@ -430,7 +432,6 @@ export class DocumentChecklistsService {
                 subject,
                 template,
                 data,
-                attachments: recipients.attachments,
             });
         } catch (error) {
             this.logger.error(`Failed to send email for tender ${tenderId}: ${error instanceof Error ? error.message : String(error)}`);
@@ -462,30 +463,29 @@ export class DocumentChecklistsService {
         const teUser = await this.recipientResolver.getUserById(tender.teamMember);
         const teName = teUser?.name || "Tender Executive";
 
-        // Build documents list
-        const documents: string[] = [];
-        if (checklist.selectedDocuments && checklist.selectedDocuments.length > 0) {
-            documents.push(...checklist.selectedDocuments);
-        }
-        if (checklist.extraDocuments && checklist.extraDocuments.length > 0) {
-            documents.push(...checklist.extraDocuments.map(doc => doc.name));
-        }
+        const apiUrl = this.configService.get<string>('app.apiUrl') || '';
+
+        // Build selected documents (names only, no files)
+        const selectedDocuments = (checklist.selectedDocuments || []).map(name => ({ name, url: null }));
+
+        // Build extra documents with file URLs
+        const extraDocuments = (checklist.extraDocuments || []).map(doc => ({
+            name: doc.name,
+            url: doc.path ? `${apiUrl}/tender-files/serve/${doc.path}` : null,
+        }));
 
         const emailData = {
             tl: tlName,
             tenderNo: tender.tenderNo,
             tenderName: tender.tenderName,
-            documents: documents.length > 0 ? documents : ["No documents specified"],
+            selectedDocuments,
+            extraDocuments,
             te: teName,
         };
-
-        // Collect attachment file paths from extraDocuments
-        const attachmentFiles = checklist.extraDocuments?.map(doc => doc.path).filter((path): path is string => !!path) || [];
 
         await this.sendEmail("document-checklist.submitted", tenderId, tender.teamMember, `Document Checklist - ${tender.tenderName}`, "document-checklist-submitted", emailData, {
             to: [{ type: "role", role: "Team Leader", teamId: tender.team }],
             cc: [{ type: "role", role: "Admin", teamId: tender.team }],
-            attachments: attachmentFiles.length > 0 ? { files: attachmentFiles } : undefined,
         });
     }
 }

@@ -20,6 +20,18 @@ export const DocumentChecklistFormSchema = z.object({
         message: 'At least one document (standard or additional) must be selected',
         path: ['selectedDocuments'],
     }
-);
+).superRefine((data, ctx) => {
+    if (data.extraDocuments) {
+        data.extraDocuments.forEach((doc, index) => {
+            if (doc.name && doc.name.trim().length > 0 && (!doc.path || doc.path.trim().length === 0)) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: 'File upload is required when document name is provided',
+                    path: ['extraDocuments', index, 'path'],
+                });
+            }
+        });
+    }
+});
 
 export type DocumentChecklistFormValues = z.infer<typeof DocumentChecklistFormSchema>;
