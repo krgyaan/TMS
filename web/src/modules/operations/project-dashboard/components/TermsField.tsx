@@ -22,6 +22,8 @@ export const TERMS_FIELD_OPTIONS = [
   "Material Unloading",
   "Acceptance of Order",
   "Documentation",
+  "PO Validity",
+  "Warranty",
 ] as const;
 
 export const DEFAULT_TERMS_ROWS: { field: string; value: string }[] = [
@@ -37,6 +39,8 @@ export const DEFAULT_TERMS_ROWS: { field: string; value: string }[] = [
   { field: "Material Unloading", value: "" },
   { field: "Acceptance of Order", value: "The party shall confirm acceptance to this Purchase Order by duly Stamping and signing on each page of the technical specifications as well as attached documents (If Any)." },
   { field: "Documentation", value: "" },
+  { field: "PO Validity", value: "" },
+  { field: "Warranty", value: "" },
 ];
 
 interface TermsFieldProps {
