@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import type { Circular } from "@/types/api.types";
-import { Calendar, User, FileText, Download, ExternalLink, ShieldCheck, ShieldAlert } from "lucide-react";
+import { User, FileText, Download, ExternalLink, ShieldCheck, ShieldAlert } from "lucide-react";
+
 
 type CircularViewModalProps = {
     open: boolean;
@@ -65,25 +66,8 @@ export const CircularViewModal = ({ open, onOpenChange, circular }: CircularView
 
                 {/* Content Details */}
                 <div className="p-6 space-y-6 max-h-[calc(100vh-200px)] overflow-y-auto">
-                    {/* Validity Metadata */}
-                    <div className="grid grid-cols-2 gap-4 bg-muted/30 p-4 rounded-xl border border-muted-foreground/10">
-                        <div className="space-y-1">
-                            <span className="text-xs text-muted-foreground flex items-center gap-1.5 font-medium">
-                                <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                                Valid From
-                            </span>
-                            <p className="text-sm font-semibold text-foreground">{formatDate(circular.valid_from)}</p>
-                        </div>
-                        <div className="space-y-1">
-                            <span className="text-xs text-muted-foreground flex items-center gap-1.5 font-medium">
-                                <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                                Expires On
-                            </span>
-                            <p className="text-sm font-semibold text-foreground">{formatDate(circular.expires_on)}</p>
-                        </div>
-                    </div>
-
                     {/* Preview Section */}
+
                     <div className="space-y-3">
                         <h4 className="text-sm font-semibold flex items-center gap-1.5">
                             <FileText className="h-4 w-4 text-muted-foreground" />

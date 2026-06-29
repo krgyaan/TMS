@@ -19,6 +19,14 @@ export const useCirculars = () => {
     });
 };
 
+export const useActiveCirculars = () => {
+    return useQuery({
+        queryKey: [...circularKey.lists(), "active"] as const,
+        queryFn: () => circularService.getActive(),
+    });
+};
+
+
 export const useCreateCircular = () => {
     const queryClient = useQueryClient();
 

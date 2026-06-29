@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { eq, and, lte, gte, desc } from 'drizzle-orm';
 import { DRIZZLE } from '@db/database.module';
 import type { DbInstance } from '@db';
 import {
@@ -12,7 +12,23 @@ import {
 export class CircularsService {
     constructor(@Inject(DRIZZLE) private readonly db: DbInstance) { }
 
+    async findActive(): Promise<Circular[]> {
+        const now = new Date();
+        return this.db
+            .select()
+            .from(circulars)
+            .where(
+                and(
+                    eq(circulars.status, true),
+                    lte(circulars.valid_from, now),
+                    gte(circulars.expires_on, now)
+                )
+            )
+            .orderBy(desc(circulars.createdAt));
+    }
+
     async findAll(): Promise<Circular[]> {
+
         return this.db.select().from(circulars);
     }
 

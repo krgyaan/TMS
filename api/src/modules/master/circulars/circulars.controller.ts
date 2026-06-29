@@ -59,8 +59,14 @@ export class CircularsController {
         return this.service.findAll();
     }
 
+    @Get('active')
+    async listActive() {
+        return this.service.findActive();
+    }
+
     @Get(':id')
     async getById(@Param('id', ParseIntPipe) id: number) {
+
         const circular = await this.service.findById(id);
         if (!circular) {
             throw new NotFoundException(`Circular with ID ${id} not found`);

@@ -10,6 +10,11 @@ class CircularService extends BaseApiService {
         return this.get<Circular[]>();
     }
 
+    async getActive() : Promise<Circular[]>{
+        return this.get<Circular[]>('/active');
+    }
+
+
     async create(data: Partial<Circular> | FormData) : Promise<Circular>{
         return this.post<Circular>("", data);
     }   
