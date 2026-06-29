@@ -246,6 +246,12 @@ export class ProjectDashboardService {
     async createPurchaseOrder(body: any, userId: number) {
     const poNumber = await this.generatePONumber(body.projectName);
 
+    const [woBasic] = await this.db
+        .select({ team: woBasicDetails.team })
+        .from(woBasicDetails)
+        .where(eq(woBasicDetails.tenderId, body.tenderId))
+        .limit(1);
+
     // Insert the purchase order
     const po = (
         await this.db
@@ -284,6 +290,7 @@ export class ProjectDashboardService {
             certRecipient: body.certRecipient,
             certRecipients: body.certRecipients ?? [],
             poRaisedBy: userId,
+            team: woBasic?.team,
             projectId: body.projectId,
         })
         .returning()
@@ -360,6 +367,7 @@ export class ProjectDashboardService {
             quotationNo: po.quotationNo,
             quotationDate: po.quotationDate,
             termsAndConditions: po.termsAndConditions,
+            team: po.team,
             certRecipient: po.certRecipient,
             certRecipients: po.certRecipients,
             remarks: po.remarks,
@@ -408,13 +416,8 @@ export class ProjectDashboardService {
         const totalGstAmt = items.reduce((s: number, i: any) => s + i.gst_amount, 0);
         const grandTotal = totalAmount + totalGstAmt;
 
-        // Determine signature image based on team
-        const [woBasic] = await this.db
-            .select({ team: woBasicDetails.team })
-            .from(woBasicDetails)
-            .where(eq(woBasicDetails.tenderId, po.tenderId))
-            .limit(1);
-        const team = woBasic?.team;
+        // Determine signature image based on stored team
+        const team = po.team;
         const isProd = process.env.NODE_ENV === 'production';
         const rootDir = isProd ? 'dist' : 'src';
         const assetsPath = join(process.cwd(), rootDir, 'modules', 'pdf', 'assets');

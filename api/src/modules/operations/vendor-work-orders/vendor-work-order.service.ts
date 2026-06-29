@@ -58,6 +58,12 @@ export class VendorWorkOrderService {
     async create(body: any, userId: number) {
         const woNumber = await this.generateWONumber(body.projectName);
 
+        const [woBasic] = await this.db
+            .select({ team: woBasicDetails.team })
+            .from(woBasicDetails)
+            .where(eq(woBasicDetails.tenderId, body.tenderId))
+            .limit(1);
+
         const wo = (
             await this.db
                 .insert(vendorWorkOrders)
@@ -92,6 +98,7 @@ export class VendorWorkOrderService {
                     certRecipient: body.certRecipient,
                     certRecipients: body.certRecipients ?? [],
                     woRaisedBy: userId,
+                    team: woBasic?.team,
                     projectId: body.projectId,
                 })
                 .returning()
@@ -516,6 +523,7 @@ export class VendorWorkOrderService {
             contactPersonPhone: wo.contactPersonPhone,
             contactPersonEmail: wo.contactPersonEmail,
             termsAndConditions: wo.termsAndConditions,
+            team: wo.team,
             certRecipient: wo.certRecipient,
             certRecipients: wo.certRecipients,
             remarks: wo.remarks,
@@ -563,13 +571,8 @@ export class VendorWorkOrderService {
         const totalGstAmt = items.reduce((s: number, i: any) => s + i.gst_amount, 0);
         const grandTotal = totalAmount + totalGstAmt;
 
-        // Determine signature image based on team
-        const [woBasic] = await this.db
-            .select({ team: woBasicDetails.team })
-            .from(woBasicDetails)
-            .where(eq(woBasicDetails.tenderId, wo.tenderId))
-            .limit(1);
-        const team = woBasic?.team;
+        // Determine signature image based on stored team
+        const team = wo.team;
         const isProd = process.env.NODE_ENV === 'production';
         const rootDir = isProd ? 'dist' : 'src';
         const assetsPath = join(process.cwd(), rootDir, 'modules', 'pdf', 'assets');

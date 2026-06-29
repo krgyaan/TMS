@@ -30,6 +30,7 @@ export const purchaseOrders = pgTable(
         remarks: text("remarks"),
         technicalSpecsAttachments: text("technical_specs_attachments"),
         accessoriesPackagingListAttachments: text("accessories_packaging_list_attachments"),
+        team: bigint("team", { mode: "number" }),
         tenderId: bigint("tender_id", { mode: "number" }).notNull(),
         projectId: bigint("project_id", { mode: "number" }).notNull(),
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

@@ -28,6 +28,7 @@ export const vendorWorkOrders = pgTable(
         remarks: text("remarks"),
         scopeOfWork: text("scope_of_work"),
         accessoriesPackagingListAttachments: text("accessories_packaging_list_attachments"),
+        team: bigint("team", { mode: "number" }),
         tenderId: bigint("tender_id", { mode: "number" }).notNull(),
         projectId: bigint("project_id", { mode: "number" }).notNull(),
         createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
