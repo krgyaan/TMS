@@ -78,6 +78,19 @@ export interface Location {
     updatedAt?: string;
 }
 
+export interface Circular { 
+    id : number, 
+    title : string,
+    file : string,
+    valid_from : string,
+    expires_on : string,
+    uploaded_by : string,
+    status : boolean,
+    createdAt?: string;
+    updatedAt?: string;
+}
+
+
 export interface ItemHeading {
     id: number;
     name: string;

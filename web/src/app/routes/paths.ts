@@ -330,6 +330,8 @@ export const paths = {
         leadTypes: "/master/lead-types",
         leadTypes_create: "/master/lead-types/create",
         leadTypes_edit: (id: number | string) => `/master/lead-types/${id}/edit`,
+
+        circulars : "/master/circular",
     },
 
     // ==================== SHARED ====================

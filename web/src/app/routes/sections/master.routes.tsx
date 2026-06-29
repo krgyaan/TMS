@@ -113,6 +113,9 @@ const Master_Vendors = lazy(() => import("@/modules/master/vendors"));
 const Master_Vendors_Create = lazy(() => import("@/modules/master/vendors/create"));
 const Master_Vendors_Edit = lazy(() => import("@/modules/master/vendors/edit"));
 
+//Circulars
+const Master_Circular = lazy(() => import("@/modules/master/circulars/CircularDashboardSection"))
+
 // ==================== ROUTES ====================
 export default function MasterRoutes() {
     return (
@@ -697,6 +700,19 @@ export default function MasterRoutes() {
                         </RouteWrapper>
                     }
                 />
+            </Route>
+
+            {/* Circular (Unified) */}
+            <Route path="circular">
+                <Route
+                    index
+                    element={
+                        <RouteWrapper>
+                            <Master_Circular />
+                        </RouteWrapper>
+                    }
+                />
+
             </Route>
         </Routes>
     );

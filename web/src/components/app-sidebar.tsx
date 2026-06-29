@@ -176,6 +176,7 @@ const navMain: NavGroup[] = [
             { title: "Lead Types", url: paths.master.leadTypes, permission: "master.lead-types" },
             { title: "TQ Types", url: paths.master.tqTypes, permission: "master.tq-types" },
             { title: "Loan Parties", url: paths.master.loanParties, permission: "master.loan-parties" },
+            { title: "Circulars" , url: paths.master.circulars, permission: "master.circulars"},
         ],
     },
     {
