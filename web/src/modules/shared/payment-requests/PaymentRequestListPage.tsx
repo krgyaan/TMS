@@ -257,7 +257,7 @@ const PaymentRequestListPage: React.FC = () => {
                             onGridReady={onGridReady}
                             gridOptions={{
                                 pagination: true,
-                                paginationPageSize: 10,
+                                paginationPageSize: 100,
                                 domLayout: "autoHeight",
                             }}
                         />

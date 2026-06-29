@@ -122,7 +122,7 @@ const MakerRequestListPage: React.FC = () => {
                     {isLoading ? (
                         <Skeleton className="h-64 w-full rounded-lg" />
                     ) : (
-                        <DataTable data={rows} columnDefs={mrColumns} onGridReady={onGridReady} gridOptions={{ pagination: true, paginationPageSize: 10, domLayout: "autoHeight" }} />
+                        <DataTable data={rows} columnDefs={mrColumns} onGridReady={onGridReady} gridOptions={{ pagination: true, paginationPageSize: 100, domLayout: "autoHeight" }} />
                     )}
                 </CardContent>
             </Card>
