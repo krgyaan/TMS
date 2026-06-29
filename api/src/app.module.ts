@@ -113,6 +113,7 @@ import { OnboardingModule } from './modules/hrms/onboarding/onboarding.module';
 import { EmployeeOnboardingModule } from './modules/hrms/employee-onboarding/employee-onboarding.module';
 import { ProfileModule } from './modules/profile/profile.module';
 import { TrainingModule } from './modules/hrms/training/training.module';
+import { CircularsModule } from './modules/master/circulars/circulars.module';
 
 @Module({
     imports: [
@@ -236,6 +237,7 @@ import { TrainingModule } from './modules/hrms/training/training.module';
         ProfileModule,
         ClientDirectoryModule,
         TrainingModule,
+        CircularsModule,
     ],
     controllers: [AppController,],
     providers: [

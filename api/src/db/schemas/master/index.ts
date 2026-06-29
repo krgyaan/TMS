@@ -49,3 +49,7 @@ export * from "./documents-submitted.relations";
 
 // EMD Responsibilities
 export * from "./emd-responsibilities";
+
+// Circulars
+export * from "./circulars.schema";
+

@@ -31,6 +31,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { useActiveCirculars } from "@/hooks/api/useCirculars";
+import { CircularViewModal } from "@/modules/master/circulars/components/CircularViewModal";
+import { Megaphone, FileDown, ExternalLink, Bell } from "lucide-react";
+
 
 // Types
 interface TenderInfo {
@@ -363,7 +367,143 @@ const OnboardingTrackerWidget = () => {
     );
 };
 
+import type { Circular } from "@/types/api.types";
+
+const getCircularFileUrl = (path?: string | null) => {
+    if (!path) return "";
+    if (path.startsWith("http")) return path;
+    const baseUrl = import.meta.env.VITE_API_URL || "";
+    const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+    return `${baseUrl}${normalizedPath}`;
+};
+
+const formatCircularDate = (dateStr?: string | Date | null) => {
+    if (!dateStr) return "N/A";
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "N/A";
+    return d.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+    });
+};
+
+const CircularsWidget = () => {
+    const { data: activeCirculars, isLoading, error } = useActiveCirculars();
+    const [selectedCircular, setSelectedCircular] = useState<Circular | null>(null);
+
+    if (isLoading) {
+        return (
+            <Card className="border border-border/50 shadow-lg bg-card/60 backdrop-blur-xl rounded-2xl p-6">
+                <div className="flex flex-col items-center justify-center py-6 space-y-2">
+                    <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                    <p className="text-sm text-muted-foreground animate-pulse">Loading notice board announcements...</p>
+                </div>
+            </Card>
+        );
+    }
+
+    if (error) {
+        return null;
+    }
+
+    const notices = activeCirculars || [];
+
+    return (
+        <Card className="border border-border/50 shadow-xl bg-card/60 backdrop-blur-xl rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-2xl hover:shadow-primary/5">
+            <CardHeader className="pb-3 border-b border-border/40">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                        <div className="p-2 bg-primary/10 text-primary rounded-xl dark:bg-primary/20 dark:text-primary">
+                            <Megaphone className="h-5 w-5" />
+                        </div>
+                        <div className="space-y-0.5">
+                            <CardTitle className="text-lg font-bold bg-gradient-to-r from-primary to-blue-600 bg-clip-text text-transparent">
+                                Notice Board & Circulars
+                            </CardTitle>
+                            <p className="text-xs text-muted-foreground">Latest official updates and company policies</p>
+                        </div>
+                    </div>
+                    {notices.length > 0 && (
+                        <Badge variant="secondary" className="font-mono bg-primary/10 text-primary border-none rounded-full">
+                            {notices.length} Active
+                        </Badge>
+                    )}
+                </div>
+            </CardHeader>
+            <CardContent className="p-0">
+                {notices.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
+                        <Bell className="h-10 w-10 text-muted-foreground/40 mb-2" />
+                        <p className="text-sm font-semibold text-foreground">All caught up!</p>
+                        <p className="text-xs text-muted-foreground max-w-xs mt-1">No active announcements or circular notices currently published.</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-1 gap-4 p-5 max-h-[350px] overflow-y-auto">
+                        {notices.map((circular) => (
+                            <div 
+                                key={circular.id}
+                                onClick={() => setSelectedCircular(circular)}
+                                className="group flex items-center justify-between p-4 bg-muted/10 hover:bg-muted/20 border border-border/10 hover:border-primary/20 rounded-xl cursor-pointer transition-all duration-300 shadow-sm hover:shadow-md hover:scale-[1.01]"
+                            >
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition-all duration-300">
+                                        <FileText className="h-4.5 w-4.5" />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors truncate">
+                                            {circular.title}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0 ml-3">
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon"
+                                        className="h-7 w-7 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            window.open(getCircularFileUrl(circular.file), "_blank");
+                                        }}
+                                    >
+                                        <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                                    </Button>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon"
+                                        className="h-7 w-7 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            const a = document.createElement("a");
+                                            a.href = getCircularFileUrl(circular.file);
+                                            a.download = circular.title;
+                                            document.body.appendChild(a);
+                                            a.click();
+                                            document.body.removeChild(a);
+                                        }}
+                                    >
+                                        <FileDown className="h-4 w-4 text-muted-foreground" />
+                                    </Button>
+                                    <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </CardContent>
+
+            <CircularViewModal 
+                open={!!selectedCircular}
+                onOpenChange={(open) => !open && setSelectedCircular(null)}
+                circular={selectedCircular}
+            />
+        </Card>
+    );
+};
+
+
 const Dashboard = () => {
+
     const navigate = useNavigate();
     const [dashboardData, setDashboardData] = useState<DashboardData>(mockDashboardData);
     const [selectedUser, setSelectedUser] = useState<string>("all");
@@ -624,6 +764,12 @@ const Dashboard = () => {
                 ))}
             </div>
 
+            
+            {/* Notice Board & Circulars Section */}
+            <div className="grid grid-cols-1 gap-6">
+                <CircularsWidget />
+            </div>
+
 
             {/* Onboarding Status Tracker Widget */}
             {(teamName == "HR" || isSuperUser) && (
@@ -631,6 +777,7 @@ const Dashboard = () => {
                     <OnboardingTrackerWidget />
                 </div>
             )}
+
 
             {/* Statistics Cards */}
             {/* <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
