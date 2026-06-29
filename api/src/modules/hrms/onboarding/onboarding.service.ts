@@ -214,8 +214,25 @@ export class OnboardingService {
       const [req] = await tx.select({ requestType: onboardingRequests.requestType, userId: onboardingRequests.userId })
         .from(onboardingRequests).where(eq(onboardingRequests.id, onboardingId)).limit(1);
       
-      if (req?.requestType === 're_onboarding' && req.userId) {
-        await this.completeReOnboarding(onboardingId, 0, tx); // 0 = system-triggered
+      if (req?.userId) {
+        if (req.requestType === 're_onboarding') {
+          await this.completeReOnboarding(onboardingId, 0, tx); // 0 = system-triggered
+        } else {
+          // Complete new_hire onboarding
+          await tx.update(onboardingRequests)
+            .set({ status: 'fully_completed', updatedAt: new Date() })
+            .where(eq(onboardingRequests.id, onboardingId));
+
+          await tx.update(userProfiles)
+            .set({ profileCompleted: true, updatedAt: new Date() })
+            .where(eq(userProfiles.userId, req.userId));
+
+          await tx.insert(onboardingActivityLogs).values({
+            onboardingId,
+            action: 'ONBOARDING_COMPLETED',
+            performedBy: null, // system-triggered
+          });
+        }
       }
     }
   }
@@ -1627,7 +1644,6 @@ export class OnboardingService {
           .where(eq(onboardingRequests.id, id))
           .limit(1);
 
-
         if (onboardingRequest?.userId) {
           const [existingProfile] = await tx
             .select()
@@ -1675,6 +1691,59 @@ export class OnboardingService {
           comment: reason || null,
         },
       });
+
+      // Sync document to employeeDocuments when approved
+      if (status === 'approved') {
+        const [onboardingRequest] = await tx
+          .select({ userId: onboardingRequests.userId })
+          .from(onboardingRequests)
+          .where(eq(onboardingRequests.id, id))
+          .limit(1);
+
+        if (onboardingRequest?.userId) {
+          // Delete existing permanent document of the same type for this user to prevent duplicates
+          await tx
+            .delete(employeeDocuments)
+            .where(
+              and(
+                eq(employeeDocuments.userId, onboardingRequest.userId),
+                eq(employeeDocuments.docType, doc.docType),
+              ),
+            );
+
+          // Insert into employeeDocuments
+          await tx.insert(employeeDocuments).values({
+            userId: onboardingRequest.userId,
+            docCategory: doc.docCategory,
+            docType: doc.docType,
+            docNumber: doc.docNumber,
+            fileUrl: doc.fileUrl,
+            issueDate: doc.issueDate,
+            expiryDate: doc.expiryDate,
+            verificationStatus: 'approved',
+            verifiedBy: adminId,
+            verificationDate: new Date(),
+            remarks: reason || null,
+          });
+        }
+      } else {
+        const [onboardingRequest] = await tx
+          .select({ userId: onboardingRequests.userId })
+          .from(onboardingRequests)
+          .where(eq(onboardingRequests.id, id))
+          .limit(1);
+
+        if (onboardingRequest?.userId) {
+          await tx
+            .delete(employeeDocuments)
+            .where(
+              and(
+                eq(employeeDocuments.userId, onboardingRequest.userId),
+                eq(employeeDocuments.docType, doc.docType),
+              ),
+            );
+        }
+      }
 
       await this.recalculateProgress(tx, id);
       return { success: true };
@@ -1730,7 +1799,6 @@ export class OnboardingService {
       permanentAddress: onProf.permanentAddress,
       emergencyContact: onProf.emergencyContact,
       designationId: sanitizeNum(onProf.designationId),
-      profileCompleted: true,
       updatedAt: new Date(),
     };
 

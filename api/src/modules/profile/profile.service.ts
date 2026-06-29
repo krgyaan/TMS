@@ -83,25 +83,22 @@ export class ProfileService {
     };
 
     // CHECK ONBOARDING STATUS
-    const [userProfileRow] = await this.db.select({ profileCompleted: userProfiles.profileCompleted })
-      .from(userProfiles).where(eq(userProfiles.userId, userId)).limit(1);
-      
-    const isComplete = userProfileRow?.profileCompleted === true;
+    const activeReqs = await this.db
+      .select({
+        id: onboardingRequests.id,
+        status: onboardingRequests.status,
+        hrStatus: onboardingRequests.hrStatus,
+        progress: onboardingRequests.progress,
+      })
+      .from(onboardingRequests)
+      .where(eq(onboardingRequests.userId, userId))
+      .orderBy(desc(onboardingRequests.createdAt))
+      .limit(1);
+
+    const hasActiveOnboarding = activeReqs.length > 0 && activeReqs[0].status !== 'fully_completed';
+    const isComplete = !hasActiveOnboarding;
 
     if (!isComplete) {
-      // Fetch active onboarding request status
-      const activeReqs = await this.db
-        .select({
-          id: onboardingRequests.id,
-          status: onboardingRequests.status,
-          hrStatus: onboardingRequests.hrStatus,
-          progress: onboardingRequests.progress,
-        })
-        .from(onboardingRequests)
-        .where(eq(onboardingRequests.userId, userId))
-        .orderBy(desc(onboardingRequests.createdAt))
-        .limit(1);
-
       let onboardingStatus: any = null;
       if (activeReqs.length > 0) {
         const obReq = activeReqs[0];
