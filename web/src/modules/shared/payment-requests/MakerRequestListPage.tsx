@@ -7,9 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DataTable from "@/components/ui/data-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
+import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import type { ColDef, GridApi, GridReadyEvent, ValueFormatterParams } from "ag-grid-community";
@@ -44,6 +46,23 @@ const MakerRequestListPage: React.FC = () => {
     const [rejectionReason, setRejectionReason] = useState("");
 
     const rows = useMemo(() => (data ?? []) as MakerRequestRow[], [data]);
+
+    const { activeTab: activeSubTab, setActiveTab: setActiveSubTab } = usePersistentTableState<"pending" | "payment_done" | "rejected">({
+        storageKey: "payment-requests-mr-subtab",
+        defaultTab: "pending",
+    });
+
+    const filteredRows = useMemo(() => {
+        if (activeSubTab === "payment_done") return rows.filter((r) => r.status === "payment_done");
+        if (activeSubTab === "rejected") return rows.filter((r) => r.status === "rejected");
+        return rows.filter((r) => r.status === "pending" || r.status === "maker_done");
+    }, [rows, activeSubTab]);
+
+    const subtabCounts = useMemo(() => ({
+        pending: rows.filter((r) => r.status === "pending" || r.status === "maker_done").length,
+        payment_done: rows.filter((r) => r.status === "payment_done").length,
+        rejected: rows.filter((r) => r.status === "rejected").length,
+    }), [rows]);
 
     const onGridReady = useCallback((event: GridReadyEvent<MakerRequestRow>) => {
         setGridApi(event.api);
@@ -110,7 +129,23 @@ const MakerRequestListPage: React.FC = () => {
                     <div className="flex justify-between items-center gap-2">
                         <CardTitle className="text-base font-semibold">Maker Requests</CardTitle>
                     </div>
-                    <CardDescription>{rows.length} request{rows.length !== 1 ? "s" : ""} found</CardDescription>
+                    <CardDescription>{filteredRows.length} request{filteredRows.length !== 1 ? "s" : ""} found</CardDescription>
+                    <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as typeof activeSubTab)}>
+                        <TabsList className="m-auto mb-0">
+                            <TabsTrigger value="pending" className="data-[state=active]:shadow-md flex items-center gap-1">
+                                Pending
+                                <Badge variant="secondary" className="text-xs">{subtabCounts.pending}</Badge>
+                            </TabsTrigger>
+                            <TabsTrigger value="payment_done" className="data-[state=active]:shadow-md flex items-center gap-1">
+                                Payment Done
+                                <Badge variant="secondary" className="text-xs">{subtabCounts.payment_done}</Badge>
+                            </TabsTrigger>
+                            <TabsTrigger value="rejected" className="data-[state=active]:shadow-md flex items-center gap-1">
+                                Rejected
+                                <Badge variant="secondary" className="text-xs">{subtabCounts.rejected}</Badge>
+                            </TabsTrigger>
+                        </TabsList>
+                    </Tabs>
                 </CardHeader>
                 <CardContent className="pt-0">
                     <div className="flex justify-end">
@@ -122,7 +157,7 @@ const MakerRequestListPage: React.FC = () => {
                     {isLoading ? (
                         <Skeleton className="h-64 w-full rounded-lg" />
                     ) : (
-                        <DataTable data={rows} columnDefs={mrColumns} onGridReady={onGridReady} gridOptions={{ pagination: true, paginationPageSize: 100, domLayout: "autoHeight" }} />
+                        <DataTable data={filteredRows} columnDefs={mrColumns} onGridReady={onGridReady} gridOptions={{ pagination: true, paginationPageSize: 10, domLayout: "autoHeight" }} />
                     )}
                 </CardContent>
             </Card>

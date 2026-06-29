@@ -7,9 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DataTable from "@/components/ui/data-table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDebouncedSearch } from "@/hooks/useDebouncedSearch";
+import { usePersistentTableState } from "@/hooks/usePersistentTableState";
 import { createActionColumnRenderer } from "@/components/data-grid/renderers/ActionColumnRenderer";
 import type { ActionItem } from "@/components/ui/ActionMenu";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -58,6 +60,23 @@ const PaymentRequestListPage: React.FC = () => {
     const [rejectionReason, setRejectionReason] = useState("");
 
     const paymentRequests = useMemo(() => (data ?? []) as PaymentRequestRow[], [data]);
+
+    const { activeTab: activeSubTab, setActiveTab: setActiveSubTab } = usePersistentTableState<"pending" | "payment_done" | "rejected">({
+        storageKey: "payment-requests-pr-subtab",
+        defaultTab: "pending",
+    });
+
+    const filteredRequests = useMemo(() => {
+        if (activeSubTab === "payment_done") return paymentRequests.filter((r) => r.status === "payment_done");
+        if (activeSubTab === "rejected") return paymentRequests.filter((r) => r.status === "rejected");
+        return paymentRequests.filter((r) => r.status === "pending" || r.status === "maker_done");
+    }, [paymentRequests, activeSubTab]);
+
+    const subtabCounts = useMemo(() => ({
+        pending: paymentRequests.filter((r) => r.status === "pending" || r.status === "maker_done").length,
+        payment_done: paymentRequests.filter((r) => r.status === "payment_done").length,
+        rejected: paymentRequests.filter((r) => r.status === "rejected").length,
+    }), [paymentRequests]);
 
     const onGridReady = useCallback((event: GridReadyEvent<PaymentRequestRow>) => {
         setGridApi(event.api);
@@ -232,8 +251,24 @@ const PaymentRequestListPage: React.FC = () => {
                         </CardTitle>
                     </div>
                     <CardDescription>
-                        {paymentRequests.length} request{paymentRequests.length !== 1 ? "s" : ""} found
+                        {filteredRequests.length} request{filteredRequests.length !== 1 ? "s" : ""} found
                     </CardDescription>
+                    <Tabs value={activeSubTab} onValueChange={(v) => setActiveSubTab(v as typeof activeSubTab)}>
+                        <TabsList className="m-auto mb-0">
+                            <TabsTrigger value="pending" className="data-[state=active]:shadow-md flex items-center gap-1">
+                                Pending
+                                <Badge variant="secondary" className="text-xs">{subtabCounts.pending}</Badge>
+                            </TabsTrigger>
+                            <TabsTrigger value="payment_done" className="data-[state=active]:shadow-md flex items-center gap-1">
+                                Payment Done
+                                <Badge variant="secondary" className="text-xs">{subtabCounts.payment_done}</Badge>
+                            </TabsTrigger>
+                            <TabsTrigger value="rejected" className="data-[state=active]:shadow-md flex items-center gap-1">
+                                Rejected
+                                <Badge variant="secondary" className="text-xs">{subtabCounts.rejected}</Badge>
+                            </TabsTrigger>
+                        </TabsList>
+                    </Tabs>
                 </CardHeader>
                 <CardContent className="pt-0">
                     <div className="flex justify-end">
@@ -252,12 +287,12 @@ const PaymentRequestListPage: React.FC = () => {
                         <Skeleton className="h-64 w-full rounded-lg" />
                     ) : (
                         <DataTable
-                            data={paymentRequests}
+                            data={filteredRequests}
                             columnDefs={prColumns}
                             onGridReady={onGridReady}
                             gridOptions={{
                                 pagination: true,
-                                paginationPageSize: 100,
+                                paginationPageSize: 10,
                                 domLayout: "autoHeight",
                             }}
                         />
