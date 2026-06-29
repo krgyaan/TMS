@@ -42,6 +42,15 @@ function getPermissionModule(title: string, parentMenuTitle?: string): string | 
         }
     }
 
+    if (title === 'Payment Requests') {
+        if (parentMenuTitle === 'Operations') {
+            return 'ops.payment-requests';
+        }
+        if (parentMenuTitle === 'Accounts') {
+            return 'accounts.payment-requests';
+        }
+    }
+
     // Standard mapping for unique titles
     const MENU_PERMISSION_MAP: Record<string, string> = {
         // Tendering sub-items
@@ -85,7 +94,6 @@ function getPermissionModule(title: string, parentMenuTitle?: string): string | 
         'TDS Checklists': 'accounts.tds-checklists',
         'GST Checklists': 'accounts.gst-checklists',
         'Fixed Expenses': 'accounts.fixed-expenses',
-        'Payment Requests': 'accounts.payment-requests',
 
         // CRM sub-items
         'Leads': 'crm.leads',

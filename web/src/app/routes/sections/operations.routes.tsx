@@ -43,6 +43,7 @@ const Operations_CreatePurchaseInvoice = lazy(() => import("@/modules/operations
 const Operations_EditPurchaseInvoice = lazy(() => import("@/modules/operations/purchase-invoices/EditPurchaseInvoicePage"));
 const Operations_CreatePaymentRequest = lazy(() => import("@/modules/operations/payment-requests/CreatePaymentRequestPage"));
 const Operations_EditPaymentRequest = lazy(() => import("@/modules/operations/payment-requests/EditPaymentRequestPage"));
+const Operations_PaymentRequestTabs = lazy(() => import("@/modules/shared/payment-requests/PaymentRequestTabsPage"));
 
 export default function OperationsRoutes() {
     return (
@@ -87,6 +88,7 @@ export default function OperationsRoutes() {
             <Route path="project-dashboard/:projectId/project-purchase-invoice/:piId/edit" element={<RouteWrapper><Operations_EditPurchaseInvoice /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/project-payment-request/create" element={<RouteWrapper><Operations_CreatePaymentRequest /></RouteWrapper>} />
             <Route path="project-dashboard/:projectId/project-payment-request/:prId/edit" element={<RouteWrapper><Operations_EditPaymentRequest /></RouteWrapper>} />
+            <Route path="payment-requests" element={<RouteWrapper><Operations_PaymentRequestTabs /></RouteWrapper>} />
         </Routes>
     );
 }
