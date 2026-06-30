@@ -208,8 +208,17 @@ export class PaymentRequestService {
 
     async getByProject(projectId: number) {
         return this.db
-            .select()
+            .select({
+                ...this.prFields,
+                requestedByName: users.name,
+                projectName: projects.projectName,
+                poNumber: purchaseOrders.poNumber,
+            })
             .from(paymentRequests)
+            .leftJoin(users, eq(paymentRequests.requestedBy, users.id))
+            .leftJoin(projects, eq(paymentRequests.projectId, projects.id))
+            .leftJoin(purchaseOrders, eq(paymentRequests.purchaseOrderId, purchaseOrders.id))
+            .leftJoin(purchaseInvoices, eq(paymentRequests.purchaseInvoiceId, purchaseInvoices.id))
             .where(eq(paymentRequests.projectId, projectId))
             .orderBy(desc(paymentRequests.id));
     }

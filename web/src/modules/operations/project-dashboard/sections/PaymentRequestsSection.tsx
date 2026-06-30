@@ -236,7 +236,7 @@ export const PaymentRequestsSection: React.FC<PaymentRequestsSectionProps> = ({
                                     <p>{detail.poNumber || `#${detail.purchaseOrderId}`}</p>
                                 </div>
                             )}
-                            {detail.paymentAgainst === "new_pi" && detail.piPartyName && (
+                            {detail.paymentAgainst === "new_pi" && (
                                 <div className="col-span-2">
                                     <Label className="text-muted-foreground text-xs mb-1 block">Purchase Invoice Details</Label>
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">

@@ -174,19 +174,53 @@ const MakerRequestListPage: React.FC = () => {
                         <div className="space-y-4 py-4">{ [1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-8 w-full" />) }</div>
                     ) : detail ? (
                         <div className="grid grid-cols-2 gap-x-6 gap-y-4 py-4">
-                            <div><Label className="text-muted-foreground text-xs">Request No</Label><p className="font-mono font-medium">{detail.requestNo}</p></div>
-                            <div><Label className="text-muted-foreground text-xs">Party Name</Label><p>{detail.partyName}</p></div>
-                            <div><Label className="text-muted-foreground text-xs">Amount</Label><p className="font-medium">{formatINR(detail.amount)}</p></div>
-                            <div><Label className="text-muted-foreground text-xs">Category</Label><p>{detail.categoryName || "—"}</p></div>
-                            <div><Label className="text-muted-foreground text-xs">Account Number</Label><p className="font-mono">{detail.accountNumber}</p></div>
-                            <div><Label className="text-muted-foreground text-xs">Bank Name</Label><p>{detail.bankName || "—"}</p></div>
-                            <div><Label className="text-muted-foreground text-xs">IFSC</Label><p className="font-mono">{detail.ifsc}</p></div>
-                            <div><Label className="text-muted-foreground text-xs">Status</Label><Badge variant="outline" className={STATUS_CONFIG[detail.status]?.color || ""}>{STATUS_CONFIG[detail.status]?.label || detail.status}</Badge></div>
-                            <div><Label className="text-muted-foreground text-xs">Requested By</Label><p>{detail.requestedByName || "—"}</p></div>
-                            <div><Label className="text-muted-foreground text-xs">Created At</Label><p>{formatDate(detail.createdAt)}</p></div>
-                            {detail.utrNumber && <div><Label className="text-muted-foreground text-xs">UTR Number</Label><p className="font-mono">{detail.utrNumber}</p></div>}
-                            {detail.rejectionReason && <div className="col-span-2"><Label className="text-muted-foreground text-xs">Rejection Reason</Label><p className="text-red-600">{detail.rejectionReason}</p></div>}
-                            {detail.remark && <div className="col-span-2"><Label className="text-muted-foreground text-xs">Remark</Label><p>{detail.remark}</p></div>}
+                            <div className="col-span-2">
+                                <Label className="text-muted-foreground text-xs">Request No</Label><p className="font-mono font-medium">{detail.requestNo}</p>
+                            </div>
+                            <div>
+                                <Label className="text-muted-foreground text-xs">Party Name</Label><p>{detail.partyName}</p>
+                            </div>
+                            <div>
+                                <Label className="text-muted-foreground text-xs">Amount</Label><p className="font-medium">{formatINR(detail.amount)}</p>
+                            </div>
+                            <div>
+                                <Label className="text-muted-foreground text-xs">Category</Label><p>{detail.categoryName || "—"}</p>
+                            </div>
+                            <div>
+                                <Label className="text-muted-foreground text-xs">Account Number</Label><p className="font-mono">{detail.accountNumber}</p>
+                            </div>
+                            <div>
+                                <Label className="text-muted-foreground text-xs">Bank Name</Label><p>{detail.bankName || "—"}</p>
+                            </div>
+                            <div>
+                                <Label className="text-muted-foreground text-xs">IFSC</Label><p className="font-mono">{detail.ifsc}</p>
+                            </div>
+                            <div>
+                                <Label className="text-muted-foreground text-xs">Status</Label><Badge variant="outline" className={STATUS_CONFIG[detail.status]?.color || ""}>{STATUS_CONFIG[detail.status]?.label || detail.status}</Badge>
+                            </div>
+                            <div>
+                                <Label className="text-muted-foreground text-xs">Requested By</Label><p>{detail.requestedByName || "—"}</p>
+                            </div>
+                            <div>
+                                <Label className="text-muted-foreground text-xs">Created At</Label><p>{formatDate(detail.createdAt)}</p>
+                            </div>
+                            {detail.utrNumber && 
+                                <div>
+                                    <Label className="text-muted-foreground text-xs">UTR Number</Label><p className="font-mono">{detail.utrNumber}</p>
+                                </div>
+                            }
+                            {detail.rejectionReason && 
+                                <div className="col-span-2">
+                                    <Label className="text-muted-foreground text-xs">Rejection Reason</Label>
+                                    <p className="text-red-600">{detail.rejectionReason}</p>
+                                </div>
+                            }
+                            {detail.remark && 
+                                <div className="col-span-2">
+                                    <Label className="text-muted-foreground text-xs">Remark</Label>
+                                    <p>{detail.remark}</p>
+                                </div>
+                            }
                             {detail.billFiles && detail.billFiles.length > 0 && (
                                 <div className="col-span-2">
                                     <Label className="text-muted-foreground text-xs">Bill / Proof Files</Label>
@@ -199,40 +233,87 @@ const MakerRequestListPage: React.FC = () => {
                             )}
                         </div>
                     ) : <p className="text-muted-foreground py-4 text-center">No details found.</p>}
-                    <DialogFooter><Button variant="outline" onClick={() => setViewingId(null)}>Close</Button></DialogFooter>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setViewingId(null)}>Close</Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 
             {/* Maker Done */}
             <Dialog open={makerDoneRow !== null} onOpenChange={(open) => { if (!open) setMakerDoneRow(null); }}>
                 <DialogContent className="sm:max-w-md">
-                    <DialogHeader><DialogTitle>Confirm Maker Done</DialogTitle><DialogDescription>Mark this maker request as "Maker Done"?</DialogDescription></DialogHeader>
-                    {makerDoneRow && <div className="space-y-2 py-2"><p><strong>Request No:</strong> {makerDoneRow.requestNo}</p><p><strong>Party:</strong> {makerDoneRow.partyName}</p><p><strong>Amount:</strong> {formatINR(makerDoneRow.amount)}</p></div>}
-                    <DialogFooter><Button variant="outline" onClick={() => setMakerDoneRow(null)}>Cancel</Button><Button onClick={confirmMakerDone} disabled={updateStatusMutation.isPending}>{updateStatusMutation.isPending ? "Updating..." : "Confirm"}</Button></DialogFooter>
+                    <DialogHeader>
+                        <DialogTitle>Confirm Maker Done</DialogTitle>
+                        <DialogDescription>Mark this maker request as "Maker Done"?</DialogDescription>
+                    </DialogHeader>
+                    {makerDoneRow && 
+                        <div className="space-y-2 py-2">
+                            <p><strong>Request No:</strong> {makerDoneRow.requestNo}</p>
+                            <p><strong>Party:</strong> {makerDoneRow.partyName}</p>
+                            <p><strong>Amount:</strong> {formatINR(makerDoneRow.amount)}</p>
+                        </div>
+                    }
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setMakerDoneRow(null)}>Cancel</Button>
+                        <Button onClick={confirmMakerDone} disabled={updateStatusMutation.isPending}>{updateStatusMutation.isPending ? "Updating..." : "Confirm"}</Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 
             {/* Payment Done */}
             <Dialog open={paymentDoneRow !== null} onOpenChange={(open) => { if (!open) { setPaymentDoneRow(null); setUtrNumber(""); } }}>
                 <DialogContent className="sm:max-w-md">
-                    <DialogHeader><DialogTitle>Payment Done</DialogTitle><DialogDescription>Enter the UTR number to confirm payment completion</DialogDescription></DialogHeader>
-                    {paymentDoneRow && <div className="space-y-4 py-2">
-                        <div className="space-y-1"><p className="text-sm"><strong>Request No:</strong> {paymentDoneRow.requestNo}</p><p className="text-sm"><strong>Party:</strong> {paymentDoneRow.partyName}</p><p className="text-sm"><strong>Amount:</strong> {formatINR(paymentDoneRow.amount)}</p></div>
-                        <div className="space-y-1"><Label htmlFor="mr-utr">UTR Number <span className="text-destructive">*</span></Label><Input id="mr-utr" value={utrNumber} onChange={(e) => setUtrNumber(e.target.value)} placeholder="e.g. SBIN1234567890" className="font-mono" /></div>
-                    </div>}
-                    <DialogFooter><Button variant="outline" onClick={() => { setPaymentDoneRow(null); setUtrNumber(""); }}>Cancel</Button><Button onClick={confirmPaymentDone} disabled={!utrNumber.trim() || updateStatusMutation.isPending}>{updateStatusMutation.isPending ? "Submitting..." : "Submit"}</Button></DialogFooter>
+                    <DialogHeader>
+                        <DialogTitle>Payment Done</DialogTitle>
+                    <DialogDescription>Enter the UTR number to confirm payment completion</DialogDescription>
+                </DialogHeader>
+                    {paymentDoneRow && 
+                        <div className="space-y-4 py-2">
+                            <div className="space-y-1">
+                                <p className="text-sm"><strong>Request No:</strong> {paymentDoneRow.requestNo}</p>
+                                <p className="text-sm"><strong>Party:</strong> {paymentDoneRow.partyName}</p>
+                                <p className="text-sm"><strong>Amount:</strong> {formatINR(paymentDoneRow.amount)}</p>
+                            </div>
+                            <div className="space-y-1">
+                                <Label htmlFor="mr-utr">
+                                    UTR Number <span className="text-destructive">*</span>
+                                </Label>
+                                <Input id="mr-utr" value={utrNumber} onChange={(e) => setUtrNumber(e.target.value)} placeholder="e.g. SBIN1234567890" className="font-mono" />
+                            </div>
+                        </div>
+                    }
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => { setPaymentDoneRow(null); setUtrNumber(""); }}>Cancel</Button>
+                        <Button onClick={confirmPaymentDone} disabled={!utrNumber.trim() || updateStatusMutation.isPending}>{updateStatusMutation.isPending ? "Submitting..." : "Submit"}</Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
 
             {/* Reject */}
             <Dialog open={rejectRow !== null} onOpenChange={(open) => { if (!open) { setRejectRow(null); setRejectionReason(""); } }}>
                 <DialogContent className="sm:max-w-md">
-                    <DialogHeader><DialogTitle>Reject Maker Request</DialogTitle><DialogDescription>Provide a reason for rejecting this request</DialogDescription></DialogHeader>
-                    {rejectRow && <div className="space-y-4 py-2">
-                        <div className="space-y-1"><p className="text-sm"><strong>Request No:</strong> {rejectRow.requestNo}</p><p className="text-sm"><strong>Party:</strong> {rejectRow.partyName}</p><p className="text-sm"><strong>Amount:</strong> {formatINR(rejectRow.amount)}</p></div>
-                        <div className="space-y-1"><Label htmlFor="mr-reject-reason">Reason for Rejection <span className="text-destructive">*</span></Label><Textarea id="mr-reject-reason" value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} placeholder="Explain why this request is rejected..." rows={3} /></div>
-                    </div>}
-                    <DialogFooter><Button variant="outline" onClick={() => { setRejectRow(null); setRejectionReason(""); }}>Cancel</Button><Button variant="destructive" onClick={confirmReject} disabled={!rejectionReason.trim() || updateStatusMutation.isPending}>{updateStatusMutation.isPending ? "Rejecting..." : "Reject"}</Button></DialogFooter>
+                    <DialogHeader>
+                        <DialogTitle>Reject Maker Request</DialogTitle>
+                        <DialogDescription>Provide a reason for rejecting this request</DialogDescription>
+                    </DialogHeader>
+                    {rejectRow && 
+                        <div className="space-y-4 py-2">
+                            <div className="space-y-1">
+                                <p className="text-sm"><strong>Request No:</strong> {rejectRow.requestNo}</p>
+                                <p className="text-sm"><strong>Party:</strong> {rejectRow.partyName}</p><p className="text-sm"><strong>Amount:</strong> {formatINR(rejectRow.amount)}</p>
+                            </div>
+                            <div className="space-y-1">
+                                <Label htmlFor="mr-reject-reason">
+                                    Reason for Rejection <span className="text-destructive">*</span>
+                                </Label>
+                                <Textarea id="mr-reject-reason" value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} placeholder="Explain why this request is rejected..." rows={3} />
+                            </div>
+                        </div>
+                    }
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => { setRejectRow(null); setRejectionReason(""); }}>Cancel</Button>
+                        <Button variant="destructive" onClick={confirmReject} disabled={!rejectionReason.trim() || updateStatusMutation.isPending}>{updateStatusMutation.isPending ? "Rejecting..." : "Reject"}</Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </>

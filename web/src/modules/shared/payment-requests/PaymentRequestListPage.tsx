@@ -316,7 +316,7 @@ const PaymentRequestListPage: React.FC = () => {
                         </div>
                     ) : detail ? (
                         <div className="grid grid-cols-2 gap-x-6 gap-y-4 py-4">
-                            <div>
+                            <div className="col-span-2">
                                 <Label className="text-muted-foreground text-xs">Request No</Label>
                                 <p className="font-mono font-medium">{detail.requestNo}</p>
                             </div>
@@ -354,7 +354,7 @@ const PaymentRequestListPage: React.FC = () => {
                                     <p>{detail.poNumber || `#${detail.purchaseOrderId}`}</p>
                                 </div>
                             )}
-                            {detail.paymentAgainst === "new_pi" && detail.piPartyName && (
+                            {detail.paymentAgainst === "new_pi" && (
                                 <div className="col-span-2">
                                     <Label className="text-muted-foreground text-xs mb-1 block">Purchase Invoice Details</Label>
                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
