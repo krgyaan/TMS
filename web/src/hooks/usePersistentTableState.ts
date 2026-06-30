@@ -11,7 +11,7 @@ export interface PersistentTableStateOptions<Tab extends string> {
     defaultPageSize?: number;
 }
 
-const RELEVANT_PARAMS = ['tab', 'q', 'page', 'size', 'sortBy', 'sortOrder'];
+const RELEVANT_PARAMS = ['tab', 'subtab', 'q', 'page', 'size', 'sortBy', 'sortOrder'];
 
 export function usePersistentTableState<Tab extends string>({
     storageKey,

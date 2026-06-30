@@ -50,6 +50,7 @@ const MakerRequestListPage: React.FC = () => {
     const { activeTab: activeSubTab, setActiveTab: setActiveSubTab } = usePersistentTableState<"pending" | "payment_done" | "rejected">({
         storageKey: "payment-requests-mr-subtab",
         defaultTab: "pending",
+        tabParam: "subtab",
     });
 
     const filteredRows = useMemo(() => {
