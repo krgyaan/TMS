@@ -4,7 +4,7 @@ export const paymentAgainstOptions = [
     { value: "upload_invoice", label: "Upload Purchase Invoice" },
     { value: "new_pi", label: "New PI" },
     { value: "po", label: "PO" },
-    { value: "others", label: "Others" },
+    { value: "imprest", label: "Imprest" },
 ] as const;
 
 export const paymentRequestFormSchema = z.object({
@@ -40,6 +40,11 @@ export const paymentRequestFormSchema = z.object({
         if (!hasPoSelection && !hasPoFile) {
             ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["selectedPoId"], message: "Select a PO or upload a PO file" });
             ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["poFile"], message: "Upload a PO file or select a PO" });
+        }
+    }
+    if (data.paymentAgainst === "imprest") {
+        if (!data.remark || !data.remark.trim()) {
+            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["remark"], message: "Remark is required for Imprest" });
         }
     }
 });

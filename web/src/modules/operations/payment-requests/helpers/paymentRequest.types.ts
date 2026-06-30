@@ -21,6 +21,12 @@ export interface PaymentRequestRow {
     projectName?: string;
     poNumber?: string;
     createdAt: string;
+    piCategory?: string;
+    piPartyName?: string;
+    piValuePreGst?: string | null;
+    piGstAmount?: string | null;
+    piInvoiceDate?: string;
+    piInvoiceFile?: string | null;
 }
 
 export interface CreatePaymentRequestDTO {
