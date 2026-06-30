@@ -266,10 +266,7 @@ const StatCard: React.FC<StatCardProps> = ({
 
 // ─── Progress Bar ─────────────────────────────────────────────────────────────
 
-const ProgressIndicator: React.FC<{ value: number; className?: string }> = ({
-  value,
-  className,
-}) => (
+const ProgressIndicator: React.FC<{ value: number; className?: string }> = ({ value, className,}) => (
   <div className={cn("flex items-center gap-2.5", className)}>
     <div className="h-1.5 flex-1 rounded-full bg-muted overflow-hidden">
       <div
@@ -309,192 +306,192 @@ interface JoineeCardProps {
 }
 
 const JoineeCard: React.FC<JoineeCardProps> = ({
-  joinee,
-  onView,
-  onApprove,
-  onReject,
-}) => {
-  const isPending = joinee.status === "pending";
+    joinee,
+    onView,
+    onApprove,
+    onReject,
+  }) => {
+    const isPending = joinee.status === "pending";
 
-  return (
-    <div
-      className={cn(
-        "group relative rounded-2xl border bg-card transition-all duration-200",
-        "hover:shadow-lg hover:shadow-black/[0.03] hover:-translate-y-0.5 hover:border-border",
-        "cursor-pointer"
-      )}
-      onClick={() => onView(joinee)}
-    >
-      <div className="p-5">
-        {/* Top row: avatar, name, status */}
-        <div className="flex items-start gap-4">
-          <Avatar className="h-12 w-12 rounded-xl flex-shrink-0 ring-1 ring-border/50">
-            {(joinee as any).profilePhoto && (
-              <AvatarImage src={(joinee as any).profilePhoto} alt={joinee.name} className="object-cover" />
-            )}
-            <AvatarFallback
-              className={cn(
-                "rounded-xl text-sm font-bold",
-                getAvatarColor(joinee.name)
-              )}
-            >
-              {getInitials(joinee.name)}
-            </AvatarFallback>
-          </Avatar>
-
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-2">
-              <div className="min-w-0">
-                <h3 className="text-sm font-semibold leading-tight truncate">
-                  {joinee.name}
-                </h3>
-                <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                  {joinee.email}
-                </p>
-              </div>
-              <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                <StatusBadge status={joinee.status} />
-                {joinee.hrStatus && <HrStatusBadge status={joinee.hrStatus} />}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Details grid */}
-        <div className="mt-4 grid grid-cols-3 gap-3">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Phone className="h-3.5 w-3.5 flex-shrink-0" />
-            <span className="truncate">{joinee.phone}</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Hash className="h-3.5 w-3.5 flex-shrink-0" />
-            <span>ID-{joinee.id}</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground justify-end">
-            <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
-            <span>{timeAgo(joinee.createdAt)}</span>
-          </div>
-        </div>
-
-        {/* Progress */}
-        <div className="mt-5 grid grid-cols-2 gap-4 pt-4 border-t">
-          {/* Employee Progress (Discrete Track) */}
-          <div>
-            <div className="flex items-center justify-between text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-              <span>Employee</span>
-              <span className="text-blue-600 dark:text-blue-400 tabular-nums">{joinee.employeeProgress}%</span>
-            </div>
-            <div className="flex gap-1 h-1.5">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div 
-                  key={i} 
-                  className={cn(
-                    "flex-1 rounded-full transition-colors", 
-                    Math.round((joinee.employeeProgress / 100) * 6) > i 
-                      ? "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" 
-                      : "bg-muted"
-                  )} 
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* HR Progress (Continuous Line) */}
-          <div>
-            <div className="flex items-center justify-between text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-              <span>HR Approval</span>
-              <span className={cn(
-                "tabular-nums",
-                joinee.progress >= 80 ? "text-emerald-600 dark:text-emerald-400" :
-                joinee.progress >= 50 ? "text-amber-600 dark:text-amber-400" :
-                "text-orange-600 dark:text-orange-400"
-              )}>
-                {joinee.progress}%
-              </span>
-            </div>
-            <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden relative">
-              <div
-                className={cn(
-                  "h-full rounded-full transition-all duration-500",
-                  joinee.progress >= 80 ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" :
-                  joinee.progress >= 50 ? "bg-amber-500" :
-                  "bg-orange-500"
-                )}
-                style={{ width: `${joinee.progress}%` }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Action footer */}
+    return (
       <div
         className={cn(
-          "flex items-center justify-between border-t px-5 py-3",
-          "bg-muted/20"
+          "group relative rounded-2xl border bg-card transition-all duration-200",
+          "hover:shadow-lg hover:shadow-black/[0.03] hover:-translate-y-0.5 hover:border-border",
+          "cursor-pointer"
         )}
+        onClick={() => onView(joinee)}
       >
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-8 text-xs text-muted-foreground hover:text-foreground gap-1.5"
-          onClick={(e) => {
-            e.stopPropagation();
-            onView(joinee);
-          }}
-        >
-          <Eye className="h-3.5 w-3.5" />
-          View Details
-        </Button>
+        <div className="p-5">
+          {/* Top row: avatar, name, status */}
+          <div className="flex items-start gap-4">
+            <Avatar className="h-12 w-12 rounded-xl flex-shrink-0 ring-1 ring-border/50">
+              {(joinee as any).profilePhoto && (
+                <AvatarImage src={(joinee as any).profilePhoto} alt={joinee.name} className="object-cover" />
+              )}
+              <AvatarFallback
+                className={cn(
+                  "rounded-xl text-sm font-bold",
+                  getAvatarColor(joinee.name)
+                )}
+              >
+                {getInitials(joinee.name)}
+              </AvatarFallback>
+            </Avatar>
 
-        {isPending && (
-          <div className="flex items-center gap-1.5">
-            <TooltipProvider delayDuration={100}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onReject(joinee);
-                    }}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="text-xs">
-                  Reject
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-
-            <TooltipProvider delayDuration={100}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onApprove(joinee);
-                    }}
-                  >
-                    <Check className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top" className="text-xs">
-                  Approve
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-semibold leading-tight truncate">
+                    {joinee.name}
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                    {joinee.email}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                  <StatusBadge status={joinee.status} />
+                  {joinee.hrStatus && <HrStatusBadge status={joinee.hrStatus} />}
+                </div>
+              </div>
+            </div>
           </div>
-        )}
+
+          {/* Details grid */}
+          <div className="mt-4 grid grid-cols-3 gap-3">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Phone className="h-3.5 w-3.5 flex-shrink-0" />
+              <span className="truncate">{joinee.phone}</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Hash className="h-3.5 w-3.5 flex-shrink-0" />
+              <span>ID-{joinee.id}</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground justify-end">
+              <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
+              <span>{timeAgo(joinee.createdAt)}</span>
+            </div>
+          </div>
+
+          {/* Progress */}
+          <div className="mt-5 grid grid-cols-2 gap-4 pt-4 border-t">
+            {/* Employee Progress (Discrete Track) */}
+            <div>
+              <div className="flex items-center justify-between text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                <span>Employee</span>
+                <span className="text-blue-600 dark:text-blue-400 tabular-nums">{joinee.employeeProgress}%</span>
+              </div>
+              <div className="flex gap-1 h-1.5">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div 
+                    key={i} 
+                    className={cn(
+                      "flex-1 rounded-full transition-colors", 
+                      Math.round((joinee.employeeProgress / 100) * 6) > i 
+                        ? "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" 
+                        : "bg-muted"
+                    )} 
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* HR Progress (Continuous Line) */}
+            <div>
+              <div className="flex items-center justify-between text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                <span>HR Approval</span>
+                <span className={cn(
+                  "tabular-nums",
+                  joinee.progress >= 80 ? "text-emerald-600 dark:text-emerald-400" :
+                  joinee.progress >= 50 ? "text-amber-600 dark:text-amber-400" :
+                  "text-orange-600 dark:text-orange-400"
+                )}>
+                  {joinee.progress}%
+                </span>
+              </div>
+              <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden relative">
+                <div
+                  className={cn(
+                    "h-full rounded-full transition-all duration-500",
+                    joinee.progress >= 80 ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" :
+                    joinee.progress >= 50 ? "bg-amber-500" :
+                    "bg-orange-500"
+                  )}
+                  style={{ width: `${joinee.progress}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Action footer */}
+        <div
+          className={cn(
+            "flex items-center justify-between border-t px-5 py-3",
+            "bg-muted/20"
+          )}
+        >
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs text-muted-foreground hover:text-foreground gap-1.5"
+            onClick={(e) => {
+              e.stopPropagation();
+              onView(joinee);
+            }}
+          >
+            <Eye className="h-3.5 w-3.5" />
+            View Details
+          </Button>
+
+          {isPending && (
+            <div className="flex items-center gap-1.5">
+              <TooltipProvider delayDuration={100}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onReject(joinee);
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">
+                    Reject
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              <TooltipProvider delayDuration={100}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onApprove(joinee);
+                      }}
+                    >
+                      <Check className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">
+                    Approve
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
 };
 
 // ─── Empty State ──────────────────────────────────────────────────────────────

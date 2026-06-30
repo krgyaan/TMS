@@ -1381,7 +1381,8 @@ export class OnboardingService {
 
           if (onProf) {
             // Generate a temporary password
-            const tempPassword = crypto.randomBytes(8).toString('hex');
+            // Rather than creating pass like this we will use firstname + @123
+            const tempPassword = (onProf.firstName || '').trim() + "@123";
 
             // Hash using Argon2
             const hashedPassword = await argon2.hash(tempPassword, {

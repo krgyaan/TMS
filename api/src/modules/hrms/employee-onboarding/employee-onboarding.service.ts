@@ -207,7 +207,7 @@ export class EmployeeOnboardingService {
         emergencyContact,
 
         // HR fields left blank — filled by HR in Profile Dashboard
-        employeeCompleted: true,   // Employee side is done at signup
+        employeeCompleted: false,   // Employee side is done at signup
         hrCompleted: false,
       } as NewOnboardingProfile);
 
