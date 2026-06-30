@@ -38,7 +38,9 @@ export function usePersistentTableState<Tab extends string>({
                 const val = parsed[field];
                 if (val !== undefined && val !== null) return val;
             }
-        } catch { }
+        } catch(err) {
+            console.error(err);
+         }
         return defaultValue;
     };
 

@@ -64,6 +64,7 @@ const PaymentRequestListPage: React.FC = () => {
     const { activeTab: activeSubTab, setActiveTab: setActiveSubTab } = usePersistentTableState<"pending" | "payment_done" | "rejected">({
         storageKey: "payment-requests-pr-subtab",
         defaultTab: "pending",
+        tabParam : "subtab"
     });
 
     const filteredRequests = useMemo(() => {
