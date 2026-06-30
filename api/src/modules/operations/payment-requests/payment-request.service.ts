@@ -7,6 +7,7 @@ import { beneficiaries } from "@/db/schemas/operations/beneficiaries.schema";
 import { users } from "@/db/schemas/";
 import { projects } from "@/db/schemas/master/projects.schema";
 import { purchaseOrders } from "@/db/schemas/operations/purchase-orders.schema";
+import { purchaseInvoices } from "@/db/schemas/operations/purchase-invoices.schema";
 import { WINSTON_MODULE_PROVIDER } from "nest-winston";
 import { Logger } from "winston";
 
@@ -161,6 +162,12 @@ export class PaymentRequestService {
         requestedBy: paymentRequests.requestedBy,
         createdAt: paymentRequests.createdAt,
         updatedAt: paymentRequests.updatedAt,
+        piCategory: purchaseInvoices.category,
+        piPartyName: purchaseInvoices.partyName,
+        piValuePreGst: purchaseInvoices.valuePreGst,
+        piGstAmount: purchaseInvoices.gstAmount,
+        piInvoiceDate: purchaseInvoices.invoiceDate,
+        piInvoiceFile: purchaseInvoices.invoiceFile,
     };
 
     async getById(id: number) {
@@ -175,6 +182,7 @@ export class PaymentRequestService {
             .leftJoin(users, eq(paymentRequests.requestedBy, users.id))
             .leftJoin(projects, eq(paymentRequests.projectId, projects.id))
             .leftJoin(purchaseOrders, eq(paymentRequests.purchaseOrderId, purchaseOrders.id))
+            .leftJoin(purchaseInvoices, eq(paymentRequests.purchaseInvoiceId, purchaseInvoices.id))
             .where(eq(paymentRequests.id, id));
 
         const pr = rows[0];
@@ -194,6 +202,7 @@ export class PaymentRequestService {
             .leftJoin(users, eq(paymentRequests.requestedBy, users.id))
             .leftJoin(projects, eq(paymentRequests.projectId, projects.id))
             .leftJoin(purchaseOrders, eq(paymentRequests.purchaseOrderId, purchaseOrders.id))
+            .leftJoin(purchaseInvoices, eq(paymentRequests.purchaseInvoiceId, purchaseInvoices.id))
             .orderBy(desc(paymentRequests.id));
     }
 

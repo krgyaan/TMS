@@ -3,6 +3,7 @@ import { FieldWrapper } from "@/components/form/FieldWrapper";
 import { SelectField } from "@/components/form/SelectField";
 import { TenderFileUploader } from "@/components/tender-file-upload";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import React from "react";
 import type { Control } from "react-hook-form";
 import { useFormContext } from "react-hook-form";
@@ -125,6 +126,14 @@ export const PaymentAgainstField: React.FC<PaymentAgainstFieldProps> = ({ contro
                         />
                     </div>
                 </>
+            )}
+
+            {paymentAgainst === "imprest" && (
+                <div className="max-w-md">
+                    <FieldWrapper control={control} name="remark" label="Remark">
+                        {(field) => <Textarea {...field} placeholder="Enter remark for Imprest..." />}
+                    </FieldWrapper>
+                </div>
             )}
         </div>
     );

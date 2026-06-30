@@ -354,6 +354,41 @@ const PaymentRequestListPage: React.FC = () => {
                                     <p>{detail.poNumber || `#${detail.purchaseOrderId}`}</p>
                                 </div>
                             )}
+                            {detail.paymentAgainst === "new_pi" && detail.piPartyName && (
+                                <div className="col-span-2">
+                                    <Label className="text-muted-foreground text-xs mb-1 block">Purchase Invoice Details</Label>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                                        <div>
+                                            <span className="text-muted-foreground">Category:</span>
+                                            <p>{detail.piCategory || "—"}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-muted-foreground">Party:</span>
+                                            <p>{detail.piPartyName}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-muted-foreground">Value (Pre GST):</span>
+                                            <p>{detail.piValuePreGst ?? "—"}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-muted-foreground">GST Amount:</span>
+                                            <p>{detail.piGstAmount ?? "—"}</p>
+                                        </div>
+                                        <div>
+                                            <span className="text-muted-foreground">Invoice Date:</span>
+                                            <p>{detail.piInvoiceDate ? formatDate(detail.piInvoiceDate) : "—"}</p>
+                                        </div>
+                                        {detail.piInvoiceFile && (
+                                            <div>
+                                                <span className="text-muted-foreground">Invoice File:</span>
+                                                <a href={tenderFilesService.getFileUrl(detail.piInvoiceFile)} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline block">
+                                                    View
+                                                </a>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                             <div>
                                 <Label className="text-muted-foreground text-xs">Status</Label>
                                 <Badge variant="outline" className={STATUS_CONFIG[detail.status]?.color || ""}>
