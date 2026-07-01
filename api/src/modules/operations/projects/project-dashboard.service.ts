@@ -426,6 +426,7 @@ export class ProjectDashboardService {
         const signFile = team === 1 ? 'arju-boi.png' : 'sign-po.jpg';
         const signBuffer = await readFile(join(assetsPath, signFile));
         const img_sign_po_base64 = signBuffer.toString('base64');
+        this.logger.info(`PO ${po.id}: generating PDF with signature for team ${team}, signature file: ${join(assetsPath, signFile)}`);
 
         const data = {
             img_sign_po_base64,
