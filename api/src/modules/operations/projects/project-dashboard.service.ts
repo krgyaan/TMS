@@ -251,7 +251,7 @@ export class ProjectDashboardService {
             .from(woBasicDetails)
             .where(eq(woBasicDetails.tenderId, body.tenderId))
             .limit(1);
-
+        this.logger.debug(`Work Order Basic Details: ${JSON.stringify(woBasic)}`); 
         this.logger.info(`Creating Purchase Order: ${poNumber} for project: ${body.projectName}, tenderId: ${body.tenderId}, team: ${woBasic?.team}`);
 
         // Insert the purchase order
