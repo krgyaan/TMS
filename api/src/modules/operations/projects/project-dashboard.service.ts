@@ -244,84 +244,86 @@ export class ProjectDashboardService {
     }
 
     async createPurchaseOrder(body: any, userId: number) {
-    const poNumber = await this.generatePONumber(body.projectName);
+        const poNumber = await this.generatePONumber(body.projectName);
 
-    const [woBasic] = await this.db
-        .select({ team: woBasicDetails.team })
-        .from(woBasicDetails)
-        .where(eq(woBasicDetails.tenderId, body.tenderId))
-        .limit(1);
+        const [woBasic] = await this.db
+            .select({ team: woBasicDetails.team })
+            .from(woBasicDetails)
+            .where(eq(woBasicDetails.tenderId, body.tenderId))
+            .limit(1);
 
-    // Insert the purchase order
-    const po = (
-        await this.db
-        .insert(purchaseOrders)
-        .values({
-            tenderId: body.tenderId,
-            poNumber,
-            poDate: body.poDate,
-            projectName: body.projectName,
-            
-            // Seller Info
-            sellerName: body.sellerName,
-            sellerAddress: body.sellerAddress,
-            sellerEmail: body.sellerEmail,
-            sellerGstNo: body.sellerGstNo,
-            sellerPanNo: body.sellerPanNo,
-            sellerMsmeNo: body.sellerMsmeNo,
-            sellerCinNo: body.sellerCinNo,
-            contactPersonName: body.contactPersonName,
-            contactPersonPhone: body.contactPersonPhone,
-            contactPersonEmail: body.contactPersonEmail,
-            
-            // Ship To Info
-            shipToName: body.shipToName,
-            shippingAddress: body.shippingAddress,
-            shipToGst: body.shipToGst,
-            shipToPan: body.shipToPan,
-            
-            // Optional fields
-            quotationNo: body.quotationNo,
-            quotationDate: body.quotationDate,
-            termsAndConditions: body.termsAndConditions ? (typeof body.termsAndConditions === 'string' ? JSON.parse(body.termsAndConditions) : body.termsAndConditions) : [],
-            technicalSpecsAttachments: body.technicalSpecsAttachments,
-            accessoriesPackagingListAttachments: body.accessoriesPackagingListAttachments,
-            remarks: body.remarks,
-            certRecipient: body.certRecipient,
-            certRecipients: body.certRecipients ?? [],
-            poRaisedBy: userId,
-            team: woBasic?.team,
-            projectId: body.projectId,
-        })
-        .returning()
-    )[0];
+        this.logger.info(`Creating Purchase Order: ${poNumber} for project: ${body.projectName}, tenderId: ${body.tenderId}, team: ${woBasic?.team}`);
+
+        // Insert the purchase order
+        const po = (
+            await this.db
+            .insert(purchaseOrders)
+            .values({
+                tenderId: body.tenderId,
+                poNumber,
+                poDate: body.poDate,
+                projectName: body.projectName,
+                
+                // Seller Info
+                sellerName: body.sellerName,
+                sellerAddress: body.sellerAddress,
+                sellerEmail: body.sellerEmail,
+                sellerGstNo: body.sellerGstNo,
+                sellerPanNo: body.sellerPanNo,
+                sellerMsmeNo: body.sellerMsmeNo,
+                sellerCinNo: body.sellerCinNo,
+                contactPersonName: body.contactPersonName,
+                contactPersonPhone: body.contactPersonPhone,
+                contactPersonEmail: body.contactPersonEmail,
+                
+                // Ship To Info
+                shipToName: body.shipToName,
+                shippingAddress: body.shippingAddress,
+                shipToGst: body.shipToGst,
+                shipToPan: body.shipToPan,
+                
+                // Optional fields
+                quotationNo: body.quotationNo,
+                quotationDate: body.quotationDate,
+                termsAndConditions: body.termsAndConditions ? (typeof body.termsAndConditions === 'string' ? JSON.parse(body.termsAndConditions) : body.termsAndConditions) : [],
+                technicalSpecsAttachments: body.technicalSpecsAttachments,
+                accessoriesPackagingListAttachments: body.accessoriesPackagingListAttachments,
+                remarks: body.remarks,
+                certRecipient: body.certRecipient,
+                certRecipients: body.certRecipients ?? [],
+                poRaisedBy: userId,
+                team: woBasic?.team,
+                projectId: body.projectId,
+            })
+            .returning()
+        )[0];
 
         // Sync edited party details back to project_parties
         await this.syncPartyFromPO(body);
 
-    // Insert products
-    if (body.products && body.products.length > 0) {
-        for (const product of body.products) {
-        const qty = Number(product.qty);
-        const rate = Number(product.rate);
-        const gstRate = Number(product.gstRate);
-        const taxableAmount = qty * rate;
-        const gstAmount = (taxableAmount * gstRate) / 100;
-        const totalAmount = taxableAmount + gstAmount;
+        // Insert products
+        if (body.products && body.products.length > 0) {
+            for (const product of body.products) {
+            const qty = Number(product.qty);
+            const rate = Number(product.rate);
+            const gstRate = Number(product.gstRate);
+            const taxableAmount = qty * rate;
+            const gstAmount = (taxableAmount * gstRate) / 100;
+            const totalAmount = taxableAmount + gstAmount;
 
-        await this.db.insert(purchaseOrderProducts).values({
-            purchaseOrderId: po.id,
-            description: product.description,
-            hsnSac: product.hsnSac,
-            qty: product.qty,
-            rate: product.rate.toString(),
-            taxableAmount: taxableAmount.toString(),
-            gstRate: product.gstRate.toString(),
-            gstAmount: gstAmount.toString(),
-            totalAmount: totalAmount.toString(),
-        });
+            await this.db.insert(purchaseOrderProducts).values({
+                purchaseOrderId: po.id,
+                description: product.description,
+                hsnSac: product.hsnSac,
+                qty: product.qty,
+                rate: product.rate.toString(),
+                taxableAmount: taxableAmount.toString(),
+                gstRate: product.gstRate.toString(),
+                gstAmount: gstAmount.toString(),
+                totalAmount: totalAmount.toString(),
+            });
+            }
         }
-    }
 
         await this.clientDirectorySyncService.syncToClientDirectory([{
             name: body.contactPersonName,

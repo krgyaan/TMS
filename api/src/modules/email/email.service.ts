@@ -272,8 +272,8 @@ export class EmailService {
 
             return { success: true, emailLogId };
         } catch (error) {
-            this.logger.error('Email send failed:', error.message);
-            return { success: false, error: error.message };
+            this.logger.error('Email send failed:', error);
+            return { success: false, error: error instanceof Error ? error.message : String(error) };
         }
     }
 
@@ -513,7 +513,7 @@ export class EmailService {
                 retried++;
             } catch (error) {
                 failed++;
-                this.logger.error(`Retry failed for email ${log.id}:`, error.message);
+                this.logger.error(`Retry failed for email ${log.id}:`, error);
             }
         }
 
