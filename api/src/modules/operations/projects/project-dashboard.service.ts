@@ -636,6 +636,13 @@ export class ProjectDashboardService {
             throw new NotFoundException("Purchase Order not found");
         }
 
+        const [woBasic] = await this.db
+            .select({ team: woBasicDetails.team })
+            .from(woBasicDetails)
+            .where(eq(woBasicDetails.tenderId, existingPO.tenderId))
+            .limit(1);
+        this.logger.info(`Updating Purchase Order: ${body.poNumber} for project: ${body.projectName}, tenderId: ${body.tenderId}, team: ${woBasic?.team}`);
+
         const updatedPO = (
             await this.db
                 .update(purchaseOrders)
@@ -669,6 +676,8 @@ export class ProjectDashboardService {
                     certRecipients: body.certRecipients ?? [],
                     poRaisedBy: userId ?? body.poRaisedBy,
                     
+                    team: woBasic?.team ?? existingPO.team,
+
                     updatedAt: new Date(),
                 })
                 .where(eq(purchaseOrders.id, id))
